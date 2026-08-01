@@ -11,7 +11,7 @@ through the pipeline: spec written → compiled → implemented → verified.
 | account-settings | amended 2026-08-01 | | | |
 | manage-accounts | amended 2026-08-01 | | | |
 | record-snapshot | amended 2026-08-01 | | | |
-| rate-lookup | written 2026-08-01 (provider open) | | | |
+| rate-lookup | amended 2026-08-01 (FX resolved; metals/equities open) | | | |
 | net-worth-view | amended 2026-08-01 | | | |
 | export-import | written 2026-08-01 | | | |
 | admin-invites | written 2026-08-01 | | | |
@@ -33,12 +33,14 @@ compiled and built first.
 
 ## Gate before compiling
 
-Per owner's call on 2026-08-01, **both open questions in
-`spec/questions.md` are resolved before any code is written** — the
-conversion-rate provider and the charting library. Do not run the
-product-owner agent until they are closed; compiling now would produce
-contracts with `openQuestions` on two features and require a second
-pass.
+Per owner's call on 2026-08-01, **the open questions in
+`spec/questions.md` are resolved before any code is written.** Do not
+run the product-owner agent until they are closed; compiling now would
+produce contracts with `openQuestions` on two features and require a
+second pass.
+
+Remaining: a metals source, an equities source, and the charting
+library. The FX provider is closed (Frankfurter, 2026-08-01).
 
 | Screen | Spec |
 |---|---|

@@ -5,24 +5,34 @@ from the spec alone, it logs a question here instead of guessing.
 Answer by editing the relevant spec file, then remove the question and
 recompile.
 
-## Conversion-rate provider(s) (spec/architecture.md, Data model)
+## Conversion-rate provider: metals and equities (spec/features/rate-lookup.md)
 
-Need a provider (or providers) covering FX rates, gold/metals, and stock
-prices for the entry-date rate "proposal." Owner has flagged this needs
-hands-on testing/evaluation before deciding — not resolvable from the
-spec alone. Once chosen, update the "Conversion-rate lookup" note in
-Data model, and the symbol-table format in
-`spec/features/rate-lookup.md`.
+**FX is resolved** — Frankfurter's public instance, decided 2026-08-01;
+see `rate-lookup.md`, Providers, and `architecture.md`, Data model.
+
+Still needed: a source for **gold/metals** and for **listed equities**.
+Two criteria matter more than price, because volume here is trivial:
+
+1. **Historical lookup by date.** Snapshots are routinely backfilled and
+   the weekend/holiday path needs dated queries. Current-rate-only
+   endpoints are common on free tiers and useless here.
+2. **Permission to cache indefinitely.** `rate-lookup.md` caches past
+   rates forever. Several commercial APIs forbid storing or
+   redistributing their data, which would put that cache in breach.
+   Check the terms for storage, not just for request volume.
+
+Candidates worth hands-on evaluation: LBMA fixings or Nasdaq Data Link
+for gold; Tiingo or Alpha Vantage for equities; Twelve Data if one
+provider covering both is worth more than best-in-class per class.
+
+Each provider chosen adds one server-side host constant, one adapter,
+and its entries in the symbol table served by `GET /api/rates/symbols`.
 
 Blocks: `rate-lookup` acceptance criteria are provider-independent and
-can be implemented against a stubbed provider, so this does not block
-starting the feature — only shipping it. **Owner's call (2026-08-01):
-resolve this before any code is written anyway**, so the pipeline
-compiles once against a complete spec rather than twice.
-
-Once chosen, the provider also determines the initial contents and
-`kind` vocabulary of the symbol table now served by
-`GET /api/rates/symbols`.
+can be implemented against a stub, so this does not block starting the
+feature — only shipping it. **Owner's call (2026-08-01): resolve before
+any code is written anyway**, so the pipeline compiles once against a
+complete spec rather than twice.
 
 ## Charting library (spec/features/net-worth-view.md)
 

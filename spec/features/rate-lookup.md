@@ -1,7 +1,9 @@
 # Rate lookup
 
-<!-- Provider choice remains open — see spec/questions.md. Everything
-below is provider-independent and holds whichever is chosen. -->
+<!-- FX is resolved (Frankfurter, see Providers below). Metals and listed
+equities remain open — see spec/questions.md. Everything outside the
+Providers section is provider-independent and holds whichever is
+chosen. -->
 
 ## What it does
 
@@ -42,6 +44,41 @@ unit (1 troy oz, 1 share, one unit of the base currency), so there is no
 field an amount could travel in even by mistake (architecture.md,
 Base-amount rule). Any request carrying an unrecognised query parameter
 is rejected with 400 rather than ignored.
+
+## Providers
+
+The proxy routes a request to a provider by the symbol's asset class.
+Each provider is a server-side constant — host, URL template, and any
+key — and never influenced by client input (see SSRF hardening below).
+
+### FX — resolved
+
+**Frankfurter's public instance, `api.frankfurter.dev`.** HTTPS, no API
+key, no daily or monthly quota; requests are rate-limited only against
+abuse, and the operators ask heavy users to cache, which this design
+already does (see Caching). 201 currencies from 84 central banks, with
+history back to 1948, so an FX symbol is simply an ISO 4217 code.
+
+- An FX `rateSymbol` is the **base currency code** (`USD`, `EUR`), and
+  `quote` is the user's main currency — consistent with `rateSymbol`
+  naming the base asset only (`manage-accounts.md`).
+- The currency half of the operator's symbol table can be seeded
+  directly from the provider's own currency list rather than typed by
+  hand.
+- Rates are **not published for every calendar date**. A weekend,
+  holiday, or pre-publication date resolves through the existing
+  prior-close rule below, with `asOf` carrying the earlier date so the
+  user sees the lag. This is the normal path, not an error.
+- Because there is no API key, the key-redaction rule below has no FX
+  component. It still binds for any metals or equities provider.
+- Self-hosting Frankfurter is the same open-source service, so moving to
+  a private instance later changes one host constant and nothing else.
+
+### Metals and listed equities — open
+
+Unresolved; see `spec/questions.md`. Both must be checked for whether
+their terms permit **caching past rates indefinitely**, which this
+design does and several commercial providers forbid.
 
 ## The symbol table
 

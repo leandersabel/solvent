@@ -126,8 +126,23 @@ timing to a third party.
   before use, redirects are disabled, and egress has a timeout. This
   matters because the proxy runs in an environment with reachable
   internal NAS services.
-- Provider(s) still to be chosen — needs hands-on evaluation, tracked in
-  `spec/questions.md`.
+- **FX provider (resolved 2026-08-01): Frankfurter's public instance at
+  `api.frankfurter.dev`.** Free, no API key, no daily or monthly quota,
+  aggregating 84 central banks across 201 currencies with history back
+  to 1948. Chosen over self-hosting the same open-source service on the
+  NAS because it adds no container, no writable volume, no `FROM` digest
+  for Dependabot to track, and nothing extra to pull by hand on a
+  platform with no auto-pull — while landing exactly on the privacy line
+  already drawn above: it observes which currencies are queried, never
+  an amount, because the base-amount rule leaves no parameter an amount
+  could travel in. The decision is deliberately cheap to unwind — self
+  hosting runs the same software, so switching is one host constant in
+  the server-side whitelist.
+- **Metals and listed equities are still unresolved** — tracked in
+  `spec/questions.md`. Those are also where data licensing needs
+  checking: this design caches past rates indefinitely, which several
+  commercial providers forbid. Frankfurter carries no such restriction
+  and asks only that heavy users cache, which this design already does.
 
 ## Tech stack
 
