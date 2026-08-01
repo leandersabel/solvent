@@ -47,11 +47,11 @@ bands mirror down, the net-worth line runs over the top.
   in the profile's configured order (`account-settings.md`), archived
   ones excluded. Default "Total" — one band, no stacking — until the
   user configures a dimension. It also drives the breakdown section
-  below. Beside it, the dimension's
-  **coverage**: "7 of 10 accounts assigned", clickable to filter the
-  table to the unassigned ones. A dimension covering a third of the
-  accounts draws a chart that is correct and misleading, and this line
-  is what prevents that being read as a bug.
+  below. Beside it, the dimension's **coverage**: "7 of 10 accounts
+  assigned", clickable to filter the table to the unassigned ones. A
+  dimension covering a third of the accounts draws a chart that is
+  correct and misleading, and this line is what prevents that being read
+  as a bug.
 - **Absolute / percentage** toggle. Percentage normalizes each side
   against itself; the caption says so, because a reader will otherwise
   assume the shares are of the net figure.
@@ -98,7 +98,6 @@ currency · As of · (row action).
   (`Liquidity: Cash`), omitting dimensions the account has no value for
   rather than printing "Unassigned" on every row. With no dimensions
   configured, the column is absent entirely.
-
 - Money columns right-aligned, `tabular-nums`.
 - "As of" shows the snapshot date, plainly, at any age. The column is
   sortable, which is what makes it answer "what have I not touched in a
@@ -114,8 +113,8 @@ currency · As of · (row action).
 ### 4. Breakdown by dimension
 
 Where the chart above shows how composition **moved**, this shows what
-it is made of **right now** — a different question, and the reason the
-section survives at all.
+it is made of **right now** — a different question, which is why the
+section exists.
 
 - Horizontal bars, one per band of the dimension selected in "Group by",
   **in the dimension's configured value order** — not sorted by value.
@@ -125,13 +124,10 @@ section survives at all.
 - Direct label on each bar: value label and amount.
 - "Unassigned" is a bar like any other, and "Other" folds the fifth and
   beyond, matching the chart.
-- **The bars sum to exactly the net-worth total**, and so the section
-  needs no caveat. Its predecessor was a breakdown by overlapping tags
-  that shipped with a standing disclaimer that the parts could exceed
-  the whole; a section that has to apologize for its own arithmetic was
-  the wrong section. Dimensions partition, so the arithmetic is honest
-  and a pie chart would now be defensible — bars are kept anyway,
-  because they compare lengths better and label directly.
+- **The bars sum to exactly the net-worth total**, so the section needs
+  no caveat. Dimensions partition, which would make a pie chart
+  defensible here too; bars are used anyway, because they compare
+  lengths better and label directly.
 - With "Group by" on "Total", this section is absent — a single bar
   equal to the hero figure says nothing.
 

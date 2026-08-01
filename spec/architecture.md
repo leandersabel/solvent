@@ -9,10 +9,10 @@ spec/ui/*.md to compile implementation contracts. -->
 
 A net worth tracker, self-hosted on the owner's own NAS.
 
-- **Users**: not single-user — a small number of accounts (e.g. household
-  members), not open to the public. Each user has a fully separate,
-  privately encrypted vault: own password → own encryption key, no data
-  shared or visible between users. No shared/household view.
+- **Users**: a small number of accounts (e.g. household members), not open
+  to the public. Each user has a separate vault: own password → own
+  encryption key, nothing shared or visible between users. No
+  shared/household view.
 
 ## Components
 
@@ -114,17 +114,16 @@ cannot read any type. A record row is:
 | `updated_at` | plaintext | server clock, for sync and debugging |
 
 Five of these columns — `record_id`, `record_type`, `account_id`,
-`schema_version`, `version` — are exactly the AAD (see Key management),
-so the server cannot move a blob to a different slot within a vault
-without breaking decryption. `user_id` is a column but **not** part of
-the AAD; cross-vault relocation is already impossible under the DEK
-boundary, and the reasoning is recorded under Key management.
+`schema_version`, `version` — are exactly the AAD, so the server cannot
+move a blob to a different slot within a vault without breaking
+decryption. `user_id` is **not** part of the AAD: cross-vault relocation
+is already impossible under the DEK boundary. See Key management for
+both.
 
-The plaintext columns are also, by construction, **metadata the server
-can see**: record counts, which snapshots belong to which account, and
-write timestamps. That is within the accepted metadata leak in the
-threat model — the plaintext shape deliberately carries no name, value,
-date, or unit.
+The plaintext columns are **metadata the server can see**: record
+counts, which snapshots belong to which account, and write timestamps.
+That is within the accepted metadata leak in the threat model — the
+plaintext shape deliberately carries no name, value, date, or unit.
 
 Endpoints (all session-authenticated, all CSRF-protected on writes):
 
@@ -137,50 +136,48 @@ Endpoints (all session-authenticated, all CSRF-protected on writes):
 The server never accepts a `user_id` from the client; it is always taken
 from the session.
 
-**Conversion-rate lookup**: a small server-side proxy/cache endpoint
-fetches rates (FX, gold) from a public API and serves the
-entry-date "proposal" to the client. Chosen over a direct client-side
-fetch: requests get cached, and no browser individually leaks update
-timing to a third party.
-- **Privacy scope (resolved)**: the proxy does observe which asset
-  types/currencies an authenticated user queries (gold, USD, CHF) — but
-  never the amount held. Per owner's call, asset *type* is not
-  confidential (knowing someone holds gold or dollars reveals nothing
-  sensitive); the *amount* is what the zero-knowledge model protects, and
-  that never reaches the proxy or server in any form.
+**Conversion-rate lookup**: a server-side proxy/cache endpoint fetches
+rates (FX, gold) from a public API and serves the entry-date "proposal"
+to the client. Chosen over a direct client-side fetch: requests get
+cached, and no browser individually leaks update timing to a third
+party.
+- **Privacy scope**: the proxy observes which asset types/currencies an
+  authenticated user queries (gold, USD, CHF), never the amount held.
+  Asset *type* is not confidential (knowing someone holds gold or
+  dollars reveals nothing sensitive); the *amount* is what the
+  zero-knowledge model protects, and that never reaches the proxy or
+  server in any form.
   - This includes the user's **main currency**, which travels as the
     `quote` parameter on every lookup. It is stored only inside the
     encrypted profile record, never as a plaintext column — but the
-    server does learn it in the ordinary course of serving proposals.
-    Named here so it is covered by the same accepted-leak decision as
-    asset type, rather than looking like an oversight against
-    register.md's storage rule.
+    server learns it in the ordinary course of serving proposals. That
+    falls under the same accepted-leak decision as asset type; it is not
+    an oversight against register.md's storage rule.
 - **Base-amount rule (hard requirement)**: every rate request queries the
   rate for a fixed, reasonable base unit (e.g. "price of 1 troy oz", a
-  unit currency pair) — never the account's actual snapshot
-  value. This is what keeps amounts out of the request entirely; enforce
-  it client-side as a requirement, not an incidental property of the API
-  shape.
+  unit currency pair) — never the account's actual snapshot value. This
+  keeps amounts out of the request entirely; enforce it client-side as a
+  requirement, not an incidental property of the API shape.
 - **SSRF hardening**: the outbound request's host/provider is never
   client-influenced — providers and endpoints are server-side
   whitelisted, symbols are validated against a strict allowlist/regex
   before use, redirects are disabled, and egress has a timeout. This
   matters because the proxy runs in an environment with reachable
   internal NAS services.
-- **FX provider (resolved 2026-08-01): Frankfurter's public instance at
+- **FX provider: Frankfurter's public instance at
   `api.frankfurter.dev`.** Free, no API key, no daily or monthly quota,
   aggregating 84 central banks across 201 currencies with history back
   to 1948. Chosen over self-hosting the same open-source service on the
   NAS because it adds no container, no writable volume, no `FROM` digest
   for Dependabot to track, and nothing extra to pull by hand on a
-  platform with no auto-pull — while landing exactly on the privacy line
-  already drawn above: it observes which currencies are queried, never
-  an amount, because the base-amount rule leaves no parameter an amount
-  could travel in. The decision is deliberately cheap to unwind — self
-  hosting runs the same software, so switching is one host constant in
-  the server-side whitelist.
-- **Gold provider (resolved 2026-08-01): Narodowy Bank Polski's public
-  API at `api.nbp.pl`.** Same shape and same rationale as the FX choice
+  platform with no auto-pull — while landing on the privacy line already
+  drawn above: it observes which currencies are queried, never an
+  amount, because the base-amount rule leaves no parameter an amount
+  could travel in. Cheap to unwind — self-hosting runs the same
+  software, so switching is one host constant in the server-side
+  whitelist.
+- **Gold provider: Narodowy Bank Polski's public API at
+  `api.nbp.pl`.** Same shape and same rationale as the FX choice
   — a central bank, no API key, no quota, no vendor account, one host
   constant to unwind — with dated history from 2013 and no restriction
   on storing what it publishes. Three trade-offs were accepted
@@ -200,19 +197,16 @@ timing to a third party.
   records as an account's unit: letting users invent one would make
   adding a provider later a migration over ciphertext the server cannot
   read.
-- **Listed securities are not priced by lookup at all (resolved
-  2026-08-01)** — brokerage holdings are depot-level accounts (see
-  Account above), so there is no equity rate to fetch. The provider
-  search was run first and found the licensing largely closed; the
-  candidates and the reason they fail are recorded in `rate-lookup.md`
-  so the question is not reopened on a vendor's marketing page. One
-  finding generalizes and is worth stating here, because it constrains
+- **Listed securities are not priced by lookup at all** — brokerage
+  holdings are depot-level accounts (see Account above), so there is no
+  equity rate to fetch. `rate-lookup.md` records the candidates and why
+  each fails, the licensing being largely closed. One constraint binds
   every future provider: **a snapshot stores its rate permanently,
   inside user ciphertext the server cannot read, enumerate, or delete.**
   Terms requiring deletion of all data on termination are therefore
   unsatisfiable by construction — not a cache-policy problem a shorter
   TTL could fix. Neither Frankfurter nor NBP carries such a restriction,
-  which is now a hard criterion rather than a happy accident.
+  which is a hard criterion rather than a happy accident.
 
 ## Tech stack
 
@@ -265,9 +259,8 @@ timing to a third party.
   encryption. The disk file still deserves protection as defense in
   depth, but the security guarantee doesn't depend on it.
 - **Charting**: none. The trend chart is drawn directly in SVG
-  (net-worth-view.md, Rules) — benchmarked against the alternatives on
-  2026-08-01, see spec/questions.md. This keeps the strict CSP intact
-  with one less pinned bundle to audit.
+  (net-worth-view.md, Rules), which keeps the strict CSP intact with one
+  less pinned bundle to audit.
 - **Frontend**: hybrid. Flask + Jinja2 + htmx server-renders the app shell
   (navigation, login/registration, layout) — nothing sensitive passes
   through it. Data screens (balances, net worth charts) render
@@ -283,8 +276,7 @@ in spec/questions.md rather than choosing for you. -->
 
 ### Threat model
 
-Actors this design defends against vs. accepts, named explicitly so
-nothing gets resolved by inference downstream:
+Actors this design defends against vs. accepts:
 
 - **Network attacker** (on-path or off-path, passive or active): defended
   — TLS everywhere plus HSTS (see Network & transport) prevents both
@@ -299,7 +291,7 @@ nothing gets resolved by inference downstream:
   controls that; closing it fully needs independent code
   signing/verification, out of scope here.
 - **Malicious or compromised server process**: same boundary as the
-  admin — can't decrypt anything, and can no longer silently rearrange
+  admin — can't decrypt anything, and cannot silently rearrange
   ciphertext without detection.
 - **Another user of the same instance**: defended — per-user salts and
   keys throughout; no vault is decryptable with another user's password,
@@ -370,9 +362,9 @@ nothing gets resolved by inference downstream:
     re-binds (export-import.md): the imported vault is re-encrypted
     under a freshly generated DEK, so the two vaults share no key
     material afterwards and cross-injection is impossible rather than
-    merely detected. A consequence worth stating outright, because it
-    removes a whole class of ordering problem: **the client never needs
-    to know its own `user_id`, and no endpoint returns one.**
+    merely detected. This removes a whole class of ordering problem:
+    **the client never needs to know its own `user_id`, and no endpoint
+    returns one.**
   - A client-maintained, DEK-authenticated manifest (expected record
     IDs + versions) would additionally catch wholesale deletion of the
     set — worth revisiting post-v1, not required to ship.

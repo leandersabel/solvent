@@ -9,11 +9,6 @@ reordered, archived, and restored.
 
 Exercises: `spec/features/account-settings.md` (Dimensions).
 
-<!-- Added because account-settings.md specified the whole feature —
-ordered values, labels, archiving, the >4 fold — and no screen built it.
-Since dimensions replaced freeform tags entirely, this is now the only
-way a user organizes their accounts at all. -->
-
 ## Layout
 
 Standard app shell, content max-width 720px. Reached from Settings,
@@ -114,12 +109,11 @@ rendering constraint from the validated chart palette
 
 - Every operation on this screen writes **at most one record** — the
   profile. Creating, renaming, reordering, archiving, and restoring all
-  touch no account record. This is the property that opaque ids buy
-  (`account-settings.md`), and it is worth asserting in tests rather
-  than assuming.
+  touch no account record. This is the property opaque ids buy
+  (`account-settings.md`); assert it in tests rather than assuming it.
 - Labels are free text in any script and render with `x-text`
   everywhere, including in the chart legend and every tooltip.
 - Reordering is keyboard-operable, not drag-only: each handle exposes
   move-up and move-down, since band order is load-bearing and a
-  drag-only control would make it unreachable
-  (`design-system.md`, Accessibility).
+  drag-only control would make it unreachable (`design-system.md`,
+  Accessibility).

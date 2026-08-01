@@ -18,8 +18,8 @@ product, the screen states it outright in a tinted callout at the top:
 > a password, or recover a vault — not even your own users'. Solvent has
 > no key that can.
 
-This is not decoration. It sets the correct expectation before an admin
-tries to help someone who has locked themselves out.
+It sets the expectation before an admin tries to help someone who has
+locked themselves out.
 
 ## Layout
 
@@ -27,16 +27,46 @@ Standard shell, content max-width 900px.
 
 ### Create invite
 
-- A single primary button, "Create invite link", plus an optional
-  expiry select (default from the feature spec).
-- On creation, the token is shown **once**, in a copyable field, with:
-  "Copy this now — it is not stored and cannot be shown again."
-  The token is stored hashed at rest, so this is literally true.
+Primary button "Create invite link", with three controls above it:
+
+- **Label** — optional free text, "Sarah's laptop". One line beneath:
+  "Only you see this, and it is stored unencrypted — keep it to a
+  nickname." This is the one user-typed string in the product the server
+  stores in plaintext (`admin-invites.md`), and the form says so at the
+  point of entry rather than leaving an admin to assume otherwise.
+- **Expires** — select, 1–30 days, default 7.
+- **Make this an administrator invite** — a checkbox, unchecked, never
+  remembered between invites. The consequence is stated at the point of
+  choice, not discovered afterwards:
+
+  > Whoever uses this link becomes an administrator: they can invite and
+  > remove users. They still cannot read anyone's data — no one can.
+
+  This checkbox is the only way an admin is made after the bootstrap
+  CLI, because there is no promote or demote (`admin-invites.md`). That
+  is why it is a visible control on the main path and not a hidden flag:
+  the alternative is an operator reaching for shell access to do
+  something the product supports.
+
+  It mints a new account that is born an admin. It cannot reach an
+  existing user, and checking it changes no one's role.
+
+On creation, the token is shown **once**, in a copyable field, with:
+"Copy this now — it is not stored and cannot be shown again." The token
+is stored hashed at rest, so this is literally true. For an admin invite
+the confirmation names it: "This is an administrator invite."
 
 ### Invites table
 
-Columns: Created · Expires · Status · (action).
+Columns: Label · Created · Expires · Status · (action).
 
+- The label, or ink-muted "—" when unset.
+- An admin invite carries an **Admin** chip beside its label — the
+  standard chip, identified by its text rather than a new color
+  (`design-system.md`, Accessibility). An unused admin invite is the
+  most powerful token outstanding on the instance and must be visible at
+  a glance, not inferable only from who eventually appears in the users
+  table.
 - Status chips: **Unused** (petrol), **Used** (ink-muted, with the
   resulting username and the date), **Expired** (ink-muted),
   **Revoked** (ink-muted).
@@ -45,8 +75,12 @@ Columns: Created · Expires · Status · (action).
 
 ### Users table
 
-Columns: Username · Created · Role · (action).
+Columns: Username · Created · Role · Records · Last active · (action).
 
+- **Records** and **Last active** come from `GET /api/admin/users`
+  (`admin-invites.md`) and are the only two facts an admin learns about
+  a vault — the record count the server can already see, and a login
+  timestamp. They are what an admin checks before deleting someone.
 - Removing a user deletes their row, every record, and every session.
   Requires typing the username. The dialog states that the vault is
   gone and unrecoverable — an admin cannot export it first, because an
@@ -76,3 +110,6 @@ Columns: Username · Created · Role · (action).
 - Invite tokens are ≥128-bit, single-use, time-limited, stored hashed,
   and invalidated on first use (`architecture.md`, Storage & data
   handling).
+- No control on this screen changes an existing user's role. `isAdmin`
+  is sent only on invite creation; the Role column stays display-only
+  (`admin-invites.md`).

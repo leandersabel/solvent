@@ -26,10 +26,11 @@ using SQLite", "zero-knowledge encryption") into complete, unambiguous
 spec prose: concrete parameters (not "Argon2id" but "Argon2id, ≥256 MiB,
 ≥3 iterations"), explicit trust boundaries, and a named threat model
 (which actors are defended against, which are accepted). Edit
-`spec/architecture.md` directly. If a decision needs the owner's
-judgment (provider choice, risk tolerance, cost/ops tradeoff), don't
-guess — log it to `spec/questions.md` instead, same discipline as
-product-owner.
+`spec/architecture.md` directly, following `CLAUDE.md`, Writing the
+spec: state the target design, never what it replaced. If a decision
+needs the owner's judgment (provider choice, risk tolerance, cost/ops
+tradeoff), don't guess — log it to `spec/questions.md` instead, same
+discipline as product-owner.
 
 **2. Security design review** — audit the current spec (and, once code
 exists, the implementation) against a threat model naming concrete

@@ -58,10 +58,6 @@ destroyed.
 
 Records are decrypted and re-encrypted client-side under a **freshly
 generated DEK** rather than restored verbatim under the file's key.
-Since `user_id` is not in the AAD (architecture.md, Key management), a
-verbatim restore would in fact decrypt fine — so this step is not, as
-an earlier draft had it, forced by AAD rebinding. It is here for a
-better reason.
 
 A vault transfer leaves two accounts holding the same DEK: the exporter
 keeps their vault and keeps writing to it, and the importer now holds a
@@ -102,12 +98,12 @@ names the change when the file's main currency differs from the current
 one, because arriving at a vault denominated in another currency without
 being told is a bad surprise even when it is correct.
 
-Consequences worth stating outright: the user's **password does not
-change** across an import, but their **DEK does** — and it is a key that
-has never existed anywhere before, not the file's. Salt, KDF envelope,
-and Auth Key are untouched. The exported file keeps opening with
-`DEK_file` and its own password; re-keying the live vault does not
-reach backwards into files already written.
+Consequences: the user's **password does not change** across an import,
+but their **DEK does** — and it is a key that has never existed anywhere
+before, not the file's. Salt, KDF envelope, and Auth Key are untouched.
+The exported file keeps opening with `DEK_file` and its own password;
+re-keying the live vault does not reach backwards into files already
+written.
 
 ## Rules
 
@@ -139,10 +135,8 @@ reach backwards into files already written.
 - **Malformed JSON, wrong `format`, or unknown `formatVersion`
   (newer)** → reject with a clear message. A newer file in an older app
   is not something to guess at.
-- **There is no `formatVersion` below 1.** The file shape changed during
-  spec review — `userId` was removed — but nothing had shipped, so
-  version 1 *is* the post-review shape. Do not write a migration for a
-  format that never existed outside a draft.
+- **There is no `formatVersion` below 1.** Version 1 is the current
+  shape; there is no older format to migrate from.
 - **Older `formatVersion`** → migrate the plaintext shape client-side
   after decryption, before re-encrypting, reusing the same per-type
   migration chain the client already applies lazily on read

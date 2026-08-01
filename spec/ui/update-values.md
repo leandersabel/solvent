@@ -3,27 +3,20 @@
 ## Purpose
 
 The sweep: every account you could update, on one screen, for one date.
-This is how a user actually sits down and does their monthly or
-quarterly update, and it is the highest-value screen in the product
-after the dashboard.
+This is how a user sits down and does their monthly or quarterly update
+— the highest-value screen in the product after the dashboard.
 
 Exercises: `spec/features/record-snapshot.md`, and the proposal half of
 `spec/features/rate-lookup.md`.
 
-<!-- Replaces the staleness warning, which was a dashboard chip with a
-configurable threshold. Owner's call 2026-08-01: a per-account "last
-updated about a year ago" shown at the moment you can act on it is more
-useful than a global threshold that flags slow-moving assets forever
-until the user learns to ignore it. -->
+## No threshold, no warning
 
-## Why this exists instead of a staleness warning
-
-A single threshold cannot be right for a product built on sparse,
-uneven updates. A current account moves monthly, gold yearly, unlisted
-property every few years. At any fixed number the slow assets are
-permanently flagged, and a warning that is always on for the same three
-rows is one the user stops reading — at which point it fails for the
-account that genuinely went quiet.
+A single threshold cannot be right for a product built on sparse, uneven
+updates. A current account moves monthly, gold yearly, unlisted property
+every few years. At any fixed number the slow assets are permanently
+flagged, and a warning that is always on for the same three rows is one
+the user stops reading — at which point it fails for the account that
+genuinely went quiet.
 
 So there is **no threshold, no chip, and no warning color**. Each row
 here states its own age in plain language, next to the control that
@@ -138,8 +131,8 @@ ordinary snapshot; the sweep is a different way to reach the same write.
 - `value` and `rate` are decimal strings end to end; no float touches
   them.
 - No value is sent anywhere before it is encrypted, and no value appears
-  in any rate request in any field or encoding
-  (`architecture.md`, Base-amount rule).
+  in any rate request in any field or encoding (`architecture.md`,
+  Base-amount rule).
 - Recorded and carried-forward figures are distinguished by **marker and
   wording, not color alone** (`design-system.md`, Accessibility).
 - The date is a calendar date — no time, no timezone.

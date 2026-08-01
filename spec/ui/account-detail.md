@@ -10,11 +10,6 @@ from after the moment it was entered.
 Exercises: `spec/features/record-snapshot.md` (the editing and deleting
 half), `spec/features/manage-accounts.md` (archive lifecycle).
 
-<!-- Added because record-snapshot.md specifies editing and deleting a
-past snapshot, and rateSource exists so "a user can audit which figures
-were guessed" — none of which had a screen. The upsert prompt let a user
-overwrite a date they already remembered; nothing let them look. -->
-
 ## Layout
 
 Standard app shell, content max-width 900px. Reached by clicking an

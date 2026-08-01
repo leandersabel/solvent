@@ -33,15 +33,14 @@ snapshot.rate)`
   account last valued in March uses March's rate. This is deliberate and
   must be surfaced: show each account's "as of" date wherever its figure
   appears.
-- **There is no staleness threshold and no stale-account warning.** An
-  earlier draft flagged any account not valued within a configurable
-  number of days. It was removed because no single number fits a product
-  built on uneven cadence — a current account moves monthly, unlisted
-  property every few years — so the slow accounts sit permanently
-  flagged until the warning is ignored, and then it fails for the
-  account that genuinely went quiet. The age of each figure is instead
-  stated in plain language on `ui/update-values.md`, next to the control
-  that acts on it.
+- **There is no staleness threshold and no stale-account warning.** No
+  single number fits a product built on uneven cadence — a current
+  account moves monthly, unlisted property every few years — so any
+  threshold leaves the slow accounts permanently flagged until the user
+  learns to ignore it, at which point it fails for the account that
+  genuinely went quiet. The age of each figure is stated in plain
+  language on `ui/update-values.md`, next to the control that acts on
+  it.
 - **Archived accounts are excluded from the current total** — an
   archived account is a closed position. They remain in history up to
   their `archivedAt` date (see Trend chart).
@@ -76,13 +75,10 @@ rest.
   "Show what's estimated" toggle marks it, and tick marks under the
   x-axis show where real snapshots exist. Default off.
 
-Interpolation replaced carry-forward steps by owner's call on
-2026-08-01, reversing the earlier decision. The reason is recorded in
-`questions.md` so it is not re-litigated by inference: this chart exists
-to show **trends**, not transactions. Real transfers are instant and
-sharp-edged, but a decade of sparse snapshots drawn as steps is a field
-of cliffs that reads worse than a curve. The literal version stays one
-click away rather than being the default.
+The chart exists to show **trends**, not transactions. Real transfers
+are instant and sharp-edged, but a decade of sparse snapshots drawn as
+steps is a field of cliffs that reads worse than a curve. The literal
+version stays one click away rather than being the default.
 
 ### Grouping by dimension
 
@@ -160,18 +156,34 @@ an otherwise smooth chart is indistinguishable from a bad snapshot.
   label — is rendered with `x-text` / `textContent`. Never `x-html`,
   never a chart library that takes an HTML string for labels or tooltips
   (architecture.md, Application hardening).
-- **The chart is drawn directly in SVG with no charting library**
-  (owner's call, 2026-08-01 — see `questions.md`). The candidates were
-  benchmarked rather than picked from memory; what a library would have
-  supplied is a fraction of what this chart needs, and the parts it does
-  not supply — the partition rule, per-account interpolation, provenance
-  tracking, per-band selection deltas — are the bulk of the work.
-  - Any library added later inherits the unchanged constraints:
-    self-hosted with SRI, CSP-safe with no `eval` or `new Function`, no
-    CDN (architecture.md, Supply chain), and text-only labels and
-    tooltips.
+- **The chart is drawn directly in SVG with no charting library.** What a
+  library supplies here is scales, tick math, and path building. What
+  this chart needs — the partition rule, per-account interpolation,
+  provenance tracking, per-band selection deltas, asset/liability
+  mirroring — is domain logic written either way. The full interactive
+  chart prototypes at ~200 lines of dependency-free JS; a production
+  version with real tick generation, decimal arithmetic, a keyboard path
+  and a table fallback is estimated at 350–450.
   - SVG, not canvas: the direct labels, `tabular-nums` figures, and the
     accessible fallback below all need real DOM.
+  - Any library added later inherits the constraints: self-hosted with
+    SRI, CSP-safe with no `eval` or `new Function`, no CDN
+    (architecture.md, Supply chain), and text-only labels and tooltips.
+    Measured against the shipped bundles:
+
+    | Library | gz | `eval` / `new Function` | `innerHTML` |
+    |---|---|---|---|
+    | Chart.js 4.5.1 | 69 KB | 0 | 0 |
+    | uPlot 1.6.32 | 21 KB | 0 | 0 |
+    | ECharts 6.1.0 | 360 KB | 1 | 15 |
+    | ApexCharts 6.6.1 | 226 KB | 0 | 37 |
+    | frappe-charts 1.6.2 | 17 KB | 0 | 17 |
+    | chartist 1.5.0 | 11 KB | 0 | 1 |
+
+    ECharts, ApexCharts, and frappe-charts fail structurally: their label
+    and tooltip paths end in `innerHTML`, and in an app where XSS means
+    Master Key capture that is not a configuration problem. Chart.js and
+    uPlot pass the CSP tests cleanly and are both MIT.
 - The chart is **keyboard reachable and has a data-table fallback**. A
   static `aria-label` on the SVG is not sufficient for the primary
   screen of the app.
@@ -239,8 +251,7 @@ an otherwise smooth chart is indistinguishable from a bad snapshot.
 - A negative-balance account reduces the net figure and appears under
   liabilities.
 - The breakdown by dimension sums to exactly the net-worth total, with
-  no disclaimer needed — the property the old overlapping tag breakdown
-  could not have.
+  no disclaimer needed.
 - With one record deliberately corrupted, the view renders the rest and
   warns that 1 record could not be decrypted.
 - No network request is made when switching chart range, dimension,

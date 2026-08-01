@@ -1,10 +1,5 @@
 # Record API
 
-<!-- Added because architecture.md (Record storage API) defines the
-endpoint every other feature reads and writes through, without any
-feature file owning its implementation. Without this, nine contracts
-assume an API no contract builds. -->
-
 ## What it does
 
 One generic, type-agnostic store for every encrypted record a user
@@ -70,11 +65,10 @@ into.
 ## Schema migration
 
 `schema_version` is bumped when a record type's **plaintext** shape
-changes. **There is no version below 1**: the account shape changed
-during spec review — `tags` became a `dims` map, `rateSymbol` folded
-into `unit`, a `note` appeared — but nothing had shipped, so version 1
-is the post-review shape and no migration chain reaches back past it. The server cannot migrate anything — it cannot read the
-payload — so migration is entirely client-side and **lazy**:
+changes. **Version 1 is the current shape and there is nothing below
+it**, so no migration chain reaches back past it. The server cannot
+migrate anything — it cannot read the payload — so migration is entirely
+client-side and **lazy**:
 
 1. On read, the client decrypts a record and, if its `schema_version` is
    below the client's current version for that type, runs it through an
@@ -84,8 +78,8 @@ payload — so migration is entirely client-side and **lazy**:
    which bumps `version` and `schema_version` together like any other
    write.
 
-Consequences that make this the right shape, and that must not be
-"fixed" later by a well-meaning bulk rewrite:
+Consequences of that shape — not defects for a later bulk rewrite to
+"fix":
 
 - **No migration event.** There is no moment where a vault is
   half-migrated, and no long-running rewrite that can fail partway.
@@ -204,9 +198,9 @@ specified and owned by `manage-accounts.md`, not here.
   including separators and the empty `account_id` — the regression test
   that keeps two implementations from drifting into an unreadable vault.
 - The AAD contains no user identifier in any form, asserted against the
-  fixture: a record encrypted by one user and inserted directly into
-  another user's rows fails to decrypt under that user's DEK, which is
-  the property `user_id` in the AAD would have been duplicating.
+  fixture. A record encrypted by one user and inserted directly into
+  another user's rows still fails to decrypt under that user's DEK —
+  the DEK boundary carries that property, not the AAD.
 - A `snapshot` `PUT` with an empty `accountId`, and an `account` `PUT`
   with one set, are both 400.
 - A ciphertext over the per-record cap, a vault over the record-count

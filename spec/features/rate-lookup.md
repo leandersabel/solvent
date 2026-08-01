@@ -1,17 +1,14 @@
 # Rate lookup
 
-<!-- All providers are resolved: FX (Frankfurter) and gold (NBP) are
-live, the other three metals are deferred with seeded symbols, and
-listed securities are out of scope entirely. See Providers below.
-Everything outside that section is provider-independent. -->
+<!-- Everything outside the Providers section is provider-independent. -->
 
 ## What it does
 
 A server-side proxy and cache that fetches conversion rates (FX, metals)
-from a whitelisted public provider and serves an
-entry-date rate **proposal** to the client. It exists so requests get
-cached and so no browser individually leaks its update timing to a third
-party (architecture.md, Data model).
+from a whitelisted public provider and serves an entry-date rate
+**proposal** to the client. It exists so requests get cached and so no
+browser individually leaks its update timing to a third party
+(architecture.md, Data model).
 
 The proposal is advice, never authority: the user can always override
 it, and the value that lands in the snapshot is whatever the user
@@ -52,7 +49,7 @@ The proxy routes a request to a provider by the symbol's asset class.
 Each provider is a server-side constant — host, URL template, and any
 key — and never influenced by client input (see SSRF hardening below).
 
-### FX — resolved
+### FX
 
 **Frankfurter's public instance, `api.frankfurter.dev`.** HTTPS, no API
 key, no daily or monthly quota; requests are rate-limited only against
@@ -77,7 +74,7 @@ history back to 1948, so an FX symbol is simply an ISO 4217 code.
 - Self-hosting Frankfurter is the same open-source service, so moving to
   a private instance later changes one host constant and nothing else.
 
-### Gold — resolved
+### Gold
 
 **Narodowy Bank Polski's public API, `api.nbp.pl`.** HTTPS (HTTP was
 retired 2025-08-01), no API key, no quota, no account. Publishes the
@@ -103,9 +100,9 @@ a vendor, nothing to sign up for, and one host constant to unwind.
   `XAU-ozt` multiplies by 31.1034768. Compose at full precision and
   round once, at the end.
 - **NBP's price trails the London fixing by one business day.** Verified
-  2026-08-01 against ten consecutive days: NBP's published price for
-  date D is the previous business day's LBMA AM fixing at NBP's USD rate
-  of that day, matching within 0.1%. So `asOf` will usually be one
+  against ten consecutive days: NBP's published price for date D is the
+  previous business day's LBMA AM fixing at NBP's USD rate of that day,
+  matching within 0.1%. So `asOf` will usually be one
   business day behind the snapshot date even midweek — not only across
   weekends. This is acceptable and deliberate: the proposal is advice,
   the user sees `asOf` and can override it with a better figure. Do not
@@ -113,16 +110,15 @@ a vendor, nothing to sign up for, and one host constant to unwind.
 - History begins 2013-01-02, which is the date floor for gold symbols.
 - No API key.
 
-Rejected, recorded so it is not re-litigated: **LBMA's own JSON feeds**
-(`prices.lbma.org.uk`) are keyless, CORS-open, and carry every metal
-back to 1968 in USD/GBP/EUR — a perfect technical fit that fails on
-licensing. IBA requires a licence "in order to obtain, use or
-redistribute real-time or historical benchmark data … including for
-pricing and valuation activities", which is precisely this use; the
-World Gold Council removed its historical LBMA series at IBA's request
-in March 2025. Public reachability is not permission. **Twelve Data**
-was rejected for forbidding caching beyond documented timeframes, which
-this design's indefinite cache would breach. **metals.dev** remains the
+Rejected: **LBMA's own JSON feeds** (`prices.lbma.org.uk`) are keyless,
+CORS-open, and carry every metal back to 1968 in USD/GBP/EUR — a perfect
+technical fit that fails on licensing. IBA requires a licence "in order
+to obtain, use or redistribute real-time or historical benchmark data …
+including for pricing and valuation activities", which is precisely this
+use; the World Gold Council removed its historical LBMA series at IBA's
+request in March 2025. Public reachability is not permission. **Twelve
+Data** forbids caching beyond documented timeframes, which this design's
+indefinite cache would breach. **metals.dev** remains the
 fallback if silver, platinum, or palladium lookup is wanted later: USD
 per troy ounce natively, all four metals, storage unrestricted, at the
 cost of an API key, a vendor account, ~5 years of history, and a 100
@@ -140,18 +136,17 @@ then a server-side change with no migration and no stale user data.
 Not deferred like the other metals: **there is nothing here to defer.**
 Brokerage holdings are recorded at depot level (architecture.md, Data
 model) — one account in the depot's reporting currency, holding the
-total the broker reports. That total needs FX at most, and FX is
-resolved. So there is no security rate to fetch, no ticker namespace to
-adopt into user records, and no `kind: equity` in the symbol table.
+total the broker reports. That total needs FX at most, which the FX
+provider covers. So there is no security rate to fetch, no ticker
+namespace to adopt into user records, and no `kind: equity` in the
+symbol table.
 
-Dropping the kind is safe in a way that dropping a *symbol* would not
-be: `kind` is operator config, a symbol is written into ciphertext as an
-account's unit.
-Reintroducing a kind later is a config change, which is exactly why the
-metals are seeded and this is not.
+Adding a `kind` later would be safe in a way that adding a *symbol* is
+not: `kind` is operator config, while a symbol is written into
+ciphertext as an account's unit. That asymmetry is why the metals are
+seeded and this is not.
 
-Recorded so it is not re-litigated — the provider search ran first, and
-the licensing is largely closed:
+Rejected, the licensing being largely closed:
 
 - **Tiingo** — free tier permits data "only transiently in volatile
   memory or in a temporary, non-persistent cache"; paid tiers require
@@ -167,13 +162,13 @@ the licensing is largely closed:
   out on fit rather than terms — 25 requests/day shared across the whole
   instance, and thin coverage of European listings.
 
-The objection that generalizes, and that would have outlived a better
-provider: **a snapshot stores its rate permanently, inside user
-ciphertext the server cannot read, enumerate, or delete.** "Delete all
-data on termination" is unsatisfiable here by construction, not a
-cache-policy problem a shorter TTL could fix. Any future provider for
-any asset class must be checked against that, not merely against
-request volume — it is the same test that eliminated LBMA for gold.
+The objection that generalizes: **a snapshot stores its rate
+permanently, inside user ciphertext the server cannot read, enumerate,
+or delete.** "Delete all data on termination" is unsatisfiable here by
+construction, not a cache-policy problem a shorter TTL could fix. Any
+future provider for any asset class must be checked against that, not
+merely against request volume — the same test that eliminates LBMA for
+gold.
 
 ## The symbol table
 

@@ -101,14 +101,12 @@ It prints an invite URL and exits. The invite it creates carries an
 
 **On a populated instance the command requires `--force`**, printing
 how many users and admins already exist and what the flag will do. It
-does not refuse outright, and the reason matters: an earlier draft
-blocked it entirely so it "cannot be used later to mint an admin around
-the UI." But the only actor who can run it holds shell access to the
-host — and that actor already holds the SQLite file, the `SECRET_KEY`,
-and the ability to modify the served JavaScript, which architecture.md
-(Threat model) states outright is **not** defended against. The guard
-blocked someone who has already won, and its real effect was to remove
-the only recovery path in the product.
+does not refuse outright. The only actor who can run it holds shell
+access to the host, and that actor already holds the SQLite file, the
+`SECRET_KEY`, and the ability to modify the served JavaScript, which
+architecture.md (Threat model) states outright is **not** defended
+against. A hard block would stop someone who has already won, at the
+cost of the only recovery path in the product.
 
 That path is the point. An admin who loses their password cannot
 recover their vault — by design, nothing changes that — but the
@@ -207,8 +205,8 @@ invocation, and it is honest that it cannot stop anything more.
   asserted by enumerating every registered route and attempting the
   change through each.
 - The last remaining admin cannot delete their own account, by either
-  path — the admin panel returns 409 and `DELETE /api/auth/account` returns
-  409.
+  path — the admin panel returns 409, and so does
+  `DELETE /api/auth/account`.
 - `DELETE /api/admin/users/<username>` removes that user's row, every
   record, and every session in one transaction; the deleted user's
   subsequent request returns 401 and their login fails.

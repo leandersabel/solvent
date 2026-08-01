@@ -1,9 +1,5 @@
 # Account settings
 
-<!-- Added because architecture.md references a password-change endpoint
-(Application hardening, CSRF) and a per-user main currency (Data model)
-without either having a feature home. -->
-
 ## What it does
 
 A user's own settings: change password, view and understand their main

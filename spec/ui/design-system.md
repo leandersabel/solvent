@@ -22,9 +22,8 @@ If a screen needs a third accent, it is over-designed. Cut something.
 
 ## Two palettes, not one
 
-The most important rule here, and the one that is easy to get wrong:
-**chrome colors and chart colors are different jobs and do not share
-values.**
+The rule easiest to get wrong: **chrome colors and chart colors are
+different jobs and do not share values.**
 
 - **Chrome** (nav, text, buttons, rules) is muted — low chroma. That is
   what makes it read as expensive rather than as a toy.
@@ -174,12 +173,11 @@ Both always carry a direct label. A chart showing both at once is
 legible, and is also telling the user their dimension neither covers its
 accounts nor fits in four values.
 
-An earlier draft carried a third, hatched band — "Ambiguous", for an
-account holding two values of one dimension. It is gone because the
-state is gone: `dims` is a map keyed by dimension id
-(`manage-accounts.md`), so a second value cannot be written by the form,
-an import, or a hand-edited export. The hatch pattern is removed rather
-than reserved; a pattern kept for an unreachable state is a pattern that
+There is no third band for an account holding two values of one
+dimension: `dims` is a map keyed by dimension id
+(`manage-accounts.md`), so that state cannot be written by the form, an
+import, or a hand-edited export. No hatch or pattern fill is defined
+anywhere in this system — a pattern reserved for an unreachable state
 gets reused for the wrong thing later.
 
 ## Status
@@ -190,15 +188,13 @@ with an icon and a text label** — never color alone.
 | Role | Hex | Contrast | Use in Solvent |
 |---|---|---|---|
 | good | `#1d7635` | 5.40 | gains, positive delta |
-| warning | `#c2603d` | 3.96 | **no current consumer** — non-text, see below |
+| warning | `#c2603d` | 3.96 | **reserved, no consumer** — non-text, see below |
 | critical | `#ac312c` | 6.18 | losses, decryption failure, destructive confirm |
 
-`warning`'s only use was the stale-account chip, which was removed with
-the staleness threshold (`net-worth-view.md`). The token is kept rather
-than deleted so the status triad stays complete, but **nothing should
-reach for it without first checking that the thing it marks is really a
-warning** — the last one turned out to be a fact about data age wearing
-a warning's clothes.
+`warning` has no consumer in v1. The token exists so the status triad is
+complete, but **nothing should reach for it without first checking that
+the thing it marks is really a warning.** Data that is merely old is
+not: figure age is stated in words, not flagged (`net-worth-view.md`).
 
 `good` and `critical` clear 4.5:1 and may carry text. **`warning` may
 not**: at 3.96 it is an icon, border, and fill color only, and the label
@@ -208,10 +204,10 @@ the icon carries the status either way — identity is never color-alone.
 There is deliberately **no darker warning step** for text, unlike
 brass-600. Darkening it to clear 4.5:1 requires roughly `#b35733`, which
 sits ΔE 7.8 from `critical` — under the ~9.5 separation this palette
-holds elsewhere, so a stale-account chip would start reading as an
-error. Warning and critical are neighbouring hues and converge as they
-darken; the honest resolution is that warning does not get to be text,
-not that it gets a step which quietly fails a different test.
+holds elsewhere, so a warning chip would start reading as an error.
+Warning and critical are neighbouring hues and converge as they darken;
+the honest resolution is that warning does not get to be text, not that
+it gets a step which quietly fails a different test.
 
 `warning` sits ΔE 9.4 from brass-500 — deliberately, so a warning chip
 never reads as the brand accent. `critical` sits ΔE 9.6 from chart slot

@@ -32,11 +32,14 @@ For each feature, write `spec/.compiled/<feature-name>.json` with:
 }
 ```
 
-Then update `spec/status.md`: mark the feature's Spec column done, and
-Compiled done (with today's date) if compilation succeeded.
+Then update `spec/status.md`: tick the feature's Compiled column if
+compilation succeeded. `status.md` carries state only — no narrative,
+no changelog.
 
 ## Rules
 
+- Follow `CLAUDE.md`, Writing the spec, for anything you write into
+  `spec/`. Target state only: never record what a decision replaced.
 - Never invent requirements, tech choices, or acceptance criteria that
   aren't stated or clearly implied in the spec. If something is
   ambiguous, missing, or contradictory, do NOT guess — append a

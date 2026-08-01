@@ -30,14 +30,12 @@ payload:
   depot's reporting currency; there is no share or ticker unit, by
   design (architecture.md, Non-goals).
 
-  **There is no separate `rateSymbol` field.** An earlier design had
-  one, and the two could disagree: an account measured in `XAU-g`
-  priced with `XAU-ozt` produced a net worth wrong by a factor of
-  31.1034768, silently, with nothing on any screen to reveal it. They
-  were never legitimately different — a depot's unit *is* its symbol,
-  gold in grams *is* `XAU-g` — so the second field stored the same fact
-  a second time with nothing keeping the copies honest. One field
-  cannot disagree with itself.
+  **There is no separate rate-symbol field.** A second field could
+  disagree with the unit: an account measured in `XAU-g` but priced with
+  `XAU-ozt` reports a net worth wrong by a factor of 31.1034768,
+  silently, with nothing on any screen to reveal it. The two are never
+  legitimately different — a depot's unit *is* its reporting currency,
+  gold in grams *is* `XAU-g`. One field cannot disagree with itself.
 
   Consequences:
   - The unit names the **base asset only**. The quote currency is the
@@ -60,10 +58,9 @@ payload:
   what a user wants to jot about a holding — "joint with M", "sold half
   in 2024" — has an honest home instead of being forced into a
   taxonomy.
-- **There is no server-side dimension entity**, and no tag table: a
-  server-side list would leak the classification graph. Everything the
-  UI shows is derived client-side from the decrypted profile and
-  accounts.
+- **There is no server-side dimension entity**: a server-side list would
+  leak the classification graph. Everything the UI shows is derived
+  client-side from the decrypted profile and accounts.
 - `archivedAt` is `null` for active accounts, otherwise the ISO date the
   account was archived.
 
@@ -77,14 +74,11 @@ dimension.
 - **At most one value per dimension, structurally.** `dims` is a map
   keyed by dimension id, so a second value for one dimension cannot be
   written — not by the form, not by an import, not by a hand-edited
-  export. A JSON object cannot carry the same key twice. This replaces
-  an earlier design where assignments were `key:value` strings sharing
-  an array with freeform tags, where two values *were* expressible and
-  had to be caught and displayed as an "Ambiguous" band. Making the
+  export. A JSON object cannot carry the same key twice. Making the
   fault unrepresentable beats detecting it.
 - **Ids, never labels.** Both halves of an entry are short opaque ids
   (8 characters of `[a-z0-9]`, generated client-side at creation). Two
-  consequences that are the whole point:
+  consequences carry the point:
   - Labels are free text in any script, and renaming one is a
     single-record write to the profile. There is no multi-record
     rewrite anywhere in this feature.
@@ -109,23 +103,6 @@ are user configuration, not derivable from the accounts: the accounts
 yield which value ids are in use, but never their labels or their
 intended order, and order is load-bearing for a stacked chart. They live
 in the encrypted profile record (`account-settings.md`).
-
-## No freeform tags
-
-Removed 2026-08-01, and recorded here so the absence reads as a decision
-rather than an omission. Every tag example this spec ever carried was a
-dimension in disguise: `architecture.md`'s "cash", "investment",
-"retirement" are the values of the `liquidity` dimension; `bank:ubs` is
-a `bank` dimension; `emergency-fund` is a one-value dimension whose
-absence means no.
-
-Overlapping labels were the stated reason to keep both, and overlap is
-what having *several* dimensions already provides — an account carries a
-liquidity value and an emergency-fund value at once. Tags added a second
-way to spell a classification, one that could not be ordered, stacked,
-or summed without a disclaimer. What replaces them: a one-value
-dimension ("flag") for the yes/no case, and the `note` field for text
-that was never a category.
 
 ## Inputs / outputs
 
@@ -251,8 +228,8 @@ the set atomically without the client enumerating ids. Endpoint:
   paths annotate the date as an archive.
 - An account saved with a dimension set to one value and then re-saved
   with another carries exactly one entry for that dimension id
-  afterwards — which the map shape makes true by construction, so the
-  test is a guard against the shape regressing to an array.
+  afterwards — true by construction of the map, so the test guards the
+  shape itself.
 - **Purge**: the account record and every snapshot with that
   `account_id` are gone, in one transaction — a mid-delete failure
   leaves neither partially deleted.
@@ -263,8 +240,8 @@ the set atomically without the client enumerating ids. Endpoint:
   blocked client-side. The test asserts the UI refuses it — not that an
   API call is rejected, which the server cannot do.
 - No account record contains a rate symbol distinct from its unit,
-  asserted against the record shape: the field does not exist, so the
-  31× mismatch has nowhere to live.
+  asserted against the record shape: no such field exists, so the 31×
+  mismatch has nowhere to live.
 - An account whose unit is free text triggers zero rate-lookup
   requests; an account whose unit is a listed symbol triggers exactly
   one per snapshot entry.

@@ -54,9 +54,8 @@ Contribution to net worth = `value × rate`, in the main currency.
 1. User picks an account and a date (defaults to today).
 2. If the account's unit is a symbol in the operator's table, the client
    requests a proposal from the rate-lookup proxy for that unit and date
-   (rate-lookup.md).
-   The request carries **a fixed base unit, never the value being
-   entered** (architecture.md, Base-amount rule).
+   (rate-lookup.md). The request carries **a fixed base unit, never the
+   value being entered** (architecture.md, Base-amount rule).
 3. User enters the value; the rate field is pre-filled and editable.
 4. The client shows the computed main-currency figure live.
 5. Client encrypts and `PUT`s the record.

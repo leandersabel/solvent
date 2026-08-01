@@ -50,7 +50,7 @@ figures needs to know which were guesses (`record-snapshot.md`,
   user changes the value. Never silently keep the proposed badge.
 - **manual** — no chip; the label reads "Enter the rate".
 
-## The three rate situations
+## The four rate situations
 
 1. **Account unit = main currency** → the rate field is **hidden
    entirely**, rate fixed at `1`, `rateSource: manual`. Showing a
@@ -65,8 +65,7 @@ figures needs to know which were guesses (`record-snapshot.md`,
    "This account has no price source — enter the rate yourself" rather
    than presenting an empty field with no explanation.
 4. **The unit is a symbol with `lookup: false`** (silver, platinum,
-   palladium in
-   v1) → **no request is made** either; the client already knows from
+   palladium in v1) → **no request is made** either; the client knows from
    the symbol table that none is coming, and a round-trip to be told
    `204` only delays the form. Copy names the metal — "No market rate
    for silver yet — enter it yourself" — and must not reuse the outage

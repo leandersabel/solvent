@@ -1,7 +1,6 @@
 # Features
 
-One file per feature, e.g. `add-account.md`, `import-statement.md`,
-`net-worth-chart.md`. Each should cover:
+One file per feature. Each covers:
 
 - What the feature does, from the user's perspective
 - Inputs / outputs
