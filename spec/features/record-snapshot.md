@@ -84,13 +84,26 @@ value at a new date rather than typing it (`ui/update-values.md`). It
 writes an ordinary snapshot — no new field, no new `rateSource` value,
 nothing for the record shape to learn.
 
-The one rule that matters: **the rate is fetched fresh for the new
-date; the previous snapshot's rate is never copied forward.** For most
-non-currency holdings the quantity is what stays constant and the price
-is what moves — you still own 12.5 troy ounces, and gold has done
-something since. Copying the old rate would stamp a new date onto a
-stale price, which is worse than recording nothing, because it looks
-like a measurement.
+**Confirming asserts that the whole figure is unchanged**, not merely
+the quantity. What that means for the rate depends on whether anything
+can contradict the user:
+
+- **Unit is a listed symbol** → the rate is **fetched fresh** for the
+  new date and the previous one is never copied. For a non-currency
+  holding the quantity is what stays constant and the price is what
+  moves: you still own 12.5 troy ounces, and gold has done something
+  since. Copying the old rate would stamp a new date onto a price a
+  known source disagrees with — worse than recording nothing, because
+  it looks like a measurement. The user is asserting the quantity; the
+  provider supplies the rest.
+- **Unit is free text** (`m²`, `bottles`) → **the previous rate
+  carries**, and the user is asserting the valuation too. There is no
+  source to contradict them, so their last estimate is the best figure
+  available, and refusing to carry it would leave the sweep unable to
+  help with exactly the holdings most likely to have sat untouched for a
+  year. The carried rate is shown before saving, never applied
+  invisibly, and `rateSource` stays `manual` — so the audit trail on
+  `ui/account-detail.md` records it as the hand-held figure it is.
 
 Confirming is unavailable for an account with no snapshots: there is
 nothing to confirm.
@@ -207,9 +220,12 @@ quiet wrong number.
 - With two snapshots present for one (account, date), the history view
   shows both flagged, the client picks neither, and that date is
   excluded from the interpolated series until resolved.
-- Confirming a previous value writes a snapshot whose `value` equals the
-  previous one and whose `rate` was fetched for the **new** date — with
-  the proxy stubbed to return a different rate, the stored rate is the
-  new one, never the old snapshot's.
+- Confirming a previous value on a **listed-unit** account writes a
+  snapshot whose `value` equals the previous one and whose `rate` was
+  fetched for the **new** date — with the proxy stubbed to return a
+  different rate, the stored rate is the new one, never the old
+  snapshot's.
+- Confirming on a **free-text-unit** account carries the previous rate
+  forward, stores `rateSource: manual`, and issues no rate request.
 - Confirming an account with no snapshots is not offered, and the
   equivalent request is rejected client-side.

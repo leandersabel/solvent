@@ -139,6 +139,10 @@ reach backwards into files already written.
 - **Malformed JSON, wrong `format`, or unknown `formatVersion`
   (newer)** → reject with a clear message. A newer file in an older app
   is not something to guess at.
+- **There is no `formatVersion` below 1.** The file shape changed during
+  spec review — `userId` was removed — but nothing had shipped, so
+  version 1 *is* the post-review shape. Do not write a migration for a
+  format that never existed outside a draft.
 - **Older `formatVersion`** → migrate the plaintext shape client-side
   after decryption, before re-encrypting, reusing the same per-type
   migration chain the client already applies lazily on read

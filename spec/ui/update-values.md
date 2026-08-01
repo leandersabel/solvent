@@ -34,8 +34,9 @@ fixes it.
 Standard app shell, content max-width 900px. Reached from a global
 "Update values" action in the shell, and from the dashboard hero.
 
-At the top, **one date for the whole sweep**, defaulting to today.
-Changing it re-evaluates every row. One date, not one per row: this
+At the top, **one date for the whole sweep**, defaulting to today and
+never in the future (`record-snapshot.md`) — a snapshot describes what
+was. Changing it re-evaluates every row. One date, not one per row: this
 screen exists for "it's the end of the month, let me do my update", and
 per-row dates would make that a puzzle. Odd dates are what the
 single-account modal is for (`snapshot-entry.md`).
@@ -67,18 +68,26 @@ Name · unit · what it is worth now · age · the control.
 
 It is the main action for anything whose quantity does not change. You
 still own 12.5 troy ounces; what moved is the gold price. Confirm writes
-`value` unchanged and `rate` fetched for the sweep date, so net worth
-updates correctly with one click and no typing.
+`value` unchanged, so net worth updates correctly with one click and no
+typing.
 
 It also converts an inferred stretch into recorded data, which is what
 the chart's "Show what's estimated" toggle is asking about
 (`net-worth-view.md`).
 
-- The refreshed rate follows the ordinary rules: proposed where the unit
-  is a listed symbol, manual where it is free text, `rateSource` set
-  accordingly (`record-snapshot.md`). Confirm never reuses the previous
-  snapshot's rate — that would record today's date against a stale
-  price, which is worse than not recording at all.
+Confirming asserts the **whole figure** is unchanged, and the rate
+follows from whether anything can contradict that
+(`record-snapshot.md`):
+
+- **Listed unit** → the rate is fetched fresh for the sweep date. The
+  row's label reads "Still 12.5 XAU-ozt" — the user vouches for the
+  quantity, the provider for the price.
+- **Free-text unit** → the previous rate carries, and the label says so:
+  "Still worth about the same", with the carried rate visible on the row
+  and its age beside it — "estimated 14 months ago". The user is
+  asserting the valuation too, which for a painting or a plot of land is
+  a real thing to assert and the only figure anyone has. It is never
+  applied invisibly.
 - Confirm is **disabled for an account with no snapshots**. There is no
   previous value to confirm; the row asks for one.
 - **There is no "confirm all".** Confirming asserts that you checked,

@@ -70,7 +70,10 @@ into.
 ## Schema migration
 
 `schema_version` is bumped when a record type's **plaintext** shape
-changes. The server cannot migrate anything — it cannot read the
+changes. **There is no version below 1**: the account shape changed
+during spec review — `tags` became a `dims` map, `rateSymbol` folded
+into `unit`, a `note` appeared — but nothing had shipped, so version 1
+is the post-review shape and no migration chain reaches back past it. The server cannot migrate anything — it cannot read the
 payload — so migration is entirely client-side and **lazy**:
 
 1. On read, the client decrypts a record and, if its `schema_version` is
