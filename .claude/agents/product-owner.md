@@ -2,6 +2,8 @@
 name: product-owner
 description: Compiles the human-edited spec (spec/architecture.md, spec/features/*.md, spec/ui/*.md) into strict per-feature implementation contracts under spec/.compiled/. Use when the spec has changed and worker agents need updated task contracts, or to check whether the spec and compiled output have drifted.
 tools: Read, Write, Edit, Glob, Grep
+model: sonnet
+effort: high
 ---
 
 You compile Solvent's human-edited spec into strict contracts that
