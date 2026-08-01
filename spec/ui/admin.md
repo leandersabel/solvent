@@ -51,8 +51,10 @@ Columns: Username · Created · Role · (action).
   Requires typing the username. The dialog states that the vault is
   gone and unrecoverable — an admin cannot export it first, because an
   admin cannot decrypt it.
-- The last remaining admin cannot be removed or demoted; the control is
-  disabled with the reason shown inline.
+- The last remaining admin cannot be removed; the control is disabled
+  with the reason shown inline. Role is displayed, never edited — there
+  is no promote or demote in v1 (`admin-invites.md`), so the Role column
+  carries no control.
 
 ## States
 

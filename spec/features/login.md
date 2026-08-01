@@ -53,6 +53,18 @@ lock the user out.
 
 ## Rules
 
+- **Residual enumeration leak, accepted.** A decoy always carries the
+  server's *current default* KDF envelope, while a real user can carry a
+  stale one — that is the whole reason the re-wrap flow above exists. So
+  any account not yet upgraded is distinguishable from a decoy by its
+  envelope, and the defense only fully holds once every user sits at
+  current parameters. This is accepted rather than closed: the audience
+  is a small invited household, registration already accepts enumeration
+  (register.md), and the alternative — decoys drawing from the set of
+  historical parameter sets — would mean the server tracking every
+  parameter set it has ever used, forever, for a threat this deployment
+  does not face. Do not write a test asserting a stale-envelope account
+  is indistinguishable; it is not.
 - The Auth Key is stored server-side hashed with Argon2id at modest
   server-side cost (starting point: 64 MiB, 2 iterations). The Auth Key
   is already high-entropy, so this is defense in depth, not the primary
@@ -104,6 +116,8 @@ lock the user out.
 - `/api/auth/salt` returns the same response shape, same status, and
   statistically indistinguishable timing for a known and an unknown
   username; the decoy salt for a given username is stable across calls.
+  Asserted for a user **at current KDF parameters** — a stale-envelope
+  account is knowingly distinguishable (see Rules).
 - Wrong password and unknown username produce identical client-visible
   errors.
 - A user whose stored KDF envelope is below the server default is

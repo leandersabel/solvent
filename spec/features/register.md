@@ -73,6 +73,15 @@ before anything is sent to the server (architecture.md, Key management).
 - **Password and confirmation differ** → inline error.
 - **Client cannot run WASM Argon2id** (very old browser) → hard failure
   with an explanatory message. There is no weaker fallback KDF.
+- **Client can run WASM but cannot allocate ≥256 MiB** (mobile Safari,
+  typically) → a distinct hard failure naming the device, with a retry.
+  Critically, registration must **not** silently fall back to weaker
+  parameters here: that would mint a vault permanently weaker than the
+  policy, on the device least able to protect it, and the KDF envelope
+  would record the weakness as if it were chosen. Better to refuse the
+  registration and have the user create their vault on a computer — the
+  stale-KDF re-wrap (login.md) upgrades parameters later, but it cannot
+  retroactively justify a vault created below the minimum.
 - **KDF derivation is slow** (≥256 MiB, ≥3 iterations) → show a busy
   state; the tab must not appear frozen. Run derivation in a Web Worker
   so the UI thread stays responsive.

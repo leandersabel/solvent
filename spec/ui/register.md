@@ -65,6 +65,12 @@ settings afterwards (`account-settings.md`, Main currency).
 - **Error — username taken**: inline, plain: "That username is taken."
   Enumeration is accepted here (`register.md`, Edge cases); do not
   contort the message.
+- **Error — cannot allocate memory for derivation**: same treatment as
+  Unlock, but the copy must be clearer that no vault was created:
+  "Solvent could not set up your vault on this device — it does not have
+  enough memory available. Your invite is still valid; try again on a
+  computer." The invite is untouched, since nothing was submitted
+  (`register.md`).
 - **Error — submit failed after derivation**: the form retains every
   field so nothing must be re-typed or re-derived.
 - **Populated**: success lands the user authenticated on the dashboard,

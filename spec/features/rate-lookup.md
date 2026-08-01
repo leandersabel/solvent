@@ -28,7 +28,7 @@ accepted (record-snapshot.md).
 Response `200`:
 
 ```json
-{ "rate": "0.9312", "base": "1 XAU-ozt", "quote": "CHF",
+{ "rate": "3142.75", "base": "1 XAU-ozt", "quote": "CHF",
   "asOf": "2026-07-31", "source": "provider-name", "cached": true }
 ```
 
@@ -42,6 +42,22 @@ unit (1 troy oz, 1 share, one unit of the base currency), so there is no
 field an amount could travel in even by mistake (architecture.md,
 Base-amount rule). Any request carrying an unrecognised query parameter
 is rejected with 400 rather than ignored.
+
+## The symbol table
+
+`GET /api/rates/symbols` → `[{ symbol, label, kind }]`, the operator's
+configured symbol table. Session-authenticated, read-only, cacheable.
+
+It exists so the account form can validate a `rateSymbol` at the point
+of choice instead of letting the user discover an unusable symbol later,
+on a different screen, when they try to record a snapshot
+(`manage-accounts.md`, `ui/account-form.md`). An unknown symbol stays a
+`400` at `/api/rates` — this endpoint moves the error earlier, it does
+not soften it.
+
+The table is operator configuration, not user data: it is identical for
+every user, reveals nothing about who holds what, and adding a symbol
+remains an operator action.
 
 ## Caching
 
@@ -129,3 +145,8 @@ reachable (architecture.md, SSRF hardening):
   key.
 - Exceeding the per-user rate limit returns 429.
 - A future date is rejected with 400.
+- `GET /api/rates/symbols` returns exactly the symbols the server will
+  accept at `/api/rates` — asserted by querying every returned symbol
+  and getting no 400, so the two can never drift.
+- `GET /api/rates/symbols` requires a session and makes no outbound
+  request.

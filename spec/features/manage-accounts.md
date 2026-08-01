@@ -13,9 +13,9 @@ payload:
 
 ```json
 {
-  "name": "UBS current account",
-  "unit": { "kind": "currency", "code": "CHF" },
-  "rateSymbol": "USDCHF",
+  "name": "UBS dollar account",
+  "unit": { "kind": "currency", "code": "USD" },
+  "rateSymbol": "USD",
   "tags": ["cash", "liquid"],
   "archivedAt": null,
   "createdAt": "2026-08-01T09:14:00Z"
@@ -27,7 +27,13 @@ payload:
   drives formatting and decimal places, nothing else.
 - `rateSymbol` is the symbol the rate-lookup proxy should be queried
   with, or `null` for accounts with no public price source. It is set by
-  the user, not inferred — see rate-lookup.md.
+  the user, not inferred — see rate-lookup.md. It names the **base asset
+  only** (`USD`, `XAU-ozt`, `AAPL`); the quote currency is the user's
+  main currency and travels as a separate `quote` parameter, so a pair
+  like `USDCHF` is malformed. It is validated against the operator's
+  symbol table at the account form (`GET /api/rates/symbols`), so an
+  unusable symbol is caught at the point of choice rather than at
+  snapshot time.
 - `tags` is a plain string array. **There is no server-side tag
   entity**: a separate tag table would leak the tag graph to the server.
   The tag list shown in the UI is the union of all decrypted accounts'

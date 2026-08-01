@@ -117,9 +117,13 @@ and Auth Key are untouched.
   (newer)** → reject with a clear message. A newer file in an older app
   is not something to guess at.
 - **Older `formatVersion`** → migrate the plaintext shape client-side
-  after decryption, before re-encrypting. This is the whole point of the
+  after decryption, before re-encrypting, reusing the same per-type
+  migration chain the client already applies lazily on read
+  (`record-api.md`, Schema migration). This is the whole point of the
   feature; each supported old version needs an explicit migration path
-  and a test with a real fixture file.
+  and a test with a real fixture file. There is exactly one set of
+  migration functions in the product — a second, import-only copy would
+  drift.
 - **Oversized file** → rejected client-side by size before parse, and
   server-side before write.
 - **Import of a vault exported by a different user** → works, by

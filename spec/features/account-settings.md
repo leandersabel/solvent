@@ -61,11 +61,20 @@ quietly corrupts history.
 
 Self-service, irreversible, and distinct from an admin deleting a user.
 
+`DELETE /api/auth/account` `{ authKey, confirmUsername }`.
+
 - Requires re-entering the password (verified via Auth Key, same as
-  login) and typing the username to confirm.
+  login) and typing the username to confirm. The server checks
+  `authKey` against the stored hash in constant time, and that
+  `confirmUsername` equals the session user's normalized username — a
+  mismatch on either is a 400 and deletes nothing. The typed username is
+  a deliberate second factor of intent, so it is verified server-side
+  and not left as a UI formality.
 - Deletes the user row, every record, and every session, in one
   transaction. Nothing is soft-deleted — there is no vault to preserve
   that anyone could ever open.
+- Refused with 409 if the user is the last remaining admin
+  (admin-invites.md).
 - The dialog offers **export first** as the primary action and deletion
   as the secondary one.
 - The last remaining admin cannot delete themselves (admin-invites.md).
@@ -88,11 +97,20 @@ Self-service, irreversible, and distinct from an admin deleting a user.
     explicitly defends against (architecture.md, Threat model). No
     setting disables it.
 - **Absolute session expiry** at 12 hours from issue.
-- **Log out** discards in-memory keys and invalidates the server session.
-- **"Log out everywhere"** invalidates every session for the user.
-- A settings row lists active sessions by issue time and last activity.
+- **Log out** — `POST /api/auth/logout`. Invalidates the current server
+  session; the client discards its in-memory keys first, so a failed
+  request still leaves nothing readable in the tab.
+- **"Log out everywhere"** — `POST /api/auth/logout-all`. Invalidates
+  every session for the user, **including the current one**. There is no
+  "all except this one" variant; the one place that keeps the current
+  session alive is a password change, which does it as part of its own
+  transaction.
+- A settings row lists active sessions by issue time and last activity —
+  `GET /api/sessions` → `[{ id, issuedAt, lastActiveAt, current }]`.
   No IP or user-agent is stored — it would be metadata the app does not
-  otherwise keep, for a household instance where it answers nothing.
+  otherwise keep, for a household instance where it answers nothing —
+  and no endpoint returns any, because none is recorded. `id` is an
+  opaque handle, never the session cookie's value.
 
 ## Edge cases
 
@@ -128,7 +146,24 @@ Self-service, irreversible, and distinct from an admin deleting a user.
 - The main currency field is not editable and states why.
 - Account deletion removes the user row, all records, and all sessions;
   a subsequent login with those credentials fails.
+- A `DELETE /api/auth/account` with a wrong `authKey`, or a
+  `confirmUsername` that does not match the session user, is rejected
+  server-side and deletes nothing — asserted by calling the endpoint
+  directly, since a client bypassing the dialog is the case that
+  matters.
+- The last remaining admin's `DELETE /api/auth/account` returns 409 and
+  deletes nothing.
 - The deletion dialog presents export as the primary action.
+- `GET /api/sessions` returns no IP address and no user-agent for any
+  session — asserted against the endpoint's full response shape, so the
+  test fails if one is added later. It never returns a session cookie
+  value.
+- `GET /api/sessions` returns only the session user's own sessions;
+  none belonging to another user appear.
+- `POST /api/auth/logout` invalidates the calling session only; a second
+  session for the same user still works afterwards.
+- All four endpoints return 401 unauthenticated, and the three writes
+  are rejected without a CSRF token or the required custom header.
 - After the configured idle period, in-memory keys are gone and reading
   vault data prompts to unlock; after 12 hours, the server session is
   rejected regardless of activity.

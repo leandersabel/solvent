@@ -62,8 +62,9 @@ figures needs to know which were guesses (`record-snapshot.md`,
   unavailable — enter it yourself." Not an error color. **Saving a
   snapshot must never be blocked by the proxy being unavailable.**
 - **Error — duplicate date**: on save, a confirm rather than a
-  rejection: "You already recorded 12 450.00 CHF for 31 July. Replace
-  it?" Confirming updates the existing record in place; declining leaves
+  rejection: "You already recorded 12 450.00 USD for 31 July. Replace
+  it?" — the previously recorded value, in the account's native unit.
+  Confirming updates the existing record in place; declining leaves
   the original untouched and returns to the form.
 - **Error — validation**: non-numeric or malformed value/rate, inline,
   no submission. Future date, inline. Zero and negative values are

@@ -29,4 +29,6 @@ One file per screen or major view. Each covers:
 | `admin.md` | admin-invites |
 
 Every feature in `spec/features/` has a screen home, and no screen
-exercises a feature that does not exist.
+exercises a feature that does not exist. The one exception is
+`record-api.md` — the generic encrypted-record store every screen reads
+and writes through. It is infrastructure and has no UI of its own.

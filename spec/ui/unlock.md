@@ -59,6 +59,19 @@ interaction and must not look like a hang.
 - **Error — WASM unavailable**: hard failure, explanatory: "Your browser
   cannot run the encryption Solvent requires." No fallback is offered
   because none exists.
+- **Error — cannot allocate memory for derivation**: a *separate* state
+  from the one above, and the likelier of the two. WASM runs, but the
+  ≥256 MiB allocation is refused — mobile Safari is the common case.
+  Copy names the device, not the password: "This device does not have
+  enough memory available to unlock your vault. Close other tabs and try
+  again, or use a computer." Offer a retry, since closing tabs can
+  genuinely fix it.
+  - **No weaker fallback is offered here either.** Deriving at reduced
+    memory would produce a different key and open nothing; deriving the
+    whole vault at reduced memory would weaken the one defense the
+    threat model names against an offline attacker with a DB dump
+    (`architecture.md`, Threat model). A vault that will not open on a
+    phone is the accepted cost.
 - **Populated**: n/a — success navigates to the dashboard.
 
 ## Rules

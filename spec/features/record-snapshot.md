@@ -66,8 +66,9 @@ particular, it must not be part of, or trigger, any rate request.
 ## Same account, same date: upsert
 
 **One snapshot per (account, date).** Entering a value for a date that
-already has one prompts "You already recorded 12 450.00 CHF for 31 July.
-Replace it?" and, on confirm, updates the existing record in place
+already has one prompts "You already recorded 12 450.00 USD for 31 July.
+Replace it?" — the previously recorded value, in the account's native
+unit — and, on confirm, updates the existing record in place
 (same `record_id`, `version` + 1, fresh nonce).
 
 Duplicate detection is client-side — the client already decrypts every
@@ -97,8 +98,14 @@ brute-force which dates a user holds data for.
 - **Date precedes the account's `createdAt`** → allowed; backfilling
   history is a normal use.
 - **Editing a past snapshot** → allowed, versioned like any other write.
-  The AAD's `monotonic_version` means the server cannot roll a snapshot
-  back to a previous version undetected (architecture.md, AAD binding).
+  The AAD's `monotonic_version` binds each ciphertext to the version it
+  was written at, so the server cannot pass an old blob off as the
+  current one. It does **not** prevent a rollback: re-serving the intact
+  `(ciphertext, version)` pair from an earlier write is self-consistent
+  and decrypts cleanly, because the client holds no record that a later
+  version existed. Catching that needs the DEK-authenticated manifest
+  deferred in architecture.md (Data integrity) — do not write a test
+  asserting rollback is detected today.
 - **Deleting a snapshot** → allowed, single confirm. Deleting the only
   snapshot for an account leaves the account with no current value; it
   is excluded from the total rather than counted as zero.

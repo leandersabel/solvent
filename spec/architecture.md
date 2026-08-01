@@ -333,10 +333,12 @@ nothing gets resolved by inference downstream:
 
 ### Application hardening
 
-- **CSP**: `default-src 'none'; script-src 'self'; connect-src 'self'
-  <rate-provider-host>; img-src 'self'; style-src 'self';
-  frame-ancestors 'none'; base-uri 'none'; form-action 'self'` — no
-  `unsafe-inline`/`unsafe-eval`.
+- **CSP**: `default-src 'none'; script-src 'self'; connect-src 'self';
+  img-src 'self'; style-src 'self'; frame-ancestors 'none'; base-uri
+  'none'; form-action 'self'` — no `unsafe-inline`/`unsafe-eval`.
+  `connect-src` is `'self'` alone: the rate provider is reached through
+  the server-side proxy (see Data model), so the browser never contacts
+  it directly and whitelisting its host would open a hole with no user.
 - **Alpine.js must use its CSP-safe build** (the standard build needs
   `unsafe-eval` for `x-` expressions, which would gut the CSP above).
 - **Decrypted content is always untrusted output**: render with

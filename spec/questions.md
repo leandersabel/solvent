@@ -16,7 +16,13 @@ Data model, and the symbol-table format in
 
 Blocks: `rate-lookup` acceptance criteria are provider-independent and
 can be implemented against a stubbed provider, so this does not block
-starting the feature — only shipping it.
+starting the feature — only shipping it. **Owner's call (2026-08-01):
+resolve this before any code is written anyway**, so the pipeline
+compiles once against a complete spec rather than twice.
+
+Once chosen, the provider also determines the initial contents and
+`kind` vocabulary of the symbol table now served by
+`GET /api/rates/symbols`.
 
 ## Charting library (spec/features/net-worth-view.md)
 
@@ -37,6 +43,9 @@ picked from memory — the full set, now that the UI is specified:
 Writing the step chart directly in SVG is a legitimate outcome of this
 evaluation, not a fallback — the requirements above are most of what a
 charting library would be brought in to provide.
+
+**Owner's call (2026-08-01): resolve before writing code.** Both open
+questions are gating the compile, not just the ship.
 
 ## Confirmed decisions (2026-08-01)
 

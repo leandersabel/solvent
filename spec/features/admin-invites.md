@@ -56,6 +56,28 @@ writes are CSRF-protected.
 - `GET /api/admin/users` → `{ username, createdAt, isAdmin,
   recordCount, lastLoginAt }` per user. Nothing about vault contents
   beyond the count the server can already see.
+- `DELETE /api/admin/users/<username>` `{ confirmUsername }` → deletes
+  that user's row, every record, and every session, in one transaction.
+  Keyed by normalized username, which is what `GET /api/admin/users`
+  returns and what the admin types to confirm; `confirmUsername` must
+  equal the path segment or the request is a 400. Refused with 409 if
+  the target is the last remaining admin.
+
+  This is the **only** destructive power an admin holds, and it destroys
+  a vault rather than opening one. There is deliberately no admin export
+  and no admin password reset, because neither is possible — see The
+  admin boundary above.
+
+  Note that an admin deleting a user is not the same operation as that
+  user deleting themselves (`account-settings.md`): the admin path
+  requires no password, because the admin has none that would help, and
+  it offers no "export first", because an admin cannot decrypt the vault
+  they are about to destroy.
+
+There is **no role-change endpoint in v1** — no promote, no demote. An
+admin is made by the bootstrap CLI or by an invite carrying `is_admin`,
+and unmade only by deleting the account. Adding one later must be
+checked against The admin boundary first.
 
 ## Bootstrap: the first admin
 
@@ -111,8 +133,17 @@ admin around the UI.
   the endpoint exists.
 - **Admin revokes their own outstanding invites** → allowed, no special
   case.
-- **Last admin deletes themselves** → refused; at least one admin must
-  remain, or the instance can never provision again without CLI access.
+- **Last admin deletes themselves** → refused, by either path (the admin
+  panel or their own settings); at least one admin must remain, or the
+  instance can never provision again without CLI access.
+- **Admin deletes their own account from the admin panel** → allowed
+  when another admin remains, and it ends their own session. No special
+  case beyond the last-admin guard.
+- **Admin deletes a user who is currently logged in** → their sessions
+  go with the transaction; their next request is a 401.
+- **Deleting a username that does not exist** → 404, the same as any
+  other admin route reached by a non-admin, so a probe distinguishes
+  nothing.
 - **Bootstrap command run on a populated instance** → refuses and exits
   non-zero.
 
@@ -136,5 +167,21 @@ admin around the UI.
 - `flask create-invite --admin` on an empty instance produces a working
   invite whose user is an admin; on a populated instance it exits
   non-zero and creates nothing.
-- The last remaining admin cannot delete their own account.
+- The last remaining admin cannot delete their own account, by either
+  path — the admin panel returns 409 and `DELETE /api/auth/account` returns
+  409.
+- `DELETE /api/admin/users/<username>` removes that user's row, every
+  record, and every session in one transaction; the deleted user's
+  subsequent request returns 401 and their login fails.
+- A `DELETE /api/admin/users/<username>` whose `confirmUsername` does
+  not match the path segment is rejected and deletes nothing.
+- Deleting one user leaves every other user's records and sessions
+  untouched — asserted with two populated vaults.
+- A simulated DB failure mid-delete leaves the target user fully intact
+  and able to log in.
+- A non-admin session receives 404 from `DELETE /api/admin/users/*`,
+  and no user is deleted.
+- No endpoint promotes or demotes an admin; the admin API surface is
+  exactly invites plus user list and user delete, asserted by
+  enumerating the registered routes under `/api/admin/`.
 - The invite token does not appear in the application's own log output.

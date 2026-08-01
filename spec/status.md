@@ -5,6 +5,7 @@ through the pipeline: spec written → compiled → implemented → verified.
 
 | Feature | Spec | Compiled | Implemented | Verified |
 |---|---|---|---|---|
+| record-api | written 2026-08-01 | | | |
 | register | written 2026-08-01 | | | |
 | login | amended 2026-08-01 | | | |
 | account-settings | amended 2026-08-01 | | | |
@@ -22,9 +23,22 @@ above. See that file for what changed and why.
 ## UI
 
 Written 2026-08-01. `spec/ui/` holds `design-system.md` plus eight
-screen specs; every feature above has a screen home. **The compile gate
-is cleared** — contracts can now carry `sourceFiles` for both halves of
-each feature.
+screen specs. Every feature above has a screen home **except
+`record-api`, which is infrastructure and has no UI by design**. The
+compile gate is cleared — contracts can carry `sourceFiles` for both
+halves of each user-facing feature.
+
+`record-api` is a dependency of every other feature and should be
+compiled and built first.
+
+## Gate before compiling
+
+Per owner's call on 2026-08-01, **both open questions in
+`spec/questions.md` are resolved before any code is written** — the
+conversion-rate provider and the charting library. Do not run the
+product-owner agent until they are closed; compiling now would produce
+contracts with `openQuestions` on two features and require a second
+pass.
 
 | Screen | Spec |
 |---|---|

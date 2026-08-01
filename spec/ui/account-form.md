@@ -22,6 +22,19 @@ table row. Form max-width 480px.
   the form explains: "You will enter the rate by hand on each snapshot."
   This is a normal case (private equity, a loan, unlisted property), not
   an error state.
+  - Unchecked, the field is a **searchable select over the operator's
+    symbol table** (`GET /api/rates/symbols`, `rate-lookup.md`), showing
+    each symbol's label and kind. The symbol must come from that list —
+    an unlisted one would fail at snapshot time with a 400, on a
+    different screen, long after the mistake was made.
+  - When the wanted symbol is absent, the form says so and points at the
+    checkbox: "Not listed? Your instance's administrator configures
+    which symbols are available. You can record this account's rate by
+    hand instead." Adding a symbol is an operator config change
+    (`rate-lookup.md`), so the form must not imply the user can do it.
+  - If the symbol list cannot be fetched, the field degrades to free
+    text with an inline notice rather than blocking the save — an
+    account can always be created, and the symbol is editable later.
 - **Tags** — chip input. Free text, comma or Enter to commit. Suggests
   from the client-derived tag union; **no request is made to fetch
   tags** — a server-side tag list would leak the tag graph.
