@@ -20,19 +20,39 @@ before anything is sent to the server (architecture.md, Key management).
 3. Client generates a random 128-bit salt (`crypto.getRandomValues`).
 4. Client derives Master Key + Auth Key from password + salt with the
    embedded parameters, generates a random 256-bit DEK, wraps the DEK
-   under the Master Key (AES-256-GCM), and encrypts a profile record
+   under the Master Key (AES-256-GCM), generates a UUIDv4
+   `profileRecordId`, and encrypts a profile record
    `{ mainCurrency, createdAt }` under the DEK.
 5. `POST /api/register` with: invite token, username, Auth Key, salt,
    KDF parameter envelope, wrapped DEK + its nonce, and the profile
-   ciphertext + nonce. **The password never leaves the browser.**
+   record's id, schema version, ciphertext, and nonce. **The password
+   never leaves the browser.**
 6. Server validates, stores, marks the invite used, and starts a
    session — the user lands logged in, keys already in memory.
+
+The profile blob is encrypted at step 4, **before** the server has
+assigned this user an identity, and that is only possible because
+`user_id` is not part of the AAD (architecture.md, Key management).
+Every AAD field is one the client chose: `account_id` empty,
+`record_type: "profile"`, its own `record_id`, its own
+`schema_version`, `version: 1`.
+
+Registration is deliberately **one transaction, not two phases**: the
+user row, the profile record, and the invite's consumption commit
+together or not at all. Splitting it would mean a request that burns a
+single-use invite and leaves a logged-in user holding a vault with no
+main currency — the worst place in the product for a partial state,
+since the invite is spent and the ~1 s key derivation has already been
+paid. The server writes the profile row through the same validator that
+backs `PUT /api/records` (record-api.md), so there is one set of rules
+with two callers rather than two record writers.
 
 ## Inputs / outputs
 
 - In (browser only): invite token, username, password, main currency.
 - In (over the wire): invite token, username, Auth Key, salt, KDF
-  envelope, wrapped DEK + nonce, profile ciphertext + nonce.
+  envelope, wrapped DEK + nonce, profile record id, profile schema
+  version, profile ciphertext + nonce.
 - Out: user row (username, salt, KDF envelope, Auth Key hash, wrapped
   DEK), profile record, invalidated invite, session cookie.
 
@@ -112,6 +132,14 @@ before anything is sent to the server (architecture.md, Key management).
   client-side and never derives keys.
 - Submitting without the "no password recovery" acknowledgement is
   blocked.
-- The AAD used for the profile blob equals `user_id ‖ account_id ‖
-  record_type ‖ record_id ‖ schema_version ‖ monotonic_version` per
-  architecture.md, with `account_id` empty and `monotonic_version` = 1.
+- The AAD used for the profile blob equals `account_id ‖ record_type ‖
+  record_id ‖ schema_version ‖ monotonic_version` per architecture.md,
+  with `account_id` empty and `monotonic_version` = 1 — and is built
+  entirely before the request is sent, asserted by encrypting the blob
+  in a test with no server interaction at all.
+- A registration whose profile insert fails leaves no user row and an
+  unconsumed invite; a registration that succeeds leaves exactly one
+  user, one profile record, and a `used` invite.
+- The profile record created by registration is indistinguishable from
+  one written through `PUT /api/records` — same validation, same column
+  values, same AAD.

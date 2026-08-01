@@ -22,7 +22,6 @@ named `solvent-vault-<username>-<YYYY-MM-DD>.json`:
   "format": "solvent-vault",
   "formatVersion": 1,
   "exportedAt": "2026-08-01T09:14:00Z",
-  "userId": "…",
   "salt": "…",
   "kdf": { "alg": "argon2id", "v": 19, "m": 262144, "t": 3, "p": 1 },
   "wrappedDek": "…", "dekNonce": "…",
@@ -34,9 +33,10 @@ named `solvent-vault-<username>-<YYYY-MM-DD>.json`:
 }
 ```
 
-`userId` is included because it is part of every record's AAD — without
-it the ciphertext cannot be authenticated on import. It is an opaque
-identifier, not a name.
+The file carries **no user identifier**. It does not need one: a
+record's AAD is built from the record's own fields (record-api.md), so
+the ciphertext authenticates without knowing who exported it. This is
+also why the file is portable between accounts at all.
 
 The export screen must state, in plain language and before the download
 starts, that **this file is exactly as sensitive as the password** —
@@ -54,37 +54,60 @@ If the target vault already holds records, the user must type `ERASE` to
 confirm, against a dialog stating exactly how many records will be
 destroyed.
 
-### The re-encryption step
+### The re-key step
 
-Records are re-encrypted client-side during import rather than copied
-across verbatim. This is not optional: every record's AAD binds
-`user_id`, so a blob exported from one user id will fail to decrypt
-under another — a verbatim restore into a fresh instance, or into a
-re-provisioned account, would produce a vault that opens and then
-decrypts nothing.
+Records are decrypted and re-encrypted client-side under a **freshly
+generated DEK** rather than restored verbatim under the file's key.
+Since `user_id` is not in the AAD (architecture.md, Key management), a
+verbatim restore would in fact decrypt fine — so this step is not, as
+an earlier draft had it, forced by AAD rebinding. It is here for a
+better reason.
+
+A vault transfer leaves two accounts holding the same DEK: the exporter
+keeps their vault and keeps writing to it, and the importer now holds a
+key that opens those writes. A malicious or compromised server could
+then inject the exporter's *later* records into the importer's vault,
+where they would decrypt cleanly — data the exporter never handed over.
+Re-keying makes the two vaults share no key material at all, so the
+injection fails at the cryptography rather than at a check.
 
 1. User, logged in as the target account, selects the file and enters
    **the password that vault was exported under** (which may differ from
    their current one).
 2. Client derives `MK_file` from the file's salt + KDF envelope and
    unwraps `DEK_file`.
-3. Client decrypts every record using `DEK_file` and the record's
-   **original** AAD, built from the file's `userId` and per-record
-   fields. Any failure aborts the whole import before anything is sent.
-4. Client re-encrypts each record under the same `DEK_file` with a fresh
-   nonce and a **new** AAD carrying the current session's `user_id`;
-   `version` resets to 1.
-5. Client wraps `DEK_file` under the **current session's Master Key** —
+3. Client decrypts every record using `DEK_file` and the record's own
+   AAD, built from its per-record fields. Any failure aborts the whole
+   import before anything is sent.
+4. Client generates a **new random 256-bit `DEK_new`**, and re-encrypts
+   each record under it with a fresh nonce. `version` resets to 1, and
+   the AAD is rebuilt for that version.
+5. Client wraps `DEK_new` under the **current session's Master Key** —
    so the user's existing login password keeps working after the import.
 6. `POST /api/import` with the new wrapped DEK and the re-encrypted
    records. The server, in one transaction, deletes every record
    belonging to the session user, replaces their wrapped DEK, and
    inserts the new set.
-7. Client swaps its in-memory DEK to `DEK_file` and reloads the view.
+7. Client swaps its in-memory DEK to `DEK_new` and reloads the view.
+
+**The profile record is replaced along with everything else**, so the
+main currency, dimensions, and idle-lock setting all become the file's.
+That is the one sanctioned way the main currency changes, and it does
+not violate the immutability rule in `account-settings.md`: that rule
+exists because changing the currency while keeping the history would
+leave every stored rate denominated in the old one. Import replaces the
+history too, so the vault stays internally consistent — every snapshot's
+`rateTarget` matches the profile it arrived with. The import review step
+names the change when the file's main currency differs from the current
+one, because arriving at a vault denominated in another currency without
+being told is a bad surprise even when it is correct.
 
 Consequences worth stating outright: the user's **password does not
-change** across an import, but their **DEK does**. Salt, KDF envelope,
-and Auth Key are untouched.
+change** across an import, but their **DEK does** — and it is a key that
+has never existed anywhere before, not the file's. Salt, KDF envelope,
+and Auth Key are untouched. The exported file keeps opening with
+`DEK_file` and its own password; re-keying the live vault does not
+reach backwards into files already written.
 
 ## Rules
 
@@ -126,9 +149,10 @@ and Auth Key are untouched.
   drift.
 - **Oversized file** → rejected client-side by size before parse, and
   server-side before write.
-- **Import of a vault exported by a different user** → works, by
-  construction, because of the re-encryption step. It is a vault
-  transfer, and it requires that vault's password.
+- **Import of a vault exported by a different user** → works. It is a
+  vault transfer, and it requires that vault's password. After it, the
+  two vaults share no key material, so the source's later writes cannot
+  be injected into the destination.
 - **Export of an empty vault** → valid; produces a file with an empty
   `records` array.
 - **Browser tab closed mid-import** → the transaction either committed
@@ -142,13 +166,23 @@ and Auth Key are untouched.
 - Export → wipe the vault → import round-trips to an identical set of
   decrypted records: same ids, types, account links, and plaintext
   payloads.
-- The exported file contains no plaintext account name, tag, value,
-  rate, or currency, verified by scanning the file for known values.
+- The exported file contains no plaintext account name, note, dimension
+  label, value, rate, or currency, verified by scanning the file for
+  known values.
 - After importing, the user logs in with their **unchanged** password
   and can read every restored record.
-- Importing a file exported under a *different* user id succeeds, and
-  every record decrypts afterwards — the regression test for the AAD
-  rebinding.
+- Importing a file exported by a *different* user succeeds, and every
+  record decrypts afterwards.
+- After an import, the vault's wrapped DEK unwraps to a key that is not
+  the file's `DEK_file` — asserted directly, since a verbatim restore
+  would now pass every other test in this list.
+- A record taken from the *source* vault after the export, and inserted
+  directly into the destination's rows, fails to decrypt. This is the
+  regression test for the re-key: it passes only because the two vaults
+  hold different DEKs.
+- The exported file still opens with its original password after the
+  source vault has been re-keyed by an unrelated import.
+- No exported file contains a user identifier in any field.
 - A file with one record's ciphertext altered by a single byte aborts
   the import, uploads nothing, and leaves the pre-existing vault intact.
 - Importing with the wrong password aborts before any request is sent.

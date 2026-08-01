@@ -43,6 +43,12 @@ completes:
 3. **Review.** A plain summary: N accounts, M snapshots, exported on
    DATE. Alongside it, what will be destroyed: "Your vault currently
    holds X records. All of them will be deleted."
+   - When the file's **main currency differs** from the current vault's,
+     say so on its own line: "This vault is kept in EUR. Yours is
+     currently in CHF." It is correct and consistent — the imported
+     snapshots carry EUR rates throughout (`export-import.md`) — but it
+     changes every figure on the dashboard, so it is not something to
+     discover afterwards.
 4. **Confirm.** The user types `ERASE`. Primary button destructive,
    labelled "Replace my vault".
 
@@ -53,8 +59,8 @@ your vault are replaced."
 ## The decryption wait
 
 Import decrypts every record with the file's DEK, then re-encrypts every
-record under the current user's AAD. On a large vault this is the
-longest operation in the product.
+record under a **newly generated** DEK (`export-import.md`, The re-key
+step). On a large vault this is the longest operation in the product.
 
 - Determinate progress: "Decrypting 340 of 1 208…", then "Re-encrypting
   …". Two labelled phases, because they are genuinely different work and

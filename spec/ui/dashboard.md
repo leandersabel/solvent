@@ -28,54 +28,112 @@ Four regions, top to bottom:
 - Beside the total, two smaller figures in ink-secondary: gross assets
   and gross liabilities. Net worth is a signed sum and the UI must show
   both sides (`net-worth-view.md`).
-- A staleness chip if any account's latest snapshot is older than 90
-  days: warning color, icon, and text "3 accounts not valued recently".
-  Clicking filters the account list to them.
+- An **"Update values"** action leading to `update-values.md`, the sweep
+  across every account. No staleness chip and no warning: how old each
+  figure is belongs on that screen, beside the control that fixes it,
+  not as a badge here (`net-worth-view.md`).
 
 ### 2. Trend chart
 
-- **Step chart** — sparse snapshots make the series a step function, and
-  a smoothed line would draw values nobody entered.
-- Carried-forward segments render **lighter or dashed**; segments
-  anchored by a real snapshot render solid. This distinction is
-  load-bearing, not decorative.
-- Range selector: 1M / 6M / 1Y / All, as a single row of text buttons
-  above the chart. Default 1Y, or All when history is shorter.
-- Crosshair with a tooltip on hover: date, total, and which accounts
-  were carried forward at that point.
-- Single series → **no legend box**; the section heading names it.
-- Chart colors, mark specs, and the tooltip contract come from
-  `design-system.md`.
-- **Switching range or tag filter issues no network request.** The whole
-  model is already in memory.
+A **stacked area chart**, drawn directly in SVG with no charting library
+(`net-worth-view.md`, Rules). Asset bands stack up from zero, liability
+bands mirror down, the net-worth line runs over the top.
+
+**Controls**, in one row above the plot:
+
+- **Range**: 1M / 6M / 1Y / All as text buttons. Default 1Y, or All when
+  history is shorter.
+- **Group by**: a select listing "Total" plus every configured dimension
+  in the profile's configured order (`account-settings.md`), archived
+  ones excluded. Default "Total" — one band, no stacking — until the
+  user configures a dimension. It also drives the breakdown section
+  below. Beside it, the dimension's
+  **coverage**: "7 of 10 accounts assigned", clickable to filter the
+  table to the unassigned ones. A dimension covering a third of the
+  accounts draws a chart that is correct and misleading, and this line
+  is what prevents that being read as a bug.
+- **Absolute / percentage** toggle. Percentage normalizes each side
+  against itself; the caption says so, because a reader will otherwise
+  assume the shares are of the net figure.
+- **"Show what's estimated"** checkbox, default off.
+
+**Interaction:**
+
+- **Hover** moves a dotted crosshair and a tooltip pinned to the top of
+  the plot: date, every visible band with its value, then the net total
+  on a separated row. Value first, date second — the value is what the
+  user came for. The hero figure follows the cursor.
+- **Drag** selects a span between two arbitrary dates. The band stays
+  after release, the hero shows the change across exactly those two
+  points, and **each legend entry gains its own delta for the span** —
+  this is how "what did my retirement do between 2019 and 2024" gets
+  answered. A plain click clears it; changing range or dimension clears
+  it.
+- **Legend** entries toggle a band. Hovering one highlights it and dims
+  the rest. With a band hidden, a line under the chart states that the
+  total covers only the visible bands.
+- **Estimated data**, when shown: bands take the estimated treatment
+  from `design-system.md`, and tick marks under the x-axis mark the
+  dates where real snapshots exist. Dashing four stacked bands is
+  unreadable, which is why the marks sit under the axis rather than in
+  the fill.
+- **Archive annotations**: a marker at each `archivedAt` with the
+  account named in the tooltip.
+- Single band ("Total") → **no legend box**; the section heading names
+  it.
+- **Keyboard**: the chart is focusable, arrow keys step the crosshair
+  between snapshot dates, and a "View as table" disclosure exposes the
+  same series as a real table.
+- Chart colors, band order, mark specs, and the tooltip contract come
+  from `design-system.md`.
+- **No control here issues a network request** — range, dimension, mode,
+  band visibility, selection. The whole model is already in memory.
 
 ### 3. Accounts table
 
-Columns: Name · Tags · Latest value (native unit) · In main currency ·
-As of · (row action).
+Columns: Name · Dimensions · Latest value (native unit) · In main
+currency · As of · (row action).
+
+- The Dimensions column shows one chip per assignment
+  (`Liquidity: Cash`), omitting dimensions the account has no value for
+  rather than printing "Unassigned" on every row. With no dimensions
+  configured, the column is absent entirely.
 
 - Money columns right-aligned, `tabular-nums`.
-- "As of" shows the snapshot date, with the warning chip inline when
-  stale.
+- "As of" shows the snapshot date, plainly, at any age. The column is
+  sortable, which is what makes it answer "what have I not touched in a
+  while" without a threshold deciding for the user.
 - Accounts with no snapshots are listed in a separate "Not yet valued"
   group below the table — **not shown as 0**, which is a real value
   meaning something different.
 - Archived accounts are hidden by default behind a "Show archived"
   toggle; when shown they are dimmed with an "Archived" chip.
-- Row click → account detail/edit (`account-form.md`). A primary
-  "Record snapshot" action per row.
+- Row click → the account's detail screen (`account-detail.md`), which
+  owns its snapshot history. A primary "Record snapshot" action per row.
 
-### 4. Breakdown by tag
+### 4. Breakdown by dimension
 
-- Horizontal bars, one per tag, sorted by value descending.
+Where the chart above shows how composition **moved**, this shows what
+it is made of **right now** — a different question, and the reason the
+section survives at all.
+
+- Horizontal bars, one per band of the dimension selected in "Group by",
+  **in the dimension's configured value order** — not sorted by value.
+  Same order as the stack above, so the two read as one thing.
 - **Every bar is chart slot 1** — these are nominal categories and the
   bar length already carries the value (`design-system.md`).
-- Direct label on each bar: tag name and amount.
-- Untagged accounts group under "Untagged".
-- Directly beneath, always visible, not behind a tooltip: **"An account
-  with several tags counts in every one of them, so these can add up to
-  more than your total."** Presenting this as a pie chart of the whole
-  would be a lie, so it is not a pie chart.
+- Direct label on each bar: value label and amount.
+- "Unassigned" is a bar like any other, and "Other" folds the fifth and
+  beyond, matching the chart.
+- **The bars sum to exactly the net-worth total**, and so the section
+  needs no caveat. Its predecessor was a breakdown by overlapping tags
+  that shipped with a standing disclaimer that the parts could exceed
+  the whole; a section that has to apologize for its own arithmetic was
+  the wrong section. Dimensions partition, so the arithmetic is honest
+  and a pie chart would now be defensible — bars are kept anyway,
+  because they compare lengths better and label directly.
+- With "Group by" on "Total", this section is absent — a single bar
+  equal to the hero figure says nothing.
 
 ## States
 
@@ -91,6 +149,10 @@ As of · (row action).
   not a flat line running back to the beginning of time.
 - **Populated — all accounts archived**: total "—", history still
   renders.
+- **No dimensions configured**: "Group by" offers only "Total", with a
+  link to `dimensions.md` to create one. The chart is a single band, the
+  breakdown section is absent, and every other control still works. This
+  is the default for a new vault and must not nag.
 - **Error — some records failed to decrypt**: the view renders
   everything readable, with a **prominent, non-dismissible** critical
   banner: "N records could not be read." This is the AAD-binding
@@ -104,8 +166,10 @@ As of · (row action).
 
 - Money arithmetic in decimal at full precision; rounded only for
   display.
-- Every decrypted string — account name, tag, tooltip label — renders
-  with `x-text`. An account named `<script>alert(1)</script>` appears as
-  literal text in the table, the chart legend, and every tooltip.
+- Every decrypted string — account name, note, dimension and value
+  label, tooltip label — renders with `x-text`. An account named
+  `<script>alert(1)</script>` appears as literal text in the table, the
+  chart legend, and every tooltip, as does a dimension value labelled
+  the same way.
 - Large histories downsample **for display only**; totals always compute
   on the full data.

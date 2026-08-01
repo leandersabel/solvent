@@ -23,7 +23,10 @@ One file per screen or major view. Each covers:
 | `register.md` | register |
 | `dashboard.md` | net-worth-view |
 | `account-form.md` | manage-accounts |
-| `snapshot-entry.md` | record-snapshot, proposal half of rate-lookup |
+| `account-detail.md` | record-snapshot (edit/delete), manage-accounts (archive) |
+| `snapshot-entry.md` | record-snapshot (one account), proposal half of rate-lookup |
+| `update-values.md` | record-snapshot (the sweep), proposal half of rate-lookup |
+| `dimensions.md` | account-settings (dimensions) |
 | `settings.md` | account-settings |
 | `export-import.md` | export-import |
 | `admin.md` | admin-invites |

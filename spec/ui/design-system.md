@@ -16,7 +16,7 @@ Two accents, used sparingly and for different jobs:
 - **Brass** — the prestige accent. Primary actions, active navigation,
   the emphasis on a key figure. Warm against the cool petrol.
 - **Plum** — the secondary accent. Non-primary highlights, chart series
-  3, tag chips. Never on a button that competes with brass.
+  3. Never on a button that competes with brass.
 
 If a screen needs a third accent, it is over-designed. Cut something.
 
@@ -117,22 +117,70 @@ Fernandes (2009) severity-1.0 CVD model, OKLab ΔE ×100:
 - All four clear 3:1 on the ground, so **no relief channel is required**
   — but direct labels are still specified per chart below.
 
-**Past four series, fold the remainder into "Other."** A fifth tag never
-gets a generated hue. Re-validate with the skill's
+**Past four series, fold the remainder into "Other."** A fifth dimension
+value never gets a generated hue. Re-validate with the skill's
 `validate_palette.js` if any hex changes.
 
 ### Colors by chart job
 
-- **Nominal bars** (tag breakdown): every bar takes **slot 1**, and bar
-  length carries the value. Coloring nominal bars by value spends the
-  identity channel re-encoding what length already shows. Identity comes
-  from the direct label on each bar.
+- **Nominal bars** (the dashboard's breakdown by dimension): every bar
+  takes **slot 1**, and bar length carries the value. Coloring nominal
+  bars by value spends the identity channel re-encoding what length
+  already shows. Identity comes from the direct label on each bar.
+  - The bars and the stacked chart show the same dimension, so a reader
+    could expect the band colors to carry over. They deliberately do
+    not: the stack needs hue to separate four adjacent fills, while a
+    bar list separates by position and label already. Reusing the band
+    colors here would spend four slots to repeat what the chart above
+    just said.
 - **Sequential** (magnitude, if ever needed): the petrol chart hue as a
   one-hue ramp, light→dark.
 - **Diverging** (gains vs losses): status good ↔ status critical with a
   neutral gray midpoint (`#f0efec`). Net-worth change genuinely *means*
   good/bad, so it wears status tokens rather than categorical ones —
   never both in one chart.
+
+### Stacked areas
+
+The trend chart (`dashboard.md`) stacks one band per dimension value.
+The adjacent-pairlist validation above is exactly this case, so the four
+slots apply unchanged, in the dimension's configured order — **never
+reordered by size**, which would make the stack unreadable over time.
+
+- **Asset bands** fill at 85% opacity; **liability bands** mirror below
+  the zero line in **the same group color** at 45%. Same hue means same
+  group; the side of the axis carries the sign. The zero line is drawn a
+  step darker than a gridline.
+- The **net-worth line** runs over the stack in ink-primary at 1.5px.
+  It is a summary of the bands, not a fifth series, so it takes no chart
+  slot.
+- **Estimated stretches** are marked by tick marks under the x-axis at
+  the dates real snapshots exist — not by dashing the fills. Four
+  dashed stacked bands are unreadable, and the distinction has to
+  survive at the density of a decade of history.
+
+### The two neutral bands
+
+"Unassigned" and "Other" (`net-worth-view.md`) are not categories the
+user chose, and they must not consume a chart slot or read as one. Both
+are neutral, and they must not collide with each other:
+
+| Band | Fill | Meaning |
+|---|---|---|
+| Unassigned | hairline gray `#d8dfe1` | no value for this dimension — normal |
+| Other | ink-muted `#798285` | the fifth-and-beyond value, folded |
+
+Both always carry a direct label. A chart showing both at once is
+legible, and is also telling the user their dimension neither covers its
+accounts nor fits in four values.
+
+An earlier draft carried a third, hatched band — "Ambiguous", for an
+account holding two values of one dimension. It is gone because the
+state is gone: `dims` is a map keyed by dimension id
+(`manage-accounts.md`), so a second value cannot be written by the form,
+an import, or a hand-edited export. The hatch pattern is removed rather
+than reserved; a pattern kept for an unreachable state is a pattern that
+gets reused for the wrong thing later.
 
 ## Status
 
@@ -142,8 +190,28 @@ with an icon and a text label** — never color alone.
 | Role | Hex | Contrast | Use in Solvent |
 |---|---|---|---|
 | good | `#1d7635` | 5.40 | gains, positive delta |
-| warning | `#c2603d` | 3.96 | stale account (>90 days) |
+| warning | `#c2603d` | 3.96 | **no current consumer** — non-text, see below |
 | critical | `#ac312c` | 6.18 | losses, decryption failure, destructive confirm |
+
+`warning`'s only use was the stale-account chip, which was removed with
+the staleness threshold (`net-worth-view.md`). The token is kept rather
+than deleted so the status triad stays complete, but **nothing should
+reach for it without first checking that the thing it marks is really a
+warning** — the last one turned out to be a fact about data age wearing
+a warning's clothes.
+
+`good` and `critical` clear 4.5:1 and may carry text. **`warning` may
+not**: at 3.96 it is an icon, border, and fill color only, and the label
+beside it sits in ink-primary. Same rule as brass-500 and ink-muted, and
+the icon carries the status either way — identity is never color-alone.
+
+There is deliberately **no darker warning step** for text, unlike
+brass-600. Darkening it to clear 4.5:1 requires roughly `#b35733`, which
+sits ΔE 7.8 from `critical` — under the ~9.5 separation this palette
+holds elsewhere, so a stale-account chip would start reading as an
+error. Warning and critical are neighbouring hues and converge as they
+darken; the honest resolution is that warning does not get to be text,
+not that it gets a step which quietly fails a different test.
 
 `warning` sits ΔE 9.4 from brass-500 — deliberately, so a warning chip
 never reads as the brand accent. `critical` sits ΔE 9.6 from chart slot
@@ -194,7 +262,9 @@ keeps proportional figures.
   filled critical only inside a confirmation dialog.
 - **Input**: white fill, hairline border, petrol-600 2px focus ring.
   Never remove the focus ring.
-- **Tag chip**: petrol-50 fill, petrol-700 text, 4px radius, 13px.
+- **Chip**: petrol-50 fill, petrol-700 text, 4px radius, 13px. Used for
+  a dimension assignment (`Liquidity: Cash`) and for status chips such
+  as "Archived".
 - **Card**: white surface, hairline border, 10px radius, 24px padding.
 - **Table**: no vertical rules; `rule` horizontal dividers; money columns
   right-aligned and tabular.

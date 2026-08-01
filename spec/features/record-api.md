@@ -36,15 +36,22 @@ Exactly the table in architecture.md, Record storage API: `user_id`,
 
 ## The AAD encoding
 
-Every blob's GCM Additional Authenticated Data is the first six columns
-(architecture.md, Key management). Because AAD is byte-exact, the order
-and encoding are pinned here rather than left to each implementation —
-two implementations that disagree produce a vault that never decrypts.
+Every blob's GCM Additional Authenticated Data is five of the plaintext
+columns (architecture.md, Key management). Because AAD is byte-exact,
+the order and encoding are pinned here rather than left to each
+implementation — two implementations that disagree produce a vault that
+never decrypts.
 
 - **Field order** is the one written in Key management:
-  `user_id ‖ account_id ‖ record_type ‖ record_id ‖ schema_version ‖
-  version`. This differs from the column order in the storage table;
-  Key management wins.
+  `account_id ‖ record_type ‖ record_id ‖ schema_version ‖ version`.
+  This differs from the column order in the storage table; Key
+  management wins.
+- **`user_id` is not included**, deliberately (architecture.md, Key
+  management). The DEK boundary already makes a blob undecryptable in
+  another user's vault, so the client can build a record's AAD entirely
+  from values it chose or already holds — which is what lets a vault be
+  encrypted before the server has assigned the user an identity
+  (register.md).
 - **Encoding**: each field as UTF-8 text, joined with a single `0x1f`
   (ASCII unit separator) byte. A separator is required, not cosmetic —
   bare concatenation leaves field boundaries ambiguous, so two different
@@ -100,6 +107,14 @@ a future shape is how data gets silently corrupted.
 All session-authenticated. All writes CSRF-protected (architecture.md,
 Application hardening). All request and response bodies are
 Pydantic-validated.
+
+There is deliberately **no single-record `GET`.** The client fetches
+every record once per session and keeps the model in memory
+(`net-worth-view.md`, Data flow), so a stale-version reload after a 409
+refetches that record's whole type — three requests at most, on data
+already sized for one fetch. A by-id endpoint would also hand the server
+a per-record access pattern it currently cannot see. Where a screen spec
+says it "reloads the current record", this is what that means.
 
 - **`GET /api/records?type=<t>`** → every record of that type belonging
   to the session user, as
@@ -185,6 +200,10 @@ specified and owned by `manage-accounts.md`, not here.
 - The AAD string for a known tuple matches a fixture byte-for-byte,
   including separators and the empty `account_id` — the regression test
   that keeps two implementations from drifting into an unreadable vault.
+- The AAD contains no user identifier in any form, asserted against the
+  fixture: a record encrypted by one user and inserted directly into
+  another user's rows fails to decrypt under that user's DEK, which is
+  the property `user_id` in the AAD would have been duplicating.
 - A `snapshot` `PUT` with an empty `accountId`, and an `account` `PUT`
   with one set, are both 400.
 - A ciphertext over the per-record cap, a vault over the record-count

@@ -6,8 +6,9 @@ The user's own account: password, main currency, session behavior, and
 self-service deletion. Nothing admin-facing lives here, and nothing here
 can recover a lost password.
 
-Exercises: `spec/features/account-settings.md`. Export and import live
-on their own screen (`export-import.md`) and are linked from here.
+Exercises: `spec/features/account-settings.md`. Two things it owns in
+the feature spec live on their own screens and are linked from here:
+dimensions (`dimensions.md`) and export/import (`export-import.md`).
 
 ## Layout
 
@@ -21,6 +22,17 @@ stacked.
   your vault. Every rate you have recorded converts into it, so changing
   it would mix two currencies in your history." Not an editable field —
   do not ship a control that quietly corrupts history.
+
+### Organizing
+
+Two link rows, each one line of explanation and a chevron — not
+sections, because neither belongs inside a settings card:
+
+- **Dimensions** (`dimensions.md`) — "How your accounts split up in the
+  chart." Beneath it, the current count: "2 dimensions", or "None yet"
+  for a new vault.
+- **Export / import** (`export-import.md`) — "Download your vault, or
+  restore one from a file."
 
 ### Change password
 

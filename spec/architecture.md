@@ -41,20 +41,49 @@ A net worth tracker, self-hosted on the owner's own NAS.
 
 ## Data model
 
-All entity content below (names, tags, values) is encrypted client-side
+All entity content below (names, notes, classifications, values) is
+encrypted client-side
 per the Security model — the server sees ciphertext, not these fields.
 
 - **User**: has one **main currency** — the currency all accounts
   normalize into for the total net-worth figure.
 - **Account**: a holding, virtual (bank, brokerage, crypto exchange) or
-  physical (gold, real estate, collectibles). Has a name, a native unit
-  (currency code, or an asset unit like troy oz or shares), and any
-  number of **tags**. Some accounts (private equity, a private loan,
-  unlisted real estate) have no public price or rate source — the rate
-  proposal is best-effort per snapshot, not required of the account.
-- **Tag**: user-defined, freeform (e.g. "cash", "investment",
-  "retirement"), many-to-many with accounts — used for grouping/slicing
-  in the UI.
+  physical (gold, real estate, collectibles). Has a name, a native unit,
+  a free-text **note**, and one **dimension assignment** per configured
+  dimension. The unit is either a symbol from the operator's rate table
+  (`USD`, `XAU-ozt`) or free text for something with no market price
+  (`m²`) — and it **doubles as the account's rate symbol**, so a holding
+  can never be measured in one unit and priced in another.
+  Some accounts (private equity, a private loan, unlisted real estate)
+  have no public price or rate source — the rate proposal is
+  best-effort per snapshot, not required of the account.
+- **Brokerage holdings are recorded at depot level**, not per position:
+  one account whose native unit is the depot's reporting currency, and
+  whose snapshot value is the total the broker reports — the same act as
+  updating a bank account. A depot is therefore an ordinary currency
+  account: a foreign-currency depot converts through the same FX path as
+  a foreign-currency bank account, and a depot reporting in the user's
+  main currency needs no rate at all. No shares, no tickers, no
+  per-position rows. See Non-goals.
+- **Dimension**: a named axis an account is classified along —
+  "Liquidity" with values "Cash", "Retirement", and so on. An account
+  carries **at most one value per dimension, structurally**: the
+  account record's `dims` is a map from dimension id to value id, so a
+  second value for one dimension cannot be expressed at all. That
+  partition is what lets the stacked trend chart's bands sum to net
+  worth (net-worth-view.md).
+  - Dimensions and their values are identified by **short opaque ids
+    generated at creation**, never by their display labels. Labels are
+    therefore free text in any script, and renaming one rewrites no
+    account record — only the profile. Ids also cannot collide with
+    anything a user typed, which a label-derived key could.
+  - The set of dimensions, their labels, and their value order is user
+    configuration in the encrypted profile record (account-settings.md).
+- **There is no freeform tag.** Every classification is a dimension,
+  because an overlapping label is just a dimension with one value
+  ("Emergency fund: yes", absence meaning no). Two taxonomies over the
+  same accounts would mean two ways to spell one thing, and only one of
+  them can be stacked, ordered, or summed honestly.
 - **Snapshot**: a point-in-time value for one account: date, value in the
   account's native unit, and the conversion rate to the main currency
   used at entry time. The rate is always stored on the snapshot, not
@@ -84,13 +113,18 @@ cannot read any type. A record row is:
 | `ciphertext` | opaque | AES-256-GCM under the DEK |
 | `updated_at` | plaintext | server clock, for sync and debugging |
 
-The first six columns are exactly the AAD (see Key management), so the
-server cannot move a blob to a different slot without breaking
-decryption. They are also, by construction, **metadata the server can
-see**: record counts, which snapshots belong to which account, and write
-timestamps. That is within the accepted metadata leak in the threat
-model — the plaintext shape deliberately carries no name, value, date,
-or unit.
+Five of these columns — `record_id`, `record_type`, `account_id`,
+`schema_version`, `version` — are exactly the AAD (see Key management),
+so the server cannot move a blob to a different slot within a vault
+without breaking decryption. `user_id` is a column but **not** part of
+the AAD; cross-vault relocation is already impossible under the DEK
+boundary, and the reasoning is recorded under Key management.
+
+The plaintext columns are also, by construction, **metadata the server
+can see**: record counts, which snapshots belong to which account, and
+write timestamps. That is within the accepted metadata leak in the
+threat model — the plaintext shape deliberately carries no name, value,
+date, or unit.
 
 Endpoints (all session-authenticated, all CSRF-protected on writes):
 
@@ -104,19 +138,26 @@ The server never accepts a `user_id` from the client; it is always taken
 from the session.
 
 **Conversion-rate lookup**: a small server-side proxy/cache endpoint
-fetches rates (FX, gold, stocks) from a public API and serves the
+fetches rates (FX, gold) from a public API and serves the
 entry-date "proposal" to the client. Chosen over a direct client-side
 fetch: requests get cached, and no browser individually leaks update
 timing to a third party.
 - **Privacy scope (resolved)**: the proxy does observe which asset
-  types/currencies an authenticated user queries (gold, AAPL, CHF) — but
+  types/currencies an authenticated user queries (gold, USD, CHF) — but
   never the amount held. Per owner's call, asset *type* is not
-  confidential (knowing someone holds gold or AAPL reveals nothing
+  confidential (knowing someone holds gold or dollars reveals nothing
   sensitive); the *amount* is what the zero-knowledge model protects, and
   that never reaches the proxy or server in any form.
+  - This includes the user's **main currency**, which travels as the
+    `quote` parameter on every lookup. It is stored only inside the
+    encrypted profile record, never as a plaintext column — but the
+    server does learn it in the ordinary course of serving proposals.
+    Named here so it is covered by the same accepted-leak decision as
+    asset type, rather than looking like an oversight against
+    register.md's storage rule.
 - **Base-amount rule (hard requirement)**: every rate request queries the
-  rate for a fixed, reasonable base unit (e.g. "price of 1 troy oz",
-  "1 share", a unit currency pair) — never the account's actual snapshot
+  rate for a fixed, reasonable base unit (e.g. "price of 1 troy oz", a
+  unit currency pair) — never the account's actual snapshot
   value. This is what keeps amounts out of the request entirely; enforce
   it client-side as a requirement, not an incidental property of the API
   shape.
@@ -138,11 +179,40 @@ timing to a third party.
   could travel in. The decision is deliberately cheap to unwind — self
   hosting runs the same software, so switching is one host constant in
   the server-side whitelist.
-- **Metals and listed equities are still unresolved** — tracked in
-  `spec/questions.md`. Those are also where data licensing needs
-  checking: this design caches past rates indefinitely, which several
-  commercial providers forbid. Frankfurter carries no such restriction
-  and asks only that heavy users cache, which this design already does.
+- **Gold provider (resolved 2026-08-01): Narodowy Bank Polski's public
+  API at `api.nbp.pl`.** Same shape and same rationale as the FX choice
+  — a central bank, no API key, no quota, no vendor account, one host
+  constant to unwind — with dated history from 2013 and no restriction
+  on storing what it publishes. Three trade-offs were accepted
+  knowingly: it prices in PLN per gram, so a non-PLN quote composes a
+  second leg through Frankfurter at the `asOf` date; its price trails
+  the London fixing by one business day; and it covers gold only. The
+  lag is visible in `asOf` and overridable by the user, which is what
+  makes it acceptable — the proposal was never authority.
+  `rate-lookup.md` holds the adapter detail and the rejected
+  alternatives, chiefly **LBMA's own feeds, which are technically ideal
+  and licence-blocked**: ICE Benchmark Administration requires a licence
+  to use historical benchmark data for pricing and valuation, which is
+  exactly this use, and public reachability is not permission.
+- **Silver, platinum, and palladium have no provider in v1** — the user
+  enters those rates by hand. Their symbols are seeded into the symbol
+  table now anyway, because a symbol is written into encrypted user
+  records as an account's unit: letting users invent one would make
+  adding a provider later a migration over ciphertext the server cannot
+  read.
+- **Listed securities are not priced by lookup at all (resolved
+  2026-08-01)** — brokerage holdings are depot-level accounts (see
+  Account above), so there is no equity rate to fetch. The provider
+  search was run first and found the licensing largely closed; the
+  candidates and the reason they fail are recorded in `rate-lookup.md`
+  so the question is not reopened on a vendor's marketing page. One
+  finding generalizes and is worth stating here, because it constrains
+  every future provider: **a snapshot stores its rate permanently,
+  inside user ciphertext the server cannot read, enumerate, or delete.**
+  Terms requiring deletion of all data on termination are therefore
+  unsatisfiable by construction — not a cache-policy problem a shorter
+  TTL could fix. Neither Frankfurter nor NBP carries such a restriction,
+  which is now a hard criterion rather than a happy accident.
 
 ## Tech stack
 
@@ -194,6 +264,10 @@ timing to a third party.
   simplicity (single file, no separate DB service), not its own
   encryption. The disk file still deserves protection as defense in
   depth, but the security guarantee doesn't depend on it.
+- **Charting**: none. The trend chart is drawn directly in SVG
+  (net-worth-view.md, Rules) — benchmarked against the alternatives on
+  2026-08-01, see spec/questions.md. This keeps the strict CSP intact
+  with one less pinned bundle to audit.
 - **Frontend**: hybrid. Flask + Jinja2 + htmx server-renders the app shell
   (navigation, login/registration, layout) — nothing sensitive passes
   through it. Data screens (balances, net worth charts) render
@@ -280,14 +354,28 @@ nothing gets resolved by inference downstream:
     data volume (well below 2³² messages under one key); revisit DEK
     rotation only if a single vault ever approaches that bound.
   - **Data integrity (AAD binding)**: every blob's GCM Additional
-    Authenticated Data is set to `user_id ‖ account_id ‖ record_type ‖
-    record_id ‖ schema_version ‖ monotonic_version`. Decryption fails if
-    the server relocates, swaps, or rolls back a blob to a different
-    logical slot — AES-GCM's per-blob authentication alone protects
-    contents but not arrangement, so this closes that gap. A
-    client-maintained, DEK-authenticated manifest (expected record IDs +
-    versions) would additionally catch wholesale deletion of the set —
-    worth revisiting post-v1, not required to ship.
+    Authenticated Data is set to `account_id ‖ record_type ‖ record_id
+    ‖ schema_version ‖ monotonic_version`. Decryption fails if the
+    server relocates, swaps, or rolls back a blob to a different
+    logical slot within a vault — AES-GCM's per-blob authentication
+    alone protects contents but not arrangement, so this closes that
+    gap.
+  - **`user_id` is deliberately *not* in the AAD.** Cross-vault
+    relocation is already impossible without it: a blob moved into
+    another user's rows fails to decrypt under that user's DEK,
+    unconditionally. Binding `user_id` would add a second check on a
+    boundary the DEK already holds — and its only live case would be
+    the one place two users legitimately share a key, a vault transfer
+    through Export/Import. Import therefore **re-keys** rather than
+    re-binds (export-import.md): the imported vault is re-encrypted
+    under a freshly generated DEK, so the two vaults share no key
+    material afterwards and cross-injection is impossible rather than
+    merely detected. A consequence worth stating outright, because it
+    removes a whole class of ordering problem: **the client never needs
+    to know its own `user_id`, and no endpoint returns one.**
+  - A client-maintained, DEK-authenticated manifest (expected record
+    IDs + versions) would additionally catch wholesale deletion of the
+    set — worth revisiting post-v1, not required to ship.
 - **Session key handling**: Master Key and unwrapped DEK live only in
   browser memory for the session (not localStorage/sessionStorage, to
   limit XSS exposure) — a page refresh requires re-deriving them from the
@@ -358,7 +446,8 @@ nothing gets resolved by inference downstream:
   `unsafe-eval` for `x-` expressions, which would gut the CSP above).
 - **Decrypted content is always untrusted output**: render with
   `textContent`/Alpine `x-text` only, never `innerHTML`/`x-html` —
-  account names, tags, and any imported data are attacker-influenceable
+  account names, notes, dimension labels, and any imported data are
+  attacker-influenceable
   and rendered client-side, where XSS means password/Master Key capture,
   not just session theft.
 - **Session cookies**: `HttpOnly`, `Secure`, `SameSite=Lax`. Flask
@@ -410,6 +499,10 @@ nothing gets resolved by inference downstream:
 - No automated bank sync / Plaid-style integration — conflicts with
   zero-knowledge encryption, since a third party can't encrypt on the
   user's behalf.
+- No position-level tracking of listed securities — no share counts, no
+  tickers, no cost basis, no per-holding performance. A brokerage
+  account is one depot-level figure the user reads off their broker, the
+  same act as updating a bank balance (see Data model).
 - No mobile app — responsive web only.
 - No shared/household view — vaults are private per user.
 - No multi-tenant/public hosting — single instance, small fixed set of

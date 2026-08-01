@@ -52,8 +52,9 @@ Contribution to net worth = `value × rate`, in the main currency.
 ## Flow
 
 1. User picks an account and a date (defaults to today).
-2. If the account has a `rateSymbol`, the client requests a proposal
-   from the rate-lookup proxy for that symbol and date (rate-lookup.md).
+2. If the account's unit is a symbol in the operator's table, the client
+   requests a proposal from the rate-lookup proxy for that unit and date
+   (rate-lookup.md).
    The request carries **a fixed base unit, never the value being
    entered** (architecture.md, Base-amount rule).
 3. User enters the value; the rate field is pre-filled and editable.
@@ -76,6 +77,53 @@ snapshot for the account, and the server cannot see dates. Record ids
 stay random UUIDv4; deriving them from the date would let the server
 brute-force which dates a user holds data for.
 
+## Confirming a previous value
+
+A snapshot can be written by **confirming** an account's last known
+value at a new date rather than typing it (`ui/update-values.md`). It
+writes an ordinary snapshot — no new field, no new `rateSource` value,
+nothing for the record shape to learn.
+
+The one rule that matters: **the rate is fetched fresh for the new
+date; the previous snapshot's rate is never copied forward.** For most
+non-currency holdings the quantity is what stays constant and the price
+is what moves — you still own 12.5 troy ounces, and gold has done
+something since. Copying the old rate would stamp a new date onto a
+stale price, which is worse than recording nothing, because it looks
+like a measurement.
+
+Confirming is unavailable for an account with no snapshots: there is
+nothing to confirm.
+
+## Editing an existing snapshot
+
+Value, rate, note, and **date** are all editable (`ui/account-detail.md`
+is where a past snapshot is found). Editing is an ordinary versioned
+write, except when the date moves onto a date the account already holds.
+
+That case destroys a record, unlike the upsert above, which only
+replaces the one being written. It must read differently:
+
+> 30 July already holds a snapshot of 12 100.00 USD. Moving this entry
+> there will delete it.
+
+**Order the two operations write-then-delete.** The move is a `PUT`
+(this record, new date) plus a `DELETE` (the record being displaced),
+and no transaction spans two records in this API. Delete-first risks
+losing the displaced record while the `PUT` fails, leaving a hole with
+nothing to show for it. Write-first risks a moment where two snapshots
+claim one date — harmless server-side, since one-per-date is a
+client-side rule, and visible to the client afterwards.
+
+**Two snapshots on one date is therefore a reachable state, and must be
+surfaced, never silently resolved.** A client that finds one takes no
+guess at which is authoritative — not the highest `version`, not the
+latest `updated_at`. It renders both in the account's history, flagged,
+with an action to keep one; and it excludes that date from
+interpolation until resolved, because there is no correct curve through
+two values. Same family as a decryption failure: a visible fault beats a
+quiet wrong number.
+
 ## Inputs / outputs
 
 - In: account, date, value, rate (proposed, edited, or manual),
@@ -86,7 +134,7 @@ brute-force which dates a user holds data for.
 
 ## Edge cases
 
-- **Account has no rate source** (`rateSymbol: null`) → no proposal is
+- **Account has no rate source** (a free-text unit) → no proposal is
   requested at all; both value and rate are manual, and the form says so
   rather than showing an empty rate field with no explanation.
 - **Account's native unit is the main currency** → rate is fixed at `1`,
@@ -140,10 +188,28 @@ brute-force which dates a user holds data for.
 - With the rate proxy stubbed to 503, the snapshot can still be saved
   with a manual rate.
 - A future-dated snapshot is rejected.
-- An account with `rateSymbol: null` triggers zero rate-lookup requests.
+- An account with a free-text unit triggers zero rate-lookup requests.
+- The rate proposed for an account is always for one unit of *that
+  account's* unit — asserted for an account measured in `XAU-g` against
+  one measured in `XAU-ozt`, whose proposals differ by 31.1034768.
 - Attempting to record against an archived account is blocked, except
   for the closing snapshot written by the archive flow itself.
 - Every stored snapshot carries a `rateTarget` equal to the main
   currency in the profile record at entry time.
 - Editing a snapshot from a second tab with a stale `version` returns
   409 and does not overwrite.
+- Moving a snapshot's date onto an occupied date prompts with copy
+  naming the deletion, and on confirm leaves exactly one record for that
+  date.
+- The move issues the `PUT` before the `DELETE`: with the `DELETE`
+  stubbed to fail, both records still exist afterwards and neither is
+  lost.
+- With two snapshots present for one (account, date), the history view
+  shows both flagged, the client picks neither, and that date is
+  excluded from the interpolated series until resolved.
+- Confirming a previous value writes a snapshot whose `value` equals the
+  previous one and whose `rate` was fetched for the **new** date — with
+  the proxy stubbed to return a different rate, the stored rate is the
+  new one, never the old snapshot's.
+- Confirming an account with no snapshots is not offered, and the
+  equivalent request is rejected client-side.

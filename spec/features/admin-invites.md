@@ -45,9 +45,16 @@ An invite row: `id`, `token_hash`, `created_by`, `created_at`,
 All require an authenticated session whose user has `is_admin`, and all
 writes are CSRF-protected.
 
-- `POST /api/admin/invites` `{ expiresInDays, label }` →
+- `POST /api/admin/invites` `{ expiresInDays, label, isAdmin }` →
   `{ id, token, url, expiresAt }`. The only response that ever contains
-  the token.
+  the token. `isAdmin` defaults to `false`; when true, the user created
+  from this invite is an admin.
+
+  This is **not** a role-change endpoint and does not weaken the rule
+  below. It mints a new account that is born an admin; it cannot reach
+  an existing user. Promoting an existing account is the operation that
+  would let an admin move toward someone else's vault, and it stays
+  absent.
 - `GET /api/admin/invites` → list of
   `{ id, label, createdAt, expiresAt, status, usedAt, usedBy }`.
   **Never includes the token or its hash.**
@@ -75,11 +82,11 @@ writes are CSRF-protected.
   they are about to destroy.
 
 There is **no role-change endpoint in v1** — no promote, no demote. An
-admin is made by the bootstrap CLI or by an invite carrying `is_admin`,
-and unmade only by deleting the account. Adding one later must be
-checked against The admin boundary first.
+admin is made by the bootstrap CLI or by an admin invite, and unmade
+only by deleting the account. Adding a promote/demote endpoint later
+must be checked against The admin boundary first.
 
-## Bootstrap: the first admin
+## Bootstrap: the first admin, and the locked-out one
 
 Registration needs an invite and invites need an admin, so the first
 account is created out of band by a one-off CLI command run by the
@@ -90,9 +97,28 @@ flask create-invite --admin --expires-days 1
 ```
 
 It prints an invite URL and exits. The invite it creates carries an
-`is_admin` flag that the resulting user inherits. The command refuses to
-run if any user already exists, so it cannot be used later to mint an
-admin around the UI.
+`is_admin` flag that the resulting user inherits.
+
+**On a populated instance the command requires `--force`**, printing
+how many users and admins already exist and what the flag will do. It
+does not refuse outright, and the reason matters: an earlier draft
+blocked it entirely so it "cannot be used later to mint an admin around
+the UI." But the only actor who can run it holds shell access to the
+host — and that actor already holds the SQLite file, the `SECRET_KEY`,
+and the ability to modify the served JavaScript, which architecture.md
+(Threat model) states outright is **not** defended against. The guard
+blocked someone who has already won, and its real effect was to remove
+the only recovery path in the product.
+
+That path is the point. An admin who loses their password cannot
+recover their vault — by design, nothing changes that — but the
+*instance* must still be able to provision. Without the override, the
+remaining option is hand-editing SQLite against a schema of hashed
+tokens and transactional invite consumption, an operation no spec
+covers.
+
+The confirmation is friction, not security: it stops an absent-minded
+invocation, and it is honest that it cannot stop anything more.
 
 ## Inputs / outputs
 
@@ -144,8 +170,13 @@ admin around the UI.
 - **Deleting a username that does not exist** → 404, the same as any
   other admin route reached by a non-admin, so a probe distinguishes
   nothing.
-- **Bootstrap command run on a populated instance** → refuses and exits
-  non-zero.
+- **Bootstrap command run on a populated instance without `--force`** →
+  refuses, exits non-zero, and prints the existing user and admin counts
+  plus the flag that would proceed.
+- **Sole admin loses their password** → their vault is gone and stays
+  gone; the operator runs the CLI with `--force` to mint a new admin
+  invite. This is the documented recovery path for the instance, never
+  for a vault.
 
 ## Acceptance criteria
 
@@ -166,7 +197,15 @@ admin around the UI.
   of every admin endpoint, so the test fails if one is added later.
 - `flask create-invite --admin` on an empty instance produces a working
   invite whose user is an admin; on a populated instance it exits
-  non-zero and creates nothing.
+  non-zero and creates nothing, and with `--force` it succeeds.
+- An invite created with `isAdmin: true` produces an admin; the same
+  invite without it produces a non-admin. Both are asserted against the
+  resulting user row.
+- `POST /api/admin/invites` with `isAdmin: true` from a **non**-admin
+  session returns 404 and creates nothing.
+- No request to any endpoint changes an existing user's admin status —
+  asserted by enumerating every registered route and attempting the
+  change through each.
 - The last remaining admin cannot delete their own account, by either
   path — the admin panel returns 409 and `DELETE /api/auth/account` returns
   409.

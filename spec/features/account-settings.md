@@ -57,6 +57,84 @@ The settings screen shows the main currency with a one-line note that it
 is fixed at registration and why. Do not ship an editable field that
 quietly corrupts history.
 
+**Import is the one exception, and it is not a loophole.** Restoring a
+vault replaces the profile *and* every snapshot together
+(`export-import.md`), so the imported vault is internally consistent —
+there is no history left denominated in the old currency to mix with.
+The danger this rule guards against is changing the label while keeping
+the data, which import does not do.
+
+## Dimensions
+
+The user's grouping dimensions (`manage-accounts.md`, Dimensions) are
+configured on their own screen (`ui/dimensions.md`, linked from
+settings) and stored in the **encrypted profile record**, so they follow
+the user across devices and the server never learns how anyone slices
+their wealth.
+
+```json
+"dimensions": [
+  {
+    "id": "d7f3a1b2",
+    "label": "Liquidity",
+    "archivedAt": null,
+    "values": [
+      { "id": "9c4e0f11", "label": "Cash",               "archivedAt": null },
+      { "id": "2a8b7d30", "label": "Liquid investments", "archivedAt": null },
+      { "id": "5f1c9e44", "label": "Fixed investments",  "archivedAt": null },
+      { "id": "b03d6a27", "label": "Retirement",         "archivedAt": null }
+    ]
+  }
+]
+```
+
+- **`id` is opaque and immutable**: 8 characters of `[a-z0-9]` from
+  `crypto.getRandomValues`, minted at creation, checked for uniqueness
+  against the profile already in memory. It is never shown, never typed,
+  and never derived from the label.
+- **`label` is free display text** in any script, renamable at any time.
+  A rename writes one record — the profile — and touches no account.
+  This is the whole reason ids are not slugs: a label-derived key would
+  make renaming either impossible or a multi-record rewrite that can
+  fail partway, and would risk colliding with strings already in user
+  data.
+- **Order in `values` is the band order** in the stacked chart. It
+  cannot be derived from the accounts, which yield which value ids are
+  in use but never the intended sequence — and a stack whose bands
+  reorder over time is unreadable (`net-worth-view.md`). Reordering
+  writes one record.
+- **Order of `dimensions` is the order of the dashboard's "Group by"
+  select.**
+- Absent or empty means no dimensions: the chart groups by nothing and
+  offers "Total" alone. This is the default for a new user; the feature
+  costs nothing until it is used.
+- Values may exceed four; the chart folds the remainder into "Other"
+  (`design-system.md`). The screen says so rather than capping the list,
+  because the limit is a rendering constraint, not a data one.
+
+### Deleting is archiving
+
+Deleting a dimension or a single value sets `archivedAt` and keeps the
+definition in the profile. It leaves every account's `dims` entry
+untouched: those accounts render as "Unassigned" for that dimension
+until it is restored, and restoring it brings every assignment back
+exactly.
+
+There is deliberately **no "remove everywhere" option**, and no
+multi-record write anywhere in this feature. Stripping entries from N
+account records to undo a display setting is a destructive operation
+that can fail partway, offered in exchange for a few bytes of inert data
+inside ciphertext nobody reads. An archived definition costs one line in
+the profile record and buys exact reversibility.
+
+An archived dimension is hidden from the account form and the "Group by"
+select, and listed under a collapsed "Archived" section on the
+dimensions screen with a restore action.
+
+A **flag** — a dimension with a single value — is the shape that
+replaces a yes/no tag. Absence of an entry means no; the account form
+renders it as a checkbox rather than a select.
+
 ## Delete my account
 
 Self-service, irreversible, and distinct from an admin deleting a user.
@@ -77,7 +155,6 @@ Self-service, irreversible, and distinct from an admin deleting a user.
   (admin-invites.md).
 - The dialog offers **export first** as the primary action and deletion
   as the secondary one.
-- The last remaining admin cannot delete themselves (admin-invites.md).
 
 ## Session and lock
 
@@ -172,4 +249,19 @@ Self-service, irreversible, and distinct from an admin deleting a user.
   profile record.
 - A profile record with `idleLockMinutes` set to 0, 500, or a
   non-integer still locks, at the clamped bound.
+- Reordering a dimension's values reorders the chart's bands and writes
+  one record — no account record is touched.
+- Renaming a dimension's label, or a value's label, writes one record
+  and leaves every account record byte-identical.
+- Archiving a dimension and restoring it returns every account to the
+  band it was in, with no account record written in either direction.
+- Archiving a single value moves its accounts to "Unassigned";
+  restoring it moves them back.
+- No operation in the dimensions feature writes more than one record.
+  Asserted by counting `PUT`s across create, rename, reorder, archive,
+  and restore.
+- Two dimensions created in the same session hold different ids, and an
+  id is never equal to any label.
+- A profile with no `dimensions` key renders the dashboard with "Total"
+  as the only grouping and no errors.
 - "Log out everywhere" invalidates the current session too.
