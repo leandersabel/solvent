@@ -15,7 +15,12 @@ password recovery) and not a sync mechanism.
 ## Export
 
 `GET /api/export` returns a JSON file, `Content-Disposition: attachment`,
-named `solvent-vault-<username>-<YYYY-MM-DD>.json`:
+named `solvent-vault-<username>-<YYYY-MM-DD>.json`.
+
+It **requires the `X-Solvent-Request` header** despite being a GET
+(architecture.md, CSRF), so it is not reachable by navigation: the
+client fetches it and saves the response through a blob URL rather than
+pointing an `<a href>` at it. Following the URL directly is a 403.
 
 ```json
 {
@@ -82,8 +87,9 @@ injection fails at the cryptography rather than at a check.
    so the user's existing login password keeps working after the import.
 6. `POST /api/import` with the new wrapped DEK and the re-encrypted
    records. The server, in one transaction, deletes every record
-   belonging to the session user, replaces their wrapped DEK, and
-   inserts the new set.
+   belonging to the session user, replaces their wrapped DEK, inserts
+   the new set, and **invalidates every other session for the user**,
+   keeping the importing one.
 7. Client swaps its in-memory DEK to `DEK_new` and reloads the view.
 
 **The profile record is replaced along with everything else**, so the
@@ -114,13 +120,31 @@ written.
 - Strict server-side validation before any write: total payload size
   cap, per-record ciphertext size cap, record count cap, known
   `recordType` values, well-formed UUIDs, base64 decodes cleanly,
-  `accountId` present exactly for `snapshot` records and referencing an
-  account in the same import.
+  `accountId` present exactly for `snapshot` records (`null` otherwise,
+  never `""` — record-api.md) and referencing an account in the same
+  import.
+- **Every record goes through the same per-record validator as
+  `PUT /api/records`** (record-api.md), field-consistency check
+  included, so there is one set of rules with two callers. That
+  validator also enforces `version: 1` on every imported record rather
+  than trusting the client to have reset it at step 4 — a record
+  arriving at any other version is a 400 for the whole payload.
 - Client-side validation mirrors this so a bad file fails fast without
   a large upload.
 - The import is one transaction. A failure at any point leaves the
   existing vault exactly as it was — never half-erased.
-- Export is rate-limited per user; it is a full vault read.
+- **Every other session is invalidated by the import**, in that same
+  transaction. A second session still holds `DEK_old` and the old
+  model: its updates to existing records fail the version check, but a
+  *create* — new UUID, `version: 1` — is accepted and stores ciphertext
+  under a key no longer in the envelope, producing a permanently
+  unreadable record whose only symptom is the decryption-failure
+  banner. A password change already invalidates other sessions
+  (account-settings.md) and changes strictly less: it leaves the DEK
+  intact. Import must not be the weaker of the two.
+- Export is rate-limited per user — **default 5 per hour**, operator
+  config (architecture.md, Rate limiting). It is a full vault read, and
+  nobody backs up five times an hour.
 
 ## Edge cases
 
@@ -193,7 +217,17 @@ written.
   intact and readable.
 - Payloads over the size cap, over the record-count cap, or with an
   unknown `recordType` are rejected before any write.
+- A payload with one record at `version: 2`, or one `snapshot` whose
+  `accountId` names no account in the same payload, is rejected whole —
+  the same validator `PUT /api/records` runs.
+- Every record in the vault reads `version: 1` after an import.
+- A second session belonging to the importing user is invalidated: its
+  next API call returns 401, and a record it attempts to create after
+  the import never reaches the vault.
 - A fixture file at `formatVersion: 1` still imports after the format
   advances to 2.
 - The export screen shows the sensitivity warning before the download is
   triggered, not after.
+- `GET /api/export` as a plain top-level navigation returns 403 and
+  writes no file, with a valid session cookie present — the regression
+  test for the header requirement.

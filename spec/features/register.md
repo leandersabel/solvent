@@ -11,18 +11,24 @@ before anything is sent to the server (architecture.md, Key management).
 ## Flow
 
 1. `GET /register?invite=<token>` is server-rendered (Jinja). The page
-   embeds the server's **current default KDF parameters** (algorithm,
-   version, memory, iterations, parallelism) so no extra round-trip is
-   needed. The server checks the token is well-formed, unused, and
-   unexpired; an invalid token renders an error page with no form.
+   embeds two things so no extra round-trip is needed: the server's
+   **current default KDF envelope** (architecture.md, Key management)
+   and the **currency half of the symbol table** (rate-lookup.md) for
+   the main-currency picker. Both are needed before the user has a
+   session, which is why they ride on the page rather than on an API
+   the page cannot call. The server checks the token is well-formed,
+   unused, and unexpired; an invalid token renders an error page with
+   no form.
 2. User enters username, password, password confirmation, and main
-   currency (ISO 4217, from a fixed list).
+   currency, chosen from that embedded list.
 3. Client generates a random 128-bit salt (`crypto.getRandomValues`).
 4. Client derives Master Key + Auth Key from password + salt with the
    embedded parameters, generates a random 256-bit DEK, wraps the DEK
    under the Master Key (AES-256-GCM), generates a UUIDv4
-   `profileRecordId`, and encrypts a profile record
-   `{ mainCurrency, createdAt }` under the DEK.
+   `profileRecordId`, and encrypts a profile record under the DEK
+   holding `{ mainCurrency, createdAt }` — the two required keys of the
+   payload in account-settings.md, The profile record. The optional
+   ones are written later, by the settings that own them.
 5. `POST /api/register` with: invite token, username, Auth Key, salt,
    KDF parameter envelope, wrapped DEK + its nonce, and the profile
    record's id, schema version, ciphertext, and nonce. **The password
@@ -72,6 +78,16 @@ with two callers rather than two record writers.
   are at or above the server's configured minimum (a client must not be
   able to register itself a weak KDF); wrapped DEK and profile blobs are
   within the size limits from architecture.md, Blob and quota limits.
+- **The main-currency list is exactly the provider-quotable currency
+  set** — the `kind: currency` rows of the operator's symbol table,
+  which are seeded from the FX provider's own currency list
+  (rate-lookup.md). Not the full ISO 4217 set. The main currency is the
+  `quote` on *every* rate lookup the vault will ever make, and it is
+  immutable outside import (account-settings.md), so a code the
+  provider cannot quote into means no proposal ever resolves — a fault
+  discovered long after the vault is populated and no longer fixable in
+  settings. Offering only quotable codes makes that unreachable by
+  choosing.
 - Main currency is stored **only inside the encrypted profile record**,
   never as a plaintext column.
 - The invite is marked used in the **same transaction** as the user

@@ -47,7 +47,9 @@ figures needs to know which were guesses (`record-snapshot.md`,
 - **proposed** — a small brass chip "Market rate · 31 Jul" beside the
   field.
 - **edited** — the chip changes to "Edited from 0.9312" the moment the
-  user changes the value. Never silently keep the proposed badge.
+  user changes the value, naming the rate stored as `proposedRate`
+  (`record-snapshot.md`), so the same chip renders identically a year
+  later on `account-detail.md`. Never silently keep the proposed badge.
 - **manual** — no chip; the label reads "Enter the rate".
 
 ## The four rate situations
@@ -55,12 +57,13 @@ figures needs to know which were guesses (`record-snapshot.md`,
 1. **Account unit = main currency** → the rate field is **hidden
    entirely**, rate fixed at `1`, `rateSource: manual`. Showing a
    disabled "1" field is noise.
-2. **Account's unit is a listed symbol** → proposal requested for that
-   unit and date. The request carries **a fixed base unit, never the
-   value being entered** — enforce this in the client, and never let the
-   value field participate in or trigger a rate request. The rate is
-   always per one of *this account's* unit, which is guaranteed rather
-   than checked: the unit is the symbol (`manage-accounts.md`).
+2. **Account's unit is a symbol with `lookup: true`** → proposal
+   requested for that unit and date. The request carries **a fixed base
+   unit, never the value being entered** — enforce this in the client,
+   and never let the value field participate in or trigger a rate
+   request. The rate is always per one of *this account's* unit, which
+   is guaranteed rather than checked: the unit is the symbol
+   (`manage-accounts.md`).
 3. **The unit is free text** → no request is made at all. The form says
    "This account has no price source — enter the rate yourself" rather
    than presenting an empty field with no explanation.
@@ -71,6 +74,24 @@ figures needs to know which were guesses (`record-snapshot.md`,
    for silver yet — enter it yourself" — and must not reuse the outage
    notice below, which tells the user something is broken when nothing
    is.
+
+## Editing an existing snapshot
+
+The same modal, pre-filled — including the rate, which comes from the
+stored record and not from a fresh proposal (`record-snapshot.md`, The
+rate when editing). The chip shows the stored `rateSource`, so a
+snapshot saved as "Market rate · 31 Jul" still reads that way when
+reopened a year later.
+
+- Changing the **value** or the note touches no rate field and issues no
+  request.
+- Changing the **rate** flips a `proposed` chip to "Edited from …" as it
+  does at entry; a `manual` one stays chipless.
+- Changing the **date** fetches a proposal for the new date and offers
+  it as a one-click "Use the rate for 12 Aug" beside the field. It is
+  never applied on its own — declining keeps the stored rate, which is
+  the right outcome for the common case of a mistyped date. If no
+  proposal comes back, no offer appears and nothing is blocked.
 
 ## States
 

@@ -11,9 +11,9 @@ Exercises: `spec/features/net-worth-view.md`. Links into
 
 ## Layout
 
-App shell: petrol-800 top bar with wordmark, nav (Dashboard, Accounts,
-Settings, and Admin for admins), and a lock button. Content max-width
-1200px on ground.
+Standard app shell (`design-system.md`, App shell), content max-width
+1200px on ground. The accounts table below is the account list the shell
+deliberately has no nav entry for.
 
 Four regions, top to bottom:
 
@@ -72,11 +72,9 @@ bands mirror down, the net-worth line runs over the top.
 - **Legend** entries toggle a band. Hovering one highlights it and dims
   the rest. With a band hidden, a line under the chart states that the
   total covers only the visible bands.
-- **Estimated data**, when shown: bands take the estimated treatment
-  from `design-system.md`, and tick marks under the x-axis mark the
-  dates where real snapshots exist. Dashing four stacked bands is
-  unreadable, which is why the marks sit under the axis rather than in
-  the fill.
+- **Estimated data**, when shown: the chart form of the estimated
+  marker (`design-system.md`) — tick marks under the x-axis at the dates
+  real snapshots exist. The bands themselves are unchanged.
 - **Archive annotations**: a marker at each `archivedAt` with the
   account named in the tooltip.
 - Single band ("Total") → **no legend box**; the section heading names
@@ -124,10 +122,20 @@ section exists.
 - Direct label on each bar: value label and amount.
 - "Unassigned" is a bar like any other, and "Other" folds the fifth and
   beyond, matching the chart.
-- **The bars sum to exactly the net-worth total**, so the section needs
-  no caveat. Dimensions partition, which would make a pie chart
-  defensible here too; bars are used anyway, because they compare
-  lengths better and label directly.
+- **A band can be net negative** — a mortgage under "Fixed" — so the
+  bars sit against a **shared zero baseline** and negative bands run
+  **leftward** from it, in the same slot-1 fill at the liability
+  opacity (`design-system.md`, Nominal bars). This is the stacked
+  chart's asset-up/liability-down convention turned on its side, so the
+  two sections read the same way. When every band is positive the
+  baseline sits at the left edge and the bars look ordinary; the layout
+  does not change shape depending on the data.
+- **The bars sum to exactly the net-worth total** — a *signed* sum, with
+  leftward bars subtracting, which is the same arithmetic the hero
+  figure does. So the section needs no caveat. Dimensions partition,
+  which would make a pie chart defensible here too — except that a pie
+  cannot show a negative slice at all; bars are used anyway, because
+  they compare lengths better and label directly.
 - With "Group by" on "Total", this section is absent — a single bar
   equal to the hero figure says nothing.
 

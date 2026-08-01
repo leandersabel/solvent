@@ -44,8 +44,9 @@ In main currency · Source · (row actions).
 - **Source** carries the provenance chips from `snapshot-entry.md`:
   "Market rate · 31 Jul" for `proposed`, "Edited from 0.9312" for
   `edited`, and nothing at all for `manual`. This column is the whole
-  reason `rateSource` is stored (`record-snapshot.md`) — without it the
-  field is written and never read.
+  reason `rateSource` and `proposedRate` are stored
+  (`record-snapshot.md`) — without it, both fields are written and never
+  read.
 - A note on a snapshot shows as an icon that expands the row; notes are
   not truncated into the table.
 - Rate is hidden as a column when the account's unit is the main

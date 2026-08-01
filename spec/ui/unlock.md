@@ -82,5 +82,8 @@ interaction and must not look like a hang.
   work. This is a deliberate call — a manager-generated passphrase is
   the best realistic defense for a vault with no recovery.
 - Re-unlock mode must preserve whatever the user was doing: after
-  unlocking, return to the previous view with unsaved form input intact
-  (`login.md`, clock-skew edge case).
+  unlocking, return to the previous view with unsaved form input intact.
+  That input is the **one named exception** to the idle lock discarding
+  all decrypted state (`login.md`, Rules) — everything else on the
+  previous view is re-decrypted, so the view repopulates rather than
+  reappearing.

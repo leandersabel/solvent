@@ -255,7 +255,11 @@ reachable (architecture.md, SSRF hardening):
 - `symbol` is validated against a strict allowlist before use: it must
   match `^[A-Z0-9][A-Z0-9._-]{0,15}$` **and** be present in the
   server's configured symbol table. Regex alone is not sufficient.
-- `quote` must be a known ISO 4217 code.
+- `quote` must be a `kind: currency` row of the server's symbol table —
+  the same set registration offers as a main currency (`register.md`).
+  "A known ISO 4217 code" is the looser check and the wrong one: ISO
+  4217 contains codes the FX provider cannot quote into, and `quote` is
+  the user's main currency on every request the vault ever makes.
 - `date` must parse as a calendar date, not be in the future, and not
   precede the floor configured **for that symbol** — 2013-01-02 for
   gold, the provider's own history start for others. A single global
@@ -269,11 +273,16 @@ reachable (architecture.md, SSRF hardening):
 
 ## Rate limiting and failure
 
-- Per-user request limit on the endpoint, independent of the login
-  limiter — a compromised session must not be usable to hammer the
-  provider on the instance's API quota.
-- A circuit breaker opens after repeated provider failures and serves
-  `204` directly for a cool-off period instead of retrying per request.
+- Per-user request limit on the endpoint, **default 120 per hour**,
+  independent of the login limiter — a compromised session must not be
+  usable to hammer the provider on the instance's API quota. A full
+  sweep of thirty accounts costs at most thirty requests and mostly
+  hits cache, so the limit sits far above honest use.
+- A circuit breaker opens after **5 consecutive provider failures** and
+  serves `204` directly for a **5-minute cool-off** instead of retrying
+  per request.
+- Both are operator config with those defaults (architecture.md, Rate
+  limiting).
 - Provider errors are logged with the symbol and status, never with the
   requesting user's identity beyond what the access log already holds.
 
@@ -287,6 +296,15 @@ reachable (architecture.md, SSRF hardening):
 - **Provider down, rate-limited, or timing out** → `204`; the client
   falls back to manual entry and says why. Recording a snapshot is never
   blocked by the proxy.
+- **`symbol` equals `quote`** → `200` with `rate: "1"`, `base` naming
+  that unit, `asOf` set to the requested date, `source: "identity"`,
+  `cached: false`, and **no outbound request**. The answer is 1 by
+  definition, and Frankfurter errors on base = quote, so passing it
+  through would turn the most trivially answerable question in the API
+  into a provider error. The client never asks — the rate field is
+  hidden for a main-currency account (`record-snapshot.md`) — but the
+  server answers correctly regardless, the same reason a
+  `lookup: false` symbol answers `204` rather than `400`.
 - **Symbol not in the server's symbol table** → `400`. Adding a symbol
   is an operator config change, not a user action.
 - **Symbol in the table with `lookup: false`** (`XAG-ozt` and the rest)
@@ -324,8 +342,9 @@ reachable (architecture.md, SSRF hardening):
   no request to that address is made.
 - With the provider stubbed to hang, the endpoint returns `204` within
   the configured timeout rather than holding the connection.
-- After N consecutive provider failures the circuit breaker returns
-  `204` without an outbound attempt, and closes again after the cool-off.
+- After the configured number of consecutive provider failures the
+  circuit breaker returns `204` without an outbound attempt, and closes
+  again after the cool-off.
 - An unauthenticated request returns 401 and makes no outbound request.
 - No log line, response body, or error page contains the provider API
   key.
@@ -351,3 +370,8 @@ reachable (architecture.md, SSRF hardening):
 - With the FX leg stubbed to fail, the response is `204` and no rate
   carrying a PLN figure under another currency's label is ever returned.
 - A gold request dated 2012-12-31 returns 400.
+- `symbol=CHF&quote=CHF` returns `rate: "1"` with no outbound request.
+- A `quote` that is a valid ISO 4217 code but absent from the symbol
+  table is rejected with 400 — asserted with a code the FX provider
+  does not serve, since that is the case a plain ISO check waves
+  through.

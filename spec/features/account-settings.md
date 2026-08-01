@@ -7,6 +7,39 @@ currency, see session state, and delete their own account. Nothing here
 is admin-facing (admin-invites.md) and nothing here can recover a lost
 password.
 
+## The profile record
+
+One `profile` record per vault, holding everything about the user that
+is not a credential. It is the only record guaranteed to exist after
+registration, and the complete payload is:
+
+```json
+{
+  "mainCurrency": "CHF",
+  "createdAt": "2026-07-31T09:14:00Z",
+  "idleLockMinutes": 15,
+  "dimensions": []
+}
+```
+
+- **`mainCurrency`** — required. Chosen at registration from the
+  provider-quotable currency set (`register.md`) and immutable outside
+  import (Main currency, below).
+- **`createdAt`** — required. Written once at registration, never
+  rewritten.
+- **`idleLockMinutes`** — optional, 5–60, absent means 15 (Session and
+  lock).
+- **`dimensions`** — optional. The grouping configuration (Dimensions,
+  below), which is where its own shape is defined; absent or empty means
+  no dimensions.
+
+Registration writes the two required keys and nothing else
+(`register.md`), and both optional keys appear the first time the user
+sets one. The shape is stated here rather than assembled from the
+sections that own each field, because two things read the *whole*
+payload and need to know its bounds: `schema_version` migration
+(`record-api.md`) and import validation (`export-import.md`).
+
 ## Change password
 
 The DEK does not change, so **no vault record is re-encrypted** — only
@@ -20,8 +53,9 @@ Master Key wraps a DEK instead of encrypting records directly.
    and unwraps the DEK. A failed unwrap means the current password is
    wrong — stop, do not send anything.
 3. Client generates a fresh 128-bit salt and derives `MK_new` + `AK_new`
-   with the server's **current default** KDF parameters, not the old
-   ones. A password change is also a KDF upgrade.
+   with the server's **current default** KDF parameters, read from the
+   envelope the app shell embeds (architecture.md, Key management), not
+   the old ones. A password change is also a KDF upgrade.
 4. Client re-wraps the same DEK under `MK_new` with a fresh nonce.
 5. `POST /api/auth/change-password`
    `{ currentAuthKey, salt, kdf, authKey, wrappedDek, dekNonce }`.
@@ -154,10 +188,11 @@ Self-service, irreversible, and distinct from an admin deleting a user.
 
 ## Session and lock
 
-- **Idle lock** after a period without activity: the client discards the
-  Master Key and DEK from memory and shows an unlock prompt. The server
-  session survives, so unlocking needs only the password, not a full
-  re-login (login.md).
+- **Idle lock** after a period without activity: the client discards its
+  keys and all decrypted state and shows an unlock prompt; the server
+  session survives, so unlocking needs only the password (login.md,
+  Rules, which states the rule and its one exception). This screen owns
+  only the period.
   - **User-configurable, 5–60 minutes, default 15.** Stored as
     `idleLockMinutes` in the encrypted profile record, so it follows the
     user across devices and the server never sees it; absent means 15.
@@ -236,7 +271,7 @@ Self-service, irreversible, and distinct from an admin deleting a user.
 - `POST /api/auth/logout` invalidates the calling session only; a second
   session for the same user still works afterwards.
 - All four endpoints return 401 unauthenticated, and the three writes
-  are rejected without a CSRF token or the required custom header.
+  are rejected without the `X-Solvent-Request` header.
 - After the configured idle period, in-memory keys are gone and reading
   vault data prompts to unlock; after 12 hours, the server session is
   rejected regardless of activity.

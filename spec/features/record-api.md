@@ -52,15 +52,36 @@ never decrypts.
   bare concatenation leaves field boundaries ambiguous, so two different
   tuples could produce identical AAD.
 - `account_id` empty is the empty string, not the literal `null`, and
-  still contributes its separator.
+  still contributes its separator. This is the **AAD byte rule only** —
+  on the wire the same absence is `null`; see below.
 - `schema_version` and `version` are their decimal representations
   without padding.
 
-The client builds this string; the server independently builds the same
-string from the row's own columns and compares before storing. A
+**No request or response carries an `aad` field.** The AAD is a byte
+string both sides derive; sending it would invite a server that trusts
+the client's copy of values it already holds. The server also cannot
+verify the AAD actually used at encryption time — a wrong AAD surfaces
+only when the client fails to decrypt, which is exactly the tripwire it
+is there to be.
+
+What the server does enforce is **field consistency**, before storing:
+the body's `recordType`, `accountId`, `schemaVersion`, and `version`
+against the path's `record_id`, and against the stored row's immutable
+columns (`recordType` never changes; `accountId` never changes). A
 mismatch is a 400 — the server cannot decrypt, but it can refuse to
 store a blob whose claimed slot disagrees with the slot it is going
-into.
+into. `POST /api/import` runs every record through this same validator
+(`export-import.md`).
+
+## `accountId` on the wire
+
+`null` when absent, everywhere: the `PUT` body, the `GET` response, and
+the export file's records. One representation, so import has one case to
+map rather than three, and an empty string is rejected as malformed
+rather than quietly accepted as a second spelling of absent.
+
+The AAD is where that `null` becomes `""` — the one conversion, done
+when building the byte string, on both sides.
 
 ## Schema migration
 
@@ -159,8 +180,9 @@ specified and owned by `manage-accounts.md`, not here.
 - **`PUT` with a `record_id` that is not a well-formed UUIDv4** → 400.
   The id is client-generated, so it is validated as a shape, not
   trusted as an identity.
-- **`PUT` for `snapshot` with an empty `accountId`**, or for `account`
-  / `profile` with one set → 400.
+- **`PUT` for `snapshot` with `accountId: null`**, or for `account` /
+  `profile` with one set → 400. So is an `accountId` of `""` on any
+  type — absence has one spelling.
 - **`PUT` whose `accountId` names an account row that does not exist
   for this user** → 400. The server can check this: `account_id` is
   plaintext.
@@ -190,10 +212,13 @@ specified and owned by `manage-accounts.md`, not here.
 - A request body containing a `userId` field naming another user is
   rejected; no row is written under either user.
 - An unauthenticated request to any of the three endpoints returns 401.
-- A write without the CSRF token or required custom header is rejected.
+- A write without the `X-Solvent-Request` header is rejected, and a
+  cross-origin attempt to send it never reaches the endpoint because the
+  preflight fails.
 - Two successive writes to one record produce different nonces.
-- A blob whose client-supplied AAD tuple disagrees with the row it is
-  being stored into is rejected with 400.
+- A `PUT` whose body tuple disagrees with the path `record_id` or with
+  the stored row's immutable columns is rejected with 400, and the row
+  is byte-identical afterwards.
 - The AAD string for a known tuple matches a fixture byte-for-byte,
   including separators and the empty `account_id` — the regression test
   that keeps two implementations from drifting into an unreadable vault.
@@ -201,8 +226,13 @@ specified and owned by `manage-accounts.md`, not here.
   fixture. A record encrypted by one user and inserted directly into
   another user's rows still fails to decrypt under that user's DEK —
   the DEK boundary carries that property, not the AAD.
-- A `snapshot` `PUT` with an empty `accountId`, and an `account` `PUT`
-  with one set, are both 400.
+- A `snapshot` `PUT` with `accountId: null`, and an `account` `PUT` with
+  one set, are both 400; so is either with `accountId: ""`.
+- `accountId` is `null`, never `""`, in a `GET /api/records` response
+  and in an exported file — asserted against both, since the two are
+  written by different code paths.
+- A request body carrying an `aad` field is rejected rather than
+  ignored: the server builds the AAD it compares against from the row.
 - A ciphertext over the per-record cap, a vault over the record-count
   cap, and a user over the byte quota each return 413 with nothing
   written.

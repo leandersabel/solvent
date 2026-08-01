@@ -130,8 +130,16 @@ invocation, and it is honest that it cannot stop anything more.
 - The invite URL is `https://<host>/register?invite=<token>`. It is
   copied to the clipboard by the admin and delivered out of band; the
   app does not email it.
-- Admin UI pages carry `Referrer-Policy: no-referrer` so a token in the
-  URL is not leaked onward by a subsequent navigation.
+- **`/register` carries `Referrer-Policy: no-referrer`**, as do admin UI
+  pages. The register page is the one that matters: the token rides in
+  *its* URL, so it is that page's outbound navigations that could carry
+  the token in a `Referer` header, while the admin page only displays
+  the link. The CSP already blocks third-party subresources, which
+  closes the common leak path; the header closes the rest at no cost.
+- **The register page drops the token from the address bar** with
+  `history.replaceState` once the form has taken it, so a bookmark,
+  a shared screen, or a browser-history sync afterwards carries nothing.
+  The form submits the token it already holds, not the URL's copy.
 - The token must not appear in server access logs. Since it rides in a
   query string on `/register`, the app strips or redacts it in its own
   logging, and the deployment's reverse proxy / tunnel logging is

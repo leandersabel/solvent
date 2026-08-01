@@ -4,7 +4,9 @@
 
 Turn a valid invite link into a vault. Server-rendered (Jinja) at
 `GET /register?invite=<token>`; the page embeds the server's current
-default KDF parameters so no extra round-trip is needed.
+default KDF envelope and the selectable currency list, so no extra
+round-trip is needed and nothing here calls a session-authenticated API
+(`register.md`).
 
 Exercises: `spec/features/register.md`.
 
@@ -16,7 +18,8 @@ Same centered card as Unlock, max-width 480px, slightly taller.
 2. Username — 3–32 chars, `[a-z0-9._-]`, normalized to lowercase as the
    user types (show the normalization, don't silently apply it later).
 3. Password + confirmation, with a **strength meter**.
-4. Main currency — a searchable select of ISO 4217 codes.
+4. Main currency — a searchable select over the currency list the page
+   embeds (`register.md`), not all of ISO 4217.
 5. The no-recovery acknowledgement (below).
 6. Primary button: "Create vault".
 
@@ -52,6 +55,10 @@ A select, plus a 13px ink-secondary note directly beneath: **"This
 cannot be changed later."** Users pick this in five seconds and live
 with it for years — the warning belongs at the point of choice, not in
 settings afterwards (`account-settings.md`, Main currency).
+
+The list holds only currencies the rate provider can quote into
+(`register.md`, Rules), so there is no "unsupported currency" state to
+design here: every option works for every future lookup.
 
 ## States
 

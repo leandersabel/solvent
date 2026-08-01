@@ -23,8 +23,10 @@ Own screen, reached from Settings. Content max-width 720px, two cards.
   > both owns your vault. If you lose the password, the file is
   > permanently unreadable.
 
-- Primary button "Export vault". Downloads
-  `solvent-vault-<username>-<YYYY-MM-DD>.json`.
+- Primary button "Export vault", **not a link**: it fetches the endpoint
+  and saves the response through a blob URL, because the endpoint
+  requires a header a navigation cannot send (`export-import.md`). The
+  file lands as `solvent-vault-<username>-<YYYY-MM-DD>.json` either way.
 - Beneath, ink-muted: the record count and the file's approximate size,
   so the user can sanity-check what they got.
 
@@ -96,5 +98,5 @@ step). On a large vault this is the longest operation in the product.
   any records. It is never skipped, and no "don't ask again" exists.
 - An older `formatVersion` migrates client-side after decryption, before
   re-encryption. Each supported version needs its own fixture test.
-- Export is rate-limited per user; the button reflects the limit rather
-  than failing silently.
+- Export is rate-limited per user (`export-import.md`); the button
+  reflects the limit rather than failing silently.

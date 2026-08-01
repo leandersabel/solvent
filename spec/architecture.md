@@ -111,7 +111,7 @@ cannot read any type. A record row is:
 | `version` | plaintext | monotonic, starts at 1, +1 per write |
 | `nonce` | plaintext | fresh 96-bit random per encryption |
 | `ciphertext` | opaque | AES-256-GCM under the DEK |
-| `updated_at` | plaintext | server clock, for sync and debugging |
+| `updated_at` | plaintext | server clock, for debugging |
 
 Five of these columns — `record_id`, `record_type`, `account_id`,
 `schema_version`, `version` — are exactly the AAD, so the server cannot
@@ -230,9 +230,9 @@ party.
   security patches even without a dependency bump, opening a PR if the
   digest changed. Patch-level PRs may auto-merge after CI passes;
   minor/major bumps need manual review. Dependencies touching crypto or
-  auth (`hash-wasm`/libsodium.js, Alpine, anything in the auth/session
-  path) are excluded from auto-merge regardless of bump level and always
-  need manual review. Actions workflows run with least-privilege
+  auth (`hash-wasm`, Alpine, anything in the auth/session path) are
+  excluded from auto-merge regardless of bump level and always need
+  manual review. Actions workflows run with least-privilege
   `permissions:` blocks, pin third-party actions by commit SHA, and use
   `pull_request` (never `pull_request_target`) so fork-triggered runs
   can't reach GHCR push secrets. Images are signed at push (cosign/
@@ -246,7 +246,7 @@ party.
   pay for their ceremony, and Django's batteries (admin, settings,
   migrations) are more structure than needed. The server never decrypts
   anything (see Security), so it holds no session-scoped decryption key —
-  sessions just carry a logged-in flag after Auth Key verification, which
+  a session row is just an identity after Auth Key verification, which
   any framework handles equally well. JSON endpoints that store/return
   ciphertext blobs (IV, nonce, tag, wrapped DEK) use Pydantic for
   validation, added directly into Flask rather than adopting FastAPI for
@@ -319,8 +319,20 @@ Actors this design defends against vs. accepts:
   even unintentionally. Zero-knowledge means there's no plaintext on the
   server to leak, by construction.
 - **Key derivation (per user, browser-side only)**: password + per-user
-  salt → Argon2id via WASM (e.g. `hash-wasm` or libsodium.js — not native
-  Web Crypto PBKDF2, which is weaker) → HKDF-split into two keys:
+  salt → Argon2id via **`hash-wasm`** (not native Web Crypto PBKDF2,
+  which is weaker) → HKDF-split into two keys:
+  - `hash-wasm` ships one small WASM module per algorithm, so the
+    self-hosted, SRI-pinned artifact covers Argon2id and nothing else —
+    the smallest thing that can be audited and re-pinned on a bump. CI
+    asserts a published RFC 9106 Argon2id test vector, which is what
+    makes a smaller library as trustworthy here as a larger one: the
+    primitive has known-answer tests and this uses exactly one
+    primitive.
+  - **libsodium.js rejected**: a few hundred KB of Emscripten port to
+    reach one function, and its Emscripten heap is where a 256 MiB
+    `memlimit` would need verifying on every target browser. The audited
+    C provenance is real but does not survive the port unexamined, and
+    it buys nothing a known-answer test does not.
   - **Master Key** — never leaves the browser; encrypts/decrypts the
     user's data-encryption key (DEK).
   - **Auth Key** — sent to the server at login to verify identity, stored
@@ -335,6 +347,15 @@ Actors this design defends against vs. accepts:
     parameters and transparently re-wrap the DEK after a successful
     unlock, which is how parameters get raised later without breaking
     existing vaults.
+  - **The server's current default envelope is embedded in every
+    server-rendered page**: the registration page (register.md) and the
+    authenticated app shell (`ui/design-system.md`, App shell). Any
+    client-side flow that must derive at *current* parameters — a
+    registration, a password change (account-settings.md) — reads it
+    from the page it is already on, with no extra round-trip and one
+    source for the value. Login is the one exception, because it runs
+    before the shell exists: it carries the envelope on the salt
+    response, and the target envelope on `kdfStale`.
 - **DEK envelope**: a random per-user DEK is generated client-side,
   encrypted with the Master Key, and stored server-side as an opaque blob
   the server can't decrypt. All financial data is encrypted client-side
@@ -442,31 +463,96 @@ Actors this design defends against vs. accepts:
   attacker-influenceable
   and rendered client-side, where XSS means password/Master Key capture,
   not just session theft.
+- **Sessions are server-side rows**, not self-contained signed cookies:
+  `(id, token_hash, user_id, issued_at, last_active_at)`. The cookie
+  carries only a random session token, signed with the Flask
+  `SECRET_KEY`; the server looks the session up by the token's hash. No
+  key material of any kind rides in the cookie. Server-side rows are
+  what make sessions enumerable and revocable, which the product
+  requires in four places: listing active sessions, "log out
+  everywhere", invalidating every other session on a password change or
+  an import, and the absolute 12-hour expiry (account-settings.md,
+  export-import.md). `id` is a separate opaque handle — it is what
+  `GET /api/sessions` returns, so no response ever hands JavaScript the
+  cookie's own value.
 - **Session cookies**: `HttpOnly`, `Secure`, `SameSite=Lax`. Flask
   `SECRET_KEY` must be a strong value injected externally (TrueNAS app
-  env), never a default or committed value — a weak/leaked key forges
-  sessions with no password needed.
-- **CSRF**: state-changing JSON endpoints (store-blob, invite, import,
-  password change) require `SameSite` plus a CSRF token or a required
-  custom header — same-origin cookie auth is not implicitly CSRF-safe.
+  env), never a default or committed value — the signature is what
+  stops an attacker spraying guessed session tokens at the lookup, so a
+  weak or leaked key turns guessing into forgery. A valid signature
+  alone is still not a session: the token must hash to a stored row.
+- **CSRF**: `SameSite=Lax` plus **a required custom request header**,
+  `X-Solvent-Request: 1`, on every endpoint that is not meant to be
+  reached by navigation — every state-changing one (records, invite,
+  import, password change, logout, account deletion) **and
+  `GET /api/export`**. Same-origin cookie auth is not implicitly
+  CSRF-safe.
+  - **A header rather than a token.** A cross-origin page cannot set a
+    custom header without a preflight, and the preflight fails because
+    no CORS headers are served. Every endpoint in this product is called
+    by same-origin `fetch` — registration and login must be, since they
+    carry derived key material — so there is no browser form POST for a
+    token to protect that the header does not. A token would add
+    minting, embedding, rotation, and a second failure mode, to assert
+    the same thing.
+  - **Export is included because it is a GET.** With `SameSite=Lax` a
+    top-level navigation sends the session cookie, so a hostile link
+    would otherwise drop the victim's whole encrypted vault into their
+    own Downloads — no exfiltration, since the attacker never sees the
+    file, but a surprising vault file on a possibly shared machine.
+    Requiring the header makes the endpoint non-navigable; the client
+    downloads via `fetch` + blob instead of a plain link
+    (export-import.md).
 - **Login enumeration**: the salt-fetch step returns a deterministic
   decoy salt (`HMAC(server_secret, normalized_username)`) for unknown
   identifiers, with constant-time, identically-shaped responses for real
   vs. fake accounts — invite-only registration protects sign-up, not
   whether an account already exists.
 - **Rate limiting**: per-account and per-IP limits with exponential
-  backoff and lockout/alerting on the login and salt-fetch endpoints.
-  Argon2id runs client-side, so the server's per-attempt cost is cheap —
-  throttling is the only thing standing between an online attacker and
-  unlimited guesses.
+  backoff and lockout on the login and salt-fetch endpoints. The
+  expensive Argon2id derivation runs client-side, so an attacker
+  scripting the API directly pays nothing per guess — throttling is the
+  only thing standing between them and unlimited guesses.
+  - **Defaults**: per account, 10 attempts per 15 minutes, then a
+    15-minute lockout once 20 fail within an hour. Per IP, 60 requests
+    per hour across `/api/auth/login` and `/api/auth/salt` together —
+    together, because splitting the budget lets an attacker spend twice.
+  - Every limit here, and the concurrency cap below, is **operator
+    config with the stated default**. Unlike the storage caps, the right
+    number depends on the deployment — a LAN-only instance and an
+    internet-exposed one face different traffic — and no acceptance
+    criterion asserts a specific count. Tests assert the *behaviour* at
+    whatever the configured value is: the limit engages, the lockout
+    holds, and the response shape does not reveal whether the account
+    exists.
+- **Concurrency cap on Auth Key verification**: the server's per-attempt
+  cost is *not* negligible. Every `/api/auth/login`, for a real account
+  or a decoy, runs Argon2id over the Auth Key at 64 MiB (login.md), so N
+  parallel attempts allocate N × 64 MiB before the rate limiter's
+  verdict matters — a memory-exhaustion lever on a NAS. Verifications
+  run behind a concurrency limit — **default 4**, so peak Argon2id
+  memory is ~256 MiB — and requests over it queue, then fail with the
+  ordinary throttle response. The memory ceiling is then a bound the box
+  can hold rather than a consequence of how fast the limiter reacts.
+- **Alerting means a structured log line**, not a notification: lockout
+  emits an event with a stable name, the affected account, and the
+  window, at a level the operator's existing container-log tooling can
+  filter on. The product has no email or push path and is not gaining
+  one for this.
 
 ### Storage & data handling
 
-- **Blob and quota limits**: max ciphertext blob size, max records per
-  vault, and a total per-user storage quota (starting point: low tens of
-  MB per user — generous for years of manual snapshots across a
-  household's accounts, adjustable, not itself load-bearing on
-  security). Reject oversized payloads before they hit the DB.
+- **Blob and quota limits** — **64 KiB** per ciphertext blob, **50 000**
+  records per vault, **32 MiB** total per user. Rejected before the row
+  reaches the DB, with 413 (record-api.md).
+  - These three are **compiled-contract parameters**, not operator
+    config: the 413 tests assert exact behaviour at a boundary, and a
+    boundary that moves per deployment is one the contract cannot state.
+  - Every one has an order of magnitude of headroom. A snapshot payload
+    is a few hundred bytes; thirty accounts updated monthly for thirty
+    years is ~11 000 records and a few MB. The caps exist to bound a
+    runaway client or a hostile payload, not to ration honest use, and
+    they are not load-bearing on security.
 - **Invite tokens**: ≥128-bit entropy, single-use, time-limited, stored
   hashed at rest, invalidated on first use.
 - **Import authorization**: strict schema/size validation on the
@@ -477,12 +563,18 @@ Actors this design defends against vs. accepts:
 
 ### Supply chain
 
-- All crypto and framework JS/WASM (`hash-wasm`/libsodium.js, Alpine) is
-  self-hosted from the app origin with pinned versions and Subresource
-  Integrity hashes — never loaded from a third-party CDN, which would
-  otherwise sit inside the trust boundary and could silently exfiltrate
-  passwords via a malicious script. CI/CD supply-chain controls (image
-  signing, dependency-merge policy) live under Tech stack.
+- All crypto and framework JS/WASM (`hash-wasm`, Alpine) is self-hosted
+  from the app origin with pinned versions and Subresource Integrity
+  hashes — never loaded from a third-party CDN, which would otherwise
+  sit inside the trust boundary and could silently exfiltrate passwords
+  via a malicious script. CI/CD supply-chain controls (image signing,
+  dependency-merge policy) live under Tech stack.
+- **That list is two entries, and it is meant to stay short.** Decimal
+  arithmetic is written against `BigInt` rather than pulled in
+  (record-snapshot.md), and the trend chart is drawn in SVG rather than
+  charted (net-worth-view.md) — both for the same reason: every
+  third-party file in the browser is one more thing to pin, hash,
+  re-verify on a bump, and trust with a page that handles the password.
 
 ## Non-goals
 

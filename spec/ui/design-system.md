@@ -126,6 +126,13 @@ value never gets a generated hue. Re-validate with the skill's
   takes **slot 1**, and bar length carries the value. Coloring nominal
   bars by value spends the identity channel re-encoding what length
   already shows. Identity comes from the direct label on each bar.
+  - **Signed bars**: bars grow rightward from a zero baseline, and a
+    negative band grows **leftward** from that same baseline — slot 1
+    again, at 45% opacity, matching the stacked chart's liability
+    treatment so the sign reads identically in both places. The
+    baseline is drawn a step darker than a gridline, as the chart's
+    zero line is. The direct label stays on the outboard end of the
+    bar, carrying the signed amount.
   - The bars and the stacked chart show the same dimension, so a reader
     could expect the band colors to carry over. They deliberately do
     not: the stack needs hue to separate four adjacent fills, while a
@@ -153,10 +160,8 @@ reordered by size**, which would make the stack unreadable over time.
 - The **net-worth line** runs over the stack in ink-primary at 1.5px.
   It is a summary of the bands, not a fifth series, so it takes no chart
   slot.
-- **Estimated stretches** are marked by tick marks under the x-axis at
-  the dates real snapshots exist — not by dashing the fills. Four
-  dashed stacked bands are unreadable, and the distinction has to
-  survive at the density of a decade of history.
+- **Estimated stretches** take the estimated marker below — never a
+  change to the fills.
 
 ### The two neutral bands
 
@@ -179,6 +184,29 @@ dimension: `dims` is a map keyed by dimension id
 import, or a hand-edited export. No hatch or pattern fill is defined
 anywhere in this system — a pattern reserved for an unreachable state
 gets reused for the wrong thing later.
+
+### The estimated marker
+
+Inferred figures — every stretch between two snapshots, and everything
+after an account's last one (`net-worth-view.md`) — are marked one way
+across the product, in two forms of the same mark. Never in a status
+color: data that is inferred is not a warning, the same reason figure
+age is stated in words rather than flagged.
+
+| Form | Mark | Where |
+|---|---|---|
+| Chart | tick marks under the x-axis, ink-muted, at the dates real snapshots exist | the trend chart (`dashboard.md`) |
+| Row | an "Estimated" chip — hairline `#d8dfe1` fill, ink-secondary text, otherwise the standard chip | a carried-forward figure (`update-values.md`) |
+
+The chart form is under the axis rather than in the fill because four
+dashed stacked bands are unreadable, and the distinction has to survive
+at the density of a decade of history. A row has no axis to hang a tick
+under, so the mark changes form; the meaning and the neutral register do
+not.
+
+Both forms ship **with wording, never as the mark alone** — "last
+updated about a year ago" beside the chip, the "Show what's estimated"
+caption beside the ticks (Accessibility).
 
 ## Status
 
@@ -248,6 +276,35 @@ keeps proportional figures.
   except avatars and status dots.
 - **Hairline rules, not shadows.** One 1px `hairline` border. A single
   soft shadow is permitted on a modal only.
+
+## App shell
+
+One shell wraps every authenticated screen; each screen spec describes
+only its own content region.
+
+- **Top bar**, petrol-800: wordmark at the left, nav beside it, the
+  global **Update values** action and the lock button at the right.
+- **Nav is three entries — Dashboard, Settings, and Admin for admins.**
+  There is deliberately **no "Accounts" entry**: the dashboard's own
+  table *is* the account list (`dashboard.md`), so a fourth entry would
+  either lead back to the screen the user is on or open a second,
+  thinner copy of it.
+- **Update values** is a global action rather than a nav destination —
+  it opens the sweep (`update-values.md`) from anywhere, which is what
+  makes the sweep reachable while the user is deep in one account. The
+  dashboard hero repeats it because that is where a user arrives
+  already intending to do it.
+- **Lock button** — the idle lock, triggered by hand. One click
+  discards the keys and all decrypted state and shows the re-unlock
+  screen (`login.md`, Rules); the server session stays alive, so
+  unlocking needs only the password. No confirmation dialog: this is
+  the control someone reaches for when another person walks into the
+  room, and a confirm step spends the seconds it exists to save.
+- Content max-width 1200px on the ground. Narrower screens set their
+  own width (forms 480px, the sweep and account detail 900px).
+- The shell is server-rendered Jinja (`architecture.md`, Components) and
+  carries no plaintext — nav labels, the wordmark, and the current
+  default KDF envelope (`architecture.md`, Key management).
 
 ## Components
 

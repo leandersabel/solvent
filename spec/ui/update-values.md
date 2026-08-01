@@ -24,8 +24,9 @@ fixes it.
 
 ## Layout
 
-Standard app shell, content max-width 900px. Reached from a global
-"Update values" action in the shell, and from the dashboard hero.
+Standard app shell (`design-system.md`, App shell), content max-width
+900px. Reached from the shell's global "Update values" action, and from
+the dashboard hero.
 
 At the top, **one date for the whole sweep**, defaulting to today and
 never in the future (`record-snapshot.md`) — a snapshot describes what
@@ -45,8 +46,9 @@ Name · unit · what it is worth now · age · the control.
     recorded 3 weeks ago". ink-primary.
   - *Carried forward* — no snapshot since, so the dashboard is showing
     the last known value: "12 450.00 USD · last updated about a year
-    ago". ink-secondary, with the same marker the chart uses for
-    inferred stretches. Everything after an account's last snapshot is
+    ago". ink-secondary, with the row form of the estimated marker —
+    an "Estimated" chip (`design-system.md`). Everything after an
+    account's last snapshot is
     carried, not measured (`net-worth-view.md`), and this is where a
     user finds out.
 - **Age in plain language** — "3 weeks ago", "about a year ago", "never
@@ -72,15 +74,24 @@ Confirming asserts the **whole figure** is unchanged, and the rate
 follows from whether anything can contradict that
 (`record-snapshot.md`):
 
-- **Listed unit** → the rate is fetched fresh for the sweep date. The
-  row's label reads "Still 12.5 XAU-ozt" — the user vouches for the
-  quantity, the provider for the price.
-- **Free-text unit** → the previous rate carries, and the label says so:
-  "Still worth about the same", with the carried rate visible on the row
-  and its age beside it — "estimated 14 months ago". The user is
-  asserting the valuation too, which for a painting or a plot of land is
-  a real thing to assert and the only figure anyone has. It is never
-  applied invisibly.
+- **Main currency** → no rate step at all; the row reads "Still
+  12 450.00 CHF" and one click writes it.
+- **Unit with a live rate source** → the rate is fetched fresh for the
+  sweep date. The row's label reads "Still 12.5 XAU-ozt" — the user
+  vouches for the quantity, the provider for the price.
+  - **No proposal came back** → the row's Confirm becomes a rate field
+    with the previous value already filled in, and the label says what
+    is missing: "Still 12.5 XAU-ozt — enter today's rate". The old rate
+    is not offered, because a source exists for this unit and simply
+    is not answering (`record-snapshot.md`). Ink-secondary, not an
+    error color, and the row still saves.
+- **Unit with no rate source** — free text, or a `lookup: false` symbol
+  → the previous rate carries, and the label says so: "Still worth about
+  the same", with the carried rate visible on the row and its age
+  beside it — "estimated 14 months ago". The user is asserting the
+  valuation too, which for a painting or a plot of land is a real thing
+  to assert and the only figure anyone has. It is never applied
+  invisibly.
 - Confirm is **disabled for an account with no snapshots**. There is no
   previous value to confirm; the row asks for one.
 - **There is no "confirm all".** Confirming asserts that you checked,
@@ -117,7 +128,8 @@ ordinary snapshot; the sweep is a different way to reach the same write.
   **the value field stays usable** — the user types while the rate
   loads.
 - **Row — proposal unavailable**: falls back to manual with the
-  ink-secondary notice from `snapshot-entry.md`. Never an error color;
+  ink-secondary notice from `snapshot-entry.md`, and one-click Confirm
+  is replaced by the prefilled rate field above. Never an error color;
   saving is never blocked by the proxy.
 - **Row — saved**: a quiet inline confirmation on the row, the figure
   and age updating in place. The row does not disappear — vanishing rows

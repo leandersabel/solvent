@@ -18,7 +18,12 @@ memory for the session only — never in localStorage or sessionStorage.
    (architecture.md, Login enumeration).
 2. Client derives Master Key + Auth Key in a Web Worker.
 3. `POST /api/auth/login` `{ username, authKey }` → on success, sets the
-   session cookie and returns `{ wrappedDek, dekNonce, kdfStale }`.
+   session cookie and returns `{ wrappedDek, dekNonce, kdfStale }`. An
+   **unknown username still runs a full Argon2id verification** against
+   a fixed decoy hash and discards the result. Without it the endpoint
+   answers in microseconds for accounts that do not exist and in tens of
+   milliseconds for ones that do, which reveals existence by timing and
+   throws away the work the decoy salt did one step earlier.
 4. Client unwraps the DEK with the Master Key. **A failed unwrap is
    itself an authentication failure** — treat it as a wrong password and
    surface the same error, do not silently continue with a dead key.
@@ -48,8 +53,9 @@ lock the user out.
 
 - In (browser only): password.
 - In (over the wire): username, Auth Key.
-- Out: session cookie carrying a logged-in flag and user id only — no
-  key material of any kind; wrapped DEK + nonce; `kdfStale`.
+- Out: session cookie carrying an opaque session token only — no key
+  material of any kind, and no user id (architecture.md, Application
+  hardening); wrapped DEK + nonce; `kdfStale`.
 
 ## Rules
 
@@ -73,10 +79,22 @@ lock the user out.
 - Session cookie: `HttpOnly`, `Secure`, `SameSite=Lax`
   (architecture.md, Application hardening).
 - **Idle lock**: after the user's configured idle period (5–60 minutes,
-  default 15 — account-settings.md) the client discards the Master Key
-  and DEK from memory and shows a re-unlock prompt. The server session
-  may still be valid; unlocking re-derives keys from the password
-  without a full re-login.
+  default 15 — account-settings.md) the client discards the Master Key,
+  the DEK, **and every decrypted value derived from them** — the whole
+  in-memory model, rendered figures, chart series, and any cached
+  plaintext — then shows a re-unlock prompt. Dropping the keys alone
+  would leave the lock cosmetic against the threat it exists for:
+  another household member at the unlocked machine, who can open
+  devtools. The server session may still be valid; unlocking re-derives
+  the keys and **re-decrypts the vault from scratch**, so the reload
+  after an idle lock is by design, not a missed cache.
+  - **One named exception: unsaved form input the user typed**, which
+    survives so a lock mid-entry does not destroy work (`ui/unlock.md`).
+    It is what the user is about to commit, not vault content read back
+    from the server, and it is scoped to the open form — nothing else
+    decrypted is exempt. The same rule covers the manual lock button
+    (`ui/design-system.md`, App shell) and a session expiring
+    mid-request.
 - **Session lifetime**: server-side session expires 12 hours after
   issue, absolute, not sliding.
 - A page refresh discards in-memory keys by definition and requires
@@ -128,7 +146,16 @@ lock the user out.
   still log in afterwards with the old parameters.
 - Exceeding the per-account attempt limit locks the account and returns
   the same response shape for a nonexistent account.
+- `/api/auth/login` with an unknown username takes statistically
+  indistinguishable time from one with a known username and a wrong Auth
+  Key — asserted with the decoy-hash verification in place, since
+  removing it is the regression this catches.
 - After the configured idle period, an attempt to read vault data
-  prompts for re-unlock, and the in-memory keys are no longer present.
+  prompts for re-unlock, the in-memory keys are gone, **and no decrypted
+  account name, value, or snapshot remains reachable** — asserted
+  against the in-memory model, not only the key handles. Unsaved input
+  in an open form is the one thing still present.
+- Re-unlocking after an idle lock refetches and re-decrypts the vault;
+  it does not restore a model kept across the lock.
 - A test asserts no key material is written to `localStorage` or
   `sessionStorage` at any point in the flow.
