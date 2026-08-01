@@ -20,18 +20,23 @@ starting the feature — only shipping it.
 
 ## Charting library (spec/features/net-worth-view.md)
 
-Needs to be self-hosted, CSP-safe with no `eval`, able to render a step
-chart, and take label/tooltip text without an HTML string. Not chosen.
-Candidates worth benchmarking against those constraints rather than
-picking from memory.
+Not chosen. Must be benchmarked against these constraints rather than
+picked from memory — the full set, now that the UI is specified:
 
-## UI screens not yet specified (spec/ui/)
+- Self-hosted with an SRI hash, no CDN (architecture.md, Supply chain).
+- CSP-safe: no `eval`, no `new Function` (architecture.md, Application
+  hardening).
+- Renders a **step** chart, with per-segment styling — carried-forward
+  segments must be visually distinct from snapshot-anchored ones
+  (ui/dashboard.md). This is the constraint most libraries fail.
+- Takes label and tooltip text as **text, never an HTML string**.
+- Crosshair tooltip on hover, downsampling for large series.
+- Accepts an explicit categorical palette (ui/design-system.md) rather
+  than imposing its own.
 
-`spec/ui/` holds only its README — no screen specs exist. Features
-reference screens (registration, unlock, dashboard, account form,
-snapshot entry, settings, admin) but nothing defines their layout,
-states, or which feature each exercises. Needed before compiling, or
-each contract's `sourceFiles` will cover only half its sources.
+Writing the step chart directly in SVG is a legitimate outcome of this
+evaluation, not a fallback — the requirements above are most of what a
+charting library would be brought in to provide.
 
 ## Confirmed decisions (2026-08-01)
 
