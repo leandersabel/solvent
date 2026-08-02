@@ -20,7 +20,7 @@ named `solvent-vault-<username>-<YYYY-MM-DD>.json`.
 It **requires the `X-Solvent-Request` header** despite being a GET
 (architecture.md, CSRF), so it is not reachable by navigation: the
 client fetches it and saves the response through a blob URL rather than
-pointing an `<a href>` at it. Following the URL directly is a 403.
+pointing an `<a href>` at it. Following the URL directly is a Forbidden.
 
 ```json
 {
@@ -128,7 +128,7 @@ written.
   included, so there is one set of rules with two callers. That
   validator also enforces `version: 1` on every imported record rather
   than trusting the client to have reset it at step 4 — a record
-  arriving at any other version is a 400 for the whole payload.
+  arriving at any other version is a Bad Request for the whole payload.
 - Client-side validation mirrors this so a bad file fails fast without
   a large upload.
 - The import is one transaction. A failure at any point leaves the
@@ -222,12 +222,12 @@ written.
   the same validator `PUT /api/records` runs.
 - Every record in the vault reads `version: 1` after an import.
 - A second session belonging to the importing user is invalidated: its
-  next API call returns 401, and a record it attempts to create after
-  the import never reaches the vault.
+  next API call returns Unauthorized, and a record it attempts to create
+  after the import never reaches the vault.
 - A fixture file at `formatVersion: 1` still imports after the format
   advances to 2.
 - The export screen shows the sensitivity warning before the download is
   triggered, not after.
-- `GET /api/export` as a plain top-level navigation returns 403 and
-  writes no file, with a valid session cookie present — the regression
-  test for the header requirement.
+- `GET /api/export` as a plain top-level navigation returns Forbidden
+  and writes no file, with a valid session cookie present — the
+  regression test for the header requirement.

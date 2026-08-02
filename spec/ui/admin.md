@@ -104,9 +104,9 @@ Columns: Username · Created · Role · Records · Last active · (action).
 
 ## Rules
 
-- Non-admins never see the nav entry, and the route returns 404 rather
-  than 403 — an authenticated non-admin should not learn the route
-  exists.
+- Non-admins never see the nav entry, and the route returns Not Found
+  rather than Forbidden — an authenticated non-admin should not learn
+  the route exists.
 - Invite tokens are ≥128-bit, single-use, time-limited, stored hashed,
   and invalidated on first use (`architecture.md`, Storage & data
   handling).

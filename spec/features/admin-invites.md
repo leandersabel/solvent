@@ -73,8 +73,8 @@ writes are CSRF-protected.
   that user's row, every record, and every session, in one transaction.
   Keyed by normalized username, which is what `GET /api/admin/users`
   returns and what the admin types to confirm; `confirmUsername` must
-  equal the path segment or the request is a 400. Refused with 409 if
-  the target is the last remaining admin.
+  equal the path segment or the request is a Bad Request. Refused with
+  Conflict if the target is the last remaining admin.
 
   This is the **only** destructive power an admin holds, and it destroys
   a vault rather than opening one. There is deliberately no admin export
@@ -162,13 +162,13 @@ invocation, and it is honest that it cannot stop anything more.
   it.
 - **Revoked invite whose link is already sent** → refused immediately;
   this is the whole point of having revocation.
-- **Revoking an already-used invite** → 409, with a message pointing at
-  user deletion instead.
+- **Revoking an already-used invite** → Conflict, with a message
+  pointing at user deletion instead.
 - **Two registrations racing on one invite** → the consuming
   transaction's uniqueness constraint means exactly one wins; the other
   gets the generic invalid-invite error.
-- **Non-admin hits an admin endpoint** → 404, not 403 — do not confirm
-  the endpoint exists.
+- **Non-admin hits an admin endpoint** → Not Found, not Forbidden — do
+  not confirm the endpoint exists.
 - **Admin revokes their own outstanding invites** → allowed, no special
   case.
 - **Last admin deletes themselves** → refused, by either path (the admin
@@ -178,9 +178,9 @@ invocation, and it is honest that it cannot stop anything more.
   when another admin remains, and it ends their own session. No special
   case beyond the last-admin guard.
 - **Admin deletes a user who is currently logged in** → their sessions
-  go with the transaction; their next request is a 401.
-- **Deleting a username that does not exist** → 404, the same as any
-  other admin route reached by a non-admin, so a probe distinguishes
+  go with the transaction; their next request is a Unauthorized.
+- **Deleting a username that does not exist** → Not Found, the same as
+  any other admin route reached by a non-admin, so a probe distinguishes
   nothing.
 - **Bootstrap command run on a populated instance without `--force`** →
   refuses, exits non-zero, and prints the existing user and admin counts
@@ -202,8 +202,10 @@ invocation, and it is honest that it cannot stop anything more.
 - An expired invite fails registration.
 - Invalid, expired, used, and revoked invites yield byte-identical
   registration errors (shared assertion with register.md).
-- Revoking a `used` invite returns 409 and does not change its status.
-- A non-admin session receives 404 from every `/api/admin/*` endpoint.
+- Revoking a `used` invite returns Conflict and does not change its
+  status.
+- A non-admin session receives Not Found from every `/api/admin/*`
+  endpoint.
 - No admin endpoint returns any user's wrapped DEK, salt, KDF envelope,
   or record ciphertext — asserted by inspecting the full response shape
   of every admin endpoint, so the test fails if one is added later.
@@ -216,24 +218,24 @@ invocation, and it is honest that it cannot stop anything more.
   invite without it produces a non-admin. Both are asserted against the
   resulting user row.
 - `POST /api/admin/invites` with `isAdmin: true` from a **non**-admin
-  session returns 404 and creates nothing.
+  session returns Not Found and creates nothing.
 - No request to any endpoint changes an existing user's admin status —
   asserted by enumerating every registered route and attempting the
   change through each.
 - The last remaining admin cannot delete their own account, by either
-  path — the admin panel returns 409, and so does
+  path — the admin panel returns Conflict, and so does
   `DELETE /api/auth/account`.
 - `DELETE /api/admin/users/<username>` removes that user's row, every
   record, and every session in one transaction; the deleted user's
-  subsequent request returns 401 and their login fails.
+  subsequent request returns Unauthorized and their login fails.
 - A `DELETE /api/admin/users/<username>` whose `confirmUsername` does
-  not match the path segment is rejected and deletes nothing.
+  not match the path segment is a Bad Request and deletes nothing.
 - Deleting one user leaves every other user's records and sessions
   untouched — asserted with two populated vaults.
 - A simulated DB failure mid-delete leaves the target user fully intact
   and able to log in.
-- A non-admin session receives 404 from `DELETE /api/admin/users/*`,
-  and no user is deleted.
+- A non-admin session receives Not Found from `DELETE
+  /api/admin/users/*`, and no user is deleted.
 - No endpoint promotes or demotes an admin; the admin API surface is
   exactly invites plus user list and user delete, asserted by
   enumerating the registered routes under `/api/admin/`.

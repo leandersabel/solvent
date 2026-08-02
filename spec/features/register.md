@@ -140,8 +140,9 @@ with two callers rather than two record writers.
 - The invite's status is `used`, and a second registration with the same
   token fails.
 - A POST carrying KDF parameters below the server minimum is rejected
-  with 400, even though the client UI would never send them.
-- A POST with a salt that is not 16 bytes is rejected.
+  with Bad Request, even though the client UI would never send them.
+- A POST with a salt that is not 16 bytes is rejected with Bad
+  Request.
 - Invalid, expired, used, and revoked invites produce byte-identical
   error responses.
 - A password of 11 characters, or one scoring below zxcvbn 3, is blocked

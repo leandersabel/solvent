@@ -3,12 +3,14 @@
 Maintained by the product-owner agent: spec → compiled → implemented →
 verified.
 
-**Every feature and screen is spec'd. Every feature is compiled.**
+**Every feature and screen is spec'd. Every feature but `app-shell` is
+compiled.**
 
 Rows are in build order.
 
 | Feature | Compiled | Implemented | Verified |
 |---|---|---|---|
+| app-shell | | | |
 | record-api | x | | |
 | rate-lookup | x | | |
 | admin-invites | x | | |
@@ -27,7 +29,8 @@ its `/api/admin/*` endpoints need a session, so they come after `login`.
 `spec/ui/` holds `design-system.md` plus eleven screens: unlock,
 register, dashboard, account-form, account-detail, snapshot-entry,
 update-values, dimensions, settings, export-import, admin. Every feature
-has a screen except `record-api`, which is infrastructure.
+has a screen except `app-shell`, which renders the chrome around them,
+and `record-api`, which is infrastructure.
 
 `spec/questions.md` holds no open questions, so compiling can start.
 

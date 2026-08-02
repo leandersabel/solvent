@@ -193,8 +193,9 @@ the set atomically without the client enumerating ids. Endpoint:
   net worth view shows its empty state.
 - **Unarchiving** → clears `archivedAt`; the account rejoins active
   lists and the current total.
-- **Concurrent edit from two tabs** → the second `PUT` fails with 409 on
-  the version check; the UI reloads and asks the user to redo the edit.
+- **Concurrent edit from two tabs** → the second `PUT` fails with
+  Conflict on the version check; the UI reloads and asks the user to
+  redo the edit.
 - **An account carrying a `dims` entry for a dimension that no longer
   exists** → the entry is left alone and the account renders as
   "Unassigned" for it. Stripping the entry would be a destructive
@@ -213,8 +214,8 @@ the set atomically without the client enumerating ids. Endpoint:
   encryption correctly).
 - Editing name, note, or a dimension assignment increments `version`
   and writes a different nonce than the previous version.
-- A `PUT` sent with a stale `version` is rejected with 409 and does not
-  modify the stored record.
+- A `PUT` sent with a stale `version` is rejected with Conflict and does
+  not modify the stored record.
 - Deleting an account that has snapshots shows a dialog offering both
   archive and permanent delete, with archive preselected.
 - **Archive**: the account record gains `archivedAt`, no snapshot record
@@ -234,8 +235,8 @@ the set atomically without the client enumerating ids. Endpoint:
   `account_id` are gone, in one transaction — a mid-delete failure
   leaves neither partially deleted.
 - Purge cannot delete another user's records: a `DELETE` naming an
-  `account_id` belonging to a different user returns 404, not 403, and
-  deletes nothing.
+  `account_id` belonging to a different user returns Not Found, not
+  Forbidden, and deletes nothing.
 - Attempting to change the unit of an account with ≥1 snapshot is
   blocked client-side. The test asserts the UI refuses it — not that an
   API call is rejected, which the server cannot do.

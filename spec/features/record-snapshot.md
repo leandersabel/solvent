@@ -136,7 +136,7 @@ can contradict the user:
   recording nothing, because it looks like a measurement. The user is
   asserting the quantity; the provider supplies the rest.
   - **When that fetch yields no proposal** (provider down,
-    rate-limited, circuit breaker open, or `204` for the date), the
+    rate-limited, circuit breaker open, or No Content for the date), the
     rate has no honest value to take: the previous one is forbidden
     here and there is no new one. So **one-click Confirm is
     unavailable** and the row falls back to manual rate entry with the
@@ -302,7 +302,7 @@ quiet wrong number.
 - Every stored snapshot carries a `rateTarget` equal to the main
   currency in the profile record at entry time.
 - Editing a snapshot from a second tab with a stale `version` returns
-  409 and does not overwrite.
+  Conflict and does not overwrite.
 - Moving a snapshot's date onto an occupied date prompts with copy
   naming the deletion, and on confirm leaves exactly one record for that
   date.
@@ -325,7 +325,7 @@ quiet wrong number.
 - Confirming on a **main-currency** account writes `rate: "1"`,
   `rateSource: manual`, and issues no rate request.
 - Confirming on a `lookup: true` account **with the proxy stubbed to
-  204**
+  No Content**
   offers no one-click Confirm; the row asks for a rate with the previous
   value prefilled, and the previous rate is never written.
 - Confirming an account with no snapshots is not offered, and the

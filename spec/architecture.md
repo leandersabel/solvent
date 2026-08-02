@@ -129,7 +129,7 @@ Endpoints (all session-authenticated, all CSRF-protected on writes):
 
 - `GET /api/records?type=<t>` — all of the user's records of a type.
 - `PUT /api/records/<record_id>` — create or update. The client sends
-  the expected current `version`; the server rejects with 409 if it
+  the expected current `version`; the server rejects with Conflict if it
   differs, so a stale tab cannot silently clobber a newer write.
 - `DELETE /api/records/<record_id>` — delete one record.
 
@@ -207,6 +207,30 @@ party.
   unsatisfiable by construction — not a cache-policy problem a shorter
   TTL could fix. Neither Frankfurter nor NBP carries such a restriction,
   which is a hard criterion rather than a happy accident.
+
+## Status codes
+
+Every endpoint answers from this set, and every spec file names the
+status rather than its number. The numbers live here alone, so a
+contract pins one value and prose stays readable.
+
+| Name | Code | Answered when |
+|---|---|---|
+| OK | 200 | the request succeeded and carries a body |
+| No Content | 204 | the request was valid and there is nothing to return — a rate with no proposal available, never an error |
+| Bad Request | 400 | input is malformed, out of range, or names something the caller may safely learn does not exist |
+| Unauthorized | 401 | no valid session |
+| Forbidden | 403 | the required `X-Solvent-Request` header is absent (Application hardening) |
+| Not Found | 404 | the target does not exist, **or** exists but belongs to someone else, **or** is a route the caller must not learn exists |
+| Conflict | 409 | the write lost an optimistic-concurrency check, or the target's state forbids it |
+| Content Too Large | 413 | a storage cap would be exceeded (Storage & data handling) |
+| Too Many Requests | 429 | a rate limit engaged (Application hardening) |
+| Server Error | 500 | an unhandled failure. Never a designed answer; it appears in this spec only where a test stubs one |
+
+Not Found carries three distinct conditions deliberately. Splitting
+them would answer the question the attacker is asking — whether an id,
+an account, or an admin route exists — so the three are
+indistinguishable by construction rather than by convention.
 
 ## Tech stack
 
@@ -481,12 +505,12 @@ Actors this design defends against vs. accepts:
 - **CSRF**: `SameSite=Lax` plus **a required custom request header**,
   `X-Solvent-Request: 1`, on every endpoint that is not meant to be
   reached by navigation — every state-changing one (records, invite,
-  import, password change, logout, account deletion) **and
-  `GET /api/export`**. Same-origin cookie auth is not implicitly
-  CSRF-safe. A request missing the header is rejected with **403** and
-  changes nothing. The check runs **before authentication**, so the
-  response is identical whether or not the session is valid — a caller
-  without the header learns nothing about session state.
+  import, password change, logout, account deletion) **and `GET
+  /api/export`**. Same-origin cookie auth is not implicitly CSRF-safe. A
+  request missing the header is rejected with **Forbidden** and changes
+  nothing. The check runs **before authentication**, so the response is
+  identical whether or not the session is valid — a caller without the
+  header learns nothing about session state.
   - **A header rather than a token.** A cross-origin page cannot set a
     custom header without a preflight, and the preflight fails because
     no CORS headers are served. Every endpoint in this product is called
@@ -544,10 +568,11 @@ Actors this design defends against vs. accepts:
 
 - **Blob and quota limits** — **64 KiB** per ciphertext blob, **50 000**
   records per vault, **32 MiB** total per user. Rejected before the row
-  reaches the DB, with 413 (record-api.md).
+  reaches the DB, with Content Too Large (record-api.md).
   - These three are **compiled-contract parameters**, not operator
-    config: the 413 tests assert exact behaviour at a boundary, and a
-    boundary that moves per deployment is one the contract cannot state.
+    config: the Content Too Large tests assert exact behaviour at a
+    boundary, and a boundary that moves per deployment is one the
+    contract cannot state.
   - Every one has an order of magnitude of headroom. A snapshot payload
     is a few hundred bytes; thirty accounts updated monthly for thirty
     years is ~11 000 records and a few MB. The caps exist to bound a

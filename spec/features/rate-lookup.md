@@ -25,23 +25,23 @@ accepted (record-snapshot.md).
 - Session-authenticated. Anonymous requests are refused, so the proxy is
   not an open relay.
 
-Response `200`:
+Response OK:
 
 ```json
 { "rate": "3142.75", "base": "1 XAU-ozt", "quote": "CHF",
   "asOf": "2026-07-31", "source": "provider-name", "cached": true }
 ```
 
-Response `204 No Content` — no proposal available (a symbol with no
-provider yet, no data for that date, provider unreachable). The client
-falls back to manual entry.
+Response No Content No Content` — no proposal available (a symbol with
+no provider yet, no data for that date, provider unreachable). The
+client falls back to manual entry.
 
 **The endpoint accepts no amount parameter, in any form.** This is the
 base-amount rule made structural: the rate is always for one fixed base
 unit (1 troy oz, one unit of the base currency), so there is no
 field an amount could travel in even by mistake (architecture.md,
 Base-amount rule). Any request carrying an unrecognised query parameter
-is rejected with 400 rather than ignored.
+is rejected with Bad Request rather than ignored.
 
 ## Providers
 
@@ -83,18 +83,18 @@ price of 1 g of fine gold (millesimal fineness 1000) in PLN, daily, from
 FX provider, and chosen for the same reasons: a central bank rather than
 a vendor, nothing to sign up for, and one host constant to unwind.
 
-- Lookup is a **range query**, not a single-date query:
-  `GET /api/cenyzlota/{date−14d}/{date}` returns only the days NBP
-  actually published, and the adapter takes the last entry on or before
-  `date`. That satisfies the prior-close rule in one request with no
-  retry loop, and an empty result inside the window means `204`. A
-  single-date query returns `404` on every weekend and Polish holiday,
-  so it is the wrong call to make. The API caps a range at 93 days.
+- Lookup is a **range query**, not a single-date query: `GET
+  /api/cenyzlota/{date−14d}/{date}` returns only the days NBP actually
+  published, and the adapter takes the last entry on or before `date`.
+  That satisfies the prior-close rule in one request with no retry loop,
+  and an empty result inside the window means No Content. A single-date
+  query returns Not Found on every weekend and Polish holiday, so it is
+  the wrong call to make. The API caps a range at 93 days.
 - **The quote conversion is a second leg.** NBP prices in PLN only, so a
   non-PLN `quote` is converted PLN→quote through Frankfurter **at the
   `asOf` date, not the requested date** — pairing a rate with FX from a
-  different day would misprice it. Either leg failing yields `204`; a
-  half-composed rate is never returned. `source` names the chain
+  different day would misprice it. Either leg failing yields No Content;
+  a half-composed rate is never returned. `source` names the chain
   (`"nbp+frankfurter"`, or `"nbp"` when the quote is PLN).
 - **Unit conversion is exact**: `XAU-g` takes NBP's figure directly,
   `XAU-ozt` multiplies by 31.1034768. Compose at full precision and
@@ -179,15 +179,15 @@ cacheable.
 It exists because **the account form's unit picker is built from it**
 (`ui/account-form.md`): a user chooses what an account is measured in
 from this list, and that choice is also its rate symbol
-(`manage-accounts.md`). An unknown symbol stays a `400` at
+(`manage-accounts.md`). An unknown symbol stays a Bad Request at
 `/api/rates` — the table means a user cannot reach that error by
 choosing, only by hand-editing an export.
 
 - `kind` — `currency` or `metal`. Display and grouping only.
 - `lookup` — whether the proxy can price this symbol **today**. `false`
   means the symbol is valid and canonical but has no provider yet: the
-  user enters the rate by hand, and `/api/rates` answers `204`, not
-  `400`. This is a designed state, not a degraded one.
+  user enters the rate by hand, and `/api/rates` answers No Content, not
+  Bad Request. This is a designed state, not a degraded one.
 
 The table is operator configuration, not user data: it is identical for
 every user, reveals nothing about who holds what, and adding a symbol
@@ -279,8 +279,8 @@ reachable (architecture.md, SSRF hardening):
   sweep of thirty accounts costs at most thirty requests and mostly
   hits cache, so the limit sits far above honest use.
 - A circuit breaker opens after **5 consecutive provider failures** and
-  serves `204` directly for a **5-minute cool-off** instead of retrying
-  per request.
+  serves No Content directly for a **5-minute cool-off** instead of
+  retrying per request.
 - Both are operator config with those defaults (architecture.md, Rate
   limiting).
 - Provider errors are logged with the symbol and status, never with the
@@ -289,14 +289,15 @@ reachable (architecture.md, SSRF hardening):
 ## Inputs / outputs
 
 - In: symbol, quote currency, date. Never an amount.
-- Out: a rate for one base unit, its `asOf` date and source, or `204`.
+- Out: a rate for one base unit, its `asOf` date and source, or No
+  Content.
 
 ## Edge cases
 
-- **Provider down, rate-limited, or timing out** → `204`; the client
-  falls back to manual entry and says why. Recording a snapshot is never
-  blocked by the proxy.
-- **`symbol` equals `quote`** → `200` with `rate: "1"`, `base` naming
+- **Provider down, rate-limited, or timing out** → No Content; the
+  client falls back to manual entry and says why. Recording a snapshot
+  is never blocked by the proxy.
+- **`symbol` equals `quote`** → OK with `rate: "1"`, `base` naming
   that unit, `asOf` set to the requested date, `source: "identity"`,
   `cached: false`, and **no outbound request**. The answer is 1 by
   definition, and Frankfurter errors on base = quote, so passing it
@@ -304,22 +305,23 @@ reachable (architecture.md, SSRF hardening):
   into a provider error. The client never asks — the rate field is
   hidden for a main-currency account (`record-snapshot.md`) — but the
   server answers correctly regardless, the same reason a
-  `lookup: false` symbol answers `204` rather than `400`.
-- **Symbol not in the server's symbol table** → `400`. Adding a symbol
-  is an operator config change, not a user action.
+  `lookup: false` symbol answers No Content rather than Bad Request.
+- **Symbol not in the server's symbol table** → Bad Request. Adding a
+  symbol is an operator config change, not a user action.
 - **Symbol in the table with `lookup: false`** (`XAG-ozt` and the rest)
-  → `204`, no outbound request, no error log. The client should not have
-  asked — it holds the table — but the server must answer this way
+  → No Content, no outbound request, no error log. The client should not
+  have asked — it holds the table — but the server must answer this way
   regardless, so that turning a symbol's lookup on later is a config
   change and nothing more.
-- **Gold, non-PLN quote, FX leg fails** → `204`. Never return the PLN
-  figure labelled with the requested quote.
-- **Gold date before 2013-01-02** → `400`, per the per-symbol floor, not
-  a `204` — the request is out of range, not merely unanswerable.
+- **Gold, non-PLN quote, FX leg fails** → No Content. Never return the
+  PLN figure labelled with the requested quote.
+- **Gold date before 2013-01-02** → Bad Request, per the per-symbol
+  floor, not a No Content — the request is out of range, not merely
+  unanswerable.
 - **Weekend, holiday, or pre-listing date** → return the most recent
   prior close with `asOf` set to that earlier date, and the client shows
   "rate as of 29 Jul" so the user can see the lag. If no prior close
-  exists within a configured window, `204`.
+  exists within a configured window, No Content.
 - **Provider returns a rate in an unexpected currency** → reject and
   treat as no proposal rather than silently mislabelling it.
 - **Provider returns a zero, negative, or non-numeric rate** → treated
@@ -333,27 +335,28 @@ reachable (architecture.md, SSRF hardening):
   repeat, `"cached": true` with no second outbound request.
 - Today's rate is refetched after the 1-hour TTL and not before.
 - A request with any parameter that could carry an amount is rejected
-  with 400; a test enumerates the accepted parameter set and asserts it
-  is exactly `{symbol, date, quote}`.
+  with Bad Request; a test enumerates the accepted parameter set and
+  asserts it is exactly `{symbol, date, quote}`.
 - `symbol=http://192.168.1.1/`, `symbol=../../etc/passwd`, and a symbol
   matching the regex but absent from the symbol table are all rejected
-  with 400, and no outbound request is made.
+  with Bad Request, and no outbound request is made.
 - With the provider stubbed to reply `302` toward an internal address,
   no request to that address is made.
-- With the provider stubbed to hang, the endpoint returns `204` within
-  the configured timeout rather than holding the connection.
+- With the provider stubbed to hang, the endpoint returns No Content
+  within the configured timeout rather than holding the connection.
 - After the configured number of consecutive provider failures the
-  circuit breaker returns `204` without an outbound attempt, and closes
-  again after the cool-off.
-- An unauthenticated request returns 401 and makes no outbound request.
+  circuit breaker returns No Content without an outbound attempt, and
+  closes again after the cool-off.
+- An unauthenticated request returns Unauthorized and makes no outbound
+  request.
 - No log line, response body, or error page contains the provider API
   key.
-- Exceeding the per-user rate limit returns 429.
-- A future date is rejected with 400.
+- Exceeding the per-user rate limit returns Too Many Requests.
+- A future date is rejected with Bad Request.
 - `GET /api/rates/symbols` returns exactly the symbols the server will
   accept at `/api/rates` — asserted by querying every returned symbol
-  and getting no 400, so the two can never drift. Symbols with
-  `lookup: false` are included in this sweep and must answer `204`.
+  and getting no Bad Request, so the two can never drift. Symbols with
+  `lookup: false` are included in this sweep and must answer No Content.
 - `GET /api/rates/symbols` requires a session and makes no outbound
   request.
 - The table contains all eight seeded metal symbols, with `lookup: true`
@@ -362,16 +365,17 @@ reachable (architecture.md, SSRF hardening):
   31.1034768, to the precision returned.
 - With NBP stubbed to publish nothing for a requested Saturday, the
   proposal returns the preceding published day with `asOf` set to it —
-  and with nothing published in the whole 14-day window, `204`.
+  and with nothing published in the whole 14-day window, No Content.
 - A gold request with a non-PLN quote makes exactly two outbound
   requests, and the FX leg is fetched for the **`asOf` date**, not the
   requested date — asserted against a stub that would return a different
   rate for each.
-- With the FX leg stubbed to fail, the response is `204` and no rate
-  carrying a PLN figure under another currency's label is ever returned.
-- A gold request dated 2012-12-31 returns 400.
+- With the FX leg stubbed to fail, the response is No Content and no
+  rate carrying a PLN figure under another currency's label is ever
+  returned.
+- A gold request dated 2012-12-31 returns Bad Request.
 - `symbol=CHF&quote=CHF` returns `rate: "1"` with no outbound request.
 - A `quote` that is a valid ISO 4217 code but absent from the symbol
-  table is rejected with 400 — asserted with a code the FX provider
-  does not serve, since that is the case a plain ISO check waves
-  through.
+  table is rejected with Bad Request — asserted with a code the FX
+  provider does not serve, since that is the case a plain ISO check
+  waves through.

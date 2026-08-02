@@ -100,9 +100,9 @@ rendering constraint from the validated chart palette
 - **Error — save failed**: inline on the card, the edit preserved, and
   the previous value still shown as current. Every write here is a
   single record, so a failure changes nothing.
-- **Error — 409 stale profile**: "Your settings were changed in another
-  tab." The screen reloads the profile and asks the user to redo the
-  edit rather than merging.
+- **Error — Conflict stale profile**: "Your settings were changed in
+  another tab." The screen reloads the profile and asks the user to redo
+  the edit rather than merging.
 - **Populated**: as above.
 
 ## Rules

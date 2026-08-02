@@ -121,9 +121,9 @@ deleted outright.
 - **Empty**: n/a.
 - **Error — validation**: inline per field. Name required; unit code
   required; nothing else is.
-- **Error — 409 stale version**: "This account was changed in another
-  tab." The panel reloads the current record and asks the user to redo
-  the edit rather than silently merging or clobbering.
+- **Error — Conflict stale version**: "This account was changed in
+  another tab." The panel reloads the current record and asks the user
+  to redo the edit rather than silently merging or clobbering.
 - **Error — save failed**: the form keeps every value; nothing is lost.
 - **Populated**: saved account appears in the table immediately from
   local state, with no refetch.

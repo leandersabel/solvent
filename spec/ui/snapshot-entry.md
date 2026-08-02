@@ -68,12 +68,12 @@ figures needs to know which were guesses (`record-snapshot.md`,
    "This account has no price source — enter the rate yourself" rather
    than presenting an empty field with no explanation.
 4. **The unit is a symbol with `lookup: false`** (silver, platinum,
-   palladium in v1) → **no request is made** either; the client knows from
-   the symbol table that none is coming, and a round-trip to be told
-   `204` only delays the form. Copy names the metal — "No market rate
-   for silver yet — enter it yourself" — and must not reuse the outage
-   notice below, which tells the user something is broken when nothing
-   is.
+   palladium in v1) → **no request is made** either; the client knows
+   from the symbol table that none is coming, and a round-trip to be
+   told No Content only delays the form. Copy names the metal — "No
+   market rate for silver yet — enter it yourself" — and must not reuse
+   the outage notice below, which tells the user something is broken
+   when nothing is.
 
 ## Editing an existing snapshot
 

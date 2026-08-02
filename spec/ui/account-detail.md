@@ -84,8 +84,8 @@ which is not the same as being worth 0 (`net-worth-view.md`).
   resolved. This is a visible fault by design — silently preferring the
   higher `version` would put a wrong number in the chart with nothing
   on screen to explain it.
-- **Error — 409 on a snapshot write**: "This snapshot was changed in
-  another tab." The row reloads from the current record; no merge.
+- **Error — Conflict on a snapshot write**: "This snapshot was changed
+  in another tab." The row reloads from the current record; no merge.
 - **Error — delete failed**: inline on the row, row unchanged.
 
 ## Rules

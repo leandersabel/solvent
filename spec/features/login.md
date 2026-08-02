@@ -119,9 +119,9 @@ lock the user out.
   dashboard; keys are still only in memory, so if they were lost to a
   refresh the client must prompt to unlock rather than render an empty
   vault.
-- **Clock skew / expired session mid-request** → API returns 401 with a
-  machine-readable code; the client prompts for re-unlock rather than
-  discarding unsaved input.
+- **Clock skew / expired session mid-request** → API returns
+  Unauthorized with a machine-readable code; the client prompts for
+  re-unlock rather than discarding unsaved input.
 
 ## Acceptance criteria
 
@@ -142,8 +142,8 @@ lock the user out.
   transparently upgraded on login: salt, envelope, Auth Key hash, and
   wrapped DEK all change; the DEK is unchanged, proven by decrypting a
   record written before the upgrade.
-- If `/api/auth/rewrap` returns 500, the user stays logged in and can
-  still log in afterwards with the old parameters.
+- If `/api/auth/rewrap` returns Server Error, the user stays logged in
+  and can still log in afterwards with the old parameters.
 - Exceeding the per-account attempt limit locks the account and returns
   the same response shape for a nonexistent account.
 - `/api/auth/login` with an unknown username takes statistically

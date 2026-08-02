@@ -172,16 +172,16 @@ Self-service, irreversible, and distinct from an admin deleting a user.
 `DELETE /api/auth/account` `{ authKey, confirmUsername }`.
 
 - Requires re-entering the password (verified via Auth Key, same as
-  login) and typing the username to confirm. The server checks
-  `authKey` against the stored hash in constant time, and that
-  `confirmUsername` equals the session user's normalized username — a
-  mismatch on either is a 400 and deletes nothing. The typed username is
-  a deliberate second factor of intent, so it is verified server-side
-  and not left as a UI formality.
+  login) and typing the username to confirm. The server checks `authKey`
+  against the stored hash in constant time, and that `confirmUsername`
+  equals the session user's normalized username — a mismatch on either
+  is a Bad Request and deletes nothing. The typed username is a
+  deliberate second factor of intent, so it is verified server-side and
+  not left as a UI formality.
 - Deletes the user row, every record, and every session, in one
   transaction. Nothing is soft-deleted — there is no vault to preserve
   that anyone could ever open.
-- Refused with 409 if the user is the last remaining admin
+- Refused with Conflict if the user is the last remaining admin
   (admin-invites.md).
 - The dialog offers **export first** as the primary action and deletion
   as the secondary one.
@@ -259,8 +259,8 @@ Self-service, irreversible, and distinct from an admin deleting a user.
   server-side and deletes nothing — asserted by calling the endpoint
   directly, since a client bypassing the dialog is the case that
   matters.
-- The last remaining admin's `DELETE /api/auth/account` returns 409 and
-  deletes nothing.
+- The last remaining admin's `DELETE /api/auth/account` returns Conflict
+  and deletes nothing.
 - The deletion dialog presents export as the primary action.
 - `GET /api/sessions` returns no IP address and no user-agent for any
   session — asserted against the endpoint's full response shape, so the
@@ -270,11 +270,11 @@ Self-service, irreversible, and distinct from an admin deleting a user.
   none belonging to another user appear.
 - `POST /api/auth/logout` invalidates the calling session only; a second
   session for the same user still works afterwards.
-- All four endpoints return 401 unauthenticated, and the three writes
-  are rejected without the `X-Solvent-Request` header.
+- All four endpoints return Unauthorized unauthenticated, and the three
+  writes return Forbidden without the `X-Solvent-Request` header.
 - After the configured idle period, in-memory keys are gone and reading
-  vault data prompts to unlock; after 12 hours, the server session is
-  rejected regardless of activity.
+  vault data prompts to unlock; after 12 hours, the server session
+  answers Unauthorized regardless of activity.
 - The idle-lock setting defaults to 15 minutes, survives a re-login, and
   appears in plaintext nowhere in the DB — it lives in the encrypted
   profile record.
