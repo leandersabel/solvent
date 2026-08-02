@@ -22,7 +22,7 @@
     "userIdSource": {"value": "the server assigns user_id from the session on every imported record; never reads one from the payload", "cite": "spec/features/export-import.md#rules"},
     "sessionInvalidationScope": {"value": "every other session for the user is invalidated in the same transaction as the import; the importing session survives — must not be weaker than a password change (account-settings.md), which changes strictly less", "cite": "spec/features/export-import.md#rules"},
     "formatVersionRule": {"value": "no formatVersion below 1 exists; an older version migrates client-side after decryption and before re-encryption, reusing the same per-type migration chain as lazy read migration (record-api.md); a newer/unknown formatVersion is rejected", "cite": "spec/features/export-import.md#edge-cases"},
-    "profileReplacementIsSanctioned": {"value": "import replaces the profile record too, which is the one sanctioned way the main currency changes — it does not violate account-settings.md's immutability rule because history is replaced together, staying internally consistent", "cite": "spec/features/export-import.md#the-re-key-step"}
+    "profileReplacementIsSanctioned": {"value": "import replaces the profile record too, and is the one sanctioned way the main currency changes", "cite": "spec/features/export-import.md#the-re-key-step"}
   },
   "verify": {
     "criteria": {"file": "spec/features/export-import.md", "section": "Acceptance criteria"},

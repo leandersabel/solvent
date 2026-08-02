@@ -69,8 +69,10 @@ For each feature, write `spec/.compiled/<feature-name>.json` with:
   the reviewer's own test.
 
 Then update `spec/status.md`: tick the feature's Compiled column if
-compilation succeeded. `status.md` carries state only — no narrative,
-no changelog.
+compilation succeeded. Tick `Verified` once the reviewer agent reports
+no outstanding findings for that feature; a feature with open findings
+stays unticked. `status.md` carries state only — no narrative, no
+changelog.
 
 ## Rules
 

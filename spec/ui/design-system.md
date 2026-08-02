@@ -303,8 +303,9 @@ only its own content region.
 - Content max-width 1200px on the ground. Narrower screens set their
   own width (forms 480px, the sweep and account detail 900px).
 - The shell is server-rendered Jinja (`architecture.md`, Components) and
-  carries no plaintext — nav labels, the wordmark, and the current
-  default KDF envelope (`architecture.md`, Key management).
+  carries no plaintext — nav labels and the wordmark. The unauthenticated
+  screens sit outside it (`unlock.md`, `register.md`) and embed the
+  current default KDF envelope in their own page.
 
 ## Components
 

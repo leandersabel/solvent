@@ -8,7 +8,7 @@
     {"file": "spec/features/account-settings.md", "sections": ["The profile record"]},
     {"file": "spec/features/rate-lookup.md", "sections": ["The symbol table", "Seeded symbols"]},
     {"file": "spec/ui/register.md", "sections": ["all"], "role": "the only screen this feature drives"},
-    {"file": "spec/ui/design-system.md", "sections": ["Components", "States", "App shell"], "role": "input and error-state conventions for the registration form, and the shell that delivers the default KDF envelope to this page"}
+    {"file": "spec/ui/design-system.md", "sections": ["Components", "States"], "role": "input and error-state conventions for the registration form, which sits outside the app shell and embeds its own KDF envelope (ui/register.md, Purpose)"}
   ],
   "dependsOn": ["admin-invites", "rate-lookup", "account-settings"],
   "parameters": {
@@ -20,7 +20,7 @@
     "usernameRule": {"value": "normalized (trimmed, lowercased) before storage/comparison; allowed 3-32 chars, [a-z0-9._-]", "cite": "spec/features/register.md#rules"},
     "mainCurrencySet": {"value": "exactly the kind:currency rows of the operator's symbol table (rate-lookup.md), not full ISO 4217", "cite": "spec/features/register.md#rules"},
     "profileRecordId": {"value": "client-generated UUIDv4, profile AAD built with account_id empty, record_type: \"profile\", version: 1, entirely before the request is sent", "cite": "spec/features/register.md#flow"},
-    "initialProfilePayload": {"value": "{ mainCurrency, createdAt } only — the two required keys; idleLockMinutes and dimensions are absent until a later settings write", "cite": "spec/features/account-settings.md#The profile record"},
+    "initialProfilePayload": {"value": "{ mainCurrency, createdAt } only — the two required keys; idleLockMinutes and dimensions are absent until a later settings write", "cite": "spec/features/account-settings.md#the-profile-record"},
     "transactionScope": {"value": "user row insert, profile record insert, and invite consumption all commit in one transaction, or none do", "cite": "spec/features/register.md#flow"},
     "kdfEnvelopeSource": {"value": "the server's current default KDF envelope, embedded on the GET /register page, used verbatim for derivation", "cite": "spec/features/register.md#flow"},
     "kdfMinimumEnforcement": {"value": "server rejects any submitted KDF parameters below its configured minimum with 400, even though the client UI never sends them", "cite": "spec/features/register.md#acceptance-criteria"},

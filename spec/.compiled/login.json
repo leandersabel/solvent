@@ -6,7 +6,7 @@
     {"file": "spec/architecture.md", "sections": ["Key management", "Application hardening"]},
     {"file": "spec/features/account-settings.md", "sections": ["Session and lock"]},
     {"file": "spec/ui/unlock.md", "sections": ["all"], "role": "the single password screen, in full-login and re-unlock modes"},
-    {"file": "spec/ui/design-system.md", "sections": ["Components", "States", "App shell"], "role": "input and error-state conventions for the password screen, and the shell that carries the default KDF envelope and hosts the re-unlock screen"}
+    {"file": "spec/ui/design-system.md", "sections": ["Components", "States"], "role": "input and error-state conventions for the password screen, which sits outside the app shell (ui/unlock.md, Layout)"}
   ],
   "dependsOn": ["register", "record-api", "account-settings"],
   "parameters": {
@@ -20,7 +20,7 @@
     "serverSideAuthKeyHash": {"value": "Argon2id, starting point 64 MiB memory, 2 iterations, constant-time comparison — defense in depth, not the primary work factor", "cite": "spec/features/login.md#rules"},
     "sessionCookie": {"value": "HttpOnly, Secure, SameSite=Lax; carries only an opaque session token, no key material, no user id", "cite": "spec/features/login.md#inputs-outputs"},
     "sessionLifetime": {"value": "absolute 12 hours from issue, not sliding", "cite": "spec/features/login.md#rules"},
-    "idleLock": {"value": "user-configurable 5-60 minutes, default 15, stored as idleLockMinutes in the encrypted profile record (absent = 15)", "cite": "spec/features/account-settings.md#Session and lock"},
+    "idleLock": {"value": "user-configurable 5-60 minutes, default 15, stored as idleLockMinutes in the encrypted profile record (absent = 15)", "cite": "spec/features/account-settings.md#session-and-lock"},
     "idleLockDiscard": {"value": "discards Master Key, DEK, and every decrypted value derived from them (whole in-memory model, rendered figures, chart series, cached plaintext); the one named exception is unsaved form input in the open form", "cite": "spec/features/login.md#rules"},
     "rewrapSaltSize": {"value": "fresh 128-bit salt generated for the re-wrap", "cite": "spec/features/login.md#stale-kdf-re-wrap"},
     "rewrapFailureBehavior": {"value": "session continues on old parameters if the rewrap POST fails; retried on next login, never locks the user out", "cite": "spec/features/login.md#stale-kdf-re-wrap"},

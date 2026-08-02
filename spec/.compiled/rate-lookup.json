@@ -18,7 +18,12 @@
       "success": 200,
       "noProposal": 204,
       "unauthenticated": 401,
-      "badRequest": "400 (unrecognised param, symbol not in table, malformed/future/pre-floor date, quote not a kind:currency symbol-table row)",
+      "unrecognisedParam": 400,
+      "symbolNotInTable": 400,
+      "malformedDate": 400,
+      "futureDate": 400,
+      "preFloorDate": 400,
+      "quoteNotCurrency": 400,
       "rateLimited": 429
     },
     "identityShortCircuit": {"value": "symbol == quote returns 200, rate: \"1\", asOf = requested date, source: \"identity\", cached: false, no outbound request", "cite": "spec/features/rate-lookup.md#edge-cases"},

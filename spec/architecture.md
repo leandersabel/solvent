@@ -269,9 +269,6 @@ party.
   them in-browser with the session's Master Key, and renders the result —
   the server has nothing to template there, since it never has plaintext.
 
-<!-- Leave blank if undecided — the product-owner agent should flag this
-in spec/questions.md rather than choosing for you. -->
-
 ## Security
 
 ### Threat model
@@ -486,7 +483,10 @@ Actors this design defends against vs. accepts:
   reached by navigation — every state-changing one (records, invite,
   import, password change, logout, account deletion) **and
   `GET /api/export`**. Same-origin cookie auth is not implicitly
-  CSRF-safe.
+  CSRF-safe. A request missing the header is rejected with **403** and
+  changes nothing. The check runs **before authentication**, so the
+  response is identical whether or not the session is valid — a caller
+  without the header learns nothing about session state.
   - **A header rather than a token.** A cross-origin page cannot set a
     custom header without a preflight, and the preflight fails because
     no CORS headers are served. Every endpoint in this product is called

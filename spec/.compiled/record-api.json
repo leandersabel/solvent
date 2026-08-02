@@ -10,7 +10,7 @@
     "rowColumns": {"value": ["user_id", "record_id", "record_type", "account_id", "schema_version", "version", "nonce", "ciphertext", "updated_at"], "cite": "spec/features/record-api.md#row-shape"},
     "recordTypeEnum": {"value": ["account", "snapshot", "profile"], "cite": "spec/features/record-api.md#row-shape"},
     "primaryKey": {"value": "(user_id, record_id)", "cite": "spec/features/record-api.md#row-shape"},
-    "nonceSizeBits": {"value": 96, "cite": "spec/architecture.md#Key management"},
+    "nonceSizeBits": {"value": 96, "cite": "spec/architecture.md#key-management"},
     "versionRule": {"value": "starts at 1, +1 per write; PUT must supply stored version + 1 (or 1 to create)", "cite": "spec/features/record-api.md#endpoints"},
     "aadFieldOrder": {"value": ["account_id", "record_type", "record_id", "schema_version", "version"], "cite": "spec/features/record-api.md#the-aad-encoding"},
     "aadSeparator": {"value": "0x1f (ASCII unit separator) between each field", "cite": "spec/features/record-api.md#the-aad-encoding"},
@@ -18,10 +18,10 @@
     "aadExcludesUserId": {"value": true, "cite": "spec/features/record-api.md#the-aad-encoding"},
     "accountIdOnWire": {"value": "null when absent, everywhere (PUT body, GET response, export file); empty string is rejected as malformed", "cite": "spec/features/record-api.md#accountid-on-the-wire"},
     "storageCaps": {
-      "maxCiphertextPerRecord": {"value": "64 KiB", "cite": "spec/architecture.md#Storage & data handling"},
-      "maxRecordsPerVault": {"value": 50000, "cite": "spec/architecture.md#Storage & data handling"},
-      "maxBytesPerUser": {"value": "32 MiB", "cite": "spec/architecture.md#Storage & data handling"},
-      "overLimitStatus": {"value": 413, "cite": "spec/architecture.md#Storage & data handling"}
+      "maxCiphertextPerRecord": {"value": "64 KiB", "cite": "spec/architecture.md#storage-data-handling"},
+      "maxRecordsPerVault": {"value": 50000, "cite": "spec/architecture.md#storage-data-handling"},
+      "maxBytesPerUser": {"value": "32 MiB", "cite": "spec/architecture.md#storage-data-handling"},
+      "overLimitStatus": {"value": 413, "cite": "spec/architecture.md#storage-data-handling"}
     },
     "statusCodes": {
       "createConflictOrStaleVersion": 409,
@@ -33,7 +33,7 @@
       "aadFieldInBody": "rejected (400)",
       "notFoundOrOtherUsersRecord": 404,
       "unauthenticated": 401,
-      "missingCsrfHeader": "rejected",
+      "missingCsrfHeader": 403,
       "overQuota": 413
     },
     "endpoints": {
