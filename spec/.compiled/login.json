@@ -1,0 +1,44 @@
+{
+  "feature": "login",
+  "summary": "Vault unlock: the browser fetches salt/KDF params (real or a deterministic decoy), derives Master Key and Auth Key, sends only the Auth Key, and on success gets a session plus the wrapped DEK — with a transparent stale-KDF re-wrap and an idle lock that discards the entire in-memory model.",
+  "read": [
+    {"file": "spec/features/login.md", "sections": ["all"]},
+    {"file": "spec/architecture.md", "sections": ["Key management", "Application hardening"]},
+    {"file": "spec/features/account-settings.md", "sections": ["Session and lock"]},
+    {"file": "spec/ui/unlock.md", "sections": ["all"], "role": "the single password screen, in full-login and re-unlock modes"}
+  ],
+  "dependsOn": ["register", "record-api", "account-settings"],
+  "parameters": {
+    "endpoints": {
+      "saltFetch": "POST /api/auth/salt { username } -> { salt, kdf }",
+      "login": "POST /api/auth/login { username, authKey } -> { wrappedDek, dekNonce, kdfStale } and sets session cookie",
+      "rewrap": "POST /api/auth/rewrap { salt, kdf, authKey, wrappedDek, dekNonce } — authenticated, replaces all five stored fields in one transaction"
+    },
+    "decoySalt": {"value": "HMAC(server_secret, normalized_username) truncated to 16 bytes, paired with the server's current default KDF envelope, for an unknown username", "cite": "spec/features/login.md#flow"},
+    "unknownUsernameLoginBehavior": {"value": "runs a full Argon2id verification against a fixed decoy hash and discards the result, so timing does not reveal existence", "cite": "spec/features/login.md#flow"},
+    "serverSideAuthKeyHash": {"value": "Argon2id, starting point 64 MiB memory, 2 iterations, constant-time comparison — defense in depth, not the primary work factor", "cite": "spec/features/login.md#rules"},
+    "sessionCookie": {"value": "HttpOnly, Secure, SameSite=Lax; carries only an opaque session token, no key material, no user id", "cite": "spec/features/login.md#inputs-outputs"},
+    "sessionLifetime": {"value": "absolute 12 hours from issue, not sliding", "cite": "spec/features/login.md#rules"},
+    "idleLock": {"value": "user-configurable 5-60 minutes, default 15, stored as idleLockMinutes in the encrypted profile record (absent = 15)", "cite": "spec/features/account-settings.md#Session and lock"},
+    "idleLockDiscard": {"value": "discards Master Key, DEK, and every decrypted value derived from them (whole in-memory model, rendered figures, chart series, cached plaintext); the one named exception is unsaved form input in the open form", "cite": "spec/features/login.md#rules"},
+    "rewrapSaltSize": {"value": "fresh 128-bit salt generated for the re-wrap", "cite": "spec/features/login.md#stale-kdf-re-wrap"},
+    "rewrapFailureBehavior": {"value": "session continues on old parameters if the rewrap POST fails; retried on next login, never locks the user out", "cite": "spec/features/login.md#stale-kdf-re-wrap"},
+    "sessionRotation": {"value": "session id is rotated (new session id) on every successful login", "cite": "spec/features/login.md#rules"}
+  },
+  "verify": {
+    "criteria": {"file": "spec/features/login.md", "section": "Acceptance criteria"},
+    "fixtures": [
+      "a real user at current KDF parameters and a nonexistent username, for the salt-fetch and login timing/shape-indistinguishability assertions",
+      "a real user with a deliberately stale KDF envelope, for the transparent-upgrade assertion (salt/envelope/Auth-Key-hash/wrapped-DEK all change, DEK proven unchanged)",
+      "a record written before a KDF upgrade, to prove decryptability survives the re-wrap",
+      "a stubbed /api/auth/rewrap returning 500, for the 'stays logged in on rewrap failure' criterion"
+    ],
+    "focus": [
+      "timing-indistinguishability criteria (salt fetch, login) need actual statistical timing measurement across many trials, not a single-run assertion",
+      "the idle-lock criterion must assert against the in-memory model itself (no decrypted name/value/snapshot reachable), not just that the key handles are null — a test that only checks the key variables would pass a broken implementation that leaves data cached elsewhere",
+      "'no key material in localStorage/sessionStorage at any point' needs an assertion that runs throughout the flow, not just at the end, since a leak-then-clear bug would otherwise pass",
+      "the stale-envelope account is deliberately distinguishable from a decoy (Rules) — do not write or accept a test asserting otherwise; only the current-KDF-parameters case is asserted indistinguishable"
+    ]
+  },
+  "openQuestions": []
+}

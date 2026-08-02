@@ -1,0 +1,50 @@
+{
+  "feature": "admin-invites",
+  "summary": "Invite-only user provisioning: admins mint single-use, time-limited invite links, list/revoke them, list users with metadata-only visibility, and delete a user's whole vault — with no decryption, password-reset, or role-change ability anywhere in the surface.",
+  "read": [
+    {"file": "spec/features/admin-invites.md", "sections": ["all"]},
+    {"file": "spec/architecture.md", "sections": ["Components", "Threat model", "Storage & data handling"]},
+    {"file": "spec/ui/admin.md", "sections": ["all"], "role": "the only screen this feature drives"}
+  ],
+  "dependsOn": ["register", "login", "account-settings"],
+  "parameters": {
+    "inviteRow": {"value": ["id", "token_hash", "created_by", "created_at", "expires_at", "status", "used_at", "used_by", "label"], "cite": "spec/features/admin-invites.md#invite-lifecycle"},
+    "tokenEntropy": {"value": "256 bits, secrets.token_urlsafe(32), shown once at creation, never retrievable afterward", "cite": "spec/features/admin-invites.md#invite-lifecycle"},
+    "tokenHash": {"value": "SHA-256, looked up by hash, never scanned/compared as plaintext", "cite": "spec/features/admin-invites.md#invite-lifecycle"},
+    "expiry": {"value": "default 7 days, admin-settable 1-30 days at creation", "cite": "spec/features/admin-invites.md#invite-lifecycle"},
+    "statusValues": {"value": ["pending", "used", "revoked"], "note": "expired is derived from expires_at, never stored", "cite": "spec/features/admin-invites.md#invite-lifecycle"},
+    "sentinelCreatedBy": {"value": "system:bootstrap, refused as a registration username", "cite": "spec/features/admin-invites.md#invite-lifecycle"},
+    "endpoints": {
+      "createInvite": "POST /api/admin/invites { expiresInDays, label, isAdmin } -> { id, token, url, expiresAt }",
+      "listInvites": "GET /api/admin/invites -> [{ id, label, createdAt, expiresAt, status, usedAt, usedBy }] (never token or hash)",
+      "revokeInvite": "POST /api/admin/invites/<id>/revoke -> status: revoked; idempotent if already revoked, refused (409) if used",
+      "listUsers": "GET /api/admin/users -> [{ username, createdAt, isAdmin, recordCount, lastLoginAt }]",
+      "deleteUser": "DELETE /api/admin/users/<username> { confirmUsername } -> deletes user row, all records, all sessions in one transaction; 400 if confirmUsername mismatches path; 409 if target is the last remaining admin"
+    },
+    "authRequirement": {"value": "every /api/admin/* endpoint requires an authenticated session with is_admin; a non-admin session gets 404, never 403", "cite": "spec/features/admin-invites.md#endpoints"},
+    "noRoleChangeEndpoint": {"value": "no promote/demote endpoint exists anywhere; the only way to make an admin is the bootstrap CLI or an invite created with isAdmin: true", "cite": "spec/features/admin-invites.md#endpoints"},
+    "bootstrapCli": {"value": "flask create-invite --admin --expires-days 1; requires --force on a populated instance, printing existing user/admin counts, and does not refuse outright even then", "cite": "spec/features/admin-invites.md#bootstrap-the-first-admin-and-the-locked-out-one"},
+    "inviteUrlFormat": {"value": "https://<host>/register?invite=<token>", "cite": "spec/features/admin-invites.md#rules"},
+    "referrerPolicy": {"value": "Referrer-Policy: no-referrer on /register and admin UI pages", "cite": "spec/features/admin-invites.md#rules"},
+    "tokenUrlScrub": {"value": "the register page removes the token from the address bar via history.replaceState once the form holds it", "cite": "spec/features/admin-invites.md#rules"},
+    "logRedaction": {"value": "the app strips/redacts the invite token from its own access logging; the deployment's reverse proxy/tunnel logging is documented separately as a place it may still appear", "cite": "spec/features/admin-invites.md#rules"}
+  },
+  "verify": {
+    "criteria": {"file": "spec/features/admin-invites.md", "section": "Acceptance criteria"},
+    "fixtures": [
+      "a seeded admin session and a seeded non-admin session, for the 404-not-403 assertions across every /api/admin/* route",
+      "a bootstrap-CLI-minted invite (created_by: system:bootstrap) alongside an admin-minted one, to test the sentinel username refusal",
+      "two populated vaults, for the 'deleting one user leaves the other's records and sessions untouched' criterion",
+      "a simulated DB failure mid-delete, for the transactional-rollback criterion",
+      "the full response shape of every admin endpoint, for the 'never returns wrapped DEK/salt/KDF envelope/ciphertext' sweep"
+    ],
+    "focus": [
+      "the 'no endpoint promotes or demotes an admin' criterion requires enumerating every registered route under /api/admin/, not just testing the documented ones",
+      "the last-admin guard must be checked on both deletion paths — the admin panel's DELETE /api/admin/users/<username> and the user's own DELETE /api/auth/account (account-settings.md) — a test that only covers one path is incomplete",
+      "the invite token must never appear in the application's own log output — requires inspecting actual log lines, not just the HTTP response",
+      "the DB-failure-mid-delete criterion needs an actual fault injection (simulated failure) to prove atomicity, not just a happy-path delete test",
+      "byte-identical registration errors for invalid/expired/used/revoked invites is a shared assertion with register.md — verify it is asserted once, not divergently in both feature tests"
+    ]
+  },
+  "openQuestions": []
+}

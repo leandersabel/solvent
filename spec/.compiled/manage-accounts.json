@@ -1,0 +1,43 @@
+{
+  "feature": "manage-accounts",
+  "summary": "Create, edit, archive, and delete accounts (holdings) — an encrypted record whose unit doubles as its rate symbol and whose dims map holds at most one value per dimension by construction, with server-side atomic cascade delete on purge.",
+  "read": [
+    {"file": "spec/features/manage-accounts.md", "sections": ["all"]},
+    {"file": "spec/architecture.md", "sections": ["Data model", "Record storage API", "Non-goals"]},
+    {"file": "spec/features/account-settings.md", "sections": ["Dimensions", "Deleting is archiving"]},
+    {"file": "spec/features/rate-lookup.md", "sections": ["The symbol table", "Seeded symbols"]},
+    {"file": "spec/features/record-snapshot.md", "sections": ["all"], "role": "the archive flow's closing snapshot and the upsert rule the closing-snapshot field follows"},
+    {"file": "spec/ui/account-form.md", "sections": ["all"], "role": "create/edit and the archive-vs-delete dialog"},
+    {"file": "spec/ui/account-detail.md", "sections": ["Header"], "role": "where archive/edit/delete are launched from"}
+  ],
+  "dependsOn": ["record-api", "account-settings", "rate-lookup", "record-snapshot"],
+  "parameters": {
+    "recordShape": {"value": "record_type: \"account\", account_id empty; payload { name, unit, dims, note, archivedAt, createdAt }", "cite": "spec/features/manage-accounts.md#record-shape"},
+    "unitIsRateSymbol": {"value": "there is no separate rate-symbol field; unit is either a symbol table entry or free text, and doubles as the rate symbol", "cite": "spec/features/manage-accounts.md#record-shape"},
+    "dimsShape": {"value": "dims is a map of dimension id -> value id, both 8-char [a-z0-9] opaque ids from the profile's dimension config; carries no display text", "cite": "spec/features/manage-accounts.md#record-shape"},
+    "note": {"value": "free text, optional, null when unset", "cite": "spec/features/manage-accounts.md#record-shape"},
+    "archivedAt": {"value": "null for active accounts, otherwise the ISO date archived", "cite": "spec/features/manage-accounts.md#record-shape"},
+    "nameUniqueness": {"value": "account names need not be unique; record_id is identity", "cite": "spec/features/manage-accounts.md#rules"},
+    "unitChangeLock": {"value": "changing the unit is blocked, client-enforced only, once the account has >=1 snapshot, because unit lives inside ciphertext the server cannot validate", "cite": "spec/features/manage-accounts.md#rules"},
+    "purgeEndpoint": {"value": "DELETE /api/accounts/<account_id>?mode=purge — server-side atomic cascade of the account record and every snapshot with that account_id; the one deliberately type-aware exception to record-api.md; another user's account_id returns 404, not 403", "cite": "spec/features/manage-accounts.md#delete-the-user-chooses"},
+    "deleteDialogOptions": {"value": "an account with snapshots offers Archive (default, preselected, with an optional closing snapshot dated archivedAt prefilled 0) or Delete permanently (typed-name confirm, cascades); an account with no snapshots skips the dialog and is deleted outright", "cite": "spec/features/manage-accounts.md#delete-the-user-chooses"},
+    "unassignedRendering": {"value": "a missing dims entry, or a dims value naming an archived/nonexistent dimension or value, renders as 'Unassigned'; the entry is never stripped from the account record", "cite": "spec/features/manage-accounts.md#dimensions"}
+  },
+  "verify": {
+    "criteria": {"file": "spec/features/manage-accounts.md", "section": "Acceptance criteria"},
+    "fixtures": [
+      "a configured dimension set (at least one multi-value dimension and one flag) with accounts assigned, for the dims-map and Unassigned-rendering criteria",
+      "an account with an existing snapshot, for the unit-change-lock and archive-closing-snapshot criteria",
+      "two users each owning an account, for the purge cross-user 404-not-403 criterion",
+      "an account name/note/dimension label containing `<img src=x onerror=alert(1)>`, for the XSS-rendering criterion"
+    ],
+    "focus": [
+      "the unit-change-lock criterion is explicitly client-only ('the test asserts the UI refuses it — not that an API call is rejected, which the server cannot do') — do not write a server-side test for this and call it complete",
+      "purge must be tested for atomicity with a simulated mid-delete failure, not just a happy-path cascade",
+      "'no account record contains a rate symbol distinct from its unit' is a shape assertion — verify the schema has no such field, don't just check a sample record",
+      "the archive-with-closing-snapshot criterion needs the chart-interpolation behavior checked too (net-worth-view.md), not just that the snapshot record was written",
+      "dims-map single-entry-per-dimension is 'true by construction' per the spec — the test should guard the shape (a JSON object can't carry a duplicate key) rather than attempt to construct the invalid state and check it's rejected"
+    ]
+  },
+  "openQuestions": []
+}

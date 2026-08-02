@@ -1,0 +1,45 @@
+{
+  "feature": "register",
+  "summary": "A person holding a valid invite creates a vault client-side (salt, Master Key, Auth Key, DEK, encrypted profile record) before anything reaches the server, then submits it all in one transaction that also consumes the invite.",
+  "read": [
+    {"file": "spec/features/register.md", "sections": ["all"]},
+    {"file": "spec/architecture.md", "sections": ["Key management", "Storage & data handling"]},
+    {"file": "spec/features/admin-invites.md", "sections": ["Invite lifecycle", "Rules", "Edge cases"]},
+    {"file": "spec/features/account-settings.md", "sections": ["The profile record"]},
+    {"file": "spec/features/rate-lookup.md", "sections": ["The symbol table", "Seeded symbols"]},
+    {"file": "spec/ui/register.md", "sections": ["all"], "role": "the only screen this feature drives"}
+  ],
+  "dependsOn": ["admin-invites", "rate-lookup", "account-settings"],
+  "parameters": {
+    "endpoint": {"value": "POST /api/register", "cite": "spec/features/register.md#flow"},
+    "requestFields": {"value": "invite token, username, Auth Key, salt, KDF parameter envelope, wrapped DEK + its nonce, profile record id, profile schema version, profile ciphertext, profile nonce — never the password", "cite": "spec/features/register.md#flow"},
+    "saltSize": {"value": "128 bits (16 bytes), crypto.getRandomValues, server rejects any other length with 400", "cite": "spec/features/register.md#flow"},
+    "dekSize": {"value": "256 bits, random, wrapped under the Master Key with AES-256-GCM", "cite": "spec/features/register.md#flow"},
+    "passwordPolicy": {"value": "client-enforced only: >=12 characters and zxcvbn score >=3, no composition rules", "cite": "spec/features/register.md#rules"},
+    "usernameRule": {"value": "normalized (trimmed, lowercased) before storage/comparison; allowed 3-32 chars, [a-z0-9._-]", "cite": "spec/features/register.md#rules"},
+    "mainCurrencySet": {"value": "exactly the kind:currency rows of the operator's symbol table (rate-lookup.md), not full ISO 4217", "cite": "spec/features/register.md#rules"},
+    "profileRecordId": {"value": "client-generated UUIDv4, profile AAD built with account_id empty, record_type: \"profile\", version: 1, entirely before the request is sent", "cite": "spec/features/register.md#flow"},
+    "initialProfilePayload": {"value": "{ mainCurrency, createdAt } only — the two required keys; idleLockMinutes and dimensions are absent until a later settings write", "cite": "spec/features/account-settings.md#The profile record"},
+    "transactionScope": {"value": "user row insert, profile record insert, and invite consumption all commit in one transaction, or none do", "cite": "spec/features/register.md#flow"},
+    "kdfEnvelopeSource": {"value": "the server's current default KDF envelope, embedded on the GET /register page, used verbatim for derivation", "cite": "spec/features/register.md#flow"},
+    "kdfMinimumEnforcement": {"value": "server rejects any submitted KDF parameters below its configured minimum with 400, even though the client UI never sends them", "cite": "spec/features/register.md#acceptance-criteria"},
+    "inviteErrorMessage": {"value": "invalid, expired, used, and revoked invites all render the identical error page/message, no form", "cite": "spec/features/register.md#edge-cases"},
+    "usernameEnumeration": {"value": "accepted at this endpoint (invite-gated, small trusted audience) — a taken-username error is plain, not obfuscated; contrast login.md's decoy-salt defense", "cite": "spec/features/register.md#edge-cases"}
+  },
+  "verify": {
+    "criteria": {"file": "spec/features/register.md", "section": "Acceptance criteria"},
+    "fixtures": [
+      "a valid unused invite (from admin-invites.md) for the happy path, plus one each of invalid/expired/used/revoked for the byte-identical-error assertion",
+      "a captured request payload from a real registration, to assert absence of password/Master Key/unwrapped DEK",
+      "a known AAD fixture for the profile blob (account_id empty, record_type profile, version 1), built client-side with no server interaction",
+      "a KDF-parameters-below-minimum payload and a non-16-byte salt payload, for the two server-side rejection criteria"
+    ],
+    "focus": [
+      "the request-body-contains-no-secret assertion must inspect the actual serialized payload, not just trust the client code path",
+      "the 'registration is one transaction' criterion needs a simulated failure between the user insert and the profile insert to prove no partial state — a happy-path test alone doesn't show this",
+      "byte-identical invite error responses is a shared assertion with admin-invites.md; verify it's asserted once against real HTTP responses across all four invite states, not paraphrased per state",
+      "the profile record indistinguishability criterion ('same validation, same column values, same AAD' as an ordinary PUT /api/records) needs a direct comparison against a record-api.md-path write, not just 'it looks like a profile record'"
+    ]
+  },
+  "openQuestions": []
+}

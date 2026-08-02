@@ -1,0 +1,48 @@
+{
+  "feature": "net-worth-view",
+  "summary": "The dashboard's core payoff: current net worth computed client-side from decrypted records, per-account balances with no staleness threshold, dimension grouping/breakdown, and a stacked SVG trend chart with per-account linear interpolation, asset/liability mirroring, and an estimated-data toggle.",
+  "read": [
+    {"file": "spec/features/net-worth-view.md", "sections": ["all"]},
+    {"file": "spec/architecture.md", "sections": ["Data model", "Application hardening", "Supply chain"]},
+    {"file": "spec/features/manage-accounts.md", "sections": ["Dimensions", "Delete: the user chooses"]},
+    {"file": "spec/features/record-snapshot.md", "sections": ["Record shape"], "role": "decimal representation the total/interpolation arithmetic reuses"},
+    {"file": "spec/ui/dashboard.md", "sections": ["all"], "role": "the only screen this feature drives"},
+    {"file": "spec/ui/design-system.md", "sections": ["Chart palette (validated)", "The two neutral bands", "The estimated marker"], "role": "chart color/marker contract this feature must not deviate from"}
+  ],
+  "dependsOn": ["record-api", "manage-accounts", "record-snapshot", "account-settings"],
+  "parameters": {
+    "dataFlow": {"value": "on unlock, fetch all three record types once (GET /api/records?type=account|snapshot|profile), decrypt, build the in-memory model; subsequent writes update the model directly with no refetch", "cite": "spec/features/net-worth-view.md#data-flow"},
+    "totalFormula": {"value": "total = sum over active accounts of (latest snapshot.value * that snapshot.rate); 'latest' = greatest date, not most recently written", "cite": "spec/features/net-worth-view.md#current-net-worth"},
+    "noStalenessThreshold": {"value": "no threshold and no warning at any account age anywhere in this feature; age is stated in words, not flagged", "cite": "spec/features/net-worth-view.md#current-net-worth"},
+    "archivedAccountsExcludedFromTotal": {"value": true, "cite": "spec/features/net-worth-view.md#current-net-worth"},
+    "noSnapshotsExcludedNotZero": {"value": "an account with no snapshots contributes nothing and is listed as 'not yet valued', never shown as 0", "cite": "spec/features/net-worth-view.md#current-net-worth"},
+    "interpolationRule": {"value": "each account interpolated linearly between its own snapshots (each converted to main currency at its own stored rate) independently, then summed — never sum-then-interpolate; nothing before an account's first snapshot; carried forward after its last", "cite": "spec/features/net-worth-view.md#values-between-snapshots"},
+    "estimatedToggleDefault": {"value": "off", "cite": "spec/features/net-worth-view.md#values-between-snapshots"},
+    "bandPartitionRule": {"value": "one band per dimension value, order fixed from the dimension's configured value order, never sorted by size; unassigned/unknown/archived-value entries fall into an 'Unassigned' band; no dimension selected = single 'Total' band", "cite": "spec/features/net-worth-view.md#grouping-by-dimension"},
+    "assetLiabilityMirroring": {"value": "asset bands stack upward from zero, liability bands mirror downward in the same group color, net-worth line runs over the top", "cite": "spec/features/net-worth-view.md#assets-and-liabilities"},
+    "archivedAccountChartBehavior": {"value": "contributes nothing after archivedAt; interpolates into the closing snapshot if one exists, otherwise drops at archivedAt; either way an annotation marks the date", "cite": "spec/features/net-worth-view.md#archived-accounts"},
+    "chartRanges": {"value": "1M, 6M, 1Y, All; default 1Y, or All if history is shorter", "cite": "spec/features/net-worth-view.md#ranges-and-modes"},
+    "percentageMode": {"value": "asset bands normalized against total assets, liability bands against total liabilities, independently — never against the signed net figure", "cite": "spec/features/net-worth-view.md#ranges-and-modes"},
+    "chartImplementation": {"value": "hand-written SVG, no charting library; keyboard reachable with a data-table fallback; decrypted labels/tooltips via x-text/textContent only, never innerHTML/x-html or a library that takes an HTML string", "cite": "spec/features/net-worth-view.md#rules"},
+    "noNetworkOnInteraction": {"value": "switching range, dimension, absolute/percentage mode, or band visibility issues zero network requests — the whole model is already in memory", "cite": "spec/features/net-worth-view.md#rules"},
+    "decryptionFailureHandling": {"value": "a record that fails to decrypt is skipped, the rest of the view renders, and a prominent non-dismissible warning names the count", "cite": "spec/features/net-worth-view.md#edge-cases"}
+  },
+  "verify": {
+    "criteria": {"file": "spec/features/net-worth-view.md", "section": "Acceptance criteria"},
+    "fixtures": [
+      "three accounts in different units with known snapshots, for the hand-computed total-equality assertion",
+      "two accounts whose histories start years apart, for the per-account-interpolation-not-sum-first assertion",
+      "an account archived with and without a closing snapshot, for the two archived-account chart-behavior criteria",
+      "a deliberately corrupted record, for the decryption-failure warning criterion",
+      "an account/dimension-value label of `<script>alert(1)</script>`, for the XSS-rendering criterion across list, chart legend, and tooltip"
+    ],
+    "focus": [
+      "the interpolation criterion needs the sum-then-interpolate failure mode actually distinguished — assert the later account's first snapshot raises only its own band, not just that the final total is right",
+      "'the sum of the visible bands equals the net-worth line at that date' must be checked at multiple dates across the range, not just the endpoint",
+      "'no network request on interaction' requires intercepting actual network calls across range/dimension/mode/band-visibility changes, not inspecting the UI code for fetch calls",
+      "the decryption-failure warning must be non-dismissible and the count must be exact — a test that only checks a warning appears (without the count or dismissibility) is incomplete",
+      "chart color/marker assertions (band order, neutral-band fills, estimated ticks) should be checked against design-system.md's tables directly rather than re-deriving acceptable values"
+    ]
+  },
+  "openQuestions": []
+}

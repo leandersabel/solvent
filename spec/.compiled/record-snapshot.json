@@ -1,0 +1,50 @@
+{
+  "feature": "record-snapshot",
+  "summary": "Record, edit, upsert, confirm-forward, and delete a point-in-time value for one account, with the rate permanently stored at entry time as an exact decimal string, provenance tracked (proposed/edited/manual), and a write-then-delete order for a date move onto an occupied date.",
+  "read": [
+    {"file": "spec/features/record-snapshot.md", "sections": ["all"]},
+    {"file": "spec/architecture.md", "sections": ["Data model", "Record storage API"]},
+    {"file": "spec/ui/snapshot-entry.md", "sections": ["all"], "role": "single-account entry and edit modal"},
+    {"file": "spec/ui/update-values.md", "sections": ["all"], "role": "the sweep — Confirm's four rate situations"},
+    {"file": "spec/ui/account-detail.md", "sections": ["Snapshot history", "Deleting a snapshot"], "role": "edit/delete entry point and the two-snapshots-on-one-date fault display"}
+  ],
+  "dependsOn": ["record-api", "rate-lookup", "manage-accounts"],
+  "parameters": {
+    "recordShape": {"value": "record_type: \"snapshot\", account_id set to owner; payload { date, value, rate, rateTarget, rateSource, rateAsOf, proposedRate, note }", "cite": "spec/features/record-snapshot.md#record-shape"},
+    "decimalRepresentation": {"value": "value and rate are decimal strings, never JSON numbers or floats; parsed to BigInt at fixed scale 12, computed as integers, formatted back to strings", "cite": "spec/features/record-snapshot.md#record-shape"},
+    "decimalScale": {"value": 12, "cite": "spec/features/record-snapshot.md#record-shape"},
+    "multiplicationRule": {"value": "integer product of two scale-12 values is scale 24, divided back by 10^12 with round-half-even, rescaled exactly once", "cite": "spec/features/record-snapshot.md#record-shape"},
+    "divisionRule": {"value": "used only in percentage view and per-account interpolation; rounds half-even at scale 12; display rounding is a separate later step", "cite": "spec/features/record-snapshot.md#record-shape"},
+    "rateSourceEnum": {"value": ["proposed", "edited", "manual"], "cite": "spec/features/record-snapshot.md#record-shape"},
+    "proposedRateSemantics": {"value": "set exactly when rateSource is edited (holds the original proposal, never overwritten by a second edit), null otherwise", "cite": "spec/features/record-snapshot.md#record-shape"},
+    "rateAsOfSemantics": {"value": "null when manual; for edited it keeps the original proposal's date, unchanged by a later value/note edit", "cite": "spec/features/record-snapshot.md#record-shape"},
+    "netWorthContribution": {"value": "value * rate, in the main currency", "cite": "spec/features/record-snapshot.md#record-shape"},
+    "writeEndpoint": {"value": "PUT /api/records/<uuid> (record-api.md)", "cite": "spec/features/record-snapshot.md#inputs-outputs"},
+    "upsertRule": {"value": "one snapshot per (account, date); re-entering an occupied date prompts replace; confirming updates in place (same record_id, version+1, fresh nonce); declining leaves the original untouched", "cite": "spec/features/record-snapshot.md#same-account-same-date-upsert"},
+    "dateMoveOrder": {"value": "moving a snapshot's date onto an occupied date writes the PUT (new date) before the DELETE (displaced record); a failed DELETE leaves both records present rather than losing the displaced one", "cite": "spec/features/record-snapshot.md#editing-an-existing-snapshot"},
+    "duplicateDateResolution": {"value": "two snapshots on one date is a reachable, surfaced state: neither is auto-preferred (not highest version, not latest updated_at), both render flagged with a keep-one action, and the date is excluded from interpolation until resolved", "cite": "spec/features/record-snapshot.md#editing-an-existing-snapshot"},
+    "editRatePrefill": {"value": "editing opens on the stored rate/rateSource/rateAsOf, never a fresh proposal; editing value/note alone touches no rate field; editing the rate by hand moves proposed->edited and captures proposedRate; changing the date offers (never auto-applies) a fresh proposal", "cite": "spec/features/record-snapshot.md#the-rate-when-editing"},
+    "confirmRateRule": {"value": "main currency: rate 1, manual, no request. Live rate source (lookup:true): rate fetched fresh for the new date, previous rate never copied; no proposal -> one-click Confirm unavailable, falls back to manual with previous value prefilled. No rate source (free text or lookup:false): previous rate carries forward, rateSource stays manual", "cite": "spec/features/record-snapshot.md#confirming-a-previous-value"},
+    "futureDateBlocked": {"value": true, "cite": "spec/features/record-snapshot.md#edge-cases"},
+    "zeroAndNegativeValid": {"value": true, "cite": "spec/features/record-snapshot.md#edge-cases"},
+    "archivedAccountBlocked": {"value": "snapshots blocked against archived accounts except the one closing snapshot written by the archive flow itself (manage-accounts.md)", "cite": "spec/features/record-snapshot.md#edge-cases"}
+  },
+  "verify": {
+    "criteria": {"file": "spec/features/record-snapshot.md", "section": "Acceptance criteria"},
+    "fixtures": [
+      "a rounding-midpoint fixture for round-half-even multiplication, exact on the twelfth decimal in both directions",
+      "a value with more than twelve decimal places, for the input-rejection criterion",
+      "an account measured in XAU-g and one in XAU-ozt, for the 31.1034768 cross-symbol rate assertion",
+      "a stubbed rate proxy returning 503, 204, and a differing rate per date, for the manual-fallback, no-proposal-Confirm, and Confirm-fetches-fresh criteria",
+      "two snapshots forced onto one (account, date) via a stubbed failing DELETE, for the duplicate-date display and move-order criteria"
+    ],
+    "focus": [
+      "'no rate-lookup request contains the entered value, in any field, in any encoding' needs an assertion against the actual outbound request, not just that the endpoint accepts no amount parameter (rate-lookup.md already covers the server side; this is the client's discipline)",
+      "the write-then-delete move order must be proven with a stubbed failing DELETE showing both records still exist, not just asserted from the spec text",
+      "the duplicate-date criterion requires the client to pick neither record and exclude the date from interpolation — verify both halves, not just that both rows render",
+      "editing a value alone must assert the rate proxy received zero requests, not just that the stored rate field is unchanged",
+      "the round-trip decimal criteria ('0.1' + '0.2' = '0.3') must run through the actual BigInt scale-12 arithmetic path, since a float-based reimplementation would also happen to pass a naive string-equality check on simple inputs"
+    ]
+  },
+  "openQuestions": []
+}

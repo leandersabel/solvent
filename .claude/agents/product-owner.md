@@ -17,20 +17,56 @@ implementation agents can build against without re-interpreting prose.
 
 ## Output
 
+A contract is an **index into the spec plus what prose cannot encode**.
+It is not a restatement. The engineer reads the spec; the contract tells
+them which parts, in what order, and pins the values a test asserts
+exactly.
+
+Never copy a passage you could point at. If a rule is stated well in
+`spec/`, cite its file and heading — a second copy is a second thing to
+keep in sync, and CLAUDE.md's "one fact, one home" governs `spec/`.
+
 For each feature, write `spec/.compiled/<feature-name>.json` with:
 
 ```json
 {
   "feature": "kebab-case-name",
-  "sourceFiles": ["spec/features/x.md", "spec/ui/y.md"],
   "summary": "one sentence",
-  "inputs": [],
-  "outputs": [],
-  "acceptanceCriteria": [],
-  "dependsOn": [],
+  "read": [
+    {"file": "spec/features/x.md", "sections": ["all"]},
+    {"file": "spec/architecture.md", "sections": ["Key management"]},
+    {"file": "spec/ui/y.md", "sections": ["all"], "role": "screen this feature drives"}
+  ],
+  "dependsOn": ["feature-whose-rows-or-routes-this-one-needs"],
+  "parameters": {},
+  "verify": {
+    "criteria": {"file": "spec/features/x.md", "section": "Acceptance criteria"},
+    "fixtures": [],
+    "focus": []
+  },
   "openQuestions": []
 }
 ```
+
+- **`read`** — every file the engineer must load, with the headings that
+  bear on this feature. Order it: read the first entry first.
+- **`dependsOn`** — what must already exist for this feature to run or
+  be tested: another feature's rows, routes, or session. Not citation —
+  a feature file pointing at another for a payload shape or a rule
+  belongs in `read`. Coupling is many-to-many and may be circular; the
+  invite/registration bootstrap genuinely is. Record it as it is.
+  Build order is not derived from this — `spec/status.md` states it.
+- **`parameters`** — every value the spec pins as exact: numeric limits,
+  byte encodings, field orders, header names, status codes tied to a
+  named condition. These are what a boundary test asserts, so a
+  paraphrase is useless — carry the literal value, and cite where it is
+  stated. If `spec/` calls something a compiled-contract parameter, it
+  belongs here by name.
+- **`verify`** — the reviewer's target. `criteria` points at the spec's
+  own acceptance list rather than copying it. `fixtures` names artifacts
+  the criteria assume must exist (a byte-exact AAD fixture, a seeded
+  second user). `focus` flags criteria that are easy to fake and need
+  the reviewer's own test.
 
 Then update `spec/status.md`: tick the feature's Compiled column if
 compilation succeeded. `status.md` carries state only — no narrative,

@@ -1,0 +1,63 @@
+{
+  "feature": "record-api",
+  "summary": "One generic, type-agnostic CRUD store for encrypted account/snapshot/profile records, with server-enforced field consistency, optimistic-concurrency versioning, and a byte-exact client-built AAD the server never sees.",
+  "read": [
+    {"file": "spec/features/record-api.md", "sections": ["all"]},
+    {"file": "spec/architecture.md", "sections": ["Data model", "Record storage API", "Key management", "Storage & data handling"]}
+  ],
+  "dependsOn": [],
+  "parameters": {
+    "rowColumns": {"value": ["user_id", "record_id", "record_type", "account_id", "schema_version", "version", "nonce", "ciphertext", "updated_at"], "cite": "spec/features/record-api.md#row-shape"},
+    "recordTypeEnum": {"value": ["account", "snapshot", "profile"], "cite": "spec/features/record-api.md#row-shape"},
+    "primaryKey": {"value": "(user_id, record_id)", "cite": "spec/features/record-api.md#row-shape"},
+    "nonceSizeBits": {"value": 96, "cite": "spec/architecture.md#Key management"},
+    "versionRule": {"value": "starts at 1, +1 per write; PUT must supply stored version + 1 (or 1 to create)", "cite": "spec/features/record-api.md#endpoints"},
+    "aadFieldOrder": {"value": ["account_id", "record_type", "record_id", "schema_version", "version"], "cite": "spec/features/record-api.md#the-aad-encoding"},
+    "aadSeparator": {"value": "0x1f (ASCII unit separator) between each field", "cite": "spec/features/record-api.md#the-aad-encoding"},
+    "aadEncoding": {"value": "each field UTF-8 text; account_id empty is empty string (not null) and still contributes its separator; schema_version and version are unpadded decimal", "cite": "spec/features/record-api.md#the-aad-encoding"},
+    "aadExcludesUserId": {"value": true, "cite": "spec/features/record-api.md#the-aad-encoding"},
+    "accountIdOnWire": {"value": "null when absent, everywhere (PUT body, GET response, export file); empty string is rejected as malformed", "cite": "spec/features/record-api.md#accountid-on-the-wire"},
+    "storageCaps": {
+      "maxCiphertextPerRecord": {"value": "64 KiB", "cite": "spec/architecture.md#Storage & data handling"},
+      "maxRecordsPerVault": {"value": 50000, "cite": "spec/architecture.md#Storage & data handling"},
+      "maxBytesPerUser": {"value": "32 MiB", "cite": "spec/architecture.md#Storage & data handling"},
+      "overLimitStatus": {"value": 413, "cite": "spec/architecture.md#Storage & data handling"}
+    },
+    "statusCodes": {
+      "createConflictOrStaleVersion": 409,
+      "recordTypeImmutableMismatch": 400,
+      "malformedRecordId": 400,
+      "accountIdShapeViolation": 400,
+      "accountIdNamesUnknownAccount": 400,
+      "userIdFieldInBody": "rejected (400)",
+      "aadFieldInBody": "rejected (400)",
+      "notFoundOrOtherUsersRecord": 404,
+      "unauthenticated": 401,
+      "missingCsrfHeader": "rejected",
+      "overQuota": 413
+    },
+    "endpoints": {
+      "list": "GET /api/records?type=<t>",
+      "write": "PUT /api/records/<record_id>",
+      "delete": "DELETE /api/records/<record_id>",
+      "note": "no single-record GET; DELETE /api/accounts/<account_id>?mode=purge is owned by manage-accounts.md, not this contract"
+    }
+  },
+  "verify": {
+    "criteria": {"file": "spec/features/record-api.md", "section": "Acceptance criteria"},
+    "fixtures": [
+      "byte-exact AAD fixture for a known (account_id, record_type, record_id, schema_version, version) tuple, including the empty-account_id case",
+      "two seeded users each with records of all three types, for cross-user isolation and 404-not-403 tests",
+      "a record stored at an older schema_version, to assert reads leave version/nonce/ciphertext byte-identical",
+      "a record at a schema_version above the client's known version, to assert it is skipped and counted rather than guessed at"
+    ],
+    "focus": [
+      "409 responses must leave the stored row byte-identical, not just return the right status",
+      "a rejected write (400/409/413) must not increment version or write anything — easy to fake by only checking the response code",
+      "the AAD assertion must be byte-for-byte against the fixture, including separators, not just 'contains the right substrings'",
+      "no log line contains a ciphertext value — requires inspecting actual log output, not just the response",
+      "a userId or aad field in the request body must be rejected outright, not silently stripped and ignored"
+    ]
+  },
+  "openQuestions": []
+}

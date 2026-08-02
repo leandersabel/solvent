@@ -39,6 +39,12 @@ An invite row: `id`, `token_hash`, `created_by`, `created_at`,
 - `label` is a free-text note ("Sarah's laptop") so an admin can tell
   outstanding invites apart. It is server-side plaintext — deliberately,
   since invites are provisioning metadata, not vault data.
+- `created_by` is the admin who minted the invite, or the reserved
+  sentinel `system:bootstrap` for one minted by the CLI, which runs with
+  no session and no user behind it. The sentinel is refused as a
+  username at registration, so it can never name a real user. A sentinel
+  rather than an empty `created_by`, so provenance is always a value the
+  invite list can show and no reader has to special-case an absence.
 
 ## Endpoints
 
@@ -204,6 +210,8 @@ invocation, and it is honest that it cannot stop anything more.
 - `flask create-invite --admin` on an empty instance produces a working
   invite whose user is an admin; on a populated instance it exits
   non-zero and creates nothing, and with `--force` it succeeds.
+- A CLI-minted invite records `created_by` as `system:bootstrap`, and a
+  registration attempt using that value as a username is refused.
 - An invite created with `isAdmin: true` produces an admin; the same
   invite without it produces a non-admin. Both are asserted against the
   resulting user row.

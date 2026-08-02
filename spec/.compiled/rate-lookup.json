@@ -1,0 +1,68 @@
+{
+  "feature": "rate-lookup",
+  "summary": "A session-authenticated, SSRF-hardened server-side proxy/cache that serves an entry-date rate proposal (FX via Frankfurter, gold via NBP+Frankfurter) for a fixed base unit, and the read-only symbol table the account form's unit picker and this endpoint share.",
+  "read": [
+    {"file": "spec/features/rate-lookup.md", "sections": ["all"]},
+    {"file": "spec/architecture.md", "sections": ["Data model", "Record storage API"]},
+    {"file": "spec/ui/snapshot-entry.md", "sections": ["all"], "role": "single-account entry screen showing the proposal and its provenance"},
+    {"file": "spec/ui/update-values.md", "sections": ["all"], "role": "sweep screen fetching a fresh proposal per row on Confirm"}
+  ],
+  "dependsOn": ["login"],
+  "parameters": {
+    "endpoint": {"value": "GET /api/rates?symbol=<SYMBOL>&date=<YYYY-MM-DD>&quote=<CCY>", "cite": "spec/features/rate-lookup.md#endpoint"},
+    "acceptedQueryParams": {"value": ["symbol", "date", "quote"], "cite": "spec/features/rate-lookup.md#endpoint"},
+    "symbolsEndpoint": {"value": "GET /api/rates/symbols", "cite": "spec/features/rate-lookup.md#the-symbol-table"},
+    "responseShape200": {"value": "{ rate, base, quote, asOf, source, cached }", "cite": "spec/features/rate-lookup.md#endpoint"},
+    "statusCodes": {
+      "success": 200,
+      "noProposal": 204,
+      "unauthenticated": 401,
+      "badRequest": "400 (unrecognised param, symbol not in table, malformed/future/pre-floor date, quote not a kind:currency symbol-table row)",
+      "rateLimited": 429
+    },
+    "identityShortCircuit": {"value": "symbol == quote returns 200, rate: \"1\", asOf = requested date, source: \"identity\", cached: false, no outbound request", "cite": "spec/features/rate-lookup.md#edge-cases"},
+    "symbolRegex": {"value": "^[A-Z0-9][A-Z0-9._-]{0,15}$, and must also be present in the symbol table", "cite": "spec/features/rate-lookup.md#ssrf-and-egress-hardening"},
+    "dateFloors": {"value": "gold: 2013-01-02; other symbols: the provider's own history start; enforced per-symbol, not a single global floor", "cite": "spec/features/rate-lookup.md#ssrf-and-egress-hardening"},
+    "egressHardening": {"value": "HTTPS only with cert verification, redirects disabled, 5s connect+read timeout, response size cap, provider hosts/URL templates are server-side constants", "cite": "spec/features/rate-lookup.md#ssrf-and-egress-hardening"},
+    "cacheKey": {"value": "(symbol, quote, date)", "cite": "spec/features/rate-lookup.md#caching"},
+    "cacheTtl": {"value": "past dates cached indefinitely; today's date cached 1 hour then refetched", "cite": "spec/features/rate-lookup.md#caching"},
+    "rateLimitDefault": {"value": "120 requests/hour per user, independent of the login limiter (operator config)", "cite": "spec/features/rate-lookup.md#rate-limiting-and-failure"},
+    "circuitBreaker": {"value": "opens after 5 consecutive provider failures, serves 204 for a 5-minute cool-off (operator config)", "cite": "spec/features/rate-lookup.md#rate-limiting-and-failure"},
+    "goldUnitConversion": {"value": "XAU-g takes NBP's gram figure directly; XAU-ozt = gram figure * 31.1034768, composed at full precision and rounded once at the end", "cite": "spec/features/rate-lookup.md#gold"},
+    "goldRangeQuery": {"value": "GET /api/cenyzlota/{date-14d}/{date}, taking the last entry on or before date; empty result in the 14-day window means 204; NBP caps a range at 93 days", "cite": "spec/features/rate-lookup.md#gold"},
+    "goldFxLegDate": {"value": "the PLN->quote FX leg is fetched at the asOf date, not the requested date", "cite": "spec/features/rate-lookup.md#gold"},
+    "goldSourceLabel": {"value": "\"nbp+frankfurter\" when a second leg is used, \"nbp\" when quote is PLN", "cite": "spec/features/rate-lookup.md#gold"},
+    "seededSymbolTable": {
+      "value": [
+        {"symbol": "XAU-ozt", "label": "Gold, troy ounce", "kind": "metal", "lookup": true},
+        {"symbol": "XAU-g", "label": "Gold, gram", "kind": "metal", "lookup": true},
+        {"symbol": "XAG-ozt", "label": "Silver, troy ounce", "kind": "metal", "lookup": false},
+        {"symbol": "XAG-g", "label": "Silver, gram", "kind": "metal", "lookup": false},
+        {"symbol": "XPT-ozt", "label": "Platinum, troy ounce", "kind": "metal", "lookup": false},
+        {"symbol": "XPT-g", "label": "Platinum, gram", "kind": "metal", "lookup": false},
+        {"symbol": "XPD-ozt", "label": "Palladium, troy ounce", "kind": "metal", "lookup": false},
+        {"symbol": "XPD-g", "label": "Palladium, gram", "kind": "metal", "lookup": false}
+      ],
+      "cite": "spec/features/rate-lookup.md#seeded-symbols"
+    },
+    "metalSymbolNamingRule": {"value": "<ISO 4217 metal code>-<unit>, unit ozt or g", "cite": "spec/features/rate-lookup.md#seeded-symbols"},
+    "currencySymbolSource": {"value": "seeded from Frankfurter's own currency list, all with lookup: true", "cite": "spec/features/rate-lookup.md#seeded-symbols"}
+  },
+  "verify": {
+    "criteria": {"file": "spec/features/rate-lookup.md", "section": "Acceptance criteria"},
+    "fixtures": [
+      "a stubbed Frankfurter and NBP provider (success, empty-window, and failure responses) so tests never hit the live services",
+      "a stubbed provider returning 302 toward an internal address, to assert SSRF/redirect hardening",
+      "a stubbed provider that hangs, to assert the timeout path returns 204 within the configured window",
+      "the seeded symbol table (eight metal rows plus the Frankfurter currency list) as a fixture, since one acceptance criterion sweeps every returned symbol against /api/rates"
+    ],
+    "focus": [
+      "the accepted-query-parameter test must enumerate the exact set {symbol, date, quote} and reject anything extra, not just accept the documented three",
+      "SSRF hardening needs adversarial symbol values (path traversal, a URL, a regex-matching-but-untabled symbol) actually asserted against zero outbound calls, not just a 400 status",
+      "the gold two-leg composition must assert the FX leg is fetched at asOf, not the requested date — needs a stub where the two dates would produce different rates",
+      "the circuit breaker and rate limiter are operator-config defaults; tests assert behaviour at whatever value is configured, not a hardcoded count",
+      "provider API key must never appear in a log line, response body, or error message — requires inspecting actual output, not just the response status"
+    ]
+  },
+  "openQuestions": []
+}

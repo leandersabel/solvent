@@ -3,22 +3,26 @@
 Maintained by the product-owner agent: spec → compiled → implemented →
 verified.
 
-**Every feature and screen is spec'd. Nothing is compiled.**
+**Every feature and screen is spec'd. Every feature is compiled.**
 
-Build `record-api` first — every other feature depends on it.
+Rows are in build order.
 
 | Feature | Compiled | Implemented | Verified |
 |---|---|---|---|
-| record-api | | | |
-| register | | | |
-| login | | | |
-| account-settings | | | |
-| manage-accounts | | | |
-| record-snapshot | | | |
-| rate-lookup | | | |
-| net-worth-view | | | |
-| export-import | | | |
-| admin-invites | | | |
+| record-api | x | | |
+| rate-lookup | x | | |
+| admin-invites | x | | |
+| register | x | | |
+| login | x | | |
+| account-settings | x | | |
+| manage-accounts | x | | |
+| record-snapshot | x | | |
+| net-worth-view | x | | |
+| export-import | x | | |
+
+`admin-invites` is built in two parts: the invite table and
+`flask create-invite` come before `register`, which consumes an invite;
+its `/api/admin/*` endpoints need a session, so they come after `login`.
 
 `spec/ui/` holds `design-system.md` plus eleven screens: unlock,
 register, dashboard, account-form, account-detail, snapshot-entry,
