@@ -3,14 +3,13 @@
 Maintained by the product-owner agent: spec → compiled → implemented →
 verified.
 
-**Every feature and screen is spec'd. Every feature but `app-shell` is
-compiled.**
+**Every feature and screen is spec'd and compiled.**
 
 Rows are in build order.
 
 | Feature | Compiled | Implemented | Verified |
 |---|---|---|---|
-| app-shell | | | |
+| app-shell | x | | |
 | record-api | x | | |
 | rate-lookup | x | | |
 | admin-invites | x | | |
