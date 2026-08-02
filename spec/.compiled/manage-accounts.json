@@ -8,7 +8,8 @@
     {"file": "spec/features/rate-lookup.md", "sections": ["The symbol table", "Seeded symbols"]},
     {"file": "spec/features/record-snapshot.md", "sections": ["all"], "role": "the archive flow's closing snapshot and the upsert rule the closing-snapshot field follows"},
     {"file": "spec/ui/account-form.md", "sections": ["all"], "role": "create/edit and the archive-vs-delete dialog"},
-    {"file": "spec/ui/account-detail.md", "sections": ["Header"], "role": "where archive/edit/delete are launched from"}
+    {"file": "spec/ui/account-detail.md", "sections": ["Header"], "role": "where archive/edit/delete are launched from"},
+    {"file": "spec/ui/design-system.md", "sections": ["Typography", "Components", "States", "App shell"], "role": "money-figure typography, the Archived chip and destructive-action conventions for the account form and detail header, and the shell whose content width this screen sets"}
   ],
   "dependsOn": ["record-api", "account-settings", "rate-lookup", "record-snapshot"],
   "parameters": {

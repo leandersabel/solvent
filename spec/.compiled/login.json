@@ -5,7 +5,8 @@
     {"file": "spec/features/login.md", "sections": ["all"]},
     {"file": "spec/architecture.md", "sections": ["Key management", "Application hardening"]},
     {"file": "spec/features/account-settings.md", "sections": ["Session and lock"]},
-    {"file": "spec/ui/unlock.md", "sections": ["all"], "role": "the single password screen, in full-login and re-unlock modes"}
+    {"file": "spec/ui/unlock.md", "sections": ["all"], "role": "the single password screen, in full-login and re-unlock modes"},
+    {"file": "spec/ui/design-system.md", "sections": ["Components", "States", "App shell"], "role": "input and error-state conventions for the password screen, and the shell that carries the default KDF envelope and hosts the re-unlock screen"}
   ],
   "dependsOn": ["register", "record-api", "account-settings"],
   "parameters": {

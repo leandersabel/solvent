@@ -5,7 +5,8 @@
     {"file": "spec/features/rate-lookup.md", "sections": ["all"]},
     {"file": "spec/architecture.md", "sections": ["Data model", "Record storage API"]},
     {"file": "spec/ui/snapshot-entry.md", "sections": ["all"], "role": "single-account entry screen showing the proposal and its provenance"},
-    {"file": "spec/ui/update-values.md", "sections": ["all"], "role": "sweep screen fetching a fresh proposal per row on Confirm"}
+    {"file": "spec/ui/update-values.md", "sections": ["all"], "role": "sweep screen fetching a fresh proposal per row on Confirm"},
+    {"file": "spec/ui/design-system.md", "sections": ["Typography", "Components", "States", "App shell"], "role": "rate/money typography, chip and button conventions, and loading/error-state defaults for the entry and sweep screens, plus the shell that hosts the sweep as a global action"}
   ],
   "dependsOn": ["login"],
   "parameters": {

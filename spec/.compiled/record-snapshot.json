@@ -6,7 +6,8 @@
     {"file": "spec/architecture.md", "sections": ["Data model", "Record storage API"]},
     {"file": "spec/ui/snapshot-entry.md", "sections": ["all"], "role": "single-account entry and edit modal"},
     {"file": "spec/ui/update-values.md", "sections": ["all"], "role": "the sweep — Confirm's four rate situations"},
-    {"file": "spec/ui/account-detail.md", "sections": ["Snapshot history", "Deleting a snapshot"], "role": "edit/delete entry point and the two-snapshots-on-one-date fault display"}
+    {"file": "spec/ui/account-detail.md", "sections": ["Snapshot history", "Deleting a snapshot"], "role": "edit/delete entry point and the two-snapshots-on-one-date fault display"},
+    {"file": "spec/ui/design-system.md", "sections": ["Typography", "Components", "States", "The estimated marker", "App shell"], "role": "decimal-value typography, the Estimated chip, destructive/replace-confirm conventions, and the shell for the entry, sweep, and detail screens this feature drives"}
   ],
   "dependsOn": ["record-api", "rate-lookup", "manage-accounts"],
   "parameters": {

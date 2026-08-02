@@ -7,7 +7,7 @@
     {"file": "spec/features/manage-accounts.md", "sections": ["Dimensions", "Delete: the user chooses"]},
     {"file": "spec/features/record-snapshot.md", "sections": ["Record shape"], "role": "decimal representation the total/interpolation arithmetic reuses"},
     {"file": "spec/ui/dashboard.md", "sections": ["all"], "role": "the only screen this feature drives"},
-    {"file": "spec/ui/design-system.md", "sections": ["Chart palette (validated)", "The two neutral bands", "The estimated marker"], "role": "chart color/marker contract this feature must not deviate from"}
+    {"file": "spec/ui/design-system.md", "sections": ["Chart palette (validated)", "The two neutral bands", "The estimated marker", "Typography", "States", "Motion", "App shell"], "role": "chart color/marker contract this feature must not deviate from, plus the hero-figure typography and no-count-up motion rule, the loading/empty/error defaults for the dashboard, and the shell it renders inside"}
   ],
   "dependsOn": ["record-api", "manage-accounts", "record-snapshot", "account-settings"],
   "parameters": {

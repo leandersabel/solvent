@@ -4,7 +4,8 @@
   "read": [
     {"file": "spec/features/admin-invites.md", "sections": ["all"]},
     {"file": "spec/architecture.md", "sections": ["Components", "Threat model", "Storage & data handling"]},
-    {"file": "spec/ui/admin.md", "sections": ["all"], "role": "the only screen this feature drives"}
+    {"file": "spec/ui/admin.md", "sections": ["all"], "role": "the only screen this feature drives"},
+    {"file": "spec/ui/design-system.md", "sections": ["Components", "States", "App shell"], "role": "table, chip, and form conventions for the invite/user admin screen, and the shell's Admin nav entry this feature owns"}
   ],
   "dependsOn": ["register", "login", "account-settings"],
   "parameters": {

@@ -6,7 +6,8 @@
     {"file": "spec/architecture.md", "sections": ["Components", "Key management", "Application hardening", "Storage & data handling"]},
     {"file": "spec/features/record-api.md", "sections": ["Row shape", "The AAD encoding", "`accountId` on the wire", "Schema migration", "Endpoints"]},
     {"file": "spec/features/account-settings.md", "sections": ["Change password", "Session and lock"], "role": "the session-invalidation pattern import must not be weaker than"},
-    {"file": "spec/ui/export-import.md", "sections": ["all"], "role": "the only screen this feature drives"}
+    {"file": "spec/ui/export-import.md", "sections": ["all"], "role": "the only screen this feature drives"},
+    {"file": "spec/ui/design-system.md", "sections": ["Components", "States", "App shell"], "role": "button and error/confirmation-state conventions for the export/import screen, and the shell it renders inside"}
   ],
   "dependsOn": ["record-api", "login", "register", "account-settings"],
   "parameters": {

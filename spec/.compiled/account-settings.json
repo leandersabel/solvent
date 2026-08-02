@@ -6,7 +6,8 @@
     {"file": "spec/architecture.md", "sections": ["Key management", "Data model", "Application hardening", "Storage & data handling"]},
     {"file": "spec/features/admin-invites.md", "sections": ["The admin boundary", "Endpoints"]},
     {"file": "spec/ui/settings.md", "sections": ["all"], "role": "password, main currency, session/lock, delete-account screen"},
-    {"file": "spec/ui/dimensions.md", "sections": ["all"], "role": "dimension create/rename/reorder/archive/restore screen"}
+    {"file": "spec/ui/dimensions.md", "sections": ["all"], "role": "dimension create/rename/reorder/archive/restore screen"},
+    {"file": "spec/ui/design-system.md", "sections": ["Components", "States", "App shell"], "role": "form, chip, and table conventions for the password/session/delete-account and dimension screens, and the authenticated shell they render inside"}
   ],
   "dependsOn": ["login", "record-api", "register", "admin-invites"],
   "parameters": {

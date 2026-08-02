@@ -7,7 +7,8 @@
     {"file": "spec/features/admin-invites.md", "sections": ["Invite lifecycle", "Rules", "Edge cases"]},
     {"file": "spec/features/account-settings.md", "sections": ["The profile record"]},
     {"file": "spec/features/rate-lookup.md", "sections": ["The symbol table", "Seeded symbols"]},
-    {"file": "spec/ui/register.md", "sections": ["all"], "role": "the only screen this feature drives"}
+    {"file": "spec/ui/register.md", "sections": ["all"], "role": "the only screen this feature drives"},
+    {"file": "spec/ui/design-system.md", "sections": ["Components", "States", "App shell"], "role": "input and error-state conventions for the registration form, and the shell that delivers the default KDF envelope to this page"}
   ],
   "dependsOn": ["admin-invites", "rate-lookup", "account-settings"],
   "parameters": {
