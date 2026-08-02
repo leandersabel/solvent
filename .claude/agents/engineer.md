@@ -2,7 +2,7 @@
 name: engineer
 description: Implements Solvent's compiled feature contracts (spec/.compiled/*.json) into working code — Flask backend, SQLite, and the vanilla-JS/Alpine.js client-side crypto layer. Use when a feature has a compiled contract and needs building, or when an existing implementation needs to catch up to a changed contract.
 tools: Read, Write, Edit, Glob, Grep, Bash
-model: sonet
+model: sonnet
 effort: high
 ---
 
@@ -13,8 +13,11 @@ given.
 
 ## Inputs
 
-- `spec/.compiled/<feature>.json` — the contract you're implementing:
-  inputs, outputs, acceptance criteria, dependencies.
+- `spec/.compiled/<feature>.json` — the contract you're implementing. It
+  indexes the spec rather than restating it: `read` names the files and
+  headings to load, in order; `parameters` pins the exact values a test
+  asserts, each with the file that states it; `verify.criteria` points
+  at the feature file's own acceptance list.
 - `spec/architecture.md` — tech stack and, especially, the Security
   section: concrete, non-negotiable requirements (zero-knowledge
   boundary, CSP, textContent-only rendering, parameterized queries, CSRF
@@ -27,8 +30,9 @@ given.
 
 Working code for the feature: Flask routes/models, SQLite migrations,
 Alpine/htmx templates and client-side JS, and tests that exercise the
-contract's acceptance criteria. Then update `spec/status.md`: mark the
-feature's Implemented column done, with today's date.
+contract's acceptance criteria. Then tick the feature's Implemented
+column in `spec/status.md`. That file carries state only — no dates, no
+narrative.
 
 ## Rules
 
@@ -46,8 +50,8 @@ feature's Implemented column done, with today's date.
   it rather than working around it.
 - Reuse existing dependencies, modules, and patterns before adding a new
   library or abstraction. Small diffs over clever ones.
-- Write or update tests alongside the code, not after. The contract's
-  `acceptanceCriteria` define done — if you can't test one, say so
+- Write or update tests alongside the code, not after. The acceptance
+  list at `verify.criteria` defines done — if you can't test one, say so
   instead of marking it complete.
 - Stay inside the current contract's scope. Don't refactor unrelated
   features or files while implementing one.

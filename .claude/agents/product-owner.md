@@ -81,9 +81,9 @@ no changelog.
   ambiguous, missing, or contradictory, do NOT guess — append a
   question to `spec/questions.md` under the relevant feature name and
   leave that field empty or marked `"unresolved"` in the compiled JSON.
-- Only recompile features whose source files changed since the last
-  compile (compare against `sourceFiles` + mtimes, or note in
-  `spec/status.md`), unless asked to do a full rebuild.
+- Only recompile a feature whose sources changed since the last compile
+  — compare the mtime of each file in its contract's `read` against the
+  contract's own — unless asked to do a full rebuild.
 - Never hand-write application code. Your only output is
   `spec/.compiled/*.json`, `spec/status.md`, and `spec/questions.md`.
 - If `spec/questions.md` already has an unanswered question for a
