@@ -64,17 +64,25 @@ as the screen working rather than the screen having frozen.
 
 ### Signing in as an administrator
 
-Same card, same two fields, and from there it is a different act. An
-administrator is not opening anything. There is no vault behind an
-administrator account, so nothing is decrypted, and the screen does not
-spend the deliberate wait building a key that would have nothing to
-unlock. Signing in is quick, and it lands in the admin area.
+Same card, same two fields, same wait, and from there it is a
+different act. An administrator is not opening anything. There is no
+vault behind an administrator account, so nothing is decrypted, and it
+lands in the admin area rather than on a dashboard.
 
-The card looks identical while it is being filled in. It does not
-announce, before a correct password has been typed, that the username
-belongs to an administrator. Anyone can put a name into the field, and
-what comes back must not tell them which kind of account, if any, wears
-it.
+The wait is the one part that does not change, and that is deliberate.
+It happens in your browser before anything is sent, so for the screen
+to skip it the browser would have to know the name belongs to an
+administrator before you have proved anything. Anyone could then time
+the screen and read off which usernames administer the instance,
+without guessing a single password. So an administrator pays the same
+second or two, building a key that is thrown away, and the screen gives
+nothing away.
+
+The card looks and behaves identically while it is being filled in. It
+does not announce, before a correct password has been typed, that the
+username belongs to an administrator. Anyone can put a name into the
+field, and what comes back must not tell them which kind of account, if
+any, wears it.
 
 An administrator has nothing to lock and no vault to re-open, so
 everything below about locking, the idle timer, and the lock button

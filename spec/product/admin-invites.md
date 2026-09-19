@@ -159,10 +159,19 @@ about to remove an account looks at them to check they are removing the
 right one and that it is not in active use. None of it is content, and
 no further fact is added later without checking the boundary above.
 
-Removing an account requires typing its username. For a user account
-the dialog states that the vault goes with it and cannot be brought
-back, and does not offer to save a copy first, because an administrator
-cannot read the vault they are about to destroy.
+Removing an account requires typing its username, and nothing more.
+For a user account the dialog states that the vault goes with it and
+cannot be brought back, and does not offer to save a copy first,
+because an administrator cannot read the vault they are about to
+destroy.
+
+The administrator is not asked for their own password first. That is a
+decision with a cost: an administrator session left open on an
+unlocked machine can destroy somebody's whole history in two clicks,
+bounded only by the idle timeout, so what protects it is keeping the
+machine to yourself rather than anything the app does. Typing the
+username stays the whole of the friction, and it is what the dialog
+leans on.
 
 Which kind an account is, is shown here and is not changed here,
 because it is not changed anywhere.
