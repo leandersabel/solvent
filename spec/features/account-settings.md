@@ -60,13 +60,22 @@ Master Key wraps a DEK instead of encrypting records directly.
 5. `POST /api/auth/change-password`
    `{ currentAuthKey, salt, kdf, authKey, wrappedDek, dekNonce }`.
 6. Server verifies `currentAuthKey` against the stored hash, then
-   replaces salt, envelope, Auth Key hash, and wrapped DEK in one
-   transaction.
+   replaces the **`password` unlock method row only** (its `params`,
+   its `verifier`, and its wrapper) in one transaction. No other row
+   is written, and any other unlock method the vault holds is left
+   alone, because the DEK is the same key afterwards and every wrapper
+   still opens it (architecture.md, One key, N wrappers).
 7. Server invalidates **all other sessions** for the user and keeps the
    current one. The client keeps its in-memory DEK; no re-login needed.
 
 The current password is verified in two independent places — client-side
 by the DEK unwrap, server-side by the Auth Key. Both must hold.
+
+**There is no "remove password" action, and there will not be one.**
+The password method is the only wrapper an export file can carry
+(`export-import.md`), so a vault without it has no openable backup and
+no migration path. Changing the password replaces the row. Nothing
+deletes it short of deleting the account.
 
 The screen must warn that **existing export files still open with the
 old password**, since they carry their own salt and wrapped DEK. Changing
@@ -178,9 +187,9 @@ Self-service, irreversible, and distinct from an admin deleting a user.
   is a Bad Request and deletes nothing. The typed username is a
   deliberate second factor of intent, so it is verified server-side and
   not left as a UI formality.
-- Deletes the user row, every record, and every session, in one
-  transaction. Nothing is soft-deleted — there is no vault to preserve
-  that anyone could ever open.
+- Deletes the user row, every unlock method row, every record, and
+  every session, in one transaction. Nothing is soft-deleted: there is
+  no vault to preserve that anyone could ever open.
 - Refused with Conflict if the user is the last remaining admin
   (admin-invites.md).
 - The dialog offers **export first** as the primary action and deletion
@@ -198,8 +207,10 @@ Self-service, irreversible, and distinct from an admin deleting a user.
     user across devices and the server never sees it; absent means 15.
     Values outside the range are clamped client-side.
   - The range is bounded at both ends deliberately. Re-unlocking costs a
-    full Argon2id derivation (~1 s desktop, several seconds on a phone),
-    so a fixed 15 minutes is a real tax on a long session; but the idle
+    full Argon2id derivation, a fraction of a second on a desktop
+    browser and about two seconds on an iPhone (architecture.md, Key
+    management), so a fixed 15 minutes is a real tax on a long session
+    on a phone; but the idle
     lock is also the last defense against another household member
     walking up to an unlocked tab, which is a threat this design
     explicitly defends against (architecture.md, Threat model). No
@@ -240,7 +251,8 @@ Self-service, irreversible, and distinct from an admin deleting a user.
 ## Acceptance criteria
 
 - Changing the password rewrites salt, KDF envelope, Auth Key hash, and
-  wrapped DEK, and leaves every record's ciphertext byte-identical.
+  wrapped DEK in the `password` unlock method row, writes no other row,
+  and leaves every record's ciphertext byte-identical.
 - After a password change the user can still decrypt records written
   before it, in the same session and after a fresh login.
 - The old password no longer logs in; the new one does.
@@ -252,8 +264,9 @@ Self-service, irreversible, and distinct from an admin deleting a user.
 - A password change on a vault with old KDF parameters results in
   parameters equal to the server's current default.
 - The main currency field is not editable and states why.
-- Account deletion removes the user row, all records, and all sessions;
-  a subsequent login with those credentials fails.
+- Account deletion removes the user row, its unlock method rows, all
+  records, and all sessions; a subsequent login with those credentials
+  fails.
 - A `DELETE /api/auth/account` with a wrong `authKey`, or a
   `confirmUsername` that does not match the session user, is rejected
   server-side and deletes nothing — asserted by calling the endpoint

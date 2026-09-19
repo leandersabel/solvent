@@ -12,8 +12,9 @@ account-provisioning role, not a data role.**
 
 Stated here because it is easy to erode later: an admin has **no
 decryption ability over any vault, including their own operator's.**
-There is no endpoint, and must never be one, that returns another user's
-wrapped DEK, salt, KDF envelope, or any record ciphertext. An admin
+There is no endpoint, and must never be one, that returns any record
+ciphertext, or any field of another user's unlock method row (wrapped
+DEK, salt, KDF envelope, Auth Key hash). An admin
 cannot reset a password, because a password reset would orphan the vault
 anyway — there is nothing to reset toward. The only destructive power an
 admin holds is deleting a user account outright, which destroys that
@@ -206,9 +207,10 @@ invocation, and it is honest that it cannot stop anything more.
   status.
 - A non-admin session receives Not Found from every `/api/admin/*`
   endpoint.
-- No admin endpoint returns any user's wrapped DEK, salt, KDF envelope,
-  or record ciphertext — asserted by inspecting the full response shape
-  of every admin endpoint, so the test fails if one is added later.
+- No admin endpoint returns any field of any user's unlock method row,
+  or any record ciphertext, asserted by inspecting the full response
+  shape of every admin endpoint, so the test fails if one is added
+  later.
 - `flask create-invite --admin` on an empty instance produces a working
   invite whose user is an admin; on a populated instance it exits
   non-zero and creates nothing, and with `--force` it succeeds.

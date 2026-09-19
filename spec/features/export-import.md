@@ -7,6 +7,17 @@ KDF envelope, and wrapped DEK needed to open it — to a single local
 file. The file is fully encrypted; without the password it reveals
 nothing but record counts and types.
 
+**The file carries exactly one wrapper: the password unlock method's**
+(architecture.md, Vault key and unlock methods). Not a list, and never
+a wrapper belonging to another method, because a wrapper bound to an
+authenticator does not travel: a file restored on another machine, or
+after the authenticator is lost, could not use it, and its credential
+id in a file the user may hand to someone else is a device correlator
+sitting in a backup for no benefit. This is the reason the password
+method is mandatory and permanent (`account-settings.md`): it is what
+makes a vault exportable at all, and export is the product's only
+backup and its only migration path across data-model upgrades.
+
 It serves two jobs: a **user-held backup** independent of the NAS's ZFS
 snapshots, and the **migration path across data-model upgrades**. It is
 explicitly *not* a password-recovery mechanism (architecture.md, No
@@ -28,7 +39,7 @@ pointing an `<a href>` at it. Following the URL directly is a Forbidden.
   "formatVersion": 1,
   "exportedAt": "2026-08-01T09:14:00Z",
   "salt": "…",
-  "kdf": { "alg": "argon2id", "v": 19, "m": 262144, "t": 3, "p": 1 },
+  "kdf": { "alg": "argon2id", "v": 19, "m": 65536, "t": 3, "p": 1 },
   "wrappedDek": "…", "dekNonce": "…",
   "records": [
     { "recordId": "…", "recordType": "account", "accountId": null,
@@ -87,10 +98,23 @@ injection fails at the cryptography rather than at a check.
    so the user's existing login password keeps working after the import.
 6. `POST /api/import` with the new wrapped DEK and the re-encrypted
    records. The server, in one transaction, deletes every record
-   belonging to the session user, replaces their wrapped DEK, inserts
-   the new set, and **invalidates every other session for the user**,
-   keeping the importing one.
+   belonging to the session user, replaces the wrapper on their
+   `password` unlock method row, inserts the new set, and
+   **invalidates every other session for the user**, keeping the
+   importing one.
 7. Client swaps its in-memory DEK to `DEK_new` and reloads the view.
+
+**Import is the one flow that changes the DEK, so it is the one flow
+bound by the rewrite-every-wrapper rule** (architecture.md, One key, N
+wrappers). Every unlock method the vault holds must end this
+transaction wrapping `DEK_new`, and any method the importing session
+cannot re-wrap is **deleted in that same transaction**, never left
+behind. A stale wrapper is worse than a missing one: it unwraps
+cleanly to the old DEK, so the method authenticates and then every
+record fails to decrypt, which reads as a corrupt vault rather than a
+missing unlock option. In v1 this costs nothing, because the password
+method is the only one and the importing session is holding its Master
+Key by definition.
 
 **The profile record is replaced along with everything else**, so the
 main currency, dimensions, and idle-lock setting all become the file's.
@@ -205,6 +229,12 @@ written.
 - The exported file still opens with its original password after the
   source vault has been re-keyed by an unrelated import.
 - No exported file contains a user identifier in any field.
+- An exported file carries exactly one wrapper, and no field that
+  names, counts, or describes an unlock method.
+- An import replaces the `password` row's `wrapped_dek` and `dek_nonce`
+  and leaves its `params` and `verifier` byte-identical: the salt, the
+  KDF envelope, and the Auth Key hash all survive an import, and the
+  user logs in afterwards with the unchanged password.
 - A file with one record's ciphertext altered by a single byte aborts
   the import, uploads nothing, and leaves the pre-existing vault intact.
 - Importing with the wrong password aborts before any request is sent.

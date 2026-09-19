@@ -83,16 +83,30 @@ this file says what you can expect of a price wherever you meet one.
   beyond the prices sitting in the values you recorded. The app asks for
   a price only when you are recording something.
 
+## Where prices come from, and what that costs you
+
+Prices come from free public sources with nobody answerable for them.
+Currencies come from central bank data republished by a free open source
+service, gold from the Polish central bank directly. No account, no fee,
+no contract.
+
+The costs of that are accepted, not overlooked. If a source stops or
+changes, there is nobody to call and prices get typed by hand until the
+app is changed. Silver, platinum and palladium have no source at all and
+are typed every time. A paid provider was weighed and rejected: the good
+ones require every copy of their data to be deleted when you stop paying,
+and Solvent cannot do that, because each price is stored inside your
+encrypted entries, which the server can neither read nor delete.
+
+What makes this survivable is that a price is only ever a proposal. You
+can overwrite any of them, and no entry is ever blocked by a lookup that
+failed.
+
 ## Decisions taken on your behalf
 
 These were not in anything you said. They are marked so you can overrule
 them.
 
-- **Prices come from free public sources with nobody answerable for
-  them.** Currencies come from central bank data republished by a free
-  open source service, gold from the Polish central bank directly. No
-  account, no fee, no contract, and no support if either stops. See the
-  question raised with this batch.
 - **The gold price you are offered is usually a day old**, because the
   Polish central bank publishes one business day behind the London
   market, weekdays included. The app shows the day it is for rather than

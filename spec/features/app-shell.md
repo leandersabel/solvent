@@ -69,9 +69,15 @@ conditions indistinguishable.
 
 One place creates the schema and opens the SQLite file on its writable
 volume (architecture.md, Tech stack). Each table's columns are stated
-by the feature that owns them: records (record-api.md), users
-(register.md), invites (admin-invites.md), sessions (architecture.md,
-Application hardening).
+by the feature that owns them: records (record-api.md), users and
+unlock methods (register.md), invites (admin-invites.md), sessions
+(architecture.md, Application hardening).
+
+`users` carries identity and role and nothing else, so the columns the
+shell needs are its whole column set: no key material is a column of
+`users` (architecture.md, Vault key and unlock methods). Registration
+adds the separate `unlock_methods` table rather than extending this
+one.
 
 ## The chrome
 

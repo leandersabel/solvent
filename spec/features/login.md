@@ -2,23 +2,36 @@
 
 ## What it does
 
-A user unlocks their vault. The browser fetches the user's salt and KDF
+A user unlocks their vault. The browser fetches the salt and KDF
 parameters, derives the Master Key and Auth Key, and sends only the Auth
 Key. The server verifies it against a stored hash, starts a session, and
 returns the wrapped DEK. Master Key and unwrapped DEK live in browser
 memory for the session only — never in localStorage or sessionStorage.
 
+Every field this feature reads or writes belongs to the vault's
+**`password` unlock method row** (architecture.md, Vault key and unlock
+methods): its `params` hold the salt and KDF envelope, its `verifier`
+holds the Auth Key hash, and its `wrapped_dek` and `dek_nonce` are the
+wrapper this flow returns. The `users` table is touched for identity
+alone. v1 has no other unlock method, and this feature specifies none.
+
 ## Flow
 
-1. `POST /api/auth/salt` `{ username }` → `{ salt, kdf }`. Returns a
-   real salt + envelope for a known user, and a **deterministic decoy**
+1. `POST /api/auth/salt` `{ username }` → `{ salt, kdf }`, which is the
+   `password` row's `params` and nothing else. Returns a real salt +
+   envelope for a known user, and a **deterministic decoy**
    `HMAC(server_secret, normalized_username)` truncated to 16 bytes,
    plus the server's current default KDF envelope, for an unknown one.
    Responses must be identically shaped and constant-time
-   (architecture.md, Login enumeration).
+   (architecture.md, Login enumeration). This endpoint answers an
+   unauthenticated caller, which is why `params` carries nothing secret
+   and the Auth Key hash is a separate column.
 2. Client derives Master Key + Auth Key in a Web Worker.
 3. `POST /api/auth/login` `{ username, authKey }` → on success, sets the
-   session cookie and returns `{ wrappedDek, dekNonce, kdfStale }`. An
+   session cookie and returns `{ wrappedDek, dekNonce, kdfStale }`,
+   which is the `password` row's wrapper: **one wrapper, the one the
+   caller just authenticated with**, never a list (architecture.md, One
+   key, N wrappers). An
    **unknown username still runs a full Argon2id verification** against
    a fixed decoy hash and discards the result. Without it the endpoint
    answers in microseconds for accounts that do not exist and in tens of
@@ -31,6 +44,14 @@ memory for the session only — never in localStorage or sessionStorage.
 
 ## Stale-KDF re-wrap
 
+**This is the only path by which a vault's KDF parameters are raised**,
+and therefore the path by which the Argon2id memory parameter is raised
+if Safari's WebAssembly engine gets faster (architecture.md, Why 64 MiB
+and not more). The operator raises the server's default envelope, and
+every vault follows on its owner's next login, with no migration, no
+re-encryption, and no prompt. There is no other mechanism, which is why
+the envelope is stored per vault rather than compiled in.
+
 When the stored envelope is weaker than the server's current default,
 the login response sets `kdfStale: true` and includes the target
 envelope. After a successful unlock the client, without user
@@ -41,8 +62,12 @@ interaction:
    using the target parameters.
 3. Re-wraps the existing DEK under Master Key'.
 4. `POST /api/auth/rewrap` `{ salt, kdf, authKey, wrappedDek, dekNonce }`
-   against the authenticated session; the server replaces all five
-   fields in one transaction.
+   against the authenticated session. In one transaction the server
+   replaces the **`password` unlock method row only**: its `params`,
+   its `verifier`, and its wrapper. No other row changes, and no other
+   unlock method is touched, because the DEK is the same key afterwards
+   and every other wrapper still opens it (architecture.md, One key, N
+   wrappers).
 
 The DEK itself does not change, so **no vault record is re-encrypted**.
 If the re-wrap POST fails, the session continues normally on the old
@@ -142,6 +167,15 @@ lock the user out.
   transparently upgraded on login: salt, envelope, Auth Key hash, and
   wrapped DEK all change; the DEK is unchanged, proven by decrypting a
   record written before the upgrade.
+- That upgrade writes the user's `password` unlock method row and
+  nothing else, asserted by comparing every other row of `users` and
+  `unlock_methods` before and after.
+- Raising the server's default Argon2id memory parameter and logging in
+  leaves the vault stored at the new value, with every record still
+  decryptable. This is the test that the parameter has a live upgrade
+  path rather than a documented one.
+- `POST /api/auth/login` returns exactly one wrapper and no field
+  naming, counting, or describing any other unlock method.
 - If `/api/auth/rewrap` returns Server Error, the user stays logged in
   and can still log in afterwards with the old parameters.
 - Exceeding the per-account attempt limit locks the account and returns

@@ -73,11 +73,12 @@ design here: every option works for every future lookup.
   Enumeration is accepted here (`register.md`, Edge cases); do not
   contort the message.
 - **Error — cannot allocate memory for derivation**: same treatment as
-  Unlock, but the copy must be clearer that no vault was created:
-  "Solvent could not set up your vault on this device — it does not have
-  enough memory available. Your invite is still valid; try again on a
-  computer." The invite is untouched, since nothing was submitted
-  (`register.md`).
+  Unlock, including that it is a defensive state rather than an expected
+  one (`ui/unlock.md`), but the copy must be clearer that no vault was
+  created: "Solvent could not set up your vault. This device does not
+  have enough memory available right now. Your invite is still valid.
+  Close other tabs and try again." The invite is untouched, since
+  nothing was submitted (`register.md`). Do not suggest another device.
 - **Error — submit failed after derivation**: the form retains every
   field so nothing must be re-typed or re-derived.
 - **Populated**: success lands the user authenticated on the dashboard,

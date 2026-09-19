@@ -25,15 +25,17 @@ A net worth tracker, self-hosted on the owner's own NAS.
   verification), ciphertext blob storage/retrieval, and a conversion-rate
   proxy/cache (public reference data only, no plaintext ever passes
   through it).
-- **Database**: SQLite. Stores per-user salts, Auth Key hashes, wrapped
-  DEKs, and ciphertext blobs. See Storage under Tech stack.
+- **Database**: SQLite. Stores each vault's unlock-method rows (salt,
+  KDF envelope, Auth Key hash, wrapped DEK) and its ciphertext blobs.
+  See Storage under Tech stack.
 - **Build/deploy pipeline**: GitHub Actions + Dependabot → GHCR → manual
   pull on TrueNAS. See CI/CD under Tech stack.
 - **Admin panel**: user provisioning is invite-only — an admin generates an
   invite link, and registration requires a valid, unused invite. No
   self-service sign-up.
-- **Export/Import**: user-initiated export of a vault (ciphertext blobs,
-  wrapped DEK, salt) to a local file — still fully encrypted, so the file
+- **Export/Import**: user-initiated export of a vault (ciphertext blobs
+  plus the password unlock method's wrapper) to a local file, still
+  fully encrypted, so the file
   exposes nothing without the password. Serves as a personal backup and
   as the migration path across data-model upgrades, distinct from the
   NAS-level ZFS backups (disaster recovery, not schema migration). Import
@@ -94,6 +96,82 @@ per the Security model — the server sees ciphertext, not these fields.
 - Accounts don't need a snapshot on every date — updates are sparse by
   design (you won't touch every account every time). The UI carries the
   last known value forward when charting net worth over time.
+
+### Vault key and unlock methods
+
+A vault has **one data encryption key, wrapped independently by one or
+more unlock methods, one row each**. The DEK itself never changes, so
+adding or removing an unlock method re-encrypts nothing. Key management
+holds the cryptographic rules. This is the row shape.
+
+`unlock_methods`:
+
+| Column | Visibility | Notes |
+|---|---|---|
+| `id` | plaintext | opaque server-generated handle |
+| `user_id` | plaintext | owner, `ON DELETE CASCADE` from `users` |
+| `method` | plaintext | `password`. The only value any endpoint accepts |
+| `params` | plaintext | method-specific JSON, shape keyed on `method`. For `password`: `{ salt, kdf }` |
+| `verifier` | opaque | what the server checks an authenticator against. For `password`: the Argon2id hash of the Auth Key |
+| `wrapped_dek` | opaque | the vault's DEK under this method's wrapping key, AES-256-GCM |
+| `dek_nonce` | plaintext | fresh 96-bit random per wrap |
+| `created_at` | plaintext | server clock |
+
+**`params` is public and `verifier` is secret, and that is the line
+between them.** `params` holds exactly what a caller needs *before* it
+can authenticate, so the pre-authentication step hands it to an
+unauthenticated caller (login.md, salt fetch) and nothing secret may
+ever be placed in it. `verifier` is returned by no endpoint. A second
+method's fields follow the same split: a passkey method would carry its
+credential id and PRF salt in `params` and its credential public key in
+`verifier`, with no Auth Key anywhere.
+
+**Authentication lives on the method row, not on the user.** The
+objection is real: authenticating and unwrapping a key are two
+different jobs on two different axes, and a passkey method
+authenticates by WebAuthn assertion with no Auth Key involved at all.
+The answer is that this design has no authenticator that is not also
+the source of a wrapping key. The Auth Key and the Master Key are the
+two halves of one HKDF split, over one password and one salt, so
+putting the Auth Key hash on `users` while its salt sits in a method
+row would spread a single derivation across two tables and make every
+password change and every re-wrap a two-table transaction, for no
+separation gained. The two axes are honored by giving **each method its
+own `verifier`** rather than by giving the vault a single one: a
+passkey row holds a credential public key there and no Auth Key, and
+the server dispatches verification on `method`.
+
+One constraint falls out of that for any future method: its
+pre-authentication step needs its own decoy treatment matching the
+salt fetch's, or it reintroduces the enumeration oracle login.md
+closes.
+
+`params` is one JSON column rather than a column per field because that
+is what lets a second method's fields differ without a schema change.
+The server validates it as a union discriminated on `method`, so an
+unparseable or wrong-shaped `params` is a Bad Request, not a row that
+sits in the table until someone tries to log in with it.
+
+- **Exactly one `password` row per vault, always.** Enforced by a unique
+  index on `user_id` restricted to `method = 'password'`, written by
+  registration in the same transaction as the user row, and removed by
+  nothing except deleting the account. The reason is export: an export
+  file carries the password method's wrapper and no other
+  (export-import.md), because a wrapper bound to an authenticator cannot
+  travel to another machine. A vault with no password method therefore
+  has no openable export, and export is this product's only backup and
+  its only migration path across data-model upgrades (see Components).
+  A second method is additive, never a replacement.
+- **v1 implements the password method and nothing else.** There are no
+  passkey endpoints, no passkey UI, and no `method` value other than
+  `password` is accepted anywhere. The row shape above is the whole of
+  what v1 owes a future second method: it admits one without a
+  migration. Do not build one now.
+- The `users` table holds **identity and role only**: username and admin
+  flag. No salt, no KDF envelope, no Auth Key hash and no wrapped DEK is
+  a column of `users`, because all four come out of one derivation and a
+  password change rewrites them together, in one row. `register.md` owns
+  both tables.
 
 ### Record storage API
 
@@ -225,7 +303,7 @@ indistinguishable by construction rather than by convention.
   security patches even without a dependency bump, opening a PR if the
   digest changed. Patch-level PRs may auto-merge after CI passes;
   minor/major bumps need manual review. Dependencies touching crypto or
-  auth (`hash-wasm`, Alpine, anything in the auth/session path) are
+  auth (`argon2id`, Alpine, anything in the auth/session path) are
   excluded from auto-merge regardless of bump level and always need
   manual review. Actions workflows run with least-privilege
   `permissions:` blocks, pin third-party actions by commit SHA, and use
@@ -315,34 +393,71 @@ Actors this design defends against vs. accepts:
   even unintentionally. Zero-knowledge means there's no plaintext on the
   server to leak, by construction.
 - **Key derivation (per user, browser-side only)**: password + per-user
-  salt → Argon2id via **`hash-wasm`** (not native Web Crypto PBKDF2,
-  which is weaker) → HKDF-split into two keys:
-  - `hash-wasm` ships one small WASM module per algorithm, so the
-    self-hosted, SRI-pinned artifact covers Argon2id and nothing else —
-    the smallest thing that can be audited and re-pinned on a bump. CI
-    asserts a published RFC 9106 Argon2id test vector, which is what
-    makes a smaller library as trustworthy here as a larger one: the
-    primitive has known-answer tests and this uses exactly one
-    primitive.
-  - **libsodium.js rejected**: a few hundred KB of Emscripten port to
-    reach one function, and its Emscripten heap is where a 256 MiB
-    `memlimit` would need verifying on every target browser. The audited
-    C provenance is real but does not survive the port unexamined, and
-    it buys nothing a known-answer test does not.
+  salt → Argon2id via the **`argon2id`** library (npm `argon2id`, from
+  openpgpjs) rather than native Web Crypto PBKDF2, which is weaker →
+  HKDF-split into two keys:
   - **Master Key** — never leaves the browser; encrypts/decrypts the
     user's data-encryption key (DEK).
   - **Auth Key** — sent to the server at login to verify identity, stored
     server-side only as a hash. Can't derive the Master Key or decrypt
     anything.
-  - **Starting parameters**: Argon2id, memory ≥256 MiB, ≥3 iterations,
-    parallelism 1 (single-threaded WASM) — re-benchmarked against actual
-    target client hardware before ship, raised if headroom allows.
+  - **Parameters**: 64 MiB memory, 3 iterations, parallelism 1, over a
+    128-bit salt. RFC 9106's second recommended option is 64 MiB at 3
+    iterations. Its parallelism of 4 is unavailable to a single-threaded
+    WASM build in a Worker, and dropping to 1 leaves memory and passes
+    unchanged, so an attacker pays the same area per guess.
+  - **Why 64 MiB and not more**: the binding constraint is time on the
+    slowest supported client, not memory. No current device refuses the
+    allocation, at this size or well above it. Safari's WebAssembly
+    engine runs this workload roughly twelve times slower than Chrome's
+    on hardware whose single-core performance is within about 15
+    percent, so each doubling of memory costs an iPhone whole seconds
+    rather than tens of milliseconds. At 64 MiB an iPhone unlock takes
+    about two seconds and a desktop browser a fraction of one, which is
+    the bar: the parameter is set by what keeps the slowest supported
+    device usable.
+  - **Raising iterations to compensate for the lower memory is
+    rejected.** It buys the attacker cost back by spending exactly the
+    login time the memory setting exists to protect, on the same device.
+  - **Two mitigations are ruled out by measurement rather than
+    argument**, so neither is worth re-investigating. A warm
+    WebAssembly instance is within 2 percent of a cold one at every
+    size, so growing the WASM heap is not the cost. Every target reports
+    WebAssembly SIMD and the library already selects its SIMD binary, so
+    shipping a SIMD build changes nothing. The residual is the engine
+    itself.
+  - The `argon2id` library is one algorithm and nothing else, about 7 KB
+    minified with the WASM inlined, so the self-hosted, SRI-pinned
+    artifact is a single small file to audit and re-pin on a bump. It
+    ships separate SIMD and non-SIMD binaries and chooses between them,
+    and it manages the hash's memory JS-side, so a failed allocation
+    surfaces as an ordinary allocation failure the client can catch and
+    report (`ui/unlock.md`) instead of an opaque WASM trap. CI asserts a
+    published RFC 9106 Argon2id test vector, which is what makes a small
+    library as trustworthy here as a large one: the primitive has
+    known-answer tests and this uses exactly one primitive.
+  - **`hash-wasm` rejected**: it produces byte-identical output for
+    identical parameters, so the choice between the two is purely cost,
+    and it is 16 to 19 percent slower on Apple devices while a dead heat
+    on desktop. The slowest supported device is what sets the memory
+    parameter, so a library that is slower only there is the one that
+    costs memory.
+  - **libsodium.js rejected**: a few hundred KB of Emscripten port to
+    reach one function, with an Emscripten heap whose allocation
+    behaviour has to be verified per target browser instead of being
+    managed explicitly. The audited C provenance is real but does not
+    survive the port unexamined, and it buys nothing a known-answer test
+    does not.
   - **Versioned envelope**: the KDF algorithm, version, and parameters
-    (memory/iterations/parallelism) are stored alongside the per-user
-    salt and wrapped DEK, not hardcoded — so a login can detect stale
-    parameters and transparently re-wrap the DEK after a successful
-    unlock, which is how parameters get raised later without breaking
-    existing vaults.
+    (memory/iterations/parallelism) live in the password method's
+    `params` alongside its salt, not in a constant, so a login can
+    detect stale parameters and transparently re-wrap the DEK after a
+    successful unlock. **That re-wrap is the mechanism by which the
+    memory parameter is raised** (login.md, Stale-KDF re-wrap): raising
+    the server's default envelope upgrades each vault on its owner's
+    next login, re-encrypting no record and breaking no existing vault.
+    A faster WebAssembly engine on the slowest supported device is
+    cashed out this way and no other.
   - **The server's current default envelope is embedded in every
     server-rendered page**: the registration page (register.md) and the
     authenticated app shell (`ui/design-system.md`, App shell). Any
@@ -352,11 +467,39 @@ Actors this design defends against vs. accepts:
     source for the value. Login is the one exception, because it runs
     before the shell exists: it carries the envelope on the salt
     response, and the target envelope on `kdfStale`.
-- **DEK envelope**: a random per-user DEK is generated client-side,
-  encrypted with the Master Key, and stored server-side as an opaque blob
+- **DEK envelope**: a random per-vault DEK is generated client-side,
+  wrapped with the Master Key, and stored server-side as an opaque blob
   the server can't decrypt. All financial data is encrypted client-side
   with the DEK (AES-256-GCM) before it's sent; the server stores and
   returns ciphertext only.
+- **One key, N wrappers.** The wrapped DEK is not a property of the
+  user. It is a property of an unlock method, and a vault may hold more
+  than one (Data model, Vault key and unlock methods). Four rules follow
+  from the DEK being the same key in every wrapper:
+  - **Each authentication returns exactly one wrapper**, the one
+    belonging to the method that just authenticated. No endpoint returns
+    the set of them, because a client can only unwrap with the method it
+    used, and a list would tell any caller which authenticators a vault
+    has. Nor does any v1 endpoint enumerate a vault's methods. A
+    settings screen that lists them belongs to the work that adds a
+    second method, and would return handles and labels, never wrappers.
+  - **Re-wrapping one method never touches another.** The stale-KDF
+    re-wrap (login.md) and a password change (account-settings.md) each
+    replace exactly one row, and every other wrapper keeps opening the
+    same DEK. This is also why no vault record is re-encrypted by
+    either.
+  - **Anything that changes the DEK must rewrite every wrapper in the
+    same transaction, and delete any wrapper it cannot rewrite.** Import
+    re-keys the vault (export-import.md), so it is the one flow this
+    binds. A wrapper left holding the previous DEK is worse than a
+    missing one: it unwraps successfully and then fails to decrypt every
+    record, so the method authenticates and the vault merely looks
+    corrupt.
+  - **Record encryption is untouched by the wrapper count.** Records are
+    encrypted under the DEK and their AAD is built from their own
+    fields, so adding, changing, or removing a wrapper alters neither
+    the DEK nor any AAD field. No record is re-encrypted, and the
+    `user_id`-not-in-AAD argument below is unaffected.
   - **Nonce strategy**: a fresh random 96-bit nonce for every encryption
     operation, including re-encrypting an existing record on edit — never
     reuse a record's previous nonce. Collision risk is negligible at this
@@ -558,18 +701,25 @@ Actors this design defends against vs. accepts:
 
 ### Supply chain
 
-- All crypto and framework JS/WASM (`hash-wasm`, Alpine) is self-hosted
-  from the app origin with pinned versions and Subresource Integrity
-  hashes — never loaded from a third-party CDN, which would otherwise
-  sit inside the trust boundary and could silently exfiltrate passwords
-  via a malicious script. CI/CD supply-chain controls (image signing,
-  dependency-merge policy) live under Tech stack.
-- **That list is two entries, and it is meant to stay short**, because
-  every third-party file in the browser is one more thing to pin, hash,
-  re-verify on a bump, and trust with a page that handles the password.
-  That is why decimal arithmetic is written against `BigInt`
-  (record-snapshot.md) and the trend chart is drawn in SVG
-  (net-worth-view.md) rather than pulled in.
+- All crypto and framework JS/WASM is self-hosted from the app origin
+  with pinned versions and Subresource Integrity hashes, never loaded
+  from a third-party CDN, which would otherwise sit inside the trust
+  boundary and could silently exfiltrate passwords via a malicious
+  script. CI/CD supply-chain controls (image signing, dependency-merge
+  policy) live under Tech stack.
+- **The list is named here in full, and it is meant to stay short**:
+  `argon2id` (Key management), Alpine in its CSP-safe build, and
+  zxcvbn. Every third-party file in the browser is one more thing to
+  pin, hash, re-verify on a bump, and trust with a page that handles the
+  password, so adding one is a design decision made here rather than an
+  import added in passing. That is why decimal arithmetic is written
+  against `BigInt` (record-snapshot.md) and the trend chart is drawn in
+  SVG (net-worth-view.md) rather than pulled in.
+- **zxcvbn is loaded only by the two screens that score a password**,
+  registration (`ui/register.md`) and change password
+  (`ui/settings.md`). It is the largest of the three and the app shell
+  has no use for it, so it does not ride along on every authenticated
+  page.
 
 ## Non-goals
 

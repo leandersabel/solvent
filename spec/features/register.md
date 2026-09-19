@@ -36,6 +36,27 @@ before anything is sent to the server (architecture.md, Key management).
 6. Server validates, stores, marks the invite used, and starts a
    session — the user lands logged in, keys already in memory.
 
+## What registration writes
+
+Two tables, and this feature owns both (architecture.md, Vault key and
+unlock methods).
+
+- **`users`**: identity and role only, meaning the normalized username
+  and the admin flag. Registration adds **no key column** to this
+  table. The app shell already creates it (`app-shell.md`, Database).
+- **`unlock_methods`**: exactly one row, `method: 'password'`. Its
+  `params` take the request's salt and KDF envelope verbatim, its
+  `verifier` takes the Argon2id hash of the submitted Auth Key, and its
+  `wrapped_dek` and `dek_nonce` take the wrapper. The unique index on
+  `(user_id)` where `method = 'password'` makes a second password row
+  unrepresentable.
+
+`method` is not a client input. The server writes `'password'`, and
+**no endpoint in v1 accepts any other value**, so a payload carrying
+one is a Bad Request. That, and the row shape, is the whole of what v1
+owes a second unlock method. No passkey endpoint, storage, or screen is
+specified here or anywhere else.
+
 The profile blob is encrypted at step 4, **before** the server has
 assigned this user an identity, and that is only possible because
 `user_id` is not part of the AAD (architecture.md, Key management).
@@ -44,11 +65,12 @@ Every AAD field is one the client chose: `account_id` empty,
 `schema_version`, `version: 1`.
 
 Registration is deliberately **one transaction, not two phases**: the
-user row, the profile record, and the invite's consumption commit
-together or not at all. Splitting it would mean a request that burns a
-single-use invite and leaves a logged-in user holding a vault with no
-main currency — the worst place in the product for a partial state,
-since the invite is spent and the ~1 s key derivation has already been
+user row, its password unlock method row, the profile record, and the
+invite's consumption commit together or not at all. Splitting it would
+mean a request that burns a single-use invite and leaves a logged-in
+user holding a vault with no main currency, or a user row with no way
+to unlock it, the worst place in the product for a partial state,
+since the invite is spent and the key derivation has already been
 paid. The server writes the profile row through the same validator that
 backs `PUT /api/records` (record-api.md), so there is one set of rules
 with two callers rather than two record writers.
@@ -59,8 +81,9 @@ with two callers rather than two record writers.
 - In (over the wire): invite token, username, Auth Key, salt, KDF
   envelope, wrapped DEK + nonce, profile record id, profile schema
   version, profile ciphertext + nonce.
-- Out: user row (username, salt, KDF envelope, Auth Key hash, wrapped
-  DEK), profile record, invalidated invite, session cookie.
+- Out: user row (username), its `password` unlock method row (salt, KDF
+  envelope, Auth Key hash, wrapped DEK + nonce), profile record,
+  invalidated invite, session cookie.
 
 ## Rules
 
@@ -109,18 +132,21 @@ with two callers rather than two record writers.
 - **Password and confirmation differ** → inline error.
 - **Client cannot run WASM Argon2id** (very old browser) → hard failure
   with an explanatory message. There is no weaker fallback KDF.
-- **Client can run WASM but cannot allocate ≥256 MiB** (mobile Safari,
-  typically) → a distinct hard failure naming the device, with a retry.
-  Critically, registration must **not** silently fall back to weaker
-  parameters here: that would mint a vault permanently weaker than the
-  policy, on the device least able to protect it, and the KDF envelope
-  would record the weakness as if it were chosen. Better to refuse the
-  registration and have the user create their vault on a computer — the
-  stale-KDF re-wrap (login.md) upgrades parameters later, but it cannot
-  retroactively justify a vault created below the minimum.
-- **KDF derivation is slow** (≥256 MiB, ≥3 iterations) → show a busy
-  state; the tab must not appear frozen. Run derivation in a Web Worker
-  so the UI thread stays responsive.
+- **Client can run WASM but cannot allocate the KDF's memory** → a
+  distinct hard failure naming the device, with a retry, and no vault
+  created. This is a **defensive path, not an expected one**: the 64 MiB
+  allocation succeeds on every current target, and a device that refuses
+  it is memory-starved at that moment rather than incapable. It is
+  specified because the alternative to a designed state is a raw
+  allocation error shown to a user. Registration must **not** fall back
+  to weaker parameters here: that would mint a vault permanently weaker
+  than the policy and the KDF envelope would record the weakness as if
+  it were chosen. The stale-KDF re-wrap (login.md) upgrades parameters
+  later, but it cannot retroactively justify a vault created below the
+  minimum.
+- **KDF derivation is slow** → show a busy state; the tab must not
+  appear frozen. Run derivation in a Web Worker so the UI thread stays
+  responsive.
 - **Registration POST fails after key derivation** → the client keeps
   form state so the user need not re-enter and re-derive.
 
@@ -132,9 +158,18 @@ with two callers rather than two record writers.
 - The registration request body contains no password, no Master Key, and
   no unwrapped DEK — asserted against the captured request payload in a
   test, not by inspection.
-- After registration the DB holds: a per-user salt, a KDF envelope with
+- After registration the DB holds exactly one `unlock_methods` row for
+  the user, `method: 'password'`, carrying the salt, a KDF envelope with
   the parameters actually used, an Auth Key **hash** (never the Auth
   Key), and a wrapped DEK the server cannot unwrap.
+- The `users` row holds no salt, no KDF envelope, no Auth Key hash and
+  no wrapped DEK, asserted against the table's full column set, so the
+  test fails if one is added back.
+- A `POST /api/register` carrying a `method` field of any value is
+  rejected with Bad Request, and no endpoint accepts a `method` other
+  than `password`.
+- A second `password` row for the same user cannot be inserted. The
+  unique index rejects it.
 - The stored profile record is ciphertext; the main currency appears in
   plaintext nowhere in the DB.
 - The invite's status is `used`, and a second registration with the same
@@ -154,9 +189,10 @@ with two callers rather than two record writers.
   with `account_id` empty and `monotonic_version` = 1 — and is built
   entirely before the request is sent, asserted by encrypting the blob
   in a test with no server interaction at all.
-- A registration whose profile insert fails leaves no user row and an
-  unconsumed invite; a registration that succeeds leaves exactly one
-  user, one profile record, and a `used` invite.
+- A registration whose profile insert fails leaves no user row, no
+  unlock method row, and an unconsumed invite; a registration that
+  succeeds leaves exactly one user, one `password` unlock method row,
+  one profile record, and a `used` invite.
 - The profile record created by registration is indistinguishable from
   one written through `PUT /api/records` — same validation, same column
   values, same AAD.

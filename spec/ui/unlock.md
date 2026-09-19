@@ -31,9 +31,10 @@ link that implies recovery is worse than its absence.
 
 ## The derivation wait
 
-Argon2id at ≥256 MiB runs in a Web Worker and takes roughly 1s on
-desktop, several seconds on a phone. This is the screen's defining
-interaction and must not look like a hang.
+Argon2id runs in a Web Worker and takes a fraction of a second on a
+desktop browser and about two seconds on an iPhone (`architecture.md`,
+Key management). This is the screen's defining interaction and must not
+look like a hang.
 
 - On submit the button becomes a determinate-looking progress state
   labelled "Deriving your key…" and the form disables.
@@ -60,18 +61,24 @@ interaction and must not look like a hang.
   cannot run the encryption Solvent requires." No fallback is offered
   because none exists.
 - **Error — cannot allocate memory for derivation**: a *separate* state
-  from the one above, and the likelier of the two. WASM runs, but the
-  ≥256 MiB allocation is refused — mobile Safari is the common case.
-  Copy names the device, not the password: "This device does not have
-  enough memory available to unlock your vault. Close other tabs and try
-  again, or use a computer." Offer a retry, since closing tabs can
-  genuinely fix it.
+  from the one above. WASM runs, but the allocation is refused. Copy
+  names the device, not the password: "This device does not have enough
+  memory available right now. Close other tabs and try again." Offer a
+  retry, since closing tabs can genuinely fix it.
+  - **This is a defensive state, not an expected one.** The allocation
+    succeeds on every current target, phones included
+    (`architecture.md`, Key management), and a device that refuses it
+    is momentarily memory-starved rather than unable to run Solvent. The
+    state exists because the alternative is showing a user a raw
+    allocation error, and the copy says "right now" for the same
+    reason. Never suggest the vault cannot be opened on this class of
+    device.
   - **No weaker fallback is offered here either.** Deriving at reduced
-    memory would produce a different key and open nothing; deriving the
-    whole vault at reduced memory would weaken the one defense the
-    threat model names against an offline attacker with a DB dump
-    (`architecture.md`, Threat model). A vault that will not open on a
-    phone is the accepted cost.
+    memory would produce a different key and open nothing, so there is
+    nothing to fall back *to*, and a fallback that re-derived the whole
+    vault lower would weaken the one defense the threat model names
+    against an offline attacker with a DB dump (`architecture.md`,
+    Threat model).
 - **Populated**: n/a — success navigates to the dashboard.
 
 ## Rules

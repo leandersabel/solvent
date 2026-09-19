@@ -41,14 +41,17 @@ can have.
 
 ### The wait
 
-Turning a password into a key is slow on purpose. Around a second on a
-computer, several seconds on a phone. This is the screen's defining
-moment and it must never look like a hang.
+Turning a password into a key is slow on purpose. About a sixth of a
+second on a computer, and a little under two seconds on a phone or
+tablet, where the browser runs this kind of work much more slowly on
+otherwise comparable hardware. This is the screen's defining moment and
+it must never look like a hang.
 
 On submit the button becomes a progress state labeled as deriving the
 key, and the form goes quiet. One line beneath: this takes a moment by
 design, it is what makes the password hard to attack. The tab stays
-responsive the whole time.
+responsive the whole time, so the extra second or two on a phone reads
+as the screen working rather than the screen having frozen.
 
 ### Locking
 
@@ -87,13 +90,14 @@ unlocking they are returned to where they were.
 - **The browser cannot do the encryption Solvent needs.** A hard stop
   with a plain explanation. No fallback is offered, because none
   exists.
-- **The device cannot spare the memory.** The more likely of the two,
-  and a separate message. The copy blames the device, not the password:
-  this device does not have enough memory available to unlock your
-  vault, close other tabs and try again, or use a computer. Retry is
-  offered, because closing tabs genuinely can fix it. In practice this
-  means an iPhone or iPad cannot open a vault. See
-  "Decisions taken on the client's behalf".
+- **The device is out of memory at that moment.** A separate message.
+  Any device, of any kind, can be too busy right now to spare what
+  unlocking needs, with enough other tabs and other apps open. The copy
+  blames the moment, not the password and not the device: this device
+  does not have enough memory available right now, close other tabs and
+  try again. Retry is offered, because closing tabs genuinely can fix
+  it. The copy must never tell somebody their phone or their computer
+  is incapable of opening a vault, because it is not.
 - **The session ran out mid-action.** The person is asked to unlock
   again. Nothing they typed is thrown away.
 
@@ -119,6 +123,10 @@ upgrade that could lock somebody out would be worse than no upgrade.
   screen learns nothing about who has an account here.
 - Being locked out after too many attempts looks the same whether or
   not the account exists.
+- A vault opens on a phone and on a tablet, not only on a computer.
+  Unlocking there takes a little under two seconds rather than a
+  fraction of one, and for the whole of that the screen shows it is
+  working and stays responsive to touch.
 - After the idle period, the keys and every decrypted figure, name, and
   chart are gone from the browser, and touching the vault asks for the
   password. Nothing decrypted is reachable by anyone who opens the
@@ -158,10 +166,11 @@ upgrade that could lock somebody out would be worse than no upgrade.
   the password itself rather than a check the server performs, so a
   second factor at the door would guard the session, not the data. It
   is worth having later, and it is not what makes the vault safe.
-- **No weaker unlock on a device that cannot manage the real one.**
-  Weakening it would produce a key that opens nothing anyway, and
-  weakening it everywhere would undo the one protection that stands
-  between a stolen copy of the data and someone reading it.
+- **No easier unlock offered to a device that is short of memory right
+  now.** Unlocking with anything weaker would produce a key that opens
+  nothing anyway, and weakening it for everybody would undo the one
+  protection that stands between a stolen copy of the data and someone
+  reading it. The person closes a tab and tries again instead.
 - **Guessing who has an account is not fully closed off.** For vaults
   at the current protection strength it is. A vault that has not been
   signed into since the last raise is, until its owner next signs in,
@@ -178,7 +187,17 @@ upgrade that could lock somebody out would be worse than no upgrade.
   exact numbers are left to whoever runs the instance, because a
   home-network-only install and an internet-facing one do not need the
   same limits.
-- **A vault cannot be opened on a low-memory device**, chiefly iPhone
-  and iPad. This is the same limit as `register.md` and it is the one
-  place where the encryption the client asked for collides with the
-  responsive web the client also asked for. Raised as a question.
+- **The encryption was tuned so that a phone or tablet unlocks in
+  about two seconds instead of eight to ten.** Reversible. Phone and
+  tablet browsers run this particular computation many times slower
+  than a computer's does, so a setting that keeps a computer at a
+  fraction of a second would have left somebody on a phone waiting
+  eight to ten seconds every time they unlocked. It was lowered until
+  a phone comes in a little under two. The cost is real but small:
+  roughly one character of password strength against somebody who has
+  stolen a copy of the stored data, and the setting chosen is one of
+  the two the standard behind this encryption recommends. If phone
+  browsers get faster, Solvent can raise it again on its own, applying
+  the stronger setting to each person's vault the next time they sign
+  in, with nothing for anybody to do and nothing inside the vault
+  touched. See "Keeping the lock current".
