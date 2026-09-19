@@ -42,7 +42,8 @@ wiped vault has been failed by that dialog.
 - Primary button "Export vault", **not a link**: it fetches the endpoint
   and saves the response through a blob URL, because the endpoint
   requires a header a navigation cannot send (`export-import.md`). The
-  file lands as `solvent-vault-<username>-<YYYY-MM-DD>.json` either way.
+  file lands as `solvent-vault-<YYYY-MM-DD>.json` either way, naming
+  nobody, the same as its contents.
 - Afterwards, in ink-muted: what the file holds, by kind, and its
   approximate size, so the user can see they got what they expected.
   Both timelines are named, the figures and the prices, because a file

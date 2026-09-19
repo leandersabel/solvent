@@ -33,7 +33,11 @@ password recovery) and not a sync mechanism.
 ## Export
 
 `GET /api/export` returns a JSON file, `Content-Disposition: attachment`,
-named `solvent-vault-<username>-<YYYY-MM-DD>.json`.
+named `solvent-vault-<YYYY-MM-DD>.json`. The name carries no user
+identifier, for the same reason the contents carry none: a file found
+on a lost machine or a shared drive must not say whose vault it is.
+Two vaults exported on one day collide in a downloads folder, and the
+browser's own numbering is the answer to that.
 
 It **requires the `X-Solvent-Request` header** despite being a GET
 (architecture.md, CSRF), so it is not reachable by navigation: the
