@@ -2,24 +2,35 @@
 
 ## What it does
 
-Turns an invite link (`admin-invites.md`) into a vault. The person
-picks a username, a password, and the currency their whole net worth
-will be counted in, and lands inside Solvent already signed in, with an
-empty vault ready to fill.
+Turns an invite link (`admin-invites.md`) into the account it was made
+for. Every invite is for one of the two kinds of account, fixed when it
+was created, and the link decides which of two screens the person sees.
+They never choose.
 
-This is the single most consequential screen in the product, for one
-reason: the password chosen here is the only thing that will ever open
-this vault. Nobody at Solvent, no administrator, and no operator with
-access to the machine can open it without that password, and none of
-them can issue a new one. The client asked for zero-knowledge
+- **An invite for a user account** makes a vault. The person picks a
+  username, a password, and the currency their whole net worth will be
+  counted in, and lands inside Solvent already signed in, with an empty
+  vault ready to fill.
+- **An invite for an administrator account** makes no vault, because an
+  administrator account does not have one. The person picks a username
+  and a password, and that is the whole of it.
+
+The first is the single most consequential screen in the product, for
+one reason: the password chosen there is the only thing that will ever
+open that vault. Nobody at Solvent, no administrator, and no operator
+with access to the machine can open it without that password, and none
+of them can issue a new one. The client asked for zero-knowledge
 encryption, and this screen is where the person finds out what that
 costs them.
 
-Who it is for: a household member who has been sent a link.
+Who it is for: a household member who has been sent a link, and the
+person taking on the running of the instance.
 
 ## The screens
 
 ### Create your vault
+
+This is the screen an invite for a user account opens.
 
 A single card, nothing else on the page. No navigation, no marketing.
 The person arrived from a link, they are here to do one thing.
@@ -84,6 +95,30 @@ Setting up a vault does that plus a little more. For the whole of it
 the screen says it is working and stays responsive. It must never look
 like it has hung.
 
+### Create an administrator account
+
+This is the screen an invite for an administrator account opens, and it
+is a shorter one. A single card, same as the other, with a username and
+a password held to the same bar and measured by the same strength
+gauge.
+
+What is absent is absent because there is no vault:
+
+- **No main currency.** Nothing in this account is ever counted in one.
+- **No no-recovery acknowledgement.** The sentence a vault owner has to
+  agree to is not true here. There is no vault to become permanently
+  unreadable, because there is none to begin with.
+- **No deliberate wait.** Nothing is being locked, so the screen does
+  not spend a second and a half building a lock around it.
+
+In their place, one line saying what the account is: this account
+invites and removes people on this instance. It holds no financial data
+and cannot read anybody else's. If you also want to keep your own
+finances in Solvent, that is a separate account, and you need a
+separate invite for it.
+
+The person lands in the admin area, signed in.
+
 ### When it goes wrong
 
 - **The link is no good.** No form at all, just: this invite link is
@@ -91,8 +126,12 @@ like it has hung.
   that, word for word.
 - **The username is taken.** Said plainly. Somebody holding a valid
   invite to a small household instance learning that a username exists
-  is accepted rather than defended against here.
-- **The device is out of memory at that moment.** Any device, of any
+  is accepted rather than defended against here. A username is taken
+  once, across the whole instance, whichever kind of account holds it,
+  so a person who holds both a user account and an administrator
+  account signs in to them under two different names.
+- **The device is out of memory at that moment.** On the vault screen.
+  Any device, of any
   kind, can be too busy right now to spare what setting up needs, with
   enough other tabs and other apps open. The screen says so in terms of
   the moment, not the password and not the device, makes clear that no
@@ -105,11 +144,22 @@ like it has hung.
 
 ## What must be true
 
-- A valid link, a password that clears the bar, and a free username
-  produce a vault, and the person is inside it, already signed in.
-  They are never bounced to a sign-in screen to type the password they
-  just chose.
-- The password never leaves the browser. Not in any form, not once.
+- The link alone decides which of the two screens appears. Nothing on
+  either screen lets the person choose which kind of account they are
+  making, and a link for one kind never produces the other.
+- A valid link for a user account, a password that clears the bar, and
+  a free username produce a vault, and the person is inside it, already
+  signed in. They are never bounced to a sign-in screen to type the
+  password they just chose.
+- A valid link for an administrator account, a password that clears the
+  same bar, and a free username produce an administrator account, and
+  the person is in the admin area, already signed in. No vault is
+  created, no currency is asked for or recorded, and the account holds
+  nothing encrypted.
+- A username is free or taken across the whole instance, not within one
+  kind of account. Two accounts never share a username.
+- A vault owner's password never leaves the browser. Not in any form,
+  not once.
 - Nobody with the machine, the disk, or the database in hand can read
   the main currency, the account names, or anything else in the vault,
   because none of it is stored in readable form.
@@ -118,9 +168,10 @@ like it has hung.
   up the link. The person tries again with the same link.
 - A password under twelve characters, or one that fails the strength
   rating, cannot be submitted, and the slow setup never starts.
-- The form cannot be submitted without ticking the no-recovery
-  acknowledgement.
-- The two passwords have to match.
+- The vault form cannot be submitted without ticking the no-recovery
+  acknowledgement. The administrator form does not carry one, and does
+  not claim anything about recovery in its place.
+- The two passwords have to match, on either screen.
 - The currency list offers only currencies that will work for every
   future conversion this vault makes.
 - A wrong, used, expired, or called-back link produce responses that
@@ -172,6 +223,17 @@ like it has hung.
   characters, with dot, underscore, and hyphen allowed. Nobody asked
   for this. It exists so that two people cannot claim names that differ
   only by capitalization.
+- **One pool of usernames for both kinds of account.** A person who
+  holds a user account and an administrator account picks a second name
+  for the second one rather than reusing the first. The cost is that
+  they have to think of one. What it buys is that a username names
+  exactly one account, so nobody ever has to say which kind they meant.
+- **An administrator password is held to the same bar as a vault
+  password.** It protects the ability to delete every account on the
+  instance, so it is not the place to relax the rule.
+- **Creating an administrator account lands the person in the admin
+  area, signed in**, the same way creating a vault lands its owner
+  inside it. Nobody types a password they just chose a second time.
 - **The encryption was tuned so that a phone or tablet is comfortable
   to use, at a cost of roughly one character of password strength.**
   Reversible. The same setting governs setting a vault up and opening

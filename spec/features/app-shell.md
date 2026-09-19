@@ -69,22 +69,105 @@ conditions indistinguishable.
 
 One place creates the schema and opens the SQLite file on its writable
 volume (architecture.md, Tech stack). Each table's columns are stated
-by the feature that owns them: records (record-api.md), users and
-unlock methods (register.md), invites (admin-invites.md), sessions
-(architecture.md, Application hardening).
+by the feature that owns them: records (record-api.md), principals and
+credentials (register.md), DEK wrappers (register.md), invites
+(admin-invites.md), sessions (architecture.md, Application hardening).
 
-`users` carries identity and role and nothing else, so the columns the
-shell needs are its whole column set: no key material is a column of
-`users` (architecture.md, Vault key and unlock methods). Registration
-adds the separate `unlock_methods` table rather than extending this
-one.
+`principals` carries identity and kind and nothing else, so the columns
+the shell needs to resolve a session and choose a nav are its whole
+column set: no key material is a column of `principals`
+(architecture.md, Accounts on this instance). Registration adds the
+separate `credentials` and `dek_wrappers` tables rather than extending
+this one.
+
+Two triggers live here, because they are schema and the schema is
+created in one place:
+
+- a `BEFORE INSERT` on `records` and
+- a `BEFORE INSERT` on `dek_wrappers`
+
+each resolving the row's principal and aborting when its `kind` is
+`administrator`. They are the storage-layer half of "an administrator
+has no vault" (architecture.md, Credentials and vault key wrappers).
+A SQLite `CHECK` cannot reach another table, which is why this is a
+trigger and not a column constraint. Nothing in the application is
+expected to hit them. They exist so that a future feature that would
+has to be written deliberately.
+
+## The two surfaces
+
+There are two surfaces, the vault and the administration, and no
+session reaches both. Routes that belong to neither are shared.
+
+Every route in the product is in exactly one of the three groups
+below, and the group together with the session's principal kind
+decides whether the route answers at all. The check sits beside the
+CSRF middleware and runs immediately after authentication, once, so no
+individual endpoint repeats it.
+
+- **Shared**, the four routes every account needs to hold a
+  credential and a session: `/login`, `/api/auth/salt`,
+  `/api/auth/login`, `/api/auth/logout`, `/api/auth/upgrade-kdf`, and
+  `/api/auth/change-password`. Both kinds reach these.
+- **Vault**, the record store, the rate lookup, export, import,
+  `/api/sessions`, `/api/auth/logout-all`,
+  `DELETE /api/auth/account`, the `/settings` shell page, the
+  dashboard, and every screen that renders vault data. A vault owner
+  reaches these. **An administrator gets Not Found**, `/settings`
+  included: settings exists only inside a vault
+  (`account-settings.md`).
+- **Administration**, the `/admin` shell page and every
+  `/api/admin/*` endpoint. An administrator reaches these. **A vault
+  owner gets Not Found.**
+
+Not Found in both directions, never Forbidden, and for the same reason
+in both: Forbidden confirms the route exists (architecture.md, Status
+codes). For an administrator on a vault route it is also literally
+accurate, because that account has no vault for the route to address.
+
+The **root path** resolves by kind: the Dashboard for a vault owner,
+the Admin area for an administrator. It is the only route that
+resolves to different content per kind, and it does so because a
+bookmark of the bare host has to work for both.
+
+A route added later belongs to a named group in this list. A route
+that belongs to no group is unreachable, which is the safe direction
+to fail.
 
 ## The chrome
 
-Layout, the three nav entries, the global Update values action, the
-lock button, and the content max-width are specified in
-ui/design-system.md, App shell. This feature renders that shell; each
-screen spec describes only its own content region.
+Layout, the nav, the global Update values action, the lock button, and
+the content max-width are specified in ui/design-system.md, App shell.
+This feature renders that shell; each screen spec describes only its
+own content region.
+
+The chrome differs by kind, and it differs by omission rather than by
+rearrangement:
+
+| | Vault owner | Administrator |
+|---|---|---|
+| Nav | Dashboard, Settings | none |
+| Update values | shown | absent |
+| Right-hand control | Lock | Sign out |
+| Embedded KDF envelope | yes | yes |
+| Record and decryption layer | loaded | not loaded |
+| Argon2id worker | loaded | loaded |
+
+- **An administrator's bar carries a wordmark and Sign out and nothing
+  else.** No Dashboard, no Settings, no Admin entry: with one
+  destination there is nothing for a nav to navigate between, and
+  every other entry would answer Not Found. Movement inside the admin
+  area is that area's own business (`ui/admin.md`).
+- **The right-hand control is Lock for a vault owner and Sign out for
+  an administrator**, because Lock means "drop the keys and keep the
+  session" and an administrator has no keys to drop.
+- **Update values is absent, not disabled.** It opens a vault flow.
+- **The Argon2id worker still ships to an administrator**, because
+  changing their password derives at current parameters like any other
+  account, and because a stale-KDF upgrade can fire on any sign-in
+  (login.md).
+- **The current default KDF envelope is still embedded**
+  (architecture.md, Key management), for the same reason.
 
 ## Inputs / outputs
 
@@ -119,6 +202,10 @@ screen spec describes only its own content region.
   Unauthorized when the header is present and the session is not.
 - **Lock pressed with unsaved form input** → the one named exception in
   login.md, Rules applies; the shell adds no confirmation of its own.
+- **An administrator navigates to a vault route by typing it** → Not
+  Found, the same page a vault owner gets for `/admin`. No message
+  explains the kind mismatch, because explaining it is the thing Not
+  Found is chosen over Forbidden to avoid.
 
 ## Acceptance criteria
 
@@ -142,8 +229,34 @@ screen spec describes only its own content region.
   indistinguishable.
 - Starting the app with `SECRET_KEY` unset fails, and the message
   contains the variable name and no key material.
-- Nav shows Dashboard and Settings for a non-admin, and Admin as a
-  third entry for an admin. There is no Accounts entry for either.
+- Nav shows Dashboard and Settings for a vault owner. An
+  administrator's bar shows no nav entries at all, and its only
+  control is Sign out. There is no Accounts entry and no Admin entry
+  in either bar.
+- An administrator session receives Not Found from `/settings`,
+  `/api/sessions`, and `/api/auth/logout-all`, and OK from
+  `/api/auth/change-password`.
+- An administrator session receives Not Found from every vault route
+  and a vault owner session receives Not Found from every
+  administration route, asserted by enumerating every registered route
+  and calling each with a session of both kinds. A route that answers
+  something other than Not Found to the wrong kind, or that appears in
+  neither group, fails the test.
+- An administrator's `GET /api/records` returns Not Found, not an
+  empty list, asserted specifically, because an empty list is the
+  plausible wrong answer and it reads as "your vault is empty" rather
+  than "you have none".
+- The root path renders the Dashboard for a vault owner and the Admin
+  area for an administrator, and neither session can reach the other's
+  through it.
+- An administrator session's page loads the Argon2id worker and does
+  not load the record or decryption layer.
+- An administrator session's chrome carries no Update values action,
+  no Lock button, and no nav entries.
+- Inserting a `records` row or a `dek_wrappers` row whose principal is
+  an administrator is rejected by the database itself, asserted
+  against the schema with a direct SQL insert rather than through an
+  endpoint.
 - The lock button discards keys and decrypted state and shows
   re-unlock with no confirmation dialog, and the server session
   survives it (login.md, Rules).

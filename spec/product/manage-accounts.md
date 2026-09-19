@@ -46,7 +46,8 @@ A short form: name, what it is measured in, one line per axis you have
 configured, and a note hidden behind "Add a note" so it does not clutter
 the common case.
 
-The unit is picked from a list your administrator maintains, with a
+The unit is picked from a list an administrator maintains for the
+whole instance, with a
 "Something else..." option at the foot for anything not on it. Picking
 from the list is what lets the app propose prices later. Typing your own
 unit is a normal answer for a flat or a wine cellar, and the form says
@@ -54,8 +55,9 @@ what it costs in one line at the moment you choose: you will enter the
 price yourself each time. Some units on the list are there without a
 price source behind them, and those are marked in the list as
 "rate entered by hand" rather than hidden. When a unit you want is
-missing, the form says the administrator configures the list, so you do
-not go looking for a setting you do not have.
+missing, the form says the list is configured for the instance as a
+whole rather than per vault, so you do not go looking for a setting you
+do not have.
 
 Filing happens inside this form, never on another screen. Each axis has
 a "new value" option at the foot of its list, and there is a "new axis"

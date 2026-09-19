@@ -7,8 +7,8 @@ KDF envelope, and wrapped DEK needed to open it — to a single local
 file. The file is fully encrypted; without the password it reveals
 nothing but record counts and types.
 
-**The file carries exactly one wrapper: the password unlock method's**
-(architecture.md, Vault key and unlock methods). Not a list, and never
+**The file carries exactly one wrapper: the password credential's**
+(architecture.md, Credentials and vault key wrappers). Not a list, and never
 a wrapper belonging to another method, because a wrapper bound to an
 authenticator does not travel: a file restored on another machine, or
 after the authenticator is lost, could not use it, and its credential
@@ -99,14 +99,14 @@ injection fails at the cryptography rather than at a check.
 6. `POST /api/import` with the new wrapped DEK and the re-encrypted
    records. The server, in one transaction, deletes every record
    belonging to the session user, replaces the wrapper on their
-   `password` unlock method row, inserts the new set, and
+   `password` credential's wrapper, inserts the new set, and
    **invalidates every other session for the user**, keeping the
    importing one.
 7. Client swaps its in-memory DEK to `DEK_new` and reloads the view.
 
 **Import is the one flow that changes the DEK, so it is the one flow
 bound by the rewrite-every-wrapper rule** (architecture.md, One key, N
-wrappers). Every unlock method the vault holds must end this
+wrappers). Every credential the vault holds must end this
 transaction wrapping `DEK_new`, and any method the importing session
 cannot re-wrap is **deleted in that same transaction**, never left
 behind. A stale wrapper is worse than a missing one: it unwraps
@@ -137,10 +137,12 @@ written.
 
 ## Rules
 
-- The server assigns `user_id` from the session on every imported
-  record. It never reads a user id from the uploaded payload — one
-  user's import can never write into another's vault (architecture.md,
-  Import authorization).
+- The server assigns `principal_id` from the session on every imported
+  record. It never reads an account id from the uploaded payload — one
+  account's import can never write into another's vault
+  (architecture.md, Import authorization). Export and import are both
+  on the vault surface, so an administrator session receives Not Found
+  from either (`app-shell.md`, The two surfaces).
 - Strict server-side validation before any write: total payload size
   cap, per-record ciphertext size cap, record count cap, known
   `recordType` values, well-formed UUIDs, base64 decodes cleanly,
@@ -230,7 +232,7 @@ written.
   source vault has been re-keyed by an unrelated import.
 - No exported file contains a user identifier in any field.
 - An exported file carries exactly one wrapper, and no field that
-  names, counts, or describes an unlock method.
+  names, counts, or describes a credential.
 - An import replaces the `password` row's `wrapped_dek` and `dek_nonce`
   and leaves its `params` and `verifier` byte-identical: the salt, the
   KDF envelope, and the Auth Key hash all survive an import, and the
@@ -238,7 +240,7 @@ written.
 - A file with one record's ciphertext altered by a single byte aborts
   the import, uploads nothing, and leaves the pre-existing vault intact.
 - Importing with the wrong password aborts before any request is sent.
-- A `POST /api/import` payload with a `userId` field naming another user
+- A `POST /api/import` payload with a `principalId` field naming another user
   writes nothing into that user's vault; the records land under the
   session user.
 - Importing into a non-empty vault without the typed `ERASE`

@@ -4,33 +4,84 @@
 
 Solvent is not open to the public and has no sign-up. An account comes
 into existence exactly one way: somebody already inside the instance
-creates a link and hands it to a person they know. That person follows
-the link and sets up their own vault (`register.md`).
+creates a link and hands it to a person they know.
 
-The person who hands out links is an **administrator**. It is a
-provisioning role and nothing else. An administrator decides who gets
-an account on this instance and who stops having one. They get no
-ability to see what anyone keeps in it.
+There are two kinds of account on an instance, and they are different
+things rather than the same thing with different powers.
+
+- A **user account** owns a vault: the accounts, balances, notes and
+  history one person keeps. Everything in it is readable only with that
+  person's password. Following a link into a user account is what
+  `register.md` describes.
+- An **administrator account** manages the platform. It decides who
+  gets an account on this instance and who stops having one. **It has
+  no vault.** It holds no accounts, no balances, no notes, nothing
+  encrypted, and there is nothing in it to unlock.
+
+That an administrator cannot read anyone's data is therefore not a rule
+the product has to enforce in each place somebody might try. It is what
+the account is. There is no vault attached to it to open.
 
 Who it is for: the household member who runs the instance, and anyone
 they choose to share that duty with.
 
+## Two accounts, one person
+
+The same person may hold both kinds. Two usernames, two passwords, used
+for two different jobs. The household member who runs the instance
+signs in to their administrator account to hand out an invite or remove
+somebody, and signs in to their user account to look at their own
+money. Neither account can do the other's work.
+
+This is deliberate and it is the point of the separation. Privilege is
+something a person steps into on purpose for the length of one task,
+rather than something they carry around all day in the account they use
+for everything. The cost is honest: a second password to remember, and
+a second sign-in before doing administrative work. What it buys is that
+an administrator account has nothing in it worth stealing. Somebody who
+guesses an administrator's password gets a list of usernames and the
+power to delete, and not one figure out of any vault, including the
+vault belonging to that same administrator's own user account.
+
+**Several administrator accounts can exist at the same time.** Sharing
+the duty is normal, not an exception, and the instance does not have a
+single privileged person in it.
+
+**An account never changes kind.** A user account cannot be turned into
+an administrator account, and an administrator account cannot be turned
+into a user account. This is not a restriction the product enforces,
+because there is nothing to convert: a user account's whole substance
+is a vault nobody but its owner can read, and an administrator account
+has no vault to give it or take away. Somebody who has a vault and now
+needs to administer the instance is given a second account, and keeps
+the first one untouched.
+
 ## The admin boundary
 
-The client asked for zero-knowledge encryption. Applied to the
-administrator role, that means the following, stated the way a person
+The client asked for zero-knowledge encryption. Applied to
+administration, that means the following, stated the way a person
 experiences it rather than the way it is built:
 
-- An administrator cannot read another person's accounts, balances,
-  notes, or history. Not one figure.
+- An administrator cannot read anyone's accounts, balances, notes, or
+  history. Not one figure. Not another person's, and not the vault held
+  by their own user account, which they reach the same way everybody
+  does, by signing in to that account with its own password.
 - An administrator cannot reset anybody's password.
-- An administrator cannot recover a locked-out vault. Not someone
-  else's, and not their own.
+- An administrator cannot recover a locked-out vault.
 - The only destructive power an administrator holds is removing an
   entire account, and that destroys the vault rather than opening it.
 
 This is the hard line of the product. Every future administrator
 feature is checked against it before it is built.
+
+Note what the line does and does not do. It bounds an administrator,
+it does not enumerate them. Running the platform is the job, and the
+tasks that belong to it will grow: handing out accounts, removing
+them, and maintaining the settings that apply to the whole instance
+rather than to one vault, such as the list of units a holding can be
+measured in. What never grows is reach into a vault. A new
+administrator task is judged against the line above, not against a
+list of the tasks that came before it.
 
 It also has to be said out loud on screen, because "admin panel" means
 the opposite in nearly every other product a person has used. An
@@ -41,11 +92,11 @@ to somebody who has just locked themselves out.
 
 ### The admin area
 
-Reachable only by an administrator. Somebody who is not one never sees
-the entry, and if they go looking for the address directly the app
-behaves as though the page does not exist rather than telling them they
-are not allowed in. Confirming that an admin area exists is itself
-information this instance does not hand out.
+Reachable only by signing in to an administrator account. Nobody else
+ever sees the entry, and if they go looking for the address directly
+the app behaves as though the page does not exist rather than telling
+them they are not allowed in. Confirming that an admin area exists is
+itself information this instance does not hand out.
 
 The area opens with the boundary stated plainly, in the app's own
 voice: you can invite and remove people, you cannot read anyone's data,
@@ -56,6 +107,12 @@ could.
 
 Three choices, then one button.
 
+- **Which kind of account the link creates.** A user account unless
+  chosen otherwise, never remembered from the last invite. Choosing an
+  administrator account is spelled out where it is chosen: whoever uses
+  this link gets an account that can invite and remove people and has
+  no vault of its own, and if that person also wants to keep financial
+  data in Solvent they need a separate invite for a user account.
 - **A note to yourself.** Optional, free text, something like "Sarah's
   laptop", so that a list of outstanding links is tellable apart. This
   is the one thing a person types anywhere in Solvent that the server
@@ -63,111 +120,153 @@ Three choices, then one button.
   leaving the administrator to assume otherwise. The guidance is to
   keep it to a nickname.
 - **How long the link stays good.** Between one and thirty days.
-- **Whether the person becomes an administrator.** A checkbox, off
-  every time, never remembered from the last invite. Ticking it is
-  spelled out where it is ticked: whoever uses this link can invite and
-  remove people, and still cannot read anyone's data, because nobody
-  can.
 
 On creation the link appears once, ready to copy, with the plain fact
 beside it that it is not stored and cannot be shown again. That is
-literally true, not a scare message. An administrator invite says so in
-its confirmation.
+literally true, not a scare message. An administrator invite says which
+kind of account it creates in its confirmation.
 
 The link is copied and delivered however the administrator likes:
 message, in person, written down. Solvent does not send it.
 
 ### Outstanding invites
 
-One row per link ever created: the note, when it was made, when it
-stops working, and where it stands. A link is waiting to be used, has
-been used (by whom, and when), has run out of time, or was called back.
-An invite that makes an administrator is marked as such at a glance,
-because an unused administrator link is the most powerful thing
-outstanding on the instance and should not be discoverable only by
-noticing who eventually turns up in the people list.
+One row per link ever created: which kind of account it creates, the
+note, when it was made, when it stops working, and where it stands. A
+link is waiting to be used, has been used (by whom, and when), has run
+out of time, or was called back. An invite for an administrator account
+is marked as such at a glance, because an unused administrator link is
+the most powerful thing outstanding on the instance and should not be
+discoverable only by noticing who eventually turns up in the accounts
+list.
 
 A link that has not been used yet can be called back, with a
 confirmation. Once a link has been used, calling it back is meaningless
-and the app says so, pointing at removing the resulting person instead.
+and the app says so, pointing at removing the resulting account
+instead.
 
 The link itself never appears again here.
 
-### The people on this instance
+### The accounts on this instance
 
-One row per person: their username, when they joined, whether they are
-an administrator, how many items their vault holds, and when they last
-signed in.
+One row per account: its username, which kind of account it is, when it
+was created, and when it was last signed in to. A user account also
+shows how many items its vault holds.
 
-Those last two are the only facts about somebody else's vault that
-exist anywhere in this product. A count and a date. An administrator
-about to remove somebody looks at them to check they are removing the
-right account and that it is not in active use. Neither is content, and
-no third fact is added later without checking the boundary above.
+That item count and those dates are the only facts about somebody
+else's account that exist anywhere in this product. An administrator
+about to remove an account looks at them to check they are removing the
+right one and that it is not in active use. None of it is content, and
+no further fact is added later without checking the boundary above.
 
-Removing a person requires typing their username. The dialog states
-that the vault goes with them and cannot be brought back, and does not
-offer to save a copy first, because an administrator cannot read the
-vault they are about to destroy.
+Removing an account requires typing its username. For a user account
+the dialog states that the vault goes with it and cannot be brought
+back, and does not offer to save a copy first, because an administrator
+cannot read the vault they are about to destroy.
 
-Whether somebody is an administrator is shown here and cannot be
-changed here. See "What it deliberately does not do".
+Which kind an account is, is shown here and is not changed here,
+because it is not changed anywhere.
 
-### The first administrator, and the locked-out one
+### The first administrator, and a second one
 
-Registration needs a link, and links need an administrator, so the very
-first account on a new instance is created by whoever installed
-Solvent, working directly on the machine it runs on. That produces one
-invite link and nothing else.
+Links need an administrator, and there is nobody on a fresh instance to
+create one, so the very first link is produced by whoever installed
+Solvent, working directly on the machine it runs on. It is an invite
+for an administrator account and nothing else. The installer follows it
+in a browser, chooses a username and a password, and the instance has
+its first administrator. No vault has been created at that point,
+because an administrator account does not have one.
 
-The same path is the instance's only recovery. If the sole
-administrator forgets their password, their vault is gone and stays
-gone, which is the deal the product makes everywhere. But the
-*instance* must still be able to hand out accounts. So the same
-direct-on-the-machine step works on an instance that already has
-people, after stating how many there are and what it is about to do,
-and after being told to go ahead anyway. It is a speed bump against an
-absent-minded command, not a security control, and it should not
-pretend to be one: whoever can run it already holds the machine.
+Every account after that comes from a link handed out inside the app.
+A **second administrator** is created the ordinary way: an existing
+administrator makes an invite for an administrator account and gives it
+to the person who will hold it. The step on the machine is not needed
+again for this, and sharing the duty does not require touching the
+server.
+
+The same direct-on-the-machine step is also the instance's only way
+back if every administrator password is lost. It works on an instance
+that already has accounts, after stating how many there are and what it
+is about to do, and after being told to go ahead anyway. It is a speed
+bump against an absent-minded command, not a security control, and it
+should not pretend to be one: whoever can run it already holds the
+machine. It creates an administrator account and reaches no vault, so
+it is not a route to anybody's data.
+
+### A locked-out administrator
+
+An administrator who forgets their password is not in the position a
+vault owner is. Nothing of theirs is encrypted with it, so there is
+nothing that becomes permanently unreadable, and the permanence that
+applies to a vault does not have to apply here.
+
+Another administrator removes the locked-out account and issues a
+fresh administrator invite. It is the same act as removing any other
+account, so there is nothing new to build and nothing new an
+administrator can do.
+
+Deliberately there is no way for one administrator to set a new
+password on another administrator's account. That would be the first
+thing on the instance letting one person act as another, and it is
+worth more to keep that absent than to save the few minutes the
+removal takes.
+
+On an instance with a single administrator there is nobody to do the
+removing, and the way back is the same step on the machine that
+created the first administrator. That is the standing recovery path,
+and it reaches no vault, because an administrator account never has
+one.
 
 ## What must be true
 
-- There is no way to create an account on this instance without a link
-  from an administrator.
+- There is no way to create an account of either kind on this instance
+  without a link, and only an administrator can produce one from inside
+  the app.
+- Every invite creates either a user account or an administrator
+  account, fixed when the invite is made and shown on the link's row
+  until it is used.
+- An administrator account has no vault. There is nothing in it to
+  encrypt, nothing to unlock, and no financial data of any kind, and no
+  screen anywhere offers to put any there.
+- An administrator sees no accounts, balances, notes, or history
+  belonging to anybody, including the vault of a user account they
+  themselves hold. The item count and the dates named above are the
+  whole of what an administrator learns about an account.
+- There is no way, anywhere in the product, to turn a user account into
+  an administrator account or an administrator account into a user
+  account.
+- More than one administrator account can exist on an instance at the
+  same time, and each can do everything any other administrator can.
 - A link works once. The second person to try it is turned away.
 - A link stops working when its time runs out.
 - A link that has been called back stops working immediately, even
   though it has not run out of time.
 - A link that is wrong, used up, out of time, or called back all fail
   the same way, with the same words. Someone holding a bad link learns
-  nothing about which kind of bad it is.
+  nothing about which kind of bad it is, or which kind of account it
+  would have made.
 - The link is readable exactly once, at the moment it is created. It is
   nowhere in the app afterwards.
-- No screen, no list, and no part of the product shows an administrator
-  anything from inside another person's vault beyond the item count and
-  the last sign-in date named above.
-- There is no way, anywhere in the product, to turn an existing account
-  into an administrator or to stop one being an administrator.
-- Ticking the administrator box creates a person who is an
-  administrator from their first sign-in. Leaving it unticked creates
-  one who is not.
-- A person who is not an administrator, trying anything in the admin
-  area, is answered as though it does not exist, and nothing happens.
-- Removing a person removes their account, everything in their vault,
-  and every session they have open, all at once or not at all. If it
-  fails partway, they are still there and can still sign in.
-- Removing one person leaves everyone else's vault untouched.
+- Somebody who is not signed in to an administrator account, trying
+  anything in the admin area, is answered as though it does not exist,
+  and nothing happens. A signed-in vault owner is answered the same way
+  as a stranger.
+- Removing a user account removes the account, everything in its vault,
+  and every session it has open, all at once or not at all. If it fails
+  partway, the account is still there and can still sign in.
+- Removing one account leaves every other account untouched.
 - Someone removed while signed in is signed out on their next action
   and cannot sign back in.
-- The last remaining administrator cannot be removed, by an
-  administrator or by themselves.
+- The last remaining administrator account cannot be removed, by
+  another administrator or by itself.
 - An administrator who is not the last one can remove their own
-  account, and is signed out by doing it.
+  administrator account, and is signed out by doing it. Their user
+  account, if they hold one, is a separate account and is not touched.
 - Asking to remove a username that does not exist looks exactly like
   every other refusal, so guessing usernames teaches nothing.
-- Setting up the very first account on an empty instance produces a
-  working administrator. Doing it on an instance that already has
-  people refuses, says how many there are, and changes nothing, until
+- Setting up the first account on an empty instance produces a working
+  administrator and no vault. Doing it on an instance that already has
+  accounts refuses, says how many there are, and changes nothing, until
   it is explicitly told to proceed.
 - The link does not turn up in Solvent's own logs.
 
@@ -175,22 +274,26 @@ pretend to be one: whoever can run it already holds the machine.
 
 - **No self-service sign-up.** The client asked for a small invited
   group, not a public service.
+- **No vault on an administrator account.** It is not an account with
+  its financial features switched off. There is no dashboard, no
+  account list, no figures, and nothing to lock, because there is
+  nothing in it to hide.
+- **No account changes kind.** An administrator account and a user
+  account are different things, not two settings of one thing. A person
+  who needs both holds both.
 - **No password reset by an administrator.** Not withheld, impossible.
-  There is nothing to reset toward: the password is what makes the
-  vault readable, so a new one would open an empty room.
-- **No administrator view of anyone's data**, and no export of a
-  vault before deleting it. Same reason.
-- **No promoting or demoting an existing account.** An administrator is
-  made at the moment their account is created, or not at all. See
-  "Decisions taken on the client's behalf", and the open question in
-  the report that goes with this file.
+  There is nothing to reset toward: a vault owner's password is what
+  makes their vault readable, so a new one would open an empty room.
+- **No administrator view of anyone's data**, and no export of a vault
+  before deleting it. Same reason.
 - **Solvent does not send the invite.** It never sends mail of any
   kind, so there is no mail service to run, keep working, or trust with
   a link that grants an account. The administrator delivers it by hand.
-- **No undo on removing a person.** Nothing is kept in a recycle bin,
+- **No undo on removing an account.** Nothing is kept in a recycle bin,
   because there is no readable vault to keep.
-- **The last administrator cannot be removed**, or the instance could
-  never hand out an account again without going back to the machine.
+- **The last administrator account cannot be removed**, or the instance
+  could never hand out an account again without going back to the
+  machine.
 
 ## Decisions taken on the client's behalf
 
@@ -199,17 +302,16 @@ Recorded here because the client did not choose these and may want to.
 - **A link lasts seven days unless changed, and can be set anywhere
   from one to thirty.** Short enough that a forgotten link expires,
   long enough to survive a weekend.
-- **There is no promote or demote.** Every route by which an
-  administrator could move toward somebody else's vault is one fewer if
-  the role is fixed at creation. The cost is real: making an existing
-  person an administrator today means removing their account and
-  inviting them again, which destroys their vault. Raised as a
-  question.
+- **The first administrator is created by following a link, like every
+  other account.** The step on the machine produces an invite rather
+  than an account with credentials set on the server, so a password is
+  chosen in the browser by the person who will use it, and there is one
+  way an account comes to exist rather than two.
 - **The note on an invite is readable by the server.** Everything else
   a person types in Solvent is not. This is provisioning paperwork
   rather than vault content, and encrypting it would mean the invite
   list could only be read by the one administrator who wrote it.
-- **The people list carries an item count and a last sign-in date.**
-  Both are facts the server already has. They are listed because an
-  administrator removing somebody should be able to see they have the
-  right account.
+- **The accounts list carries an item count and the dates.** All are
+  facts the server already has. They are listed because an
+  administrator removing an account should be able to see they have the
+  right one.

@@ -2,132 +2,262 @@
 
 ## What it does
 
-An admin generates single-use, time-limited invite links. Registration
-requires a valid unused invite; there is no self-service sign-up
-(architecture.md, Components). The admin can list and revoke outstanding
-invites, and can see that users exist — and nothing else. **Admin is an
-account-provisioning role, not a data role.**
+An administrator generates single-use, time-limited invite links, each
+naming the **kind of account** it will create. Registration requires a
+valid unused invite; there is no self-service sign-up (architecture.md,
+Components). An administrator can list and revoke outstanding invites,
+see the accounts on the instance, and remove one — and nothing else.
+
+**An administrator account is a kind of account, not a capability on a
+vault-owning one** (architecture.md, Accounts on this instance). Several
+exist at once. One person doing both jobs holds two accounts with two
+usernames and two passwords, and nothing in the system records that
+they are the same person.
 
 ## The admin boundary
 
-Stated here because it is easy to erode later: an admin has **no
-decryption ability over any vault, including their own operator's.**
-There is no endpoint, and must never be one, that returns any record
-ciphertext, or any field of another user's unlock method row (wrapped
-DEK, salt, KDF envelope, Auth Key hash). An admin
-cannot reset a password, because a password reset would orphan the vault
-anyway — there is nothing to reset toward. The only destructive power an
-admin holds is deleting a user account outright, which destroys that
-vault rather than opening it.
+An administrator has **no decryption ability over any vault**, and in
+this model that is a statement about what their account *is* rather
+than a list of endpoints that were careful.
 
-Any future admin feature must be checked against this line.
+An administrator principal has no `dek_wrappers` row and no `records`
+row, and the schema refuses to give it either (`app-shell.md`,
+Database). So there is no key material in an administrator session for
+an endpoint to leak by accident, nothing for a mistaken join to pull
+back, and no vault that "their" account owns. The vault surface
+answers an administrator session Not Found at the routing layer before
+any handler runs (`app-shell.md`, The two surfaces).
+
+On top of that structure, the endpoint rule still holds and is still
+worth stating: there is no endpoint, and must never be one, that
+returns any record ciphertext, or any field of any account's
+credential row (salt, KDF envelope, Auth Key hash) or wrapper. An
+administrator cannot reset a password, because a password reset would
+orphan the vault anyway — there is nothing to reset toward. The only
+destructive power an administrator holds is removing an account
+outright, which destroys that vault rather than opening it.
+
+**The same person's two accounts are not linked anywhere**, and no
+feature may add a link. A stored association between an administrator
+and "their" vault is the one field that would make an administrator
+the owner of something encrypted, and the first feature to read it
+would be the one that crosses this line.
+
+Any future admin feature must be checked against all of the above.
 
 ## Invite lifecycle
 
-An invite row: `id`, `token_hash`, `created_by`, `created_at`,
+An invite row: `id`, `token_hash`, `kind`, `created_by`, `created_at`,
 `expires_at`, `status`, `used_at`, `used_by`, `label`.
+
+- **`kind`** is `vault_owner` or `administrator`, chosen at creation
+  and never edited. It is the sole source of the kind of the account
+  the invite produces (`register.md`), which is what makes "the kind
+  is fixed at creation" true of the *account* rather than merely
+  unexposed: the value is decided before the account exists and read
+  once, at the moment it is written.
 
 - **Token**: 256 bits from `secrets.token_urlsafe(32)`. Shown **once**,
   at creation, in the response — never retrievable afterwards, because
   only its hash is stored.
 - **Hashing**: SHA-256. The token is high-entropy and unguessable, so a
   slow KDF buys nothing here; lookup is by hash, in constant time.
-- **Expiry**: default 7 days, admin-settable at creation (1–30 days).
+- **Expiry**: default 7 days, set by the administrator at creation
+  (1–30 days).
 - **Status**: `pending` → `used` | `revoked`. `expired` is derived from
   `expires_at`, not stored, so it cannot drift.
 - **Single use**: consumed atomically in the same transaction as the
   user insert (register.md). A failed registration does not consume it.
-- `label` is a free-text note ("Sarah's laptop") so an admin can tell
-  outstanding invites apart. It is server-side plaintext — deliberately,
+- `label` is a free-text note ("Sarah's laptop") so an administrator
+  can tell outstanding invites apart. It is server-side plaintext — deliberately,
   since invites are provisioning metadata, not vault data.
-- `created_by` is the admin who minted the invite, or the reserved
-  sentinel `system:bootstrap` for one minted by the CLI, which runs with
-  no session and no user behind it. The sentinel is refused as a
-  username at registration, so it can never name a real user. A sentinel
-  rather than an empty `created_by`, so provenance is always a value the
-  invite list can show and no reader has to special-case an absence.
+- `created_by` is the administrator who minted the invite, or the
+  reserved sentinel `system:bootstrap` for one minted by the CLI, which
+  runs with no session and no principal behind it. The sentinel is
+  refused as a username at registration, so it can never name a real
+  account of either kind. A sentinel rather than an empty
+  `created_by`, so provenance is always a value the invite list can
+  show and no reader has to special-case an absence.
 
 ## Endpoints
 
-All require an authenticated session whose user has `is_admin`, and all
-writes are CSRF-protected.
+All require a session whose principal is an `administrator`, and all
+writes are CSRF-protected. A vault owner session gets Not Found from
+every one of them, at the routing layer (`app-shell.md`, The two
+surfaces).
 
-- `POST /api/admin/invites` `{ expiresInDays, label, isAdmin }` →
-  `{ id, token, url, expiresAt }`. The only response that ever contains
-  the token. `isAdmin` defaults to `false`; when true, the user created
-  from this invite is an admin.
+- `POST /api/admin/invites` `{ expiresInDays, label, kind }` →
+  `{ id, token, url, expiresAt, kind }`. The only response that ever
+  contains the token. **`kind` is required and has no default.** It is
+  `vault_owner` or `administrator`, and any other value is a Bad
+  Request.
 
-  This is **not** a role-change endpoint and does not weaken the rule
-  below. It mints a new account that is born an admin; it cannot reach
-  an existing user. Promoting an existing account is the operation that
-  would let an admin move toward someone else's vault, and it stays
-  absent.
+  A required field rather than a flag defaulting to false, because the
+  two outcomes are different kinds of account rather than one account
+  with an extra power, and a caller that does not say which it wants
+  has not said enough. The screen still presents it as an unticked
+  checkbox (`ui/admin.md`). The API does not, because an API has no
+  screen to explain a default on.
+
+  This endpoint mints an account that is born its kind. It cannot
+  reach an existing account, and nothing else can either.
 - `GET /api/admin/invites` → list of
-  `{ id, label, createdAt, expiresAt, status, usedAt, usedBy }`.
+  `{ id, label, kind, createdAt, expiresAt, status, usedAt, usedBy }`.
   **Never includes the token or its hash.**
 - `POST /api/admin/invites/<id>/revoke` → sets `status: revoked`.
   Idempotent on an already-revoked invite; refused on a used one.
-- `GET /api/admin/users` → `{ username, createdAt, isAdmin,
-  recordCount, lastLoginAt }` per user. Nothing about vault contents
-  beyond the count the server can already see.
-- `DELETE /api/admin/users/<username>` `{ confirmUsername }` → deletes
-  that user's row, every record, and every session, in one transaction.
-  Keyed by normalized username, which is what `GET /api/admin/users`
-  returns and what the admin types to confirm; `confirmUsername` must
-  equal the path segment or the request is a Bad Request. Refused with
-  Conflict if the target is the last remaining admin.
+- `GET /api/admin/accounts` → per account,
+  `{ username, kind, createdAt, lastLoginAt }`, plus `recordCount`
+  **for a vault owner only**. Both kinds are listed, because an
+  administrator needs to see the other administrators to know whether
+  they are the last one and to remove one.
 
-  This is the **only** destructive power an admin holds, and it destroys
-  a vault rather than opening one. There is deliberately no admin export
-  and no admin password reset, because neither is possible — see The
-  admin boundary above.
+  `recordCount` is **absent** for an administrator rather than zero.
+  Zero and "has no vault" are different statements, and a zero invites
+  the reader to think the vault is empty when the point is that there
+  is none. The response is a union discriminated on `kind`, the same
+  shape rule `params` follows (architecture.md, Credentials and vault
+  key wrappers).
 
-  Note that an admin deleting a user is not the same operation as that
-  user deleting themselves (`account-settings.md`): the admin path
-  requires no password, because the admin has none that would help, and
-  it offers no "export first", because an admin cannot decrypt the vault
-  they are about to destroy.
+  Nothing about vault contents beyond the count the server can already
+  see.
+- `DELETE /api/admin/accounts/<username>` `{ confirmUsername }` →
+  deletes that principal's row, its credential, its wrapper, every
+  record, and every session, in one transaction. Keyed by normalized
+  username, which is what `GET /api/admin/accounts` returns and what
+  the administrator types to confirm; `confirmUsername` must equal the
+  path segment or the request is a Bad Request.
 
-There is **no role-change endpoint in v1** — no promote, no demote. An
-admin is made by the bootstrap CLI or by an admin invite, and unmade
-only by deleting the account. Adding a promote/demote endpoint later
-must be checked against The admin boundary first.
+  This is the **only** destructive power an administrator holds. On a
+  vault owner it destroys a vault rather than opening one. On an
+  administrator it destroys no data at all, because there is none.
+  That is why removing an administrator is the lighter of the two
+  operations and needs no extra ceremony beyond the confirmation and
+  the last-administrator guard below.
 
-## Bootstrap: the first admin, and the locked-out one
+  There is deliberately no admin export and no admin password reset,
+  because neither is possible — see The admin boundary above.
 
-Registration needs an invite and invites need an admin, so the first
-account is created out of band by a one-off CLI command run by the
-operator on the host:
+  Removing a vault owner is not the same operation as that person
+  removing themselves (`account-settings.md`): this path requires no
+  password, because an administrator has none that would help, and it
+  offers no "export first", because an administrator cannot decrypt
+  the vault they are about to destroy.
+
+There is **no endpoint that changes an account's kind** — no promote,
+no demote, and no field on any request that is read into `principals.
+kind` after the insert. An administrator account is made by the
+bootstrap CLI's invite or by an administrator invite, and unmade only
+by deleting it. Adding such an endpoint later must be checked against
+The admin boundary first.
+
+## Who may remove whom, and the last administrator
+
+- **An administrator may remove any account, of either kind**, including
+  another administrator. Administrators are peers and the model has no
+  hierarchy: the client asked for several at once and named no seniority
+  among them, and inventing one would mean a rank column that the same
+  removal power could be used to route around anyway.
+- **An administrator may remove their own account**, through this
+  endpoint, while another administrator remains. Doing so ends their
+  own session with the transaction.
+- **An administrator's own account is removed here and nowhere else.**
+  `DELETE /api/auth/account` is a vault owner's endpoint
+  (`account-settings.md`) and answers an administrator session Not
+  Found. One deletion path for administrators means one place the
+  guard below has to hold.
+- **At least one administrator account exists at all times.** A
+  deletion that would leave none is refused with **Conflict**. Without
+  the rule the instance could never provision an account again without
+  shell access to the host.
+
+**The guard and the delete are one `BEGIN IMMEDIATE` transaction.**
+Counting the remaining administrators and then deleting in two
+statements outside a write transaction lets two administrators remove
+each other concurrently, each counting two and each deleting one,
+leaving zero. Serializing them means the second attempt counts one and
+is refused. This is the failure the rule exists to prevent, so it is
+specified as a transaction rather than left to a handler to get right.
+
+There is no guard on removing the last *vault owner*. An instance with
+administrators and no vault owners is idle, not broken.
+
+## An administrator's own credential
+
+An administrator has no settings screen, because settings is a vault
+screen (`account-settings.md`). They still hold a password, and a
+password nobody can rotate is a defect rather than a simplification.
+So the admin area carries **one control of its own that is not about
+provisioning: Change password.**
+
+- It posts to `POST /api/auth/change-password`, the same shared
+  endpoint a vault owner uses, sending no wrapper
+  (`account-settings.md`, Change password).
+- It invalidates every other session of that administrator and keeps
+  the current one, which is what the endpoint already does. That is
+  also the administrator's "sign out everywhere": there is no separate
+  control, because the one operation they would reach for it after is
+  the one that already performs it.
+- There is no session list for an administrator and no
+  `POST /api/auth/logout-all`. Both are on the vault surface
+  (`app-shell.md`, The two surfaces). Keeping the administrator
+  surface to provisioning plus this one credential control is the
+  point: the fewer things that session can do, the less a stolen one
+  is worth.
+
+**An administrator who has forgotten their password is not recovered,
+they are replaced.** Another administrator removes the account and
+issues a fresh administrator invite, which costs nothing because the
+account held nothing. With no other administrator to do it, the
+bootstrap CLI below is the path.
+
+## Bootstrap: the first administrator, and the locked-out one
+
+Registration needs an invite and invites need an administrator, so the
+first account on a fresh instance is created out of band by a one-off
+CLI command run by the operator on the host:
 
 ```
-flask create-invite --admin --expires-days 1
+flask create-invite --kind administrator --expires-days 1
 ```
 
-It prints an invite URL and exits. The invite it creates carries an
-`is_admin` flag that the resulting user inherits.
+It prints an invite URL and exits. **`--kind` is required**, taking
+`administrator` or `vault-owner`, and the invite it creates carries
+that kind for the account to inherit (`register.md`). The command
+creates an invite and never an account, which is what keeps every
+credential in the product derived in a browser: there is no path by
+which an account exists whose Argon2id ran server-side.
 
-**On a populated instance the command requires `--force`**, printing
-how many users and admins already exist and what the flag will do. It
-does not refuse outright. The only actor who can run it holds shell
+**The command requires `--force` whenever an administrator account
+already exists**, printing how many accounts of each kind there are
+and what it is about to create. That condition, rather than "any
+account exists", because an instance with an administrator has the
+admin area for this and the CLI is bypassing it, while an instance
+with vault owners and no administrator is exactly the state the
+command exists to repair.
+
+It does not refuse outright. The only actor who can run it holds shell
 access to the host, and that actor already holds the SQLite file, the
 `SECRET_KEY`, and the ability to modify the served JavaScript, which
 architecture.md (Threat model) states outright is **not** defended
 against. A hard block would stop someone who has already won, at the
 cost of the only recovery path in the product.
 
-That path is the point. An admin who loses their password cannot
-recover their vault — by design, nothing changes that — but the
-*instance* must still be able to provision. Without the override, the
-remaining option is hand-editing SQLite against a schema of hashed
-tokens and transactional invite consumption, an operation no spec
-covers.
+That path is the point. An administrator who loses their password
+cannot recover their own vault account, because they have none, and
+the vault account they hold separately is as unrecoverable as anyone
+else's, which nothing changes. But the *instance* must still be able to
+provision. Without the override, the remaining option is hand-editing
+SQLite against a schema of hashed tokens and transactional invite
+consumption, an operation no spec covers.
 
 The confirmation is friction, not security: it stops an absent-minded
 invocation, and it is honest that it cannot stop anything more.
 
 ## Inputs / outputs
 
-- In: admin action (create, list, revoke), expiry, optional label.
+- In: administrator action (create, list, revoke), the kind of account
+  the invite creates, expiry, optional label.
 - Out: an invite URL shown once; a list of invite states; revocation.
 
 ## Rules
@@ -135,7 +265,8 @@ invocation, and it is honest that it cannot stop anything more.
 - Invite tokens are compared by hashing the presented token and looking
   up the hash — never by scanning and comparing plaintext.
 - The invite URL is `https://<host>/register?invite=<token>`. It is
-  copied to the clipboard by the admin and delivered out of band; the
+  copied to the clipboard by the administrator and delivered out of
+  band; the
   app does not email it.
 - **`/register` carries `Referrer-Policy: no-referrer`**, as do admin UI
   pages. The register page is the one that matters: the token rides in
@@ -168,28 +299,36 @@ invocation, and it is honest that it cannot stop anything more.
 - **Two registrations racing on one invite** → the consuming
   transaction's uniqueness constraint means exactly one wins; the other
   gets the generic invalid-invite error.
-- **Non-admin hits an admin endpoint** → Not Found, not Forbidden — do
-  not confirm the endpoint exists.
-- **Admin revokes their own outstanding invites** → allowed, no special
-  case.
-- **Last admin deletes themselves** → refused, by either path (the admin
-  panel or their own settings); at least one admin must remain, or the
-  instance can never provision again without CLI access.
-- **Admin deletes their own account from the admin panel** → allowed
-  when another admin remains, and it ends their own session. No special
-  case beyond the last-admin guard.
-- **Admin deletes a user who is currently logged in** → their sessions
-  go with the transaction; their next request is an Unauthorized.
-- **Deleting a username that does not exist** → Not Found, the same as
-  any other admin route reached by a non-admin, so a probe distinguishes
-  nothing.
-- **Bootstrap command run on a populated instance without `--force`** →
-  refuses, exits non-zero, and prints the existing user and admin counts
-  plus the flag that would proceed.
-- **Sole admin loses their password** → their vault is gone and stays
-  gone; the operator runs the CLI with `--force` to mint a new admin
-  invite. This is the documented recovery path for the instance, never
-  for a vault.
+- **A vault owner hits an admin endpoint** → Not Found, not Forbidden
+  — do not confirm the endpoint exists (`app-shell.md`, The two
+  surfaces).
+- **An administrator revokes their own outstanding invites** → allowed,
+  no special case.
+- **The last administrator removes themselves** → Conflict, and
+  nothing is deleted.
+- **Two administrators concurrently remove each other, and they are
+  the only two** → one transaction wins and the other is refused with
+  Conflict, and the instance keeps exactly one administrator.
+- **An administrator removes their own account while another remains**
+  → allowed, and it ends their own session. No special case beyond the
+  last-administrator guard.
+- **An administrator removes another administrator** → allowed, and no
+  vault data is involved, because an administrator account holds none.
+- **An administrator removes an account that is currently signed in**
+  → their sessions go with the transaction; their next request is an
+  Unauthorized.
+- **Removing a username that does not exist** → Not Found, the same as
+  any other admin route reached by a vault owner, so a probe
+  distinguishes nothing.
+- **Bootstrap command run while an administrator exists, without
+  `--force`** → refuses, exits non-zero, and prints how many accounts
+  of each kind exist plus the flag that would proceed.
+- **Sole administrator loses their password** → that account is gone
+  and stays gone; the operator runs the CLI with `--force` to mint a
+  new administrator invite. This is the documented recovery path for
+  the instance, never for a vault. The vault accounts on the instance
+  are untouched by it, since they were never reachable from the
+  administrator account in the first place.
 
 ## Acceptance criteria
 
@@ -205,40 +344,69 @@ invocation, and it is honest that it cannot stop anything more.
   registration errors (shared assertion with register.md).
 - Revoking a `used` invite returns Conflict and does not change its
   status.
-- A non-admin session receives Not Found from every `/api/admin/*`
+- A vault owner session receives Not Found from every `/api/admin/*`
   endpoint.
-- No admin endpoint returns any field of any user's unlock method row,
-  or any record ciphertext, asserted by inspecting the full response
-  shape of every admin endpoint, so the test fails if one is added
-  later.
-- `flask create-invite --admin` on an empty instance produces a working
-  invite whose user is an admin; on a populated instance it exits
-  non-zero and creates nothing, and with `--force` it succeeds.
+- No admin endpoint returns any field of any account's credential row
+  or any wrapper, or any record ciphertext, asserted by inspecting the
+  full response shape of every admin endpoint, so the test fails if
+  one is added later.
+- `flask create-invite --kind administrator` on an instance with no
+  administrator produces a working invite whose account is an
+  administrator. With an administrator present it exits non-zero and
+  creates nothing, and with `--force` it succeeds.
+- `flask create-invite` without `--kind` exits non-zero and creates
+  nothing.
+- The CLI creates an invite and never an account: after running it,
+  `principals` is unchanged, asserted against the table.
 - A CLI-minted invite records `created_by` as `system:bootstrap`, and a
   registration attempt using that value as a username is refused.
-- An invite created with `isAdmin: true` produces an admin; the same
-  invite without it produces a non-admin. Both are asserted against the
-  resulting user row.
-- `POST /api/admin/invites` with `isAdmin: true` from a **non**-admin
-  session returns Not Found and creates nothing.
-- No request to any endpoint changes an existing user's admin status —
+- An invite created with `kind: administrator` produces a principal
+  with `kind: administrator` and no wrapper. One with
+  `kind: vault_owner` produces a vault owner with one. Both asserted
+  against the resulting rows.
+- `POST /api/admin/invites` without `kind` is a Bad Request and
+  creates nothing.
+- `POST /api/admin/invites` with `kind: administrator` from a **vault
+  owner** session returns Not Found and creates nothing.
+- No request to any endpoint changes an existing account's kind —
   asserted by enumerating every registered route and attempting the
   change through each.
-- The last remaining admin cannot delete their own account, by either
-  path — the admin panel returns Conflict, and so does
-  `DELETE /api/auth/account`.
-- `DELETE /api/admin/users/<username>` removes that user's row, every
-  record, and every session in one transaction; the deleted user's
-  subsequent request returns Unauthorized and their login fails.
-- A `DELETE /api/admin/users/<username>` whose `confirmUsername` does
-  not match the path segment is a Bad Request and deletes nothing.
-- Deleting one user leaves every other user's records and sessions
-  untouched — asserted with two populated vaults.
-- A simulated DB failure mid-delete leaves the target user fully intact
-  and able to log in.
-- A non-admin session receives Not Found from `DELETE
-  /api/admin/users/*`, and no user is deleted.
-- No endpoint promotes or demotes an admin; the admin API surface is
-  exactly invites plus user list and user delete, asserted by
-  enumerating the registered routes under `/api/admin/`.
+- The last remaining administrator cannot remove their own account:
+  `DELETE /api/admin/accounts/<their own>` returns Conflict and
+  deletes nothing.
+- An administrator removing another administrator succeeds while a
+  third remains, and the removed account can no longer sign in.
+- An administrator changes their own password through
+  `POST /api/auth/change-password`, the new one signs them in, the old
+  one does not, and every other session of theirs is gone while the
+  current one survives.
+- An administrator session receives Not Found from `GET /api/sessions`
+  and `POST /api/auth/logout-all`.
+- The admin area's controls are exactly invites, the account list,
+  account removal, and change password, asserted against the rendered
+  area rather than only the API.
+- Two concurrent `DELETE /api/admin/accounts/*` requests, each
+  targeting one of the only two administrators, leave exactly one
+  administrator: one succeeds and one returns Conflict. Asserted with
+  the two requests overlapping, since the serial case passes either
+  way and is not the bug.
+- `DELETE /api/admin/accounts/<username>` removes that principal's
+  row, its credential, its wrapper, every record, and every session in
+  one transaction; the removed account's subsequent request returns
+  Unauthorized and their login fails.
+- A `DELETE /api/admin/accounts/<username>` whose `confirmUsername`
+  does not match the path segment is a Bad Request and deletes
+  nothing.
+- Removing one account leaves every other account's records and
+  sessions untouched — asserted with two populated vaults.
+- A simulated DB failure mid-delete leaves the target account fully
+  intact and able to sign in.
+- A vault owner session receives Not Found from `DELETE
+  /api/admin/accounts/*`, and no account is deleted.
+- `GET /api/admin/accounts` lists both kinds, and an administrator's
+  row carries no `recordCount` field at all, asserted against the row's
+  full key set rather than against its value.
+- No endpoint changes an account's kind; the admin API surface is
+  exactly invites plus the account list and account delete, asserted
+  by enumerating the registered routes under `/api/admin/`.
 - The invite token does not appear in the application's own log output.

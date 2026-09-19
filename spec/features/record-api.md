@@ -2,10 +2,17 @@
 
 ## What it does
 
-One generic, type-agnostic store for every encrypted record a user
-owns: accounts, snapshots, and the profile. The server has no per-type
-logic because it cannot read any type — it moves opaque blobs in and
-out of rows keyed by plaintext columns it is allowed to see.
+One generic, type-agnostic store for every encrypted record a vault
+owner holds: accounts, snapshots, and the profile. The server has no
+per-type logic because it cannot read any type — it moves opaque blobs
+in and out of rows keyed by plaintext columns it is allowed to see.
+
+**Every route here is on the vault surface** (`app-shell.md`, The two
+surfaces), so an administrator session receives Not Found from all of
+them. Not an empty list, which is the plausible wrong answer and reads
+as "your vault is empty" rather than "you have none". The schema
+refuses a `records` row whose principal is an administrator, so there
+is nothing behind the route for a mistake to reach either.
 
 **No screen.** This is infrastructure; `manage-accounts.md`,
 `record-snapshot.md`, `net-worth-view.md`, `account-settings.md`, and
@@ -13,7 +20,7 @@ out of rows keyed by plaintext columns it is allowed to see.
 
 ## Row shape
 
-Exactly the table in architecture.md, Record storage API: `user_id`,
+Exactly the table in architecture.md, Record storage API: `principal_id`,
 `record_id`, `record_type`, `account_id`, `schema_version`, `version`,
 `nonce`, `ciphertext`, `updated_at`.
 
@@ -26,8 +33,8 @@ Exactly the table in architecture.md, Record storage API: `user_id`,
 - `version` starts at 1 and increments by exactly 1 per write.
 - `nonce` is 96 bits, and must differ from the row's previous nonce on
   every write (architecture.md, Nonce strategy).
-- Primary key is `(user_id, record_id)`. A `record_id` is a
-  client-generated UUIDv4 and is only ever unique within a user.
+- Primary key is `(principal_id, record_id)`. A `record_id` is a
+  client-generated UUIDv4 and is only ever unique within one vault.
 
 ## The AAD encoding
 
@@ -41,12 +48,12 @@ never decrypts.
   `account_id ‖ record_type ‖ record_id ‖ schema_version ‖ version`.
   This differs from the column order in the storage table; Key
   management wins.
-- **`user_id` is not included**, deliberately (architecture.md, Key
+- **`principal_id` is not included**, deliberately (architecture.md, Key
   management). The DEK boundary already makes a blob undecryptable in
-  another user's vault, so the client can build a record's AAD entirely
-  from values it chose or already holds — which is what lets a vault be
-  encrypted before the server has assigned the user an identity
-  (register.md).
+  another account's vault, so the client can build a record's AAD
+  entirely from values it chose or already holds — which is what lets a
+  vault be encrypted before the server has assigned the account an
+  identity (register.md).
 - **Encoding**: each field as UTF-8 text, joined with a single `0x1f`
   (ASCII unit separator) byte. A separator is required, not cosmetic —
   bare concatenation leaves field boundaries ambiguous, so two different
@@ -161,14 +168,15 @@ specified and owned by `manage-accounts.md`, not here.
 
 ## Rules
 
-- **`user_id` always comes from the session, never from the client** —
-  in the path, the body, a header, or a query parameter. A payload
-  carrying a `userId` field is rejected outright rather than ignored,
-  so the mistake surfaces in a test instead of in production.
-- Every query is scoped to the session user. A record belonging to
-  another user is **Not Found, not Forbidden** — the same rule purge
-  follows (`manage-accounts.md`), so an attacker cannot map which ids
-  exist.
+- **`principal_id` always comes from the session, never from the
+  client** — in the path, the body, a header, or a query parameter. A
+  payload carrying a `principalId` field is rejected outright rather
+  than ignored, so the mistake surfaces in a test instead of in
+  production.
+- Every query is scoped to the session's principal. A record belonging
+  to another account is **Not Found, not Forbidden** — the same rule
+  purge follows (`manage-accounts.md`), so an attacker cannot map
+  which ids exist.
 - Limits are enforced before the row reaches the DB (architecture.md,
   Blob and quota limits): max ciphertext size per record, max records
   per vault, and a total per-user byte quota. Over any limit → Content
@@ -213,7 +221,7 @@ specified and owned by `manage-accounts.md`, not here.
   sees a single row of the other's.
 - A `PUT`, `GET`, or `DELETE` naming another user's `record_id` returns
   Not Found and changes nothing.
-- A request body containing a `userId` field naming another user is
+- A request body containing a `principalId` field naming another user is
   rejected; no row is written under either user.
 - An unauthenticated request to any of the three endpoints returns
   Unauthorized.

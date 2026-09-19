@@ -12,12 +12,21 @@ against something the server knows, it is the thing that makes the
 vault readable. A wrong password does not fail a check, it produces a
 key that opens nothing.
 
-The same screen does two jobs:
+The same screen does three jobs:
 
-- **Signing in**, from cold. Username and password.
+- **Signing in to a user account**, from cold. Username and password.
 - **Unlocking again**, when the session is still good but the vault has
   been locked, by the idle timer, the lock button, or a page reload.
   The username is already known, so only the password is asked for.
+- **Signing in to an administrator account** (`admin-invites.md`).
+  Username and password, and nothing is opened, because an
+  administrator account has no vault.
+
+The username decides which of the two kinds of account is being signed
+in to, and the person never says which they meant. A username belongs
+to exactly one account on the instance, so there is nothing to
+disambiguate. Somebody who holds both an administrator account and a
+user account holds two usernames and signs in to one at a time.
 
 ## The screens
 
@@ -53,7 +62,29 @@ design, it is what makes the password hard to attack. The tab stays
 responsive the whole time, so the extra second or two on a phone reads
 as the screen working rather than the screen having frozen.
 
+### Signing in as an administrator
+
+Same card, same two fields, and from there it is a different act. An
+administrator is not opening anything. There is no vault behind an
+administrator account, so nothing is decrypted, and the screen does not
+spend the deliberate wait building a key that would have nothing to
+unlock. Signing in is quick, and it lands in the admin area.
+
+The card looks identical while it is being filled in. It does not
+announce, before a correct password has been typed, that the username
+belongs to an administrator. Anyone can put a name into the field, and
+what comes back must not tell them which kind of account, if any, wears
+it.
+
+An administrator has nothing to lock and no vault to re-open, so
+everything below about locking, the idle timer, and the lock button
+belongs to a user account and not to them. The only way out of an
+administrator session is signing out.
+
 ### Locking
+
+Locking is a vault owner's concern. An administrator account holds
+nothing decrypted, so there is nothing a lock could take away.
 
 The vault locks in three ways, and all three land back on this screen:
 
@@ -84,7 +115,8 @@ unlocking they are returned to where they were.
 - **Wrong password, or a username that does not exist.** The same
   words, in the same place: invalid username or password. And the same
   speed. The screen must not give away which of the two it was, by
-  wording or by how quickly it gives up.
+  wording or by how quickly it gives up, nor whether the name it was
+  given belongs to a user account or an administrator account.
 - **Too many attempts.** Try again in a few minutes, said the same way
   whether or not the account exists.
 - **The browser cannot do the encryption Solvent needs.** A hard stop
@@ -120,7 +152,13 @@ upgrade that could lock somebody out would be worse than no upgrade.
   password again.
 - A wrong password and a username nobody has produce the same message
   and take the same time. Somebody guessing usernames at the sign-in
-  screen learns nothing about who has an account here.
+  screen learns nothing about who has an account here, or about which
+  names belong to administrators.
+- The correct username and password for an administrator account signs
+  that administrator in and lands them in the admin area. Nothing is
+  decrypted, nothing is asked about a vault, and no dashboard appears.
+- A username and password that belong to a user account never reach the
+  admin area, however they are submitted.
 - Being locked out after too many attempts looks the same whether or
   not the account exists.
 - A vault opens on a phone and on a tablet, not only on a computer.
@@ -147,9 +185,10 @@ upgrade that could lock somebody out would be worse than no upgrade.
 - A password that is correct but opens nothing is treated as a failed
   sign-in with the same message, and reported to the operator as an
   anomaly rather than shown to the person.
-- Someone already signed in who returns to the sign-in address goes
-  to their dashboard, and is asked to unlock rather than shown an empty
-  vault.
+- Someone already signed in to a user account who returns to the
+  sign-in address goes to their dashboard, and is asked to unlock
+  rather than shown an empty vault. An administrator already signed in
+  goes to the admin area, and is asked for nothing.
 
 ## What it deliberately does not do
 
@@ -165,7 +204,11 @@ upgrade that could lock somebody out would be worse than no upgrade.
 - **No second factor.** Not in this version. The vault's protection is
   the password itself rather than a check the server performs, so a
   second factor at the door would guard the session, not the data. It
-  is worth having later, and it is not what makes the vault safe.
+  is worth having later, and it is not what makes the vault safe. An
+  administrator account is the case where it would earn its keep
+  soonest, because there the password is the whole of what stands in
+  front of the power to delete every account on the instance. Still
+  not in this version, and named here so the gap is a known one.
 - **No easier unlock offered to a device that is short of memory right
   now.** Unlocking with anything weaker would produce a key that opens
   nothing anyway, and weakening it for everybody would undo the one
@@ -180,6 +223,14 @@ upgrade that could lock somebody out would be worse than no upgrade.
 
 ## Decisions taken on the client's behalf
 
+- **Both kinds of account sign in at the same screen, at the same
+  address.** A separate address for administrators would be one more
+  thing to know and would not hide anything, since an address anybody
+  can type is not a secret. One screen also means a probe cannot tell
+  the two kinds of account apart by where the name was accepted. The
+  cost is that the screen has to behave differently after a correct
+  password without hinting at it before one. Reversible, and raised as
+  a question.
 - **Everybody is signed out twelve hours after signing in**, counted
   from sign-in and not extended by activity. Long enough for a day's
   work, short enough that a forgotten tab is not a standing invitation.

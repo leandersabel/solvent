@@ -7,13 +7,16 @@ the currency their vault counts in, how long it stays unlocked, which
 sessions are open, how their accounts are grouped, and, at the bottom,
 deleting the whole thing.
 
-Nothing here is administrator-facing (`admin-invites.md`), and nothing
-here can recover a lost password. Settings is where a person finds out
-which of the product's rules are theirs to change and which are fixed
-for good, so it has to be honest about both rather than hiding the
-fixed ones.
+Nothing here can recover a lost password. Settings is where a person
+finds out which of the product's rules are theirs to change and which
+are fixed for good, so it has to be honest about both rather than
+hiding the fixed ones.
 
 Who it is for: every person with a vault, about their own vault only.
+This screen exists only inside a vault, so an administrator account
+never reaches it and there is nothing on it an administrator would
+recognize. Provisioning the instance is a different account's job
+(`admin-invites.md`), with its own screens.
 
 ## The screens
 
@@ -93,8 +96,9 @@ recover.
 secondary one. Somebody who came here wanting a backup and left with a
 wiped vault has been failed by the dialog.
 
-The last remaining administrator cannot delete themselves. The control
-is off, with the reason shown (`admin-invites.md`).
+Nobody's vault is undeletable. There is no account whose deletion would
+leave the instance unable to hand out accounts, because handing out
+accounts is not something a vault owner can do.
 
 ### Dimensions
 
@@ -180,7 +184,8 @@ single total.
   username, checked by the server and not only by the dialog. A request
   that skips the dialog entirely still cannot delete with either one
   wrong.
-- The last remaining administrator cannot delete their own account.
+- Any vault owner can delete their own account, whoever else is on the
+  instance. No vault is exempt.
 - The delete dialog offers exporting first as its main action.
 - The list of open sessions shows only the person's own sessions, never
   anyone else's, and carries no IP address and no device information,

@@ -9,10 +9,15 @@ spec/ui/*.md to compile implementation contracts. -->
 
 A net worth tracker, self-hosted on the owner's own NAS.
 
-- **Users**: a small number of accounts (e.g. household members), not open
-  to the public. Each user has a separate vault: own password → own
-  encryption key, nothing shared or visible between users. No
-  shared/household view.
+- **Vault owners**: a small number of accounts (e.g. household
+  members), not open to the public. Each has a separate vault: own
+  password → own encryption key, nothing shared or visible between
+  them. No shared/household view.
+- **Administrators**: accounts that provision and remove other
+  accounts and own no vault at all. A separate kind of account rather
+  than a capability on a vault owner, so one person doing both jobs
+  holds two accounts with two passwords. Several may exist at once.
+  See Data model, Accounts on this instance.
 
 ## Components
 
@@ -25,16 +30,18 @@ A net worth tracker, self-hosted on the owner's own NAS.
   verification), ciphertext blob storage/retrieval, and a conversion-rate
   proxy/cache (public reference data only, no plaintext ever passes
   through it).
-- **Database**: SQLite. Stores each vault's unlock-method rows (salt,
-  KDF envelope, Auth Key hash, wrapped DEK) and its ciphertext blobs.
-  See Storage under Tech stack.
+- **Database**: SQLite. Stores every account's credential row (salt,
+  KDF envelope, Auth Key hash), each vault's DEK wrappers, and its
+  ciphertext blobs. See Storage under Tech stack.
 - **Build/deploy pipeline**: GitHub Actions + Dependabot → GHCR → manual
   pull on TrueNAS. See CI/CD under Tech stack.
-- **Admin panel**: user provisioning is invite-only — an admin generates an
-  invite link, and registration requires a valid, unused invite. No
-  self-service sign-up.
+- **Admin panel**: account provisioning is invite-only. An
+  administrator generates an invite link naming the kind of account it
+  creates, and registration requires a valid, unused invite. There is
+  no self-service sign-up. Reachable only by an administrator session,
+  which holds no key material of any kind.
 - **Export/Import**: user-initiated export of a vault (ciphertext blobs
-  plus the password unlock method's wrapper) to a local file, still
+  plus the password credential's wrapper) to a local file, still
   fully encrypted, so the file
   exposes nothing without the password. Serves as a personal backup and
   as the migration path across data-model upgrades, distinct from the
@@ -97,25 +104,101 @@ per the Security model — the server sees ciphertext, not these fields.
   design (you won't touch every account every time). The UI carries the
   last known value forward when charting net worth over time.
 
-### Vault key and unlock methods
+### Accounts on this instance
 
-A vault has **one data encryption key, wrapped independently by one or
-more unlock methods, one row each**. The DEK itself never changes, so
-adding or removing an unlock method re-encrypts nothing. Key management
-holds the cryptographic rules. This is the row shape.
+Every account on the instance is a row of `principals`, and its `kind`
+is fixed when the row is written. There is no promotion and no
+demotion, and no endpoint writes `kind` after the insert
+(admin-invites.md).
 
-`unlock_methods`:
+| Column | Visibility | Notes |
+|---|---|---|
+| `id` | plaintext | opaque server-generated handle, returned to no client |
+| `username` | plaintext | normalized, unique across both kinds |
+| `kind` | plaintext | `vault_owner` \| `administrator`, `CHECK`-constrained |
+| `created_at` | plaintext | server clock |
+| `last_login_at` | plaintext | server clock, rewritten on each successful login |
+
+- A **vault owner** owns a vault: a DEK, records, a profile, an export.
+- An **administrator** owns none of that. No DEK, no wrapper, no
+  records, nothing encrypted and nothing to unlock. This is the point
+  of the separation: "an administrator cannot read a vault" becomes a
+  property of what their row can be joined to, rather than a check
+  every new admin feature has to pass.
+- One person holding both kinds holds **two principals, two usernames,
+  two passwords**, and **nothing in the schema links them**. A link
+  would be a stored claim that some administrator owns some vault, and
+  the first feature to read it would be the one that crosses the
+  boundary admin-invites.md draws.
+
+**One username space across both kinds.** `username` is unique over the
+whole table, so a username resolves to exactly one principal of exactly
+one kind. Two namespaces are rejected: a username could then name a
+vault owner and an administrator at once, and the pre-authentication
+step would have to ask an unauthenticated caller which of the two they
+mean. That answer is the kind of an account, handed out before anyone
+has proven anything, which is exactly the oracle Login enumeration
+exists to close. One space costs the operator a naming convention for
+the two accounts of one person and buys a login flow that never
+branches on kind before it has verified a credential.
+
+Every column above means something for both kinds, which is what makes
+one table right here. The columns that would not, meaning salt, KDF
+envelope, verifier and wrapped DEK, are on this table for neither.
+
+### Credentials and vault key wrappers
+
+Two facts with two existence conditions, so two tables.
+
+**Every principal has exactly one credential.** It is what
+authenticates them, and an administrator has one exactly as a vault
+owner does.
+
+**Only a vault owner has a wrapper.** A vault has one data encryption
+key, wrapped independently by one or more credentials, one row each.
+The DEK itself never changes, so adding or removing a wrapper
+re-encrypts nothing. Key management holds the cryptographic rules.
+These are the row shapes.
+
+`credentials`:
 
 | Column | Visibility | Notes |
 |---|---|---|
 | `id` | plaintext | opaque server-generated handle |
-| `user_id` | plaintext | owner, `ON DELETE CASCADE` from `users` |
+| `principal_id` | plaintext | `ON DELETE CASCADE` from `principals` |
 | `method` | plaintext | `password`. The only value any endpoint accepts |
 | `params` | plaintext | method-specific JSON, shape keyed on `method`. For `password`: `{ salt, kdf }` |
 | `verifier` | opaque | what the server checks an authenticator against. For `password`: the Argon2id hash of the Auth Key |
-| `wrapped_dek` | opaque | the vault's DEK under this method's wrapping key, AES-256-GCM |
+| `created_at` | plaintext | server clock |
+
+`dek_wrappers`:
+
+| Column | Visibility | Notes |
+|---|---|---|
+| `credential_id` | plaintext | primary key, `ON DELETE CASCADE` from `credentials` |
+| `wrapped_dek` | opaque | the vault's DEK under this credential's wrapping key, AES-256-GCM |
 | `dek_nonce` | plaintext | fresh 96-bit random per wrap |
 | `created_at` | plaintext | server clock |
+
+**Why two tables rather than one with an empty wrapper.** One table
+would leave `wrapped_dek` and `dek_nonce` permanently empty on every
+administrator row, and that emptiness would be carrying the
+load-bearing statement "this account has no vault" while the schema
+enforced nothing. Split, the statement is the absence of a row, which a
+foreign key and a primary key enforce between them, and every column of
+every row means something. The split is also what the two axes ask for:
+authenticating and unwrapping a key are different jobs, and an
+administrator's credential is an authenticator that is not the source
+of any wrapping key. A passkey credential would be the mirror case, a
+wrapping-key source whose `verifier` holds a credential public key and
+no Auth Key, and it fits these two tables unchanged.
+
+What stays on the credential is the **salt and the KDF envelope**, in
+`params`. They belong beside the verifier, which was computed over a
+value derived from them, and they are what the pre-authentication step
+hands out on its own. The wrapper comes out of the same password and is
+still a separate fact, because it is the fact a vault owner has and an
+administrator does not.
 
 **`params` is public and `verifier` is secret, and that is the line
 between them.** `params` holds exactly what a caller needs *before* it
@@ -126,52 +209,40 @@ method's fields follow the same split: a passkey method would carry its
 credential id and PRF salt in `params` and its credential public key in
 `verifier`, with no Auth Key anywhere.
 
-**Authentication lives on the method row, not on the user.** The
-objection is real: authenticating and unwrapping a key are two
-different jobs on two different axes, and a passkey method
-authenticates by WebAuthn assertion with no Auth Key involved at all.
-The answer is that this design has no authenticator that is not also
-the source of a wrapping key. The Auth Key and the Master Key are the
-two halves of one HKDF split, over one password and one salt, so
-putting the Auth Key hash on `users` while its salt sits in a method
-row would spread a single derivation across two tables and make every
-password change and every re-wrap a two-table transaction, for no
-separation gained. The two axes are honored by giving **each method its
-own `verifier`** rather than by giving the vault a single one: a
-passkey row holds a credential public key there and no Auth Key, and
-the server dispatches verification on `method`.
-
-One constraint falls out of that for any future method: its
-pre-authentication step needs its own decoy treatment matching the
-salt fetch's, or it reintroduces the enumeration oracle login.md
-closes.
-
 `params` is one JSON column rather than a column per field because that
 is what lets a second method's fields differ without a schema change.
 The server validates it as a union discriminated on `method`, so an
 unparseable or wrong-shaped `params` is a Bad Request, not a row that
 sits in the table until someone tries to log in with it.
 
-- **Exactly one `password` row per vault, always.** Enforced by a unique
-  index on `user_id` restricted to `method = 'password'`, written by
-  registration in the same transaction as the user row, and removed by
-  nothing except deleting the account. The reason is export: an export
-  file carries the password method's wrapper and no other
-  (export-import.md), because a wrapper bound to an authenticator cannot
-  travel to another machine. A vault with no password method therefore
-  has no openable export, and export is this product's only backup and
-  its only migration path across data-model upgrades (see Components).
-  A second method is additive, never a replacement.
+One constraint falls out of that for any future method: its
+pre-authentication step needs its own decoy treatment matching the
+salt fetch's, or it reintroduces the enumeration oracle login.md
+closes.
+
+- **Exactly one `password` credential per principal, always.** Enforced
+  by a unique index on `principal_id` restricted to `method =
+  'password'`, written in the same transaction as the principal row,
+  and removed by nothing except deleting the account. For a vault owner
+  the reason is export: an export file carries the password
+  credential's wrapper and no other (export-import.md), because a
+  wrapper bound to an authenticator cannot travel to another machine. A
+  vault with no password credential therefore has no openable export,
+  and export is this product's only backup and its only migration path
+  across data-model upgrades (see Components). For an administrator it
+  is simply the only way in. A second method is additive, never a
+  replacement.
 - **v1 implements the password method and nothing else.** There are no
   passkey endpoints, no passkey UI, and no `method` value other than
-  `password` is accepted anywhere. The row shape above is the whole of
-  what v1 owes a future second method: it admits one without a
+  `password` is accepted anywhere. The row shapes above are the whole
+  of what v1 owes a future second method: they admit one without a
   migration. Do not build one now.
-- The `users` table holds **identity and role only**: username and admin
-  flag. No salt, no KDF envelope, no Auth Key hash and no wrapped DEK is
-  a column of `users`, because all four come out of one derivation and a
-  password change rewrites them together, in one row. `register.md` owns
-  both tables.
+- **The schema refuses a vault row attached to an administrator.** A
+  `records` insert and a `dek_wrappers` insert each read the
+  principal's `kind` and abort on `administrator`. Two triggers, named
+  in app-shell.md, Database, because SQLite's `CHECK` cannot reach
+  another table and this guarantee is worth more than two statements.
+  `register.md` owns `principals` and `credentials`.
 
 ### Record storage API
 
@@ -181,7 +252,7 @@ cannot read any type. A record row is:
 
 | Column | Visibility | Notes |
 |---|---|---|
-| `user_id` | plaintext | owner; every query is scoped to the session's user |
+| `principal_id` | plaintext | the owning vault owner; every query is scoped to the session's principal |
 | `record_id` | plaintext | client-generated UUIDv4 |
 | `record_type` | plaintext | `account` \| `snapshot` \| `profile` |
 | `account_id` | plaintext | the owning account for `snapshot`; empty otherwise |
@@ -194,7 +265,7 @@ cannot read any type. A record row is:
 Five of these columns — `record_id`, `record_type`, `account_id`,
 `schema_version`, `version` — are exactly the AAD, so the server cannot
 move a blob to a different slot within a vault without breaking
-decryption. `user_id` is **not** part of the AAD: cross-vault relocation
+decryption. `principal_id` is **not** part of the AAD: cross-vault relocation
 is already impossible under the DEK boundary. See Key management for
 both.
 
@@ -203,7 +274,11 @@ counts, which snapshots belong to which account, and write timestamps.
 That is within the accepted metadata leak in the threat model — the
 plaintext shape deliberately carries no name, value, date, or unit.
 
-Endpoints (all session-authenticated, all CSRF-protected on writes):
+Endpoints (all authenticated as a vault owner, all CSRF-protected on
+writes). An administrator session reaches none of them: the record
+store is part of the vault surface, and a request to it from an
+administrator is Not Found (app-shell.md, The two surfaces), because
+that account has no vault for the query to be scoped to.
 
 - `GET /api/records?type=<t>` — all of the user's records of a type.
 - `PUT /api/records/<record_id>` — create or update. The client sends
@@ -211,8 +286,8 @@ Endpoints (all session-authenticated, all CSRF-protected on writes):
   differs, so a stale tab cannot silently clobber a newer write.
 - `DELETE /api/records/<record_id>` — delete one record.
 
-The server never accepts a `user_id` from the client; it is always taken
-from the session.
+The server never accepts a `principal_id` from the client; it is
+always taken from the session.
 
 **Conversion-rate lookup**: a server-side proxy/cache endpoint fetches
 rates (FX, gold) from a public API and serves the entry-date "proposal"
@@ -356,21 +431,33 @@ Actors this design defends against vs. accepts:
   — TLS everywhere plus HSTS (see Network & transport) prevents both
   credential interception and in-transit tampering with the served
   crypto JS.
-- **Malicious or curious server admin**: defended for *passive*
-  observation — reading logs, attaching a debugger, dumping the DB — by
+- **Host operator with shell access to the NAS**: defended for
+  *passive* observation — reading logs, attaching a debugger, dumping the DB — by
   the zero-knowledge model, and for ciphertext *tampering* (relocating,
   swapping, replaying a blob) by AAD binding (see Key management). Not
-  defended against an admin who *actively* modifies the served JS to
+  defended against an operator who *actively* modifies the served JS to
   capture a password during login — whoever controls the served code
   controls that; closing it fully needs independent code
-  signing/verification, out of scope here.
+  signing/verification, out of scope here. This actor is distinct from
+  the administrator account below: holding the machine and holding an
+  administrator login are different powers, and only the first one can
+  do this.
 - **Malicious or compromised server process**: same boundary as the
-  admin — can't decrypt anything, and cannot silently rearrange
-  ciphertext without detection.
-- **Another user of the same instance**: defended — per-user salts and
-  keys throughout; no vault is decryptable with another user's password,
-  and the admin account has no special decryption ability over any
-  vault, including its own operator's.
+  host operator — can't decrypt anything, and cannot silently
+  rearrange ciphertext without detection.
+- **An administrator account of the same instance**: defended, and
+  structurally rather than by endpoint discipline. An administrator
+  principal has no credential wrapping any key, no `dek_wrappers` row,
+  and no `records` row, so there is no key material in that session
+  for an endpoint to leak by accident and nothing for a future admin
+  feature to reach toward. What they hold is the power to create and
+  destroy accounts, and destroying one destroys its vault rather than
+  opening it (admin-invites.md, The admin boundary). An administrator
+  who is also a vault owner under a second account gets exactly what
+  that second account's password gets them, in a separate session.
+- **Another vault owner of the same instance**: defended — per-account
+  salts and keys throughout; no vault is decryptable with another
+  account's password.
 - **Offline attacker with a DB dump or an export file**: only as
   defended as password strength × Argon2id cost, by construction (see
   Key management) — there is no rate limit on an offline attack.
@@ -388,16 +475,17 @@ Actors this design defends against vs. accepts:
 ### Key management
 
 - **Model: full client-side zero-knowledge encryption.** Server-side
-  envelope encryption was rejected because it puts the admin inside the
-  trust boundary — anything the server decrypts, the admin can observe,
-  even unintentionally. Zero-knowledge means there's no plaintext on the
+  envelope encryption was rejected because it puts whoever holds the
+  server inside the trust boundary — anything the server decrypts, they
+  can observe, even unintentionally. Zero-knowledge means there's no plaintext on the
   server to leak, by construction.
-- **Key derivation (per user, browser-side only)**: password + per-user
-  salt → Argon2id via the **`argon2id`** library (npm `argon2id`, from
+- **Key derivation (per account, browser-side only)**: password +
+  per-account salt → Argon2id via the **`argon2id`** library (npm `argon2id`, from
   openpgpjs) rather than native Web Crypto PBKDF2, which is weaker →
   HKDF-split into two keys:
   - **Master Key** — never leaves the browser; encrypts/decrypts the
-    user's data-encryption key (DEK).
+    vault's data-encryption key (DEK). An administrator derives it and
+    discards it, unused (Administrator credentials, below).
   - **Auth Key** — sent to the server at login to verify identity, stored
     server-side only as a hash. Can't derive the Master Key or decrypt
     anything.
@@ -467,25 +555,57 @@ Actors this design defends against vs. accepts:
     source for the value. Login is the one exception, because it runs
     before the shell exists: it carries the envelope on the salt
     response, and the target envelope on `kdfStale`.
+- **Administrator credentials: the same derivation, half of it thrown
+  away.** An administrator has no vault, so there is no Master Key to
+  put to work and no wrapper to unwrap. Their credential verification
+  is nevertheless the *identical* flow: the same salt fetch, the same
+  Argon2id at the same parameters over the same 128-bit salt, the same
+  HKDF split, the same Auth Key on the wire, the same server-side
+  Argon2id over that Auth Key. The client derives both halves and
+  discards the Master Key.
+  - **The waste is the feature.** The client cannot know which kind of
+    account it is authenticating as until it has authenticated, and it
+    must not, or the pre-authentication step becomes the oracle Login
+    enumeration exists to close. A derivation that branched on kind
+    would have to be told the kind by `/api/auth/salt`, and that
+    endpoint answers anyone. So the derivation does not branch, and
+    what it costs an administrator is a few microseconds of HKDF on
+    top of an Argon2id run they were paying for anyway.
+  - **Sending the password to the server instead is rejected.** It is
+    the obvious shortcut for an account with no vault, and it fails
+    three ways. The wire shape of a login would differ by kind and
+    leak it before authentication. The server would hold a plaintext
+    password, the one secret this whole design is built to keep off
+    it. And a server-side Argon2id at client-side cost would blow the
+    concurrency cap under Application hardening, which is sized for
+    hashing a high-entropy Auth Key and not for being the work factor.
+  - For an administrator the Argon2id derivation therefore exists for
+    exactly one purpose: making an offline attack on `verifier` pay
+    the same price it pays against a vault owner. `verifier` is the
+    only thing in the database an offline attacker can attack for an
+    administrator account, and there is nothing behind it to decrypt.
 - **DEK envelope**: a random per-vault DEK is generated client-side,
   wrapped with the Master Key, and stored server-side as an opaque blob
   the server can't decrypt. All financial data is encrypted client-side
   with the DEK (AES-256-GCM) before it's sent; the server stores and
   returns ciphertext only.
 - **One key, N wrappers.** The wrapped DEK is not a property of the
-  user. It is a property of an unlock method, and a vault may hold more
-  than one (Data model, Vault key and unlock methods). Four rules follow
-  from the DEK being the same key in every wrapper:
-  - **Each authentication returns exactly one wrapper**, the one
-    belonging to the method that just authenticated. No endpoint returns
-    the set of them, because a client can only unwrap with the method it
-    used, and a list would tell any caller which authenticators a vault
-    has. Nor does any v1 endpoint enumerate a vault's methods. A
-    settings screen that lists them belongs to the work that adds a
-    second method, and would return handles and labels, never wrappers.
-  - **Re-wrapping one method never touches another.** The stale-KDF
-    re-wrap (login.md) and a password change (account-settings.md) each
-    replace exactly one row, and every other wrapper keeps opening the
+  account. It is a property of a credential, and a vault may hold more
+  than one (Data model, Credentials and vault key wrappers). Five rules
+  follow from the DEK being the same key in every wrapper:
+  - **Each authentication returns at most one wrapper**, the one
+    belonging to the credential that just authenticated, and none at
+    all when the account is an administrator. No endpoint returns the
+    set of them, because a client can only unwrap with the credential
+    it used, and a list would tell any caller which authenticators a
+    vault has. Nor does any v1 endpoint enumerate an account's
+    credentials. A settings screen that lists them belongs to the work
+    that adds a second method, and would return handles and labels,
+    never wrappers.
+  - **Re-wrapping one credential never touches another.** The
+    stale-KDF upgrade (login.md) and a password change
+    (account-settings.md) each replace exactly one credential row and
+    at most its own wrapper, and every other wrapper keeps opening the
     same DEK. This is also why no vault record is re-encrypted by
     either.
   - **Anything that changes the DEK must rewrite every wrapper in the
@@ -499,7 +619,13 @@ Actors this design defends against vs. accepts:
     encrypted under the DEK and their AAD is built from their own
     fields, so adding, changing, or removing a wrapper alters neither
     the DEK nor any AAD field. No record is re-encrypted, and the
-    `user_id`-not-in-AAD argument below is unaffected.
+    `principal_id`-not-in-AAD argument below is unaffected.
+  - **Zero wrappers is a valid state, and it is what an administrator
+    is.** Not a vault whose wrappers were all removed, which is
+    unreachable: the last `password` credential of a vault owner
+    cannot be deleted (Data model), so a vault owner always has at
+    least one. An administrator's principal simply never had a
+    `dek_wrappers` row, and the schema refuses to give it one.
   - **Nonce strategy**: a fresh random 96-bit nonce for every encryption
     operation, including re-encrypting an existing record on edit — never
     reuse a record's previous nonce. Collision risk is negligible at this
@@ -512,10 +638,10 @@ Actors this design defends against vs. accepts:
     logical slot within a vault — AES-GCM's per-blob authentication
     alone protects contents but not arrangement. `record-api.md` pins
     the byte encoding.
-  - **`user_id` is deliberately *not* in the AAD**, because the DEK
+  - **`principal_id` is deliberately *not* in the AAD**, because the DEK
     boundary already makes a blob undecryptable in another user's
     vault. Two things follow: **the client never needs to know its own
-    `user_id`, and no endpoint returns one**, and a vault transfer
+    `principal_id`, and no endpoint returns one**, and a vault transfer
     **re-keys** rather than re-binds, so the two vaults share no key
     material afterwards. `record-api.md` argues the first,
     `export-import.md` the second.
@@ -597,7 +723,7 @@ Actors this design defends against vs. accepts:
   and rendered client-side, where XSS means password/Master Key capture,
   not just session theft.
 - **Sessions are server-side rows**, not self-contained signed cookies:
-  `(id, token_hash, user_id, issued_at, last_active_at)`. The cookie
+  `(id, token_hash, principal_id, issued_at, last_active_at)`. The cookie
   carries only a random session token, signed with the Flask
   `SECRET_KEY`; the server looks the session up by the token's hash. No
   key material of any kind rides in the cookie. Server-side rows are
@@ -608,6 +734,12 @@ Actors this design defends against vs. accepts:
   export-import.md). `id` is a separate opaque handle — it is what
   `GET /api/sessions` returns, so no response ever hands JavaScript the
   cookie's own value.
+  - **The row shape does not vary by kind and carries no `kind`
+    column.** Kind is read through `principal_id`, so there is exactly
+    one place it is written and a session can never disagree with the
+    account it belongs to.
+  - **`last_active_at` is written on every authenticated request**, not
+    only read. It is what `GET /api/sessions` reports.
 - **Session cookies**: `HttpOnly`, `Secure`, `SameSite=Lax`. Flask
   `SECRET_KEY` must be a strong value injected externally (TrueNAS app
   env), never a default or committed value — the signature is what
@@ -645,6 +777,22 @@ Actors this design defends against vs. accepts:
   identifiers, with constant-time, identically-shaped responses for real
   vs. fake accounts — invite-only registration protects sign-up, not
   whether an account already exists.
+  - **Nothing before a verified credential varies with an account's
+    kind.** The salt response carries no kind field and is drawn from
+    the same `credentials.params` for both, both kinds are registered
+    with a 128-bit salt and an envelope at or above the same server
+    minimum, and the client's derivation is identical (Key management,
+    Administrator credentials). The username space is single, so there
+    is nothing for the caller to disambiguate. An attacker who can
+    tell a vault owner's username from an administrator's without
+    guessing a password has found a bug, and login.md's acceptance
+    list is where it gets caught.
+  - **After** a verified credential the response does differ: a vault
+    owner's carries a wrapper and an administrator's does not, and the
+    login body names the kind outright. That is a fact the caller has
+    just proven they are entitled to. The resulting size difference on
+    the wire falls under the accepted request-size metadata leak in
+    Threat model, and is not treated as a control.
 - **Rate limiting**: per-account and per-IP limits with exponential
   backoff and lockout on the login and salt-fetch endpoints. The
   expensive Argon2id derivation runs client-side, so an attacker

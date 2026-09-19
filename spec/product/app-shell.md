@@ -3,10 +3,12 @@
 ## What it does
 
 The app shell is the frame every signed-in screen sits in: the bar
-across the top, the navigation, the two controls at its right, and the
-width the page content is held to. It is identical on every screen, so
-a person always knows where they are and what they can reach from
-there.
+across the top, the navigation, the controls at its right, and the
+width the page content is held to. For a person with a vault it is
+identical on every screen, so they always know where they are and what
+they can reach from there. The admin area, which belongs to a different
+kind of account with no vault, sits in a stripped-down version of the
+same frame, described below.
 
 It is also where the app's protections are applied once for the whole
 product rather than screen by screen, so a new screen cannot be added
@@ -20,9 +22,10 @@ inside the browser.
 ## Who it is for
 
 The household members who use Solvent day to day, the small invited
-group the product as a whole is for. There is no visitor, no public
-page, no signed-out landing page. Everything the shell frames sits
-behind the password.
+group the product as a whole is for, and the administrators who
+provision the instance for them. There is no visitor, no public page,
+no signed-out landing page. Everything the shell frames sits behind the
+password.
 
 ## What "looks like a private bank" commits us to
 
@@ -77,16 +80,22 @@ the page: no bar, no navigation, no copy selling the product.
 
 ### Navigation
 
-Three entries at most, and never more:
+Two entries, the same two for everybody who has a vault, and never
+more:
 
 - **Dashboard**
 - **Settings**
-- **Admin**, for an administrator only. Everyone else sees two entries.
 
 There is deliberately no **Accounts** entry. The dashboard's own table
-is the list of accounts, so a fourth entry would either lead back to
+is the list of accounts, so a third entry would either lead back to
 the screen the person is already on or open a thinner second copy of
 it.
+
+There is no **Admin** entry either, and there is no navigation state in
+which one appears. Administering the instance is done from an
+administrator account, which is a separate account with no vault
+(`admin-invites.md`). Nobody signed in to a vault has anywhere
+administrative to go, so nothing in this bar leads there.
 
 ### Update values
 
@@ -113,7 +122,31 @@ into an open form and not yet saved, so locking in the middle of
 entering figures does not destroy the work. Nothing else survives it.
 
 Signing out fully, and signing out everywhere at once, live in Settings
-rather than in the bar.
+rather than in the bar. That is a choice between two similar controls,
+and it only arises where both exist. An administrator has no Lock, so
+Sign out is the only control in their bar and there is nothing for it
+to be confused with.
+
+### The administrator's frame
+
+An administrator account has no vault, so almost nothing above applies
+to it. The admin area sits in a plainer version of the same frame: the
+same deep petrol blue bar, the same wordmark, the same restraint, and
+at the right a single **Sign out**.
+
+What is missing is missing because there is nothing for it to act on:
+
+- **No Dashboard and no Settings**, because there are no figures and no
+  vault whose behavior could be configured.
+- **No Update values**, because there are no holdings to update.
+- **No Lock**, because nothing has been decrypted. A lock exists to
+  throw away figures on screen, and there are none. Signing out is the
+  only way to leave.
+
+The navigation inside the admin area is that area's own business
+(`admin-invites.md`), not the product's main navigation. The two bars
+are told apart by what they carry rather than by looking different, and
+the look is the one described above in both.
 
 ### The page below the bar
 
@@ -163,11 +196,14 @@ running app, with no access to the code.
 
 **The chrome**
 
-1. Every signed-in screen shows the same top bar: the wordmark at the
-   left, the navigation beside it, Update values and Lock at the right.
-2. Someone who is not an administrator sees exactly two navigation
-   entries, Dashboard and Settings. An administrator sees those two and
-   Admin. Neither sees an Accounts entry.
+1. Every screen a vault owner sees when signed in shows the same top
+   bar: the wordmark at the left, the navigation beside it, Update
+   values and Lock at the right.
+2. Everybody with a vault sees exactly two navigation entries,
+   Dashboard and Settings. Nobody, ever, sees an Accounts entry or an
+   Admin entry. An administrator sees the bar carrying the wordmark and
+   Sign out, with no Dashboard, no Settings, no Update values and no
+   Lock.
 3. The password screen and the registration screen show no top bar and
    no navigation at all.
 4. Every control in the top bar can be reached and operated with the
@@ -226,6 +262,10 @@ running app, with no access to the code.
 - **No Accounts entry in the navigation.** The dashboard table is the
   account list, so the entry would lead back to the current screen or
   duplicate it.
+- **No Admin entry in the navigation, for anybody.** The navigation
+  frames a vault, and administering the instance is not something a
+  vault owner does. It is done from a separate account that has no
+  vault and no dashboard to hang the entry beside.
 - **No sign-out button in the top bar.** Locking is the frequent act
   and signing out is rare and deliberate. Two similar-looking buttons
   side by side in the bar would invite the wrong one. Signing out lives
@@ -252,9 +292,13 @@ running app, with no access to the code.
 The client never spoke to these. Each was taken so the work could
 proceed, and each is reversible on request.
 
-- **The navigation is Dashboard, Settings and Admin, with no Accounts
-  entry.** Reversing it means designing a separate accounts screen that
-  does not simply repeat the dashboard table.
+- **The navigation is Dashboard and Settings, with no Accounts entry.**
+  Reversing it means designing a separate accounts screen that does not
+  simply repeat the dashboard table.
+- **The admin area keeps the same bar rather than getting a look of its
+  own.** A visibly different chrome would make the admin area feel like
+  a second product bolted on. The same restraint, with fewer controls
+  in it, says more plainly that there is simply less here.
 - **Update values is an action in the bar rather than a fourth
   navigation entry.**
 - **Lock has no confirmation step.**

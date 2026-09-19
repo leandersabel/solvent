@@ -2,10 +2,27 @@
 
 ## What it does
 
-A user's own settings: change password, view and understand their main
-currency, see session state, and delete their own account. Nothing here
-is admin-facing (admin-invites.md) and nothing here can recover a lost
-password.
+A vault owner's own settings: change password, view and understand
+their main currency, see session state, configure dimensions and the
+idle lock, and delete their own account. Nothing here is admin-facing
+(admin-invites.md) and nothing here can recover a lost password.
+
+**`/settings` is a vault route** (app-shell.md, The two surfaces).
+Every card on it is about a vault, so an administrator session gets
+Not Found from the page and from `GET /api/sessions`,
+`POST /api/auth/logout-all`, and `DELETE /api/auth/account`.
+
+An administrator still has a credential and still has to be able to
+rotate it. **Change password below is the one section of this feature
+that both kinds reach**, through a shared endpoint, and an
+administrator reaches it from a control inside the admin area rather
+than from a settings page they have no other reason to load
+(admin-invites.md, An administrator's own credential).
+
+**An administrator does not delete their account here either.** They
+do it through `DELETE /api/admin/accounts/<their own username>`
+(admin-invites.md), which is where the last-administrator guard lives.
+One deletion path means one place that guard has to hold.
 
 ## The profile record
 
@@ -60,22 +77,35 @@ Master Key wraps a DEK instead of encrypting records directly.
 5. `POST /api/auth/change-password`
    `{ currentAuthKey, salt, kdf, authKey, wrappedDek, dekNonce }`.
 6. Server verifies `currentAuthKey` against the stored hash, then
-   replaces the **`password` unlock method row only** (its `params`,
-   its `verifier`, and its wrapper) in one transaction. No other row
-   is written, and any other unlock method the vault holds is left
-   alone, because the DEK is the same key afterwards and every wrapper
-   still opens it (architecture.md, One key, N wrappers).
+   replaces the **`password` credential row** (its `params` and its
+   `verifier`) and, for a vault owner, that credential's **one
+   `dek_wrappers` row**, in one transaction. No other row is written,
+   and any other credential the account holds is left alone, because
+   the DEK is the same key afterwards and every wrapper still opens it
+   (architecture.md, One key, N wrappers).
 7. Server invalidates **all other sessions** for the user and keeps the
    current one. The client keeps its in-memory DEK; no re-login needed.
 
-The current password is verified in two independent places — client-side
-by the DEK unwrap, server-side by the Auth Key. Both must hold.
+For a vault owner the current password is verified in two independent
+places — client-side by the DEK unwrap, server-side by the Auth Key.
+Both must hold.
+
+**An administrator changes their password through the same endpoint**,
+sending no `wrappedDek` and no `dekNonce`, and steps 2 and 4 collapse
+to deriving `MK_old` and throwing it away: there is no DEK to unwrap
+and none to re-wrap. Their current password is therefore verified in
+one place, server-side by `currentAuthKey`, because the second check
+was the unwrap and there is nothing to unwrap. The server
+discriminates on the session's principal kind and not on which fields
+arrived, so a vault owner's request without a wrapper is a Bad Request
+and an administrator's with one is too.
 
 **There is no "remove password" action, and there will not be one.**
-The password method is the only wrapper an export file can carry
-(`export-import.md`), so a vault without it has no openable backup and
-no migration path. Changing the password replaces the row. Nothing
-deletes it short of deleting the account.
+For a vault owner, the password credential's wrapper is the only one
+an export file can carry (`export-import.md`), so a vault without it
+has no openable backup and no migration path. For an administrator it
+is the only way in at all. Changing the password replaces the row.
+Nothing deletes it short of deleting the account.
 
 The screen must warn that **existing export files still open with the
 old password**, since they carry their own salt and wrapped DEK. Changing
@@ -176,7 +206,9 @@ renders it as a checkbox rather than a select.
 
 ## Delete my account
 
-Self-service, irreversible, and distinct from an admin deleting a user.
+A vault owner's own account. Self-service, irreversible, and distinct
+from an administrator removing an account (admin-invites.md). Not
+Found for an administrator session.
 
 `DELETE /api/auth/account` `{ authKey, confirmUsername }`.
 
@@ -187,21 +219,25 @@ Self-service, irreversible, and distinct from an admin deleting a user.
   is a Bad Request and deletes nothing. The typed username is a
   deliberate second factor of intent, so it is verified server-side and
   not left as a UI formality.
-- Deletes the user row, every unlock method row, every record, and
-  every session, in one transaction. Nothing is soft-deleted: there is
-  no vault to preserve that anyone could ever open.
-- Refused with Conflict if the user is the last remaining admin
-  (admin-invites.md).
+- Deletes the principal row, every credential row, every wrapper,
+  every record, and every session, in one transaction. Nothing is
+  soft-deleted: there is no vault to preserve that anyone could ever
+  open.
+- **No last-administrator check.** A vault owner is never an
+  administrator, so removing one can never leave the instance
+  unadministered. The guard belongs to the one path that can, which is
+  where it lives (admin-invites.md, Who may remove whom, and the last
+  administrator).
 - The dialog offers **export first** as the primary action and deletion
   as the secondary one.
 
 ## Session and lock
 
-- **Idle lock** after a period without activity: the client discards its
-  keys and all decrypted state and shows an unlock prompt; the server
-  session survives, so unlocking needs only the password (login.md,
-  Rules, which states the rule and its one exception). This screen owns
-  only the period.
+- **Idle lock, a vault owner**, after a period without activity: the
+  client discards its keys and all decrypted state and shows an unlock
+  prompt; the server session survives, so unlocking needs only the
+  password (login.md, Rules, which states the rule and its one
+  exception). This screen owns only the period.
   - **User-configurable, 5–60 minutes, default 15.** Stored as
     `idleLockMinutes` in the encrypted profile record, so it follows the
     user across devices and the server never sees it; absent means 15.
@@ -215,7 +251,18 @@ Self-service, irreversible, and distinct from an admin deleting a user.
     walking up to an unlocked tab, which is a threat this design
     explicitly defends against (architecture.md, Threat model). No
     setting disables it.
-- **Absolute session expiry** at 12 hours from issue.
+- **There is no idle rule for an administrator**, and the absence is
+  a decision rather than an omission. The idle lock is a client-side
+  act: it discards in-memory keys and decrypted state, and an
+  administrator holds neither. It leaves the server session alive, so
+  it was never the control that bounds how long a session can act.
+  Turning it into a server-side session kill for administrators alone
+  would give that kind *more* protection against someone at an
+  unattended machine than a vault owner gets, whose post-lock session
+  can still delete every record in their vault. The bound on an
+  administrator session is the absolute expiry below, the same bound
+  a vault owner's session has.
+- **Absolute session expiry** at 12 hours from issue, for both kinds.
 - **Log out** — `POST /api/auth/logout`. Invalidates the current server
   session; the client discards its in-memory keys first, so a failed
   request still leaves nothing readable in the tab.
@@ -250,9 +297,15 @@ Self-service, irreversible, and distinct from an admin deleting a user.
 
 ## Acceptance criteria
 
-- Changing the password rewrites salt, KDF envelope, Auth Key hash, and
-  wrapped DEK in the `password` unlock method row, writes no other row,
-  and leaves every record's ciphertext byte-identical.
+- Changing the password rewrites salt, KDF envelope, and Auth Key hash
+  in the `password` credential row and the wrapped DEK in that
+  credential's wrapper, writes no other row, and leaves every record's
+  ciphertext byte-identical.
+- An administrator changing their password rewrites their credential
+  row and creates no `dek_wrappers` row. The new password signs them
+  in and the old one does not.
+- A change-password request from an administrator session carrying a
+  wrapper is a Bad Request and writes nothing.
 - After a password change the user can still decrypt records written
   before it, in the same session and after a fresh login.
 - The old password no longer logs in; the new one does.
@@ -264,16 +317,22 @@ Self-service, irreversible, and distinct from an admin deleting a user.
 - A password change on a vault with old KDF parameters results in
   parameters equal to the server's current default.
 - The main currency field is not editable and states why.
-- Account deletion removes the user row, its unlock method rows, all
-  records, and all sessions; a subsequent login with those credentials
-  fails.
+- Account deletion removes the principal row, its credential rows, its
+  wrappers, all records, and all sessions; a subsequent login with
+  those credentials fails.
 - A `DELETE /api/auth/account` with a wrong `authKey`, or a
   `confirmUsername` that does not match the session user, is rejected
   server-side and deletes nothing — asserted by calling the endpoint
   directly, since a client bypassing the dialog is the case that
   matters.
-- The last remaining admin's `DELETE /api/auth/account` returns Conflict
-  and deletes nothing.
+- `DELETE /api/auth/account` from an administrator session returns Not
+  Found and deletes nothing, including when they are not the last
+  administrator.
+- An administrator session receives Not Found from `/settings`,
+  `GET /api/sessions`, `POST /api/auth/logout-all`, and
+  `DELETE /api/auth/account`, and is unaffected by any idle period.
+- An administrator session is still dead 12 hours after issue,
+  asserted the same way a vault owner's is.
 - The deletion dialog presents export as the primary action.
 - `GET /api/sessions` returns no IP address and no user-agent for any
   session — asserted against the endpoint's full response shape, so the
