@@ -1,0 +1,44 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>{% block title %}Solvent{% endblock %}</title>
+  <link rel="stylesheet" href="{{ url_for('static', filename='css/tokens.css') }}">
+  {% block head %}{% endblock %}
+  {# The server's current default KDF envelope, embedded so a client-side
+     flow on this page (e.g. a password change) can derive at current
+     parameters with no extra round-trip (architecture.md, Key management). #}
+  <script id="kdf-envelope" type="application/json">{{ kdf_envelope | tojson }}</script>
+</head>
+<body>
+  <div x-data="shell">
+    <header class="topbar">
+      <span class="wordmark">Solvent</span>
+      <nav aria-label="Primary">
+        <ul>
+          {% for entry in nav_entries(g.get('user')) %}
+          <li><a href="{{ entry.href }}">{{ entry.label }}</a></li>
+          {% endfor %}
+        </ul>
+      </nav>
+      <div class="topbar-actions">
+        <button type="button" class="btn-secondary">
+          Update values
+        </button>
+        <button type="button" class="btn-secondary"
+                @click="$store.shell.lock()">
+          Lock
+        </button>
+      </div>
+    </header>
+    <main class="content">
+      {% block content %}{% endblock %}
+    </main>
+  </div>
+
+  <script src="{{ url_for('static', filename='vendor/alpinejs-csp/' ~ alpine_version ~ '/cdn.min.js') }}"
+          integrity="{{ alpine_sri }}" crossorigin="anonymous" defer></script>
+  <script src="{{ url_for('static', filename='js/shell.js') }}" defer></script>
+</body>
+</html>

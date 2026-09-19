@@ -1,0 +1,20 @@
+Vendored dependency -- self-hosted per spec/architecture.md, Supply chain
+(no third-party CDN sits inside the trust boundary).
+
+Package:  @alpinejs/csp (the CSP-safe build -- no `unsafe-eval` needed for
+          `x-` expressions; the plain Alpine build is never served here).
+Version:  3.15.12
+Source:   https://cdn.jsdelivr.net/npm/@alpinejs/csp@3.15.12/dist/cdn.min.js
+SRI:      sha384-MKLWq9B+VC0W3U8kDIBEsSu8uCnQ1B0UQpRaB+F7uR5ocXFbymMUKuLRntu5LLdu
+
+The hash above is asserted in solvent/templates/shell/base.html's
+<script integrity="..."> attribute and in tests/test_chrome.py, so a
+tampered or re-fetched file fails closed rather than silently serving
+different bytes than the ones reviewed here.
+
+Re-pin by re-downloading the new version's cdn.min.js, recomputing:
+  openssl dgst -sha384 -binary cdn.min.js | openssl base64 -A
+and updating both this file and the template's integrity attribute.
+Dependencies touching the auth/session path (this one, per
+architecture.md, Tech stack -- CI/CD & updates) need manual review on
+any version bump, never auto-merge.

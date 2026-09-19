@@ -1,2 +1,15 @@
 .DS_Store
 node_modules/
+
+# Python
+__pycache__/
+*.pyc
+.pytest_cache/
+.venv/
+venv/
+*.egg-info/
+
+# Local SQLite data and env files -- never committed
+instance/
+*.db
+.env

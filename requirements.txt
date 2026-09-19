@@ -1,0 +1,5 @@
+# Runtime dependencies (spec/architecture.md, Tech stack).
+# itsdangerous ships as a Flask dependency already -- reused for session
+# cookie signing rather than adding a new library.
+flask==3.1.3
+pydantic==2.13.4

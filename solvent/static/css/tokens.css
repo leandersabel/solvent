@@ -1,0 +1,118 @@
+/* Design tokens and app-shell chrome (spec/ui/design-system.md).
+   Every screen that extends templates/shell/base.html shares this file;
+   a screen's own stylesheet adds only what its content region needs. */
+
+:root {
+  /* Ground and surfaces */
+  --ground: #faf9f7;
+  --surface: #ffffff;
+  --surface-tinted: #eff7f9;
+
+  /* Petrol ramp (chrome) */
+  --petrol-50: #eff7f9;
+  --petrol-100: #e0eef2;
+  --petrol-200: #c4dde3;
+  --petrol-300: #9dc2cc;
+  --petrol-400: #71a1ae;
+  --petrol-500: #477e8c;
+  --petrol-600: #2c6471;
+  --petrol-700: #184d59;
+  --petrol-800: #0c3943;
+  --petrol-900: #06272f;
+
+  /* Accents */
+  --brass-500: #a08147;
+  --brass-600: #876b36;
+  --brass-700: #6c5426;
+  --plum-600: #7f415a;
+  --plum-700: #693449;
+
+  /* Ink and line */
+  --ink-primary: #111d20;
+  --ink-secondary: #4d575a;
+  --ink-muted: #798285;
+  --rule: #c4cccf;
+  --hairline: #d8dfe1;
+
+  /* Status */
+  --status-good: #1d7635;
+  --status-warning: #c2603d;
+  --status-critical: #ac312c;
+
+  /* Shape */
+  --radius-input: 6px;
+  --radius-card: 10px;
+  --content-max-width: 1200px;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+body {
+  margin: 0;
+  background: var(--ground);
+  color: var(--ink-primary);
+  font-family: system-ui, -apple-system, "Segoe UI", sans-serif;
+  font-size: 15px;
+}
+
+.topbar {
+  display: flex;
+  align-items: center;
+  gap: 24px;
+  background: var(--petrol-800);
+  color: #ffffff;
+  padding: 12px 24px;
+}
+
+.topbar .wordmark {
+  font-weight: 600;
+}
+
+.topbar nav ul {
+  display: flex;
+  gap: 16px;
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+
+.topbar nav a {
+  color: #ffffff;
+  text-decoration: none;
+}
+
+.topbar nav a:focus-visible,
+.btn-secondary:focus-visible {
+  outline: 2px solid var(--petrol-600);
+  outline-offset: 2px;
+}
+
+.topbar-actions {
+  margin-left: auto;
+  display: flex;
+  gap: 8px;
+}
+
+.btn-secondary {
+  background: transparent;
+  border: 1px solid var(--hairline);
+  color: var(--petrol-700);
+  border-radius: var(--radius-input);
+  padding: 6px 12px;
+  font: inherit;
+  cursor: pointer;
+}
+
+.content {
+  max-width: var(--content-max-width);
+  margin: 0 auto;
+  padding: 24px;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  * {
+    transition: none !important;
+  }
+}
