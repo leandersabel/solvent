@@ -217,10 +217,10 @@ single total.
 
 ## What it deliberately does not do
 
-- **The main currency cannot be changed.** Every value ever recorded
-  carries the rate that converted it at the time, so relabeling the
-  currency would leave years of history denominated in the old one and
-  the chart would silently add two currencies together. Making it
+- **The main currency cannot be changed.** Every rate ever recorded
+  converts into it, so relabeling the currency would leave years of
+  history denominated in the old one and the chart would silently add
+  two currencies together. Making it
   changeable means recording which currency each historical rate points
   at and deciding what to do about the past, which is real work and not
   a toggle. Restoring a vault from a file is the one exception, and it

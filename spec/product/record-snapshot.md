@@ -2,10 +2,11 @@
 
 ## What it does
 
-Records what one holding was worth on one date. A date, a number in the
-holding's own unit, and the price used to turn it into your main
-currency. Do that a few times a year per holding and the result is your
-history, which is what the chart draws and what the total is made of.
+Records what one holding was worth on one date. A date and a number in
+the holding's own unit. Do that a few times a year per holding and the
+result is your history, which is what the chart draws and what the
+total is made of. What one unit of it is worth in your main currency is
+recorded too, on its own, and mostly without you doing anything.
 
 This is the recurring act in Solvent. Everything else is setup. It is
 for the person who sits down at the end of a month or a quarter, opens
@@ -18,22 +19,66 @@ is never part of any price lookup the app makes. The app can ask what a
 troy ounce of gold was worth on 31 July without anyone learning that you
 hold twelve of them.
 
-## The price, and why it is kept
+## Two things, recorded separately
 
-A holding measured in dollars has to become francs to join your total.
-The app proposes the price where a source exists, you can always change
-it, and the price you actually used is kept with that entry forever.
+How much you hold and what a unit of it is worth are different
+questions, and Solvent keeps them apart.
 
-That last part is the whole point. The price is never recalculated
-later, so today's currency move does not rewrite what you were worth in
-2019. A chart that changes its own past is not a record of anything.
+A holding's own list of values holds only the quantities you actually
+recorded. Twelve troy ounces in March, twelve and a half in September,
+and nothing on the dates in between. The gold price has its own run of
+entries alongside that list, and so does the dollar rate. One run per
+unit, shared by every holding measured in it.
 
-The app also says where each price came from, and still says it a year
-later. Each entry says whether the price was the one the
-app proposed, one you changed (and shows what was proposed), or one you
-typed because nothing was available. That is a question you will only
-ever ask about an old figure, which is why it is stored rather than
-remembered by the tab that entered it.
+The two are joined at the moment a figure is shown. What a holding is
+worth on a date is the quantity on that date at the rate on that date,
+and either side can have moved since you last looked.
+
+Nothing is ever recalculated behind you. A rate entry is written for
+one date and never rewritten, so what your dollars were worth in 2019
+is what 2019's rate says, forever, whatever the dollar does tomorrow. A
+chart that changes its own past is not a record of anything.
+
+Each rate entry says where it came from, and still says it a year
+later: the figure the app proposed, one you changed, with what was
+proposed still shown, or one you typed because nothing was available.
+That is a question you will only ever ask about an old figure, which is
+why it is stored rather than remembered by the tab that entered it.
+
+## Recording anything refreshes every rate
+
+Record your franc account and nothing else, and the dollar rate and the
+gold price get a fresh entry too, for the same date, without you asking
+for one. That is the point of it. Your total is then never built out of
+a rate nobody has looked at since March, however long ago you last
+touched the holdings that need one.
+
+You see every rate that is about to be written and can change any of
+them. Leaving one alone accepts it.
+
+**That is the opposite of how a quantity behaves, and it is
+deliberate.** A quantity is written only if you act. A rate is written
+unless you act. The two rules look inconsistent and are the same test
+applied twice: a quantity is something you have to go and look up on a
+statement, so the app will never write one you did not gather, and
+nobody gathers an exchange rate, so refusing to write one buys you
+nothing and costs you a stale total.
+
+The same test decides which rates refresh. A rate somebody publishes,
+the dollar or gold, costs nothing to get right and is written by
+default. A price only you can supply, what your flat is worth per
+square meter, is something you have to sit down and think about, so it
+follows the quantity rule instead. It is written when you set it and
+not otherwise, and its age stays honest.
+
+Recording nothing writes nothing. Open the sweep, act on no row, close
+it, and there is no new entry anywhere, rates included. The refresh
+rides along with a recording. It is not something the app does on a
+timer.
+
+Rates are written for the date being recorded, not for today. Adding a
+March figure from a statement you have just found writes March's rates,
+which is what makes a backfilled figure worth anything at all.
 
 ## The screens
 
@@ -74,24 +119,39 @@ Only Confirm, or typing a figure and saving that row, writes an entry.
 Scroll past a row with your last figure sitting in it and that holding
 has no entry for that date.
 
-What a confirmation costs you depends only on whether a price is
-involved:
+No holding row ever asks you about a price. Every row answers in its
+own unit, and confirming one is one click whatever it is measured in.
 
-- **Already in your main currency.** One click, no price question at
-  all, because there is no conversion to make.
-- **Something with a live price source**, like a foreign currency or
-  gold. One click, and the app fetches the price for the new date. It
-  never reuses the old price, which would put a conversion into your
-  history that no source stands behind.
-- **Something with no price source**, like your flat or the wine. One
-  click, and your last price carries forward, shown to you before it is
-  recorded. You are the only source for that number, so your last
-  estimate is the best figure there is.
-- **A live source that does not answer** (the provider is down, or has
-  nothing for that date). The one click steps aside and the row asks for
-  the price, with the quantity already filled in. You are only asked for
-  the part nothing can supply, and the click comes back as soon as
-  prices do.
+#### The rates, at the foot of the sweep
+
+Below the rows, one line per unit anything in your vault is measured
+in, filled in for the sweep's date. It is not a second sheet of work.
+In the ordinary case you read it, it is right, and you finish.
+
+- **A unit somebody publishes**, dollars or gold. The line arrives
+  filled in and says which day the figure is actually for, which over a
+  weekend is an earlier day (`rate-lookup.md`). It is written whether
+  or not you touched it.
+- **A unit only you can price**, your flat's square meters. The line
+  shows your last figure and the day you set it, and writes nothing
+  unless you change it. Your estimate of the flat does not get newer
+  because you recorded a bank balance.
+- **A published unit whose source did not answer.** The line says so
+  and stays empty. Nothing is written for that unit, your total carries
+  on at the most recent rate it has, and the line comes back filled in
+  as soon as the source does. You are never asked to type a dollar rate
+  in order to record a franc account.
+
+The one time a rate is asked for rather than offered is when the unit
+has no rate at all and you are recording a quantity in it. Twelve troy
+ounces with no gold price is not a figure, so the app asks once, and
+after that the unit refreshes or carries forward like any other.
+
+Your main currency has no line. There is nothing to convert.
+
+The rates go in with the first row you record, so stopping halfway
+still leaves them fresh. Change a line after that and the day's rate
+changes with it.
 
 Rows record one at a time as you finish them. You can stop anywhere and
 keep every row you acted on, and a row that fails to record says so on
@@ -103,30 +163,41 @@ computer's answer, and a phone may walk you through one holding at a
 time instead. Same sweep, not a cut-down one, and it comes after the
 first version (`app-shell.md`, which owns the rule). Nothing here
 stands in its way: every question the sweep asks belongs to a single
-holding, and rows already record one at a time.
+holding or to a single unit, and both record one at a time.
 
 ### One holding, one date
 
 A small form for everything the sweep is not for: an odd date, a March
 figure you are adding now that the statement is in front of you,
-history you are backfilling from old statements. Holding, date, value, price, an optional note. The converted
-figure updates as you type, because that is the number you are actually
-reasoning about.
+history you are backfilling from old statements. Holding, date, value,
+an optional note. The converted figure updates as you type, because
+that is the number you are actually reasoning about.
+
+This records something, so it writes rates like the sweep does, for the
+date on the form. They sit on one folded line stating what will be
+written, which opens if you want to change any of them. A figure dated
+2019 takes 2019's rates, so the entry is worth something the moment it
+lands.
 
 ### Finding and fixing a wrong figure
 
 The holding's own page lists every value ever recorded for it, newest
-first, with the date, the figure, the price used, the converted amount,
-and where that price came from. This is where a typo from eight months
-ago gets found and corrected.
+first, with the date, the figure, the rate that applied on that date,
+the converted amount, and where that rate came from. This is where a
+typo from eight months ago gets found and corrected.
 
-Correcting the number or the note leaves the price alone. Correcting the
-price records that you changed it, and keeps what the app had proposed.
-Moving an entry to a different date makes the app offer the price for
-the new date beside the field, as one click, without applying it. The
-usual reason for a date correction is a mistyped day on a figure that
-was always about the day you meant, so the price you already vouched for
-stays unless you say otherwise.
+Correcting the number or the note touches no rate. Moving an entry to a
+different date moves it onto that date's rate, which is the right
+answer: the usual reason for a date correction is a mistyped day on a
+figure that was always about the day you meant.
+
+A wrong rate is corrected from the unit's own run of entries, reached
+from any holding measured in it, which lists every rate ever written
+for that unit with its date and where it came from. It is a separate
+act from correcting a figure because it is a shared one, and the app
+says so before it goes through: every holding measured in that unit
+moves on that date, and so does every total that used it. See the
+question raised with this batch.
 
 Deleting a value asks once, naming what will happen: your net worth
 around that date will change.
@@ -137,19 +208,22 @@ around that date will change.
   immediately, with no reloading and no waiting.
 - The converted figure is visible while you type, before anything is
   saved.
-- A price that moves tomorrow does not change any figure you already
-  recorded, or any point in the chart before today.
+- A rate published tomorrow does not change any figure you already
+  recorded, or any point in the chart before today. A rate entry is
+  written for one date and never rewritten.
 - A value entered on one machine reads back identically on another,
   down to the last decimal. No figure ever drifts by a fraction of a
   cent through being stored and read back.
 - Nothing the app sends out to look up a price contains the amount you
   are entering, in any form.
 - The price provider being down never stops you recording a value. The
-  form says so quietly and lets you type the price.
+  rate line says so quietly, nothing is written for that unit, and
+  every row still records.
 - A holding with a unit you made up never triggers a lookup at all, and
-  the form says why the price field is yours to fill rather than showing
-  an empty field with no explanation.
-- A holding measured in your main currency never shows a price field.
+  the screen says why that rate is yours to set rather than showing an
+  empty line with no explanation.
+- A holding measured in your main currency never shows a rate anywhere
+  in the product.
 - Recording a second value for a holding on a date it already has asks
   whether to replace the one that is there, naming the figure already
   recorded, and ends with one value on that date either way.
@@ -161,8 +235,9 @@ around that date will change.
   that date out until you answer, rather than picking one and putting a
   number you never chose into your history.
 - A row you did not act on produces no entry. Leave eleven of fifteen
-  rows alone, finish the sweep, and those eleven holdings have exactly
-  the history they had before you opened it.
+  rows alone, finish the sweep, and those eleven holdings hold exactly
+  the values they held before you opened it, even though the rates they
+  are valued at have moved.
 - A figure the screen pre-filled into a row and you did not confirm
   appears nowhere afterwards. The holding's own list of values has
   nothing new on that date.
@@ -171,10 +246,19 @@ around that date will change.
   as unfinished at any point.
 - Nothing on the sweep counts, scores, flags or later mentions how many
   holdings you left alone.
-- Confirming a holding with a live price source stores the new date's
-  price, never the old one.
-- Confirming a holding with no price source carries your last price
-  forward and shows it to you before recording it.
+- Recording one franc account writes a rate entry for every published
+  unit anything in your vault is measured in, dated the same day,
+  whether or not you looked at any of them.
+- A rate line you never touched is written and a holding row you never
+  touched is not, on the same sweep.
+- Closing the sweep without acting on a single row writes nothing at
+  all, rates included.
+- Backfilling a figure dated in March writes March's rates, not
+  today's.
+- A unit only you can price keeps the figure and the date you last set
+  it, however many times you record something else.
+- One rate per unit per day, the same rule as one value per holding per
+  day.
 - Confirming is unavailable for a holding that has never been valued.
   There is nothing to confirm.
 - A value of zero is accepted and means a closed out position, which is
@@ -184,8 +268,10 @@ around that date will change.
 - A date in the future is refused.
 - A date before you created the holding is accepted, because entering
   ten years of old statements is a normal thing to do.
-- An entry that was recorded a year ago still says, today, whether its
-  price was proposed, changed by you, or typed by you.
+- The rate that applied to an entry recorded a year ago still says,
+  today, whether it was proposed, changed by you, or typed by you.
+- Correcting a rate for a date is announced as moving every holding
+  measured in that unit on that date, before it goes through.
 - Entering the same value in two browser tabs does not silently lose one
   of them.
 
@@ -194,8 +280,15 @@ around that date will change.
 - **No transactions.** One figure per holding per date, not every
   deposit and withdrawal. Solvent records what things were worth, not
   what happened. Spending and budgeting are somebody else's product.
-- **No more than one value per holding per day.** A date holds what it
-  was worth that day. Intraday movement is not what this measures.
+- **No more than one value per holding per day**, and no more than one
+  rate per unit per day. A date holds what things were worth that day.
+  Intraday movement is not what this measures.
+- **No rate attached to a value.** A figure you recorded is a quantity
+  and nothing else. There is no second rate sitting on the entry that
+  could disagree with the unit's own run of rates.
+- **No rate refresh on a timer.** Rates move when you record something.
+  Nothing runs in the background, nothing updates while you are away,
+  and a screen you are only reading never contacts a source.
 - **No future dates.** An entry describes what was.
 - **No button that records every holding at once.** There is nothing
   for one to do. A holding you did not go and look up needs no action
@@ -219,11 +312,19 @@ them.
 - **One value per holding per date**, with entering a second one
   offering to replace the first.
 - **Future dates are refused** outright rather than warned about.
-- **Confirming never reuses an old price for something with a live
-  source.** The price is refetched, and if none comes back the one click
-  becomes a short question instead. The alternative, carrying the old
-  price forward, is quieter and sometimes wrong in a way nothing on
-  screen would reveal.
+- **A published rate that could not be fetched writes nothing**, rather
+  than carrying the last one forward under a new date. Carrying it
+  forward would put a figure nobody published into your history under a
+  date it was not published for, quietly and in a way nothing on screen
+  would reveal.
+- **A rate only you can supply follows the quantity rule.** Your flat's
+  price per square meter is written when you set it and not otherwise.
+  The rule you gave was about exchange rates, and this is where the
+  line under it falls: a price you have to think about is gathered, and
+  the app does not write things you did not gather.
+- **A rate is corrected from its unit's own run of entries**, not from
+  the holding's page, because the correction is shared by every holding
+  in that unit. See the question raised with this batch.
 - **The closing value offered when archiving a holding** follows the
   same one value per date rule as everything else, so archiving on a
   date that already has a value offers to replace it.

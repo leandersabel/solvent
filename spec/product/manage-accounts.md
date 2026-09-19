@@ -26,7 +26,10 @@ decorated, and nothing nags.
   gold, square meters, bottles. One choice, and it is the same choice
   the app uses to look up a price. A holding can therefore never be
   measured in grams and priced per ounce, which is the kind of mistake
-  that is wrong by a factor of thirty and shows nowhere on screen.
+  that is wrong by a factor of thirty and shows nowhere on screen. It
+  also picks which run of rates the holding is valued by, shared with
+  every other holding in that unit and kept separately from the
+  figures you record (`record-snapshot.md`).
 - **Where it is filed.** Zero or more axes, each one a question you
   invented about your money: Liquidity, with values Cash, Investments,
   Retirement. A holding sits in exactly one value of each axis, or in
@@ -85,7 +88,9 @@ down into the closing figure like any other recorded value. Skip it and
 the chart still drops on that date, with nothing recorded to explain
 why, so the app says that in the dialog rather than letting you find out
 in a chart six months later. Either way the date is annotated as an
-archive, so the drop is never mistaken for a bad entry.
+archive, so the drop is never mistaken for a bad entry. Accepting the
+closing value records something, so it refreshes the rates like any
+other recording does (`record-snapshot.md`).
 
 **Delete permanently** is the other answer, and it removes the holding
 and every value ever recorded against it. You type the holding's name to
@@ -115,6 +120,9 @@ and the current total.
   axis, which reads as a normal state and not as an error.
 - Archiving a holding leaves every net worth figure before the archive
   date exactly as it was, and removes the holding from today's total.
+- Archiving the last holding measured in a unit stops that unit being
+  refreshed when you record. Its rates so far stay and unarchiving
+  resumes them.
 - Archiving with the closing value accepted makes the chart run into
   that figure. Archiving with it skipped still works, and the chart
   drops on that date with an archive annotation.
@@ -126,7 +134,8 @@ and the current total.
   or deleted, and the app gives no hint that it exists.
 - Once a holding has recorded values, the app refuses to change what it
   is measured in and says why, rather than quietly reinterpreting
-  figures you entered in the old unit.
+  figures you entered in the old unit and revaluing its whole history
+  against a different run of rates.
 - Editing a holding in two browser tabs at once does not silently lose
   one of the edits. The second one is told and asked to redo it.
 - A name, note or axis label containing something that looks like code

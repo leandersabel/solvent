@@ -41,13 +41,44 @@ Beside it, in smaller type, your gross assets and your gross
 liabilities. Net worth is a signed sum, and hiding a mortgage inside one
 collapsed figure hides the most important thing about it.
 
-Each holding's figure is converted at the price recorded with its own
-most recent entry, so a flat last valued in March joins the total at
-March's exchange rate. That is visible: every figure shows the date it
-is as of.
+Each holding joins the total at its last recorded quantity, valued at
+the most recent rate for its unit. Your March dollar balance, at this
+month's rate. Two dates are in play and both are on the screen: each
+holding states the date of its own last figure, and the screen states
+one date for the rates, which is the day you last recorded anything.
+Recording anything refreshes every rate, so there is one rate date for
+the whole vault rather than one per holding (`record-snapshot.md`,
+which owns that rule).
 
 An "Update values" action sits here and in the top bar of every screen,
 because the total is where you arrive already intending to update it.
+
+### Which rates the screen is using
+
+A two-position control beside the total:
+
+- **Latest rates**, with the date they are from. Every holding's last
+  figure at the newest rate there is. This is what you are worth, and
+  it is the position the screen opens in.
+- **Rates as of each figure**, which values each holding at the rate
+  that applied on the day you last recorded it. Your March dollars at
+  March's rate.
+
+Both sides are named rather than one being an unlabeled off state,
+because both are real questions and the default deserves a name as
+much as the alternative. It says latest rather than today's because
+nothing here fetches anything: the newest rate you have is the one
+your last recording wrote.
+
+The second position is for comparing, not a second answer. Held
+against the first it tells you how much of the move since you last
+looked was your money and how much was the rates, which is the one
+thing the first position cannot show on its own. It changes the total,
+the list of holdings and the breakdown, and leaves the chart alone,
+because every point in the chart is already drawn at the rates of its
+own date and there is nothing there for the control to do. In the
+second position the total is not the chart's right hand edge. That is
+the comparison working, not a disagreement.
 
 ### The chart
 
@@ -93,15 +124,26 @@ Each holding is recorded whenever you get around to it, which for some is
 monthly and for others every few years, and one update covers whatever
 you gathered that evening. So the chart has a handful of real points per
 holding and a great many days to draw. Between two of a holding's
-entries the app interpolates, and after its last entry it carries the
-figure forward. That is how the line is meant to work: record a holding
-in September after a figure from March and the line runs straight from
-the March figure to the September one.
+entries the app interpolates its quantity, and after the last one it
+carries the quantity forward. The rate does the same along its own run
+of entries. That is how the line is meant to work: record a holding in
+September after a figure from March and the line runs straight from the
+March figure to the September one.
+
+So a band moves on days you recorded nothing about the holding under
+it. Your dollar account holds the same dollars it held in March and its
+band still rises and falls, because the dollar did. That is not a guess
+at what you might have done, it is what those dollars were worth. And
+because recording anything writes every rate (`record-snapshot.md`), a
+sweep in which you touched only your franc account still puts a real
+rate point in the dollar and gold runs on that date, so the foreign
+bands bend there too.
 
 Neither the interpolation nor the carry forward is written down. They
-are the drawing. Your history holds the figures you recorded and
-nothing else (`record-snapshot.md`), so a long run between two entries
-is the normal shape of a correct chart rather than a hole in it.
+are the drawing. Your history holds the quantities you recorded and the
+rates written alongside them and nothing else (`record-snapshot.md`),
+so a long run between two entries is the normal shape of a correct
+chart rather than a hole in it.
 
 A "Show what's estimated" checkbox marks the dates where you actually
 recorded something. It is off by default, which is a decision taken on
@@ -126,7 +168,11 @@ Below the chart, every active holding: its name, what it is filed under,
 its latest figure in its own unit, the same figure in your main
 currency, and the date that figure is as of.
 
-The as of date sorts, which is how you find what you have not touched in
+The as of date is the date of the quantity, never of the rate. A
+holding has two ages now and only one of them is yours: the rate's age
+is one date for the whole screen rather than a column, because you
+cannot act on it and because it is the same for everything. The
+quantity's age sorts, which is how you find what you have not touched in
 a while without the app deciding for you what counts as too long.
 Holdings you have never valued are listed separately as "not yet
 valued", never as zero, because zero is a real figure that means
@@ -151,12 +197,15 @@ the section needs no small print.
 
 ## What must be true
 
-- The total equals the sum of every active holding's latest figure
-  converted at its own recorded price. Exactly, to the cent, checkable
-  by hand.
-- Every figure on screen carries the date it is as of.
-- A currency moving today changes nothing about any past point in the
-  chart, and nothing about any figure already recorded.
+- The total equals the sum of every active holding's last recorded
+  quantity at the most recent rate for its unit. Exactly, to the cent,
+  checkable by hand.
+- Every figure on screen carries the date of the quantity behind it,
+  and the screen carries one date for the rates it used.
+- A rate written today adds a point at today and moves nothing before
+  it. No past point in the chart and no quantity you recorded changes.
+- Nothing on this screen contacts a price source. What it shows are the
+  rates already in your vault, written by your last recording.
 - For every date in the chart, the visible bands add up to the net worth
   line at that date.
 - The breakdown bars add up to the total, with no disclaimer attached.
@@ -170,9 +219,15 @@ the section needs no small print.
 - A holding recorded in March and then not again until September draws
   a straight run between those two figures, and nothing on the screen
   treats the months between as an omission.
-- An update that covered only some of your holdings moves only those
-  holdings' bands. Every other band carries on from its own last
-  recorded figure, with nothing recorded for it and nothing flagged.
+- An update that covered only some of your holdings records a quantity
+  only for those. Every other holding keeps the quantity it had, with
+  nothing recorded for it and nothing flagged, and its band still moves
+  if its rate did.
+- Recording one franc account moves every band measured in a foreign
+  unit, on that date and after it, because every rate was refreshed.
+- Switching to rates as of each figure changes the total, the list and
+  the breakdown, and leaves the chart pixel for pixel the same.
+- On latest rates, the chart's right hand edge is the total.
 - Two holdings whose histories start years apart do not bend each
   other's shape. The later one's first entry lifts only its own band.
 - A holding you have never valued is listed as not yet valued and is not
@@ -208,6 +263,13 @@ the section needs no small print.
   point it would fail for the one that genuinely went quiet. Instead
   every figure states its age in plain words next to the action that
   records a new one. See the question raised with this batch.
+
+  This is about the age of a quantity, the only age that is yours. A
+  rate's age is the app's to keep down and it is stated once for the
+  whole screen, so there is nothing to badge there either.
+- **No rate lookup from this screen.** Opening the overview fetches
+  nothing. Rates move when you record something (`record-snapshot.md`),
+  which is why the control reads latest rates and not today's rates.
 - **No forecast, no projection, no target.** The chart ends today.
 - **No benchmark and no performance figure.** Solvent does not tell you
   how you are doing against an index, which would need position level
@@ -231,6 +293,9 @@ them.
   axis.
 - **Estimated stretches are not marked by default.** The checkbox is off
   when the screen loads. Raised as a question with this batch.
+- **The screen opens on latest rates.** That is the answer to what am I
+  worth. The other position answers a question you go looking for, and
+  opening on it would put a comparison where the headline belongs.
 - **Archived holdings leave the current total** and stay in history.
 - **A holding with no recorded values is left out of the total** rather
   than counted as zero.

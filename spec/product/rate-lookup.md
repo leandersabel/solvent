@@ -12,6 +12,11 @@ in is a proposal, never a verdict.** You can always change it, and what
 gets kept is the number you saved, not the number the app offered
 (`record-snapshot.md`).
 
+It looks up every unit you hold, not only the one you are recording,
+because recording anything refreshes every rate (`record-snapshot.md`,
+which owns that rule). Updating one franc account asks the sources
+about dollars and gold.
+
 This is for the person with a foreign currency account or physical gold.
 If everything you own is already in your main currency, you never meet
 this part of the app.
@@ -21,13 +26,14 @@ this part of the app.
 There is no screen of its own. Prices turn up inside three places, and
 this file says what you can expect of a price wherever you meet one.
 
-- **Recording a value** and **the sweep**, where the price field comes
-  filled in and stays editable, labelled with both units, with the
-  converted figure updating under it as you type. What each of the four
-  situations does, and how a price you changed is marked afterwards, is
-  `record-snapshot.md`.
-- **A holding's history**, where each entry says which price was used
-  and where it came from (`record-snapshot.md`).
+- **Recording a value** and **the sweep**, where the rates sit together
+  in one place rather than on the row of the holding they belong to,
+  each filled in, each editable, each labeled with both units. What
+  each situation does, and how a rate you changed is marked afterwards,
+  is `record-snapshot.md`.
+- **A holding's history**, where each entry shows the rate that applied
+  on its date and where that rate came from, and the unit's own run of
+  rates is one click away (`record-snapshot.md`).
 - **Setting up a holding**, where you choose what it is measured in from
   a list. That one choice also decides whether prices can be looked up
   for it. Things with no price source are in the list too, marked as
@@ -38,8 +44,13 @@ this file says what you can expect of a price wherever you meet one.
 
 - **Nothing about a lookup can stop you recording a value.** Turn the
   price service off entirely and every figure in the product can still
-  be entered by hand, with a sentence on screen explaining why the field
-  is yours to fill.
+  be entered by hand, with a sentence on screen explaining why the
+  field is yours to fill. A unit whose source did not answer simply
+  gets no entry that day.
+- **A lookup no longer says which holding you touched.** Every unit in
+  your vault is asked about whenever you record anything, so the
+  pattern of lookups is the same whether you updated one holding or
+  fifteen, and the same whichever one it was.
 - **The amount you hold never goes out with a lookup, in any form.**
   What leaves your NAS is which currency or metal was asked about, for
   which day, and which currency you keep your total in. Never how much
@@ -54,9 +65,9 @@ this file says what you can expect of a price wherever you meet one.
 - **A thing with no price source reads as a thing with no price source,
   and an outage reads as an outage.** They are never worded the same
   way. Silver having no source yet is normal, and must not look broken.
-- **Asking twice costs once.** Several holdings in the same currency, or
-  two people in the household updating on the same day, produce one
-  lookup, not one per holding.
+- **Asking twice costs once.** Several holdings in the same currency,
+  the same unit reached twice in one sweep, or two people in the
+  household updating on the same day, produce one lookup.
 - **The app keeps no record of who asked about what.**
 
 ## What it deliberately does not do
@@ -68,7 +79,7 @@ this file says what you can expect of a price wherever you meet one.
   decision recorded in `manage-accounts.md`, not a deferral.
 - **No silver, platinum, or palladium prices yet.** All three are in the
   unit list by name so you record them against the name the app will
-  keep using, and you type the price. Adding a source later changes
+  keep using, and you set the rate. Adding a source later changes
   nothing about what you already recorded. See the question raised with
   this batch.
 - **You cannot add a currency or a metal to the list yourself.** The
@@ -76,12 +87,13 @@ this file says what you can expect of a price wherever you meet one.
   operator's job. What you can always do instead is type your own unit
   and your own prices.
 - **No estimating between published days.** A day with nothing published
-  gets the last published figure, labelled with its own date. It is
+  gets the last published figure, labeled with its own date. It is
   never averaged, smoothed, or interpolated into a number nobody
   published.
-- **No price tracking.** No alerts, no watchlist, no price history
-  beyond the prices sitting in the values you recorded. The app asks for
-  a price only when you are recording something.
+- **No price tracking.** Each unit has a run of rate entries, but it is
+  a record and not a watchlist. No alerts, nothing fetched unless you
+  are recording something, and no screen you are only reading ever
+  contacts a source.
 
 ## Where prices come from, and what that costs you
 
@@ -92,11 +104,12 @@ no contract.
 
 The costs of that are accepted, not overlooked. If a source stops or
 changes, there is nobody to call and prices get typed by hand until the
-app is changed. Silver, platinum and palladium have no source at all and
-are typed every time. A paid provider was weighed and rejected: the good
-ones require every copy of their data to be deleted when you stop paying,
-and Solvent cannot do that, because each price is stored inside your
-encrypted entries, which the server can neither read nor delete.
+app is changed. Silver, platinum and palladium have no source at all,
+so you set those rates yourself and they carry forward until you change
+them. A paid provider was weighed and rejected: the good ones require
+every copy of their data to be deleted when you stop paying, and
+Solvent cannot do that, because every rate is stored inside your
+encrypted vault, which the server can neither read nor delete.
 
 What makes this survivable is that a price is only ever a proposal. You
 can overwrite any of them, and no entry is ever blocked by a lookup that
