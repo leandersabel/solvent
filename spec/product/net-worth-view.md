@@ -224,6 +224,10 @@ the section needs no small print.
   which is the correction working and not the chart drifting
   (`record-snapshot.md`). Correcting a rate moves every band measured
   in that unit on that date.
+- A date whose figures were all cleared still bends every band
+  measured in a foreign unit, because the prices recorded that day
+  stand. Only a deleted recording leaves the chart with nothing at
+  that date (`record-snapshot.md`).
 - Nothing on this screen contacts a price source. What it shows are the
   rates already in your vault, written by your last recording.
 - For every date in the chart, the visible bands add up to the net worth

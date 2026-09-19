@@ -326,20 +326,38 @@ it leaves April alone. Nothing recalculates itself afterwards either: a
 figure you corrected today is not corrected again tomorrow by anything
 the app does.
 
-#### Emptying one out
+#### Clearing one out, and deleting one
 
-Clear every figure from a recording and there is nothing left for that
-date to be. The recording goes, its rates go with it, every holding's
-list loses that date, and the chart runs across it as though the
-sitting had never happened. That is the exact reverse of the rule that
-opening the sweep and acting on no row writes nothing. A date holds
-what somebody recorded, and with nothing recorded there is no date.
+Two different acts, and what separates them is the prices.
 
-Undoing a sitting you should never have made is one intention rather
-than eight, so a reopened recording offers to remove the whole thing in
-one action. It asks once and names what a person needs in order to
-answer: the holdings that lose a figure, and that every holding in a
-foreign unit moves on that date, because its rate goes too.
+**Clear every figure and the recording stands.** The prices captured
+that evening are still captured, so the date is still a date. What you
+have is a recording with no figures and its prices intact, which is an
+ordinary state and not the wreckage of one. The date still shows in
+the chart, because those prices are real and every holding measured in
+those units is valued by them, so the foreign bands still bend there.
+What has gone is the quantities: the holdings you cleared have no
+point on that date any more, and their runs straighten across it.
+
+Clearing a figure is an ordinary edit and costs what an edit costs. No
+typed confirmation and no warning ladder. It says what it does, the
+same as changing a figure says what changing it does.
+
+An empty recording is always one you emptied. Opening a date that
+holds nothing and acting on nothing still writes nothing, so the app
+never makes one. And since no holding has a figure on that date, an
+empty recording appears in no holding's list of values. You reach it
+by its date, from the chart or by moving the sweep's date onto it.
+
+**Delete removes the recording outright, prices and all.** It is its
+own button on the reopened recording and a deliberate separate act,
+never a consequence of emptying the fields. It asks once, and the
+confirmation says the two things that make it destructive: the prices
+go with it, so every holding measured in those units moves on that
+date and not only the holdings that had a figure, and there is no way
+back. Deleted, the date is gone from every holding's list and from
+every unit's prices, and the chart runs across it as though the
+sitting had never happened.
 
 #### Moving an entry to another date
 
@@ -405,9 +423,9 @@ worth around that date will change.
 - A rate line you never touched is written and a holding row you never
   touched is not, on the same sweep.
 - Opening the sweep, acting on nothing and closing it writes nothing
-  at all, rates included. That holds whether the date was empty or
-  already held a recording, and a rate the screen proposed for an
-  empty line is not written either.
+  at all, rates included. That holds whether the date held nothing at
+  all or already held a recording, and a rate the screen proposed for
+  an empty line is not written either.
 - Backfilling a figure dated in March writes March's rates, not
   today's.
 - A unit only you can price keeps the figure and the date you last set
@@ -455,10 +473,20 @@ worth around that date will change.
 - Adding a figure to a date that already carries rates uses those
   rates. Nothing is looked up and no holding measured in those units
   moves.
-- Clearing the last figure out of a recording removes that date
-  entirely, rates included, and the chart runs straight across it.
-- Removing a whole recording asks once and names what moves before it
-  goes.
+- Clearing every figure out of a recording leaves the recording and
+  its prices. The date still bends every band measured in those
+  units, and only the cleared holdings straighten across it.
+- A recording with no figures reads as an ordinary empty recording,
+  never as an error or as something to tidy up.
+- Clearing a figure asks no more of you than changing one does. No
+  typed confirmation, no second warning.
+- A recording is deleted by its own button and never by emptying it.
+- The delete confirmation says that the prices go too, that every
+  holding measured in those units moves on that date, and that it
+  cannot be undone.
+- A deleted recording leaves no trace. Its date is gone from every
+  holding's list and from every unit's prices, and the chart runs
+  across it.
 - Two sessions starting a recording for the same date end with one
   recording. The second is refused, told the date already has one, and
   given it in a single click.
@@ -530,9 +558,6 @@ them.
   about it, because it may be one you chose. A unit that went in empty
   is looked up again, because the outage that emptied it is the reason
   you came back.
-- **Emptying a recording takes its rates with it.** The alternative,
-  leaving rates on a date nobody recorded anything for, would keep
-  every foreign holding bending at a date that no longer exists.
 - **Confirming on a reopened recording records the figure the holding
   carried into that date**, meaning its last figure before that date
   rather than the newest one in its history.

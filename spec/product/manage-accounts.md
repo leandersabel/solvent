@@ -124,6 +124,9 @@ and the current total.
   date exactly as it was, and removes the holding from today's total.
 - A closing value recorded onto a date that already has a recording
   joins it and moves no rate, so no other holding shifts on that date.
+- Clearing a closing value later leaves the archive annotation where
+  it is, and the chart drops on that date exactly as it does when the
+  value was skipped in the dialog.
 - Archiving the last holding measured in a unit stops that unit being
   refreshed when you record. Its rates so far stay and unarchiving
   resumes them.
