@@ -2,14 +2,13 @@
 
 ## What it does
 
-Everything a person controls about their own account: their password,
-the currency their vault counts in, how long it stays unlocked, which
-sessions are open, how their accounts are grouped, and, at the bottom,
+Everything you control about your own account: your password, the
+currency your vault counts in, how long it stays unlocked, which
+sessions are open, how your holdings are grouped, and, at the bottom,
 deleting the whole thing.
 
 Nothing here can recover a lost password. The rules that are fixed for
-good are shown alongside the ones a person can change, rather than
-hidden.
+good are shown alongside the ones you can change, rather than hidden.
 
 Who it is for: every person with a vault, about their own vault only.
 This screen exists only inside a vault, so an administrator account
@@ -35,7 +34,7 @@ history. There is no field here, not a disabled one.
 
 Link rows out to screens that do not belong inside a settings card:
 
-- **Dimensions**, described as how accounts split up in the chart, with
+- **Dimensions**, described as how holdings split up in the chart, with
   how many exist right now, or "None yet".
 - **Export and import** (`export-import.md`), described as downloading
   the vault or restoring one from a file.
@@ -54,10 +53,10 @@ Three things are said here, most surprising first:
 - **Export files already saved still open with the old password.** They
   carry their own copy of the lock. Changing the password here does not
   reach back and protect a file already downloaded. This carries a
-  warning icon, because it is the one way a person can believe they
-  have locked something they have not.
-- Other sessions were signed out. The current one stays, and nobody
-  has to sign in again after changing their own password.
+  warning icon, because it is the one way you can believe you have
+  locked something you have not.
+- Other sessions were signed out. The current one stays, and you do
+  not have to sign in again after changing your own password.
 
 A wrong current password is caught before anything is sent, and is
 reported plainly.
@@ -73,7 +72,7 @@ reported plainly.
   activity.** Stated, not adjustable.
 - **Open sessions**, listed by when each started and when it was last
   used, with a line volunteering that Solvent records no IP addresses
-  and no devices. A person who has used any other product assumes those
+  and no devices. Anyone who has used another product assumes those
   are kept.
 - **Sign out**, and **sign out everywhere**, which ends the current
   session too.
@@ -97,13 +96,13 @@ to.
 
 ### Dimensions
 
-A dimension is an axis accounts are sorted along: "Liquidity", with
-values Cash, Investments, Retirement. Each account takes one value per
+A dimension is an axis holdings are sorted along: "Liquidity", with
+values Cash, Investments, Retirement. Each holding takes one value per
 dimension, which is what lets the bands of the chart add up to exactly
 the net worth. This screen is where they are renamed, reordered, put
-away, and brought back. Creating one also happens on the account form
-(`manage-accounts.md`), and how they are drawn belongs to the dashboard
-(`net-worth-view.md`).
+away, and brought back. Creating one also happens on the form for
+adding or changing a holding (`manage-accounts.md`), and how they are
+drawn belongs to the dashboard (`net-worth-view.md`).
 
 One card per dimension, in the order they appear in the dashboard's
 grouping control, so dragging a card here changes that order too.
@@ -111,12 +110,12 @@ grouping control, so dragging a card here changes that order too.
 Each card shows:
 
 - Its **name**, editable in place. Renaming is instant and free, and
-  touches no account.
-- Its **coverage**, the same figure the dashboard shows: seven of ten
-  accounts assigned, with the unassigned ones a click away. A dimension
-  covering a third of the accounts draws a chart that is accurate and
-  useless, and this is where that shows, at setup rather than in a
-  confusing chart later.
+  touches no holding.
+- Its **coverage**, the same figure the dashboard shows: "7 of 10
+  holdings assigned", with the unassigned ones a click away. A
+  dimension covering a third of the holdings draws a chart that is
+  accurate and useless, and this is where that shows, at setup rather
+  than in a confusing chart later.
 - Its **values**, in the order they stack in the chart, each draggable,
   renamable, and archivable. This order is never sorted by size: a
   stack whose bands swap places from month to month cannot be read.
@@ -127,10 +126,9 @@ section when there is anything in it.
 
 **Creating a dimension** asks for a name and a first value, because a
 dimension with no values sorts nothing. The same dialog offers a
-**flag**: a dimension with exactly one value, which the account form
-shows as a checkbox rather than a list. That is the shape a yes-or-no
-label such as "Emergency fund" takes, and making one is as quick as
-typing a tag.
+**flag**: a dimension with exactly one value, which that form shows as
+a checkbox rather than a list. That is the shape a yes-or-no label such
+as "Emergency fund" takes, and making one is as quick as typing a tag.
 
 **Past four values**, a note appears under the list, not a warning and
 not a cap: the chart shows the first four and folds the rest into
@@ -138,18 +136,18 @@ not a cap: the chart shows the first four and folds the rest into
 bands can be told apart on screen, not a limit on the data.
 
 **Deleting is called archiving**, and the dialog says why in one line:
-archiving keeps every account's assignment, and restoring brings every
-account back to the band it was in. An archived dimension simply stops
-appearing, on the account form, in the grouping control, and in the
-chart. An archived value moves its accounts to "Unassigned".
+archiving keeps every holding's assignment, and restoring brings every
+holding back to the band it was in. An archived dimension simply stops
+appearing, on that form, in the grouping control, and in the chart. An
+archived value moves its holdings to "Unassigned".
 
-There is no permanent delete and no "remove this from all my accounts".
-Stripping a setting out of every account is a destructive sweep that
-can fail halfway, in exchange for a scrap of leftover data nobody
-reads. An archived definition costs one line and buys exact
+There is no permanent delete and no "remove this from all my
+holdings". Stripping a setting out of every holding is a destructive
+sweep that can fail halfway, in exchange for a scrap of leftover data
+nobody reads. An archived definition costs one line and buys exact
 reversibility.
 
-The first time somebody opens this screen it explains the word, because
+The first time you open this screen it explains the word, because
 "dimension" is the least self-explanatory thing in the product, with
 one concrete example and one button. Nowhere else in the app nags about
 it: a vault with no dimensions is completely usable and charts as a
@@ -168,8 +166,8 @@ single total.
   anything is sent. A doctored request that skips the browser check is
   still refused.
 - Changing the password signs out every other session and leaves the
-  current one alone. Nobody has to sign in again after changing their
-  own password.
+  current one alone. You do not have to sign in again after changing
+  your own password.
 - A change that fails partway changes nothing: the old password still
   works, and the screen says exactly that.
 - A vault protected less strongly than the instance currently requires
@@ -183,29 +181,28 @@ single total.
 - Any vault owner can delete their own account, whoever else is on the
   instance. No vault is exempt.
 - The delete dialog offers exporting first as its main action.
-- The list of open sessions shows only the person's own sessions, never
-  anyone else's, and carries no IP address and no device information,
-  because none is recorded anywhere.
+- The list of open sessions shows only your own sessions, never anyone
+  else's, and carries no IP address and no device information, because
+  none is recorded anywhere.
 - Signing out ends the current session and leaves another session on
   the same account working. Signing out everywhere ends that one too,
   including the current one.
 - The idle lock is fifteen minutes unless changed, can be set between
-  five and sixty, survives signing out and back in, follows the person
-  to another device, and is not readable by anybody holding the
-  machine.
+  five and sixty, survives signing out and back in, follows you to
+  another device, and is not readable by anybody holding the machine.
 - There is no setting, anywhere, that turns the idle lock off. A vault
   carrying a nonsense value for it still locks, at the nearest
   allowed setting.
-- Renaming a dimension or one of its values changes no account.
+- Renaming a dimension or one of its values changes no holding.
 - Reordering a dimension's values reorders the chart's bands, and
-  changes no account.
-- Archiving a dimension and restoring it puts every account back in
-  exactly the band it was in, without touching a single account either
+  changes no holding.
+- Archiving a dimension and restoring it puts every holding back in
+  exactly the band it was in, without touching a single holding either
   way.
-- Archiving one value moves its accounts to "Unassigned", and restoring
-  it moves them back.
+- Archiving one value moves its holdings to "Unassigned", and
+  restoring it moves them back.
 - Nothing on the dimensions screen can fail halfway across several
-  accounts, because nothing it does writes to more than one place.
+  holdings, because nothing it does writes to more than one place.
 - A vault with no dimensions charts as a single total and works
   normally throughout.
 - Two dimensions made in the same sitting never collide, whatever they
@@ -222,8 +219,8 @@ single total.
 
   The cost falls on one person: somebody who moves country, or who
   picks the wrong currency in the seconds they spend on that list at
-  sign-up. Their route out is a new vault and their history entered
-  again by hand. What earns that cost is the warning directly under the
+  sign-up. The route out is a new vault and the history entered again
+  by hand. What earns that cost is the warning directly under the
   field, at the point of choice, saying the choice is permanent.
 - **No password recovery here either.** Changing a password needs the
   current one. See `register.md`.
@@ -236,15 +233,15 @@ single total.
 - **No soft delete, no grace period, no recycle bin** on deleting an
   account. There is no readable vault to hold in reserve.
 - **No permanent delete of a dimension**, and no way to strip one from
-  every account at once.
+  every holding at once.
 - **No cap on how many values a dimension has**, even though the chart
   only draws four separately.
-- **No freeform tags.** Every way of labeling an account is a
+- **No freeform tags.** Every way of labeling a holding is a
   dimension, because a tag is a dimension with one value. Two
-  vocabularies over the same accounts would mean two ways to spell one
+  vocabularies over the same holdings would mean two ways to spell one
   thing, and only one of them can be stacked and summed honestly.
 
-## Decisions taken on the client's behalf
+## Decisions taken on your behalf
 
 - **The idle lock is fifteen minutes unless changed, adjustable between
   five and sixty, and cannot be switched off.** Unlocking is never
@@ -252,13 +249,13 @@ single total.
   lock at all would undo the defense against somebody walking up to an
   open screen.
 - **Changing a password signs out other sessions but not this one.**
-  The alternative, signing everybody out including the person who just
+  The alternative, signing everybody out including whoever just
   changed it, is defensible and more cautious. Keeping the current
   session is the friendlier default and there is no stolen key to
   invalidate, because the key never changed.
 - **Deleting a dimension archives it instead.** Nobody asked for
   archiving. It exists because the honest alternative, editing every
-  account to remove a setting, can fail halfway.
+  holding to remove a setting, can fail halfway.
 - **Open sessions are listed at all.** Nobody asked for the list. It
-  is the only way a person can tell whether they are still signed in
+  is the only way you can tell whether you are still signed in
   somewhere else, given that there is no other trace of it anywhere.

@@ -158,13 +158,13 @@ their wealth.
   against the profile already in memory. It is never shown, never typed,
   and never derived from the label.
 - **`label` is free display text** in any script, renamable at any time.
-  A rename writes one record — the profile — and touches no account.
+  A rename writes one record — the profile — and touches no holding.
   This is the whole reason ids are not slugs: a label-derived key would
   make renaming either impossible or a multi-record rewrite that can
   fail partway, and would risk colliding with strings already in user
   data.
 - **Order in `values` is the band order** in the stacked chart. It
-  cannot be derived from the accounts, which yield which value ids are
+  cannot be derived from the holdings, which yield which value ids are
   in use but never the intended sequence — and a stack whose bands
   reorder over time is unreadable (`net-worth-view.md`). Reordering
   writes one record.
@@ -180,14 +180,14 @@ their wealth.
 ### Deleting is archiving
 
 Deleting a dimension or a single value sets `archivedAt` and keeps the
-definition in the profile. It leaves every account's `dims` entry
-untouched: those accounts render as "Unassigned" for that dimension
+definition in the profile. It leaves every holding's `dims` entry
+untouched: those holdings render as "Unassigned" for that dimension
 until it is restored, and restoring it brings every assignment back
 exactly.
 
 There is deliberately **no "remove everywhere" option**, and no
 multi-record write anywhere in this feature. Stripping entries from N
-account records to undo a display setting is a destructive operation
+`account` records to undo a display setting is a destructive operation
 that can fail partway, offered in exchange for a few bytes of inert data
 inside ciphertext nobody reads. An archived definition costs one line in
 the profile record and buys exact reversibility.
@@ -253,7 +253,8 @@ Found for an administrator session.
   it was never the control that bounds how long a session can act. The
   bound on an administrator session is the absolute expiry below, the
   same bound a vault owner's session has.
-- **Absolute session expiry** at 12 hours from issue, for both kinds.
+- **Absolute session expiry** applies to both kinds. `login.md`,
+  Rules owns the value.
 - **Log out** — `POST /api/auth/logout`. Invalidates the current server
   session; the client discards its in-memory keys first, so a failed
   request still leaves nothing readable in the tab.
@@ -344,12 +345,12 @@ Found for an administrator session.
 - A profile record with `idleLockMinutes` set to 0, 500, or a
   non-integer still locks, at the clamped bound.
 - Reordering a dimension's values reorders the chart's bands and writes
-  one record — no account record is touched.
+  one record — no `account` record is touched.
 - Renaming a dimension's label, or a value's label, writes one record
-  and leaves every account record byte-identical.
-- Archiving a dimension and restoring it returns every account to the
-  band it was in, with no account record written in either direction.
-- Archiving a single value moves its accounts to "Unassigned";
+  and leaves every `account` record byte-identical.
+- Archiving a dimension and restoring it returns every holding to the
+  band it was in, with no `account` record written in either direction.
+- Archiving a single value moves its holdings to "Unassigned";
   restoring it moves them back.
 - No operation in the dimensions feature writes more than one record.
   Asserted by counting `PUT`s across create, rename, reorder, archive,

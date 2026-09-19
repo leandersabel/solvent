@@ -145,7 +145,7 @@ written.
 ## Rules
 
 - The server assigns `principal_id` from the session on every imported
-  record. It never reads an account id from the uploaded payload — one
+  record. It never reads an `accountId` from the uploaded payload — one
   account's import can never write into another's vault
   (architecture.md, Import authorization). Export and import are both
   on the vault surface, so an administrator session receives Not Found
@@ -155,7 +155,7 @@ written.
   `recordType` values, well-formed UUIDs, base64 decodes cleanly,
   `accountId` present exactly for `snapshot` records and `null` for
   every other type, never `""` (record-api.md), and referencing an
-  account in the same import.
+  `account` record in the same import.
 - **Every record goes through the same per-record validator as
   `PUT /api/records`** (record-api.md), field-consistency check
   included, so there is one set of rules with two callers. That
@@ -216,12 +216,12 @@ written.
 ## Acceptance criteria
 
 - Export → wipe the vault → import round-trips to an identical set of
-  decrypted records: same ids, types, account links, and plaintext
+  decrypted records: same ids, types, `account_id` links, and plaintext
   payloads, for quantities and prices alike.
 - A vault exported and reimported draws a byte-identical chart and the
   same total in both pricing modes (`net-worth-view.md`), which is the
   test that fails if either timeline is dropped.
-- The exported file contains no plaintext account name, note, dimension
+- The exported file contains no plaintext holding name, note, dimension
   label, value, rate, symbol, date, or currency, verified by scanning
   the file for known values.
 - After importing, the user logs in with their **unchanged** password
@@ -258,7 +258,8 @@ written.
 - Payloads over the size cap, over the record-count cap, or with an
   unknown `recordType` are rejected before any write.
 - A payload with one record at `version: 2`, or one `snapshot` whose
-  `accountId` names no account in the same payload, is rejected whole —
+  `accountId` names no `account` record in the same payload, is
+  rejected whole —
   the same validator `PUT /api/records` runs.
 - Every record in the vault reads `version: 1` after an import.
 - A second session belonging to the importing user is invalidated: its

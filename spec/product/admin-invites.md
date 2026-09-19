@@ -9,13 +9,13 @@ creates a link and hands it to a person they know.
 There are two kinds of account on an instance, and they are different
 things rather than the same thing with different powers.
 
-- A **user account** owns a vault: the accounts, balances, notes and
+- A **user account** owns a vault: the holdings, balances, notes and
   history one person keeps. Everything in it is readable only with that
   person's password. Following a link into a user account is what
   `register.md` describes.
 - An **administrator account** manages the platform. It decides who
   gets an account on this instance and who stops having one. **It has
-  no vault.** It holds no accounts, no balances, no notes, nothing
+  no vault.** It holds no holdings, no balances, no notes, nothing
   encrypted, and there is nothing in it to unlock.
 
 That an administrator cannot read anyone's data is therefore not a rule
@@ -54,10 +54,10 @@ is given a second account, and keeps the first one untouched.
 
 ## The admin boundary
 
-The client asked for zero-knowledge encryption. Applied to
-administration, and stated the way a person experiences it:
+You asked for zero-knowledge encryption. Applied to administration,
+and stated the way it is experienced:
 
-- An administrator cannot read anyone's accounts, balances, notes, or
+- An administrator cannot read anyone's holdings, balances, notes, or
   history. Not one figure. Not another person's, and not the vault held
   by their own user account, which they reach the same way everybody
   does, by signing in to that account with its own password.
@@ -109,9 +109,9 @@ Three choices, then one button.
   data in Solvent they need a separate invite for a user account.
 - **A note to yourself.** Optional, free text, something like "Sarah's
   laptop", so that a list of outstanding links is tellable apart. This
-  is the one thing a person types anywhere in Solvent that the server
-  can read, and the form says so at the moment of typing. The guidance
-  is to keep it to a nickname.
+  is the one thing you type anywhere in Solvent that the server can
+  read, and the form says so at the moment of typing. The guidance is
+  to keep it to a nickname.
 - **How long the link stays good.** Between one and thirty days.
 
 On creation the link appears once, ready to copy, with the plain fact
@@ -223,7 +223,7 @@ created the first administrator.
 - An administrator account has no vault. There is nothing in it to
   encrypt, nothing to unlock, and no financial data of any kind, and no
   screen anywhere offers to put any there.
-- An administrator sees no accounts, balances, notes, or history
+- An administrator sees no holdings, balances, notes, or history
   belonging to anybody, including the vault of a user account they
   themselves hold. The item count and the dates named above are the
   whole of what an administrator learns about an account.
@@ -267,11 +267,11 @@ created the first administrator.
 
 ## What it deliberately does not do
 
-- **No self-service sign-up.** The client asked for a small invited
-  group, not a public service.
+- **No self-service sign-up.** You asked for a small invited group,
+  not a public service.
 - **No vault on an administrator account.** It is not an account with
-  its financial features switched off. There is no dashboard, no
-  account list, no figures, and nothing to lock, because there is
+  its financial features switched off. There is no dashboard, no list
+  of holdings, no figures, and nothing to lock, because there is
   nothing in it to hide.
 - **No account changes kind.** An administrator account and a user
   account are different things, not two settings of one thing. A person
@@ -290,9 +290,7 @@ created the first administrator.
   could never hand out an account again without going back to the
   machine.
 
-## Decisions taken on the client's behalf
-
-Recorded here because the client did not choose these and may want to.
+## Decisions taken on your behalf
 
 - **A link lasts seven days unless changed, and can be set anywhere
   from one to thirty.** Short enough that a forgotten link expires,
@@ -303,7 +301,7 @@ Recorded here because the client did not choose these and may want to.
   chosen in the browser by the person who will use it, and there is one
   way an account comes to exist rather than two.
 - **The note on an invite is readable by the server.** Everything else
-  a person types in Solvent is not. This is provisioning paperwork
+  you type in Solvent is not. This is provisioning paperwork
   rather than vault content, and encrypting it would mean the invite
   list could only be read by the one administrator who wrote it.
 - **The accounts list carries an item count and the dates.** All are

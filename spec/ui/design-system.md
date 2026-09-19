@@ -176,9 +176,9 @@ are neutral, and they must not collide with each other:
 
 Both always carry a direct label. A chart showing both at once is
 legible, and is also telling the user their dimension neither covers its
-accounts nor fits in four values.
+holdings nor fits in four values.
 
-There is no third band for an account holding two values of one
+There is no third band for a holding with two values of one
 dimension: `dims` is a map keyed by dimension id
 (`manage-accounts.md`), so that state cannot be written by the form, an
 import, or a hand-edited export. No hatch or pattern fill is defined
@@ -188,7 +188,7 @@ gets reused for the wrong thing later.
 ### The estimated marker
 
 Inferred figures — every stretch between two snapshots, and everything
-after an account's last one (`net-worth-view.md`) — are marked one way
+after a holding's last one (`net-worth-view.md`) — are marked one way
 across the product, in two forms of the same mark. Never in a status
 color: data that is inferred is not a warning, the same reason figure
 age is stated in words rather than flagged.
@@ -317,8 +317,8 @@ only its own content region.
   one, which is specified for the light ground.
 - **Nav is Dashboard and Settings**, the same for everybody who has a
   vault.
-  - There is deliberately **no "Accounts" entry**: the dashboard's own
-    table *is* the account list (`dashboard.md`), so a third entry
+  - There is deliberately **no "Holdings" entry**: the dashboard's own
+    table *is* the list of holdings (`dashboard.md`), so a third entry
     would either lead back to the screen the user is on or open a
     second, thinner copy of it.
   - There is deliberately **no "Admin" entry, in any state.**
@@ -328,7 +328,7 @@ only its own content region.
 - **Update values** is a global action rather than a nav destination. It
   opens the sweep (`update-values.md`) at today, going straight into
   editing today's recording with no screen in between, which is what
-  makes the sweep reachable while the user is deep in one account. It
+  makes the sweep reachable while the user is deep in one holding. It
   is the fast path for the one act somebody performs every month, and a
   page in front of it would add a step to exactly the thing the product
   exists to make cheap.
@@ -344,10 +344,11 @@ only its own content region.
   different, and movement inside the admin area belongs to `admin.md`.
 - **Lock button** — the idle lock, triggered by hand. One click
   discards the keys and all decrypted state and shows the re-unlock
-  screen (`login.md`, Rules); the server session stays alive, so
-  unlocking needs only the password. No confirmation dialog: this is
-  the control someone reaches for when another person walks into the
-  room, and a confirm step spends the seconds it exists to save.
+  screen (`unlock.md`, with the rule in `login.md`, Rules). The server
+  session stays alive, so unlocking needs only the password. No
+  confirmation dialog: this is the control someone reaches for when
+  another person walks into the room, and a confirm step spends the
+  seconds it exists to save.
 - Content max-width 1200px on the ground, and each screen states its
   own narrower width.
 - The shell is server-rendered Jinja (`architecture.md`, Components)

@@ -50,7 +50,7 @@ the same figure in the main currency at the price captured that day.
 Money right-aligned and tabular.
 
 - **The holding's name is the link**, opening that holding
-  (`account-detail.md`), because "which account was that" is the
+  (`account-detail.md`), because "which holding was that" is the
   question this screen provokes.
 - A figure whose unit holds no price at this date reads **not priced**
   in place of the converted figure, rather than showing the bare

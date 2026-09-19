@@ -12,8 +12,9 @@ Exercises: `spec/features/net-worth-view.md`. Links into
 
 ## Layout
 
-Standard app shell (`design-system.md`, App shell). The accounts table
-below is the account list the shell deliberately has no nav entry for.
+Standard app shell (`design-system.md`, App shell). The holdings table
+below is the list of holdings the shell deliberately has no nav entry
+for.
 
 Regions, top to bottom:
 
@@ -41,7 +42,7 @@ Regions, top to bottom:
     applied the day it was last recorded. In this position the label
     carries no date, because the rate date is the row's own as-of date
     in the table below.
-  - It changes the total, the accounts table and the breakdown, and
+  - It changes the total, the holdings table and the breakdown, and
     **leaves the chart untouched**: every point in the chart is already
     drawn at the rates of its own date, so there is nothing there for
     the control to do. The hero then no longer matches the chart's
@@ -86,7 +87,7 @@ bands mirror down, the net-worth line runs over the top.
   in the profile's configured order (`account-settings.md`), archived
   ones excluded. Default "Total" — one band, no stacking — until the
   user configures a dimension. It also drives the breakdown section
-  below. Beside it, the dimension's **coverage**: "7 of 10 accounts
+  below. Beside it, the dimension's **coverage**: "7 of 10 holdings
   assigned", clickable to filter the table to the unassigned ones
   (`dimensions.md`, which owns what coverage is for).
 - **Absolute / percentage** toggle. Percentage normalizes each side
@@ -125,7 +126,7 @@ bands mirror down, the net-worth line runs over the top.
   takes no tick, because a tick means a quantity was recorded, and it
   is reached through the date picker instead.
 - **Archive annotations**: a marker at each `archivedAt` with the
-  account named in the tooltip.
+  holding named in the tooltip.
 - Single band ("Total") → **no legend box**; the section heading names
   it.
 - **Keyboard**: the chart is focusable, arrow keys step the crosshair
@@ -137,13 +138,13 @@ bands mirror down, the net-worth line runs over the top.
 - **No control here issues a network request** — range, dimension, mode,
   band visibility, selection. The whole model is already in memory.
 
-### 3. Accounts table
+### 3. Holdings table
 
 Columns: Name · Dimensions · Latest value (native unit) · In main
 currency · As of · (row action).
 
 - The Dimensions column shows one chip per assignment
-  (`Liquidity: Cash`), omitting dimensions the account has no value for
+  (`Liquidity: Cash`), omitting dimensions the holding has no value for
   rather than printing "Unassigned" on every row. With no dimensions
   configured, the column is absent entirely.
 - Money columns right-aligned, `tabular-nums`.
@@ -158,17 +159,17 @@ currency · As of · (row action).
     true of that row. That is a holding nobody publishes a price for,
     whose price moves only when its owner revisits it
     (`net-worth-view.md`).
-- Accounts with no snapshots are listed in a separate "Not yet valued"
+- Holdings with no snapshots are listed in a separate "Not yet valued"
   group below the table — **not shown as 0**, which is a real value
   meaning something different.
-- Accounts whose unit has no price at all are listed in a separate
+- Holdings whose unit has no price at all are listed in a separate
   **"Not priced"** group, with that as the stated reason rather than
   the other one, and excluded from the total. Never counted at their
   bare quantity, which would value a holding as though its unit were
   the main currency (`net-worth-view.md`).
-- Archived accounts are hidden by default behind a "Show archived"
+- Archived holdings are hidden by default behind a "Show archived"
   toggle; when shown they are dimmed with an "Archived" chip.
-- Row click → the account's detail screen (`account-detail.md`), which
+- Row click → the holding's detail screen (`account-detail.md`), which
   owns that holding's own list of values. A "Record a value" action per
   row opens the single-holding form at that holding
   (`snapshot-entry.md`). It is not a second New recording: that button
@@ -210,11 +211,11 @@ section exists.
 - **Loading**: skeleton blocks for hero, chart, and table while
   records decrypt. The hero figure must never render a wrong
   intermediate number and appears only when the total is final.
-- **Empty — no accounts**: single centered card, "Add your first
-  account", primary button. No chart, no table, no zero total, and no
+- **Empty — no holdings**: single centered card, "Add your first
+  holding", primary button. No chart, no table, no zero total, and no
   New recording: there is nothing to record against yet.
-- **Empty — accounts but no snapshots**: table renders with every
-  account under "Not yet valued". Total shows "—", not 0. No chart.
+- **Empty — holdings but no snapshots**: table renders with every
+  holding under "Not yet valued". Total shows "—", not 0. No chart.
   New recording works, because this is the state somebody leaves by
   recording.
 - **Date picker open**: today is focused, dates holding a recording are
@@ -228,7 +229,7 @@ section exists.
   banner, no caveat.
 - **Populated — one snapshot total**: the chart shows a single point,
   not a flat line running back to the beginning of time.
-- **Populated — all accounts archived**: total "—", history still
+- **Populated — all holdings archived**: total "—", history still
   renders.
 - **No dimensions configured**: "Group by" offers only "Total", with a
   link to `dimensions.md` to create one. The chart is a single band, the

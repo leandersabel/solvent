@@ -403,8 +403,6 @@ invocation and nothing more.
   `POST /api/auth/change-password`, the new one signs them in, the old
   one does not, and every other session of theirs is gone while the
   current one survives.
-- An administrator session receives Not Found from `GET /api/sessions`
-  and `POST /api/auth/logout-all`.
 - Every control in the rendered admin area maps to a route under
   `/api/admin/` or to `POST /api/auth/change-password`, asserted
   against the rendered area, so a control wired to a vault route

@@ -43,7 +43,7 @@ A tinted petrol-50 callout, full content width, in the app's own voice:
 
 > You can invite and remove people on this instance, and maintain the
 > list of units a holding can be measured in. You cannot read anyone's
-> accounts, balances, notes, or history, you cannot reset anybody's
+> holdings, balances, notes, or history, you cannot reset anybody's
 > password, and you cannot recover a locked-out vault. Solvent holds no
 > key that could, including for the vault behind your own user account.
 
@@ -265,10 +265,10 @@ says what it does:
 > **Retire XAG-g?**
 >
 > This takes it out of the list people choose from when they set up a
-> holding. Accounts already measured in it keep working and keep
+> holding. Holdings already measured in it keep working and keep
 > getting rates, and nothing is renamed.
 >
-> Solvent cannot tell you how many accounts use it. A unit lives inside
+> Solvent cannot tell you how many holdings use it. A unit lives inside
 > vault data, which it cannot read.
 >
 > You can put it back at any time.
@@ -279,7 +279,7 @@ for that says so in one line.
 A unit is never deleted and never renamed. That is not a control this
 screen has chosen to withhold: the code is written into record
 ciphertext the server cannot read, so deleting or renaming one would
-leave accounts measured in something that no longer exists, findable
+leave holdings measured in something that no longer exists, findable
 only by their owners, one at a time.
 
 ## Your password
@@ -383,7 +383,7 @@ gauge).
 - Every control on these screens maps to a route under `/api/admin/` or
   to the shared change-password endpoint. There is no control here
   wired to anything a vault owner uses.
-- No screen in this area renders a figure, a balance, an account name
+- No screen in this area renders a figure, a balance, a holding's name
   from anybody's vault, or any other decrypted content, because none is
   reachable from this session.
 - Kind is displayed and never edited, on an invite row or an account
@@ -401,7 +401,7 @@ gauge).
 - **No session list and no "sign out everywhere".** Changing the
   password already ends every other session of theirs, which is the one
   thing an administrator would reach for either of those to do.
-- **No count of how many accounts use a unit.** Not withheld,
+- **No count of how many holdings use a unit.** Not withheld,
   impossible: a unit lives inside record ciphertext the server cannot
   read. The retire dialog says what retiring means instead of showing
   who it touches.

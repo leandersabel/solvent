@@ -20,7 +20,7 @@ accepted (`record-rate.md`).
 
 - `date`, the recording date.
 - `quote` — the user's main currency, the currency to price into.
-- `symbol` is **optional**. One symbol, which is an account's unit
+- `symbol` is **optional**. One symbol, which is a holding's unit
   (`manage-accounts.md`). Omitted, the response covers the whole
   quotable table.
 - Session-authenticated. Anonymous requests are refused, so the proxy is
@@ -100,7 +100,7 @@ already does (see Caching). History goes back to 1948, and an FX
 symbol is simply an ISO 4217 code.
 
 - An FX symbol is the **base currency code** (`USD`, `EUR`) — which is
-  simply the account's unit — and `quote` is the user's main currency.
+  simply the holding's unit — and `quote` is the user's main currency.
   A unit names the base asset only (`manage-accounts.md`).
 - The currency half of the operator's symbol table can be seeded
   directly from the provider's own currency list rather than typed by
@@ -174,7 +174,7 @@ migration and no stale user data.
 
 Not deferred like the other metals: **there is nothing here to defer.**
 Brokerage holdings are recorded at depot level (architecture.md, Data
-model) — one account in the depot's reporting currency, holding the
+model) — one holding in the depot's reporting currency, holding the
 total the broker reports. That total needs FX at most, which the FX
 provider covers. So there is no security rate to fetch, no ticker
 namespace to adopt into user records, and no `kind: equity` in the
@@ -182,7 +182,7 @@ symbol table.
 
 Adding a `kind` later would be safe in a way that adding a *symbol* is
 not: `kind` is operator config, while a symbol is written into
-ciphertext as an account's unit. That asymmetry is why the metals are
+ciphertext as a holding's unit. That asymmetry is why the metals are
 seeded and this is not.
 
 Rejected, the licensing being largely closed:
@@ -216,7 +216,7 @@ operator's configured symbol table. Session-authenticated, read-only,
 cacheable.
 
 It exists because **the account form's unit picker is built from it**
-(`ui/account-form.md`): a user chooses what an account is measured in
+(`ui/account-form.md`): a user chooses what a holding is measured in
 from this list, and that choice is also its rate symbol
 (`manage-accounts.md`). An unknown symbol stays a Bad Request at
 `/api/rates`, which no user reaches by choosing: the client never names
@@ -254,11 +254,11 @@ Found to a vault owner (`app-shell.md`, The two surfaces).
 
 **`symbol` and `kind` are immutable, and there is no delete.** This is
 the hard rule of the whole surface and it follows from one fact: a
-symbol is written into user records as an account's `unit`, inside
+symbol is written into user records as a holding's `unit`, inside
 ciphertext the server cannot read. So the server cannot tell whether a
 symbol is in use, cannot migrate the records that use it, and cannot
 warn the administrator who is about to strand them. Renaming `XAU-ozt`
-or deleting it would leave accounts measured in something that no
+or deleting it would leave holdings measured in something that no
 longer exists, discoverable only by their owner, one at a time, and
 unfixable without hand-editing an export.
 
@@ -268,9 +268,9 @@ unfixable without hand-editing an export.
   currency to a metal would break every lookup a vault has ever made
   and cannot make again.
 - **`retired: true` is the substitute for deleting.** A retired symbol
-  is dropped from `GET /api/rates/symbols`, so no new account can be
+  is dropped from `GET /api/rates/symbols`, so no new holding can be
   measured in it, and stays fully valid everywhere else: `/api/rates`
-  still prices it, existing accounts keep working, and unretiring it
+  still prices it, existing holdings keep working, and unretiring it
   restores it exactly. Same shape as archiving a dimension
   (`account-settings.md`, Deleting is archiving), and for the same
   reason: reversibility costs one flag, and the destructive version
@@ -295,7 +295,7 @@ unfixable without hand-editing an export.
   Application hardening), because server-controlled text is still
   text and the rule is not worth a second code path.
 
-**No response here counts how many accounts use a symbol**, and none
+**No response here counts how many holdings use a symbol**, and none
 could: the server cannot read a `unit`. An administrator retiring a
 symbol is told what it means rather than shown who it affects.
 
@@ -303,9 +303,9 @@ symbol is told what it means rather than shown who it affects.
 
 Metal symbols are seeded for all four precious metals even though only
 gold has a provider. **A symbol is a permanent identifier written into
-user records** — it is the account's `unit` (`manage-accounts.md`); if a
+user records** — it is the holding's `unit` (`manage-accounts.md`); if a
 user typing free text records `GOLD`, `xau`, or `XAUCHF` today, adding a
-provider later means either abandoning those accounts or migrating
+provider later means either abandoning those holdings or migrating
 ciphertext the server cannot read. Seeding the canonical form now costs
 a few config rows and removes that migration entirely. Because the unit
 picker offers this table before it offers free text, the canonical form
@@ -328,7 +328,7 @@ than invented: **`<ISO 4217 metal code>-<unit>`**, unit `ozt` or `g`.
 Both units are offered because a holding is measured in one or the
 other, and the rate must be per that same unit — a rate per troy ounce
 against a holding recorded in grams is off by a factor of 31. Since the
-account's unit *is* its symbol, choosing `XAU-g` picks both at once and
+holding's unit *is* its symbol, choosing `XAU-g` picks both at once and
 the mismatch cannot occur (`manage-accounts.md`). Gold gets both entries
 for free: NBP publishes per gram, so `XAU-g` is the raw figure and
 `XAU-ozt` is the one conversion.
@@ -345,7 +345,7 @@ symbols and none are coming** (Listed securities, above).
   change.
 - **Today's date is cached for 1 hour**, then refetched.
 - A cache hit issues no outbound request, so repeated entry across a
-  household's accounts on one day mostly hits cache.
+  household's holdings on one day mostly hits cache.
 - Cache entries are public reference data, not user data: they are not
   per-user and hold nothing about who asked or how much they hold.
 
@@ -409,7 +409,7 @@ reachable (architecture.md, SSRF hardening):
   definition, and Frankfurter errors on base = quote, so passing it
   through would turn the most trivially answerable question in the API
   into a provider error. The client never asks — the rate field is
-  hidden for a main-currency account (`record-snapshot.md`) — but the
+  hidden for a main-currency holding (`record-snapshot.md`) — but the
   server answers correctly regardless, the same reason a
   `lookup: false` symbol answers No Content rather than Bad Request.
 - **Symbol not in the server's symbol table** → Bad Request. Adding a
@@ -433,7 +433,7 @@ reachable (architecture.md, SSRF hardening):
   treat as no proposal rather than silently mislabelling it.
 - **Provider returns a zero, negative, or non-numeric rate** → treated
   as no proposal.
-- **Two accounts share a symbol** → one cache entry serves both, one
+- **Two holdings share a symbol** → one cache entry serves both, one
   outbound request, and one price entry in the vault
   (`record-rate.md`).
 - **A whole-table request where every symbol fails** → No Content,
@@ -451,7 +451,7 @@ reachable (architecture.md, SSRF hardening):
   map, and costs no more outbound requests than the gold path alone.
 - A whole-table request followed by a single-symbol request for a symbol
   in it makes no second outbound request: the two forms share one cache.
-- Recording across fifteen accounts in six symbols issues exactly one
+- Recording across fifteen holdings in six symbols issues exactly one
   request to this endpoint.
 - Today's rate is refetched after the 1-hour TTL and not before.
 - A request with any parameter that could carry an amount is rejected
@@ -477,7 +477,7 @@ reachable (architecture.md, SSRF hardening):
   `kind` is a Bad Request and changes nothing. There is no route that
   deletes a symbol, asserted by enumerating the registered routes.
 - Retiring a symbol removes it from `GET /api/rates/symbols` and
-  leaves `/api/rates` pricing it unchanged, so an account already
+  leaves `/api/rates` pricing it unchanged, so a holding already
   measured in it still resolves a rate. Unretiring restores it to the
   picker.
 - `PATCH` setting `lookup: true` on a symbol with no configured
@@ -490,7 +490,7 @@ reachable (architecture.md, SSRF hardening):
 - `POST` or `PATCH` carrying `hasAdapter` is a Bad Request and
   changes nothing.
 - No response from any `/api/admin/symbols` route contains a count,
-  list, or any other indication of which accounts use a symbol,
+  list, or any other indication of which holdings use a symbol,
   asserted against the full response shape.
 - An administrator adding a currency makes it available in the next
   registration's main-currency picker (`register.md`) with no restart.

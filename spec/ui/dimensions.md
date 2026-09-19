@@ -2,7 +2,7 @@
 
 ## Purpose
 
-Configure the axes accounts are classified along — the bands of the
+Configure the axes holdings are classified along — the bands of the
 stacked chart and the grouping of the dashboard's breakdown. This is the
 only screen where dimensions and their values are created, renamed,
 reordered, archived, and restored.
@@ -25,11 +25,11 @@ Each card carries:
   instant: it writes the profile record and no account record
   (`account-settings.md`).
 - Its **coverage**, the same figure the dashboard shows: "7 of 10
-  accounts assigned", the unassigned count linking to a filtered account
-  list. A dimension covering a third of the accounts draws a chart that
-  is correct and useless, and this is where that gets noticed — at the
-  point of configuration, not after a confusing chart.
-  - Coverage counts **active accounts**, the same set the dashboard
+  holdings assigned", the unassigned count linking to a filtered list
+  of holdings. A dimension covering a third of the holdings draws a
+  chart that is correct and useless, and this is where that gets
+  noticed — at the point of configuration, not after a confusing chart.
+  - Coverage counts **active holdings**, the same set the dashboard
     table holds. An archived holding is a closed position and has no
     say in whether a dimension is worth charting.
   - It is stated in ink-secondary and carries **no status color and no
@@ -100,23 +100,23 @@ save button and no reorder mode.
 
 "Delete" is called **Archive**, and the dialog says why in one line:
 
-> Archiving keeps your accounts' assignments. Restore it and every
-> account returns to the band it was in.
+> Archiving keeps your holdings' assignments. Restore it and every
+> holding returns to the band it was in.
 
 - Archiving a **dimension** hides it from the account form, the "Group
-  by" select, and the breakdown. Its accounts render as "Unassigned"
+  by" select, and the breakdown. Its holdings render as "Unassigned"
   for it — which is to say, it simply stops appearing.
-- Archiving a **value** moves its accounts to "Unassigned" in that
+- Archiving a **value** moves its holdings to "Unassigned" in that
   dimension.
 - **Archiving the last active value of a dimension is allowed.** The
-  dimension stays, reads as covering nothing, and every account shows
+  dimension stays, reads as covering nothing, and every holding shows
   "Unassigned" for it, which is exactly how it read before anything was
   filed. Refusing would invent a rule the record shape does not hold,
   and somebody who wants the dimension gone has the action for that one
   menu away.
 - **Restoring either brings every assignment back exactly**, because
   nothing was ever removed from an account record.
-- There is no permanent delete and **no "remove from all accounts"
+- There is no permanent delete and **no "remove from all holdings"
   option**. Stripping entries from N account records is a destructive
   multi-record write offered to reclaim a few bytes inside ciphertext
   nobody reads (`account-settings.md`). The screen must not offer one;
@@ -142,15 +142,15 @@ beside it, and its unassigned link stays a tap target of its own.
 
   > Dimensions are how your net worth splits up. Give one a name —
   > "Liquidity" — and values like Cash, Investments, Retirement. Each
-  > account gets one value, so the bands of your chart add up to exactly
-  > your net worth.
+  > holding gets one value, so the bands of your chart add up to
+  > exactly your net worth.
   >
   > [ Create a dimension ]
 
   No nagging elsewhere in the app; a vault with no dimensions is fully
   usable and charts as a single "Total" band.
-- **Empty, no accounts yet**: the cards render normally and coverage
-  reads "0 of 0 accounts assigned". A dimension configured before the
+- **Empty, no holdings yet**: the cards render normally and coverage
+  reads "0 of 0 holdings assigned". A dimension configured before the
   first holding is a normal order of work, and nothing on the screen
   treats it as premature.
 - **Saving**: the change is shown at once from local state, with the
@@ -165,15 +165,15 @@ beside it, and its unassigned link stays a tap target of its own.
 
 ## What it deliberately does not show
 
-- **No account names.** Coverage is a count with a link out to the
+- **No holding names.** Coverage is a count with a link out to the
   filtered list. Listing holdings inside a configuration screen would
-  make it a second, thinner account list.
+  make it a second, thinner list of holdings.
 - **No ids**, anywhere, in any state. They are what `dims` stores and
   they are never anybody's business.
 - **No value totals and no chart preview.** What a band is worth
   belongs to the dashboard, which is one click away, and a figure here
   would be a second place for the same number to be right or wrong.
-- **No permanent delete and no "remove from all accounts".**
+- **No permanent delete and no "remove from all holdings".**
 - **No cap on values**, only the note above.
 
 ## Rules

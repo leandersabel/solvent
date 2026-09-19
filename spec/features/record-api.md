@@ -3,7 +3,7 @@
 ## What it does
 
 One generic, type-agnostic store for every encrypted record a vault
-owner holds: accounts, snapshots, rates, and the profile. The server has
+owner holds: `account`, `snapshot`, `rate` and `profile`. The server has
 no per-type logic because it cannot read any type: it moves opaque
 blobs in and out of rows keyed by plaintext columns it is allowed to
 see.
@@ -34,7 +34,7 @@ Exactly the table in architecture.md, Record storage API: `principal_id`,
   plaintext column. Stated as the complement rather than as a list, so a
   type added later is empty until something argues otherwise.
 - **The column set does not grow per type.** A `rate` record is owned by
-  a symbol rather than an account, and that symbol stays inside the
+  a symbol rather than an `account`, and that symbol stays inside the
   ciphertext: there is no plaintext `symbol` column and no plaintext
   `date` column, for the reasons `record-rate.md` gives.
 - `version` starts at 1 and increments by exactly 1 per write.
@@ -204,8 +204,8 @@ specified and owned by `manage-accounts.md`, not here.
 - **`PUT` for `snapshot` with `accountId: null`**, or for `account`,
   `rate`, or `profile` with one set → Bad Request. So is an `accountId`
   of `""` on any type. Absence has one spelling.
-- **`PUT` whose `accountId` names an account row that does not exist for
-  this user** → Bad Request. The server can check this: `account_id` is
+- **`PUT` whose `accountId` names an `account` row that does not exist
+  for this user** → Bad Request. The server can check this: `account_id` is
   plaintext.
 - **Two tabs write the same record concurrently** → the second sees
   Conflict and reloads; no merge is attempted anywhere in the system.

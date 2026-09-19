@@ -55,7 +55,7 @@ as server-side plaintext looks free. It is not.
 **The symbol is inside the ciphertext, and there is no plaintext symbol
 column.** A plaintext column would buy here what `account_id` buys for
 a snapshot, a server-side cascade, and there is no cascade to run:
-deleting an account never deletes a rate entry (another account may be
+deleting a holding never deletes a rate entry (another holding may be
 measured in the same symbol, and the chart's history stays truthful
 either way), and a symbol is never deleted, only retired
 (`rate-lookup.md`). It would cost the one fact this whole section is
@@ -83,9 +83,9 @@ rule and same reason as a snapshot's id (`record-snapshot.md`).
 }
 ```
 
-- `symbol` is the account unit this prices (`manage-accounts.md`):
+- `symbol` is the holding's unit this prices (`manage-accounts.md`):
   either a row of the operator's symbol table or the free text a person
-  typed. It is the only key to the series, because an account's unit
+  typed. It is the only key to the series, because a holding's unit
   *is* its rate symbol and the two can never disagree.
 - `date` is a calendar date, `YYYY-MM-DD`, no time and no timezone. It
   is the date the price applies to, which is the date the entry was
@@ -95,7 +95,7 @@ rule and same reason as a snapshot's id (`record-snapshot.md`).
   other quantity in the product (`record-snapshot.md`, Record shape).
   No IEEE-754 float touches it.
 - `rateTarget` is the ISO 4217 code `rate` converts into: the main
-  currency as of entry time. Written for the same reason the account's
+  currency as of entry time. Written for the same reason the holding's
   unit is written into its own record, so no historical figure becomes
   ambiguous if a changeable main currency ever arrives.
 - `rateSource` is `proposed` (taken from the lookup proxy unedited),
@@ -124,7 +124,7 @@ per-blob cap.
 ## The refresh
 
 **Recording anything at all refreshes the price of every holding that
-needs one.** Record a single franc account and the dollar rate and the
+needs one.** Record a single franc holding and the dollar rate and the
 gold price still get entries.
 
 **Prices are written by default and quantities are not**: a quantity
@@ -139,12 +139,12 @@ and doing nothing accepts and writes it.
   March's prices. A backfill therefore inserts price knots into the
   past, and the chart's entry marks already say that stretch was drawn
   rather than recorded.
-- **Which symbols.** The distinct `unit` of every **active** account,
+- **Which symbols.** The distinct `unit` of every **active** holding,
   minus any unit equal to the profile's `mainCurrency`, whose rate is
   `"1"` by definition and is stored nowhere and requested from nobody.
-  An archived account's symbol is not refreshed, except in the archive
+  An archived holding's symbol is not refreshed, except in the archive
   flow's own closing snapshot (`manage-accounts.md`), which is a
-  recording action taken while the account is still active.
+  recording action taken while the holding is still active.
 - **At most one refresh per recording date.** The entries for a date
   are ensured once for the whole sitting, not once per row, so a
   fifteen-row sweep writes one set of prices and issues one rate
@@ -293,7 +293,7 @@ never hidden and never rolled back:
 ## Two entries on one date
 
 One entry per (symbol, date) is enforced the way one snapshot per
-(account, date) is: a create is refused when a fresh reload finds the
+(holding, date) is: a create is refused when a fresh reload finds the
 slot taken, and a save whose reload finds the date taken is refused
 whole (`record-snapshot.md`, Creating and reopening are distinct acts).
 The server can enforce neither, because there is no plaintext symbol
@@ -331,14 +331,14 @@ Three definitions, used everywhere:
 
 - **The latest price** for a symbol is the entry with the greatest
   `date`, never the most recently written.
-- **The price as recorded** for an account is the entry with the
-  greatest `date` at or before the date of that account's latest
+- **The price as recorded** for a holding is the entry with the
+  greatest `date` at or before the date of that holding's latest
   quantity entry. This is what the holding was priced at when its
   quantity was last recorded.
 - **A unit equal to `mainCurrency`** prices at exactly `"1"`, from no
   entry. It is not an unpriced holding.
 
-A symbol with quantities and no entry at all leaves those accounts
+A symbol with quantities and no entry at all leaves those holdings
 **unpriced**, which `net-worth-view.md` owns.
 
 ## Editing a captured rate
@@ -370,7 +370,7 @@ to win silently.
 - **Editing one entry changes every holding measured in that symbol on
   that date.** That is what one price for one symbol on one day means,
   and the confirmation says so, naming how many holdings are affected.
-  The client can count them: it holds every account record. A save
+  The client can count them: it holds every `account` record. A save
   changing several rates confirms once, naming each symbol and its
   count, rather than queueing a dialog per line.
 - **Deleting an entry** is allowed, by clearing its line
@@ -407,15 +407,15 @@ to win silently.
   dates around them, and the only thing that removes them is deleting
   the recording (`record-snapshot.md`, Deleting a recording).
 - **A symbol the recording date never priced**, because the provider
-  was down that day or the account did not exist yet. The line is empty
+  was down that day or the holding did not exist yet. The line is empty
   and says so. Recording a quantity at that date fills it, and somebody
   who only wants the line filled asks for the lookup on the line
   itself.
 - **A symbol whose only holdings are archived** is not refreshed, and
   its existing entries stay. Historical points still price correctly.
-- **An account is created in a symbol nobody holds yet.** Its first
+- **A holding is created in a symbol nobody holds yet.** Its first
   recording is what creates the symbol's first entry. Between the
-  account existing and that recording, the account has no quantity
+  holding existing and that recording, the holding has no quantity
   either, so it is "not yet valued" rather than unpriced.
 - **A free-text unit whose price the person has never entered** leaves
   the holding unpriced until they do. The recording row asks for the
@@ -441,12 +441,12 @@ to win silently.
   distinct active unit that is not the main currency, at the recording
   date, and none for the main currency.
 - Recording for a holding measured in the main currency still writes
-  those price entries. The franc account is the case the whole split
+  those price entries. The franc holding is the case the whole split
   exists for.
-- A `rate` record's plaintext columns carry no symbol, date, or account
-  link: `account_id` is `null` on the wire and empty in the AAD, and
+- A `rate` record's plaintext columns carry no symbol, date, or
+  `account_id`: it is `null` on the wire and empty in the AAD, and
   the only other plaintext is the type, the ids, and the versions.
-- A vault with two accounts measured in `USD` holds one `rate` record
+- A vault with two holdings measured in `USD` holds one `rate` record
   per date, not two.
 - Recording at a past date writes price entries at that past date, and
   the latest entry for each symbol is unchanged when a later one
@@ -464,7 +464,7 @@ to win silently.
   writes nothing at all, rates included, and reports the date rather
   than updating any entry.
 - No request to `/api/rates` contains an edited rate, a quantity, or
-  any account identifier, asserted over the full request including
+  any holding identifier, asserted over the full request including
   headers.
 - Two entries planted for one (symbol, date) with different `rate`
   strings are both flagged, neither is read, and the symbol prices that

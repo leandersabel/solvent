@@ -4,19 +4,19 @@
 
 The app shell is the frame every signed-in screen sits in: the bar
 across the top, the navigation, the controls at its right, and the
-width the page content is held to. For a person with a vault it is
-identical on every screen, so they always know where they are and what
-they can reach from there. The admin area sits in a stripped-down
-version of the same frame.
+width the page content is held to. With a vault it is identical on
+every screen, so you always know where you are and what you can reach
+from there. The admin area sits in a stripped-down version of the same
+frame.
 
 It is also where the app's protections are applied once for the whole
 product rather than screen by screen, so a new screen cannot be added
 without them.
 
 The shell itself never shows anything from the vault. The only words in
-it are the app's name and the navigation labels. Figures, account names
-and notes exist only after the password has been entered, and only
-inside the browser.
+it are the app's name and the navigation labels. Figures, holding
+names and notes exist only after the password has been entered, and
+only inside the browser.
 
 ## Who it is for
 
@@ -27,8 +27,8 @@ shell frames sits behind the password.
 
 ## What "looks like a private bank" commits us to
 
-The client asked for something that looks like a private bank. In terms
-of what a person actually sees, that is:
+You asked for something that looks like a private bank. In terms of
+what you actually see, that is:
 
 - **One structural color.** A deep petrol blue carries the chrome.
   Beyond it there are two accents, a warm brass for the primary action
@@ -84,10 +84,9 @@ more:
 - **Dashboard**
 - **Settings**
 
-There is deliberately no **Accounts** entry. The dashboard's own table
-is the list of accounts, so a third entry would either lead back to
-the screen the person is already on or open a thinner second copy of
-it.
+There is deliberately no **Holdings** entry. The dashboard's own table
+is the list of holdings, so a third entry would either lead back to the
+screen you are already on or open a thinner second copy of it.
 
 There is no **Admin** entry either, and there is no navigation state in
 which one appears. Administering the instance is done from a separate
@@ -97,21 +96,21 @@ vault has anywhere administrative to go.
 ### Update values
 
 "Update values" is an action in the bar, not a destination in the
-navigation. Pressing it opens the update sweep from wherever the person
-currently is, which is what keeps the sweep reachable while someone is
-deep inside a single account. It goes straight into editing today and
-asks nothing. The dashboard carries the front door instead, a New
-recording button with a date picker, because that is where a person
-arrives already meaning to do it and where choosing the date is worth a
-click (`record-snapshot.md`).
+navigation. Pressing it opens the update sweep from wherever you are,
+which is what keeps the sweep reachable while you are deep inside a
+single holding. It goes straight into editing today and asks nothing.
+The dashboard carries the front door instead, a New recording button
+with a date picker, because that is where you arrive already meaning to
+do it and where choosing the date is worth a click
+(`record-snapshot.md`).
 
 ### Lock
 
 One press of **Lock** immediately discards the keys and everything
 decrypted from them, and shows the password screen. There is no "are
-you sure". This is the control someone reaches for when another person
-walks into the room, and a confirmation step spends the seconds the
-control exists to save.
+you sure". This is the control you reach for when somebody else walks
+into the room, and a confirmation step spends the seconds the control
+exists to save.
 
 Locking is not signing out. The session stays alive, so coming back
 needs the password only and the username is not asked for again.
@@ -149,7 +148,7 @@ are told apart by what they carry rather than by looking different.
 
 Content sits centered on the warm ground and is held to a width that
 stays readable on a wide monitor. Narrower content sets its own: forms
-are narrow, the update sweep and a single account's detail sit in
+are narrow, the update sweep and a single holding's detail sit in
 between.
 
 A content region arrives empty and fills once the browser has decrypted
@@ -165,7 +164,7 @@ included.
 Working on a phone does not mean one layout that stretches. A screen is
 allowed two designs that do the same job in different shapes, and the
 app chooses between them by the width of the screen it is on. The
-update sweep is the example the client gave: on a computer it is a wide
+update sweep is the example you gave: on a computer it is a wide
 table with every holding in view, and on a phone it may instead be a
 step at a time, one holding per step. Same act, same figures recorded
 at the end, different screen. So a screen is described at each size
@@ -177,7 +176,7 @@ reach: no action exists only inside a wide table, and no screen has a
 single route to something a narrow screen could not offer.
 
 What the top bar becomes at phone width is a decision for whoever draws
-the phone layouts, not a question for the client.
+the phone layouts, not a question for you.
 
 When those layouts are built, the test is that every screen can be read
 and operated end to end on a phone, the update sweep included, without
@@ -191,7 +190,7 @@ panning sideways.
    bar: the wordmark at the left, the navigation beside it, Update
    values and Lock at the right.
 2. Everybody with a vault sees exactly two navigation entries,
-   Dashboard and Settings. Nobody, ever, sees an Accounts entry or an
+   Dashboard and Settings. Nobody, ever, sees a Holdings entry or an
    Admin entry. An administrator sees the bar carrying the wordmark and
    Sign out, with no Dashboard, no Settings, no Update values and no
    Lock.
@@ -205,12 +204,12 @@ panning sideways.
    New recording button reaches once a date has been picked.
 6. One press of Lock clears every figure from the screen and shows the
    password screen, with no confirmation step in between.
-7. After locking, entering the password alone returns the person to the
-   app. The username is not asked for again.
+7. After locking, entering the password alone returns you to the app.
+   The username is not asked for again.
 8. Locking while a form holds unsaved typed input, then unlocking,
    returns that typed input. Nothing else comes back without being
    decrypted again.
-9. Nothing in the bar or the navigation ever shows an account name, a
+9. Nothing in the bar or the navigation ever shows a holding's name, a
    figure, or a note.
 
 **The look**
@@ -251,9 +250,9 @@ panning sideways.
 
 ## What it deliberately does not do
 
-- **No Accounts entry in the navigation.** The dashboard table is the
-  account list, so the entry would lead back to the current screen or
-  duplicate it.
+- **No Holdings entry in the navigation.** The dashboard table is the
+  list of holdings, so the entry would lead back to the current screen
+  or duplicate it.
 - **No Admin entry in the navigation, for anybody.** The navigation
   frames a vault, and administering the instance is not something a
   vault owner does. It is done from a separate account that has no
@@ -264,13 +263,13 @@ panning sideways.
   in Settings.
 - **No confirmation step on Lock.** The control exists to be fast under
   pressure.
-- **No dark theme.** The client asked for a light ground. A dark theme
+- **No dark theme.** You asked for a light ground. A dark theme
   is a second complete set of colors that has to be checked for
   readability from scratch rather than inverted, and the chart colors
   in particular are chosen against the warm ground and are not valid on
   a dark one.
-- **No custom typeface.** The app uses the typeface the person's own
-  device provides. A downloaded one would have to be hosted and
+- **No custom typeface.** The app uses the typeface your own device
+  provides. A downloaded one would have to be hosted and
   version-pinned like every other asset, and it would flash unstyled
   text on the password screen, the slowest screen in the product.
   Elegance here comes from spacing and restraint instead.
@@ -279,12 +278,10 @@ panning sideways.
   vault. This is not a rule the shell follows, it is a thing it is
   incapable of.
 
-## Decisions taken on the client's behalf
+## Decisions taken on your behalf
 
-The client never spoke to these. Each is reversible on request.
-
-- **The navigation is Dashboard and Settings, with no Accounts entry.**
-  Reversing it means designing a separate accounts screen that does not
+- **The navigation is Dashboard and Settings, with no Holdings entry.**
+  Reversing it means designing a separate holdings screen that does not
   simply repeat the dashboard table.
 - **The admin area keeps the same bar rather than getting a look of its
   own.** A visibly different chrome would make the admin area feel like

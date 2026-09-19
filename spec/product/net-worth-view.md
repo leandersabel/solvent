@@ -139,13 +139,13 @@ September after a figure from March and the line runs straight from the
 March figure to the September one.
 
 So a band moves on days you recorded nothing about the holding under
-it. Your dollar account holds the same dollars it held in March and its
-band still rises and falls, because the dollar did. That is not a guess
-at what you might have done, it is what those dollars were worth. And
-because recording anything writes every rate (`record-snapshot.md`), a
-sweep in which you touched only your franc account still puts a real
-rate point in the dollar and gold runs on that date, so the foreign
-bands bend there too.
+it. Your dollar holding sits at the same dollars it held in March and
+its band still rises and falls, because the dollar did. That is not a
+guess at what you might have done, it is what those dollars were worth.
+And because recording anything writes every rate
+(`record-snapshot.md`), a sweep in which you touched only your franc
+holding still puts a real rate point in the dollar and gold runs on
+that date, so the foreign bands bend there too.
 
 Neither the interpolation nor the carry forward is written down. They
 are the drawing. Your history holds the quantities you recorded and the
@@ -197,8 +197,9 @@ valued", never as zero, because zero is a real figure that means
 something else. Archived holdings are hidden behind a toggle. Clicking a
 row opens that holding.
 
-There is no separate "Accounts" entry in the navigation, because this
-list is the account list (`app-shell.md`, which owns the navigation).
+There is no separate "Holdings" entry in the navigation, because this
+list is the list of holdings (`app-shell.md`, which owns the
+navigation).
 
 ### The breakdown
 
@@ -249,7 +250,7 @@ the section needs no small print.
   only for those. Every other holding keeps the quantity it had, with
   nothing recorded for it and nothing flagged, and its band still moves
   if its rate did.
-- Recording one franc account moves every band measured in a foreign
+- Recording one franc holding moves every band measured in a foreign
   unit, on that date and after it, because every rate was refreshed.
 - Switching to rates as of each figure changes the total, the list and
   the breakdown, and leaves the chart pixel for pixel the same.
@@ -310,9 +311,6 @@ the section needs no small print.
   color blind readers.
 
 ## Decisions taken on your behalf
-
-These were not in anything you said. They are marked so you can overrule
-them.
 
 - **The chart defaults to one year**, or everything when your history is
   shorter, and defaults to grouping by nothing until you have set up an

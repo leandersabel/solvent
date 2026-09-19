@@ -2,17 +2,18 @@
 
 ## Purpose
 
-Create and edit an account (a holding), and the archive/delete decision
-for one that already has history.
+Create and edit a holding, and the archive/delete decision for one
+that already has history.
 
 Exercises: `spec/features/manage-accounts.md`.
 
 ## Layout
 
 Modal over the dashboard for create; full panel for edit, reached from
-the account's detail screen (`account-detail.md`). Form max-width 480px.
+the holding's detail screen (`account-detail.md`). Form max-width
+480px.
 
-- **Name** — free text. Not required to be unique; two accounts may
+- **Name** — free text. Not required to be unique; two holdings may
   share a name.
 - **Measured in**, the unit the holding is counted in, and the choice
   that decides which run of prices values it. One searchable select
@@ -23,7 +24,7 @@ the account's detail screen (`account-detail.md`). Form max-width 480px.
   This single control sets the unit *and* the rate symbol, because they
   are the same thing (`manage-accounts.md`): a listed unit gets
   proposals, a free-text unit does not, and no combination of answers
-  can produce an account measured in grams and priced per ounce.
+  can produce a holding measured in grams and priced per ounce.
 
   **The ordinary answers come first, and an unusual one says what it
   commits you to** (`manage-accounts.md`, Decisions taken on your
@@ -47,9 +48,9 @@ the account's detail screen (`account-detail.md`). Form max-width 480px.
   - Symbols with `lookup: false` are **listed and selectable**, marked
     "rate entered by hand" in the option row — silver, platinum and
     palladium in v1. Picking one is a normal choice, not a warning
-    state: it records the canonical symbol against the holding, so the
-    account starts getting proposals automatically if a provider is
-    added later. Pushing the user to free text would lose that.
+    state: it records the canonical symbol against the holding, so it
+    starts getting proposals automatically if a provider is added
+    later. Pushing the user to free text would lose that.
   - **"Something else…"** takes free text (`m²`, `bottles`) with a
     one-line consequence stated at the point of choice, not discovered
     later: "You enter the price yourself each time you record a value."
@@ -62,7 +63,7 @@ the account's detail screen (`account-detail.md`). Form max-width 480px.
       measured in `usd` and one measured in `USD` look identical on
       every later screen and only one of them is ever priced.
   - **A unit the table no longer offers** still shows as the current
-    choice on an account already measured in it, with its stored text.
+    choice on a holding already measured in it, with its stored text.
     A retired symbol keeps pricing (`rate-lookup.md`, Maintaining the
     table), so nothing is wrong and nothing needs deciding. The option
     is simply absent for anyone choosing afresh.
@@ -98,7 +99,7 @@ the account's detail screen (`account-detail.md`). Form max-width 480px.
   - **`+ New value`** at the foot of each select creates one inline: the
     user types a label, it is appended to that dimension in the profile
     and selected here. Two writes, both single-record — the profile and
-    then this account. Without it, classifying an account means leaving
+    then this holding. Without it, classifying a holding means leaving
     a half-filled form to visit another screen, which is how a taxonomy
     stops being used.
   - **`+ New dimension`** beneath the block does the same one level up,
@@ -112,7 +113,7 @@ the account's detail screen (`account-detail.md`). Form max-width 480px.
 
 ## Unit, once there are snapshots
 
-The unit control is **disabled** on an account with ≥1 snapshot, with an
+The unit control is **disabled** on a holding with ≥1 snapshot, with an
 inline explanation rather than a silent lock:
 
 > The unit cannot change once you have recorded a value here. Your
@@ -128,8 +129,8 @@ ciphertext, so the server cannot validate it (`manage-accounts.md`).
 
 ## Delete: the user chooses
 
-Deleting an account **with snapshots** opens a dialog offering two real
-options, archive preselected. An account with **no** snapshots skips the
+Deleting a holding **with snapshots** opens a dialog offering two real
+options, archive preselected. A holding with **no** snapshots skips the
 dialog entirely and is deleted outright.
 
 ### Archive
@@ -151,7 +152,7 @@ you stop it.
   - **The replace prompt does not fire here.** It exists to catch
     somebody writing at a date they did not know was taken, and the
     stored figure is in the field they are looking at
-    (`record-snapshot.md`, Same account, same date). The dialog's own
+    (`record-snapshot.md`, Same holding, same date). The dialog's own
     confirm is the confirmation.
 - Skipping states its cost: "Without this, your chart drops by the last
   figure recorded here, with nothing recorded on that date to explain
@@ -161,7 +162,7 @@ you stop it.
 - This is the expected path, and the copy reads as an ordinary question
   rather than a warning. The value it captures is what lets the chart
   run into the close instead of falling off a cliff
-  (`net-worth-view.md`, Archived accounts).
+  (`net-worth-view.md`, Archived holdings).
 
 **A closing value is a recording.** It joins the recording for the
 archive date and writes that date's prices for every unit that needs
@@ -174,11 +175,11 @@ is rewritten.
 them in this order:
 
 1. The closing value, as an ordinary recording at the archive date.
-2. That date's price entries, over the units of the accounts as they
-   stand at this moment, this account still among them.
-3. The account record's archive flag, last.
+2. That date's price entries, over the units of the holdings as they
+   stand at this moment, this holding still among them.
+3. The `account` record's archive flag, last.
 
-The flag goes last because the refresh covers active accounts only.
+The flag goes last because the refresh covers active holdings only.
 Setting it first would drop this holding's unit out of the set and
 archive a position at a price nobody captured.
 
@@ -191,7 +192,7 @@ when the value was skipped here.
 
 ### Delete permanently
 
-Requires typing the account name to confirm. The confirm button stays
+Requires typing the holding's name to confirm. The confirm button stays
 disabled until the typed name matches, so a mistyped name reaches no
 error state.
 
@@ -229,7 +230,7 @@ a second arrangement.
   the notice names the cost, because a typed `dollars` is a free-text
   unit rather than the `USD` run of prices, and the choice is fixed once
   a value is recorded.
-- **Error, Conflict stale version**: "This account was changed in
+- **Error, Conflict stale version**: "This holding was changed in
   another tab." The panel reloads the current record.
 - **Error, save failed**: the form keeps every value.
 - **Error, the closing value did not save**: nothing is archived and
@@ -243,8 +244,8 @@ a second arrangement.
   figure stays recorded at that date and the holding is still active.
   Say both halves and offer the archive again, which now prefills with
   the figure stored there.
-- **Populated**: the saved account appears in the table immediately from
-  local state, with no refetch.
+- **Populated**: the saved holding appears in the table immediately
+  from local state, with no refetch.
 
 ## What it deliberately does not show
 
@@ -274,11 +275,11 @@ a second arrangement.
 - `manage-accounts.md`, Rules applies unchanged.
 - Creating a value or a dimension inline writes the profile record
   first. If that write fails, the account form keeps every field and
-  says the value was not created; it never saves an account referencing
+  says the value was not created; it never saves a holding referencing
   an id that does not exist.
-- Unarchiving is available from the archived rows and from the account's
-  detail screen: one action, no dialog, restoring the account to active
-  lists and the current total. Its unit rejoins the set that the next
+- Unarchiving is available from the archived rows and from the
+  holding's detail screen: one action, no dialog, restoring the holding
+  to active lists and the current total. Its unit rejoins the set that the next
   recording refreshes (`record-rate.md`, The refresh).
 - Names, notes and dimension labels are decrypted user text and render
   through `x-text` or `textContent` only (`design-system.md`,

@@ -89,8 +89,8 @@ successfully**.
   included. It is the one sanctioned way the main currency of a vault
   changes (`account-settings.md`), and you are told before you confirm,
   not after.
-- After a restore, the same person signed in elsewhere is signed out and
-  has to sign in again. Nothing typed there afterwards reaches the
+- After a restore, you are signed out anywhere else you are signed in,
+  and have to sign in again. Nothing typed there afterwards reaches the
   vault.
 - Two vaults are independent from the moment of a restore. If someone
   gives you their file and keeps using their own vault, nothing they
@@ -121,9 +121,6 @@ successfully**.
 
 ## Decisions taken on your behalf
 
-These were not in anything you said. They are marked so you can overrule
-them.
-
 - **A file exported by one person can be restored into another
   person's account on the same instance**, given that file's password.
   The file says nothing about whose vault it was, and that is kept
@@ -138,8 +135,8 @@ them.
 
   Telling you how long it has been, or putting a copy somewhere by
   itself, is wanted and is not in the first version. What the first
-  version owes them is that a backup stays a plain file the person
-  holds, with nothing else depending on the app knowing when one was
+  version owes them is that a backup stays a plain file you hold,
+  with nothing else depending on the app knowing when one was
   last made.
 - **There is a ceiling on how often the whole vault can be downloaded**,
   a few times an hour. It reads everything you own, and nobody backs up

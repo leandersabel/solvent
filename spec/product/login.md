@@ -2,11 +2,11 @@
 
 ## What it does
 
-Opens a vault. The person types their password, waits a moment, and
-their accounts, figures, and history appear.
+Opens a vault. You type your password, wait a moment, and your
+holdings, figures, and history appear.
 
 It is the only screen where a password is typed outside registration
-and changing a password, and it is where the client's zero-knowledge
+and changing a password, and it is where your zero-knowledge
 requirement is felt rather than explained: the password is not checked
 against something the server knows, it is the thing that makes the
 vault readable. A wrong password does not fail a check, it produces a
@@ -23,9 +23,9 @@ The same screen does three jobs:
   administrator account has no vault.
 
 The username decides which of the two kinds of account is being signed
-in to, and the person never says which they meant, because a username
-belongs to exactly one account on the instance. Somebody who holds both
-kinds holds two usernames and signs in to one at a time.
+in to, and you never say which you meant, because a username belongs
+to exactly one account on the instance. Somebody who holds both kinds
+holds two usernames and signs in to one at a time.
 
 ## The screens
 
@@ -91,8 +91,8 @@ Locking is a vault owner's concern.
 
 The vault locks in three ways, and all three land back on this screen:
 
-- **By itself**, after a stretch of no activity. The person sets how
-  long in settings (`account-settings.md`, which owns the period).
+- **By itself**, after a stretch of no activity. You set how long in
+  settings (`account-settings.md`, which owns the period).
 - **By hand**, with the lock button in the top bar. One click, no
   confirmation (`app-shell.md`, which owns the button).
 - **By reloading the page.** Nothing is kept anywhere on the device, so
@@ -105,11 +105,11 @@ machine, and that person can open the browser's own developer tools. So
 unlocking genuinely reloads and re-reads the vault, and that pause is
 by design.
 
-**One thing survives a lock: whatever the person was typing.** An
-unsaved form keeps what is in it, so a lock in the middle of entering
-figures does not destroy the work. That is what the person is about to
-commit, not vault content read back. Nothing else is exempt, and after
-unlocking they are returned to where they were.
+**One thing survives a lock: whatever you were typing.** An unsaved
+form keeps what is in it, so a lock in the middle of entering figures
+does not destroy the work. That is what you are about to commit, not
+vault content read back. Nothing else is exempt, and after unlocking
+you are returned to where you were.
 
 ### When it goes wrong
 
@@ -128,20 +128,20 @@ unlocking they are returned to where they were.
   unlocking needs. The copy blames the moment, not the password and not
   the device: this device does not have enough memory available right
   now, close other tabs and try again. Retry is offered, because
-  closing tabs genuinely can fix it. It must never tell somebody their
-  phone or their computer is incapable of opening a vault.
-- **The session ran out mid-action.** The person is asked to unlock
-  again. Nothing they typed is thrown away.
+  closing tabs genuinely can fix it. It must never tell you that your
+  phone or your computer is incapable of opening a vault.
+- **The session ran out mid-action.** You are asked to unlock again.
+  Nothing you typed is thrown away.
 
 ### Keeping the lock current
 
 Over time the instance raises how hard it is to attack a stored vault.
-When somebody with an older vault signs in, Solvent quietly rebuilds
-the protection around it at the current strength, with no prompt and no
-wait beyond the sign-in they already did. Nothing inside the vault is
-re-encrypted and nothing can be lost in the process. If it fails, the
-person is signed in as normal and it is tried again next time. An
-upgrade that could lock somebody out would be worse than no upgrade.
+When you sign in with an older vault, Solvent quietly rebuilds the
+protection around it at the current strength, with no prompt and no
+wait beyond the sign-in you already did. Nothing inside the vault is
+re-encrypted and nothing can be lost in the process. If it fails, you
+are signed in as normal and it is tried again next time. An upgrade
+that could lock somebody out would be worse than no upgrade.
 
 ## What must be true
 
@@ -171,20 +171,20 @@ upgrade that could lock somebody out would be worse than no upgrade.
   browser's own tools at that point.
 - Unlocking after a lock re-reads and re-decrypts the vault rather than
   restoring what was on screen before.
-- What the person was typing into an open form is still there after
+- What you were typing into an open form is still there after
   unlocking, and it is the only thing that is.
 - The lock button in the top bar locks immediately, with no
-  confirmation, and does not sign the person out. Unlocking needs only
-  the password.
+  confirmation, and does not sign you out. Unlocking needs only the
+  password.
 - Everybody is signed out twelve hours after signing in, however busy
   they have been.
 - A vault made when the instance protected vaults less strongly is
   brought up to current strength at the next sign-in, without being
   asked and without touching anything inside the vault. If that step
-  fails the person is still signed in and can still sign in next time.
+  fails you are still signed in and can still sign in next time.
 - A password that is correct but opens nothing is treated as a failed
   sign-in with the same message, and reported to the operator as an
-  anomaly rather than shown to the person.
+  anomaly rather than shown to you.
 - Someone already signed in to a user account who returns to the
   sign-in address goes to their dashboard, and is asked to unlock
   rather than shown an empty vault. An administrator already signed in
@@ -212,7 +212,7 @@ upgrade that could lock somebody out would be worse than no upgrade.
   now.** Unlocking with anything weaker would produce a key that opens
   nothing anyway, and weakening it for everybody would undo the one
   protection that stands between a stolen copy of the data and someone
-  reading it. The person closes a tab and tries again instead.
+  reading it. You close a tab and try again instead.
 - **Guessing who has an account is not fully closed off.** For vaults
   at the current protection strength it is. A vault that has not been
   signed into since the last raise is, until its owner next signs in,
@@ -220,7 +220,7 @@ upgrade that could lock somebody out would be worse than no upgrade.
   household, where sign-in is already gated and registration accepts
   the same exposure.
 
-## Decisions taken on the client's behalf
+## Decisions taken on your behalf
 
 - **Both kinds of account sign in at the same screen, at the same
   address.** A separate address for administrators would be one more

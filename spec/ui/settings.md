@@ -4,7 +4,7 @@
 
 A vault owner's own account: their password, the currency their vault
 counts in, how long it stays unlocked, which sessions are open, how
-their accounts are grouped, and, at the bottom, deleting the whole
+their holdings are grouped, and, at the bottom, deleting the whole
 thing.
 
 **This screen exists only inside a vault.** An administrator account
@@ -37,7 +37,7 @@ max-width 720px, one card per section, stacked in the order below.
 Two link rows, each one line of explanation and a chevron. Neither
 belongs inside a settings card, so neither is a section.
 
-- **Dimensions** (`ui/dimensions.md`). "How your accounts split up in
+- **Dimensions** (`ui/dimensions.md`). "How your holdings split up in
   the chart." Beneath it, how many exist right now, or "None yet".
 - **Export and import** (`ui/export-import.md`). "Download your vault,
   or restore one from a file."

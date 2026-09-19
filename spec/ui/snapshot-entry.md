@@ -16,11 +16,12 @@ Exercises: `spec/features/record-snapshot.md`, and the refresh half of
 
 ## Layout
 
-Modal, max-width 460px, reachable from any account row on the dashboard
-and from the holding's own screen. The same modal, pre-filled, is what
-edits an existing entry (`account-detail.md`).
+An ordinary Dialog (`design-system.md`, Components), reachable from
+any holding's row on the dashboard and from the holding's own screen.
+The same modal, pre-filled, is what edits an existing entry
+(`account-detail.md`).
 
-- **Account** — preselected when opened from a row; otherwise a select.
+- **Holding** — preselected when opened from a row; otherwise a select.
   Static when editing: an entry does not move between holdings, since
   its value is denominated in one holding's unit.
 - **Date** — defaults to today. Future dates blocked. Editable when
@@ -113,7 +114,7 @@ The same modal, pre-filled with the stored value, date and note.
   (`update-values.md`, which owns the copy).
 - **Error, validation**: the quantity field's own rules
   (`design-system.md`, Components), and a future date refused inline.
-- **Error, archived account**: the entry point does not exist for
+- **Error, archived holding**: the entry point does not exist for
   archived holdings. The only exception is the closing value written by
   the archive flow (`account-form.md`).
 - **Populated**: saved; the modal closes and the dashboard updates from

@@ -226,7 +226,7 @@ rearrangement:
   contains the variable name and no key material.
 - Nav shows Dashboard and Settings for a vault owner. An
   administrator's bar shows no nav entries at all, and its only
-  control is Sign out. There is no Accounts entry and no Admin entry
+  control is Sign out. There is no Holdings entry and no Admin entry
   in either bar.
 - An administrator session receives Not Found from `/settings`,
   `/api/sessions`, and `/api/auth/logout-all`, and OK from

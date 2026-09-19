@@ -2,7 +2,7 @@
 
 ## What it does
 
-You hold things that are not in your main currency: a dollar account,
+You hold things that are not in your main currency: a dollar holding,
 gold in a safe. Your net worth is one figure, so each of those needs a
 price for the day you record it, and looking that price up yourself,
 for the right day, is the tedious part of an update.
@@ -14,11 +14,11 @@ gets kept is the number you saved, not the number the app offered
 
 It looks up every unit you hold, not only the one you are recording,
 because recording anything refreshes every rate (`record-snapshot.md`,
-which owns that rule). Updating one franc account asks the sources
+which owns that rule). Updating one franc holding asks the sources
 about dollars and gold.
 
-This is for the person with a foreign currency account or physical gold.
-If everything you own is already in your main currency, you never meet
+This is for you if you hold a foreign currency or physical gold. If
+everything you own is already in your main currency, you never meet
 this part of the app.
 
 ## The screens
@@ -124,9 +124,6 @@ can overwrite any of them, and no entry is ever blocked by a lookup that
 failed.
 
 ## Decisions taken on your behalf
-
-These were not in anything you said. They are marked so you can overrule
-them.
 
 - **The gold price you are offered is usually a day old**, because the
   Polish central bank publishes one business day behind the London

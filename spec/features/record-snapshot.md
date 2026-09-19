@@ -2,8 +2,8 @@
 
 ## What it does
 
-Enter a point-in-time quantity for one account: a date and a value in
-the account's native unit. That is the whole of a snapshot.
+Enter a point-in-time quantity for one holding: a date and a value in
+the holding's native unit. That is the whole of a snapshot.
 
 **A snapshot carries no rate.** Quantities and prices are two separate
 timelines (architecture.md, Data model), one price series per symbol
@@ -19,7 +19,7 @@ This file owns only the quantity.
 ## Record shape
 
 `record_type: "snapshot"`, plaintext `account_id` set to the owning
-account. Decrypted payload:
+holding. Decrypted payload:
 
 ```json
 {
@@ -46,7 +46,7 @@ account. Decrypted payload:
     **round-half-even**. Addition and subtraction need no rescale, which
     is why a sum of snapshots is exact by construction.
   - **Division** happens in two places only — the percentage view and
-    per-account interpolation (`net-worth-view.md`) — and rounds
+    per-holding interpolation (`net-worth-view.md`) — and rounds
     half-even at scale 12 as well. Rounding for *display* is a separate,
     later step applied to a figure already exact at scale 12.
   - A decimal library was rejected on the same grounds as a charting
@@ -58,12 +58,12 @@ account. Decrypted payload:
   snapshot is "what it was worth that day."
 - `note` is free text, optional, `null` when unset.
 
-Contribution to net worth = `value` times the price of the account's
+Contribution to net worth = `value` times the price of the holding's
 unit, which `net-worth-view.md` selects from the price timeline.
 
 ## Flow
 
-1. User picks an account and a date (defaults to today).
+1. User picks a holding and a date (defaults to today).
 2. User enters the value. The client shows the converted main-currency
    figure live, using the price it already holds or the proposal for
    that date (`record-rate.md`).
@@ -74,16 +74,16 @@ unit, which `net-worth-view.md` selects from the price timeline.
 The value field is never sent anywhere before it is encrypted — in
 particular, it must not be part of, or trigger, any rate request.
 
-## Same account, same date: upsert
+## Same holding, same date: upsert
 
-**One snapshot per (account, date).** Entering a value for a date that
+**One snapshot per (holding, date).** Entering a value for a date that
 already has one prompts "You already recorded 12 450.00 USD for 31 July.
-Replace it?" — the previously recorded value, in the account's native
+Replace it?" — the previously recorded value, in the holding's native
 unit — and, on confirm, updates the existing record in place
 (same `record_id`, `version` + 1, fresh nonce).
 
 Duplicate detection is client-side — the client already decrypts every
-snapshot for the account, and the server cannot see dates. Record ids
+snapshot for the holding, and the server cannot see dates. Record ids
 stay random UUIDv4; deriving them from the date would let the server
 brute-force which dates a user holds data for.
 
@@ -96,7 +96,7 @@ carries a confirm of its own (`manage-accounts.md`).
 
 ## Confirming a previous value
 
-A snapshot can be written by **confirming** an account's last recorded
+A snapshot can be written by **confirming** a holding's last recorded
 quantity at a new date rather than typing it (`ui/update-values.md`). It
 writes an ordinary snapshot: same `value`, new `date`, new `record_id`.
 No new field and nothing for the record shape to learn.
@@ -105,11 +105,11 @@ No new field and nothing for the record shape to learn.
 own 12.5 troy ounces. What gold has done since is the price timeline's
 business, and it is refreshed by the act of recording whether or not
 anything was confirmed (`record-rate.md`). That is why confirming has no
-cases: it is one click for a franc account, for a dollar account, for
+cases: it is one click for a franc holding, for a dollar holding, for
 gold, and for the flat, and it stays one click when the provider is
 down, because nothing about it depends on a price resolving.
 
-Confirming is unavailable for an account with no snapshots. There is
+Confirming is unavailable for a holding with no snapshots. There is
 nothing to confirm.
 
 ## A recording is a date
@@ -126,7 +126,7 @@ entries grouped by their own `date` field.
 
 - Every fact a grouping record could hold is already on its members.
   The date is on each of them, and the uniqueness rules, one snapshot
-  per (account, date) and one entry per (symbol, date), already pin the
+  per (holding, date) and one entry per (symbol, date), already pin the
   identity such a record would be asserting.
 - **It could disagree with what it claims to group.** A member deleted
   from the holding's own page, written by a second session, or whose
@@ -183,7 +183,7 @@ Moving one entry between dates stays what it is, an edit of that
 snapshot from the holding's own page (Moving the date onto an occupied
 date).
 
-**The replace prompt does not fire here** (Same account, same date).
+**The replace prompt does not fire here** (Same holding, same date).
 The stored figure is on screen in the field being edited, so the prompt
 would fire on every ordinary correction and tell the person what they
 are already looking at.
@@ -222,7 +222,7 @@ decryption warning rather than silently shaping the list.
   the reopen flow, which is the only way an existing figure changes.
 - **Inside a reopened recording, a create whose slot another session
   filled fails the same way.** The holding was not silent after all.
-- **The replace prompt is a different case** (Same account, same date).
+- **The replace prompt is a different case** (Same holding, same date).
   There the stored figure is put in front of the person and they choose
   to replace it, before anything is written. That is consent, not a
   collision discovered at write time.
@@ -322,7 +322,7 @@ fields.
 
 Value, note, and **date** are all editable (`ui/account-detail.md` is
 where a past snapshot is found). Editing is an ordinary versioned write,
-except when the date moves onto a date the account already holds.
+except when the date moves onto a date the holding already holds.
 
 **No edit here touches a price.** Correcting a typo in a value, or
 moving an entry from 30 July to 31 July, changes which price the holding
@@ -362,7 +362,7 @@ never silently resolved.** Two paths reach it, and no third one does:
 
 A client that finds a pair takes no guess at which is authoritative,
 not the highest `version` and not the latest `updated_at`. It renders
-both in the account's history and in the recording for that date, both
+both in the holding's history and in the recording for that date, both
 flagged, with an action to keep one, and it excludes that date from
 interpolation until resolved, because there is no correct curve through
 two values. Same family as a decryption failure: a visible fault beats
@@ -370,7 +370,7 @@ a quiet wrong number.
 
 ## Inputs / outputs
 
-- In: account, date, value, optional note.
+- In: holding, date, value, optional note.
 - Out: encrypted snapshot record via `PUT /api/records/<uuid>`, and the
   recording date's price entries behind it (`record-rate.md`). Net worth
   view and trend chart reflect both immediately from local state,
@@ -389,7 +389,7 @@ a quiet wrong number.
   the holding is listed as **not priced** rather than counted wrong,
   which `net-worth-view.md` owns.
 - **Date is in the future** → blocked. A snapshot describes what was.
-- **Date precedes the account's `createdAt`** → allowed; backfilling
+- **Date precedes the holding's `createdAt`** → allowed; backfilling
   history is a normal use.
 - **Editing a past snapshot** → allowed, versioned like any other write.
   The AAD's `version` binds each ciphertext to the version it
@@ -402,7 +402,7 @@ a quiet wrong number.
   asserting rollback is detected today.
 - **Deleting a snapshot** → allowed, single confirm, from the holding's
   page or by clearing its figure in the recording for its date.
-  Deleting the only snapshot for an account leaves the account with no
+  Deleting the only snapshot for a holding leaves the holding with no
   current value, and it is excluded from the total rather than counted
   as zero. No price entry is deleted with it: a price belongs to a
   symbol, not to the holding that happened to prompt it.
@@ -415,12 +415,12 @@ a quiet wrong number.
   date is available to be recorded again as though it never had been.
 - **Value of zero** → valid and meaningful (a closed-out position). Not
   the same as having no snapshot.
-- **Negative value** → valid. Mortgages and loans are accounts with
+- **Negative value** → valid. Mortgages and loans are holdings with
   negative balances; net worth is a signed sum.
 - **Non-numeric or malformed value** → inline validation, no
   submission.
-- **Snapshot recorded against an archived account** → blocked; archived
-  accounts take no new snapshots. The one exception is the **closing
+- **Snapshot recorded against an archived holding** → blocked; archived
+  holdings take no new snapshots. The one exception is the **closing
   snapshot written as part of archiving** (manage-accounts.md), dated
   `archivedAt` and written in the same flow that sets it.
 
@@ -438,11 +438,11 @@ a quiet wrong number.
 - A value with more than twelve decimal places is rejected at input
   rather than silently truncated.
 - Re-entering a date that already has a snapshot prompts to replace and,
-  on confirm, results in **one** record for that (account, date) with
+  on confirm, results in **one** record for that (holding, date) with
   `version` incremented and a different nonce.
 - Declining the replace prompt leaves the original record untouched.
 - A negative value and a zero value both round-trip and are included in
-  the total; an account with no snapshots is excluded from the total.
+  the total; a holding with no snapshots is excluded from the total.
 - No request issued during the flow contains the entered value, in any
   field, in any encoding.
 - With the rate proxy stubbed to 503, the snapshot still saves, and the
@@ -452,19 +452,19 @@ a quiet wrong number.
   written, and the holding is listed as not priced. Asserted for a
   free-text unit and for a symbol whose lookup returned nothing.
 - A future-dated snapshot is rejected.
-- Attempting to record against an archived account is blocked, except
+- Attempting to record against an archived holding is blocked, except
   for the closing snapshot written by the archive flow itself.
 - Editing a snapshot from a second tab with a stale `version` returns
   Conflict and does not overwrite.
 - Editing a snapshot's value, note, or date issues no request to
   `/api/rates` and writes no `rate` record.
-- Confirming writes a snapshot whose `value` equals the account's last
-  recorded one at the new date, for an account in the main currency, one
+- Confirming writes a snapshot whose `value` equals the holding's last
+  recorded one at the new date, for a holding in the main currency, one
   with a live rate source, and one with none, with no branch between
   them.
 - Confirming stays available and stays one click with the rate proxy
   stubbed to No Content.
-- Confirming an account with no snapshots is not offered, and the
+- Confirming a holding with no snapshots is not offered, and the
   equivalent request is rejected client-side.
 - Moving a snapshot's date onto an occupied date prompts with copy
   naming the deletion, and on confirm leaves exactly one record for that
@@ -472,7 +472,7 @@ a quiet wrong number.
 - The move issues the `PUT` before the `DELETE`: with the `DELETE`
   stubbed to fail, both records still exist afterwards and neither is
   lost.
-- With two snapshots present for one (account, date), the history view
+- With two snapshots present for one (holding, date), the history view
   shows both flagged, the client picks neither, and that date is
   excluded from the interpolated series until resolved.
 - Deleting a snapshot deletes no `rate` record, asserted by count.

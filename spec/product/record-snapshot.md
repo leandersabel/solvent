@@ -9,10 +9,10 @@ total is made of. What one unit of it is worth in your main currency is
 recorded too, on its own, and mostly without you doing anything.
 
 This is the recurring act in Solvent. Everything else is setup. It is
-for the person who sits down at the end of a month or a quarter, opens
-the online banking of four banks, and wants to be done in a few minutes.
-What they gathered that evening is what gets recorded, and nothing else
-does.
+for you at the end of a month or a quarter, sitting down with the
+online banking of four banks open and wanting to be done in a few
+minutes. What you gathered that evening is what gets recorded, and
+nothing else does.
 
 The number you type never leaves your browser in readable form, and it
 is never part of any price lookup the app makes. The app can ask what a
@@ -51,7 +51,7 @@ why it is stored rather than remembered by the tab that entered it.
 
 ## Recording anything refreshes every rate
 
-Record your franc account and nothing else, and the dollar rate and the
+Record your franc holding and nothing else, and the dollar rate and the
 gold price get a fresh entry too, for the same date, without you asking
 for one. Your total is then never built out of a rate nobody has looked
 at since March, however long ago you last touched the holdings that
@@ -105,7 +105,7 @@ Three things you might want to put right are the same act on the same
 screen:
 
 - **A figure you got wrong.** The balance you typed was the wrong
-  account's.
+  holding's.
 - **A holding that was silent.** You skipped it that evening, so it has
   no entry for that date, and the statement is in front of you now.
 - **A rate you disagree with.** The figure the source published that
@@ -146,7 +146,7 @@ what that date holds.
 - **The date**, as the heading. That is the recording's name.
 - **The figures**, one line each: the holding, the figure in that
   holding's own unit, and the same figure in your main currency. The
-  holding's name opens the holding, because "which account was that"
+  holding's name opens the holding, because "which holding was that"
   is the question this screen provokes.
 - **The prices**, one line each: the unit, the price, and where it
   came from, in the same words as everywhere else. Proposed, changed
@@ -229,7 +229,7 @@ In the ordinary case you read it, it is right, and you finish.
   and stays empty. Nothing is written for that unit, your total carries
   on at the most recent rate it has, and the line comes back filled in
   as soon as the source does. You are never asked to type a dollar rate
-  in order to record a franc account.
+  in order to record a franc holding.
 
 The one time a rate is asked for rather than offered is when the unit
 has no rate at all and you are recording a quantity in it. Twelve troy
@@ -358,7 +358,7 @@ never because the date has been closed against them.
 
 That last one is why a price is corrected here and nowhere else. The
 same edit made on a screen listing nothing but rates would move
-figures the person was not looking at.
+figures you were not looking at.
 
 Nothing outside that date moves. March's rate is March's, and changing
 it leaves April alone. Nothing recalculates itself afterwards either: a
@@ -458,7 +458,7 @@ worth around that date will change.
   as unfinished at any point.
 - Nothing on the sweep counts, scores, flags or later mentions how many
   holdings you left alone.
-- Recording one franc account writes a rate entry for every published
+- Recording one franc holding writes a rate entry for every published
   unit anything in your vault is measured in, dated the same day,
   whether or not you looked at any of them.
 - A rate line you never touched is written and a holding row you never
@@ -560,7 +560,7 @@ worth around that date will change.
 - A refused attempt leaves nothing behind. None of its figures appear
   anywhere afterwards, and nothing on screen says anything was saved.
 - The refusal reads as the date already being taken, never as
-  something the person did wrong.
+  something you did wrong.
 - Entering the same value in two browser tabs never loses one of them
   without saying so, and neither does editing the same recording in
   two.
@@ -603,9 +603,6 @@ worth around that date will change.
   this version. The provenance of each price is on the holding's page.
 
 ## Decisions taken on your behalf
-
-These were not in anything you said. They are marked so you can overrule
-them.
 
 - **One value per holding per date**, with entering a second one
   offering to replace the first.

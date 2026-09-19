@@ -105,8 +105,8 @@ Confirm asserts the quantity and only the quantity
 moved is the gold price, which belongs to the unit and is handled at
 the foot of this screen.
 
-So it has no cases. One click for a franc account, for a dollar
-account, for gold and for the flat, and **still one click with the
+So it has no cases. One click for a franc holding, for a dollar
+holding, for gold and for the flat, and **still one click with the
 price provider down**, because nothing about it waits on a price
 resolving.
 
@@ -163,7 +163,7 @@ Line states:
   for it today." Nothing is written for that unit, the total carries on
   at the most recent rate it has, and the line comes back filled in as
   soon as the source does. Nobody is ever asked to type a dollar rate
-  in order to record a franc account.
+  in order to record a franc holding.
 - **A unit only its owner can price**, free text or a symbol the proxy
   has no provider for. The line shows the last figure and when it was
   set, "estimated 14 months ago", and writes nothing unless it is
@@ -265,7 +265,7 @@ write.
 ## States
 
 - **Loading**: none. Everything comes from the in-memory model.
-- **Empty, no accounts**: "Add an account first", linking to the
+- **Empty, no holdings**: "Add a holding first", linking to the
   account form. No rate block: there are no units to price.
 - **Empty, an empty recording reopened**: every row reads as nothing
   recorded for this date, and the rate lines show the prices that kept

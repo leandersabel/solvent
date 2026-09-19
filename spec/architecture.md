@@ -50,43 +50,43 @@ All entity content below (names, notes, classifications, values) is
 encrypted client-side
 per the Security model — the server sees ciphertext, not these fields.
 
-- **User**: has one **main currency** — the currency all accounts
-  normalize into for the total net-worth figure.
+- **Vault owner**: has one **main currency** — the currency every
+  holding normalizes into for the total net-worth figure.
 - **Account**: a holding, virtual (bank, brokerage, crypto exchange) or
   physical (gold, real estate, collectibles). Has a name, a native unit,
   a free-text **note**, and one **dimension assignment** per configured
   dimension. The unit is either a symbol from the operator's rate table
   (`USD`, `XAU-ozt`) or free text for something with no market price
-  (`m²`) — and it **doubles as the account's rate symbol**, so a holding
+  (`m²`) — and it **doubles as the holding's rate symbol**, so a holding
   can never be measured in one unit and priced in another.
-  Some accounts (private equity, a private loan, unlisted real estate)
+  Some holdings (private equity, a private loan, unlisted real estate)
   have no public price or rate source, so the price for their unit is
   entered by hand rather than proposed.
 - **Brokerage holdings are recorded at depot level**, not per position:
-  one account whose native unit is the depot's reporting currency, and
+  one holding whose native unit is the depot's reporting currency, and
   whose snapshot value is the total the broker reports — the same act as
   updating a bank account. A depot is therefore an ordinary currency
-  account: a foreign-currency depot converts through the same FX path as
+  holding: a foreign-currency depot converts through the same FX path as
   a foreign-currency bank account, and one reporting in the main
   currency needs no rate at all. See Non-goals.
-- **Dimension**: a named axis an account is classified along —
-  "Liquidity" with values "Cash", "Retirement", and so on. An account
+- **Dimension**: a named axis a holding is classified along —
+  "Liquidity" with values "Cash", "Retirement", and so on. A holding
   carries **at most one value per dimension, structurally**: the
-  account record's `dims` is a map from dimension id to value id, so a
+  `account` record's `dims` is a map from dimension id to value id, so a
   second value for one dimension cannot be expressed at all. That
   partition is what lets the stacked trend chart's bands sum to net
   worth (net-worth-view.md).
   - Dimensions and their values are identified by **short opaque ids
     generated at creation**, never by their display labels. Labels are
     therefore free text in any script, and renaming one rewrites no
-    account record — only the profile. Ids also cannot collide with
+    `account` record — only the profile. Ids also cannot collide with
     anything a user typed, which a label-derived key could.
   - The set of dimensions, their labels, and their value order is user
     configuration in the encrypted profile record (account-settings.md).
 - **There is no freeform tag.** Every classification is a dimension,
   because an overlapping label is just a dimension with one value
   ("Emergency fund: yes", absence meaning no). Two taxonomies over the
-  same accounts would mean two ways to spell one thing, and only one of
+  same holdings would mean two ways to spell one thing, and only one of
   them can be stacked, ordered, or summed honestly.
 - **Quantities and prices are two separate timelines.** A holding's own
   history holds only the quantities its owner recorded. The prices that
@@ -94,8 +94,8 @@ per the Security model — the server sees ciphertext, not these fields.
   per symbol, shared by every holding measured in it. The split is what
   stops a holding from being priced at the day it was last touched,
   which with partial updates is most holdings most of the time.
-  - **Snapshot**: a point-in-time quantity for one account, a date and a
-    value in the account's native unit, and nothing else
+  - **Snapshot**: a point-in-time quantity for one holding, a date and a
+    value in the holding's native unit, and nothing else
     (record-snapshot.md).
   - **Rate**: what one unit of a symbol was worth in the main currency
     on one date (record-rate.md). Proposed by the lookup proxy where a
@@ -103,7 +103,7 @@ per the Security model — the server sees ciphertext, not these fields.
     written, because a price recomputed later would rewrite what the
     person was worth in 2019.
   - **Recording anything refreshes every price.** Record one franc
-    account and the dollar rate and the gold price still get entries.
+    holding and the dollar rate and the gold price still get entries.
     Prices are written by default and quantities are not: a quantity has
     to be read off a statement, so the app never writes one nobody
     gathered, while a price needs no gathering.
@@ -117,7 +117,7 @@ per the Security model — the server sees ciphertext, not these fields.
     fails rather than merging into it (record-snapshot.md).
   - Today's total is each holding's last recorded quantity at the most
     recent price for its unit.
-- Updates are sparse by design: no account needs a snapshot on every
+- Updates are sparse by design: no holding needs a snapshot on every
   date. The UI carries the last known quantity forward when charting net
   worth over time, and prices it from the price timeline at each date.
 
@@ -260,16 +260,16 @@ closes.
 
 ### Record storage API
 
-Accounts, snapshots, rates, and the user profile are all stored through
-one generic record endpoint. The server has no per-type logic, because it
-cannot read any type. A record row is:
+`account`, `snapshot`, `rate` and `profile` records are all stored
+through one generic record endpoint. The server has no per-type logic,
+because it cannot read any type. A record row is:
 
 | Column | Visibility | Notes |
 |---|---|---|
 | `principal_id` | plaintext | the owning vault owner; every query is scoped to the session's principal |
 | `record_id` | plaintext | client-generated UUIDv4 |
 | `record_type` | plaintext | `account` \| `snapshot` \| `rate` \| `profile` |
-| `account_id` | plaintext | the owning account for `snapshot`; empty otherwise |
+| `account_id` | plaintext | the owning `account` record for `snapshot`; empty otherwise |
 | `schema_version` | plaintext | bumped when the plaintext shape changes |
 | `version` | plaintext | monotonic, starts at 1, +1 per write |
 | `nonce` | plaintext | fresh 96-bit random per encryption |
@@ -284,12 +284,13 @@ already impossible under the DEK boundary. See Key management for
 both.
 
 The plaintext columns are **metadata the server can see**: record
-counts, which snapshots belong to which account, and write timestamps.
+counts, which snapshots belong to which `account` record, and write
+timestamps.
 That is within the accepted metadata leak in the threat model — the
 plaintext shape deliberately carries no name, value, date, or unit.
 
 **A `rate` record adds no column.** It is owned by a symbol rather than
-an account, and the symbol is the one thing a column here would leak, so
+an `account`, and the symbol is the one thing a column here would leak, so
 it stays inside the ciphertext and `account_id` is empty like an
 `account` or a `profile`. record-rate.md argues that against the threat
 model, and record-api.md pins the column rule. Its AAD encoding is the
@@ -333,7 +334,7 @@ party.
     falls under the same accepted leak as asset type.
 - **Base-amount rule (hard requirement)**: every rate request queries the
   rate for a fixed, reasonable base unit (e.g. "price of 1 troy oz", a
-  unit currency pair) — never the account's actual snapshot value. This
+  unit currency pair) — never a holding's actual snapshot value. This
   keeps amounts out of the request entirely; enforce it client-side as a
   requirement, not an incidental property of the API shape.
 - **SSRF hardening**: the outbound request's host/provider is never
@@ -347,7 +348,7 @@ party.
   from central-bank data, so each is one host constant to unwind if it
   has to change. Silver, platinum and palladium have no provider in v1
   and are entered by hand, and listed securities have none by design,
-  because a brokerage holding is a depot-level account in a currency.
+  because a brokerage holding is recorded at depot level in a currency.
   `rate-lookup.md` holds the adapters, the seeded symbol table, and the
   rejected alternatives with the reason each fails.
 - **One constraint binds every future provider**: a rate is stored
@@ -736,7 +737,7 @@ Actors this design defends against vs. accepts:
   `unsafe-eval` for `x-` expressions, which would gut the CSP above).
 - **Decrypted content is always untrusted output**: render with
   `textContent`/Alpine `x-text` only, never `innerHTML`/`x-html` —
-  account names, notes, dimension labels, and any imported data are
+  holding names, notes, dimension labels, and any imported data are
   attacker-influenceable
   and rendered client-side, where XSS means password/Master Key capture,
   not just session theft.
@@ -748,9 +749,9 @@ Actors this design defends against vs. accepts:
   what make sessions enumerable and revocable, which the product
   requires for listing active sessions, "log out everywhere",
   invalidating every other session on a password change or an import,
-  and the absolute 12-hour expiry (account-settings.md,
-  export-import.md). `id` is a separate opaque handle — it is what
-  `GET /api/sessions` returns, so no response ever hands JavaScript the
+  and the absolute 12-hour expiry (login.md, Rules, which owns the
+  value, and export-import.md). `id` is a separate opaque handle — it
+  is what `GET /api/sessions` returns, so no response ever hands JavaScript the
   cookie's own value.
   - **The row shape does not vary by kind and carries no `kind`
     column.** Kind is read through `principal_id`, so there is exactly
@@ -853,7 +854,7 @@ Actors this design defends against vs. accepts:
     and a boundary that moves per deployment is one the contract cannot
     state.
   - Every one has an order of magnitude of headroom. A snapshot payload
-    is a few hundred bytes and a price entry less, and thirty accounts
+    is a few hundred bytes and a price entry less, and thirty holdings
     updated monthly for thirty years, with a price entry per symbol per
     recording date, stays well inside the record cap and a few MB of
     the byte quota. The caps bound a runaway client or a hostile
@@ -898,7 +899,7 @@ Actors this design defends against vs. accepts:
   user's behalf.
 - No position-level tracking of listed securities: no share counts, no
   tickers, no cost basis, no per-holding performance. A brokerage
-  account is one depot-level figure (see Data model).
+  holding is one depot-level figure (see Data model).
 - No mobile app — responsive web only.
 - No shared/household view — vaults are private per user.
 - No multi-tenant/public hosting — single instance, small fixed set of

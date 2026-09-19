@@ -322,7 +322,7 @@ never lock anyone out.
   removing it is the regression this catches.
 - After the configured idle period, an attempt to read vault data
   prompts for re-unlock, the in-memory keys are gone, **and no decrypted
-  account name, value, or snapshot remains reachable** — asserted
+  holding name, value, or snapshot remains reachable** — asserted
   against the in-memory model, not only the key handles. Unsaved input
   in an open form is the one thing still present.
 - Re-unlocking after an idle lock refetches and re-decrypts the vault;

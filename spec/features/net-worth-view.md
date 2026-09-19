@@ -3,7 +3,7 @@
 ## What it does
 
 The core payoff: current total net worth in the user's main currency,
-per-account balances, grouping by dimension, and a stacked trend chart
+per-holding balances, grouping by dimension, and a stacked trend chart
 over time. Every figure is computed client-side from decrypted records —
 the server has nothing to template here, because it has no plaintext.
 
@@ -12,7 +12,7 @@ the server has nothing to template here, because it has no plaintext.
 1. On unlock, fetch every record type
    (`GET /api/records?type=account|snapshot|rate|profile`) and decrypt
    them with the session DEK.
-2. Build the model in memory: profile (main currency), accounts,
+2. Build the model in memory: profile (main currency), holdings,
    snapshots grouped by `account_id` and sorted by date, and prices
    grouped by `symbol` and sorted by date (`record-rate.md`).
 3. Compute totals and series locally. Subsequent writes update this
@@ -27,57 +27,57 @@ is no single-record `GET` (`record-api.md`, Endpoints).
 
 ## Current net worth
 
-Every account contributes its **last recorded quantity** at a price
+Every holding contributes its **last recorded quantity** at a price
 drawn from that unit's own timeline (`record-rate.md`). The two are
-looked up separately, which is the point of the split: a dollar account
+looked up separately, which is the point of the split: a dollar holding
 last recorded in March is not stuck at March's exchange rate.
 
-`total = Σ over active accounts of (latest snapshot.value × price)`
+`total = Σ over active holdings of (latest snapshot.value × price)`
 
 The view has a **pricing mode**, and it selects the price:
 
 - **Latest rates** (the default): the **latest price** for that
-  account's unit (`record-rate.md`, Reading).
+  holding's unit (`record-rate.md`, Reading).
 - **Rates as of each figure**: the **price as recorded** for that
-  account. This is what the holding was worth when it was last
+  holding. This is what the holding was worth when it was last
   recorded, which is a real question and a different number.
 
 Both modes use the same quantity. The mode changes only which price is
 paired with it, and switching modes makes no network request, because
 both series are already in memory.
 
-**The mode reaches the total, the account list and the breakdown, and
-nothing else.** It is not a chart control (Trend chart, Ranges and
+**The mode reaches the total, the list of holdings and the breakdown,
+and nothing else.** It is not a chart control (Trend chart, Ranges and
 modes). It is named for the latest rate rather than today's rate
 because nothing on this screen fetches a price: the newest entry in the
 vault is whatever the last recording wrote.
 
 - **Latest means the greatest `date`**, in either series, never the most
   recently written.
-- **An account whose unit is the main currency** prices at `"1"` in
+- **A holding whose unit is the main currency** prices at `"1"` in
   both modes (`record-rate.md`, Reading).
-- Each account's figure carries its **quantity's as-of date** wherever
+- Each holding's figure carries its **quantity's as-of date** wherever
   it appears, because that is the date the person acts on
   (`ui/update-values.md`). A row whose price is older than the newest
   price in the vault also carries **its price's date**, since latest
   rates is then not true of that row. That case is a holding
   with no rate source, whose price only moves when its owner revisits
   it.
-- **There is no staleness threshold and no stale-account warning.** No
+- **There is no staleness threshold and no stale-holding warning.** No
   single number fits a product built on uneven cadence — a current
-  account moves monthly, unlisted property every few years — so any
-  threshold leaves the slow accounts permanently flagged until the user
-  learns to ignore it, at which point it fails for the account that
+  holding moves monthly, unlisted property every few years — so any
+  threshold leaves the slow holdings permanently flagged until the user
+  learns to ignore it, at which point it fails for the holding that
   genuinely went quiet. The age of each figure is stated in plain
   language on `ui/update-values.md`, next to the control that acts on
   it.
-- **Archived accounts are excluded from the current total** — an
-  archived account is a closed position. They remain in history up to
+- **Archived holdings are excluded from the current total** — an
+  archived holding is a closed position. They remain in history up to
   their `archivedAt` date (see Trend chart).
-- **An account with no snapshots contributes nothing** and is listed
+- **A holding with no snapshots contributes nothing** and is listed
   separately as "not yet valued" rather than shown as 0. Zero is a real
   value a user can record and means something different.
-- **An account with a quantity and no price for its unit contributes
+- **A holding with a quantity and no price for its unit contributes
   nothing either**, and is listed separately as **not priced**, with
   that as the stated reason rather than the other one. It is never
   counted at its bare quantity, which would silently value a holding as
@@ -97,15 +97,15 @@ moved, and what it was made of.
 
 ### Values between entries
 
-An account's worth at a chart date is the product of two interpolated
+A holding's worth at a chart date is the product of two interpolated
 series:
 
 `value(account, t) = quantity(account, t) × price(unit(account), t)`
 
-- **Quantity** is linearly interpolated between that account's own
+- **Quantity** is linearly interpolated between that holding's own
   snapshots. It contributes nothing to dates **before its first
   snapshot**, not backfilled with zero, which would show a false
-  jump when a long-held account is first entered, and after the last
+  jump when a long-held holding is first entered, and after the last
   snapshot it is **carried forward**, because there is nothing to
   interpolate toward.
 - **Price** is linearly interpolated between that symbol's own entries,
@@ -117,9 +117,9 @@ series:
   appearing out of nowhere on the day its owner first recorded a price,
   which is the same false jump the no-zero-backfill rule exists to
   prevent.
-- Interpolation is **per account and then summed**, never interpolation
-  of an already-summed series, because accounts start at different dates
-  and summing first would smear one account's first snapshot across the
+- Interpolation is **per holding and then summed**, never interpolation
+  of an already-summed series, because holdings start at different dates
+  and summing first would smear one holding's first snapshot across the
   rest.
 
 **A band bends between two quantity entries.** The product of two
@@ -131,7 +131,7 @@ months.
 
 Two consequences for drawing it:
 
-- **Sample each account at the union** of its own snapshot dates and its
+- **Sample each holding at the union** of its own snapshot dates and its
   symbol's price dates within range, plus the range endpoints. Sampling
   only the snapshot dates would cut every bend off, silently and
   everywhere.
@@ -151,7 +151,7 @@ others:
   entry onward, because what follows it is carried forward.
 - The **first** entry of a price series affects everything up to the
   next entry, because what precedes it is carried backward. An
-  account's first snapshot instead moves where that account's band
+  holding's first snapshot instead moves where that holding's band
   starts, since nothing precedes it.
 
 This is what makes an edit safe to offer (`record-snapshot.md`,
@@ -187,7 +187,7 @@ with them.
 **A tick means a quantity, never a price.** It answers "when did I
 actually go and look this holding up", which is the question the sweep
 is built around, and a tick for every price entry would put one under
-every month for every account and bury the ones that matter. A date
+every month for every holding and bury the ones that matter. A date
 carrying rate entries and no snapshots bends the bands and takes no
 tick.
 
@@ -200,16 +200,16 @@ the row form of the mark carries it (`ui/update-values.md`).
 ### Grouping by dimension
 
 Bands come from a **dimension** — a named axis whose values partition
-the accounts (`manage-accounts.md`, Dimensions). A stacked chart
-requires a partition: if one account could land in two bands, the bands
+the holdings (`manage-accounts.md`, Dimensions). A stacked chart
+requires a partition: if one holding could land in two bands, the bands
 would not sum to net worth.
 
-- Each account falls in **exactly one band per dimension**, guaranteed
+- Each holding falls in **exactly one band per dimension**, guaranteed
   by the record shape rather than by a check — `dims` is a map keyed by
   dimension id, so a second value cannot be expressed
   (`manage-accounts.md`). There is no "Ambiguous" band, because there is
   no ambiguous state to display.
-- Accounts with no entry for the dimension group under
+- Holdings with no entry for the dimension group under
   **"Unassigned"** — a real band, never hidden, or the bands would not
   sum to the total. An entry naming an archived or unknown value lands
   here too.
@@ -218,9 +218,9 @@ would not sum to net worth.
   value order (`account-settings.md`), never sorted by size. A stack
   whose bands reorder over time cannot be read.
 
-Because a dimension only partitions the accounts that carry it, the UI
-must show its **coverage** — how many accounts are assigned — wherever a
-dimension is chosen. A dimension covering three of ten accounts produces
+Because a dimension only partitions the holdings that carry it, the UI
+must show its **coverage** — how many holdings are assigned — wherever a
+dimension is chosen. A dimension covering three of ten holdings produces
 a mostly-"Unassigned" chart that is correct and useless, and the user
 needs to see why.
 
@@ -232,9 +232,9 @@ band keeping its group's color on both sides, and the net-worth line
 runs over the top. This keeps the signed-sum rule above visible instead
 of hiding it in a single collapsed figure.
 
-### Archived accounts
+### Archived holdings
 
-An archived account contributes nothing **after `archivedAt`**. The
+An archived holding contributes nothing **after `archivedAt`**. The
 archive flow's closing snapshot at that date (`manage-accounts.md`) is
 the expected path, and the value **interpolates into it** like any other
 snapshot rather than holding flat and stepping.
@@ -247,7 +247,7 @@ When the closing snapshot is skipped, the band still drops at
 `archivedAt` and the UI marks the point as an archive, not a valuation.
 
 Either way the drop carries an **annotation** on the x-axis and a
-tooltip line naming the account, because an unexplained vertical edge in
+tooltip line naming the holding, because an unexplained vertical edge in
 an otherwise smooth chart is indistinguishable from a bad snapshot.
 
 ### Ranges and modes
@@ -256,7 +256,7 @@ an otherwise smooth chart is indistinguishable from a bad snapshot.
 - **Pricing mode is not a chart control.** Every chart point is already
   drawn at the prices of its own date, so switching it moves no pixel.
   On latest rates the chart's right hand edge **is** the total: the
-  edge carries each account's last quantity carried forward at its
+  edge carries each holding's last quantity carried forward at its
   symbol's last price carried forward, which is the total's own
   definition. On rates as of each figure the total is deliberately not
   the edge, and the gap between them is the whole point of the mode. It
@@ -272,8 +272,8 @@ an otherwise smooth chart is indistinguishable from a bad snapshot.
 ## Inputs / outputs
 
 - In: ciphertext records fetched from the API, decrypted with the
-  session DEK: accounts, snapshots, prices, and the profile.
-- Out: current total in the selected pricing mode, per-account balances
+  session DEK: holdings, snapshots, prices, and the profile.
+- Out: current total in the selected pricing mode, per-holding balances
   with as-of dates, a breakdown by the selected dimension, trend series.
   Nothing computed here is ever sent back to the server.
 
@@ -283,13 +283,13 @@ an otherwise smooth chart is indistinguishable from a bad snapshot.
   Sums are computed at full precision and rounded only for display. A
   chart point costs two multiplications rather than one, and both round
   half-even at scale 12 like every other.
-- Every decrypted string — account name, note, dimension and value
+- Every decrypted string — holding name, note, dimension and value
   label — is rendered with `x-text` / `textContent`. Never `x-html`,
   never a chart library that takes an HTML string for labels or tooltips
   (architecture.md, Application hardening).
 - **The chart is drawn directly in SVG with no charting library.** What a
   library supplies here is scales, tick math, and path building. What
-  this chart needs — the partition rule, per-account interpolation,
+  this chart needs — the partition rule, per-holding interpolation,
   provenance tracking, per-band selection deltas, asset/liability
   mirroring — is domain logic written either way. The full interactive
   chart prototypes at ~200 lines of dependency-free JS. A production
@@ -319,26 +319,26 @@ an otherwise smooth chart is indistinguishable from a bad snapshot.
   static `aria-label` on the SVG is not sufficient for the primary
   screen of the app.
 - Formatting follows the main currency's conventions; asset units
-  (troy oz, m²) keep their own precision in per-account views.
+  (troy oz, m²) keep their own precision in per-holding views.
 
 ## Edge cases
 
-- **No accounts** → empty state pointing at "Add your first account."
-- **Accounts but no snapshots** → accounts listed as "not yet valued,"
+- **No holdings** → empty state pointing at "Add your first holding."
+- **Holdings but no snapshots** → holdings listed as "not yet valued,"
   total shown as "—" rather than 0, no chart.
 - **One snapshot total** → the chart shows a single point rather than
   failing or drawing a flat line back to the beginning of time.
-- **All accounts archived** → total is "—", history still renders.
-- **A dimension no account carries** → one "Unassigned" band covering
+- **All holdings archived** → total is "—", history still renders.
+- **A dimension no holding carries** → one "Unassigned" band covering
   everything, with the coverage indicator reading 0 of N. Correct, and
   the indicator is what stops it being read as a bug.
-- **An account whose `dims` names an archived or unknown value** →
-  "Unassigned", like any unclassified account. The entry is preserved,
+- **A holding whose `dims` names an archived or unknown value** →
+  "Unassigned", like any unclassified holding. The entry is preserved,
   so restoring the value restores the band.
 - **A dimension with more than four values** → the first four in the
   dimension's configured order take chart slots, and the remainder fold
   into "Other" (`ui/design-system.md`).
-- **An account not valued in a long time** → counted in the total at its
+- **A holding not valued in a long time** → counted in the total at its
   last known **quantity**, priced by the selected mode, with its "as of"
   date shown and no warning at any age.
 - **A chart date before any price entry for a symbol** → priced at that
@@ -361,14 +361,14 @@ an otherwise smooth chart is indistinguishable from a bad snapshot.
 
 ## Acceptance criteria
 
-- With three accounts in different units and known snapshots and price
+- With three holdings in different units and known snapshots and price
   entries, the displayed total equals the hand-computed
   `Σ value × price`, exactly, in decimal, in both pricing modes, and the
   two modes differ.
-- An account last recorded in March, with a price entry from this week,
+- A holding last recorded in March, with a price entry from this week,
   contributes at this week's price in the default mode and at March's
   price in the other. This is the regression test for the whole split.
-- Recording one franc account changes the converted figure of every
+- Recording one franc holding changes the converted figure of every
   dollar and gold holding, without any of them gaining a snapshot.
 - A change in the provider's published rate, with nothing recorded,
   changes no figure anywhere: nothing was written, so there is nothing
@@ -386,22 +386,22 @@ an otherwise smooth chart is indistinguishable from a bad snapshot.
   entries removed.
 - A symbol with two differing entries on one date prices that date from
   its neighboring entries, and the view names the fault.
-- An account whose unit has a quantity but no price entry is listed as
+- A holding whose unit has a quantity but no price entry is listed as
   not priced, is excluded from the total, and its quantity never appears
   in the total unconverted.
-- An account last valued in March shows an "as of March" marker and
+- A holding last valued in March shows an "as of March" marker and
   still contributes to the current total, with no warning attached at
   any age.
 - A snapshot recorded in the future of the chart range does not appear
   before its date.
-- An account contributes nothing to chart dates before its first
-  snapshot; adding ten years of an old account's history does not create
+- A holding contributes nothing to chart dates before its first
+  snapshot; adding ten years of an old holding's history does not create
   a step at the chart's left edge.
-- An account with snapshots of 100 on 1 January and 200 on 1 March,
+- A holding with snapshots of 100 on 1 January and 200 on 1 March,
   measured in the main currency, reads 150 on 1 February, with 1
   January and 1 March carrying an entry mark and 1 February carrying
   none, and with nobody having turned anything on.
-- The same account measured in a unit whose price is 1.00 on 1 January
+- The same holding measured in a unit whose price is 1.00 on 1 January
   and 2.00 on 1 March reads 150 × 1.50 on 1 February, not the chord
   between 100 and 400. This is the assertion that the band bends.
 - A chart date before a symbol's first price entry is priced at that
@@ -411,27 +411,27 @@ an otherwise smooth chart is indistinguishable from a bad snapshot.
 - The chart loads with its entry marks showing, with nothing turned on
   and no stored preference consulted. Just the line removes them and
   changes nothing else about the drawing.
-- Switching the pricing mode changes the total, the account list and
-  the breakdown, and changes no chart point. Asserted over every
+- Switching the pricing mode changes the total, the list of holdings
+  and the breakdown, and changes no chart point. Asserted over every
   sample of every band, not only the right hand edge.
 - On latest rates the chart's right hand edge equals the total exactly,
   in decimal. With a holding last recorded in March and a price entry
   from this week at a different figure, rates as of each figure gives
   a total that is not the edge, and nothing on screen reports that
   difference as a fault.
-- Two accounts whose histories start years apart produce a chart where
-  the later account's first snapshot raises only its own band — summing
+- Two holdings whose histories start years apart produce a chart where
+  the later holding's first snapshot raises only its own band — summing
   before interpolating would instead bend the whole series.
-- Archiving an account removes it from the current total, leaves every
+- Archiving a holding removes it from the current total, leaves every
   chart point before `archivedAt` unchanged, and drops it after, with an
   archive annotation at that date.
 - For every date in the chart, the sum of the visible bands equals the
   net-worth line at that date, in decimal.
-- An account appears in exactly one band of the selected dimension, and
-  the account count across all bands equals the total account count.
-- An account with no snapshots is listed as "not yet valued" and is not
+- A holding appears in exactly one band of the selected dimension, and
+  the holding count across all bands equals the total holding count.
+- A holding with no snapshots is listed as "not yet valued" and is not
   counted as 0.
-- A negative-balance account reduces the net figure and appears under
+- A negative-balance holding reduces the net figure and appears under
   liabilities.
 - The breakdown by dimension sums to exactly the net-worth total, with
   no disclaimer needed.
@@ -440,6 +440,6 @@ an otherwise smooth chart is indistinguishable from a bad snapshot.
   price entry, its symbol still prices from the neighboring entries.
 - No network request is made when switching chart range, dimension,
   absolute/percentage mode, pricing mode, or band visibility.
-- An account named `<script>alert(1)</script>` renders as literal text
+- A holding named `<script>alert(1)</script>` renders as literal text
   in the list, the chart legend, and any tooltip — as does a dimension
   value labelled the same way.

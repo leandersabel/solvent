@@ -60,6 +60,26 @@ screen. The app shell has no screen of its own, but the chrome it
 renders is where "looks like a private bank" is cashed out, so it has a
 product file like any other.
 
+## Naming and voice
+
+**The thing somebody owns money in is a "holding" in anything a person
+reads, and `account` in every identifier.** "Account" now means a login
+identity, because an administrator account and a user account are
+different kinds of account. Using the same word for a bank account is a
+real ambiguity, and the product is client-facing, so the client-facing
+word gives way. The record type stays `account`, the column stays
+`account_id`, the AAD's first field stays `account_id`, and endpoint
+paths stay as they are. Where prose names the record type, "the
+`account` record" is right. A screen keeps the name it has, even where
+that name and its subject now differ.
+
+`spec/product/*.md` addresses the client as **you**. `spec/features/`
+and `spec/ui/` are written for a builder and stay third person.
+
+A product file's **"Decisions taken on your behalf"** section holds what
+the client never said and may overrule. That is what the heading means,
+so no file restates it in a preamble.
+
 ## Writing the spec
 
 **Document the target state, never the route to it.**

@@ -4,24 +4,23 @@
 
 Turns an invite link (`admin-invites.md`) into the account it was made
 for. Every invite is for one of the two kinds of account, fixed when it
-was created, and the link decides which of two screens the person sees.
-They never choose.
+was created, and the link decides which of two screens you see. You
+never choose.
 
-- **An invite for a user account** makes a vault. The person picks a
-  username, a password, and the currency their whole net worth will be
-  counted in, and lands inside Solvent already signed in, with an empty
-  vault ready to fill.
+- **An invite for a user account** makes a vault. You pick a username,
+  a password, and the currency your whole net worth will be counted
+  in, and land inside Solvent already signed in, with an empty vault
+  ready to fill.
 - **An invite for an administrator account** makes no vault, because an
-  administrator account does not have one. The person picks a username
-  and a password, and that is the whole of it.
+  administrator account does not have one. You pick a username and a
+  password, and that is the whole of it.
 
 The first is the single most consequential screen in the product, for
 one reason: the password chosen there is the only thing that will ever
 open that vault. Nobody at Solvent, no administrator, and no operator
 with access to the machine can open it without that password, and none
-of them can issue a new one. The client asked for zero-knowledge
-encryption, and this screen is where the person finds out what that
-costs them.
+of them can issue a new one. You asked for zero-knowledge encryption,
+and this screen is where the cost of that is met.
 
 Who it is for: a household member who has been sent a link, and the
 person taking on the running of the instance.
@@ -33,14 +32,14 @@ person taking on the running of the instance.
 This is the screen an invite for a user account opens.
 
 A single card, nothing else on the page. No navigation, no marketing:
-the person arrived from a link to do one thing.
+you arrived from a link to do one thing.
 
 - **Username.** Three to thirty-two characters, lowercase letters,
-  digits, dot, underscore, hyphen. It is lowercased as they type rather
-  than quietly changed afterwards, so what they see is what they will
+  digits, dot, underscore, hyphen. It is lowercased as you type rather
+  than quietly changed afterwards, so what you see is what you will
   sign in with.
 - **Password, and again to confirm.** With a strength gauge that fills
-  as they type and says, in words, roughly how long the password would
+  as you type and says, in words, roughly how long the password would
   hold up.
 - **Main currency.** Everything in the vault is eventually counted into
   this one currency, and it is chosen here.
@@ -55,8 +54,8 @@ are. Both have to pass before the button becomes usable, and whichever
 one is not met is named. Never a bare "password too weak".
 
 The gauge reads as a magnitude, not as a verdict: it fills, it does not
-go from red to green, because a weak password here is not an error the
-person has made, it is a distance they have left to cover.
+go from red to green, because a weak password here is not an error you
+have made, it is a distance you have left to cover.
 
 One line of guidance under it, because this is the one place in the
 product where the advice changes the outcome: length beats symbols, and
@@ -118,7 +117,7 @@ and cannot read anybody else's. If you also want to keep your own
 finances in Solvent, that is a separate account, and you need a
 separate invite for it.
 
-The person lands in the admin area, signed in.
+You land in the admin area, signed in.
 
 ### When it goes wrong
 
@@ -137,7 +136,7 @@ The person lands in the admin area, signed in.
   password and not the device, makes clear that no vault was created
   and the invite is still good, and offers a retry after closing other
   tabs. It does not quietly set up a weaker vault instead, and it never
-  tells somebody their phone cannot do this.
+  tells you that your phone cannot do this.
 - **The submit fails after the slow part.** Everything typed is still
   there. Nobody re-types a password and waits again because of a
   network blip.
@@ -145,15 +144,15 @@ The person lands in the admin area, signed in.
 ## What must be true
 
 - The link alone decides which of the two screens appears. Nothing on
-  either screen lets the person choose which kind of account they are
-  making, and a link for one kind never produces the other.
+  either screen lets you choose which kind of account you are making,
+  and a link for one kind never produces the other.
 - A valid link for a user account, a password that clears the bar, and
-  a free username produce a vault, and the person is inside it, already
-  signed in. They are never bounced to a sign-in screen to type the
-  password they just chose.
+  a free username produce a vault, and you are inside it, already
+  signed in. You are never bounced to a sign-in screen to type the
+  password you just chose.
 - A valid link for an administrator account, a password that clears the
   same bar, and a free username produce an administrator account, and
-  the person is in the admin area, already signed in. No vault is
+  you are in the admin area, already signed in. No vault is
   created, no currency is asked for or recorded, and the account holds
   nothing encrypted.
 - A username is free or taken across the whole instance, not within one
@@ -161,11 +160,11 @@ The person lands in the admin area, signed in.
 - A vault owner's password never leaves the browser. Not in any form,
   not once.
 - Nobody with the machine, the disk, or the database in hand can read
-  the main currency, the account names, or anything else in the vault,
+  the main currency, the holding names, or anything else in the vault,
   because none of it is stored in readable form.
 - The link is used up. Trying it a second time fails.
 - A registration that fails partway leaves no account and does not use
-  up the link. The person tries again with the same link.
+  up the link. You try again with the same link.
 - A password under twelve characters, or one that fails the strength
   rating, cannot be submitted, and the slow setup never starts.
 - The vault form cannot be submitted without ticking the no-recovery
@@ -191,11 +190,11 @@ The person lands in the admin area, signed in.
 
 - **No sign-up without a link.** See `admin-invites.md`.
 - **No password recovery, no reset, no recovery code, no security
-  questions.** This is the client's zero-knowledge requirement in its
-  most literal form. There is nothing held anywhere that could open
-  this vault except the password, so there is nothing to recover it
-  with. The screen makes the person say they understand this before
-  they can continue.
+  questions.** This is your zero-knowledge requirement in its most
+  literal form. There is nothing held anywhere that could open this
+  vault except the password, so there is nothing to recover it with.
+  The screen makes you say you understand this before you can
+  continue.
 - **No email address, no phone number, no verification step.** Solvent
   never sends anything. An address would exist only to send a recovery
   mail that cannot exist, and it would be one more readable fact about
@@ -203,19 +202,19 @@ The person lands in the admin area, signed in.
 - **No weaker setup offered to a device that is short of memory right
   now.** Falling back would create a vault permanently easier to break
   into, and would record that weakness as though it had been chosen,
-  because of one busy moment on one device. Saying so and letting the
-  person try again is the honest answer.
+  because of one busy moment on one device. Saying so and letting you
+  try again is the honest answer.
 - **No changing the main currency afterwards.** See
   `account-settings.md`, which owns that rule.
 - **No composition rules.** No required symbol, no required digit, no
   forced mixed case. They push people toward short passwords with
   punctuation, which is the wrong direction here.
 
-## Decisions taken on the client's behalf
+## Decisions taken on your behalf
 
 - **The password bar is twelve characters plus a strength rating.**
-  The client asked for zero-knowledge, which makes the password the
-  only defense if the stored data is ever stolen outright. Somebody had
+  You asked for zero-knowledge, which makes the password the only
+  defense if the stored data is ever stolen outright. Somebody had
   to pick a number. Twelve with a strength check, rather than a longer
   minimum, keeps a memorable four-word phrase comfortably inside the
   bar while ruling out anything on a common-password list.
@@ -231,9 +230,9 @@ The person lands in the admin area, signed in.
 - **An administrator password is held to the same bar as a vault
   password.** It protects the ability to delete every account on the
   instance, so it is not the place to relax the rule.
-- **Creating an administrator account lands the person in the admin
-  area, signed in**, the same way creating a vault lands its owner
-  inside it. Nobody types a password they just chose a second time.
+- **Creating an administrator account lands you in the admin area,
+  signed in**, the same way creating a vault lands its owner inside
+  it. Nobody types a password they just chose a second time.
 - **The encryption was tuned so that a phone or tablet is comfortable
   to use, at a cost of roughly one character of password strength.**
   Reversible. The same setting governs setting a vault up and opening

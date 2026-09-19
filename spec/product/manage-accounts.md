@@ -1,4 +1,4 @@
-# Manage accounts
+# Manage holdings
 
 ## What it does
 
@@ -174,9 +174,6 @@ and the current total.
   unlock.
 
 ## Decisions taken on your behalf
-
-These were not in anything you said. They are marked so you can overrule
-them.
 
 - **Archive is preselected** in the stop dialog, and permanent delete is
   the secondary action.

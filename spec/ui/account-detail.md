@@ -12,12 +12,12 @@ half), `spec/features/manage-accounts.md` (archive lifecycle).
 
 ## Layout
 
-Standard app shell, content max-width 900px. Reached by clicking an
-account row on the dashboard.
+Standard app shell, content max-width 900px. Reached by clicking a
+holding's row on the dashboard.
 
 ### Header
 
-- Account name, 20px/600. Beneath it, one chip per dimension assignment
+- The holding's name, 20px/600. Beneath it, one chip per dimension assignment
   (`Liquidity: Cash`) and the note if there is one.
 - The current value: native unit and, beside it, the main-currency
   figure at **the latest price for this holding's unit**, which is a
@@ -34,8 +34,8 @@ account row on the dashboard.
     price's date is stated beside the converted figure, plainly, and
     never as a per-row column, because it is the same for every figure
     on this screen and nobody can act on it.
-- An account with no snapshots shows "Not yet valued", not 0.
-- An account whose unit has no price at all shows **"Not priced"** in
+- A holding with no snapshots shows "Not yet valued", not 0.
+- A holding whose unit has no price at all shows **"Not priced"** in
   place of the converted figure, with that as the stated reason, and it
   is excluded from the total rather than counted at its bare quantity
   (`net-worth-view.md`).
@@ -43,7 +43,7 @@ account row on the dashboard.
   this holding), **Edit** (opens `account-form.md`), **Archive** or
   **Unarchive**, **Delete**. The archive and delete dialogs are
   specified in `account-form.md` and launched from here.
-- An archived account shows an "Archived" chip and its `archivedAt`
+- An archived holding shows an "Archived" chip and its `archivedAt`
   date, and offers no "Record a value". The one exception is the
   closing snapshot the archive flow itself writes
   (`record-snapshot.md`).
@@ -82,8 +82,8 @@ Single confirm, naming the consequence rather than asking abstractly:
 > Delete the snapshot of 12 450.00 USD for 31 July? Your net worth for
 > the period around this date will change.
 
-If it is the account's only snapshot, the copy says so instead: the
-account returns to "Not yet valued" and leaves the current total —
+If it is the holding's only snapshot, the copy says so instead: the
+holding returns to "Not yet valued" and leaves the current total —
 which is not the same as being worth 0 (`net-worth-view.md`).
 
 **Deleting a value deletes no price.** A price belongs to a unit, not
@@ -99,7 +99,7 @@ and all, is a different act on a different screen
 - **Loading**: none.
 - **Empty — no snapshots**: the history table is replaced by one
   sentence and the primary action: "No snapshots yet. Record what this
-  account is worth."
+  holding is worth."
 - **Populated — one snapshot**: a table with one row. No special case.
 - **Error, duplicate date**: two entries share one date, reachable
   when a date move's `DELETE` failed and when two sittings crossed
