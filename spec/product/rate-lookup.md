@@ -89,8 +89,7 @@ meet one.
 - **No silver, platinum, or palladium prices yet.** All three are in the
   unit list by name so you record them against the name the app will
   keep using, and you set the rate. Adding a source later changes
-  nothing about what you already recorded. See the question raised with
-  this batch.
+  nothing about what you already recorded.
 - **You cannot add a currency or a metal to the list yourself.** The
   list is the same for everyone on the instance and adding to it is the
   operator's job. What you can always do instead is type your own unit

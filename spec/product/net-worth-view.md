@@ -291,7 +291,7 @@ the section needs no small print.
   the slow ones permanently until you learned to ignore it, at which
   point it would fail for the one that genuinely went quiet. Instead
   every figure states its age in plain words next to the action that
-  records a new one. See the question raised with this batch.
+  records a new one.
 
   This is about the age of a quantity, the only age that is yours. A
   rate's age is the app's to keep down and it is stated once for the

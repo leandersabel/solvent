@@ -1,43 +1,66 @@
 {
   "feature": "manage-accounts",
-  "summary": "Create, edit, archive, and delete accounts (holdings) — an encrypted record whose unit doubles as its rate symbol and whose dims map holds at most one value per dimension by construction, with server-side atomic cascade delete on purge.",
+  "summary": "Create, edit, archive and delete a holding: name, native unit which doubles as its rate symbol, one dimension value per axis, and a note, all encrypted client-side, with a server-side cascade for a permanent delete.",
   "read": [
     {"file": "spec/features/manage-accounts.md", "sections": ["all"]},
-    {"file": "spec/architecture.md", "sections": ["Data model", "Record storage API", "Non-goals"]},
-    {"file": "spec/features/account-settings.md", "sections": ["Dimensions", "Deleting is archiving"]},
-    {"file": "spec/features/rate-lookup.md", "sections": ["The symbol table", "Seeded symbols"]},
-    {"file": "spec/features/record-snapshot.md", "sections": ["all"], "role": "the archive flow's closing snapshot and the upsert rule the closing-snapshot field follows"},
-    {"file": "spec/ui/account-form.md", "sections": ["all"], "role": "create/edit and the archive-vs-delete dialog"},
-    {"file": "spec/ui/account-detail.md", "sections": ["Header"], "role": "where archive/edit/delete are launched from"},
-    {"file": "spec/ui/design-system.md", "sections": ["Typography", "Components", "States", "App shell"], "role": "money-figure typography, the Archived chip and destructive-action conventions for the account form and detail header, and the shell whose content width this screen sets"}
+    {"file": "spec/architecture.md", "sections": ["Data model", "Record storage API", "Application hardening", "Key management", "Non-goals"]},
+    {"file": "spec/features/record-api.md", "sections": ["Row shape", "The AAD encoding", "Endpoints", "Rules"], "role": "the store, the version rule, and the one type-aware exception purge is"},
+    {"file": "spec/features/account-settings.md", "sections": ["Dimensions", "Deleting is archiving", "The profile record"], "role": "where the dimension ids, labels and value order live"},
+    {"file": "spec/features/rate-lookup.md", "sections": ["The symbol table", "Seeded symbols"], "role": "the table the unit picker offers before it offers free text"},
+    {"file": "spec/features/record-snapshot.md", "sections": ["Same account, same date: upsert", "Edge cases"], "role": "the closing snapshot the archive flow writes, and the upsert rule it follows"},
+    {"file": "spec/features/record-rate.md", "sections": ["The refresh", "Reading"], "role": "the archive flow is a recording action and refreshes prices at archivedAt, and a purge deletes no price entry"},
+    {"file": "spec/features/net-worth-view.md", "sections": ["Current net worth", "Archived accounts", "Grouping by dimension"], "role": "what archiving does to the total and the chart"},
+    {"file": "spec/ui/design-system.md", "sections": ["Components", "States", "App shell"], "role": "the combobox, chip, dialog and table conventions the form and the delete decision use"},
+    {"file": "spec/ui/account-form.md", "sections": ["all"], "role": "the create and edit form and the archive or delete decision"},
+    {"file": "spec/ui/account-detail.md", "sections": ["all"], "role": "one holding's own page, where edit, archive and delete are reached"}
   ],
-  "dependsOn": ["record-api", "account-settings", "rate-lookup", "record-snapshot"],
+  "dependsOn": ["app-shell", "record-api", "register", "login", "rate-lookup", "account-settings", "record-snapshot", "record-rate", "net-worth-view"],
   "parameters": {
-    "recordShape": {"value": "record_type: \"account\", account_id empty; payload { name, unit, dims, note, archivedAt, createdAt }", "cite": "spec/features/manage-accounts.md#record-shape"},
-    "unitIsRateSymbol": {"value": "there is no separate rate-symbol field; unit is either a symbol table entry or free text, and doubles as the rate symbol", "cite": "spec/features/manage-accounts.md#record-shape"},
-    "dimsShape": {"value": "dims is a map of dimension id -> value id, both 8-char [a-z0-9] opaque ids from the profile's dimension config; carries no display text", "cite": "spec/features/manage-accounts.md#record-shape"},
-    "note": {"value": "free text, optional, null when unset", "cite": "spec/features/manage-accounts.md#record-shape"},
-    "archivedAt": {"value": "null for active accounts, otherwise the ISO date archived", "cite": "spec/features/manage-accounts.md#record-shape"},
-    "nameUniqueness": {"value": "account names need not be unique; record_id is identity", "cite": "spec/features/manage-accounts.md#rules"},
-    "unitChangeLock": {"value": "changing the unit is blocked, client-enforced only, once the account has >=1 snapshot, because unit lives inside ciphertext the server cannot validate", "cite": "spec/features/manage-accounts.md#rules"},
-    "purgeEndpoint": {"value": "DELETE /api/accounts/<account_id>?mode=purge — server-side atomic cascade of the account record and every snapshot with that account_id; the one deliberately type-aware exception to record-api.md; another user's account_id returns 404, not 403", "cite": "spec/features/manage-accounts.md#delete-the-user-chooses"},
-    "deleteDialogOptions": {"value": "an account with snapshots offers Archive (default, preselected, with an optional closing snapshot dated archivedAt prefilled 0) or Delete permanently (typed-name confirm, cascades); an account with no snapshots skips the dialog and is deleted outright", "cite": "spec/features/manage-accounts.md#delete-the-user-chooses"},
-    "unassignedRendering": {"value": "a missing dims entry, or a dims value naming an archived/nonexistent dimension or value, renders as 'Unassigned'; the entry is never stripped from the account record", "cite": "spec/features/manage-accounts.md#dimensions"}
+    "recordType": {"value": "account, with plaintext account_id empty", "cite": "spec/features/manage-accounts.md#record-shape"},
+    "payloadShape": {"value": "{ name, unit, dims, note, archivedAt, createdAt }", "cite": "spec/features/manage-accounts.md#record-shape"},
+    "unitIsTheRateSymbol": {"value": "unit is what the account is measured in and is also its rate symbol: either a row of the operator's table or free text for a holding with no market price. There is no separate rate-symbol field, because two fields could disagree and a gram-versus-troy-ounce mismatch is silent", "cite": "spec/features/manage-accounts.md#record-shape"},
+    "unitNamesTheBaseAssetOnly": {"value": "the quote currency is the user's main currency and travels as a separate quote parameter, so a pair like USDCHF is never a unit", "cite": "spec/features/manage-accounts.md#record-shape"},
+    "formattingPrecisionSource": {"value": "from the symbol table's kind, currency or metal, and from a sensible default for free text. An explicit kind on the account would be a third copy of the same fact", "cite": "spec/features/manage-accounts.md#record-shape"},
+    "dimsShape": {"value": "a map from dimension id to value id, both opaque ids from the profile's dimension config, carrying no display text. A JSON object cannot carry the same key twice, so a second value for one dimension is unrepresentable", "cite": "spec/features/manage-accounts.md#dimensions"},
+    "dimensionIdFormat": {"value": "8 characters of [a-z0-9], generated client-side at creation. Never a label-derived key, which could collide with a string already in user data", "cite": "spec/features/manage-accounts.md#dimensions"},
+    "missingDimsEntry": {"value": "a real state, rendered as Unassigned, never an error and never hidden. Nothing is backfilled at dimension-creation time. A value id naming no configured value, because the value or its dimension was archived, also renders as Unassigned, and the entry stays on the account untouched", "cite": "spec/features/manage-accounts.md#dimensions"},
+    "noServerSideDimensionEntity": {"value": "a server-side list would leak the classification graph. Everything the UI shows is derived client-side from the decrypted profile and accounts", "cite": "spec/features/manage-accounts.md#record-shape"},
+    "archivedAt": {"value": "null for an active account, otherwise the ISO date the account was archived", "cite": "spec/features/manage-accounts.md#record-shape"},
+    "deleteIsAUserChoice": {"value": "an account with snapshots presents two explicit options, archive preselected as the default, and permanent delete. An account with no snapshots skips the dialog and is deleted outright", "cite": "spec/features/manage-accounts.md#delete-the-user-chooses"},
+    "archiveFlow": {"value": "sets archivedAt and re-writes the account record. The account disappears from active lists and takes no new snapshots, every snapshot stays, and it is reversible. The dialog offers a closing snapshot dated archivedAt, prefilled with 0 and editable, and it is a recording action like any other, so it refreshes prices at archivedAt including the unit of the account being archived. The user may skip it, and either way the date carries an archive annotation", "cite": "spec/features/manage-accounts.md#delete-the-user-chooses"},
+    "archiveOntoAnOccupiedDate": {"value": "the closing-snapshot field prefills with the existing value rather than 0 and saving replaces that record in place. No replace prompt fires, because the field is showing the stored figure, and the dialog's own confirm is the confirmation", "cite": "spec/features/manage-accounts.md#edge-cases"},
+    "purge": {"value": "DELETE /api/accounts/<account_id>?mode=purge removes the account record and cascades to every snapshot carrying that account_id, server-side and atomically. It deletes no price entry, because a price belongs to a symbol and the symbol is inside the ciphertext. Requires typing the account name to confirm, and the dialog states plainly that past net-worth figures will change", "cite": "spec/features/manage-accounts.md#delete-the-user-chooses"},
+    "cascadeReach": {"value": "no other record type carries an account link, so nothing else can be swept up by the cascade", "cite": "spec/features/manage-accounts.md#delete-the-user-chooses"},
+    "namesAreNotUnique": {"value": "two accounts may share a name. The record_id is identity", "cite": "spec/features/manage-accounts.md#rules"},
+    "unitIsFrozenOnceRecorded": {"value": "changing the unit of an account that already has snapshots is blocked, because the existing quantities are counted in the old unit and a new unit would price the whole history off a different symbol's series. Client-enforced by construction, since unit lives inside the ciphertext. Renaming, re-classifying and editing the note are always allowed", "cite": "spec/features/manage-accounts.md#rules"},
+    "everyWriteReEncrypts": {"value": "every write re-encrypts the whole record with a fresh nonce and increments version", "cite": "spec/features/manage-accounts.md#rules"},
+    "renderingRule": {"value": "decrypted names, notes and dimension labels are rendered with x-text or textContent only, never x-html", "cite": "spec/features/manage-accounts.md#rules"},
+    "statusCodes": {
+      "staleVersionOnEdit": {"value": 409, "cite": "spec/architecture.md#status-codes", "condition": "a concurrent edit from a second tab. The UI reloads and asks the user to redo the edit (spec/features/manage-accounts.md#edge-cases)"},
+      "purgeOnAnotherUsersAccount": {"value": 404, "cite": "spec/architecture.md#status-codes", "condition": "Not Found, never Forbidden, and nothing is deleted (spec/features/manage-accounts.md#acceptance-criteria)"}
+    }
   },
   "verify": {
     "criteria": {"file": "spec/features/manage-accounts.md", "section": "Acceptance criteria"},
+    "productCriteria": [{"file": "spec/product/manage-accounts.md", "section": "What must be true"}],
     "fixtures": [
-      "a configured dimension set (at least one multi-value dimension and one flag) with accounts assigned, for the dims-map and Unassigned-rendering criteria",
-      "an account with an existing snapshot, for the unit-change-lock and archive-closing-snapshot criteria",
-      "two users each owning an account, for the purge cross-user 404-not-403 criterion",
-      "an account name/note/dimension label containing `<img src=x onerror=alert(1)>`, for the XSS-rendering criterion"
+      "an account with snapshots and an account without, for the two delete paths",
+      "an account whose archive date already holds a snapshot, for the prefill-and-no-prompt assertion",
+      "a second seeded vault owner holding an account, for the purge isolation assertion",
+      "a fault injected mid-purge, for the atomicity assertion",
+      "a profile holding an archived dimension and an archived value, plus accounts carrying entries that name them",
+      "an account name, a note and a dimension label each containing an XSS payload, for the literal-text assertion in the list, the chart legend and every tooltip",
+      "an account whose unit is free text and one whose unit is a listed symbol, for the rate-request-count assertion"
     ],
     "focus": [
-      "the unit-change-lock criterion is explicitly client-only ('the test asserts the UI refuses it — not that an API call is rejected, which the server cannot do') — do not write a server-side test for this and call it complete",
-      "purge must be tested for atomicity with a simulated mid-delete failure, not just a happy-path cascade",
-      "'no account record contains a rate symbol distinct from its unit' is a shape assertion — verify the schema has no such field, don't just check a sample record",
-      "the archive-with-closing-snapshot criterion needs the chart-interpolation behavior checked too (net-worth-view.md), not just that the snapshot record was written",
-      "dims-map single-entry-per-dimension is 'true by construction' per the spec — the test should guard the shape (a JSON object can't carry a duplicate key) rather than attempt to construct the invalid state and check it's rejected"
+      "the unit-change block must be asserted against the UI refusing it, not against an API call being rejected. The server cannot see the unit, so a test written against the endpoint asserts a control that does not exist and would pass against a client that allows the change",
+      "purge must be shown to delete no rate record, asserted by count before and after, because the failure is silent and only shows up later as a repriced history",
+      "purge atomicity needs a fault injected mid-delete, with neither the account record nor its snapshots partially gone afterwards",
+      "archiving onto an occupied date must show no replace prompt and must leave exactly one snapshot for that (account, date) at version + 1. Half of this rule is about something not appearing, which no happy-path test catches",
+      "'no account record contains a rate symbol distinct from its unit' is asserted against the record shape itself, so that the 31x mismatch has nowhere to live. A value-level check would pass a schema that still admits the field",
+      "renaming a dimension label must leave every account record byte-identical, compared row by row rather than by counting writes",
+      "an account whose dims names an archived value must render as Unassigned with no account record written in either direction, restore included",
+      "the XSS assertion has to cover every place a decrypted string reaches, the list, the chart legend and every tooltip, not just the account form, because the rendering path differs between them"
     ]
   },
   "openQuestions": []

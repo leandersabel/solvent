@@ -1,44 +1,69 @@
 {
   "feature": "login",
-  "summary": "Vault unlock: the browser fetches salt/KDF params (real or a deterministic decoy), derives Master Key and Auth Key, sends only the Auth Key, and on success gets a session plus the wrapped DEK — with a transparent stale-KDF re-wrap and an idle lock that discards the entire in-memory model.",
+  "summary": "One sign-in flow and one screen for both kinds of account: a kind-blind salt fetch, an identical client-side Argon2id derivation and HKDF split, an Auth Key on the wire, and a wrapper returned only after a vault owner's credential verifies, plus the stale-KDF upgrade and the idle lock.",
   "read": [
     {"file": "spec/features/login.md", "sections": ["all"]},
-    {"file": "spec/architecture.md", "sections": ["Key management", "Application hardening"]},
-    {"file": "spec/features/account-settings.md", "sections": ["Session and lock"]},
-    {"file": "spec/ui/unlock.md", "sections": ["all"], "role": "the single password screen, in full-login and re-unlock modes"},
-    {"file": "spec/ui/design-system.md", "sections": ["Components", "States"], "role": "input and error-state conventions for the password screen, which sits outside the app shell (ui/unlock.md, Layout)"}
+    {"file": "spec/architecture.md", "sections": ["Key management", "Credentials and vault key wrappers", "Application hardening", "Accounts on this instance", "Status codes", "Threat model"]},
+    {"file": "spec/features/app-shell.md", "sections": ["The two surfaces", "CSRF", "Database", "The chrome"], "role": "the shared surface this flow sits on and the root path that resolves by kind"},
+    {"file": "spec/features/account-settings.md", "sections": ["Session and lock", "Change password"], "role": "owns the idle period and the session endpoints this flow's rules refer to"},
+    {"file": "spec/features/register.md", "sections": ["What registration writes", "Rules"], "role": "the credential row and envelope this flow reads"},
+    {"file": "spec/ui/design-system.md", "sections": ["Components", "States", "App shell"], "role": "the input, button and progress conventions, and the fact that the unauthenticated screens sit outside the shell"},
+    {"file": "spec/ui/unlock.md", "sections": ["all"], "role": "the one sign-in screen at one address, its two modes, and the derivation wait"}
   ],
-  "dependsOn": ["register", "record-api", "account-settings"],
+  "dependsOn": ["app-shell", "register", "admin-invites"],
   "parameters": {
-    "endpoints": {
-      "saltFetch": "POST /api/auth/salt { username } -> { salt, kdf }",
-      "login": "POST /api/auth/login { username, authKey } -> { wrappedDek, dekNonce, kdfStale } and sets session cookie",
-      "rewrap": "POST /api/auth/rewrap { salt, kdf, authKey, wrappedDek, dekNonce } — authenticated, replaces all five stored fields in one transaction"
-    },
-    "decoySalt": {"value": "HMAC(server_secret, normalized_username) truncated to 16 bytes, paired with the server's current default KDF envelope, for an unknown username", "cite": "spec/features/login.md#flow"},
-    "unknownUsernameLoginBehavior": {"value": "runs a full Argon2id verification against a fixed decoy hash and discards the result, so timing does not reveal existence", "cite": "spec/features/login.md#flow"},
-    "serverSideAuthKeyHash": {"value": "Argon2id, starting point 64 MiB memory, 2 iterations, constant-time comparison — defense in depth, not the primary work factor", "cite": "spec/features/login.md#rules"},
-    "sessionCookie": {"value": "HttpOnly, Secure, SameSite=Lax; carries only an opaque session token, no key material, no user id", "cite": "spec/features/login.md#inputs-outputs"},
-    "sessionLifetime": {"value": "absolute 12 hours from issue, not sliding", "cite": "spec/features/login.md#rules"},
-    "idleLock": {"value": "user-configurable 5-60 minutes, default 15, stored as idleLockMinutes in the encrypted profile record (absent = 15)", "cite": "spec/features/account-settings.md#session-and-lock"},
-    "idleLockDiscard": {"value": "discards Master Key, DEK, and every decrypted value derived from them (whole in-memory model, rendered figures, chart series, cached plaintext); the one named exception is unsaved form input in the open form", "cite": "spec/features/login.md#rules"},
-    "rewrapSaltSize": {"value": "fresh 128-bit salt generated for the re-wrap", "cite": "spec/features/login.md#stale-kdf-re-wrap"},
-    "rewrapFailureBehavior": {"value": "session continues on old parameters if the rewrap POST fails; retried on next login, never locks the user out", "cite": "spec/features/login.md#stale-kdf-re-wrap"},
-    "sessionRotation": {"value": "session id is rotated (new session id) on every successful login", "cite": "spec/features/login.md#rules"}
+    "saltEndpoint": {"value": "POST /api/auth/salt { username } returning { salt, kdf }, which is the password credential's params and nothing else. Two fields, and the response carries no field naming, implying or derivable into the account's kind", "cite": "spec/features/login.md#flow"},
+    "decoySalt": {"value": "HMAC(server_secret, normalized_username) truncated to 16 bytes, plus the server's current default KDF envelope, for an unknown username. Deterministic, so it is stable across calls. Responses are identically shaped and constant-time", "cite": "spec/features/login.md#flow"},
+    "loginEndpoint": {"value": "POST /api/auth/login { username, authKey } returning { kind, kdfStale } plus, for a vault owner only, wrappedDek and dekNonce. It sets the session cookie and writes last_login_at", "cite": "spec/features/login.md#flow"},
+    "decoyVerification": {"value": "an unknown username still runs a full Argon2id verification against a fixed decoy hash and discards the result, so the endpoint does not answer in microseconds for accounts that do not exist", "cite": "spec/features/login.md#flow"},
+    "kindIsExplicit": {"value": "kind is a returned field, not something the client infers from the presence of wrappedDek. A response arriving with kind absent is treated as a failed login rather than defaulting to either kind", "cite": "spec/features/login.md#flow"},
+    "atMostOneWrapper": {"value": "the wrapper returned is the one belonging to the credential that just authenticated, never a list, and no field names, counts or describes any other credential. The lookup happens after verification, keyed on the credential id", "cite": "spec/features/login.md#flow"},
+    "clientDerivation": {"value": "both halves always, Master Key and Auth Key, in a Web Worker, because the client does not yet know whether it will need the Master Key. Identical code path for both kinds", "cite": "spec/features/login.md#flow"},
+    "kdfParameters": {"value": "Argon2id at 64 MiB memory, 3 iterations, parallelism 1, over a 128-bit salt, via the argon2id library, HKDF-split", "cite": "spec/architecture.md#key-management"},
+    "serverSideAuthKeyHash": {"value": "the Auth Key is stored hashed with Argon2id at modest server-side cost, starting point 64 MiB and 2 iterations. Defense in depth, not the primary work factor. Comparison is constant-time", "cite": "spec/features/login.md#rules"},
+    "signInWaitParity": {"value": "the sign-in wait is the same for both kinds and must not be skipped for an administrator. The channel is wall-clock time at the keyboard, not response timing on the wire, and it is closed by the client doing the same work for everyone. What an administrator saves is everything after the verification and nothing before it", "cite": "spec/features/login.md#rules"},
+    "nothingPreAuthBranchesOnKind": {"value": "the salt response, the client derivation, the Auth Key on the wire, the server-side Argon2id over it, the rate-limit keying and the lockout response are the same operations in the same order for both kinds", "cite": "spec/features/login.md#rules"},
+    "failedUnwrapIsAnAuthFailure": {"value": "a failed DEK unwrap is treated as a wrong password with the same error, and logged server-side as an anomaly. Do not silently continue with a dead key", "cite": "spec/features/login.md#flow"},
+    "kdfUpgradeEndpoint": {"value": "POST /api/auth/upgrade-kdf { salt, kdf, authKey }, plus wrappedDek and dekNonce for a vault owner, against the authenticated session. In one transaction it replaces the password credential row and, for a vault owner, that credential's one dek_wrappers row. No other row changes", "cite": "spec/features/login.md#stale-kdf-upgrade"},
+    "kdfUpgradeIsTheOnlyPath": {"value": "this is the only path by which an account's KDF parameters are raised, and therefore the only way the Argon2id memory parameter is raised. Both kinds run it. The DEK does not change, so no vault record is re-encrypted, and a failed upgrade leaves the session running on the old parameters", "cite": "spec/features/login.md#stale-kdf-upgrade"},
+    "kdfUpgradeDiscriminator": {"value": "the server discriminates on the session's principal kind, not on which fields the client sent. A vault owner's request without a wrapper is a Bad Request and an administrator's with one is too", "cite": "spec/features/login.md#stale-kdf-upgrade"},
+    "residualEnumerationLeak": {"value": "a decoy always carries the server's current default envelope while a real account can carry a stale one, so an account not yet upgraded is distinguishable from a decoy. Accepted, not closed. It leaks existence, never kind. Do not write a test asserting a stale-envelope account is indistinguishable", "cite": "spec/features/login.md#rules"},
+    "idleLock": {"value": "for a vault owner, after the configured idle period the client discards the Master Key, the DEK and every decrypted value derived from them, meaning the whole in-memory model, rendered figures, chart series and any cached plaintext, then shows a re-unlock prompt. The server session may still be valid, and unlocking re-derives the keys and re-decrypts the vault from scratch", "cite": "spec/features/login.md#rules"},
+    "idleLockException": {"value": "unsaved form input the user typed survives the lock, scoped to the open form. Nothing else decrypted is exempt. The same rule covers the manual lock button and a session expiring mid-request", "cite": "spec/features/login.md#rules"},
+    "noIdleRuleForAdministrator": {"value": "nothing is decrypted, so there is nothing for a lock to take away. An administrator session is bounded by the absolute expiry and by signing out", "cite": "spec/features/login.md#rules"},
+    "sessionLifetime": {"value": "the server-side session expires 12 hours after issue, absolute and not sliding, for both kinds. The session is rotated on successful login", "cite": "spec/features/login.md#rules"},
+    "rateLimits": {"value": "per account 10 attempts per 15 minutes, then a 15-minute lockout once 20 fail within an hour. Per IP 60 requests per hour across /api/auth/login and /api/auth/salt together. Operator config with those defaults, so tests assert the behaviour at whatever value is configured and no criterion asserts a count", "cite": "spec/architecture.md#application-hardening"},
+    "concurrencyCap": {"value": "Auth Key verifications run behind a concurrency limit, default 4, so peak Argon2id memory is bounded. Requests over it queue and then fail with the ordinary throttle response", "cite": "spec/architecture.md#application-hardening"},
+    "lockoutAlerting": {"value": "a structured log line with a stable name, the affected account and the window, not a notification", "cite": "spec/architecture.md#application-hardening"},
+    "statusCodes": {
+      "lockedOutOrOverLimit": {"value": 429, "cite": "spec/architecture.md#status-codes", "condition": "a rate limit engaged. The response shape must not reveal whether the account exists (spec/features/login.md#edge-cases)"},
+      "sessionExpiredMidRequest": {"value": 401, "cite": "spec/architecture.md#status-codes", "condition": "returned with a machine-readable code so the client prompts for re-unlock rather than discarding unsaved input (spec/features/login.md#edge-cases)"},
+      "upgradeKdfFieldMismatch": {"value": 400, "cite": "spec/architecture.md#status-codes", "condition": "a wrapper from an administrator session, or none from a vault owner session (spec/features/login.md#stale-kdf-upgrade)"}
+    }
   },
   "verify": {
     "criteria": {"file": "spec/features/login.md", "section": "Acceptance criteria"},
+    "productCriteria": [{"file": "spec/product/login.md", "section": "What must be true"}],
     "fixtures": [
-      "a real user at current KDF parameters and a nonexistent username, for the salt-fetch and login timing/shape-indistinguishability assertions",
-      "a real user with a deliberately stale KDF envelope, for the transparent-upgrade assertion (salt/envelope/Auth-Key-hash/wrapped-DEK all change, DEK proven unchanged)",
-      "a record written before a KDF upgrade, to prove decryptability survives the re-wrap",
-      "a stubbed /api/auth/rewrap returning 500, for the 'stays logged in on rewrap failure' criterion"
+      "a seeded vault owner, a seeded administrator and an unknown username, all three at current KDF parameters, for the three-way salt and login comparisons",
+      "browser-side timing capture from form submission to the Auth Key leaving the browser, for the wall-clock parity assertion",
+      "an account of each kind stored at a KDF envelope below the server default, for the upgrade path",
+      "a record written before an upgrade, to prove the DEK is unchanged by decrypting it afterwards",
+      "a server default Argon2id memory parameter that can be raised in the test, for the live-upgrade-path assertion",
+      "a stubbed /api/auth/upgrade-kdf returning Server Error, for the keep-signed-in assertion",
+      "a populated in-memory model, inspectable after an idle lock, for the assertion that no decrypted account name, value or snapshot remains reachable",
+      "a full before-and-after snapshot of principals, credentials and dek_wrappers, for the assertion that an upgrade writes one credential row and at most its own wrapper"
     ],
     "focus": [
-      "timing-indistinguishability criteria (salt fetch, login) need actual statistical timing measurement across many trials, not a single-run assertion",
-      "the idle-lock criterion must assert against the in-memory model itself (no decrypted name/value/snapshot reachable), not just that the key handles are null — a test that only checks the key variables would pass a broken implementation that leaves data cached elsewhere",
-      "'no key material in localStorage/sessionStorage at any point' needs an assertion that runs throughout the flow, not just at the end, since a leak-then-clear bug would otherwise pass",
-      "the stale-envelope account is deliberately distinguishable from a decoy (Rules) — do not write or accept a test asserting otherwise; only the current-KDF-parameters case is asserted indistinguishable"
+      "the administrator sign-in wait must be measured in the browser, from form submission to the Auth Key leaving it, and compared against a vault owner's and an unknown username's. This is the criterion the whole two-kind design turns on and it is invisible to every server-side timing test, because the channel is wall-clock time at the keyboard. It is also the test that fails if somebody later makes the administrator path skip the derivation, which is the obvious optimization",
+      "the salt response must be compared three ways, administrator against vault owner against unknown, over the endpoint's full response shape and field set, not only its two documented fields. An added field is the failure mode, and it breaks this silently",
+      "the client derivation must be compared as a code path taken, not only as an output. Two paths that produce the same bytes today can diverge in cost tomorrow, which is the leak",
+      "do not write a test asserting that a stale-envelope account is indistinguishable from a decoy. The spec states outright that it is not, and a green test there would assert something untrue",
+      "the idle-lock criterion must be asserted against the in-memory model, not only against the key handles. Dropping the keys and leaving the decrypted model in place passes any test that checks for a Master Key and fails the threat the lock exists for",
+      "re-unlocking must be shown to refetch and re-decrypt rather than restore a model kept across the lock. A cached model that is simply re-exposed looks identical from the outside",
+      "the upgrade must be shown to write exactly the password credential row and, for a vault owner, that credential's wrapper, by comparing every other row of principals, credentials and dek_wrappers before and after",
+      "an administrator's verifier must be shown to be a hash over the HKDF half and not over the raw Argon2id output, by deriving both in a test and checking which one verifies. Both produce a working login, so only this comparison tells them apart",
+      "no key material may be written to localStorage or sessionStorage at any point, asserted over the whole flow including the upgrade and the re-unlock, not only the first sign-in"
     ]
   },
   "openQuestions": []

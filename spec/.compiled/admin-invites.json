@@ -1,50 +1,76 @@
 {
   "feature": "admin-invites",
-  "summary": "Invite-only user provisioning: admins mint single-use, time-limited invite links, list/revoke them, list users with metadata-only visibility, and delete a user's whole vault — with no decryption, password-reset, or role-change ability anywhere in the surface.",
+  "summary": "The provisioning half of running the platform: single-use, time-limited invites that name the kind of account they create, the instance's account list, account removal under a last-administrator guard, an administrator's own password rotation, and the bootstrap CLI.",
   "read": [
     {"file": "spec/features/admin-invites.md", "sections": ["all"]},
-    {"file": "spec/architecture.md", "sections": ["Components", "Threat model", "Storage & data handling"]},
-    {"file": "spec/ui/admin.md", "sections": ["all"], "role": "the only screen this feature drives"},
-    {"file": "spec/ui/design-system.md", "sections": ["Components", "States", "App shell"], "role": "table, chip, and form conventions for the invite/user admin screen, and the shell's Admin nav entry this feature owns"}
+    {"file": "spec/architecture.md", "sections": ["Accounts on this instance", "Credentials and vault key wrappers", "Threat model", "Application hardening", "Storage & data handling", "Status codes"]},
+    {"file": "spec/features/app-shell.md", "sections": ["The two surfaces", "Database", "CSRF", "The chrome"], "role": "the routing layer that answers a vault owner Not Found from every /api/admin/ route, and the administrator's stripped chrome"},
+    {"file": "spec/features/register.md", "sections": ["What it does", "What registration writes", "Rules", "Edge cases"], "role": "the consumer of an invite and the writer of the kind it names"},
+    {"file": "spec/features/account-settings.md", "sections": ["Change password", "Delete my account"], "role": "the shared change-password endpoint an administrator reaches, and the vault owner deletion path this one is not"},
+    {"file": "spec/features/rate-lookup.md", "sections": ["The symbol table", "Maintaining the table"], "role": "the other administrator task on this surface, owned there and not here"},
+    {"file": "spec/ui/design-system.md", "sections": ["App shell", "Components", "States"], "role": "the administrator's frame, the section switcher that replaces nav inside the admin area, and the dialog and table conventions"},
+    {"file": "spec/ui/admin.md", "sections": ["all"], "role": "the administration surface this feature drives"}
   ],
-  "dependsOn": ["register", "login", "account-settings"],
+  "dependsOn": ["app-shell", "register", "login", "record-api", "account-settings"],
   "parameters": {
-    "inviteRow": {"value": ["id", "token_hash", "created_by", "created_at", "expires_at", "status", "used_at", "used_by", "label"], "cite": "spec/features/admin-invites.md#invite-lifecycle"},
-    "tokenEntropy": {"value": "256 bits, secrets.token_urlsafe(32), shown once at creation, never retrievable afterward", "cite": "spec/features/admin-invites.md#invite-lifecycle"},
-    "tokenHash": {"value": "SHA-256, looked up by hash, never scanned/compared as plaintext", "cite": "spec/features/admin-invites.md#invite-lifecycle"},
-    "expiry": {"value": "default 7 days, admin-settable 1-30 days at creation", "cite": "spec/features/admin-invites.md#invite-lifecycle"},
-    "statusValues": {"value": ["pending", "used", "revoked"], "note": "expired is derived from expires_at, never stored", "cite": "spec/features/admin-invites.md#invite-lifecycle"},
-    "sentinelCreatedBy": {"value": "system:bootstrap, refused as a registration username", "cite": "spec/features/admin-invites.md#invite-lifecycle"},
+    "inviteRow": {"value": ["id", "token_hash", "kind", "created_by", "created_at", "expires_at", "status", "used_at", "used_by", "label"], "cite": "spec/features/admin-invites.md#invite-lifecycle"},
+    "inviteKind": {"value": "vault_owner or administrator, chosen at creation and never edited. It is the sole source of the kind of the account the invite produces", "cite": "spec/features/admin-invites.md#invite-lifecycle"},
+    "inviteToken": {"value": "256 bits from secrets.token_urlsafe(32), shown once at creation in the response and never retrievable afterwards", "cite": "spec/features/admin-invites.md#invite-lifecycle"},
+    "inviteTokenHashing": {"value": "SHA-256. The token is high-entropy and unguessable, so a slow KDF buys nothing. Lookup is by hash, in constant time, never by scanning and comparing plaintext", "cite": "spec/features/admin-invites.md#invite-lifecycle"},
+    "inviteExpiry": {"value": "default 7 days, set by the administrator at creation within 1 to 30 days", "cite": "spec/features/admin-invites.md#invite-lifecycle"},
+    "inviteStatus": {"value": "pending, then used or revoked. expired is derived from expires_at and not stored, so it cannot drift", "cite": "spec/features/admin-invites.md#invite-lifecycle"},
+    "singleUse": {"value": "consumed atomically in the same transaction as the account insert. A failed registration does not consume it", "cite": "spec/features/admin-invites.md#invite-lifecycle"},
+    "createdBy": {"value": "the administrator who minted the invite, or the reserved sentinel system:bootstrap for one minted by the CLI. Stored and never returned: GET /api/admin/invites leaves it out and no screen shows it. The sentinel is refused as a username at registration", "cite": "spec/features/admin-invites.md#invite-lifecycle"},
     "endpoints": {
-      "createInvite": "POST /api/admin/invites { expiresInDays, label, isAdmin } -> { id, token, url, expiresAt }",
-      "listInvites": "GET /api/admin/invites -> [{ id, label, createdAt, expiresAt, status, usedAt, usedBy }] (never token or hash)",
-      "revokeInvite": "POST /api/admin/invites/<id>/revoke -> status: revoked; idempotent if already revoked, refused (409) if used",
-      "listUsers": "GET /api/admin/users -> [{ username, createdAt, isAdmin, recordCount, lastLoginAt }]",
-      "deleteUser": "DELETE /api/admin/users/<username> { confirmUsername } -> deletes user row, all records, all sessions in one transaction; 400 if confirmUsername mismatches path; 409 if target is the last remaining admin"
+      "createInvite": {"value": "POST /api/admin/invites { expiresInDays, label, kind } returning { id, token, url, expiresAt, kind }. kind is required and has no default, and any other value is a Bad Request. The only response that ever contains the token", "cite": "spec/features/admin-invites.md#endpoints"},
+      "listInvites": {"value": "GET /api/admin/invites returning { id, label, kind, createdAt, expiresAt, status, usedAt, usedBy }. Never includes the token or its hash", "cite": "spec/features/admin-invites.md#endpoints"},
+      "revokeInvite": {"value": "POST /api/admin/invites/<id>/revoke sets status revoked. Idempotent on an already-revoked invite, refused on a used one", "cite": "spec/features/admin-invites.md#endpoints"},
+      "listAccounts": {"value": "GET /api/admin/accounts returning per account { username, kind, createdAt, lastLoginAt }, plus recordCount for a vault owner only. A union discriminated on kind, and recordCount is absent for an administrator rather than zero. Both kinds are listed", "cite": "spec/features/admin-invites.md#endpoints"},
+      "deleteAccount": {"value": "DELETE /api/admin/accounts/<username> { confirmUsername } deletes that principal's row, its credential, its wrapper, every record and every session in one transaction. Keyed by normalized username, and confirmUsername must equal the path segment or the request is a Bad Request", "cite": "spec/features/admin-invites.md#endpoints"}
     },
-    "authRequirement": {"value": "every /api/admin/* endpoint requires an authenticated session with is_admin; a non-admin session gets 404, never 403", "cite": "spec/features/admin-invites.md#endpoints"},
-    "noRoleChangeEndpoint": {"value": "no promote/demote endpoint exists anywhere; the only way to make an admin is the bootstrap CLI or an invite created with isAdmin: true", "cite": "spec/features/admin-invites.md#endpoints"},
-    "bootstrapCli": {"value": "flask create-invite --admin --expires-days 1; requires --force on a populated instance, printing existing user/admin counts, and does not refuse outright even then", "cite": "spec/features/admin-invites.md#bootstrap-the-first-admin-and-the-locked-out-one"},
-    "inviteUrlFormat": {"value": "https://<host>/register?invite=<token>", "cite": "spec/features/admin-invites.md#rules"},
-    "referrerPolicy": {"value": "Referrer-Policy: no-referrer on /register and admin UI pages", "cite": "spec/features/admin-invites.md#rules"},
-    "tokenUrlScrub": {"value": "the register page removes the token from the address bar via history.replaceState once the form holds it", "cite": "spec/features/admin-invites.md#rules"},
-    "logRedaction": {"value": "the app strips/redacts the invite token from its own access logging; the deployment's reverse proxy/tunnel logging is documented separately as a place it may still appear", "cite": "spec/features/admin-invites.md#rules"}
+    "noKindChangeAnywhere": {"value": "there is no endpoint that changes an account's kind, no promote, no demote, and no field on any request that is read into principals.kind after the insert", "cite": "spec/features/admin-invites.md#endpoints"},
+    "adminBoundary": {"value": "no endpoint returns any record ciphertext, any field of any account's credential row meaning salt, KDF envelope or Auth Key hash, or any wrapper. An administrator cannot reset a password and holds no destructive power beyond removing an account outright. The same person's two accounts are not linked anywhere and no feature may add a link", "cite": "spec/features/admin-invites.md#the-admin-boundary"},
+    "lastAdministratorGuard": {"value": "at least one administrator account exists at all times. A deletion that would leave none is refused with Conflict. The guard and the delete are one BEGIN IMMEDIATE transaction, so two administrators removing each other concurrently cannot both succeed. There is no guard on removing the last vault owner", "cite": "spec/features/admin-invites.md#who-may-remove-whom-and-the-last-administrator"},
+    "whoMayRemoveWhom": {"value": "an administrator may remove any account of either kind including another administrator and including their own, while another administrator remains, which ends their own session with the transaction. An administrator's own account is removed here and nowhere else", "cite": "spec/features/admin-invites.md#who-may-remove-whom-and-the-last-administrator"},
+    "administratorPasswordChange": {"value": "one control in the admin area posting to POST /api/auth/change-password, the same shared endpoint a vault owner uses, sending no wrapper. It invalidates every other session of that administrator and keeps the current one, which is also the administrator's sign out everywhere. There is no session list for an administrator and no POST /api/auth/logout-all", "cite": "spec/features/admin-invites.md#an-administrators-own-credential"},
+    "forgottenAdministratorPassword": {"value": "an administrator who has forgotten their password is not recovered, they are replaced. There is deliberately no power for one administrator to reset another's password", "cite": "spec/features/admin-invites.md#an-administrators-own-credential"},
+    "bootstrapCli": {"value": "flask create-invite --kind administrator --expires-days 1. --kind is required and takes administrator or vault-owner. It prints an invite URL and exits, creating an invite and never an account. --force is required whenever an administrator account already exists, and without it the command refuses, exits non-zero and prints how many accounts of each kind there are plus the flag that would proceed", "cite": "spec/features/admin-invites.md#bootstrap-the-first-administrator-and-the-locked-out-one"},
+    "inviteUrl": {"value": "https://<host>/register?invite=<token>, copied to the clipboard and delivered out of band. The app does not email it", "cite": "spec/features/admin-invites.md#rules"},
+    "referrerPolicy": {"value": "Referrer-Policy: no-referrer on /register and on admin UI pages. The register page is the one that matters, because the token rides in its URL", "cite": "spec/features/admin-invites.md#rules"},
+    "tokenDroppedFromAddressBar": {"value": "the register page drops the token with history.replaceState once the form has taken it, and the form submits the token it already holds rather than the URL's copy", "cite": "spec/features/admin-invites.md#rules"},
+    "tokenNotLogged": {"value": "the token must not appear in the application's own log output. The deployment's reverse proxy or tunnel logging is documented as a place it may still appear", "cite": "spec/features/admin-invites.md#rules"},
+    "statusCodes": {
+      "vaultOwnerOnAdminRoute": {"value": 404, "cite": "spec/architecture.md#status-codes", "condition": "every /api/admin/ route, at the routing layer, never Forbidden (spec/features/admin-invites.md#edge-cases)"},
+      "revokeUsedInvite": {"value": 409, "cite": "spec/architecture.md#status-codes", "condition": "a used invite cannot be revoked, and the message points at account deletion instead (spec/features/admin-invites.md#edge-cases)"},
+      "lastAdministratorRemoval": {"value": 409, "cite": "spec/architecture.md#status-codes", "condition": "a deletion that would leave no administrator (spec/features/admin-invites.md#who-may-remove-whom-and-the-last-administrator)"},
+      "confirmUsernameMismatch": {"value": 400, "cite": "spec/architecture.md#status-codes", "condition": "confirmUsername does not equal the path segment (spec/features/admin-invites.md#endpoints)"},
+      "createInviteWithoutKind": {"value": 400, "cite": "spec/architecture.md#status-codes", "condition": "kind is required and has no default (spec/features/admin-invites.md#endpoints)"},
+      "removingAnUnknownUsername": {"value": 404, "cite": "spec/architecture.md#status-codes", "condition": "the same answer a vault owner gets from any admin route, so a probe distinguishes nothing (spec/features/admin-invites.md#edge-cases)"}
+    }
   },
   "verify": {
     "criteria": {"file": "spec/features/admin-invites.md", "section": "Acceptance criteria"},
+    "productCriteria": [{"file": "spec/product/admin-invites.md", "section": "What must be true"}],
     "fixtures": [
-      "a seeded admin session and a seeded non-admin session, for the 404-not-403 assertions across every /api/admin/* route",
-      "a bootstrap-CLI-minted invite (created_by: system:bootstrap) alongside an admin-minted one, to test the sentinel username refusal",
-      "two populated vaults, for the 'deleting one user leaves the other's records and sessions untouched' criterion",
-      "a simulated DB failure mid-delete, for the transactional-rollback criterion",
-      "the full response shape of every admin endpoint, for the 'never returns wrapped DEK/salt/KDF envelope/ciphertext' sweep"
+      "a route enumerator over the registered routes under /api/admin/ read at test time rather than a fixed list, which is what makes the boundary test cover an endpoint added later",
+      "three seeded administrators and two populated vault owners, for the removal, the last-administrator guard and the untouched-other-account assertions",
+      "two overlapping DELETE /api/admin/accounts requests, each targeting one of the only two administrators, issued concurrently rather than serially",
+      "an invite in each of the four bad states, invalid, expired, used and revoked, sharing the registration-error assertion with register",
+      "a CLI-minted invite, for the system:bootstrap sentinel and the refused-username assertion",
+      "a fresh instance with no administrator and an instance with one, for the CLI's two behaviours and the --force override",
+      "a fault injected mid-delete, for the target account being fully intact and able to sign in afterwards",
+      "captured application log output over an invite creation and a registration, for the token-absence assertion"
     ],
     "focus": [
-      "the 'no endpoint promotes or demotes an admin' criterion requires enumerating every registered route under /api/admin/, not just testing the documented ones",
-      "the last-admin guard must be checked on both deletion paths — the admin panel's DELETE /api/admin/users/<username> and the user's own DELETE /api/auth/account (account-settings.md) — a test that only covers one path is incomplete",
-      "the invite token must never appear in the application's own log output — requires inspecting actual log lines, not just the HTTP response",
-      "the DB-failure-mid-delete criterion needs an actual fault injection (simulated failure) to prove atomicity, not just a happy-path delete test",
-      "byte-identical registration errors for invalid/expired/used/revoked invites is a shared assertion with register.md — verify it is asserted once, not divergently in both feature tests"
+      "no endpoint under /api/admin/ may return any record ciphertext, any field of any account's credential row or any wrapper. This is the executable form of the admin boundary and it has to enumerate the registered routes at test time and inspect each one's full response shape, so an endpoint added later is tested automatically instead of needing to be added to a list. A fixed list of routes passes forever and misses the one that crosses the line",
+      "the same enumeration has to be used for the no-kind-change rule, attempting the change through every registered route rather than through the ones that look likely",
+      "the last-administrator guard must be tested with two genuinely overlapping requests. The serial case passes whether or not the count and the delete share a transaction, and the concurrent case is the bug the BEGIN IMMEDIATE exists for",
+      "recordCount must be shown to be absent for an administrator by asserting against the row's full key set, not against its value. A zero passes any value-based check and says exactly the wrong thing",
+      "the four bad-invite refusals must be byte-identical, which is shared with register and easy to leave half-asserted on one side",
+      "the token must be shown to appear in no table and in no application log line, over captured output from a real creation and registration rather than a source grep",
+      "every control in the rendered admin area must map to a route under /api/admin/ or to POST /api/auth/change-password, asserted against the rendered area, so a control wired to a vault route fails whatever it is for",
+      "an administrator removing their own account while another remains must be shown to end their own session, not merely to return a success status",
+      "a mid-delete failure must leave the target account able to sign in, asserted by actually signing in rather than by reading rows"
     ]
   },
   "openQuestions": []

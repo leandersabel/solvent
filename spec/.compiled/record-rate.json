@@ -1,0 +1,79 @@
+{
+  "feature": "record-rate",
+  "summary": "The price timeline: one encrypted rate record per symbol per date, refreshed as a side effect of recording any quantity, proposed by the lookup proxy where a source exists, always overridable, and stored permanently inside the vault.",
+  "read": [
+    {"file": "spec/features/record-rate.md", "sections": ["all"]},
+    {"file": "spec/features/record-api.md", "sections": ["Row shape", "The AAD encoding", "`accountId` on the wire", "Endpoints", "Rules"], "role": "the store every rate record is written through"},
+    {"file": "spec/architecture.md", "sections": ["Data model", "Record storage API", "Key management", "Storage & data handling", "Threat model"], "role": "the two-timeline split, the column rule, and the threat model the in-vault argument is made against"},
+    {"file": "spec/features/record-snapshot.md", "sections": ["A recording is a date", "Reopening and editing a recording", "Creating and reopening are distinct acts", "Clearing a figure", "Deleting a recording", "Edge cases"], "role": "the act that triggers the refresh, and the pre-create reload that enforces one entry per symbol per date"},
+    {"file": "spec/features/rate-lookup.md", "sections": ["Endpoint", "The client never names a symbol", "The symbol table", "Edge cases"], "role": "where a proposal comes from and what No Content means"},
+    {"file": "spec/features/net-worth-view.md", "sections": ["Data flow", "Current net worth", "Values between entries"], "role": "the in-memory model this series lives in and the reader of every entry"},
+    {"file": "spec/ui/design-system.md", "sections": ["Components", "States", "App shell"], "role": "the chip, disclosure and dialog conventions the rate lines and their confirmations use"},
+    {"file": "spec/ui/recording-detail.md", "sections": ["The prices", "Delete", "States", "Rules"], "role": "owns the provenance vocabulary and the one screen a stored price is read on"},
+    {"file": "spec/ui/update-values.md", "sections": ["The rates, at the foot of the sweep", "Rate lines on a reopened recording", "Changing or clearing a rate says what it moves", "Writes", "States"], "role": "the screen a rate is proposed, edited and cleared on"},
+    {"file": "spec/ui/snapshot-entry.md", "sections": ["The prices line", "Editing an existing entry", "States"], "role": "the single-holding form's account of what the refresh is about to write"}
+  ],
+  "dependsOn": ["app-shell", "record-api", "rate-lookup", "register", "login", "account-settings", "manage-accounts", "record-snapshot", "net-worth-view"],
+  "parameters": {
+    "recordType": {"value": "rate, with plaintext account_id empty, AES-256-GCM under the vault DEK like every other record", "cite": "spec/features/record-rate.md#where-it-lives-inside-the-vault"},
+    "noPlaintextSymbolOrDate": {"value": "there is no plaintext symbol column and no plaintext date column. The symbol stays inside the ciphertext, because a durable table of (principal, symbol, date, rate) rows is the list of what a person holds", "cite": "spec/features/record-rate.md#where-it-lives-inside-the-vault"},
+    "recordIdDerivation": {"value": "a random UUIDv4. Deriving it from the symbol and the date would let the server compute the id for every symbol in its own table and match", "cite": "spec/features/record-rate.md#where-it-lives-inside-the-vault"},
+    "payloadShape": {"value": "{ symbol, date, rate, rateTarget, rateSource, rateAsOf, proposedRate }", "cite": "spec/features/record-rate.md#record-shape"},
+    "dateFormat": {"value": "YYYY-MM-DD, no time and no timezone. It is the date the price applies to, which is the date the entry was recorded at, not the date the entry was written", "cite": "spec/features/record-rate.md#record-shape"},
+    "rateArithmetic": {"value": "decimal string at scale 12, parsed and computed as BigInt, no IEEE-754 float at any point. A rate with more than twelve decimal places is rejected at input rather than truncated", "cite": "spec/features/record-rate.md#record-shape"},
+    "rateTarget": {"value": "the ISO 4217 code rate converts into, which is the main currency as of entry time, written into every entry", "cite": "spec/features/record-rate.md#record-shape"},
+    "rateSourceEnum": {"value": ["proposed", "edited", "manual"], "cite": "spec/features/record-rate.md#record-shape"},
+    "rateAsOfRule": {"value": "the date the provider's figure actually applies to, which may lag date. null when manual. For edited it keeps the proposal's date", "cite": "spec/features/record-rate.md#record-shape"},
+    "proposedRateRule": {"value": "set exactly when rateSource is edited and null otherwise, and it records the original proposal, so editing an edited rate a second time leaves it alone", "cite": "spec/features/record-rate.md#record-shape"},
+    "uniqueness": {"value": "one entry per (symbol, date), and one record per entry. Not one record per symbol holding its whole series and not one record per date holding every symbol", "cite": "spec/features/record-rate.md#record-shape"},
+    "refreshSymbolSet": {"value": "the distinct unit of every active account, minus any unit equal to the profile's mainCurrency. An archived account's symbol is not refreshed, except in the archive flow's own closing snapshot", "cite": "spec/features/record-rate.md#the-refresh"},
+    "mainCurrencyRate": {"value": "1 by definition, stored nowhere and requested from nobody", "cite": "spec/features/record-rate.md#the-refresh"},
+    "refreshDate": {"value": "the date of the entry being written, the sweep's date or the single-holding form's date, never today", "cite": "spec/features/record-rate.md#the-refresh"},
+    "refreshCardinality": {"value": "at most one refresh per recording date, ensured once for the whole sitting, so a fifteen-row sweep writes one set of prices and issues one rate request", "cite": "spec/features/record-rate.md#the-refresh"},
+    "refreshTrigger": {"value": "recording a quantity refreshes. Reopening a recording does not. Changing a figure, changing a rate, or clearing one is not recording a quantity and ensures nothing. The refresh is an ensure over the date, so running it twice is a no-op the second time", "cite": "spec/features/record-rate.md#the-refresh"},
+    "lookupIsIssuedOnlyWhenNeeded": {"value": "a rate request is issued only when a symbol the date needs has no entry at it, which is why opening an old recording is silent", "cite": "spec/features/record-rate.md#the-refresh"},
+    "noProposalCases": {"value": "no proposal and a previous entry exists means nothing is written and the previous entry stays the latest, at its own date. No rate source at all means nothing is written unless the person edits it, and re-dating an unreviewed estimate is refused. No entry yet and no proposal means the row asks for the price and the holding stays unpriced, and the quantity still saves", "cite": "spec/features/record-rate.md#the-refresh"},
+    "editedRateNeverLeavesTheBrowser": {"value": "an edited rate is not part of, and does not trigger, any request to /api/rates, in any field, in any encoding", "cite": "spec/features/record-rate.md#the-refresh"},
+    "writeOrderFreshRecording": {"value": "the quantity PUT goes first and its result is the row's result. On success the recording date's price entries are PUT, one request each, starting with the symbol of the row just written. A price write cannot fail a quantity write and a price write failure is never silent", "cite": "spec/features/record-rate.md#the-write-path"},
+    "writeOrderEditedRecording": {"value": "0 the pre-create reload if the save creates anything, 1 quantity writes creates and updates alike, 2 rate writes, 3 deletions quantities first and rates after. A phase's requests may be issued together and the next phase begins when every request in the previous one has answered. No step is skipped because an earlier one failed", "cite": "spec/features/record-rate.md#saving-an-edited-recording"},
+    "typedRateIsUngated": {"value": "a rate the person typed does not wait on a quantity and is written whether or not the quantity beside it landed. A refreshed entry is still gated behind a successful quantity write", "cite": "spec/features/record-rate.md#saving-an-edited-recording"},
+    "versionRules": {"value": "the refresh only ever creates, at version 1. Somebody editing a stored entry updates it at stored version + 1. A Conflict is surfaced and never retried: the line reloads to what is stored and the message names the symbol", "cite": "spec/features/record-rate.md#the-write-path"},
+    "partialSaveReporting": {"value": "the screen stays open, every change keeps its own state, the message names how many changes were saved and which ones were not by holding name and by symbol, a retry reissues only what failed at whatever version each record now holds, and the in-memory model advances per write. Nothing in the vault records that a save was partial: no pending flag and no dirty marker", "cite": "spec/features/record-rate.md#saving-an-edited-recording"},
+    "duplicateHandling": {"value": "two entries for one (symbol, date) whose decrypted payloads are byte-identical in every field are deleted down to one. Anything else is rendered in that date's recording, flagged, with an action to keep one, and the pair drops out of the symbol's series until then. There is no provenance ranking and no automatic winner", "cite": "spec/features/record-rate.md#two-entries-on-one-date"},
+    "readingDefinitions": {"value": "the latest price for a symbol is the entry with the greatest date, never the most recently written. The price as recorded for an account is the entry with the greatest date at or before the date of that account's latest quantity entry. A unit equal to mainCurrency prices at exactly 1, from no entry, and is not an unpriced holding", "cite": "spec/features/record-rate.md#reading"},
+    "editingRules": {"value": "a stored price is edited inside the recording for its date and nowhere else. rate, rateSource and rateAsOf open on the stored values, never on a fresh proposal, and opening a recording fetches no proposal at all. Editing by hand moves proposed to edited and captures the replaced figure as proposedRate, leaving rateAsOf unchanged", "cite": "spec/features/record-rate.md#editing-a-captured-rate"},
+    "editConfirmation": {"value": "editing one entry changes every holding measured in that symbol on that date, and the confirmation says so, naming how many holdings are affected. A save changing several rates confirms once, naming each symbol and its count", "cite": "spec/features/record-rate.md#editing-a-captured-rate"},
+    "deletionEffect": {"value": "deleting an entry is allowed by clearing its line, and every entry at a date goes together when the recording itself is deleted. The confirmation says that figures around that date will change, and, when the entry is the symbol's only one, that every holding measured in it becomes unpriced", "cite": "spec/features/record-rate.md#editing-a-captured-rate"},
+    "provenanceChips": {"value": "proposed renders as 'Market rate', or 'Market rate as of 29 Jul' where the provider's figure is for an earlier day. edited renders as 'Edited from 0.9312', naming the figure that was replaced. manual renders as 'Typed by you'. The same three words are used wherever a price's origin is shown, the sweep's rate block included", "cite": "spec/ui/recording-detail.md#the-prices"}
+  },
+  "verify": {
+    "criteria": {"file": "spec/features/record-rate.md", "section": "Acceptance criteria"},
+    "productCriteria": [
+      {"file": "spec/product/record-snapshot.md", "section": "What must be true"},
+      {"file": "spec/product/net-worth-view.md", "section": "What must be true"}
+    ],
+    "fixtures": [
+      "a seeded vault holding two accounts measured in USD, one in XAU-ozt, one in the main currency, and one in a free-text unit, which is the spread every refresh rule turns on",
+      "a stubbed /api/rates answering the whole table, and variants answering No Content, hanging, and returning a revised figure for a date already stored",
+      "a recording date already holding a complete set of rate entries, for the silent-reopen assertion",
+      "a recording date holding an entry the person edited a year ago, for the assertion that opening it neither refetches nor restamps",
+      "two planted entries for one (symbol, date) with different rate strings, and a second pair whose decrypted payloads are byte-identical, supplied to the client in both orders",
+      "an export and import round trip over the planted differing pair, since version resets to 1 and any ranking that consulted it would read differently on either side",
+      "a lookup: false symbol and a free-text unit each holding one previous entry, for the two no-rate-source cases, which look different and must behave alike",
+      "request-capture over the full outbound request including headers, for the assertion that no edited rate, quantity or account identifier reaches /api/rates"
+    ],
+    "focus": [
+      "clearing every quantity at a date must leave that date's rate entries byte-identical and the recording still reopenable with its rate lines. This is easy to satisfy on paper and easy to fake with a test that only checks the recording still appears, so the rate rows have to be compared byte for byte and the symbols shown still pricing the dates around the cleared date",
+      "nothing in the vault may record that a save was partial. A reviewer has to look for the absence of a pending flag or dirty marker in the stored records after a half-failed save, not only for the message on screen. An implementation that quietly writes one is invisible to every behaviour test",
+      "the refresh must write price entries when the only row recorded is a main-currency account. That is the case the whole split exists for and it is the one a naive implementation skips, because nothing about that row needs a rate",
+      "one rate request per sitting, not per row. A fifteen-row sweep that fans out per symbol still writes exactly the right entries and passes every data assertion, so the request count has to be asserted directly",
+      "no request to /api/rates may carry an edited rate, a quantity or an account identifier, asserted over the full request including headers and query string. Checking the documented parameter set is not the same as checking what was actually sent",
+      "opening a recording of any age must issue no request to /api/rates and write no record. The fakeable version checks only the proxy. The assertion that matters covers every PUT and DELETE in the flow as well, over a date whose provider figure has since been revised",
+      "editing an edited entry a second time must leave proposedRate at the original proposal. An implementation that captures the currently displayed figure each time passes the first edit and silently loses the provider's number on the second",
+      "the differing-duplicate pair must resolve identically on two clients given the records in either order and identically before and after an export and import round trip. A ranking that reads version or updated_at passes a single-client test and fails both of these",
+      "a symbol with no rate source and an existing entry must write no new entry, asserted for a free-text unit and for a lookup: false symbol separately, because the second one looks listed and is the one an implementation treats as an outage",
+      "the write order inside a save has to be asserted on the wire: quantity PUT before either rate PUT, and every DELETE after all of them. A test that only checks the end state passes whatever order was used, and the order is the whole of the guarantee"
+    ]
+  },
+  "openQuestions": []
+}

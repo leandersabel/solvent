@@ -105,7 +105,7 @@ decides whether the route answers at all. The check sits beside the
 CSRF middleware and runs immediately after authentication, once, so no
 individual endpoint repeats it.
 
-- **Shared**, the four routes every account needs to hold a
+- **Shared**, the routes every account needs to hold a
   credential and a session: `/login`, `/api/auth/salt`,
   `/api/auth/login`, `/api/auth/logout`, `/api/auth/upgrade-kdf`, and
   `/api/auth/change-password`. Both kinds reach these.
