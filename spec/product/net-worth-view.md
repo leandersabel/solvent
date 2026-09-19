@@ -150,9 +150,16 @@ rates written alongside them and nothing else (`record-snapshot.md`),
 so a long run between two entries is the normal shape of a correct
 chart rather than a hole in it.
 
-A "Show what's estimated" checkbox marks the dates where you actually
-recorded something. It is off by default, which is a decision taken on
-your behalf and raised as a question with this batch.
+The dates you recorded something are marked on the chart from the
+moment it loads. They are the points the line is actually built from,
+and they are the dates that open a recording when you click them, so
+the marking earns its place twice over: it says which part of the line
+you gave it, and it shows you where there is something to go back to.
+
+One control takes the marks away and leaves a clean line, for when you
+want to look at the shape rather than the evidence. The honest drawing
+is what you get without asking for it, and the tidier one is the thing
+you choose.
 
 The chart is drawn as curves rather than steps deliberately. Real
 transfers are instant and sharp, but a decade of sparse entries drawn as
@@ -227,8 +234,8 @@ the section needs no small print.
 - Holdings not filed under the chosen axis appear in an "Unassigned"
   band, which is visible and counted, never dropped.
 - A holding with two entries, 100 in January and 200 in March, reads 150
-  in February, and that stretch is marked when the estimated checkbox is
-  on.
+  in February, and January and March carry a mark while February does
+  not, without anybody turning anything on.
 - A holding recorded in March and then not again until September draws
   a straight run between those two figures, and nothing on the screen
   treats the months between as an omission.
@@ -304,8 +311,10 @@ them.
 - **The chart defaults to one year**, or everything when your history is
   shorter, and defaults to grouping by nothing until you have set up an
   axis.
-- **Estimated stretches are not marked by default.** The checkbox is off
-  when the screen loads. Raised as a question with this batch.
+- **The control that hides the marks is called Just the line.** The
+  name is a decision taken on your behalf. It has to say what it does
+  without claiming the marked chart is the untidy one, since the marked
+  chart is the accurate one.
 - **The screen opens on latest rates.** That is the answer to what am I
   worth. The other position answers a question you go looking for, and
   opening on it would put a comparison where the headline belongs.
