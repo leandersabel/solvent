@@ -7,6 +7,13 @@ KDF envelope, and wrapped DEK needed to open it — to a single local
 file. The file is fully encrypted; without the password it reveals
 nothing but record counts and types.
 
+**It carries both timelines.** Quantities and prices are separate
+records (`record-rate.md`) and both are ordinary vault records, so both
+ride in the same `records` array with no format change and no second
+section. A file missing the price entries would restore a vault whose
+whole history reprices itself, which is the failure storing a price
+permanently exists to prevent.
+
 **The file carries exactly one wrapper: the password credential's**
 (architecture.md, Credentials and vault key wrappers). Not a list, and never
 a wrapper belonging to another method, because a wrapper bound to an
@@ -121,9 +128,9 @@ main currency, dimensions, and idle-lock setting all become the file's.
 That is the one sanctioned way the main currency changes, and it does
 not violate the immutability rule in `account-settings.md`: that rule
 exists because changing the currency while keeping the history would
-leave every stored rate denominated in the old one. Import replaces the
-history too, so the vault stays internally consistent — every snapshot's
-`rateTarget` matches the profile it arrived with. The import review step
+leave every stored price denominated in the old one. Import replaces the
+history too, so the vault stays internally consistent: every price
+entry's `rateTarget` matches the profile it arrived with. The import review step
 names the change when the file's main currency differs from the current
 one, because arriving at a vault denominated in another currency without
 being told is a bad surprise even when it is correct.
@@ -146,9 +153,9 @@ written.
 - Strict server-side validation before any write: total payload size
   cap, per-record ciphertext size cap, record count cap, known
   `recordType` values, well-formed UUIDs, base64 decodes cleanly,
-  `accountId` present exactly for `snapshot` records (`null` otherwise,
-  never `""` — record-api.md) and referencing an account in the same
-  import.
+  `accountId` present exactly for `snapshot` records and `null` for
+  every other type, never `""` (record-api.md), and referencing an
+  account in the same import.
 - **Every record goes through the same per-record validator as
   `PUT /api/records`** (record-api.md), field-consistency check
   included, so there is one set of rules with two callers. That
@@ -213,10 +220,13 @@ written.
 
 - Export → wipe the vault → import round-trips to an identical set of
   decrypted records: same ids, types, account links, and plaintext
-  payloads.
+  payloads, for quantities and prices alike.
+- A vault exported and reimported draws a byte-identical chart and the
+  same total in both pricing modes (`net-worth-view.md`), which is the
+  test that fails if either timeline is dropped.
 - The exported file contains no plaintext account name, note, dimension
-  label, value, rate, or currency, verified by scanning the file for
-  known values.
+  label, value, rate, symbol, date, or currency, verified by scanning
+  the file for known values.
 - After importing, the user logs in with their **unchanged** password
   and can read every restored record.
 - Importing a file exported by a *different* user succeeds, and every

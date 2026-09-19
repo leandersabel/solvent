@@ -127,13 +127,19 @@ both are legitimate:
   was liquidated at a figure, `0` if it simply ended. This is the
   expected path, not a nicety: with it, the account's band reaches its
   closing value as recorded data, and the trend chart interpolates into
-  that value like any other snapshot (net-worth-view.md). The user may
+  that value like any other snapshot (net-worth-view.md). It is a
+  recording action like any other, so it refreshes prices at
+  `archivedAt`, the unit of the account being archived included, since
+  that account is still active at that moment. The user may
   skip it, and then the band drops by the last known value on
   `archivedAt` with nothing recorded to explain it — an artifact of a
   flag rather than data the user entered. Either way the date carries an
   archive annotation, so the drop is never mistaken for a bad snapshot.
 - **Delete permanently.** Removes the account record and cascades to
-  every snapshot carrying that `account_id`. Requires typing the account
+  every snapshot carrying that `account_id`. **It deletes no price
+  entry.** A price belongs to a symbol, another account may be measured
+  in the same one, and the server could not find them anyway: the symbol
+  is inside the ciphertext (`record-rate.md`). Requires typing the account
   name to confirm. The dialog must state plainly that **past net-worth
   figures will change**, because the history is going away. Irreversible.
 
@@ -141,7 +147,9 @@ An account with no snapshots skips the dialog and is deleted outright.
 
 Cascade is executed **server-side** — the server can see `account_id` on
 snapshot rows (architecture.md, Record storage API), so it can delete
-the set atomically without the client enumerating ids. Endpoint:
+the set atomically without the client enumerating ids. That is also the
+whole reach of the cascade: no other record type carries an account
+link, so nothing else can be swept up by it. Endpoint:
 `DELETE /api/accounts/<account_id>?mode=purge`.
 
 ## Rules
@@ -150,8 +158,10 @@ the set atomically without the client enumerating ids. Endpoint:
   name. The `record_id` is identity.
 - Editing an account never touches its snapshots. Changing the unit of
   an account that already has snapshots is **blocked** — the existing
-  values and stored rates are denominated in the old unit, and silently
-  reinterpreting them would corrupt history. The user must archive and
+  quantities are counted in the old unit, and a new unit would also
+  price the whole history off a different symbol's series
+  (`record-rate.md`). Silently reinterpreting either would corrupt
+  history. The user must archive and
   create a new account instead. (Renaming, re-classifying, and editing
   the note are always allowed.) Like the password policy (register.md),
   this is **client-enforced by construction**: `unit` lives inside the

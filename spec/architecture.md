@@ -95,16 +95,32 @@ per the Security model — the server sees ciphertext, not these fields.
   ("Emergency fund: yes", absence meaning no). Two taxonomies over the
   same accounts would mean two ways to spell one thing, and only one of
   them can be stacked, ordered, or summed honestly.
-- **Snapshot**: a point-in-time value for one account: date, value in the
-  account's native unit, and the conversion rate to the main currency
-  used at entry time. The rate is always stored on the snapshot, not
-  recomputed later — otherwise the trend chart would lie about the past
-  as today's rate changes. The rate comes from the lookup proxy or manual
-  entry; non-fetchable items (private investments, unlisted assets) have
-  no proposal, so both value and rate are always manual.
+- **Quantities and prices are two separate timelines.** A holding's own
+  history holds only the quantities its owner recorded. The prices that
+  turn those quantities into the main currency are their own series, one
+  per symbol, shared by every holding measured in it. Pairing a holding
+  with the price of the day it was last touched is what the split
+  removes: with partial updates the normal case, that is most holdings
+  most of the time.
+  - **Snapshot**: a point-in-time quantity for one account, a date and a
+    value in the account's native unit, and nothing else
+    (record-snapshot.md).
+  - **Rate**: what one unit of a symbol was worth in the main currency
+    on one date (record-rate.md). Proposed by the lookup proxy where a
+    source exists, always overridable, and stored permanently once
+    written, because a price recomputed later would rewrite what the
+    person was worth in 2019.
+  - **Recording anything refreshes every price.** Record one franc
+    account and the dollar rate and the gold price still get entries.
+    Prices are written by default and quantities are not: a quantity has
+    to be looked up on a statement, so the app never writes one nobody
+    gathered, while nobody gathers a price.
+  - Today's total is each holding's last recorded quantity at the most
+    recent price for its unit.
 - Accounts don't need a snapshot on every date — updates are sparse by
   design (you won't touch every account every time). The UI carries the
-  last known value forward when charting net worth over time.
+  last known quantity forward when charting net worth over time, and
+  prices it from the price timeline at each date.
 
 ### Accounts on this instance
 
@@ -248,15 +264,15 @@ closes.
 
 ### Record storage API
 
-Accounts, snapshots, and the user profile are all stored through one
-generic record endpoint — the server has no per-type logic, because it
+Accounts, snapshots, rates, and the user profile are all stored through
+one generic record endpoint. The server has no per-type logic, because it
 cannot read any type. A record row is:
 
 | Column | Visibility | Notes |
 |---|---|---|
 | `principal_id` | plaintext | the owning vault owner; every query is scoped to the session's principal |
 | `record_id` | plaintext | client-generated UUIDv4 |
-| `record_type` | plaintext | `account` \| `snapshot` \| `profile` |
+| `record_type` | plaintext | `account` \| `snapshot` \| `rate` \| `profile` |
 | `account_id` | plaintext | the owning account for `snapshot`; empty otherwise |
 | `schema_version` | plaintext | bumped when the plaintext shape changes |
 | `version` | plaintext | monotonic, starts at 1, +1 per write |
@@ -275,6 +291,13 @@ The plaintext columns are **metadata the server can see**: record
 counts, which snapshots belong to which account, and write timestamps.
 That is within the accepted metadata leak in the threat model — the
 plaintext shape deliberately carries no name, value, date, or unit.
+
+**A `rate` record adds no column.** It is owned by a symbol rather than
+an account, and the symbol is the one thing a column here would leak, so
+it stays inside the ciphertext and `account_id` is empty like an
+`account` or a `profile`. record-rate.md argues that against the threat
+model, and record-api.md pins the column rule. The AAD encoding is
+unchanged by the new type.
 
 Endpoints (all authenticated as a vault owner, all CSRF-protected on
 writes). An administrator session reaches none of them: the record
@@ -296,12 +319,18 @@ rates (FX, gold) from a public API and serves the entry-date "proposal"
 to the client. Chosen over a direct client-side fetch: requests get
 cached, and no browser individually leaks update timing to a third
 party.
-- **Privacy scope**: the proxy observes which asset types/currencies an
-  authenticated user queries (gold, USD, CHF), never the amount held.
-  Asset *type* is not confidential (knowing someone holds gold or
-  dollars reveals nothing sensitive); the *amount* is what the
-  zero-knowledge model protects, and that never reaches the proxy or
-  server in any form.
+- **Privacy scope**: the proxy observes a date and the user's main
+  currency, never the amount held and never which symbols they hold.
+  **The client asks for the whole quotable table rather than naming
+  symbols** (`rate-lookup.md`, The client never names a symbol): since
+  recording anything refreshes every price, a per-symbol fan-out would
+  hand the server a repeating list of one person's holdings, which is a
+  larger leak than the transient per-query one this design started from.
+  Asset *type* is not confidential in itself (knowing someone holds gold
+  or dollars reveals nothing sensitive), but a complete list on a
+  schedule is a profile, and the whole-table form costs nothing to
+  avoid it. The *amount* is what the zero-knowledge model protects, and
+  that never reaches the proxy or server in any form.
   - This includes the user's **main currency**, which travels as the
     `quote` parameter on every lookup. It is stored only inside the
     encrypted profile record, never as a plaintext column — but the
@@ -327,9 +356,9 @@ party.
   because a brokerage holding is a depot-level account in a currency.
   `rate-lookup.md` holds the adapters, the seeded symbol table, and the
   rejected alternatives with the reason each fails.
-- **One constraint binds every future provider**: a snapshot stores its
-  rate permanently, inside user ciphertext the server cannot read,
-  enumerate, or delete. Terms requiring deletion of all data on
+- **One constraint binds every future provider**: a rate is stored
+  permanently as a vault record, inside user ciphertext the server
+  cannot read, enumerate, or delete. Terms requiring deletion of all data on
   termination are therefore unsatisfiable by construction, not a
   cache-policy problem a shorter TTL could fix. This is a hard
   criterion, and it is what rules out the technically ideal feeds.
@@ -472,7 +501,9 @@ Actors this design defends against vs. accepts:
   is self-hosted with Subresource Integrity, no third-party CDN sits
   inside the trust boundary (see Supply chain).
 - **Accepted, not defended**: metadata leakage (login timestamps,
-  per-user record counts, request sizes), plus whatever a deployment's
+  per-user record counts, including roughly how many distinct priced
+  symbols a vault holds from the size of a recording's burst of writes,
+  request sizes), plus whatever a deployment's
   own TLS-terminating intermediary (reverse proxy, CDN edge, tunnel)
   observes for connection metadata (see Network & transport). The
   conversion-rate lookup revealing queried asset *types* is also
@@ -842,8 +873,10 @@ Actors this design defends against vs. accepts:
     boundary, and a boundary that moves per deployment is one the
     contract cannot state.
   - Every one has an order of magnitude of headroom. A snapshot payload
-    is a few hundred bytes; thirty accounts updated monthly for thirty
-    years is ~11 000 records and a few MB. The caps exist to bound a
+    is a few hundred bytes and a price entry less. Thirty accounts
+    updated monthly for thirty years, with a price entry per symbol per
+    recording date, stays well inside one order of magnitude of the
+    record cap and a few MB of the byte quota. The caps exist to bound a
     runaway client or a hostile payload, not to ration honest use, and
     they are not load-bearing on security.
 - **Invite tokens**: ≥128-bit entropy, single-use, time-limited, stored

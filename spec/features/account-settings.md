@@ -115,20 +115,22 @@ the password does not retroactively protect an exported file.
 
 Displayed, not editable in v1.
 
-Every snapshot stores a rate *into the main currency* at entry time
-(record-snapshot.md). Changing the main currency would leave every
-historical rate denominated in the old one, so the trend chart would
-silently mix two currencies. Making it changeable needs each snapshot to
-record which currency its rate targets, plus a conversion strategy for
-history — real work, not a settings toggle.
+Every price entry stores a rate *into the main currency*
+(`record-rate.md`). Changing the main currency would leave every
+historical price denominated in the old one, so the trend chart would
+silently mix two currencies. Making it changeable needs a conversion
+strategy for the whole price timeline, real work rather than a settings
+toggle. Each entry already records which currency it targets, which is
+what makes that work possible later rather than impossible.
 
 The settings screen shows the main currency with a one-line note that it
 is fixed at registration and why. Do not ship an editable field that
 quietly corrupts history.
 
 **Import is the one exception, and it is not a loophole.** Restoring a
-vault replaces the profile *and* every snapshot together
-(`export-import.md`), so the imported vault is internally consistent —
+vault replaces the profile *and* every record together
+(`export-import.md`), price entries included, so the imported vault is
+internally consistent,
 there is no history left denominated in the old currency to mix with.
 The danger this rule guards against is changing the label while keeping
 the data, which import does not do.

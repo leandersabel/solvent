@@ -3,9 +3,10 @@
 ## What it does
 
 One generic, type-agnostic store for every encrypted record a vault
-owner holds: accounts, snapshots, and the profile. The server has no
-per-type logic because it cannot read any type — it moves opaque blobs
-in and out of rows keyed by plaintext columns it is allowed to see.
+owner holds: accounts, snapshots, rates, and the profile. The server has
+no per-type logic because it cannot read any type: it moves opaque
+blobs in and out of rows keyed by plaintext columns it is allowed to
+see.
 
 **Every route here is on the vault surface** (`app-shell.md`, The two
 surfaces), so an administrator session receives Not Found from all of
@@ -15,8 +16,9 @@ refuses a `records` row whose principal is an administrator, so there
 is nothing behind the route for a mistake to reach either.
 
 **No screen.** This is infrastructure; `manage-accounts.md`,
-`record-snapshot.md`, `net-worth-view.md`, `account-settings.md`, and
-`export-import.md` all depend on it. Build it first.
+`record-snapshot.md`, `record-rate.md`, `net-worth-view.md`,
+`account-settings.md`, and `export-import.md` all depend on it. Build it
+first.
 
 ## Row shape
 
@@ -24,12 +26,17 @@ Exactly the table in architecture.md, Record storage API: `principal_id`,
 `record_id`, `record_type`, `account_id`, `schema_version`, `version`,
 `nonce`, `ciphertext`, `updated_at`.
 
-- `record_type` ∈ `account` | `snapshot` | `profile`. Unknown values are
-  rejected — the server cannot read the payload, but it can hold the
-  type vocabulary closed.
-- `account_id` is required and non-empty exactly for `snapshot`, and
-  empty for `account` and `profile`. Enforced server-side; it is a
-  plaintext column.
+- `record_type` ∈ `account` | `snapshot` | `rate` | `profile`. Unknown
+  values are rejected. The server cannot read the payload, but it can
+  hold the type vocabulary closed.
+- `account_id` is required and non-empty **exactly for `snapshot`**, and
+  empty for every other type. Enforced server-side, because it is a
+  plaintext column. Stated as the complement rather than as a list, so a
+  type added later is empty until something argues otherwise.
+- **The column set does not grow per type.** A `rate` record is owned by
+  a symbol rather than an account, and that symbol stays inside the
+  ciphertext: there is no plaintext `symbol` column and no plaintext
+  `date` column, for the reasons `record-rate.md` gives.
 - `version` starts at 1 and increments by exactly 1 per write.
 - `nonce` is 96 bits, and must differ from the row's previous nonce on
   every write (architecture.md, Nonce strategy).
@@ -48,6 +55,10 @@ never decrypts.
   `account_id ‖ record_type ‖ record_id ‖ schema_version ‖ version`.
   This differs from the column order in the storage table; Key
   management wins.
+- **A new record type changes no byte of this encoding.** `rate` carries
+  the empty `account_id` that `account` and `profile` carry, and
+  `record_type` is already a field whose value varies by type. The
+  fixture below is the same fixture.
 - **`principal_id` is not included**, deliberately (architecture.md, Key
   management). The DEK boundary already makes a blob undecryptable in
   another account's vault, so the client can build a record's AAD
@@ -136,7 +147,7 @@ Pydantic-validated.
 There is deliberately **no single-record `GET`.** The client fetches
 every record once per session and keeps the model in memory
 (`net-worth-view.md`, Data flow), so a stale-version reload after a
-Conflict refetches that record's whole type — three requests at most, on
+Conflict refetches that record's whole type, four requests at most, on
 data already sized for one fetch. A by-id endpoint would also hand the
 server a per-record access pattern it currently cannot see. Where a
 screen spec says it "reloads the current record", this is what that
@@ -145,8 +156,8 @@ means.
 - **`GET /api/records?type=<t>`** → every record of that type belonging
   to the session user, as
   `{ recordId, recordType, accountId, schemaVersion, version, nonce,
-  ciphertext }`. One type per request; a client needing all three issues
-  three requests (`net-worth-view.md`, Data flow). `type` is required
+  ciphertext }`. One type per request; a client needing all of them
+  issues four (`net-worth-view.md`, Data flow). `type` is required
   and must be a known value.
 - **`PUT /api/records/<record_id>`** — create or update. Body carries
   `recordType`, `accountId`, `schemaVersion`, `version`, `nonce`,
@@ -192,9 +203,9 @@ specified and owned by `manage-accounts.md`, not here.
 - **`PUT` with a `record_id` that is not a well-formed UUIDv4** → Bad
   Request. The id is client-generated, so it is validated as a shape,
   not trusted as an identity.
-- **`PUT` for `snapshot` with `accountId: null`**, or for `account` /
-  `profile` with one set → Bad Request. So is an `accountId` of `""` on
-  any type — absence has one spelling.
+- **`PUT` for `snapshot` with `accountId: null`**, or for `account`,
+  `rate`, or `profile` with one set → Bad Request. So is an `accountId`
+  of `""` on any type. Absence has one spelling.
 - **`PUT` whose `accountId` names an account row that does not exist for
   this user** → Bad Request. The server can check this: `account_id` is
   plaintext.
@@ -240,8 +251,12 @@ specified and owned by `manage-accounts.md`, not here.
   fixture. A record encrypted by one user and inserted directly into
   another user's rows still fails to decrypt under that user's DEK —
   the DEK boundary carries that property, not the AAD.
-- A `snapshot` `PUT` with `accountId: null`, and an `account` `PUT` with
-  one set, are both Bad Request; so is either with `accountId: ""`.
+- A `snapshot` `PUT` with `accountId: null`, and an `account` or `rate`
+  `PUT` with one set, are both Bad Request; so is either with
+  `accountId: ""`.
+- The AAD fixture is byte-identical with `rate` in the type vocabulary
+  and without it, asserted against the stored fixture rather than
+  against a recomputation.
 - `accountId` is `null`, never `""`, in a `GET /api/records` response
   and in an exported file — asserted against both, since the two are
   written by different code paths.

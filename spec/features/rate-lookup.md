@@ -11,30 +11,67 @@ browser individually leaks its update timing to a third party
 (architecture.md, Data model).
 
 The proposal is advice, never authority: the user can always override
-it, and the value that lands in the snapshot is whatever the user
-accepted (record-snapshot.md).
+it, and the value that lands in the price timeline is whatever the user
+accepted (`record-rate.md`).
 
 ## Endpoint
 
-`GET /api/rates?symbol=<SYMBOL>&date=<YYYY-MM-DD>&quote=<CCY>`
+`GET /api/rates?date=<YYYY-MM-DD>&quote=<CCY>[&symbol=<SYMBOL>]`
 
-- `symbol` — the account's unit, which is its symbol
-  (`manage-accounts.md`).
-- `date` — the snapshot date.
+- `date`, the recording date.
 - `quote` — the user's main currency, the currency to price into.
+- `symbol` is **optional**. One symbol, which is an account's unit
+  (`manage-accounts.md`). Omitted, the response covers the whole
+  quotable table.
 - Session-authenticated. Anonymous requests are refused, so the proxy is
   not an open relay.
 
-Response OK:
+Response OK, one symbol:
 
 ```json
 { "rate": "3142.75", "base": "1 XAU-ozt", "quote": "CHF",
   "asOf": "2026-07-31", "source": "provider-name", "cached": true }
 ```
 
-Response No Content — no proposal available (a symbol with
+Response OK, whole table:
+
+```json
+{ "date": "2026-07-31", "quote": "CHF",
+  "rates": {
+    "USD": { "rate": "0.9312", "base": "1 USD", "asOf": "2026-07-31",
+             "source": "frankfurter", "cached": true },
+    "XAU-ozt": { "rate": "3142.75", "base": "1 XAU-ozt",
+                 "asOf": "2026-07-30", "source": "nbp+frankfurter",
+                 "cached": false }
+  } }
+```
+
+A symbol the proxy cannot price for that date is **absent from the
+map**, never present with a null. Absence in the map means exactly what
+No Content means for one symbol.
+
+Response No Content, meaning no proposal available at all (a symbol with
 no provider yet, no data for that date, provider unreachable). The
 client falls back to manual entry.
+
+### The client never names a symbol
+
+**Every request the app makes omits `symbol`.** Recording anything
+refreshes the price of every holding the person has (`record-rate.md`),
+so a per-symbol fan-out would hand the proxy a complete, repeating list
+of which currencies and metals that person holds, on the schedule they
+do their books. The whole-table form reveals the date and the main
+currency, which the server already holds, and nothing else.
+
+It costs almost nothing to serve. The FX provider returns every currency
+against one base in a single call, and gold is one more plus its FX leg,
+so a whole table for one `(date, quote)` is a bounded handful of
+outbound requests and a few kilobytes back. It is composed from, and
+populates, the same per-symbol cache entries as the single form.
+
+The single-symbol form stays because the acceptance sweep below queries
+every symbol in the table individually, which is what keeps
+`/api/rates/symbols` and `/api/rates` from drifting apart.
 
 **The endpoint accepts no amount parameter, in any form.** This is the
 base-amount rule made structural: the rate is always for one fixed base
@@ -42,6 +79,11 @@ unit (1 troy oz, one unit of the base currency), so there is no
 field an amount could travel in even by mistake (architecture.md,
 Base-amount rule). Any request carrying an unrecognised query parameter
 is rejected with Bad Request rather than ignored.
+
+The same rule covers the other direction. **A price the person typed or
+overrode is never sent here either**, in any field. It is their
+valuation of their own holding (`record-rate.md`), and this endpoint
+asks questions rather than reporting answers.
 
 ## Providers
 
@@ -162,9 +204,9 @@ Rejected, the licensing being largely closed:
   out on fit rather than terms — 25 requests/day shared across the whole
   instance, and thin coverage of European listings.
 
-The objection that generalizes: **a snapshot stores its rate
+The objection that generalizes: **a price entry stores its rate
 permanently, inside user ciphertext the server cannot read, enumerate,
-or delete.** "Delete all data on termination" is unsatisfiable here by
+or delete** (`record-rate.md`). "Delete all data on termination" is unsatisfiable here by
 construction, not a cache-policy problem a shorter TTL could fix. Any
 future provider for any asset class must be checked against that, not
 merely against request volume — the same test that eliminates LBMA for
@@ -328,9 +370,12 @@ reachable (architecture.md, SSRF hardening):
 
 - Per-user request limit on the endpoint, **default 120 per hour**,
   independent of the login limiter — a compromised session must not be
-  usable to hammer the provider on the instance's API quota. A full
-  sweep of thirty accounts costs at most thirty requests and mostly
-  hits cache, so the limit sits far above honest use.
+  usable to hammer the provider on the instance's API quota. A sweep of
+  any size costs **one** request, because the client asks for the whole
+  table once per recording date (`record-rate.md`, The refresh), so the
+  limit sits far above honest use. Without that rule a fifteen-row sweep
+  over six symbols would approach it, which is why it is a rule rather
+  than an optimization.
 - A circuit breaker opens after **5 consecutive provider failures** and
   serves No Content directly for a **5-minute cool-off** instead of
   retrying per request.
@@ -381,16 +426,30 @@ reachable (architecture.md, SSRF hardening):
 - **Provider returns a zero, negative, or non-numeric rate** → treated
   as no proposal.
 - **Two accounts share a symbol** → one cache entry serves both, one
-  outbound request.
+  outbound request, and one price entry in the vault
+  (`record-rate.md`).
+- **A whole-table request where every symbol fails** → No Content,
+  rather than OK with an empty map. One meaning, one shape.
+- **A whole-table request where some symbols fail** → OK with those
+  symbols absent from the map. A partial table is the normal case:
+  `lookup: false` symbols are always absent.
 
 ## Acceptance criteria
 
 - A request for a supported symbol and past date returns a rate and, on
   repeat, `"cached": true` with no second outbound request.
+- A request omitting `symbol` returns every symbol the proxy can price
+  for that date and quote, with `lookup: false` symbols absent from the
+  map, and costs no more outbound requests than the gold path alone.
+- A whole-table request followed by a single-symbol request for a symbol
+  in it makes no second outbound request: the two forms share one cache.
+- Recording across fifteen accounts in six symbols issues exactly one
+  request to this endpoint.
 - Today's rate is refetched after the 1-hour TTL and not before.
 - A request with any parameter that could carry an amount is rejected
   with Bad Request; a test enumerates the accepted parameter set and
-  asserts it is exactly `{symbol, date, quote}`.
+  asserts it is exactly `{symbol, date, quote}`, with `symbol` the only
+  optional one.
 - `symbol=http://192.168.1.1/`, `symbol=../../etc/passwd`, and a symbol
   matching the regex but absent from the symbol table are all rejected
   with Bad Request, and no outbound request is made.
