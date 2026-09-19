@@ -235,6 +235,14 @@ action.
   **Entered by hand**. Set to Automatic, Solvent proposes a rate when
   somebody records a holding in this unit. Set to Entered by hand, they
   type their own figure and nothing is fetched.
+
+  On a row the server has no price source for, the control is
+  **disabled at Entered by hand**, with the reason in ink-secondary
+  beside it: "No source for this unit yet. Rate lookup can be turned on
+  once one is configured on the server." The row carries whether a
+  source exists (`hasAdapter`), so the screen says so up front rather
+  than inviting somebody to switch the control on and then refusing
+  them. Turning it off stays available on any row.
 - The action cell offers **Retire**, or **Restore** on an already
   retired row. A retired row sets its text in ink-secondary and carries
   a **Retired** chip beside its code.
@@ -348,11 +356,16 @@ gauge).
 - **Empty**: unreachable. The table is seeded.
 - **Error, rename failed**: inline on the row, the old name restored in
   the field.
-- **Error, rate lookup cannot be turned on**: inline on the row, and the
-  control goes back to Entered by hand. "Solvent has no source for this
-  unit yet. Rate lookup stays off until one is configured on the
-  server." This is a designed refusal, not a fault: the flag must never
-  promise a proposal the server cannot serve.
+- **Error, the source went away while the page was open**: a stale
+  page, not a routine path. The control was enabled when the table
+  loaded and the server refused it anyway, because the adapter registry
+  changed underneath. Inline on the row, and the control goes back to
+  Entered by hand: "The source for this unit is no longer configured on
+  the server. Reload to see the current list." The copy reads as
+  something that changed rather than something the administrator got
+  wrong. The server refuses regardless of what the page believes,
+  because the flag must never promise a proposal the server cannot
+  serve and a client's picture of the registry is not a control.
 - **Error, that code already exists**: inline in the add form, which
   keeps every field.
 - **Error, that is not a valid code**: inline in the add form, naming
