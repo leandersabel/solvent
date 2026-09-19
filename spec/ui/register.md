@@ -16,9 +16,8 @@ Exercises: `spec/features/register.md`.
 
 ## Layout
 
-A single centered card on the warm ground, max-width 480px. No
-navigation, no marketing, nothing else on the page. The person arrived
-from a link and is here to do one thing.
+The card outside the shell (`design-system.md`, App shell), max-width
+480px. The person arrived from a link and is here to do one thing.
 
 ### Create your vault
 
@@ -52,8 +51,7 @@ The form an administrator invite renders, and a shorter one.
    every account on the instance, so it is not the place to relax it.
 5. Primary button: **Create account**.
 
-Three things on the vault form are absent here, and each is absent
-because there is no vault:
+Absent here, each because there is no vault:
 
 - **No main currency.** Nothing in this account is ever counted in one.
 - **No no-recovery acknowledgement.** That sentence is not true of this
@@ -112,10 +110,8 @@ make.
 ## Setting up
 
 Turning a password into a key is deliberately slow, and it is slow on
-both forms, because both accounts hold a password. Measured: **about a
-sixth of a second on a computer, and a little under two seconds on a
-phone or tablet**, where the browser runs this kind of work much more
-slowly on otherwise comparable hardware.
+both forms, because both accounts hold a password. The wait is the one
+in `ui/unlock.md`, The derivation wait.
 
 - On submit the button becomes a working state and the form goes quiet.
   On the vault form it reads "Setting up your vault". On the
@@ -162,13 +158,11 @@ Both forms unless a state says otherwise.
     available right now. No account was created and your invite link is
     still good. Close some other tabs and try again."
   - A **Try again** button, because closing tabs genuinely can fix it.
-  - This is a moment, not a device class. Any device, of any kind, can
-    be too busy right now with enough else open. The copy never says a
-    phone, a tablet, or any other device cannot do this, and never
-    suggests moving to a different one.
+  - A moment, not a device class, and the copy never names a device
+    (`ui/unlock.md`).
   - No weaker setup is offered. Falling back would create an account
-    permanently easier to break into and record that weakness as though
-    it had been chosen, because of one busy moment.
+    permanently easier to break into, and record that weakness as
+    though it had been chosen, because of one busy moment.
 - **Error, the submit failed after the slow part**: every field is still
   filled, including the password. Nobody re-types a password and waits
   again because of a network blip. The invite is untouched and the copy
@@ -181,17 +175,10 @@ Both forms unless a state says otherwise.
 
 ## Rules
 
-- Phones and tablets are supported targets, not a degraded case. The
-  form is reachable, usable, and submittable on a touch screen, and the
-  wait on one is stated above rather than apologized for.
 - The page drops the invite token out of the address bar as soon as the
   form holds it, so a bookmark, a shared screen, or a synced browser
   history afterwards carries nothing (`admin-invites.md`, Rules).
-- The password field is never logged and is cleared from the DOM on
-  success.
-- Autocomplete: `username` and `new-password`, so a password manager
-  can generate and store one. A manager-generated passphrase is the
-  most realistic protection a vault with no recovery can have.
+- Autocomplete: `username` and `new-password`.
 
 ## What it deliberately does not show
 

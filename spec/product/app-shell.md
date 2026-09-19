@@ -6,9 +6,8 @@ The app shell is the frame every signed-in screen sits in: the bar
 across the top, the navigation, the controls at its right, and the
 width the page content is held to. For a person with a vault it is
 identical on every screen, so they always know where they are and what
-they can reach from there. The admin area, which belongs to a different
-kind of account with no vault, sits in a stripped-down version of the
-same frame, described below.
+they can reach from there. The admin area sits in a stripped-down
+version of the same frame.
 
 It is also where the app's protections are applied once for the whole
 product rather than screen by screen, so a new screen cannot be added
@@ -21,11 +20,10 @@ inside the browser.
 
 ## Who it is for
 
-The household members who use Solvent day to day, the small invited
-group the product as a whole is for, and the administrators who
-provision the instance for them. There is no visitor, no public page,
-no signed-out landing page. Everything the shell frames sits behind the
-password.
+The household members who use Solvent day to day, and the
+administrators who provision the instance for them. There is no
+visitor, no public page, no signed-out landing page. Everything the
+shell frames sits behind the password.
 
 ## What "looks like a private bank" commits us to
 
@@ -71,8 +69,8 @@ the wordmark "Solvent", the navigation beside it, and at the right the
 **Update values** action and the **Lock** button.
 
 Those two buttons are outlined in white and styled for the dark bar
-rather than borrowed from the light page below, so their text and their
-focus outline stay readable against it.
+rather than borrowed from the light page below, so their text and focus
+outline stay readable against it.
 
 The password screen and the registration screen sit outside the shell.
 They are a single centered card on the warm ground with nothing else on
@@ -92,10 +90,9 @@ the screen the person is already on or open a thinner second copy of
 it.
 
 There is no **Admin** entry either, and there is no navigation state in
-which one appears. Administering the instance is done from an
-administrator account, which is a separate account with no vault
-(`admin-invites.md`). Nobody signed in to a vault has anywhere
-administrative to go, so nothing in this bar leads there.
+which one appears. Administering the instance is done from a separate
+account with no vault (`admin-invites.md`), so nobody signed in to a
+vault has anywhere administrative to go.
 
 ### Update values
 
@@ -103,10 +100,10 @@ administrative to go, so nothing in this bar leads there.
 navigation. Pressing it opens the update sweep from wherever the person
 currently is, which is what keeps the sweep reachable while someone is
 deep inside a single account. It goes straight into editing today and
-asks nothing, which is what a fast path is for. The dashboard carries
-the front door instead, a New recording button with a date picker,
-because that is where a person arrives already meaning to do it and
-where choosing the date is worth a click (`record-snapshot.md`).
+asks nothing. The dashboard carries the front door instead, a New
+recording button with a date picker, because that is where a person
+arrives already meaning to do it and where choosing the date is worth a
+click (`record-snapshot.md`).
 
 ### Lock
 
@@ -119,15 +116,14 @@ control exists to save.
 Locking is not signing out. The session stays alive, so coming back
 needs the password only and the username is not asked for again.
 
-The one thing a lock does not throw away is text the person has typed
-into an open form and not yet saved, so locking in the middle of
-entering figures does not destroy the work. Nothing else survives it.
+A lock does not throw away text typed into an open form and not yet
+saved, so locking in the middle of entering figures does not destroy
+the work. Nothing else survives it (`login.md`).
 
 Signing out fully, and signing out everywhere at once, live in Settings
-rather than in the bar. That is a choice between two similar controls,
-and it only arises where both exist. An administrator has no Lock, so
-Sign out is the only control in their bar and there is nothing for it
-to be confused with.
+rather than in the bar, so that two similar controls never sit side by
+side. An administrator has no Lock, so Sign out is the only control in
+their bar and there is nothing for it to be confused with.
 
 ### The administrator's frame
 
@@ -147,8 +143,7 @@ What is missing is missing because there is nothing for it to act on:
 
 The navigation inside the admin area is that area's own business
 (`admin-invites.md`), not the product's main navigation. The two bars
-are told apart by what they carry rather than by looking different, and
-the look is the one described above in both.
+are told apart by what they carry rather than by looking different.
 
 ### The page below the bar
 
@@ -165,8 +160,7 @@ why a page refresh always costs a fresh decryption.
 
 Every screen works on a phone. Not a reduced set of them, and not
 reading only: entering figures works too, the monthly update sweep
-included. Somebody who unlocks a vault on a phone lands in an app they
-can use, not in a wide page they have to pan around.
+included.
 
 Working on a phone does not mean one layout that stretches. A screen is
 allowed two designs that do the same job in different shapes, and the
@@ -177,24 +171,19 @@ step at a time, one holding per step. Same act, same figures recorded
 at the end, different screen. So a screen is described at each size
 wherever the two differ, rather than described once and assumed to fit.
 
-Phone layouts are not in the first version. The first version ships the
-wide-screen ones and is judged on those. What it may not do is put the
-phone ones out of reach: no action exists only inside a wide table, and
-no screen has a single route to something a narrow screen could not
-offer.
+Phone layouts are not in the first version, which ships the
+wide-screen ones. What it may not do is put the phone ones out of
+reach: no action exists only inside a wide table, and no screen has a
+single route to something a narrow screen could not offer.
 
-What the top bar becomes at phone width is still open. It is a design
-decision for whoever draws the phone layouts, not a question for the
-client.
+What the top bar becomes at phone width is a decision for whoever draws
+the phone layouts, not a question for the client.
 
 When those layouts are built, the test is that every screen can be read
 and operated end to end on a phone, the update sweep included, without
 panning sideways.
 
 ## What must be true
-
-Every line here is checkable by a person sitting in front of the
-running app, with no access to the code.
 
 **The chrome**
 
@@ -281,10 +270,10 @@ running app, with no access to the code.
   in particular are chosen against the warm ground and are not valid on
   a dark one.
 - **No custom typeface.** The app uses the typeface the person's own
-  device provides. A downloaded typeface would have to be hosted and
+  device provides. A downloaded one would have to be hosted and
   version-pinned like every other asset, and it would flash unstyled
-  text on the password screen, which is the slowest screen in the
-  product. Elegance here comes from spacing and restraint instead.
+  text on the password screen, the slowest screen in the product.
+  Elegance here comes from spacing and restraint instead.
 - **The shell shows no financial data at all, and could not.** The
   server that renders it holds no readable copy of anything in the
   vault. This is not a rule the shell follows, it is a thing it is
@@ -292,8 +281,7 @@ running app, with no access to the code.
 
 ## Decisions taken on the client's behalf
 
-The client never spoke to these. Each was taken so the work could
-proceed, and each is reversible on request.
+The client never spoke to these. Each is reversible on request.
 
 - **The navigation is Dashboard and Settings, with no Accounts entry.**
   Reversing it means designing a separate accounts screen that does not
@@ -302,8 +290,8 @@ proceed, and each is reversible on request.
   own.** A visibly different chrome would make the admin area feel like
   a second product bolted on. The same restraint, with fewer controls
   in it, says more plainly that there is simply less here.
-- **Update values is an action in the bar rather than a fourth
-  navigation entry.**
+- **Update values is an action in the bar rather than a navigation
+  entry.**
 - **Lock has no confirmation step.**
 - **Signing out lives in Settings rather than the bar.**
 - **The app refuses to start when its configuration is incomplete,

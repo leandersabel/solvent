@@ -45,7 +45,7 @@ def wired_app(app):
     return app
 
 
-def test_state_changing_request_without_header_is_forbidden_and_inert(wired_app):
+def test_state_changing_request_without_header_is_forbidden(wired_app):
     client = wired_app.test_client()
     resp = client.post("/__test/api/state-changing")
     assert resp.status_code == 403

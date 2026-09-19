@@ -15,12 +15,11 @@ Reopening and editing a recording, Deleting a recording) and
 ## Getting here
 
 A recording is identified by its date and nothing else, and **there is
-no list of recordings anywhere in the product**. A recording is found
-by its date, and the dates are already in front of the person:
+no list of recordings anywhere in the product**. The dates are already
+in front of the person:
 
 - **New recording** on the dashboard, picking a marked date
-  (`dashboard.md`). No warning, no question, nothing to confirm. The
-  picker can see what is there, so it opens it.
+  (`dashboard.md`).
 - **A date in a holding's own list of values** (`account-detail.md`).
   This is where a typo from eight months ago gets found.
 - **A marked date on the chart** (`dashboard.md`).
@@ -133,8 +132,7 @@ happened, and the date is free to be recorded again.
 
 ## States
 
-- **Loading**: none. Everything comes from the in-memory model
-  (`net-worth-view.md`, Data flow), so the screen renders instantly.
+- **Loading**: none.
 - **Populated**: as above.
 - **Empty recording**: the figures section is replaced by one sentence,
   "No figures recorded on this date", and the prices are listed as
@@ -181,9 +179,7 @@ happened, and the date is free to be recorded again.
   here or anywhere. A price is one fact about one unit on one day, and
   the date is the only place where that fact has exactly one field
   (`record-rate.md`). This screen shows prices only as part of a date.
-- **No list of recordings**, here or anywhere. The dates are already in
-  front of the person, in the chart, in each holding's list of values,
-  and in the date picker.
+- **No list of recordings**, here or anywhere (Getting here).
 
 ## Rules
 

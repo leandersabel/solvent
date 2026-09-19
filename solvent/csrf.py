@@ -60,10 +60,6 @@ def init_app(app: flask.Flask) -> None:
             shell_session.load_into_g()
             return
 
-        # The header check runs before authentication is even
-        # attempted, so a request missing it gets the same Forbidden
-        # regardless of whether a session exists, is valid, or is
-        # expired (app-shell.md, CSRF).
         if request.headers.get(HEADER_NAME) != REQUIRED_VALUE:
             abort(403)
 

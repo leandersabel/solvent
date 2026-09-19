@@ -23,10 +23,9 @@ The same screen does three jobs:
   administrator account has no vault.
 
 The username decides which of the two kinds of account is being signed
-in to, and the person never says which they meant. A username belongs
-to exactly one account on the instance, so there is nothing to
-disambiguate. Somebody who holds both an administrator account and a
-user account holds two usernames and signs in to one at a time.
+in to, and the person never says which they meant, because a username
+belongs to exactly one account on the instance. Somebody who holds both
+kinds holds two usernames and signs in to one at a time.
 
 ## The screens
 
@@ -59,30 +58,27 @@ it must never look like a hang.
 On submit the button becomes a progress state labeled as deriving the
 key, and the form goes quiet. One line beneath: this takes a moment by
 design, it is what makes the password hard to attack. The tab stays
-responsive the whole time, so the extra second or two on a phone reads
-as the screen working rather than the screen having frozen.
+responsive the whole time.
 
 ### Signing in as an administrator
 
 Same card, same two fields, same wait, and from there it is a
-different act. An administrator is not opening anything. There is no
-vault behind an administrator account, so nothing is decrypted, and it
-lands in the admin area rather than on a dashboard.
+different act. There is no vault behind an administrator account, so
+nothing is decrypted, and it lands in the admin area rather than on a
+dashboard.
 
 The wait is the one part that does not change, and that is deliberate.
-It happens in your browser before anything is sent, so for the screen
-to skip it the browser would have to know the name belongs to an
-administrator before you have proved anything. Anyone could then time
+It happens in the browser before anything is sent, so for the screen to
+skip it the browser would have to know the name belongs to an
+administrator before anything has been proved. Anyone could then time
 the screen and read off which usernames administer the instance,
 without guessing a single password. So an administrator pays the same
-second or two, building a key that is thrown away, and the screen gives
-nothing away.
+second or two, building a key that is thrown away.
 
-The card looks and behaves identically while it is being filled in. It
-does not announce, before a correct password has been typed, that the
-username belongs to an administrator. Anyone can put a name into the
-field, and what comes back must not tell them which kind of account, if
-any, wears it.
+The card looks and behaves identically while it is being filled in.
+Anyone can put a name into the field, and nothing that comes back
+before a correct password says which kind of account, if any, wears
+it.
 
 An administrator has nothing to lock and no vault to re-open, so
 everything below about locking, the idle timer, and the lock button
@@ -91,17 +87,14 @@ administrator session is signing out.
 
 ### Locking
 
-Locking is a vault owner's concern. An administrator account holds
-nothing decrypted, so there is nothing a lock could take away.
+Locking is a vault owner's concern.
 
 The vault locks in three ways, and all three land back on this screen:
 
 - **By itself**, after a stretch of no activity. The person sets how
   long in settings (`account-settings.md`, which owns the period).
 - **By hand**, with the lock button in the top bar. One click, no
-  confirmation. This is the control somebody reaches for when another
-  person walks into the room, and a confirmation step spends the
-  seconds it exists to save.
+  confirmation (`app-shell.md`, which owns the button).
 - **By reloading the page.** Nothing is kept anywhere on the device, so
   a refresh always means typing the password again.
 
@@ -132,12 +125,11 @@ unlocking they are returned to where they were.
   exists.
 - **The device is out of memory at that moment.** A separate message.
   Any device, of any kind, can be too busy right now to spare what
-  unlocking needs, with enough other tabs and other apps open. The copy
-  blames the moment, not the password and not the device: this device
-  does not have enough memory available right now, close other tabs and
-  try again. Retry is offered, because closing tabs genuinely can fix
-  it. The copy must never tell somebody their phone or their computer
-  is incapable of opening a vault, because it is not.
+  unlocking needs. The copy blames the moment, not the password and not
+  the device: this device does not have enough memory available right
+  now, close other tabs and try again. Retry is offered, because
+  closing tabs genuinely can fix it. It must never tell somebody their
+  phone or their computer is incapable of opening a vault.
 - **The session ran out mid-action.** The person is asked to unlock
   again. Nothing they typed is thrown away.
 
@@ -211,12 +203,11 @@ upgrade that could lock somebody out would be worse than no upgrade.
   this product takes seriously.
 - **No second factor.** Not in this version. The vault's protection is
   the password itself rather than a check the server performs, so a
-  second factor at the door would guard the session, not the data. It
-  is worth having later, and it is not what makes the vault safe. An
-  administrator account is the case where it would earn its keep
-  soonest, because there the password is the whole of what stands in
-  front of the power to delete every account on the instance. Still
-  not in this version, and named here so the gap is a known one.
+  second factor at the door would guard the session, not the data. An
+  administrator account is where it would earn its keep soonest,
+  because there the password is the whole of what stands in front of
+  the power to delete every account on the instance. Named here so the
+  gap is a known one.
 - **No easier unlock offered to a device that is short of memory right
   now.** Unlocking with anything weaker would produce a key that opens
   nothing anyway, and weakening it for everybody would undo the one
@@ -237,8 +228,7 @@ upgrade that could lock somebody out would be worse than no upgrade.
   can type is not a secret. One screen also means a probe cannot tell
   the two kinds of account apart by where the name was accepted. The
   cost is that the screen has to behave differently after a correct
-  password without hinting at it before one. Reversible, and raised as
-  a question.
+  password without hinting at it before one. Reversible.
 - **Everybody is signed out twelve hours after signing in**, counted
   from sign-in and not extended by activity. Long enough for a day's
   work, short enough that a forgotten tab is not a standing invitation.
@@ -250,13 +240,10 @@ upgrade that could lock somebody out would be worse than no upgrade.
   about two seconds instead of eight to ten.** Reversible. Phone and
   tablet browsers run this particular computation many times slower
   than a computer's does, so a setting that keeps a computer at a
-  fraction of a second would have left somebody on a phone waiting
-  eight to ten seconds every time they unlocked. It was lowered until
-  a phone comes in a little under two. The cost is real but small:
+  fraction of a second would leave somebody on a phone waiting eight to
+  ten seconds every time they unlocked. The cost is real but small:
   roughly one character of password strength against somebody who has
   stolen a copy of the stored data, and the setting chosen is one of
   the two the standard behind this encryption recommends. If phone
-  browsers get faster, Solvent can raise it again on its own, applying
-  the stronger setting to each person's vault the next time they sign
-  in, with nothing for anybody to do and nothing inside the vault
-  touched. See "Keeping the lock current".
+  browsers get faster, Solvent can raise it again on its own. See
+  "Keeping the lock current".

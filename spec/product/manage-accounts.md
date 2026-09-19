@@ -15,7 +15,7 @@ so the machine that keeps the list cannot read it. Two things follow,
 and both are intended: nobody can look your holdings up on your behalf,
 and nobody can recover them if you lose your password.
 
-The screens carry the look described in app shell. Nothing here is
+The screens carry the look described in `app-shell.md`. Nothing here is
 decorated, and nothing nags.
 
 ## What a holding is
@@ -30,10 +30,10 @@ decorated, and nothing nags.
   also picks which run of rates the holding is valued by, shared with
   every other holding in that unit and kept separately from the
   figures you record (`record-snapshot.md`).
-- **Where it is filed.** Zero or more axes, each one a question you
+- **Where it is filed.** Zero or more dimensions, each one a question you
   invented about your money: Liquidity, with values Cash, Investments,
-  Retirement. A holding sits in exactly one value of each axis, or in
-  none. See net worth view for what filing buys you.
+  Retirement. A holding sits in exactly one value of each dimension, or
+  in none. What filing buys you is in `net-worth-view.md`.
 - **A note.** Optional, free text, for what was never a category:
   "joint with M", "sold half in 2024".
 
@@ -45,29 +45,29 @@ line per position.
 
 ### Adding or changing a holding
 
-A short form: name, what it is measured in, one line per axis you have
-configured, and a note hidden behind "Add a note" so it does not clutter
-the common case.
+A short form: name, what it is measured in, one line per dimension you
+have configured, and a note hidden behind "Add a note" so it does not
+clutter the common case.
 
-The unit is picked from a list an administrator maintains for the
-whole instance, with a
-"Something else..." option at the foot for anything not on it. Picking
-from the list is what lets the app propose prices later. Typing your own
-unit is a normal answer for a flat or a wine cellar, and the form says
-what it costs in one line at the moment you choose: you will enter the
-price yourself each time. Some units on the list are there without a
-price source behind them, and those are marked in the list as
-"rate entered by hand" rather than hidden. When a unit you want is
-missing, the form says the list is configured for the instance as a
-whole rather than per vault, so you do not go looking for a setting you
-do not have.
+The unit is picked from a list an administrator maintains for the whole
+instance, with a "Something else..." option at the foot for anything
+not on it, and picking from the list is what lets the app propose
+prices later. Typing your own unit is a normal answer for a flat or a
+wine cellar, and the form says what it costs in one line at the moment
+you choose: you will enter the price yourself each time. Units on the
+list with no price source behind them are marked "rate entered by hand"
+rather than hidden. When a unit you want is missing, the form says the
+list is configured for the instance as a whole rather than per vault,
+so you do not go looking for a setting you do not have.
 
-Filing happens inside this form, never on another screen. Each axis has
-a "new value" option at the foot of its list, and there is a "new axis"
-option below the block. A taxonomy you have to leave a half filled form
-to maintain is a taxonomy that stops being used.
+Filing happens inside this form, never on another screen. Each
+dimension has a "new value" option at the foot of its list, and there
+is a "new dimension" option below the block. A taxonomy you have to
+leave a half filled form to maintain is a taxonomy that stops being
+used. Renaming, reordering and archiving live on their own screen
+(`account-settings.md`).
 
-With no axes configured the block collapses to a single link, and
+With no dimensions configured the block collapses to a single link, and
 nothing anywhere nags you to create one. A vault with no filing at all
 is a complete vault.
 
@@ -116,10 +116,10 @@ and the current total.
   never causes the app to ask anyone on the internet for a price.
 - A holding measured in your own main currency never asks you for a
   conversion rate anywhere in the product.
-- Renaming an axis or one of its values changes it everywhere it appears
-  at once, and changes nothing about any holding.
-- A holding you never filed under an axis shows as "Unassigned" for that
-  axis, which reads as a normal state and not as an error.
+- Renaming a dimension or one of its values changes it everywhere it
+  appears at once, and changes nothing about any holding.
+- A holding you never filed under a dimension shows as "Unassigned" for
+  that dimension, which reads as a normal state and not as an error.
 - Archiving a holding leaves every net worth figure before the archive
   date exactly as it was, and removes the holding from today's total.
 - A closing value recorded onto a date that already has a recording
@@ -149,8 +149,8 @@ and the current total.
   against a different run of rates.
 - Editing a holding in two browser tabs at once does not silently lose
   one of the edits. The second one is told and asked to redo it.
-- A name, note or axis label containing something that looks like code
-  is shown as the literal text you typed, everywhere it appears.
+- A name, note or dimension label containing something that looks like
+  code is shown as the literal text you typed, everywhere it appears.
 
 ## What it deliberately does not do
 
@@ -163,15 +163,12 @@ and the current total.
   on your behalf, so a bank feed and a vault only you can read cannot
   both exist. Values are entered by hand, and the sweep screen (record a
   value) is what makes that cheap.
-- **No free floating tags alongside axes.** A yes or no label is an axis
-  with one value, which the form shows as a single checkbox. Two ways to
-  classify the same holdings would mean two ways to spell one thing, and
-  only one of them can be added up honestly in a chart.
-- **No permanent deletion of an axis or one of its values.** Archiving
-  hides it and keeps every holding's filing, so restoring it puts every
-  holding back exactly where it was. An option to strip a filing from
-  every holding would be a destructive change across your whole vault
-  offered to tidy up something nobody can see.
+- **No free floating tags alongside dimensions.** A yes or no label is
+  a dimension with one value, which the form shows as a single checkbox
+  (`account-settings.md`, which owns dimensions).
+- **No permanent deletion of a dimension or one of its values.**
+  Archiving hides it and keeps every holding's filing, so restoring it
+  puts every holding back exactly where it was (`account-settings.md`).
 - **No search or report the server runs for you.** It cannot read your
   list. Everything you see is assembled in your own browser after you
   unlock.
@@ -202,9 +199,9 @@ them.
   operation in the product that would rewrite figures you personally
   vouched for, which is why it needs the confirmation and why it is not
   something to add in a hurry.
-- **A holding sits in at most one value of each axis.** This is what
+- **A holding sits in at most one value of each dimension.** This is what
   makes the chart's bands add up to your net worth. A holding that is
   half retirement and half cash has to be two holdings.
-- **An axis may hold as many values as you like**, but the chart colors
-  the first four and folds the rest into "Other". The limit is the chart,
-  not your data.
+- **A dimension may hold as many values as you like**, but the chart
+  colors the first four and folds the rest into "Other"
+  (`net-worth-view.md`). The limit is the chart, not your data.

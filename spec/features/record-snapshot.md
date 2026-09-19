@@ -6,9 +6,7 @@ Enter a point-in-time quantity for one account: a date and a value in
 the account's native unit. That is the whole of a snapshot.
 
 **A snapshot carries no rate.** Quantities and prices are two separate
-timelines (architecture.md, Data model): a holding's own history holds
-only the quantities the person recorded, and the prices that turn them
-into the main currency live in their own series, one per symbol
+timelines (architecture.md, Data model), one price series per symbol
 (`record-rate.md`). A holding priced from its own last entry would join
 today's total at the price of the day it was last touched, and with
 partial updates as the normal case that is most holdings most of the
@@ -40,7 +38,7 @@ account. Decrypted payload:
   - **One scale for every quantity.** Scale 12 covers a rate at eight
     significant decimals, a holding in troy ounces or m², and a currency
     amount at two. "Integer minor units" is a money-only idea with no
-    meaning for a rate or for 12.5 troy ounces; carrying a scale factor
+    meaning for a rate or for 12.5 troy ounces. Carrying a scale factor
     per quantity instead would be a decimal library, written here and
     worse.
   - **Multiplication rescales once**: the integer product of two
@@ -89,10 +87,10 @@ snapshot for the account, and the server cannot see dates. Record ids
 stay random UUIDv4; deriving them from the date would let the server
 brute-force which dates a user holds data for.
 
-This is the path where the date is chosen blind. Where the stored
-figure is already on screen, in the field being edited, the prompt
-does not appear. Two places do that: a reopened recording
-(Reopening and editing a recording), and the archive dialog's
+This is the path where the date is chosen blind. **The prompt fires
+only where the stored figure is not already displayed in the field
+being edited.** It therefore does not fire in a reopened recording
+(Reopening and editing a recording), nor in the archive dialog's
 closing-snapshot field, which prefills with the stored figure and
 carries a confirm of its own (`manage-accounts.md`).
 
@@ -127,22 +125,20 @@ already in memory (`net-worth-view.md`, Data flow): snapshots and rate
 entries grouped by their own `date` field.
 
 - Every fact a grouping record could hold is already on its members.
-  The date is on each of them, and the two uniqueness rules, one
-  snapshot per (account, date) and one entry per (symbol, date),
-  already pin the identity such a record would be asserting.
+  The date is on each of them, and the uniqueness rules, one snapshot
+  per (account, date) and one entry per (symbol, date), already pin the
+  identity such a record would be asserting.
 - **It could disagree with what it claims to group.** A member deleted
-  from the holding's own page, a member written by a second session, or
-  a member whose date moved would each leave a list naming records that
-  are not there and missing records that are. A derived index cannot be
-  wrong about its own contents.
+  from the holding's own page, written by a second session, or whose
+  date moved would leave it naming records that are not there. A
+  derived index cannot be wrong about its own contents.
 - It would carry a `version` of its own, so two sessions recording the
-  same date would lose an optimistic-concurrency check on a record
-  neither of them has any reason to care about, while both of their
-  real writes succeeded. A conflict over nothing.
+  same date would lose a concurrency check on a record neither of them
+  cares about while both of their real writes succeeded.
 - It would have to be deleted when its last member goes, and that
   cascade cannot run server-side, because the server cannot see a date.
 
-Consequences, which are properties rather than gaps:
+Consequences:
 
 - **A recording exists exactly as long as a record carries its date.**
   This is what lets it have contents and still be one thing. Clear
@@ -160,7 +156,7 @@ Consequences, which are properties rather than gaps:
 
 ## Reopening and editing a recording
 
-Opening a recording and saving it is one act covering three changes, in
+Opening a recording and saving it is one act covering these changes, in
 any combination:
 
 1. **Changing a quantity** already recorded at that date. An ordinary
@@ -172,8 +168,8 @@ any combination:
 3. **Changing a rate** captured at that date (`record-rate.md`, Editing
    a captured rate).
 
-The write order across all three, and what the person is told when part
-of a save fails, is `record-rate.md`, Saving an edited recording.
+The write order across them, and what the person is told when part of a
+save fails, is `record-rate.md`, Saving an edited recording.
 
 **Opening a recording writes nothing and fetches nothing.** Not a
 version bump, not a nonce, not a rate request. Reading your own history
@@ -187,14 +183,10 @@ Moving one entry between dates stays what it is, an edit of that
 snapshot from the holding's own page (Moving the date onto an occupied
 date).
 
-**The replace prompt does not fire here.** "You already recorded
-12 450.00 USD for 31 July. Replace it?" exists to catch someone writing
-at a date they did not know was taken. In a reopened recording the
-stored figure is on screen, in the field being edited, so the prompt
+**The replace prompt does not fire here** (Same account, same date).
+The stored figure is on screen in the field being edited, so the prompt
 would fire on every ordinary correction and tell the person what they
-are already looking at. The rule is that **it fires only where the
-stored figure is not already displayed in the field being edited**,
-which is the single-holding form at a date the person chose.
+are already looking at.
 
 **Two doors reach one snapshot.** The holding's own page edits one
 entry across that holding's whole history and can move its date
@@ -391,9 +383,8 @@ a quiet wrong number.
   text nobody has priced, or because the person left the rate line
   empty → **the quantity saves regardless**. **Nothing in the price half
   ever blocks a quantity**, in any form: no disabled save, no required
-  rate field, no warning to dismiss first. This is the single rule for
-  it, and `record-rate.md` points at it rather than restating it. The
-  price half degrades on its own terms (`record-rate.md`, The refresh),
+  rate field, no warning to dismiss first. The price half degrades on
+  its own terms (`record-rate.md`, The refresh),
   the rate line says quietly that nothing was written for that unit, and
   the holding is listed as **not priced** rather than counted wrong,
   which `net-worth-view.md` owns.
@@ -415,14 +406,10 @@ a quiet wrong number.
   current value, and it is excluded from the total rather than counted
   as zero. No price entry is deleted with it: a price belongs to a
   symbol, not to the holding that happened to prompt it.
-- **A recording whose every quantity is cleared** → the date keeps its
-  rate entries and is still a recording, reopens like any other, and
-  keeps pricing the dates around it. Prices are not tidied away behind
-  a quantity, for the same reason a deleted snapshot takes none with
-  it.
-- **A recording that never had a quantity**, because every row was left
-  alone while the rates were written, is the same state reached from
-  the other end and needs no separate handling.
+- **A recording with no quantities**, whether they were cleared or
+  never entered, keeps its rate entries, is still a recording, reopens
+  like any other, and keeps pricing the dates around it (Clearing a
+  figure).
 - **A recording deleted outright** → every snapshot and every rate
   entry at that date goes, the recording appears in no list, and the
   date is available to be recorded again as though it never had been.
@@ -473,8 +460,8 @@ a quiet wrong number.
   `/api/rates` and writes no `rate` record.
 - Confirming writes a snapshot whose `value` equals the account's last
   recorded one at the new date, for an account in the main currency, one
-  with a live rate source, and one with none, with no branch between the
-  three.
+  with a live rate source, and one with none, with no branch between
+  them.
 - Confirming stays available and stays one click with the rate proxy
   stubbed to No Content.
 - Confirming an account with no snapshots is not offered, and the

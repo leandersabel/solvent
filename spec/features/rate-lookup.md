@@ -96,8 +96,8 @@ key — and never influenced by client input (see SSRF hardening below).
 **Frankfurter's public instance, `api.frankfurter.dev`.** HTTPS, no API
 key, no daily or monthly quota; requests are rate-limited only against
 abuse, and the operators ask heavy users to cache, which this design
-already does (see Caching). 201 currencies from 84 central banks, with
-history back to 1948, so an FX symbol is simply an ISO 4217 code.
+already does (see Caching). History goes back to 1948, and an FX
+symbol is simply an ISO 4217 code.
 
 - An FX symbol is the **base currency code** (`USD`, `EUR`) — which is
   simply the account's unit — and `quote` is the user's main currency.
@@ -109,10 +109,9 @@ history back to 1948, so an FX symbol is simply an ISO 4217 code.
   holiday, or pre-publication date resolves through the existing
   prior-close rule below, with `asOf` carrying the earlier date so the
   user sees the lag. This is the normal path, not an error.
-- Because there is no API key, the key-redaction rule below has no FX
-  component. No provider in this design has one. The rule stays because
-  it binds any keyed provider added later — metals.dev is the live
-  candidate (see Rejected below).
+- No provider in this design has an API key. The key-redaction rule
+  below stays because it binds any keyed provider added later, of which
+  metals.dev is the live candidate (see Rejected below).
 - Self-hosting Frankfurter is the same open-source service, so moving to
   a private instance later changes one host constant and nothing else.
 
@@ -141,16 +140,14 @@ a vendor, nothing to sign up for, and one host constant to unwind.
 - **Unit conversion is exact**: `XAU-g` takes NBP's figure directly,
   `XAU-ozt` multiplies by 31.1034768. Compose at full precision and
   round once, at the end.
-- **NBP's price trails the London fixing by one business day.** Verified
-  against ten consecutive days: NBP's published price for date D is the
-  previous business day's LBMA AM fixing at NBP's USD rate of that day,
-  matching within 0.1%. So `asOf` will usually be one
-  business day behind the snapshot date even midweek — not only across
-  weekends. This is acceptable and deliberate: the proposal is advice,
-  the user sees `asOf` and can override it with a better figure. Do not
+- **NBP's price trails the London fixing by one business day.** Its
+  published price for date D is the previous business day's LBMA AM
+  fixing at NBP's USD rate of that day, within 0.1%. So `asOf` is
+  usually one business day behind the snapshot date even midweek, not
+  only across weekends. That is acceptable: the proposal is advice, the
+  user sees `asOf` and can override it with a better figure. Do not
   paper over it by stamping `asOf` with the requested date.
 - History begins 2013-01-02, which is the date floor for gold symbols.
-- No API key.
 
 Rejected: **LBMA's own JSON feeds** (`prices.lbma.org.uk`) are keyless,
 CORS-open, and carry every metal back to 1968 in USD/GBP/EUR — a perfect
@@ -168,10 +165,10 @@ request/month free tier.
 
 ### Silver, platinum, palladium — deferred, but symbolled
 
-No lookup in v1. Their symbols are nonetheless **seeded in the symbol
-table now** (see below) so the user enters the rate by hand against a
-canonical symbol rather than inventing one. Adding a provider later is
-then a server-side change with no migration and no stale user data.
+No lookup in v1. Their symbols are **seeded in the symbol table now**
+(Seeded symbols), so the rate is entered by hand against a canonical
+symbol and adding a provider later is a server-side change with no
+migration and no stale user data.
 
 ### Listed securities — out of scope
 
@@ -206,11 +203,11 @@ Rejected, the licensing being largely closed:
 
 The objection that generalizes: **a price entry stores its rate
 permanently, inside user ciphertext the server cannot read, enumerate,
-or delete** (`record-rate.md`). "Delete all data on termination" is unsatisfiable here by
-construction, not a cache-policy problem a shorter TTL could fix. Any
-future provider for any asset class must be checked against that, not
-merely against request volume — the same test that eliminates LBMA for
-gold.
+or delete** (`record-rate.md`). "Delete all data on termination" is
+unsatisfiable by construction, not a cache-policy problem a shorter TTL
+could fix. Any future provider for any asset class must be checked
+against that, not merely against request volume, the same test that
+eliminates LBMA for gold.
 
 ## The symbol table
 
@@ -222,8 +219,9 @@ It exists because **the account form's unit picker is built from it**
 (`ui/account-form.md`): a user chooses what an account is measured in
 from this list, and that choice is also its rate symbol
 (`manage-accounts.md`). An unknown symbol stays a Bad Request at
-`/api/rates` — the table means a user cannot reach that error by
-choosing, only by hand-editing an export.
+`/api/rates`, which no user reaches by choosing: the client never names
+a symbol at all, and a free-text unit draws no proposal rather than an
+error.
 
 - `kind` — `currency` or `metal`. Display and grouping only.
 - `lookup` — whether the proxy can price this symbol **today**. `false`
@@ -231,11 +229,11 @@ choosing, only by hand-editing an export.
   user enters the rate by hand, and `/api/rates` answers No Content, not
   Bad Request. This is a designed state, not a degraded one.
 
-The table is platform configuration, not user data: it is identical
-for every account and reveals nothing about who holds what.
-**Maintaining it is an administrator task** (`admin-invites.md`), and
-it clears the admin boundary without an exception: no row of it is
-anyone's data, and reading or writing one touches no vault.
+The table is platform configuration, not user data: identical for
+every account and revealing nothing about who holds what. **Maintaining
+it is an administrator task** (`admin-invites.md`, The admin boundary),
+which the table clears without an exception: no row of it is anyone's
+data.
 
 ### Maintaining the table
 
@@ -285,17 +283,12 @@ unfixable without hand-editing an export.
   the proxy cannot serve.
 
   **`hasAdapter` is what makes that refusal avoidable rather than
-  merely correct.** Without it the screen has no way to know which
-  rows can be switched on, so it has to offer the control everywhere
-  and explain a refusal afterwards. With it the control is disabled on
-  the rows that have no source, with the reason stated in place, and
-  the administrator learns what the deployment can do by reading the
-  table rather than by being turned down. The server keeps refusing
+  merely correct.** With it the control is disabled on the rows that
+  have no source, with the reason stated in place, instead of offered
+  everywhere and refused afterwards. The server keeps refusing
   regardless: a page open since before an adapter was added or removed
   is a stale page, and a client's knowledge of the registry is not a
-  control. It costs one derived boolean, and it is instance
-  configuration rather than anybody's data, so it crosses no part of
-  the admin boundary (`admin-invites.md`).
+  control.
 - **`label` is display text and changes freely.** It is stored in no
   user record, so a rename rewrites nothing. It is rendered into the
   unit picker with `textContent`, never `innerHTML` (architecture.md,
@@ -304,8 +297,7 @@ unfixable without hand-editing an export.
 
 **No response here counts how many accounts use a symbol**, and none
 could: the server cannot read a `unit`. An administrator retiring a
-symbol is told what it means rather than shown who it affects, which
-is the boundary holding by construction rather than by restraint.
+symbol is told what it means rather than shown who it affects.
 
 ### Seeded symbols
 
@@ -315,7 +307,7 @@ user records** — it is the account's `unit` (`manage-accounts.md`); if a
 user typing free text records `GOLD`, `xau`, or `XAUCHF` today, adding a
 provider later means either abandoning those accounts or migrating
 ciphertext the server cannot read. Seeding the canonical form now costs
-eight config rows and removes that migration entirely. Because the unit
+a few config rows and removes that migration entirely. Because the unit
 picker offers this table before it offers free text, the canonical form
 is also the path of least resistance.
 
@@ -343,9 +335,8 @@ for free: NBP publishes per gram, so `XAU-g` is the raw figure and
 
 Currency symbols are seeded from Frankfurter's own currency list, all
 with `lookup: true` (see Providers). They are what the unit picker
-offers for an ordinary bank account or depot. There are no security
-symbols and none are coming: a brokerage holding is a depot account
-whose unit is a currency code like any other.
+offers for an ordinary bank account or depot. **There are no security
+symbols and none are coming** (Listed securities, above).
 
 ## Caching
 
@@ -353,8 +344,8 @@ whose unit is a currency code like any other.
 - **Past dates are cached indefinitely** — a historical rate does not
   change.
 - **Today's date is cached for 1 hour**, then refetched.
-- A cache hit issues no outbound request. Repeated entry across a
-  household's accounts on the same day should mostly hit cache.
+- A cache hit issues no outbound request, so repeated entry across a
+  household's accounts on one day mostly hits cache.
 - Cache entries are public reference data, not user data: they are not
   per-user and hold nothing about who asked or how much they hold.
 
@@ -392,9 +383,7 @@ reachable (architecture.md, SSRF hardening):
   usable to hammer the provider on the instance's API quota. A sweep of
   any size costs **one** request, because the client asks for the whole
   table once per recording date (`record-rate.md`, The refresh), so the
-  limit sits far above honest use. Without that rule a fifteen-row sweep
-  over six symbols would approach it, which is why it is a rule rather
-  than an optimization.
+  limit sits far above honest use.
 - A circuit breaker opens after **5 consecutive provider failures** and
   serves No Content directly for a **5-minute cool-off** instead of
   retrying per request.

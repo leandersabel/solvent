@@ -40,8 +40,8 @@ and no later recording touches it. A chart that changes its own past
 on its own is not a record of anything.
 
 The one thing that can change a past rate is you, and only by opening
-the recording that wrote it. The difference that matters is who acted:
-the app never moves your history, and you always can.
+the recording that wrote it. The app never moves your history, and you
+always can.
 
 Each rate entry says where it came from, and still says it a year
 later: the figure the app proposed, one you changed, with what was
@@ -53,9 +53,9 @@ why it is stored rather than remembered by the tab that entered it.
 
 Record your franc account and nothing else, and the dollar rate and the
 gold price get a fresh entry too, for the same date, without you asking
-for one. That is the point of it. Your total is then never built out of
-a rate nobody has looked at since March, however long ago you last
-touched the holdings that need one.
+for one. Your total is then never built out of a rate nobody has looked
+at since March, however long ago you last touched the holdings that
+need one.
 
 You see every rate that is about to be written and can change any of
 them. Leaving one alone accepts it.
@@ -77,8 +77,7 @@ not otherwise, and its age stays honest.
 
 Recording nothing writes nothing. Open the sweep, act on no row, close
 it, and there is no new entry anywhere, rates included. The refresh
-rides along with a recording. It is not something the app does on a
-timer.
+rides along with a recording rather than running on a timer.
 
 Rates are written for the date being recorded, not for today. Adding a
 March figure from a statement you have just found writes March's rates,
@@ -139,12 +138,6 @@ by its date and the dates are already in front of you.
 The one route that skips all of that is the Update values action in
 the top bar (`app-shell.md`), which goes straight into editing today.
 
-Picking a taken date and being refused a taken date are not two
-answers to one question. The picker knows what is there before you
-have typed anything, so it opens it. The refusal is for a date that
-becomes taken while you are working, when something typed is at stake,
-and it is described under starting and editing being different acts.
-
 ### A recording's own screen
 
 Every route above lands here, and it is for looking. One page, showing
@@ -175,10 +168,6 @@ An empty recording has a screen like any other. It says it holds no
 figures and lists the prices captured that day, which is the reason
 the date is still there at all. Both buttons work: Update to put
 figures back into it, Delete to take the date away.
-
-Starting a recording is not routed through this screen. A date that
-holds nothing has nothing to look at, so the picker goes straight to
-the sweep.
 
 ### The sweep: updating in one sitting
 
@@ -347,9 +336,9 @@ only some of the time is worse than none.
 
 Carrying those entries across, so the losing attempt opens the date
 with what was typed still in it, is wanted and is not in the first
-version. What the first version owes it is only that it does not stand
-in the way: the entries that lost are discarded because nothing keeps
-them yet, never because the date has been closed against them.
+version. What the first version owes it is not standing in the way:
+the entries that lost are discarded because nothing keeps them yet,
+never because the date has been closed against them.
 
 #### What saving does to your history
 

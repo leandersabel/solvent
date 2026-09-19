@@ -5,9 +5,8 @@ The compiled contract calls for an actual process-launch harness here,
 not a unit test of the config-loading function in isolation
 (spec/.compiled/app-shell.json, verify.focus) -- a unit test could pass
 while `create_app`/`app.py` still swallowed the error and started
-anyway. `test_load_config_raises` below is kept as a fast unit check of
-the message content; the subprocess tests are the ones that actually
-exercise "the app does not start".
+anyway. The `load_config` tests check the message, and the subprocess
+tests are the ones that exercise "the app does not start".
 """
 from __future__ import annotations
 
@@ -84,9 +83,8 @@ def test_process_starts_with_secret_key_set(tmp_path):
 
 
 def test_no_key_material_reaches_process_output(tmp_path):
-    """The failure names the variable and prints no value
-    (app-shell.md, Acceptance criteria), and neither does a clean
-    start."""
+    """A clean start prints no value (app-shell.md, Acceptance
+    criteria)."""
     started = _run_app(
         {
             "SECRET_KEY": _SENTINEL_KEY,
@@ -94,10 +92,3 @@ def test_no_key_material_reaches_process_output(tmp_path):
         }
     )
     assert _SENTINEL_KEY not in started.stdout + started.stderr
-
-    # A key below the bar still must not be echoed back while the app
-    # explains why it refused.
-    refused = _run_app(
-        {"SECRET_KEY": "", "DATABASE_PATH": str(tmp_path / "refused.db")}
-    )
-    assert _SENTINEL_KEY not in refused.stdout + refused.stderr

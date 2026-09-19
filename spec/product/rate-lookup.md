@@ -91,9 +91,9 @@ meet one.
   keep using, and you set the rate. Adding a source later changes
   nothing about what you already recorded.
 - **You cannot add a currency or a metal to the list yourself.** The
-  list is the same for everyone on the instance and adding to it is the
-  operator's job. What you can always do instead is type your own unit
-  and your own prices.
+  list is the same for everyone on the instance and adding to it is an
+  administrator's job (`admin-invites.md`). What you can always do
+  instead is type your own unit and your own prices.
 - **No estimating between published days.** A day with nothing published
   gets the last published figure, labeled with its own date. It is
   never averaged, smoothed, or interpolated into a number nobody
@@ -110,14 +110,14 @@ Currencies come from central bank data republished by a free open source
 service, gold from the Polish central bank directly. No account, no fee,
 no contract.
 
-The costs of that are accepted, not overlooked. If a source stops or
-changes, there is nobody to call and prices get typed by hand until the
-app is changed. Silver, platinum and palladium have no source at all,
-so you set those rates yourself and they carry forward until you change
-them. A paid provider was weighed and rejected: the good ones require
-every copy of their data to be deleted when you stop paying, and
-Solvent cannot do that, because every rate is stored inside your
-encrypted vault, which the server can neither read nor delete.
+If a source stops or changes, there is nobody to call and prices get
+typed by hand until the app is changed. Silver, platinum and palladium
+have no source at all, so you set those rates yourself and they carry
+forward until you change them. A paid provider was weighed and
+rejected: the good ones require every copy of their data to be deleted
+when you stop paying, and Solvent cannot do that, because every rate is
+stored inside your encrypted vault, which the server can neither read
+nor delete.
 
 What makes this survivable is that a price is only ever a proposal. You
 can overwrite any of them, and no entry is ever blocked by a lookup that

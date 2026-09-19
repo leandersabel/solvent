@@ -5,8 +5,7 @@
 One Flask application wraps every other feature: it sets the response
 headers, enforces the CSRF header, issues and reads the session cookie,
 opens the SQLite file, and renders the chrome the authenticated screens
-sit inside. Each of those is stated once here and holds for every
-route.
+sit inside. Each is stated once here and holds for every route.
 
 The shell never handles plaintext financial data (architecture.md,
 Components). What it renders as text is nav labels, the wordmark, and
@@ -32,10 +31,9 @@ second thing to keep in sync.
 - `SECRET_KEY` and any provider key are read from the environment
   (architecture.md, Tech stack).
 - **The app refuses to start when `SECRET_KEY` is absent or empty**,
-  rather than generating one. A generated key is new on every restart,
-  which silently invalidates every session row; a committed default is
-  forgeable. Failing at startup makes a misconfigured deployment
-  obvious before it serves a request.
+  rather than generating one. A generated key is new on every restart
+  and silently invalidates every session row. A committed default is
+  forgeable.
 - No secret reaches a log line or an error page.
 
 ## CSRF
@@ -53,17 +51,15 @@ under an existing prefix cannot inherit one.
 **The static endpoint is exempt because a browser cannot make it
 otherwise.** No subresource request carries a custom header, so a
 stylesheet or script fetched by `<link>` or `<script src>` would fail,
-and the unauthenticated screens have no session to offer either. It
-stays one named endpoint rather than a path pattern, and what it serves
-is public by construction: the design tokens, the client-side code, and
-the vendored Alpine build, all of which any visitor may read.
+and the unauthenticated screens have no session to offer either. What
+it serves is public by construction: the design tokens, the client-side
+code, and the vendored Alpine build.
 
 **The check also runs before routing.** A request without the header is
 Forbidden whether or not the path resolves, so a probe cannot learn
 which routes exist by comparing Forbidden against Not Found. Not Found
 is reserved for a caller who got past the header (architecture.md,
-Status codes), which is the construction that makes its three
-conditions indistinguishable.
+Status codes).
 
 ## Database
 
@@ -80,8 +76,7 @@ column set: no key material is a column of `principals`
 separate `credentials` and `dek_wrappers` tables rather than extending
 this one.
 
-Two triggers live here, because they are schema and the schema is
-created in one place:
+The schema is created in one place, so its triggers live here:
 
 - a `BEFORE INSERT` on `records` and
 - a `BEFORE INSERT` on `dek_wrappers`
@@ -97,13 +92,11 @@ has to be written deliberately.
 ## The two surfaces
 
 There are two surfaces, the vault and the administration, and no
-session reaches both. Routes that belong to neither are shared.
-
-Every route in the product is in exactly one of the three groups
-below, and the group together with the session's principal kind
-decides whether the route answers at all. The check sits beside the
-CSRF middleware and runs immediately after authentication, once, so no
-individual endpoint repeats it.
+session reaches both. Every route in the product is in exactly one of
+the groups below, and the group together with the session's principal
+kind decides whether the route answers at all. The check sits beside
+the CSRF middleware and runs immediately after authentication, once, so
+no individual endpoint repeats it.
 
 - **Shared**, the routes every account needs to hold a
   credential and a session: `/login`, `/api/auth/salt`,
@@ -191,9 +184,6 @@ rearrangement:
   Application hardening).
 - A screen's content region is never server-rendered from vault data,
   because the server has no plaintext to render.
-- Headers and the CSRF check apply to unknown routes and error
-  responses too — they are properties of the application, not of a
-  route.
 
 ## Edge cases
 
@@ -248,9 +238,7 @@ rearrangement:
   something other than Not Found to the wrong kind, or that appears in
   neither group, fails the test.
 - An administrator's `GET /api/records` returns Not Found, not an
-  empty list, asserted specifically, because an empty list is the
-  plausible wrong answer and it reads as "your vault is empty" rather
-  than "you have none".
+  empty list, asserted specifically (`record-api.md`).
 - The root path renders the Dashboard for a vault owner and the Admin
   area for an administrator, and neither session can reach the other's
   through it.

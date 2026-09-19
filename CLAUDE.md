@@ -33,15 +33,22 @@ answer.
 A question that cannot be put without technical vocabulary belongs to
 the architect, who decides it and writes the reason into the spec.
 
-## The two spec layers
+## The spec layers
 
-- `spec/product/*.md` — what the client asked for, in their words.
+- `spec/product/*.md` holds what the client asked for, in their words.
   Screens as a person sees them, and a "What must be true" list
   observable from outside by someone who cannot read code. No status
   codes, no columns, no libraries.
-- `spec/architecture.md` and `spec/features/*.md` — the technical
-  derivation. Row shapes, endpoints, byte encodings, and a technical
-  acceptance list a test can assert.
+- `spec/features/*.md` holds the technical derivation. Row shapes,
+  endpoints, byte encodings, and a technical acceptance list a test can
+  assert.
+- `spec/ui/*.md` holds one file per screen, plus the design system:
+  what is on the screen, in what arrangement, and every state it must
+  handle.
+
+`spec/architecture.md` sits above all three and holds what is true
+system-wide. The same subject at two altitudes is the design, not
+duplication.
 
 Some features have no product file, because the client never asked for
 them and nothing about them is visible from outside: the record store
@@ -68,6 +75,8 @@ product file like any other.
 - Negative rules are target state and belong: "there is no separate
   rate-symbol field, because two fields could disagree."
 - One fact, one home. If a rule appears twice, the second is a pointer.
+- No counts in prose. A number of rows, screens or providers is true
+  for one edit and wrong by the next.
 - No dates, no "owner's call", no "resolved".
 
 ## Tracking files

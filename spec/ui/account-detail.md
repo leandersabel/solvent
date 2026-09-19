@@ -23,9 +23,8 @@ account row on the dashboard.
   figure at **the latest price for this holding's unit**, which is a
   price on its own timeline and not something the entry carries
   (`record-rate.md`). Then "as of 31 Jul" and its age in words, "3
-  weeks ago", with no warning attached at any age, matching
-  `update-values.md`. There is no staleness threshold anywhere in the
-  product (`net-worth-view.md`).
+  weeks ago", at any age and with no warning attached: there is no
+  staleness threshold anywhere in the product (`net-worth-view.md`).
   - **The dashboard's rates control does not reach this screen**
     (`dashboard.md`). That control is a comparison, and this screen
     answers what one holding is worth now, with nothing beside it to
@@ -42,9 +41,8 @@ account row on the dashboard.
   (`net-worth-view.md`).
 - Actions: **Record a value** (primary, opening `snapshot-entry.md` at
   this holding), **Edit** (opens `account-form.md`), **Archive** or
-  **Unarchive**, **Delete**. The
-  archive and delete dialogs are the ones specified in
-  `account-form.md`; this screen is where they are launched from.
+  **Unarchive**, **Delete**. The archive and delete dialogs are
+  specified in `account-form.md` and launched from here.
 - An archived account shows an "Archived" chip and its `archivedAt`
   date, and offers no "Record a value". The one exception is the
   closing snapshot the archive flow itself writes
@@ -64,19 +62,16 @@ main currency · (row actions).
   date**, which is what the holding was worth that day. Where the unit
   had no price at or before that date, the cell reads "not priced"
   rather than repeating the quantity.
-- **There is no Rate column and no Source column.** An entry carries no
-  rate at all: a quantity and a price are two separate timelines, and a
-  price belongs to a unit, shared by every holding measured in it
-  (`record-rate.md`). A rate on this table would be one fact printed
-  once per holding that happens to hold the unit, editable in as many
-  places as it is printed, with one of them having to win silently.
-  Where a price came from is shown on the recording that captured it,
-  which each date here links to (`recording-detail.md`).
+- **There is no Rate column and no Source column.** An entry carries
+  no rate at all: a quantity and a price are two separate timelines,
+  and a price belongs to a unit rather than to a holding
+  (`record-rate.md`, `update-values.md`). Where a price came from is
+  shown on the recording that captured it, which each date here links
+  to (`recording-detail.md`).
 - A note on an entry shows as an icon that expands the row; notes are
   not truncated into the table.
-- **No pagination.** A decade of monthly entries is 120 rows; a decade
-  of weekly is 520. Both scroll. Paginating this would add a control
-  that solves nothing.
+- **No pagination.** A decade of entries scrolls. Paginating would add
+  a control that solves nothing.
 - Row actions: **Edit** (reopens `snapshot-entry.md` pre-filled, which
   is also where the entry's date is moved) and **Delete**.
 
@@ -101,27 +96,24 @@ and all, is a different act on a different screen
 
 ## States
 
-- **Loading**: none. Everything comes from the in-memory model
-  (`net-worth-view.md`, Data flow), so the screen renders instantly.
+- **Loading**: none.
 - **Empty — no snapshots**: the history table is replaced by one
   sentence and the primary action: "No snapshots yet. Record what this
   account is worth."
 - **Populated — one snapshot**: a table with one row. No special case.
 - **Error, duplicate date**: two entries share one date, reachable
   when a date move's `DELETE` failed and when two sittings crossed
-  (`record-snapshot.md`). Both rows render, flagged critical, with a
-  line naming the fault and a **Keep this one** action on each. The
-  client picks neither, and the chart excludes that date from its
-  interpolated series until it is resolved. This is a visible fault by
-  design: silently preferring the higher `version` would put a wrong
-  number in the chart with nothing on screen to explain it. The same
-  pair is shown, flagged the same way, on that date's recording
-  (`recording-detail.md`), and answering it in either place answers it.
+  (`record-snapshot.md`). Both rows render flagged, with a line naming
+  the fault and a **Keep this one** action on each, and the chart
+  excludes that date from its interpolated series until it is
+  answered. The same pair is shown the same way on that date's
+  recording (`recording-detail.md`, which owns the fault's
+  presentation), and answering it in either place answers it.
 - **Populated, a figure whose unit is unpriced at its date**: the row
   renders with its native value and "not priced" in place of the
   converted figure. One row in this state does not affect the others.
-- **Error — Conflict on a snapshot write**: "This snapshot was changed
-  in another tab." The row reloads from the current record; no merge.
+- **Error, Conflict on a snapshot write**: "This snapshot was changed
+  in another tab." The row reloads from the current record.
 - **Error — delete failed**: inline on the row, row unchanged.
 
 ## Rules
@@ -137,8 +129,6 @@ and all, is a different act on a different screen
   the figure it shows is always the quantity recorded times the price
   recorded, both read live from the model.
 - The table is this holding's own values only, and it never reaches
-  across holdings. A cross-holding price audit ("every price I typed by
-  hand") is deliberately **not** here: it is a different question with
-  a different shape, and its absence is a decision rather than an
-  oversight. Where one price came from is on the recording that
-  captured it (`recording-detail.md`).
+  across holdings. A cross-holding price audit ("every price I typed
+  by hand") is deliberately **not** here: it is a different question
+  with a different shape.

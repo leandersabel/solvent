@@ -53,10 +53,8 @@ def load_config(env: "dict[str, str] | None" = None) -> Config:
     if not secret_key:
         raise ConfigurationError(
             "SECRET_KEY environment variable is required and must not "
-            "be empty. A generated key would be new on every restart "
-            "and invalidate every session row. A committed default "
-            "would be forgeable. Set SECRET_KEY in the deployment's "
-            "environment before starting the app."
+            "be empty. Set it in the deployment's environment before "
+            "starting the app."
         )
 
     database_path = env.get("DATABASE_PATH", "instance/solvent.db")

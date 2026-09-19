@@ -18,9 +18,8 @@ Exercises: `spec/features/export-import.md`.
 Own screen, reached from Settings. Content max-width 720px, two cards.
 
 The export card is also what the **delete-my-account** dialog reaches
-when somebody takes its primary action (`settings.md`). Same download,
-same warning before it starts. Someone who wanted a backup and got a
-wiped vault has been failed by that dialog.
+when somebody takes its primary action (`ui/settings.md`). Same
+download, same warning before it starts.
 
 ### Export
 
@@ -54,8 +53,7 @@ wiped vault has been failed by that dialog.
 
 Replace-only. There is no merge, and the UI must not imply one exists.
 
-A four-step flow in one card, each step revealed as the previous
-completes:
+A flow in one card, each step revealed as the previous completes:
 
 1. **Choose file.** Drag-drop or picker. Validated client-side for size,
    `format`, and `formatVersion` before parse.
@@ -69,8 +67,8 @@ completes:
    - The screen never says whose vault the file was, because the file
      says nothing about it. A file made by somebody else restores here
      given its password, and that is the feature working
-     (`export-import.md`, Edge cases). No step treats it as suspicious
-     and none asks for a name.
+     (`export-import.md`, Edge cases). No step asks for a name or
+     treats the file as suspicious.
 3. **Review.** What is in the file, by kind: holdings, recorded figures,
    captured prices, and the date it was exported. Alongside it, what
    will be destroyed, in the same kinds and with the total: "Your vault
@@ -116,9 +114,9 @@ Import decrypts every record with the file's DEK, then re-encrypts every
 record under a **newly generated** DEK (`export-import.md`, The re-key
 step). On a large vault this is the longest operation in the product.
 
-- Three named phases. "Decrypting 340 of 1 208…" and "Re-encrypting …"
-  carry determinate progress, because they are genuinely different work
-  and one bar that stalls halfway looks broken. "Uploading" is a single
+- Named phases. "Decrypting 340 of 1 208…" and "Re-encrypting …" carry
+  determinate progress, because they are genuinely different work and
+  one bar that stalls halfway looks broken. "Uploading" is a single
   request in one transaction, so it waits without a fabricated
   percentage.
 - Runs in a Worker; the tab stays responsive.
@@ -130,8 +128,6 @@ step). On a large vault this is the longest operation in the product.
   destroyed, stack instead of sitting side by side. What will be
   destroyed stays above the confirm step either way, so it is never
   scrolled past.
-- The drop zone falls back to the file picker, which is the only route
-  a phone has. Drag-drop is the addition, not the path.
 - The `ERASE` field and the destructive button sit together, so the
   word and what it does are on screen at once.
 

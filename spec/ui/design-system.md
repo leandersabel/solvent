@@ -1,8 +1,8 @@
 # Design system
 
-Shared visual foundations. Every screen spec in this directory assumes
-these tokens and says only what it adds. Not a screen — no feature
-compiles against this file alone, but every UI contract references it.
+Shared visual foundations and shared behavior. Every screen spec in
+this directory assumes this file and states only what it adds. It is
+not a screen, and nothing compiles against it alone.
 
 ## The look
 
@@ -106,8 +106,8 @@ Validated against the `#faf9f7` ground with the Machado–Oliveira–
 Fernandes (2009) severity-1.0 CVD model, OKLab ΔE ×100:
 
 - **Adjacent pairlist** (stacked areas, bars, lines): worst CVD ΔE
-  **16.6**, worst normal-vision ΔE **18.9**. Both clear their gates (≥8
-  and ≥15) with roughly double the margin of the reference palette.
+  **16.6**, worst normal-vision ΔE **18.9**. Both clear their gates,
+  ≥8 and ≥15.
 - **All-pairs** (scatter, small multiples — any two marks can touch):
   **the cap is the first three slots**, worst CVD ΔE **14.1**, normal
   **20.7**. Slot 4 must not appear in an all-pairs form: indigo and
@@ -315,8 +315,8 @@ only its own content region.
   global **Update values** action and the lock button at the right.
   Both buttons take the chrome variant (Components), not the secondary
   one, which is specified for the light ground.
-- **Nav is two entries, Dashboard and Settings**, the same two for
-  everybody who has a vault.
+- **Nav is Dashboard and Settings**, the same for everybody who has a
+  vault.
   - There is deliberately **no "Accounts" entry**: the dashboard's own
     table *is* the account list (`dashboard.md`), so a third entry
     would either lead back to the screen the user is on or open a
@@ -348,13 +348,15 @@ only its own content region.
   unlocking needs only the password. No confirmation dialog: this is
   the control someone reaches for when another person walks into the
   room, and a confirm step spends the seconds it exists to save.
-- Content max-width 1200px on the ground. Narrower screens set their
-  own width (forms 480px, and 900px for the sweep, a recording's own
-  screen, and account detail).
-- The shell is server-rendered Jinja (`architecture.md`, Components) and
-  carries no plaintext — nav labels and the wordmark. The unauthenticated
-  screens sit outside it (`unlock.md`, `register.md`) and embed the
-  current default KDF envelope in their own page.
+- Content max-width 1200px on the ground, and each screen states its
+  own narrower width.
+- The shell is server-rendered Jinja (`architecture.md`, Components)
+  and carries no plaintext, only nav labels and the wordmark.
+- **Outside the shell** sit unlock and register (`unlock.md`,
+  `register.md`): one centered card on the warm ground under the
+  wordmark in petrol-800, no navigation and no marketing, each setting
+  its own width. Having no session with which to fetch one, each
+  embeds the server's current default KDF envelope in its own page.
 
 ## Components
 
@@ -374,6 +376,21 @@ only its own content region.
   revealed in place** by an Edit action and saved by an explicit
   action, not a control of its own. A field that saves on blur turns
   clicking away into a write.
+- **Quantity field**: the money input. The holding's own unit sits as a
+  suffix inside the box, `inputmode="decimal"`, and the converted
+  main-currency figure appears beneath it in ink-secondary as you type,
+  because that is the number the person is reasoning about and it costs
+  no save to see. **Zero and negative are valid** and are never
+  blocked: zero is a closed out position, negative is a mortgage. More
+  than twelve decimal places is refused at input rather than truncated,
+  and a non-numeric or malformed value is refused inline with nothing
+  submitted.
+- **Password field**: `type=password` with a show-and-hide toggle,
+  never auto-submitted, never logged, and cleared from the DOM on
+  success. Each one carries autocomplete tokens, named by its own
+  screen, so a password manager can generate, store and update the
+  password. A manager-generated passphrase is the most realistic
+  protection a vault with no recovery can have.
 - **Chip**: petrol-50 fill, petrol-700 text, 4px radius, 13px. Used for
   a dimension assignment (`Liquidity: Cash`), for status chips such as
   "Archived", and for a price's provenance, whose wording is owned by
@@ -424,8 +441,8 @@ only its own content region.
   label says what is inside rather than "More". Closed by default only
   where what is inside is genuinely secondary, and the count of what is
   hidden is on the label where there is one to give. It carries the
-  archived list, "Add a note", a danger zone, the sweep's prices line,
-  and the chart's table fallback.
+  archived list, "Add a note", a danger zone, the single-holding
+  form's prices line, and the chart's table fallback.
 - **Section switcher**: a row of links moving between the sections of
   one screen. Active in brass-600 with a 2px brass-500 rule beneath it,
   inactive in petrol-600, so the active one is marked by the rule as
@@ -447,15 +464,34 @@ only its own content region.
 
 ## States
 
-Every screen spec must define all four. Defaults:
+Every screen spec defines each of these and states only what it does
+differently.
 
 - **Loading**: skeleton blocks in petrol-100 for content, never a
   spinner for page load. Spinners only for a >1s action already begun.
+  A screen served from the in-memory model has no loading state at
+  all, and where one card alone waits on a fetch, only that card
+  skeletons.
 - **Empty**: one sentence naming what is missing, one primary action.
   Never an empty table with headers.
 - **Error**: inline, above the relevant control, critical text with an
   icon. Never a toast for anything the user must act on.
 - **Populated**: the real thing.
+
+These failures recur across screens, and a screen writes only its own
+copy for them:
+
+- **A write that failed**: inline on the control that made it, every
+  typed value kept, every other control unaffected, and nothing
+  retried on the user's behalf.
+- **A conflict**: the copy names what changed in another tab or
+  window, the screen reloads that record, and the user redoes the
+  edit. Never a merge and never a silent clobber.
+- **A save that landed in part**: nothing is rolled back and nothing
+  records that a save was partial. The message names both halves, what
+  landed and what did not, by name rather than by count, and what is
+  on screen is what the vault holds rather than what the save
+  intended. Each screen states whether it reloads or stays as it is.
 
 ## Motion
 
@@ -474,6 +510,10 @@ upward from zero reads as a slot machine. Respect
   direct labels for ≤4; status carries an icon and a label.
 - All interactive elements reachable and operable by keyboard; modals
   trap focus and restore it on close.
+- **Phones and tablets are supported targets, not a degraded case.**
+  Every screen is reachable, usable and submittable on a touch screen,
+  and no action anywhere lives only in a wide layout (`app-shell.md`,
+  On a phone). A screen states only what changes shape at phone width.
 - **No drag is ever the only route.** Every drag interaction has a
   keyboard and pointer equivalent doing the same job: a reorder ships
   Move up and Move down (Components), and a file drop zone is always

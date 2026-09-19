@@ -1,10 +1,5 @@
 # Architecture
 
-<!-- Edit this file directly. It's the top-level source of truth: what the
-system is, what it's made of, and how the pieces talk to each other.
-The product-owner agent reads this alongside spec/features/*.md and
-spec/ui/*.md to compile implementation contracts. -->
-
 ## What Solvent is
 
 A net worth tracker, self-hosted on the owner's own NAS.
@@ -43,12 +38,11 @@ A net worth tracker, self-hosted on the owner's own NAS.
   (rate-lookup.md). Reachable only by an administrator session, which
   holds no key material of any kind.
 - **Export/Import**: user-initiated export of a vault (ciphertext blobs
-  plus the password credential's wrapper) to a local file, still
-  fully encrypted, so the file
-  exposes nothing without the password. Serves as a personal backup and
-  as the migration path across data-model upgrades, distinct from the
-  NAS-level ZFS backups (disaster recovery, not schema migration). Import
-  reverses this to restore a vault.
+  plus the password credential's wrapper) to a local file, still fully
+  encrypted, so it exposes nothing without the password. It is the
+  personal backup and the migration path across data-model upgrades,
+  distinct from the NAS-level ZFS backups, which are disaster recovery
+  and not schema migration. Import restores a vault from one.
 
 ## Data model
 
@@ -66,16 +60,15 @@ per the Security model — the server sees ciphertext, not these fields.
   (`m²`) — and it **doubles as the account's rate symbol**, so a holding
   can never be measured in one unit and priced in another.
   Some accounts (private equity, a private loan, unlisted real estate)
-  have no public price or rate source — the rate proposal is
-  best-effort per snapshot, not required of the account.
+  have no public price or rate source, so the price for their unit is
+  entered by hand rather than proposed.
 - **Brokerage holdings are recorded at depot level**, not per position:
   one account whose native unit is the depot's reporting currency, and
   whose snapshot value is the total the broker reports — the same act as
   updating a bank account. A depot is therefore an ordinary currency
   account: a foreign-currency depot converts through the same FX path as
-  a foreign-currency bank account, and a depot reporting in the user's
-  main currency needs no rate at all. No shares, no tickers, no
-  per-position rows. See Non-goals.
+  a foreign-currency bank account, and one reporting in the main
+  currency needs no rate at all. See Non-goals.
 - **Dimension**: a named axis an account is classified along —
   "Liquidity" with values "Cash", "Retirement", and so on. An account
   carries **at most one value per dimension, structurally**: the
@@ -98,10 +91,9 @@ per the Security model — the server sees ciphertext, not these fields.
 - **Quantities and prices are two separate timelines.** A holding's own
   history holds only the quantities its owner recorded. The prices that
   turn those quantities into the main currency are their own series, one
-  per symbol, shared by every holding measured in it. Pairing a holding
-  with the price of the day it was last touched is what the split
-  removes: with partial updates the normal case, that is most holdings
-  most of the time.
+  per symbol, shared by every holding measured in it. The split is what
+  stops a holding from being priced at the day it was last touched,
+  which with partial updates is most holdings most of the time.
   - **Snapshot**: a point-in-time quantity for one account, a date and a
     value in the account's native unit, and nothing else
     (record-snapshot.md).
@@ -113,8 +105,8 @@ per the Security model — the server sees ciphertext, not these fields.
   - **Recording anything refreshes every price.** Record one franc
     account and the dollar rate and the gold price still get entries.
     Prices are written by default and quantities are not: a quantity has
-    to be looked up on a statement, so the app never writes one nobody
-    gathered, while nobody gathers a price.
+    to be read off a statement, so the app never writes one nobody
+    gathered, while a price needs no gathering.
   - **A recording is a date, not a stored thing.** Everything recorded
     at one date, quantities and prices together, is reopened and
     edited as one act, and it is a client-side grouping of records by
@@ -125,10 +117,9 @@ per the Security model — the server sees ciphertext, not these fields.
     fails rather than merging into it (record-snapshot.md).
   - Today's total is each holding's last recorded quantity at the most
     recent price for its unit.
-- Accounts don't need a snapshot on every date — updates are sparse by
-  design (you won't touch every account every time). The UI carries the
-  last known quantity forward when charting net worth over time, and
-  prices it from the price timeline at each date.
+- Updates are sparse by design: no account needs a snapshot on every
+  date. The UI carries the last known quantity forward when charting net
+  worth over time, and prices it from the price timeline at each date.
 
 ### Accounts on this instance
 
@@ -159,14 +150,13 @@ demotion, and no endpoint writes `kind` after the insert
 
 **One username space across both kinds.** `username` is unique over the
 whole table, so a username resolves to exactly one principal of exactly
-one kind. Two namespaces are rejected: a username could then name a
-vault owner and an administrator at once, and the pre-authentication
-step would have to ask an unauthenticated caller which of the two they
-mean. That answer is the kind of an account, handed out before anyone
-has proven anything, which is exactly the oracle Login enumeration
-exists to close. One space costs the operator a naming convention for
-the two accounts of one person and buys a login flow that never
-branches on kind before it has verified a credential.
+one kind. Separate namespaces would let one username name a vault
+owner and an administrator at once, and the pre-authentication step
+would have to ask an unauthenticated caller which it means, handing out
+an account's kind before anyone has proven anything. That is the oracle
+Login enumeration exists to close. One space costs the operator a naming
+convention for the two accounts of one person, and buys a login flow
+that never branches on kind before it has verified a credential.
 
 Every column above means something for both kinds, which is what makes
 one table right here. The columns that would not, meaning salt, KDF
@@ -208,23 +198,22 @@ These are the row shapes.
 
 **Why two tables rather than one with an empty wrapper.** One table
 would leave `wrapped_dek` and `dek_nonce` permanently empty on every
-administrator row, and that emptiness would be carrying the
-load-bearing statement "this account has no vault" while the schema
-enforced nothing. Split, the statement is the absence of a row, which a
-foreign key and a primary key enforce between them, and every column of
-every row means something. The split is also what the two axes ask for:
-authenticating and unwrapping a key are different jobs, and an
-administrator's credential is an authenticator that is not the source
-of any wrapping key. A passkey credential would be the mirror case, a
-wrapping-key source whose `verifier` holds a credential public key and
-no Auth Key, and it fits these two tables unchanged.
+administrator row, carrying the load-bearing statement "this account
+has no vault" with nothing enforcing it. Split, that statement is the
+absence of a row, which a foreign key and a primary key enforce between
+them, and every column of every row means something. Authenticating and
+unwrapping a key are also different jobs: an administrator's credential
+is an authenticator that is the source of no wrapping key. A passkey
+credential would be the mirror case, a wrapping-key source whose
+`verifier` holds a credential public key and no Auth Key, and it fits
+these two tables unchanged.
 
 What stays on the credential is the **salt and the KDF envelope**, in
 `params`. They belong beside the verifier, which was computed over a
 value derived from them, and they are what the pre-authentication step
 hands out on its own. The wrapper comes out of the same password and is
-still a separate fact, because it is the fact a vault owner has and an
-administrator does not.
+still a separate fact: the one a vault owner has and an administrator
+does not.
 
 **`params` is public and `verifier` is secret, and that is the line
 between them.** `params` holds exactly what a caller needs *before* it
@@ -254,10 +243,9 @@ closes.
   credential's wrapper and no other (export-import.md), because a
   wrapper bound to an authenticator cannot travel to another machine. A
   vault with no password credential therefore has no openable export,
-  and export is this product's only backup and its only migration path
-  across data-model upgrades (see Components). For an administrator it
-  is simply the only way in. A second method is additive, never a
-  replacement.
+  which is this product's only backup and migration path (see
+  Components). For an administrator it is the only way in. A second
+  method is additive, never a replacement.
 - **v1 implements the password method and nothing else.** There are no
   passkey endpoints, no passkey UI, and no `method` value other than
   `password` is accepted anywhere. The row shapes above are the whole
@@ -288,11 +276,11 @@ cannot read any type. A record row is:
 | `ciphertext` | opaque | AES-256-GCM under the DEK |
 | `updated_at` | plaintext | server clock, for debugging |
 
-Five of these columns — `record_id`, `record_type`, `account_id`,
-`schema_version`, `version` — are exactly the AAD, so the server cannot
-move a blob to a different slot within a vault without breaking
-decryption. `principal_id` is **not** part of the AAD: cross-vault relocation
-is already impossible under the DEK boundary. See Key management for
+The columns `record_id`, `record_type`, `account_id`, `schema_version`
+and `version` are exactly the AAD, so the server cannot move a blob to
+a different slot within a vault without breaking decryption.
+`principal_id` is **not** part of the AAD: cross-vault relocation is
+already impossible under the DEK boundary. See Key management for
 both.
 
 The plaintext columns are **metadata the server can see**: record
@@ -304,8 +292,8 @@ plaintext shape deliberately carries no name, value, date, or unit.
 an account, and the symbol is the one thing a column here would leak, so
 it stays inside the ciphertext and `account_id` is empty like an
 `account` or a `profile`. record-rate.md argues that against the threat
-model, and record-api.md pins the column rule. The AAD encoding is
-unchanged by the new type.
+model, and record-api.md pins the column rule. Its AAD encoding is the
+same as every other type's.
 
 Endpoints (all authenticated as a vault owner, all CSRF-protected on
 writes). An administrator session reaches none of them: the record
@@ -332,19 +320,17 @@ party.
   **The client asks for the whole quotable table rather than naming
   symbols** (`rate-lookup.md`, The client never names a symbol): since
   recording anything refreshes every price, a per-symbol fan-out would
-  hand the server a repeating list of one person's holdings, which is a
-  larger leak than the transient per-query one this design started from.
-  Asset *type* is not confidential in itself (knowing someone holds gold
-  or dollars reveals nothing sensitive), but a complete list on a
-  schedule is a profile, and the whole-table form costs nothing to
-  avoid it. The *amount* is what the zero-knowledge model protects, and
-  that never reaches the proxy or server in any form.
+  hand the server a repeating list of one person's holdings. Asset
+  *type* is not confidential in itself (knowing someone holds gold or
+  dollars reveals nothing sensitive), but a complete list on a schedule
+  is a profile, and the whole-table form costs nothing to avoid it. The
+  *amount* is what the zero-knowledge model protects, and that never
+  reaches the proxy or server in any form.
   - This includes the user's **main currency**, which travels as the
     `quote` parameter on every lookup. It is stored only inside the
     encrypted profile record, never as a plaintext column — but the
     server learns it in the ordinary course of serving proposals. That
-    falls under the same accepted-leak decision as asset type; it is not
-    an oversight against register.md's storage rule.
+    falls under the same accepted leak as asset type.
 - **Base-amount rule (hard requirement)**: every rate request queries the
   rate for a fixed, reasonable base unit (e.g. "price of 1 troy oz", a
   unit currency pair) — never the account's actual snapshot value. This
@@ -390,10 +376,10 @@ contract pins one value and prose stays readable.
 | Too Many Requests | 429 | a rate limit engaged (Application hardening) |
 | Server Error | 500 | an unhandled failure. Never a designed answer; it appears in this spec only where a test stubs one |
 
-Not Found carries three distinct conditions deliberately. Splitting
-them would answer the question the attacker is asking — whether an id,
-an account, or an admin route exists — so the three are
-indistinguishable by construction rather than by convention.
+Not Found's conditions are indistinguishable by construction rather
+than by convention. Splitting them would answer the question the
+attacker is asking: whether an id, an account, or an admin route
+exists.
 
 ## Tech stack
 
@@ -426,16 +412,13 @@ indistinguishable by construction rather than by convention.
   sigstore) with an SBOM generated per build, so a pull can verify
   provenance beyond "the digest I was told." TrueNAS has no auto-pull for
   Custom Apps yet — it surfaces "update available" in the Apps UI, and you
-  apply it by hand. Automating that pull is a future improvement.
+  apply it by hand.
 - **Backend language**: Python.
 - **Backend framework**: Flask, over FastAPI/Django. The app is small with
   no external API consumers, so FastAPI's async/auto-docs strengths don't
   pay for their ceremony, and Django's batteries (admin, settings,
-  migrations) are more structure than needed. The server never decrypts
-  anything (see Security), so it holds no session-scoped decryption key —
-  a session row is just an identity after Auth Key verification, which
-  any framework handles equally well. JSON endpoints that store/return
-  ciphertext blobs (IV, nonce, tag, wrapped DEK) use Pydantic for
+  migrations) are more structure than needed. JSON endpoints that
+  store/return ciphertext blobs (IV, nonce, tag, wrapped DEK) use Pydantic for
   validation, added directly into Flask rather than adopting FastAPI for
   that one benefit.
 - **WSGI server**: gunicorn, serving `app:app`. Flask's built-in
@@ -452,13 +435,9 @@ indistinguishable by construction rather than by convention.
   depth, but the security guarantee doesn't depend on it.
 - **Charting**: none. The trend chart is drawn directly in SVG
   (net-worth-view.md, Rules).
-- **Frontend**: hybrid. Flask + Jinja2 + htmx server-renders the app shell
-  (navigation, login/registration, layout) — nothing sensitive passes
-  through it. Data screens (balances, net worth charts) render
-  client-side: a small vanilla-JS/Alpine.js layer (no build step, matching
-  htmx's philosophy) fetches ciphertext blobs from the JSON API, decrypts
-  them in-browser with the session's Master Key, and renders the result —
-  the server has nothing to template there, since it never has plaintext.
+- **Frontend**: hybrid, a server-rendered shell around client-rendered
+  data screens (see Components). The client layer has no build step,
+  matching htmx's philosophy.
 
 ## Security
 
@@ -490,10 +469,9 @@ Actors this design defends against vs. accepts:
   and no `records` row, so there is no key material in that session
   for an endpoint to leak by accident and nothing for a future admin
   feature to reach toward. What they hold is the running of the
-  platform, and the set of tasks that means is expected to grow:
-  provisioning accounts, removing them, and maintaining the
-  instance-wide symbol table today. Removing an account destroys its
-  vault rather than opening it. The bound on the role is the admin
+  platform: provisioning accounts, removing them, and maintaining the
+  instance-wide symbol table. Removing an account destroys its vault
+  rather than opening it. The bound on the role is the admin
   boundary rather than the list of tasks, and it is what every new one
   is checked against (admin-invites.md, The admin boundary). An
   administrator who is also a vault owner under a second account gets
@@ -548,12 +526,11 @@ Actors this design defends against vs. accepts:
     percent, so each doubling of memory costs an iPhone whole seconds
     rather than tens of milliseconds. At 64 MiB an iPhone unlock takes
     about two seconds and a desktop browser a fraction of one, which is
-    the bar: the parameter is set by what keeps the slowest supported
-    device usable.
+    the bar.
   - **Raising iterations to compensate for the lower memory is
     rejected.** It buys the attacker cost back by spending exactly the
     login time the memory setting exists to protect, on the same device.
-  - **Two mitigations are ruled out by measurement rather than
+  - **These mitigations are ruled out by measurement rather than
     argument**, so neither is worth re-investigating. A warm
     WebAssembly instance is within 2 percent of a cold one at every
     size, so growing the WASM heap is not the cost. Every target reports
@@ -607,19 +584,19 @@ Actors this design defends against vs. accepts:
   is nevertheless the *identical* flow: the same salt fetch, the same
   Argon2id at the same parameters over the same 128-bit salt, the same
   HKDF split, the same Auth Key on the wire, the same server-side
-  Argon2id over that Auth Key. The client derives both halves and
-  discards the Master Key.
+  Argon2id over it. The client derives both halves and discards the
+  Master Key.
   - **The waste is the feature.** The client cannot know which kind of
     account it is authenticating as until it has authenticated, and it
     must not, or the pre-authentication step becomes the oracle Login
     enumeration exists to close. A derivation that branched on kind
     would have to be told the kind by `/api/auth/salt`, and that
-    endpoint answers anyone. So the derivation does not branch, and
-    what it costs an administrator is a few microseconds of HKDF on
-    top of an Argon2id run they were paying for anyway.
+    endpoint answers anyone. The derivation therefore does not branch,
+    and costs an administrator a few microseconds of HKDF on top of an
+    Argon2id run they were paying for anyway.
   - **Sending the password to the server instead is rejected.** It is
     the obvious shortcut for an account with no vault, and it fails
-    three ways. The wire shape of a login would differ by kind and
+    every count. The wire shape of a login would differ by kind and
     leak it before authentication. The server would hold a plaintext
     password, the one secret this whole design is built to keep off
     it. And a server-side Argon2id at client-side cost would blow the
@@ -637,17 +614,15 @@ Actors this design defends against vs. accepts:
   returns ciphertext only.
 - **One key, N wrappers.** The wrapped DEK is not a property of the
   account. It is a property of a credential, and a vault may hold more
-  than one (Data model, Credentials and vault key wrappers). Five rules
-  follow from the DEK being the same key in every wrapper:
+  than one (Data model, Credentials and vault key wrappers). These
+  rules follow from the DEK being the same key in every wrapper:
   - **Each authentication returns at most one wrapper**, the one
     belonging to the credential that just authenticated, and none at
     all when the account is an administrator. No endpoint returns the
     set of them, because a client can only unwrap with the credential
     it used, and a list would tell any caller which authenticators a
-    vault has. Nor does any v1 endpoint enumerate an account's
-    credentials. A settings screen that lists them belongs to the work
-    that adds a second method, and would return handles and labels,
-    never wrappers.
+    vault has. No v1 endpoint enumerates an account's credentials
+    either.
   - **Re-wrapping one credential never touches another.** The
     stale-KDF upgrade (login.md) and a password change
     (account-settings.md) each replace exactly one credential row and
@@ -691,9 +666,9 @@ Actors this design defends against vs. accepts:
     **re-keys** rather than re-binds, so the two vaults share no key
     material afterwards. `record-api.md` argues the first,
     `export-import.md` the second.
-  - A client-maintained, DEK-authenticated manifest (expected record
-    IDs + versions) would additionally catch wholesale deletion of the
-    set — worth revisiting post-v1, not required to ship.
+  - Wholesale deletion of the whole record set is not detected.
+    Catching it needs a client-maintained, DEK-authenticated manifest
+    of expected record ids and versions, which v1 does not ship.
 - **Session key handling**: Master Key and unwrapped DEK live only in
   browser memory for the session (not localStorage/sessionStorage, to
   limit XSS exposure) — a page refresh requires re-deriving them from the
@@ -702,8 +677,6 @@ Actors this design defends against vs. accepts:
   password managers (e.g. Bitwarden), not a novel design — the point is
   that the server never holds a secret that doubles as both
   authenticator and decryption key.
-- Per-user salts and keys give the isolation guarantee in Threat model
-  ("Another user of the same instance").
 - **No password recovery, by design.** A forgotten password makes the
   vault permanently unreadable — nothing server-side can derive the
   Master Key, so there's no reset without discarding the data. Accepted
@@ -748,9 +721,8 @@ Actors this design defends against vs. accepts:
     confidentiality gap.
 
   This instance is internet-exposed via Cloudflare Tunnel (`cloudflared`
-  on TrueNAS, no inbound port opened); that's this deployment's choice,
-  not a spec requirement — a different operator self-hosting Solvent may
-  choose LAN-only or a plain reverse proxy instead.
+  on TrueNAS, no inbound port opened): this deployment's choice, not a
+  spec requirement.
 
 ### Application hardening
 
@@ -774,9 +746,9 @@ Actors this design defends against vs. accepts:
   `SECRET_KEY`; the server looks the session up by the token's hash. No
   key material of any kind rides in the cookie. Server-side rows are
   what make sessions enumerable and revocable, which the product
-  requires in four places: listing active sessions, "log out
-  everywhere", invalidating every other session on a password change or
-  an import, and the absolute 12-hour expiry (account-settings.md,
+  requires for listing active sessions, "log out everywhere",
+  invalidating every other session on a password change or an import,
+  and the absolute 12-hour expiry (account-settings.md,
   export-import.md). `id` is a separate opaque handle — it is what
   `GET /api/sessions` returns, so no response ever hands JavaScript the
   cookie's own value.
@@ -876,17 +848,17 @@ Actors this design defends against vs. accepts:
 - **Blob and quota limits** — **64 KiB** per ciphertext blob, **50 000**
   records per vault, **32 MiB** total per user. Rejected before the row
   reaches the DB, with Content Too Large (record-api.md).
-  - These three are **compiled-contract parameters**, not operator
-    config: the Content Too Large tests assert exact behaviour at a
-    boundary, and a boundary that moves per deployment is one the
-    contract cannot state.
+  - These are **compiled-contract parameters**, not operator config:
+    the Content Too Large tests assert exact behaviour at a boundary,
+    and a boundary that moves per deployment is one the contract cannot
+    state.
   - Every one has an order of magnitude of headroom. A snapshot payload
-    is a few hundred bytes and a price entry less. Thirty accounts
+    is a few hundred bytes and a price entry less, and thirty accounts
     updated monthly for thirty years, with a price entry per symbol per
-    recording date, stays well inside one order of magnitude of the
-    record cap and a few MB of the byte quota. The caps exist to bound a
-    runaway client or a hostile payload, not to ration honest use, and
-    they are not load-bearing on security.
+    recording date, stays well inside the record cap and a few MB of
+    the byte quota. The caps bound a runaway client or a hostile
+    payload rather than rationing honest use, and they are not
+    load-bearing on security.
 - **Invite tokens**: ≥128-bit entropy, single-use, time-limited, stored
   hashed at rest, invalidated on first use.
 - **Import authorization**: strict schema/size validation on the
@@ -913,7 +885,7 @@ Actors this design defends against vs. accepts:
   SVG (net-worth-view.md) rather than pulled in.
 - **zxcvbn is loaded only by the two screens that score a password**,
   registration (`ui/register.md`) and change password
-  (`ui/settings.md`). It is the largest of the three and the app shell
+  (`ui/settings.md`). It is the largest of them and the app shell
   has no use for it, so it does not ride along on every authenticated
   page.
 
@@ -924,10 +896,9 @@ Actors this design defends against vs. accepts:
 - No automated bank sync / Plaid-style integration — conflicts with
   zero-knowledge encryption, since a third party can't encrypt on the
   user's behalf.
-- No position-level tracking of listed securities — no share counts, no
+- No position-level tracking of listed securities: no share counts, no
   tickers, no cost basis, no per-holding performance. A brokerage
-  account is one depot-level figure the user reads off their broker, the
-  same act as updating a bank balance (see Data model).
+  account is one depot-level figure (see Data model).
 - No mobile app — responsive web only.
 - No shared/household view — vaults are private per user.
 - No multi-tenant/public hosting — single instance, small fixed set of

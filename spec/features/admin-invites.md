@@ -23,15 +23,12 @@ administrator task is judged against that rather than against the
 tasks that came before it. Two tasks exist today beyond provisioning:
 
 - **The instance-wide unit and symbol table** (`rate-lookup.md`, The
-  symbol table), which is platform configuration in the plainest
-  sense: one list, identical for every account, revealing nothing
-  about who holds what.
+  symbol table): one list, identical for every account, revealing
+  nothing about who holds what.
 - **Rotating their own password** (An administrator's own credential,
-  below), because an administrator has no settings screen and a
-  credential nobody can rotate is a defect.
+  below).
 
-Neither is provisioning, and neither needed a rule bent to admit it,
-because both clear the boundary on their own.
+Neither is provisioning, and both clear the boundary on their own.
 
 ## The admin boundary
 
@@ -68,13 +65,6 @@ record ciphertext, no credential field, no wrapper, and no fact about
 what is inside anyone's vault. It does not have to resemble anything
 already on the list.
 
-Two things make the test cheap to apply rather than a matter of
-judgement each time. An administrator session holds no key material,
-so there is nothing for a new endpoint to leak even by accident. And
-the vault surface answers that session Not Found before any handler
-runs, so a new administrator endpoint cannot reach vault data by
-calling into one that does.
-
 ## Invite lifecycle
 
 An invite row: `id`, `token_hash`, `kind`, `created_by`, `created_at`,
@@ -99,8 +89,8 @@ An invite row: `id`, `token_hash`, `kind`, `created_by`, `created_at`,
 - **Single use**: consumed atomically in the same transaction as the
   user insert (register.md). A failed registration does not consume it.
 - `label` is a free-text note ("Sarah's laptop") so an administrator
-  can tell outstanding invites apart. It is server-side plaintext — deliberately,
-  since invites are provisioning metadata, not vault data.
+  can tell outstanding invites apart. It is deliberately server-side
+  plaintext, since invites are provisioning metadata, not vault data.
 - `created_by` is the administrator who minted the invite, or the
   reserved sentinel `system:bootstrap` for one minted by the CLI, which
   runs with no session and no principal behind it. The sentinel is
@@ -110,15 +100,12 @@ An invite row: `id`, `token_hash`, `kind`, `created_by`, `created_at`,
   column has to special-case an absence.
 
   **It is stored and never returned.** `GET /api/admin/invites`
-  leaves it out and no screen shows it. The product fixes what an
-  invite's row carries and a creator is not among those columns
-  (`product/admin-invites.md`, Outstanding invites). Every
-  administrator on an instance can do everything any other can, so
-  naming one on a row would sort the rows by a distinction that
-  changes nothing about what anybody may do with them. The field
-  stays stored because it is the one thing separating a CLI-minted
-  invite from one handed out in the app, and because the server
-  already holds the principal behind the request that wrote it.
+  leaves it out and no screen shows it (`product/admin-invites.md`,
+  Outstanding invites). Every administrator can do everything any
+  other can, so naming one on a row sorts the rows by a distinction
+  that changes nothing about what anybody may do with them. It stays
+  stored because it is the one thing separating a CLI-minted invite
+  from one handed out in the app.
 
 ## Endpoints
 
@@ -141,9 +128,6 @@ The two surfaces), whether or not this file names it.
   has not said enough. The screen still presents it as an unticked
   checkbox (`ui/admin.md`). The API does not, because an API has no
   screen to explain a default on.
-
-  This endpoint mints an account that is born its kind. It cannot
-  reach an existing account, and nothing else can either.
 - `GET /api/admin/invites` → list of
   `{ id, label, kind, createdAt, expiresAt, status, usedAt, usedBy }`.
   **Never includes the token or its hash.**
@@ -171,12 +155,9 @@ The two surfaces), whether or not this file names it.
   the administrator types to confirm; `confirmUsername` must equal the
   path segment or the request is a Bad Request.
 
-  This is the **only** destructive power an administrator holds. On a
-  vault owner it destroys a vault rather than opening one. On an
-  administrator it destroys no data at all, because there is none.
-  That is why removing an administrator is the lighter of the two
-  operations and needs no extra ceremony beyond the confirmation and
-  the last-administrator guard below.
+  On a vault owner this destroys a vault rather than opening one. On
+  an administrator it destroys no data at all, so it needs no ceremony
+  beyond the confirmation and the last-administrator guard below.
 
   There is deliberately no admin export and no admin password reset,
   because neither is possible — see The admin boundary above.
@@ -198,9 +179,8 @@ The admin boundary first.
 
 - **An administrator may remove any account, of either kind**, including
   another administrator. Administrators are peers and the model has no
-  hierarchy: the client asked for several at once and named no seniority
-  among them, and inventing one would mean a rank column that the same
-  removal power could be used to route around anyway.
+  hierarchy: the client asked for several at once and named no
+  seniority among them.
 - **An administrator may remove their own account**, through this
   endpoint, while another administrator remains. Doing so ends their
   own session with the transaction.
@@ -219,8 +199,7 @@ Counting the remaining administrators and then deleting in two
 statements outside a write transaction lets two administrators remove
 each other concurrently, each counting two and each deleting one,
 leaving zero. Serializing them means the second attempt counts one and
-is refused. This is the failure the rule exists to prevent, so it is
-specified as a transaction rather than left to a handler to get right.
+is refused.
 
 There is no guard on removing the last *vault owner*. An instance with
 administrators and no vault owners is idle, not broken.
@@ -229,9 +208,9 @@ administrators and no vault owners is idle, not broken.
 
 An administrator has no settings screen, because settings is a vault
 screen (`account-settings.md`). They still hold a password, and a
-password nobody can rotate is a defect rather than a simplification.
-So the admin area carries **one control of its own that is not about
-provisioning: Change password.**
+password nobody can rotate is a defect, so the admin area carries
+**one control of its own that is not about provisioning: Change
+password.**
 
 - It posts to `POST /api/auth/change-password`, the same shared
   endpoint a vault owner uses, sending no wrapper
@@ -243,8 +222,7 @@ provisioning: Change password.**
   the one that already performs it.
 - There is no session list for an administrator and no
   `POST /api/auth/logout-all`. Both are on the vault surface
-  (`app-shell.md`, The two surfaces), and the password change already
-  does the one thing an administrator would reach for them to do.
+  (`app-shell.md`, The two surfaces).
 
 **An administrator who has forgotten their password is not recovered,
 they are replaced.** Another administrator removes the account and
@@ -287,16 +265,13 @@ architecture.md (Threat model) states outright is **not** defended
 against. A hard block would stop someone who has already won, at the
 cost of the only recovery path in the product.
 
-That path is the point. An administrator who loses their password
-cannot recover their own vault account, because they have none, and
-the vault account they hold separately is as unrecoverable as anyone
-else's, which nothing changes. But the *instance* must still be able to
-provision. Without the override, the remaining option is hand-editing
-SQLite against a schema of hashed tokens and transactional invite
-consumption, an operation no spec covers.
+That path is the point. The *instance* must still be able to
+provision, and without the override the remaining option is
+hand-editing SQLite against a schema of hashed tokens and
+transactional invite consumption, which no spec covers.
 
 The confirmation is friction, not security: it stops an absent-minded
-invocation, and it is honest that it cannot stop anything more.
+invocation and nothing more.
 
 ## Inputs / outputs
 
@@ -415,9 +390,10 @@ invocation, and it is honest that it cannot stop anything more.
   creates nothing.
 - `POST /api/admin/invites` with `kind: administrator` from a **vault
   owner** session returns Not Found and creates nothing.
-- No request to any endpoint changes an existing account's kind —
-  asserted by enumerating every registered route and attempting the
-  change through each.
+- No request to any endpoint changes an existing account's kind,
+  asserted by enumerating every registered route at test time and
+  attempting the change through each, so a route added later is
+  covered rather than exempt.
 - The last remaining administrator cannot remove their own account:
   `DELETE /api/admin/accounts/<their own>` returns Conflict and
   deletes nothing.
@@ -454,9 +430,4 @@ invocation, and it is honest that it cannot stop anything more.
 - `GET /api/admin/accounts` lists both kinds, and an administrator's
   row carries no `recordCount` field at all, asserted against the row's
   full key set rather than against its value.
-- No endpoint changes an account's kind, asserted by enumerating the
-  registered routes under `/api/admin/` and attempting it through
-  each. The enumeration is over whatever routes exist at the time the
-  test runs, not against a fixed list, so a route added later is
-  covered by it rather than exempt from it.
 - The invite token does not appear in the application's own log output.

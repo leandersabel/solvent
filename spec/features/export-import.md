@@ -22,8 +22,7 @@ after the authenticator is lost, could not use it, and its credential
 id in a file the user may hand to someone else is a device correlator
 sitting in a backup for no benefit. This is the reason the password
 method is mandatory and permanent (`account-settings.md`): it is what
-makes a vault exportable at all, and export is the product's only
-backup and its only migration path across data-model upgrades.
+makes a vault exportable at all.
 
 It serves two jobs: a **user-held backup** independent of the NAS's ZFS
 snapshots, and the **migration path across data-model upgrades**. It is
@@ -109,10 +108,9 @@ injection fails at the cryptography rather than at a check.
    so the user's existing login password keeps working after the import.
 6. `POST /api/import` with the new wrapped DEK and the re-encrypted
    records. The server, in one transaction, deletes every record
-   belonging to the session user, replaces the wrapper on their
-   `password` credential's wrapper, inserts the new set, and
-   **invalidates every other session for the user**, keeping the
-   importing one.
+   belonging to the session user, replaces their `password`
+   credential's wrapper, inserts the new set, and **invalidates every
+   other session for the user**, keeping the importing one.
 7. Client swaps its in-memory DEK to `DEK_new` and reloads the view.
 
 **Import is the one flow that changes the DEK, so it is the one flow
@@ -129,15 +127,13 @@ Key by definition.
 
 **The profile record is replaced along with everything else**, so the
 main currency, dimensions, and idle-lock setting all become the file's.
-That is the one sanctioned way the main currency changes, and it does
-not violate the immutability rule in `account-settings.md`: that rule
-exists because changing the currency while keeping the history would
-leave every stored price denominated in the old one. Import replaces the
-history too, so the vault stays internally consistent: every price
-entry's `rateTarget` matches the profile it arrived with. The import review step
-names the change when the file's main currency differs from the current
-one, because arriving at a vault denominated in another currency without
-being told is a bad surprise even when it is correct.
+That is the one sanctioned way the main currency changes
+(`account-settings.md`, Main currency): import replaces the history
+too, so every price entry's `rateTarget` matches the profile it
+arrived with. The import review step names the change when the file's
+main currency differs from the current one, because arriving at a
+vault denominated in another currency without being told is a bad
+surprise even when it is correct.
 
 Consequences: the user's **password does not change** across an import,
 but their **DEK does** — and it is a key that has never existed anywhere
@@ -176,9 +172,7 @@ written.
   *create* — new UUID, `version: 1` — is accepted and stores ciphertext
   under a key no longer in the envelope, producing a permanently
   unreadable record whose only symptom is the decryption-failure
-  banner. A password change already invalidates other sessions
-  (account-settings.md) and changes strictly less: it leaves the DEK
-  intact. Import must not be the weaker of the two.
+  banner.
 - Export is rate-limited per user — **default 5 per hour**, operator
   config (architecture.md, Rate limiting). It is a full vault read, and
   nobody backs up five times an hour.
@@ -196,16 +190,15 @@ written.
 - **Malformed JSON, wrong `format`, or unknown `formatVersion`
   (newer)** → reject with a clear message. A newer file in an older app
   is not something to guess at.
-- **There is no `formatVersion` below 1.** Version 1 is the current
-  shape; there is no older format to migrate from.
+- **There is no `formatVersion` below 1.** There is no older format to
+  migrate from.
 - **Older `formatVersion`** → migrate the plaintext shape client-side
   after decryption, before re-encrypting, reusing the same per-type
   migration chain the client already applies lazily on read
-  (`record-api.md`, Schema migration). This is the whole point of the
-  feature; each supported old version needs an explicit migration path
-  and a test with a real fixture file. There is exactly one set of
-  migration functions in the product — a second, import-only copy would
-  drift.
+  (`record-api.md`, Schema migration). Each supported old version needs
+  an explicit migration path and a test with a real fixture file. There
+  is exactly one set of migration functions in the product, and a
+  second, import-only copy would drift.
 - **Oversized file** → rejected client-side by size before parse, and
   server-side before write.
 - **Import of a vault exported by a different user** → works. It is a
@@ -247,10 +240,11 @@ written.
 - No exported file contains a user identifier in any field.
 - An exported file carries exactly one wrapper, and no field that
   names, counts, or describes a credential.
-- An import replaces the `password` row's `wrapped_dek` and `dek_nonce`
-  and leaves its `params` and `verifier` byte-identical: the salt, the
-  KDF envelope, and the Auth Key hash all survive an import, and the
-  user logs in afterwards with the unchanged password.
+- An import replaces `wrapped_dek` and `dek_nonce` on the `password`
+  credential's `dek_wrappers` row and leaves that credential's `params`
+  and `verifier` byte-identical: the salt, the KDF envelope, and the
+  Auth Key hash all survive an import, and the user logs in afterwards
+  with the unchanged password.
 - A file with one record's ciphertext altered by a single byte aborts
   the import, uploads nothing, and leaves the pre-existing vault intact.
 - Importing with the wrong password aborts before any request is sent.

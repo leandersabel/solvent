@@ -57,9 +57,9 @@ list — not a warning, and not a cap:
 > The chart shows the first four values and folds the rest into "Other".
 > All five are still tracked.
 
-`account-settings.md` is explicit that the list is not capped: four is a
-rendering constraint from the validated chart palette
-(`design-system.md`), not a limit on the data.
+The list is not capped: four is a rendering constraint from the
+validated chart palette (`design-system.md`), not a limit on the data
+(`account-settings.md`).
 
 ## Creating
 
@@ -90,14 +90,8 @@ stored label still shown. One write, the profile.
 ## Reordering
 
 Value order is the chart's band order and dimension order is the "Group
-by" order, so both are real data and both are reachable three ways:
-
-- Dragging the handle.
-- **Move up and move down on every handle**, keyboard-operable, never
-  drag-only: band order is load-bearing and a drag-only control puts it
-  out of reach (`design-system.md`, Accessibility).
-- The same two controls answer to touch, which is what makes the screen
-  usable on a phone without a drag gesture inside a scrolling page.
+by" order. Both are real data, so both use the reorder control
+(`design-system.md`, Components) and neither is drag-only.
 
 A move writes the profile once, on drop or on the key press. There is no
 save button and no reorder mode.
@@ -136,14 +130,8 @@ out of the chart, and its only question is whether it comes back.
 ## At phone width
 
 The cards stack and each one keeps every control it has on a wide
-screen. The two things that would break are handled rather than dropped:
-
-- Reordering is the move-up and move-down controls, not a drag gesture
-  competing with the page scroll.
-- The coverage line wraps under the label instead of sitting beside it,
-  and its unassigned link stays a tap target of its own.
-
-Nothing here lives only in a wide layout (`app-shell.md`, On a phone).
+screen. The coverage line wraps under the label instead of sitting
+beside it, and its unassigned link stays a tap target of its own.
 
 ## States
 
@@ -172,8 +160,7 @@ Nothing here lives only in a wide layout (`app-shell.md`, On a phone).
   the previous value still shown as current. Every write here is a
   single record, so a failure changes nothing.
 - **Error, Conflict stale profile**: "Your settings were changed in
-  another tab." The screen reloads the profile and asks the user to redo
-  the edit rather than merging.
+  another tab." The screen reloads the profile.
 - **Populated**: as above.
 
 ## What it deliberately does not show

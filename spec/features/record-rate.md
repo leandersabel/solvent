@@ -5,11 +5,9 @@
 The price timeline. One entry per (symbol, date), giving what one unit
 of that symbol was worth in the vault's main currency on that date.
 
-Quantities and prices are **two separate timelines**. A holding's own
-history carries only the quantities the person recorded
-(`record-snapshot.md`). The prices that turn those quantities into the
-main currency run alongside as their own series, one per symbol, shared
-by every holding measured in it.
+Quantities and prices are **two separate timelines**
+(`record-snapshot.md`). The prices run as their own series, one per
+symbol, shared by every holding measured in it.
 
 **No screen of its own.** `record-snapshot.md` owns the action that
 refreshes this timeline, `net-worth-view.md` reads it for the total and
@@ -26,40 +24,33 @@ A price for a symbol on a date is public reference data, so storing it
 as server-side plaintext looks free. It is not.
 
 - **Which symbols a person holds is not public.** A durable table of
-  (principal, symbol, date, rate) rows *is* that list, on the server,
-  in every database dump, every backup, and every filesystem snapshot,
-  for as long as any of them are kept. The threat model defends the
-  host operator's passive observation and the offline attacker with a
-  dump by the zero-knowledge model, and the record columns deliberately
-  carry no name, value, date, or unit (architecture.md, Record storage
-  API). A plaintext rate table would hand over the unit and the date
+  (principal, symbol, date, rate) rows *is* that list, in every
+  database dump, every backup, and every filesystem snapshot, for as
+  long as any of them are kept. The record columns deliberately carry
+  no name, value, date, or unit (architecture.md, Record storage API),
+  and a plaintext rate table would hand over the unit and the date
   directly.
-- **The accepted proxy leak is a different leak.** The proxy observes a
-  query while answering it, so it is available to whoever is watching
-  the process at that moment. A stored table is available to whoever
-  reads the disk afterward, including from a backup of a vault whose
-  owner has since been deleted. Same fact, different persistence,
-  different set of actors. The accepted one does not cover the other.
+- **The accepted proxy leak does not cover it.** The proxy observes a
+  query while answering it. A stored table is readable off the disk
+  afterward, including from a backup of a vault whose owner has since
+  been deleted. Same fact, different persistence, different actors.
 - **Not every rate is reference data.** The person may overwrite any
   proposal, and for a free-text unit or a `lookup: false` symbol there
-  is no proposal at all, so the number is entirely theirs: what they
-  believe their flat is worth per m². That is a valuation of their own
-  holding, as sensitive as the quantity beside it, and it has no
-  business leaving the browser in the clear.
-- **Export settles it on its own.** Export is the product's only backup
+  is no proposal at all: what they believe their flat is worth per m²
+  is a valuation of their own holding, as sensitive as the quantity
+  beside it, and it has no business leaving the browser in the clear.
+- **Export carries it either way.** Export is the product's only backup
   and its only migration path (architecture.md, Components), and the
   file must carry both timelines or a restore silently reprices the
-  entire history. A server-side table would have to be written into the
-  export as plaintext, and a file that today "reveals nothing but record
-  counts and types" (`export-import.md`) would become a plaintext list
-  of every symbol a person holds and every date they recorded. As a
-  vault record it rides along with no format change at all.
-- **Server-side deletability is not the prize it looks like.** The
-  providers rejected on retention terms (`rate-lookup.md`) fail against
-  the indefinite proxy cache as much as against the copy in user
-  ciphertext. Moving this timeline to the server leaves that cache
-  exactly as it is, so it satisfies no licence term that is not already
-  unsatisfiable.
+  entire history. A server-side table would enter the export as
+  plaintext, turning a file that "reveals nothing but record counts and
+  types" (`export-import.md`) into a plaintext list of every symbol a
+  person holds and every date they recorded. As a vault record it rides
+  along with no format change.
+- **Server-side deletability buys nothing.** The providers rejected on
+  retention terms (`rate-lookup.md`) fail against the indefinite proxy
+  cache as much as against the copy in user ciphertext, which moving
+  this timeline to the server leaves exactly as it is.
 
 **The symbol is inside the ciphertext, and there is no plaintext symbol
 column.** A plaintext column would buy here what `account_id` buys for
@@ -136,7 +127,6 @@ per-blob cap.
 needs one.** Record a single franc account and the dollar rate and the
 gold price still get entries.
 
-This is the asymmetry that makes the split work, and it is deliberate.
 **Prices are written by default and quantities are not**: a quantity
 must be looked up on a statement, so the app never writes one nobody
 gathered, while nobody gathers a price, so the person sees a proposal
@@ -146,10 +136,9 @@ and doing nothing accepts and writes it.
   sweep's date or the single-holding form's date, and not today. A
   March figure entered in September writes its quantity at March and
   refreshes prices **at March**, so the chart's March is priced with
-  March's prices. A backfill therefore inserts price knots
-  into the past, which is more real data rather than less, and the
-  chart's entry marks already said that stretch was drawn rather than
-  recorded.
+  March's prices. A backfill therefore inserts price knots into the
+  past, and the chart's entry marks already say that stretch was drawn
+  rather than recorded.
 - **Which symbols.** The distinct `unit` of every **active** account,
   minus any unit equal to the profile's `mainCurrency`, whose rate is
   `"1"` by definition and is stored nowhere and requested from nobody.
@@ -265,9 +254,8 @@ version check, and nothing spans two of them. The order is fixed:
 A phase's requests may be issued together, and the next phase begins
 when every request in the previous one has answered.
 
-- **Quantities before prices**, for the reason a fresh recording has:
-  the figure the person went and looked up is the expensive half, and
-  the expensive half goes first.
+- **Quantities before prices**, for the reason a fresh recording has
+  (The write path).
 - **A rate the person typed does not wait on a quantity.** The gate
   holding the refresh behind a successful quantity write exists because
   the refresh writes figures nobody asked for. An entry the person
@@ -297,7 +285,7 @@ never hidden and never rolled back:
   the total and the chart on screen are always what the vault holds and
   never what the save intended.
 - **Nothing in the vault records that a save was partial.** No pending
-  flag and no dirty marker: it would be a fifth thing to keep
+  flag and no dirty marker: it would be another thing to keep
   consistent, it would outlive the tab that could resolve it, and the
   unsaved half exists only in the open screen. Closing with changes
   unsaved says so and names them.
@@ -329,13 +317,11 @@ loses a version check and two entries for one (symbol, date) exist.
 
 **There is no provenance ranking and no automatic winner.** A rule
 picking `edited` over `proposed` and falling through to a version or an
-id would be a second way of resolving a duplicate, living beside the
-first, for a window one round trip wide. It would also pick silently
-between two figures the person typed, which is what the quantity rule
-exists to refuse. It could not even be stable: import resets every
-record to `version: 1` (`export-import.md`), so a ranking consulting
-the version would read one entry before an export and the other after,
-drawing a different chart from the same vault.
+id would pick silently between two figures the person typed, which is
+what the quantity rule exists to refuse. It could not even be stable:
+import resets every record to `version: 1` (`export-import.md`), so a
+ranking consulting the version would read one entry before an export
+and the other after, drawing a different chart from the same vault.
 
 ## Reading
 

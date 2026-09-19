@@ -1,8 +1,6 @@
 # Status
 
-Maintained by the compiler agent: spec, compiled, implemented, verified.
-
-Rows are in build order.
+Maintained by the compiler agent. Rows are in build order.
 
 | Feature | Compiled | Implemented | Verified |
 |---|---|---|---|
@@ -35,6 +33,6 @@ profile record, and takes its proposals from `rate-lookup`, while
 `record-snapshot`'s write path and `net-worth-view`'s pricing both read
 the series it writes.
 
-`dependsOn` in each contract is the coupling as it stands, which is
-many-to-many and in places circular. Build order is stated here and is
-not derived from it.
+`dependsOn` in each contract records coupling, which is many-to-many
+and in places circular. Build order is stated here, not derived from
+it.

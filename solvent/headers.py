@@ -31,12 +31,9 @@ def init_app(app: flask.Flask) -> None:
         # the only framing control (app-shell.md, Response headers).
         hsts = f"max-age={app.config['HSTS_MAX_AGE']}; includeSubDomains"
         if app.config["HSTS_PRELOAD"]:
-            # Only valid once a fixed public domain has served the
-            # header stably for the required probation period -- not
-            # applicable to a LAN/VPN-only deployment
-            # (architecture.md, Network & transport). Off by default;
-            # an operator on a stable public domain opts in via
-            # HSTS_PRELOAD=true.
+            # Off by default: valid only once a fixed public domain
+            # has served the header stably through its probation
+            # period (architecture.md, Network & transport).
             hsts += "; preload"
         response.headers["Strict-Transport-Security"] = hsts
 

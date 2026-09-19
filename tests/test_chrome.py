@@ -19,17 +19,12 @@ from tests.helpers import seed_session, seed_user
 
 def test_nav_shows_dashboard_and_settings_for_non_admin():
     entries = nav_entries({"username": "alice", "is_admin": False})
-    labels = [e["label"] for e in entries]
-    assert labels == ["Dashboard", "Settings"]
-    assert "Admin" not in labels
-    assert "Accounts" not in labels
+    assert [e["label"] for e in entries] == ["Dashboard", "Settings"]
 
 
 def test_nav_adds_admin_as_third_entry_for_admin():
     entries = nav_entries({"username": "root", "is_admin": True})
-    labels = [e["label"] for e in entries]
-    assert labels == ["Dashboard", "Settings", "Admin"]
-    assert "Accounts" not in labels
+    assert [e["label"] for e in entries] == ["Dashboard", "Settings", "Admin"]
 
 
 def test_nav_for_no_user_matches_non_admin():
@@ -111,9 +106,6 @@ def test_shell_page_contains_no_vault_plaintext(app):
         "Lock",
         "content",
     }
-    # shell/base.html sources every variable from nav_entries(),
-    # kdf_envelope() or g.user, none of which the server populates from
-    # ciphertext.
     for snippet in chrome_vocabulary:
         assert snippet in body
 
@@ -227,9 +219,8 @@ def test_top_bar_controls_clear_their_contrast_floors():
     Accessibility): body text 4.5:1, non-text 3:1."""
     bar = _css_token("petrol-800")
 
-    assert _contrast("#ffffff", bar) >= 4.5  # chrome button label, and nav
+    assert _contrast("#ffffff", bar) >= 4.5  # label, nav, focus ring
     assert _contrast(_css_token("petrol-400"), bar) >= 3.0  # its border
-    assert _contrast("#ffffff", bar) >= 3.0  # its focus ring
 
 
 def test_top_bar_uses_the_chrome_button_not_the_secondary_one(app):

@@ -21,15 +21,13 @@ the account's detail screen (`account-detail.md`). Form max-width 480px.
   **"Something else…"** at the foot opening a free-text field.
 
   This single control sets the unit *and* the rate symbol, because they
-  are the same thing (`manage-accounts.md`). There is no separate rate
-  symbol field and no "no public price source" checkbox: a listed unit
-  gets proposals, a free-text unit does not, and no combination of
-  answers can produce an account measured in grams and priced per ounce.
+  are the same thing (`manage-accounts.md`): a listed unit gets
+  proposals, a free-text unit does not, and no combination of answers
+  can produce an account measured in grams and priced per ounce.
 
   **The ordinary answers come first, and an unusual one says what it
-  commits you to.** That is the whole job of this control
-  (`manage-accounts.md`, Decisions taken on your behalf), and it is what
-  the order and the copy below are for.
+  commits you to** (`manage-accounts.md`, Decisions taken on your
+  behalf).
 
   - **Order**: the vault's main currency, then the other currencies,
     then the metals, then "Something else…". Nearly every holding is a
@@ -95,8 +93,8 @@ the account's detail screen (`account-detail.md`). Form max-width 480px.
     reads and writes them and displays only labels.
   - One value per dimension needs no enforcement here: `dims` is a map
     keyed by dimension id, so a second value is unrepresentable
-    (`manage-accounts.md`). Unlike the unit lock below, this is not a
-    rule the control has to carry — the record shape carries it.
+    (`manage-accounts.md`). The record shape carries the rule, not the
+    control.
   - **`+ New value`** at the foot of each select creates one inline: the
     user types a label, it is appended to that dimension in the profile
     and selected here. Two writes, both single-record — the profile and
@@ -158,13 +156,12 @@ you stop it.
 - Skipping states its cost: "Without this, your chart drops by the last
   figure recorded here, with nothing recorded on that date to explain
   it." The date still carries the archive annotation, which is why the
-  copy says nothing was recorded rather than nothing is known.
+  copy says nothing was recorded rather than nothing is known, and why
+  the drop is never read as a bad entry.
 - This is the expected path, and the copy reads as an ordinary question
   rather than a warning. The value it captures is what lets the chart
   run into the close instead of falling off a cliff
   (`net-worth-view.md`, Archived accounts).
-- Either way the date carries an archive annotation, so the drop is
-  never read as a bad entry.
 
 **A closing value is a recording.** It joins the recording for the
 archive date and writes that date's prices for every unit that needs
@@ -209,19 +206,14 @@ Delete: the user chooses).
 
 ## At phone width
 
-The form is one column at every width, so it stacks rather than taking a
-second arrangement. Two things are the constraint:
+The form is one column at every width, so it stacks rather than taking
+a second arrangement.
 
-- The unit select is a full-height list with a text filter, operable by
-  keyboard and by touch, and never a control that needs hover to reveal
-  what an option means. "rate entered by hand" sits in the option row
-  itself.
-- The archive and delete dialogs are full-screen sheets at phone width
-  rather than centered modals, and the closing value field is reachable
-  without the confirm button leaving the screen.
-
-No action on this screen exists only inside a wide layout
-(`app-shell.md`, On a phone).
+- The unit select is a full-height list with a text filter, and never a
+  control that needs hover to reveal what an option means: "rate
+  entered by hand" sits in the option row itself.
+- In the archive dialog the closing value field is reachable without
+  the confirm button leaving the screen.
 
 ## States
 
@@ -238,9 +230,8 @@ No action on this screen exists only inside a wide layout
   unit rather than the `USD` run of prices, and the choice is fixed once
   a value is recorded.
 - **Error, Conflict stale version**: "This account was changed in
-  another tab." The panel reloads the current record and asks the user
-  to redo the edit rather than silently merging or clobbering.
-- **Error, save failed**: the form keeps every value; nothing is lost.
+  another tab." The panel reloads the current record.
+- **Error, save failed**: the form keeps every value.
 - **Error, the closing value did not save**: nothing is archived and
   the holding is untouched. The dialog stays open with the figure still
   in the field and says exactly that. This is what the write order buys.
@@ -258,9 +249,8 @@ No action on this screen exists only inside a wide layout
 ## What it deliberately does not show
 
 - **No price and no rate field.** A holding's figure carries no price
-  (`record-snapshot.md`). Prices belong to a unit and are captured
-  inside a recording (`record-rate.md`). A price here would be a second
-  place to type one, and two places can disagree.
+  (`record-snapshot.md`), and prices belong to a unit and are captured
+  inside a recording (`record-rate.md`, `update-values.md`).
 - **No rate symbol field and no "no price source" checkbox.** The unit
   is the symbol, and one field cannot disagree with itself
   (`manage-accounts.md`).
@@ -291,5 +281,5 @@ No action on this screen exists only inside a wide layout
   lists and the current total. Its unit rejoins the set that the next
   recording refreshes (`record-rate.md`, The refresh).
 - Names, notes and dimension labels are decrypted user text and render
-  through `x-text` / `textContent` only (`design-system.md`,
+  through `x-text` or `textContent` only (`design-system.md`,
   Accessibility).

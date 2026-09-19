@@ -13,27 +13,24 @@ of `spec/features/rate-lookup.md`.
 ## The frame
 
 An administrator's top bar carries the wordmark and **Sign out**, and
-nothing else (`app-shell.md`). There is no nav in it, because an
-administrator has one destination. Moving around inside that
+nothing else (`design-system.md`, App shell). It has no nav, because
+an administrator has one destination, and moving around inside that
 destination is this screen's own job.
 
 Content max-width 900px on the ground.
 
 ## Arrangement
 
-Three things stack, in this order, on every part of the area:
+Stacked, in this order, on every part of the area:
 
 1. **The boundary callout.** Always present, never dismissible.
 2. **The section links**: Invites, Accounts, Units, Your password.
    Invites is where the area opens.
 3. **The section itself**, as cards.
 
-The section links are a single row at the top of the content region,
-above the first card, not in the top bar. The active one takes brass,
-which is what brass is for in navigation (`design-system.md`, The
-look), and the rest take petrol-600. Identity comes from the word, and
-the active one is also marked by a 2px brass-500 rule under it, so it
-does not rest on color alone.
+The section links are the section switcher (`design-system.md`,
+Components), a single row at the top of the content region above the
+first card.
 
 The boundary callout sits above the links rather than inside the first
 section, because the boundary is a property of the whole area. An
@@ -57,8 +54,7 @@ what the account is.
 
 ### Create an invite
 
-One card. Three controls, then one primary button, **Create invite
-link**.
+One card, and a primary button, **Create invite link**.
 
 - **This link creates** a user account or an administrator account. Two
   radio options, "A user account" selected, never remembered from the
@@ -73,10 +69,8 @@ link**.
 
   Radios rather than a checkbox, because the two outcomes are two kinds
   of account rather than one account with something switched on. The
-  control decides the kind of the account the link will make, and it is
-  the only thing anywhere that decides it: the value is read once, when
-  somebody follows the link, and an account carries the kind it was
-  born with for as long as it exists.
+  value is read once, when somebody follows the link, and an account
+  carries the kind it was born with for as long as it exists.
 
 - **A note to yourself.** Optional free text, "Sarah's laptop". One
   line beneath, at the point of typing:
@@ -96,8 +90,8 @@ field with a **Copy** button beside it, and beneath it:
 > Copy this now. Solvent does not store the link and cannot show it
 > again.
 
-That is literally true rather than a scare line, because only a hash of
-it is kept. For an administrator invite the confirmation names the kind
+Only a hash of the link is kept, so that is literal rather than a
+scare line. For an administrator invite the confirmation names the kind
 in its own line above the field: **This is an administrator invite.**
 
 A **Create another** button returns the card to its empty shape, with
@@ -189,7 +183,7 @@ username is the whole of the friction, and the dialog leans on it: the
 name is typed, not pasted from a placeholder, and the button will not
 take a near miss.
 
-Two rows say more:
+These rows say more:
 
 - **Your own row** adds two lines to the dialog: "This is the account
   you are signed in as. Removing it signs you out immediately." and
@@ -209,11 +203,9 @@ was encrypted, so nothing is lost by it.
 
 The one line that has to be on screen for this to be findable is the
 one already in the remove dialog for an administrator account: "A
-replacement is made by inviting one."
-
-There is no control anywhere in this area that sets a password on
-another account. That absence is the point, and it is the reason the
-path above is two ordinary actions rather than one special one.
+replacement is made by inviting one." No control anywhere in this area
+sets a password on another account, which is why the path is two
+ordinary actions rather than one special one.
 
 ## Units
 
@@ -265,7 +257,7 @@ Beneath the table, **Add a unit**, which opens a form:
   reason the code is.
 - **Rate lookup**, Entered by hand selected.
 
-### Retiring, which is what this screen has instead of deleting
+### Retiring, not deleting
 
 **Retire** is the only way a unit leaves the picker, and the dialog
 says what it does:
@@ -303,9 +295,9 @@ gauge).
   account on this instance, so it is held to the same bar as anybody
   else's."
 - On submit the button becomes a working state reading "Changing your
-  password", and the form goes quiet. It takes a moment: the password
-  being replaced and the new one are each turned into a key, so the
-  wait is about twice a sign-in's. The tab stays responsive throughout.
+  password", and the form goes quiet. Two passwords become keys, so the
+  wait is about twice a sign-in's (`ui/unlock.md`, The derivation
+  wait).
 - On success, an inline confirmation: "Your password is changed. Every
   other session of yours was signed out, and this one is still open."
 - A wrong current password is reported inline above the first field:
@@ -319,7 +311,7 @@ gauge).
 - **Loading**: skeleton rows in the table. The create card renders
   immediately, since it fetches nothing.
 - **Empty**: "No invite links yet." beneath the create card, which is
-  the single action. Never an empty table with headers.
+  the single action.
 - **Error, create failed**: inline above the button. No link was made
   and nothing was consumed. The form keeps every field.
 - **Error, call back failed**: inline on the row, status unchanged.
@@ -356,16 +348,14 @@ gauge).
 - **Empty**: unreachable. The table is seeded.
 - **Error, rename failed**: inline on the row, the old name restored in
   the field.
-- **Error, the source went away while the page was open**: a stale
-  page, not a routine path. The control was enabled when the table
-  loaded and the server refused it anyway, because the adapter registry
-  changed underneath. Inline on the row, and the control goes back to
-  Entered by hand: "The source for this unit is no longer configured on
-  the server. Reload to see the current list." The copy reads as
-  something that changed rather than something the administrator got
-  wrong. The server refuses regardless of what the page believes,
-  because the flag must never promise a proposal the server cannot
-  serve and a client's picture of the registry is not a control.
+- **Error, the source went away while the page was open**: the control
+  was enabled when the table loaded and the adapter registry changed
+  underneath. Inline on the row, and the control goes back to Entered
+  by hand: "The source for this unit is no longer configured on the
+  server. Reload to see the current list." The copy reads as something
+  that changed rather than something the administrator got wrong. The
+  server refuses regardless of what the page believes, because the flag
+  must never promise a proposal the server cannot serve.
 - **Error, that code already exists**: inline in the add form, which
   keeps every field.
 - **Error, that is not a valid code**: inline in the add form, naming

@@ -56,15 +56,14 @@ docker run --rm -p 8000:8000 \
 
 ## Workflow
 
-The client states what they want. `product-owner` turns it into
-`spec/product/` and asks whatever it cannot infer. `architect` designs
-against it. Once the client approves both, the rest runs to a deployed
-URL: `compiler` writes the contracts, `engineer` builds, `reviewer`
-checks the code against the contract, `release` builds and runs the
-image, and `qa` drives the running app against the client's own
-acceptance list.
+A chain of agents turns what the client asks for into a deployed URL:
+product spec, architecture, screens, contracts, code, review, image,
+and a test pass against the client's own acceptance list. The client
+approves the product spec and the architecture, and the rest runs on
+its own.
 
-See `CLAUDE.md` for ownership and how questions reach the client.
+See `CLAUDE.md` for who owns each step and how questions reach the
+client.
 
 ---
 

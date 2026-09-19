@@ -5,7 +5,7 @@
 A vault owner's own account: their password, the currency their vault
 counts in, how long it stays unlocked, which sessions are open, how
 their accounts are grouped, and, at the bottom, deleting the whole
-thing. Nothing here can recover a lost password.
+thing.
 
 **This screen exists only inside a vault.** An administrator account
 has none, never reaches this address, and is answered as though it does
@@ -48,8 +48,7 @@ Current password · new password · confirm, with the same bar and the
 same strength gauge as registration (`ui/register.md`, The strength
 gauge).
 
-Three things are said here, in the order somebody would be surprised
-to learn them:
+Said here, in the order somebody would be surprised to learn them:
 
 - A tinted callout above the form: "Your data is not re-encrypted. Only
   the lock around your key is rebuilt, which is why this is fast even
@@ -145,10 +144,7 @@ instance is not something a vault owner does.
 - Every figure and label on this screen that came out of the vault is
   rendered as text, never as markup (`design-system.md`,
   Accessibility).
-- The current password and the new one are never logged, and both
-  fields are cleared from the DOM on success.
-- Autocomplete: `current-password` and `new-password`, so a password
-  manager can update its entry.
+- Autocomplete: `current-password` and `new-password`.
 - The destructive controls are **Sign out everywhere**, which is
   reversible by signing in again, and **Delete my vault**, which is
   not. Only the second is styled destructive and only the second is

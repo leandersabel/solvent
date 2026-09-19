@@ -19,7 +19,7 @@ Exercises: `spec/features/record-snapshot.md`,
 
 ## Which recording you are in
 
-Three routes land here, and all three arrive at one date:
+Three routes land here, all arriving at one date:
 
 - The top bar's **Update values**, which goes straight into editing
   today (`design-system.md`, App shell).
@@ -89,13 +89,10 @@ with last March's figure sitting in it and that holding has no entry
 for this date, on this date or ever. The row's own sentence is the
 answer to "is this recorded", so nobody has to infer it from a field.
 
-Each row offers three answers, and the third one is free:
+A row can be answered by typing, by Confirm, or by doing nothing:
 
-- **Type the new number.** In the holding's own unit,
-  `inputmode="decimal"`, with the unit as a suffix inside the input.
-  The converted main-currency figure appears beneath as you type, in
-  ink-secondary, because that is the number the person is actually
-  reasoning about, and it costs no save to see.
+- **Type the new number**, in the quantity field (`design-system.md`,
+  Components).
 - **Confirm.** One click, meaning the quantity has not moved. It
   records the same quantity again at this date.
 - **Leave it alone.** No control to press. The holding gets no entry
@@ -111,7 +108,7 @@ the foot of this screen.
 So it has no cases. One click for a franc account, for a dollar
 account, for gold and for the flat, and **still one click with the
 price provider down**, because nothing about it waits on a price
-resolving. No rate appears on a holding's row in any situation.
+resolving.
 
 - **Disabled where the holding has never been valued.** There is
   nothing to confirm. The age reads "never valued" and the field is the
@@ -204,8 +201,6 @@ Line states:
   then there is nothing for them to belong to. On a recording that
   already exists there is, so filling in the rate that was missing is a
   complete act and needs no holding touched alongside it.
-- **Press Update, touch nothing, leave, and nothing is written**, the
-  proposal on an empty line included.
 
 ### Changing or clearing a rate says what it moves
 
@@ -284,16 +279,12 @@ write.
 - **Row, saved**: a quiet inline confirmation, the figure, the age and
   the row's sentence updating in place. The row does not disappear.
   Vanishing rows make a list jump under the cursor.
-- **Row, invalid value**: non-numeric or malformed, inline on the row,
-  nothing submitted. More than twelve decimal places is rejected at
-  input rather than truncated. **Zero and negative are valid** and must
-  never be blocked: zero is a closed out position, negative is a
-  mortgage.
+- **Row, invalid value**: the quantity field's own rules
+  (`design-system.md`, Components), inline on the row.
 - **Row, save failed**: inline on the row, critical, the typed input
   preserved, every other row unaffected.
 - **Row, Conflict**: "This figure was changed in another window." The
-  row reloads to the stored record and nothing is retried or merged
-  (`record-api.md`).
+  row reloads to the stored record (`record-api.md`).
 - **The date became taken while you were working**: the save is refused
   whole, before anything is written, and nothing on screen claims
   otherwise. The wording is not an accusation:

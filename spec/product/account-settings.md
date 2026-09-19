@@ -7,16 +7,14 @@ the currency their vault counts in, how long it stays unlocked, which
 sessions are open, how their accounts are grouped, and, at the bottom,
 deleting the whole thing.
 
-Nothing here can recover a lost password. Settings is where a person
-finds out which of the product's rules are theirs to change and which
-are fixed for good, so it has to be honest about both rather than
-hiding the fixed ones.
+Nothing here can recover a lost password. The rules that are fixed for
+good are shown alongside the ones a person can change, rather than
+hidden.
 
 Who it is for: every person with a vault, about their own vault only.
 This screen exists only inside a vault, so an administrator account
-never reaches it and there is nothing on it an administrator would
-recognize. Provisioning the instance is a different account's job
-(`admin-invites.md`), with its own screens.
+never reaches it. Provisioning the instance is a different account's
+job (`admin-invites.md`).
 
 ## The screens
 
@@ -31,13 +29,11 @@ Username, shown, not editable.
 **Main currency**, shown, not editable, with the reason in one line:
 it was fixed when the vault was created, every rate recorded since
 converts into it, so changing it would mix two currencies in the same
-history. This is not a control that has been disabled for now. Shipping
-an editable field here would quietly corrupt years of history, so there
-is no field.
+history. There is no field here, not a disabled one.
 
 #### Organizing
 
-Two link rows out to screens that do not belong inside a settings card:
+Link rows out to screens that do not belong inside a settings card:
 
 - **Dimensions**, described as how accounts split up in the chart, with
   how many exist right now, or "None yet".
@@ -49,13 +45,12 @@ Two link rows out to screens that do not belong inside a settings card:
 Current password, new password, confirm, with the same strength gauge
 as registration (`register.md`) and the same bar.
 
-Three things are said here, in order of how surprised somebody would be
-to learn them:
+Three things are said here, most surprising first:
 
 - Changing the password does not re-encrypt the vault. Only the lock
   around the key is rebuilt, which is why it is instant even on a large
-  vault. Said as reassurance, because "changing my password took no
-  time at all" otherwise reads as it having done nothing.
+  vault. Said as reassurance, because otherwise the speed reads as
+  nothing having happened.
 - **Export files already saved still open with the old password.** They
   carry their own copy of the lock. Changing the password here does not
   reach back and protect a file already downloaded. This carries a
@@ -78,8 +73,8 @@ reported plainly.
   activity.** Stated, not adjustable.
 - **Open sessions**, listed by when each started and when it was last
   used, with a line volunteering that Solvent records no IP addresses
-  and no devices. Saying so is the point. A person who has used any
-  other product assumes those are kept.
+  and no devices. A person who has used any other product assumes those
+  are kept.
 - **Sign out**, and **sign out everywhere**, which ends the current
   session too.
 
@@ -96,18 +91,19 @@ recover.
 secondary one. Somebody who came here wanting a backup and left with a
 wiped vault has been failed by the dialog.
 
-Nobody's vault is undeletable. There is no account whose deletion would
-leave the instance unable to hand out accounts, because handing out
-accounts is not something a vault owner can do.
+Nobody's vault is undeletable. Handing out accounts is not something a
+vault owner can do, so no deletion here can leave the instance unable
+to.
 
 ### Dimensions
 
 A dimension is an axis accounts are sorted along: "Liquidity", with
 values Cash, Investments, Retirement. Each account takes one value per
 dimension, which is what lets the bands of the chart add up to exactly
-the net worth. This screen is the only place they are created, renamed,
-reordered, put away, and brought back. How they are drawn belongs to
-the dashboard (`net-worth-view.md`).
+the net worth. This screen is where they are renamed, reordered, put
+away, and brought back. Creating one also happens on the account form
+(`manage-accounts.md`), and how they are drawn belongs to the dashboard
+(`net-worth-view.md`).
 
 One card per dimension, in the order they appear in the dashboard's
 grouping control, so dragging a card here changes that order too.
@@ -119,8 +115,8 @@ Each card shows:
 - Its **coverage**, the same figure the dashboard shows: seven of ten
   accounts assigned, with the unassigned ones a click away. A dimension
   covering a third of the accounts draws a chart that is accurate and
-  useless, and this is where somebody should notice, at the point of
-  setting it up rather than after a confusing chart.
+  useless, and this is where that shows, at setup rather than in a
+  confusing chart later.
 - Its **values**, in the order they stack in the chart, each draggable,
   renamable, and archivable. This order is never sorted by size: a
   stack whose bands swap places from month to month cannot be read.
@@ -131,10 +127,10 @@ section when there is anything in it.
 
 **Creating a dimension** asks for a name and a first value, because a
 dimension with no values sorts nothing. The same dialog offers a
-**flag** as the other option: a dimension with exactly one value, which
-the account form shows as a checkbox rather than a list. That is the
-shape that replaces a yes-or-no tag such as "Emergency fund", and it
-has to be as quick to make as typing a tag once was.
+**flag**: a dimension with exactly one value, which the account form
+shows as a checkbox rather than a list. That is the shape a yes-or-no
+label such as "Emergency fund" takes, and making one is as quick as
+typing a tag.
 
 **Past four values**, a note appears under the list, not a warning and
 not a cap: the chart shows the first four and folds the rest into
@@ -149,9 +145,9 @@ chart. An archived value moves its accounts to "Unassigned".
 
 There is no permanent delete and no "remove this from all my accounts".
 Stripping a setting out of every account is a destructive sweep that
-can fail halfway, offered in exchange for a scrap of leftover data
-nobody will ever read. An archived definition costs one line and buys
-exact reversibility.
+can fail halfway, in exchange for a scrap of leftover data nobody
+reads. An archived definition costs one line and buys exact
+reversibility.
 
 The first time somebody opens this screen it explains the word, because
 "dimension" is the least self-explanatory thing in the product, with
@@ -220,19 +216,15 @@ single total.
 - **The main currency cannot be changed.** Every rate ever recorded
   converts into it, so relabeling the currency would leave years of
   history denominated in the old one and the chart would silently add
-  two currencies together. Making it
-  changeable means recording which currency each historical rate points
-  at and deciding what to do about the past, which is real work and not
-  a toggle. Restoring a vault from a file is the one exception, and it
-  is not a loophole: an import replaces the currency and the whole
-  history together, so nothing is left over to mix.
+  two currencies together. Restoring a vault from a file is the one
+  exception and not a loophole: an import replaces the currency and the
+  whole history together, so nothing is left over to mix.
 
-  The cost is accepted rather than overlooked, and it falls on one
-  person: somebody who moves country, or who picks the wrong currency
-  in the moment they spend on that list at sign-up. Their route out is
-  a new vault and their history entered again by hand. What earns that
-  cost is the warning at the point of choice, which sits directly under
-  the field and says the choice is permanent.
+  The cost falls on one person: somebody who moves country, or who
+  picks the wrong currency in the seconds they spend on that list at
+  sign-up. Their route out is a new vault and their history entered
+  again by hand. What earns that cost is the warning directly under the
+  field, at the point of choice, saying the choice is permanent.
 - **No password recovery here either.** Changing a password needs the
   current one. See `register.md`.
 - **No "sign out everywhere except this one".** The only operation that
@@ -255,10 +247,10 @@ single total.
 ## Decisions taken on the client's behalf
 
 - **The idle lock is fifteen minutes unless changed, adjustable between
-  five and sixty, and cannot be switched off.** Both ends are chosen.
-  Unlocking is never free, so a fixed fifteen would be a tax on a long
-  sitting, and no lock at all would undo the defense against somebody
-  walking up to an open screen.
+  five and sixty, and cannot be switched off.** Unlocking is never
+  free, so a fixed fifteen would be a tax on a long sitting, and no
+  lock at all would undo the defense against somebody walking up to an
+  open screen.
 - **Changing a password signs out other sessions but not this one.**
   The alternative, signing everybody out including the person who just
   changed it, is defensible and more cautious. Keeping the current

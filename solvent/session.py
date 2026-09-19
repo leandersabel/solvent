@@ -24,8 +24,6 @@ COOKIE_NAME = "solvent_session"
 _SIGNING_SALT = "solvent-session-cookie"
 
 # Architecture.md, Application hardening: the absolute 12-hour expiry.
-# Renewing/expiring the row itself belongs to login.md; the shell only
-# needs the duration to tell a valid session from an expired one on read.
 SESSION_LIFETIME = timedelta(hours=12)
 
 

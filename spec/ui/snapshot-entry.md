@@ -27,24 +27,18 @@ edits an existing entry (`account-detail.md`).
   correcting an existing entry. Moving it onto a date the holding
   already holds prompts before destroying the record already there (see
   below).
-- **Value**, the big field, in the holding's native unit, unit shown
-  as a suffix inside the input. `inputmode="decimal"`.
-- **Live result** — beneath, ink-secondary, updating as you type:
-  "= 41 230.00 CHF". This is the number the user is actually reasoning
-  about and it should never require a save to see. It converts at the
-  price for **the date on the form**, which is the date's own price
-  where one exists and the proposal for that date otherwise
-  (`record-rate.md`).
+- **Value**, the quantity field (`design-system.md`, Components), the
+  largest thing on the form. Its live result converts at the price for
+  **the date on the form**, which is the date's own price where one
+  exists and the proposal for that date otherwise (`record-rate.md`).
 - **Note** — optional, collapsed behind "Add a note".
 - **The prices line**, folded, below. See next section.
 - Primary "Save".
 
-**There is no rate field on this form.** A price belongs to a unit and
-is shared by every holding measured in it, so a rate beside one
-holding's figure would be one fact shown per holding, where two of them
-could be typed with two different numbers for one day
-(`record-rate.md`). The prices this save writes are on their own line,
-which is about the date rather than about this holding.
+**There is no rate field on this form.** A price belongs to a unit,
+not to a holding (`record-rate.md`, `update-values.md`). The prices
+this save writes are on their own line, which is about the date rather
+than about this holding.
 
 ## The prices line
 
@@ -102,9 +96,9 @@ The same modal, pre-filled with the stored value, date and note.
   it?", naming the previously recorded value in the holding's native
   unit. Confirming updates the existing record in place. Declining
   leaves the original untouched and returns to the form. This prompt
-  exists because the date here is chosen blind, and it is deliberately absent
-  from the sweep, where the stored figure is already in the field being
-  edited (`record-snapshot.md`).
+  exists because the date here is chosen blind, and it is deliberately
+  absent from the sweep, where the stored figure is already in the
+  field being edited (`record-snapshot.md`).
 - **Error, duplicate date, moving**: editing an existing entry onto an
   occupied date is a different act and gets different copy, because a
   second record dies: "30 July already holds a snapshot of 12 100.00
@@ -117,11 +111,8 @@ The same modal, pre-filled with the stored value, date and note.
   refused whole and nothing is written. The wording names the date and
   not the person, and one button opens that recording
   (`update-values.md`, which owns the copy).
-- **Error, validation**: non-numeric or malformed value, inline, no
-  submission. More than twelve decimal places, rejected at input rather
-  than truncated. Future date, inline. Zero and negative values are
-  **valid** and must not be blocked: zero is a closed out position,
-  negative is a mortgage.
+- **Error, validation**: the quantity field's own rules
+  (`design-system.md`, Components), and a future date refused inline.
 - **Error, archived account**: the entry point does not exist for
   archived holdings. The only exception is the closing value written by
   the archive flow (`account-form.md`).

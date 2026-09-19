@@ -64,3 +64,5 @@ spec/architecture.md, Application hardening requires one".
   than read out of a template.
 - If there is nothing wrong, say so plainly. An empty findings list is
   a valid result.
+- Never put a question to the client. It goes to `spec/questions.md`
+  tagged `reviewer`, and the product owner decides what reaches them.

@@ -12,11 +12,10 @@ Exercises: `spec/features/net-worth-view.md`. Links into
 
 ## Layout
 
-Standard app shell (`design-system.md`, App shell), content max-width
-1200px on ground. The accounts table below is the account list the shell
-deliberately has no nav entry for.
+Standard app shell (`design-system.md`, App shell). The accounts table
+below is the account list the shell deliberately has no nav entry for.
 
-Four regions, top to bottom:
+Regions, top to bottom:
 
 ### 1. Hero figure
 
@@ -68,9 +67,7 @@ Four regions, top to bottom:
     recording like any other, and the picker is the one route back to
     it (`recording-detail.md`).
   - The top bar's **Update values** is the other route and is not
-    repeated here: it goes straight into editing today
-    (`design-system.md`, App shell). One control asks which date, one
-    goes to today, and the hero carries only the first.
+    repeated here (`design-system.md`, App shell).
 - **No staleness chip and no warning.** How old each figure is belongs
   beside the control that fixes it, on the sweep, not as a badge here
   (`net-worth-view.md`).
@@ -90,20 +87,15 @@ bands mirror down, the net-worth line runs over the top.
   ones excluded. Default "Total" — one band, no stacking — until the
   user configures a dimension. It also drives the breakdown section
   below. Beside it, the dimension's **coverage**: "7 of 10 accounts
-  assigned", clickable to filter the table to the unassigned ones. A
-  dimension covering a third of the accounts draws a chart that is
-  correct and misleading, and this line is what prevents that being read
-  as a bug.
+  assigned", clickable to filter the table to the unassigned ones
+  (`dimensions.md`, which owns what coverage is for).
 - **Absolute / percentage** toggle. Percentage normalizes each side
   against itself; the caption says so, because a reader will otherwise
   assume the shares are of the net figure.
 - **"Just the line"**, a checkbox, **off when the screen loads, which
   means the entry marks are on** (`design-system.md`, The estimated
   marker). Ticking it takes the marks away and leaves a clean line, for
-  looking at the shape rather than the evidence. The accurate drawing
-  is what a reader gets without asking, and the tidier one is the thing
-  they choose, which is why the control is named for what it leaves
-  rather than for what it hides (`net-worth-view.md`).
+  looking at the shape rather than the evidence.
 - **Pricing** is not a chart control. The two-position rates control in
   the hero leaves the chart alone (Hero figure).
 
@@ -123,18 +115,15 @@ bands mirror down, the net-worth line runs over the top.
   the rest. With a band hidden, a line under the chart states that the
   total covers only the visible bands.
 - **Entry marks**: the chart form of the estimated marker
-  (`design-system.md`), tick marks under the x-axis at the dates a real
-  quantity was recorded. The bands themselves are never restyled. A
+  (`design-system.md`). The bands themselves are never restyled. A
   stretch running between two marks is drawn rather than recorded, and
   that is the whole of what the marks say.
 - **Clicking a marked date opens that date's recording**
-  (`recording-detail.md`). This is the route from a shape that looks
-  wrong to the evening that produced it, and it is why the marks are on
-  by default: they show where there is something to go back to. Only
-  marked dates are click targets. A date carrying prices and no figures
-  bends the bands and takes no tick, because a tick means a quantity
-  was recorded, and it is reached through the date picker instead,
-  which is the one route to it (`recording-detail.md`).
+  (`recording-detail.md`), which is the route from a shape that looks
+  wrong to the evening that produced it. Only marked dates are click
+  targets. A date carrying prices and no figures bends the bands and
+  takes no tick, because a tick means a quantity was recorded, and it
+  is reached through the date picker instead.
 - **Archive annotations**: a marker at each `archivedAt` with the
   account named in the tooltip.
 - Single band ("Total") → **no legend box**; the section heading names
@@ -143,8 +132,8 @@ bands mirror down, the net-worth line runs over the top.
   between recorded dates, Enter on one opens its recording, and a "View
   as table" disclosure exposes the same series as a real table. Nothing
   the chart offers is reachable only by pointer.
-- Chart colors, band order, mark specs, and the tooltip contract come
-  from `design-system.md`.
+- Chart colors, band order and mark specs come from
+  `design-system.md`.
 - **No control here issues a network request** — range, dimension, mode,
   band visibility, selection. The whole model is already in memory.
 
@@ -208,21 +197,19 @@ section exists.
   two sections read the same way. When every band is positive the
   baseline sits at the left edge and the bars look ordinary; the layout
   does not change shape depending on the data.
-- **The bars sum to exactly the net-worth total** — a *signed* sum, with
-  leftward bars subtracting, which is the same arithmetic the hero
-  figure does. So the section needs no caveat. Dimensions partition,
-  which would make a pie chart defensible here too — except that a pie
-  cannot show a negative slice at all; bars are used anyway, because
-  they compare lengths better and label directly.
+- **The bars sum to exactly the net-worth total**, a *signed* sum with
+  leftward bars subtracting, the same arithmetic the hero figure does,
+  so the section needs no caveat. Bars rather than a pie: a pie cannot
+  show a negative slice at all, and bars compare lengths better and
+  label directly.
 - With "Group by" on "Total", this section is absent — a single bar
   equal to the hero figure says nothing.
 
 ## States
 
-- **Loading**: skeleton blocks for hero, chart, and table while records
-  decrypt. Decryption of a full vault is fast but not instant, and the
-  hero figure must never render a wrong intermediate number — it appears
-  only when the total is final.
+- **Loading**: skeleton blocks for hero, chart, and table while
+  records decrypt. The hero figure must never render a wrong
+  intermediate number and appears only when the total is final.
 - **Empty — no accounts**: single centered card, "Add your first
   account", primary button. No chart, no table, no zero total, and no
   New recording: there is nothing to record against yet.
@@ -254,13 +241,11 @@ section exists.
   swallowed or degrade to a console warning. Links to a detail list of
   the affected record ids.
 - **Error, two entries on one date**: a holding with two values on one
-  date, or a unit with two differing prices on one date, is a fault the
-  client will not resolve on its own (`record-snapshot.md`,
-  `record-rate.md`). A critical banner names it and links to the date's
-  recording, where the pair is shown and one is kept
-  (`recording-detail.md`). Meanwhile that date drops out of the
-  interpolated series rather than the chart picking a number nobody
-  chose.
+  date, or a unit with two differing prices on one date. A critical
+  banner names it and links to the date's recording, where the pair is
+  shown and one is kept (`recording-detail.md`). Meanwhile that date
+  drops out of the interpolated series rather than the chart picking a
+  number nobody chose.
 - **Error — session expired mid-action**: prompt to re-unlock in place;
   never discard unsaved input.
 

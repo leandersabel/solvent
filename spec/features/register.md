@@ -91,9 +91,8 @@ no endpoint anywhere writes it again (admin-invites.md).
 
 `method` is not a client input. The server writes `'password'`, and
 **no endpoint in v1 accepts any other value**, so a payload carrying
-one is a Bad Request. That, and the row shapes, is the whole of what
-v1 owes a second credential method. No passkey endpoint, storage, or
-screen is specified here or anywhere else.
+one is a Bad Request. No passkey endpoint, storage, or screen is
+specified here or anywhere else.
 
 The profile blob is encrypted at step 4, **before** the server has
 assigned this user an identity, and that is only possible because
@@ -105,14 +104,12 @@ Every AAD field is one the client chose: `account_id` empty,
 Registration is deliberately **one transaction, not two phases**: the
 principal row, its password credential row, its wrapper and profile
 record where they apply, and the invite's consumption commit together
-or not at all. Splitting it would
-mean a request that burns a single-use invite and leaves a logged-in
-user holding a vault with no main currency, or a user row with no way
-to unlock it, the worst place in the product for a partial state,
-since the invite is spent and the key derivation has already been
-paid. The server writes the profile row through the same validator that
-backs `PUT /api/records` (record-api.md), so there is one set of rules
-with two callers rather than two record writers.
+or not at all. Splitting it would mean a request that burns a
+single-use invite and leaves a logged-in user holding a vault with no
+main currency, or a user row with no way to unlock it. The server
+writes the profile row through the same validator that backs
+`PUT /api/records` (record-api.md), so there is one set of rules with
+two callers rather than two record writers.
 
 ## Inputs / outputs
 
@@ -154,8 +151,7 @@ with two callers rather than two record writers.
   immutable outside import (account-settings.md), so a code the
   provider cannot quote into means no proposal ever resolves — a fault
   discovered long after the vault is populated and no longer fixable in
-  settings. Offering only quotable codes makes that unreachable by
-  choosing.
+  settings.
 - Main currency is stored **only inside the encrypted profile record**,
   never as a plaintext column. An administrator has neither, and the
   rate lookup that would need one is on the vault surface
@@ -183,16 +179,14 @@ with two callers rather than two record writers.
   no Argon2id, because `verifier` is attacked offline either way.
 - **Client can run WASM but cannot allocate the KDF's memory** → a
   distinct hard failure naming the moment rather than the device, with
-  a retry, and no vault created. This is a **defensive path, not an expected one**: the 64 MiB
-  allocation succeeds on every current target, and a device that refuses
-  it is memory-starved at that moment rather than incapable. It is
-  specified because the alternative to a designed state is a raw
-  allocation error shown to a user. Registration must **not** fall back
-  to weaker parameters here: that would mint a vault permanently weaker
-  than the policy and the KDF envelope would record the weakness as if
-  it were chosen. The stale-KDF upgrade (login.md) raises parameters
-  later, but it cannot retroactively justify a vault created below the
-  minimum.
+  a retry, and no vault created. This is a **defensive path, not an
+  expected one**: the 64 MiB allocation succeeds on every current
+  target, and a device that refuses it is memory-starved at that moment
+  rather than incapable. Registration must **not** fall back to weaker
+  parameters here: that would mint a vault permanently weaker than the
+  policy, with the KDF envelope recording the weakness as if it were
+  chosen. The stale-KDF upgrade (login.md) raises parameters later, but
+  it cannot retroactively justify a vault created below the minimum.
 - **KDF derivation is slow** → show a busy state; the tab must not
   appear frozen. Run derivation in a Web Worker so the UI thread stays
   responsive.

@@ -10,10 +10,8 @@ You own `spec/ui/*.md`: one file per screen, plus `design-system.md`,
 which every screen assumes and states only what it adds to.
 
 A screen file is where product intent and technical contract meet a
-person. The product owner says what somebody wants to do. The
-architect says what the system can offer and what it costs. You say
-what is on the screen, in what arrangement, and what happens in every
-state it can be in.
+person. You say what is on the screen, in what arrangement, and what
+happens in every state it can be in.
 
 ## Inputs
 
@@ -58,8 +56,6 @@ state it can be in.
 - A screen never explains the product to the person. If a screen needs
   a paragraph of explanation to make sense, the design is wrong, and
   that is worth saying rather than writing the paragraph.
-- No counts in prose. A number of screens, entries or components is
-  true for one edit and wrong by the next.
 - Never invent product behavior. If a screen needs a rule nobody has
   stated, write it to `spec/questions.md` tagged `designer` rather
   than deciding what the product does.

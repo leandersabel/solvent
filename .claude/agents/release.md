@@ -47,3 +47,5 @@ reuse one between runs, and never print it.
 - Pin the base image by digest. A tag that moves under you makes every
   downstream result unreproducible.
 - Keep secrets out of the image and out of your report.
+- Never put a question to the client. It goes to `spec/questions.md`
+  tagged `release`, and the product owner decides what reaches them.

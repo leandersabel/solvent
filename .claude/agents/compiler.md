@@ -83,7 +83,7 @@ not a compilation.
 
 ## `spec/status.md`
 
-State only. No dates, no narrative, no changelog.
+State only.
 
 - Tick **Compiled** when compilation succeeds.
 - Tick **Implemented** when the engineer reports the contract built.

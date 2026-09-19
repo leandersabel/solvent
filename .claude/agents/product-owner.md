@@ -73,6 +73,5 @@ client's.
   ground it.
 - Never soften a client requirement because it looks expensive. Record
   it and let the architect price it.
-- One fact, one home. If a rule belongs to another feature, point at it.
 - Never answer a `spec/questions.md` entry yourself when it turns on the
   client's risk tolerance, budget, or taste.

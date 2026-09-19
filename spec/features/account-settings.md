@@ -12,17 +12,15 @@ Every card on it is about a vault, so an administrator session gets
 Not Found from the page and from `GET /api/sessions`,
 `POST /api/auth/logout-all`, and `DELETE /api/auth/account`.
 
-An administrator still has a credential and still has to be able to
-rotate it. **Change password below is the one section of this feature
-that both kinds reach**, through a shared endpoint, and an
-administrator reaches it from a control inside the admin area rather
-than from a settings page they have no other reason to load
-(admin-invites.md, An administrator's own credential).
+**Change password below is the one section of this feature that both
+kinds reach**, through a shared endpoint. An administrator reaches it
+from a control inside the admin area rather than from a settings page
+they have no other reason to load (admin-invites.md, An
+administrator's own credential).
 
-**An administrator does not delete their account here either.** They
-do it through `DELETE /api/admin/accounts/<their own username>`
-(admin-invites.md), which is where the last-administrator guard lives.
-One deletion path means one place that guard has to hold.
+**An administrator deletes their own account** through
+`DELETE /api/admin/accounts/<their own username>` (admin-invites.md),
+where the last-administrator guard lives.
 
 ## The profile record
 
@@ -52,10 +50,9 @@ registration, and the complete payload is:
 
 Registration writes the two required keys and nothing else
 (`register.md`), and both optional keys appear the first time the user
-sets one. The shape is stated here rather than assembled from the
-sections that own each field, because two things read the *whole*
-payload and need to know its bounds: `schema_version` migration
-(`record-api.md`) and import validation (`export-import.md`).
+sets one. Two things read the *whole* payload and need its bounds:
+`schema_version` migration (`record-api.md`) and import validation
+(`export-import.md`).
 
 ## Change password
 
@@ -94,11 +91,10 @@ Both must hold.
 sending no `wrappedDek` and no `dekNonce`, and steps 2 and 4 collapse
 to deriving `MK_old` and throwing it away: there is no DEK to unwrap
 and none to re-wrap. Their current password is therefore verified in
-one place, server-side by `currentAuthKey`, because the second check
-was the unwrap and there is nothing to unwrap. The server
-discriminates on the session's principal kind and not on which fields
-arrived, so a vault owner's request without a wrapper is a Bad Request
-and an administrator's with one is too.
+one place, server-side by `currentAuthKey`. The server discriminates
+on the session's principal kind and not on which fields arrived, so a
+vault owner's request without a wrapper is a Bad Request and an
+administrator's with one is too.
 
 **There is no "remove password" action, and there will not be one.**
 For a vault owner, the password credential's wrapper is the only one
@@ -129,11 +125,9 @@ quietly corrupts history.
 
 **Import is the one exception, and it is not a loophole.** Restoring a
 vault replaces the profile *and* every record together
-(`export-import.md`), price entries included, so the imported vault is
-internally consistent,
-there is no history left denominated in the old currency to mix with.
-The danger this rule guards against is changing the label while keeping
-the data, which import does not do.
+(`export-import.md`), price entries included, so no history is left
+denominated in the old currency. This rule guards against changing the
+label while keeping the data, which import does not do.
 
 ## Dimensions
 
@@ -248,22 +242,17 @@ Found for an administrator session.
     full Argon2id derivation, a fraction of a second on a desktop
     browser and about two seconds on an iPhone (architecture.md, Key
     management), so a fixed 15 minutes is a real tax on a long session
-    on a phone; but the idle
-    lock is also the last defense against another household member
-    walking up to an unlocked tab, which is a threat this design
+    on a phone. The idle lock is also the last defense against another
+    household member at an unlocked tab, a threat this design
     explicitly defends against (architecture.md, Threat model). No
     setting disables it.
 - **There is no idle rule for an administrator**, and the absence is
   a decision rather than an omission. The idle lock is a client-side
   act: it discards in-memory keys and decrypted state, and an
   administrator holds neither. It leaves the server session alive, so
-  it was never the control that bounds how long a session can act.
-  Turning it into a server-side session kill for administrators alone
-  would give that kind *more* protection against someone at an
-  unattended machine than a vault owner gets, whose post-lock session
-  can still delete every record in their vault. The bound on an
-  administrator session is the absolute expiry below, the same bound
-  a vault owner's session has.
+  it was never the control that bounds how long a session can act. The
+  bound on an administrator session is the absolute expiry below, the
+  same bound a vault owner's session has.
 - **Absolute session expiry** at 12 hours from issue, for both kinds.
 - **Log out** — `POST /api/auth/logout`. Invalidates the current server
   session; the client discards its in-memory keys first, so a failed

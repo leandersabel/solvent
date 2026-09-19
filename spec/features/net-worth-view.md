@@ -9,7 +9,7 @@ the server has nothing to template here, because it has no plaintext.
 
 ## Data flow
 
-1. On unlock, fetch all four record types
+1. On unlock, fetch every record type
    (`GET /api/records?type=account|snapshot|rate|profile`) and decrypt
    them with the session DEK.
 2. Build the model in memory: profile (main currency), accounts,
@@ -22,9 +22,8 @@ the server has nothing to template here, because it has no plaintext.
    acts), which is what a stale model cannot substitute for.
 
 For the expected data volume (a household, manual snapshots, years of
-history) fetching everything once per session is the right call: it is
-simpler, and it means the server learns nothing from access patterns
-about which account you are looking at.
+history) one fetch per session is the right call, and it is why there
+is no single-record `GET` (`record-api.md`, Endpoints).
 
 ## Current net worth
 
@@ -37,12 +36,11 @@ last recorded in March is not stuck at March's exchange rate.
 
 The view has a **pricing mode**, and it selects the price:
 
-- **Latest rates** (the default): the **latest** entry for that
-  account's unit, whatever date it carries.
-- **Rates as of each figure**: the latest entry for that unit **at or
-  before** the date of the account's own latest snapshot. This is what
-  the holding was worth when it was last recorded, which is a real
-  question and a different number.
+- **Latest rates** (the default): the **latest price** for that
+  account's unit (`record-rate.md`, Reading).
+- **Rates as of each figure**: the **price as recorded** for that
+  account. This is what the holding was worth when it was last
+  recorded, which is a real question and a different number.
 
 Both modes use the same quantity. The mode changes only which price is
 paired with it, and switching modes makes no network request, because
@@ -56,8 +54,8 @@ vault is whatever the last recording wrote.
 
 - **Latest means the greatest `date`**, in either series, never the most
   recently written.
-- **An account whose unit is the main currency** prices at exactly `"1"`
-  in both modes, from no entry, and is never reported as unpriced.
+- **An account whose unit is the main currency** prices at `"1"` in
+  both modes (`record-rate.md`, Reading).
 - Each account's figure carries its **quantity's as-of date** wherever
   it appears, because that is the date the person acts on
   (`ui/update-values.md`). A row whose price is older than the newest
@@ -256,8 +254,7 @@ an otherwise smooth chart is indistinguishable from a bad snapshot.
 
 - Ranges: 1M, 6M, 1Y, All. Default: 1Y, or All if history is shorter.
 - **Pricing mode is not a chart control.** Every chart point is already
-  drawn at the prices of its own date, by the formula above, so there
-  is nothing for the mode to do here and switching it moves no pixel.
+  drawn at the prices of its own date, so switching it moves no pixel.
   On latest rates the chart's right hand edge **is** the total: the
   edge carries each account's last quantity carried forward at its
   symbol's last price carried forward, which is the total's own
@@ -282,7 +279,7 @@ an otherwise smooth chart is indistinguishable from a bad snapshot.
 
 ## Rules
 
-- All money arithmetic uses decimal, never floats (record-snapshot.md).
+- All money arithmetic uses decimal, never floats (`record-snapshot.md`).
   Sums are computed at full precision and rounded only for display. A
   chart point costs two multiplications rather than one, and both round
   half-even at scale 12 like every other.
@@ -295,7 +292,7 @@ an otherwise smooth chart is indistinguishable from a bad snapshot.
   this chart needs — the partition rule, per-account interpolation,
   provenance tracking, per-band selection deltas, asset/liability
   mirroring — is domain logic written either way. The full interactive
-  chart prototypes at ~200 lines of dependency-free JS; a production
+  chart prototypes at ~200 lines of dependency-free JS. A production
   version with real tick generation, decimal arithmetic, a keyboard path
   and a table fallback is estimated at 350–450.
   - SVG, not canvas: the direct labels, `tabular-nums` figures, and the
@@ -339,23 +336,19 @@ an otherwise smooth chart is indistinguishable from a bad snapshot.
   "Unassigned", like any unclassified account. The entry is preserved,
   so restoring the value restores the band.
 - **A dimension with more than four values** → the first four in the
-  dimension's configured order take chart slots; the remainder fold into
-  "Other" (`design-system.md`).
+  dimension's configured order take chart slots, and the remainder fold
+  into "Other" (`ui/design-system.md`).
 - **An account not valued in a long time** → counted in the total at its
   last known **quantity**, priced by the selected mode, with its "as of"
-  date shown. It is the user's data: the UI states the age, it neither
-  warns nor silently excludes.
-- **An account whose unit has no price entry at all** → listed as not
-  priced, excluded from the total, and never counted at its bare
-  quantity.
+  date shown and no warning at any age.
 - **A chart date before any price entry for a symbol** → priced at that
   symbol's first entry, carried backward.
 - **Two entries for one (symbol, date) that are not byte-identical** →
-  the pair drops out of that symbol's series, the neighboring entries
-  interpolate across the date. The fault is named on screen and resolved in that date's recording
-  (`record-rate.md`). When the pair is the symbol's only entry, its
-  holdings are listed as not priced rather than counted at either
-  figure.
+  the pair drops out of that symbol's series and the neighboring
+  entries interpolate across the date. The fault is named on screen and
+  resolved in that date's recording (`record-rate.md`). When the pair
+  is the symbol's only entry, its holdings are listed as not priced
+  rather than counted at either figure.
 - **Decryption fails for one record** → that record is skipped, the rest
   of the view renders, and a prominent warning names how many records
   could not be read. An unreadable price entry drops out of its series,

@@ -7,7 +7,7 @@ is the only place a password is typed outside registration and the
 change-password forms, and the only place key derivation starts from
 cold.
 
-Two modes:
+Modes:
 
 - **Signing in.** No session. Username and password.
 - **Unlocking again.** A vault owner's session is still good and the
@@ -24,10 +24,9 @@ Exercises: `spec/features/login.md`, and the idle-lock half of
 
 ## Layout
 
-A centered card, max-width 420px, on the warm ground. Nothing else on
-the page, no navigation and no marketing.
+The card outside the shell (`design-system.md`, App shell), max-width
+420px.
 
-- Wordmark, petrol-800.
 - **Username** field, when signing in. When unlocking again, the
   username is static ink-secondary text with a "Not you? Sign out"
   link beside it.
@@ -35,9 +34,6 @@ the page, no navigation and no marketing.
 - Primary button: **Unlock**.
 - Beneath the card, 13px ink-muted: "Solvent cannot recover a lost
   password."
-
-No "remember me" and no "forgot password" link. Neither exists, and a
-dead link that implies recovery is worse than its absence.
 
 ## One card, both kinds
 
@@ -139,14 +135,7 @@ moment it is shown the screen does not know which it is.
 
 ## Rules
 
-- The password field is never auto-submitted, never logged, and cleared
-  from the DOM on success.
-- Autocomplete: `username` and `current-password`, so password managers
-  work. This is deliberate. A manager-generated passphrase is the most
-  realistic protection a vault with no recovery can have.
-- Phones and tablets are supported targets, not a degraded case. The
-  card is reachable, usable, and submittable on a touch screen, and the
-  wait on one is stated above rather than apologized for.
+- Autocomplete: `username` and `current-password`.
 - Unlocking again preserves whatever the person was doing. Afterwards
   they are returned to the previous view with unsaved form input
   intact. That input is the **one named exception** to the lock
@@ -168,7 +157,8 @@ moment it is shown the screen does not know which it is.
   restart.** The vault exists in readable form only while the tab is
   open and unlocked. There is nowhere to remember it to.
 - **No "forgot password".** There is nothing held anywhere that could
-  open a vault except the password.
+  open a vault except the password, and a dead link that implies
+  recovery is worse than its absence.
 - **No second factor.** Not in this version.
 - **No hint of how many attempts are left.** The lockout message says
   the same thing whether or not the account exists, and a counter would

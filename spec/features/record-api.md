@@ -15,7 +15,7 @@ as "your vault is empty" rather than "you have none". The schema
 refuses a `records` row whose principal is an administrator, so there
 is nothing behind the route for a mistake to reach either.
 
-**No screen.** This is infrastructure; `manage-accounts.md`,
+**No screen.** This is infrastructure. `manage-accounts.md`,
 `record-snapshot.md`, `record-rate.md`, `net-worth-view.md`,
 `account-settings.md`, and `export-import.md` all depend on it. Build it
 first.
@@ -57,8 +57,7 @@ never decrypts.
   management wins.
 - **A new record type changes no byte of this encoding.** `rate` carries
   the empty `account_id` that `account` and `profile` carry, and
-  `record_type` is already a field whose value varies by type. The
-  fixture below is the same fixture.
+  `record_type` is already a field whose value varies by type.
 - **`principal_id` is not included**, deliberately (architecture.md, Key
   management). The DEK boundary already makes a blob undecryptable in
   another account's vault, so the client can build a record's AAD
@@ -95,8 +94,8 @@ into. `POST /api/import` runs every record through this same validator
 
 `null` when absent, everywhere: the `PUT` body, the `GET` response, and
 the export file's records. One representation, so import has one case to
-map rather than three, and an empty string is a Bad Request rather
-than quietly accepted as a second spelling of absent.
+map, and an empty string is a Bad Request rather than quietly accepted
+as a second spelling of absent.
 
 The AAD is where that `null` becomes `""` — the one conversion, done
 when building the byte string, on both sides.
@@ -117,8 +116,8 @@ client-side and **lazy**:
    which bumps `version` and `schema_version` together like any other
    write.
 
-Consequences of that shape — not defects for a later bulk rewrite to
-"fix":
+Consequences of that shape, not defects for a later bulk rewrite to
+fix:
 
 - **No migration event.** There is no moment where a vault is
   half-migrated, and no long-running rewrite that can fail partway.
@@ -147,18 +146,17 @@ Pydantic-validated.
 There is deliberately **no single-record `GET`.** The client fetches
 every record once per session and keeps the model in memory
 (`net-worth-view.md`, Data flow), so a stale-version reload after a
-Conflict refetches that record's whole type, four requests at most, on
-data already sized for one fetch. A by-id endpoint would also hand the
-server a per-record access pattern it currently cannot see. Where a
-screen spec says it "reloads the current record", this is what that
-means.
+Conflict refetches that record's whole type, on data already sized for
+one fetch. A by-id endpoint would also hand the server a per-record
+access pattern it currently cannot see. Where a screen spec says it
+"reloads the current record", this is what that means.
 
 - **`GET /api/records?type=<t>`** → every record of that type belonging
   to the session user, as
   `{ recordId, recordType, accountId, schemaVersion, version, nonce,
-  ciphertext }`. One type per request; a client needing all of them
-  issues four (`net-worth-view.md`, Data flow). `type` is required
-  and must be a known value.
+  ciphertext }`. One type per request, so a client needing all of them
+  issues one per type (`net-worth-view.md`, Data flow). `type` is
+  required and must be a known value.
 - **`PUT /api/records/<record_id>`** — create or update. Body carries
   `recordType`, `accountId`, `schemaVersion`, `version`, `nonce`,
   `ciphertext`. `version` is the version **being written**:
@@ -213,8 +211,8 @@ specified and owned by `manage-accounts.md`, not here.
   Conflict and reloads; no merge is attempted anywhere in the system.
 - **A second `profile` record** → allowed by the schema, and a client
   bug. The API does not enforce a singleton, since it would be the only
-  per-type rule in a deliberately type-agnostic store; clients treat the
-  highest `version` as authoritative.
+  per-type rule in a deliberately type-agnostic store. Clients treat
+  the highest `version` as authoritative.
 - **Quota exhausted mid-session** → Content Too Large on write; reads
   keep working, so the vault is never locked away by its own size.
 - **Request body over the size cap** → rejected at the framework layer
@@ -234,12 +232,10 @@ specified and owned by `manage-accounts.md`, not here.
   Not Found and changes nothing.
 - A request body containing a `principalId` field naming another user is
   rejected; no row is written under either user.
-- An unauthenticated request to any of the three endpoints returns
-  Unauthorized.
-- A write without the `X-Solvent-Request` header returns Forbidden,
-  and a
-  cross-origin attempt to send it never reaches the endpoint because the
-  preflight fails.
+- An unauthenticated request to any endpoint here returns Unauthorized.
+- A write without the `X-Solvent-Request` header returns Forbidden, and
+  a cross-origin attempt to send it never reaches the endpoint because
+  the preflight fails.
 - Two successive writes to one record produce different nonces.
 - A `PUT` whose body tuple disagrees with the path `record_id` or with
   the stored row's immutable columns is rejected with Bad Request, and

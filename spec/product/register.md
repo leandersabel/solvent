@@ -32,8 +32,8 @@ person taking on the running of the instance.
 
 This is the screen an invite for a user account opens.
 
-A single card, nothing else on the page. No navigation, no marketing.
-The person arrived from a link, they are here to do one thing.
+A single card, nothing else on the page. No navigation, no marketing:
+the person arrived from a link to do one thing.
 
 - **Username.** Three to thirty-two characters, lowercase letters,
   digits, dot, underscore, hyphen. It is lowercased as they type rather
@@ -88,12 +88,10 @@ with a full vault and no way to fix it.
 
 ### Setting up
 
-Turning the password into a key is deliberately slow: about a sixth of
-a second on a computer, and a little under two seconds on a phone or
-tablet, where the browser runs this kind of work much more slowly.
-Setting up a vault does that plus a little more. For the whole of it
-the screen says it is working and stays responsive. It must never look
-like it has hung.
+Turning the password into a key is deliberately slow (`login.md`,
+which owns the timing), and setting up a vault does that plus a little
+more. For the whole of it the screen says it is working and stays
+responsive. It must never look like it has hung.
 
 ### Create an administrator account
 
@@ -107,12 +105,12 @@ What is absent is absent because there is no vault:
 - **No main currency.** Nothing in this account is ever counted in one.
 - **No no-recovery acknowledgement.** The sentence a vault owner has to
   agree to is not true here. There is no vault to become permanently
-  unreadable, because there is none to begin with.
-The wait stays, and it is the one thing that does not fall away. Even
-with no vault, the password still has to be turned into the proof the
-server checks at sign-in, and that is the same slow work. What changes
-is only what the screen says while it happens: it is making an
-account, not building a lock around something.
+  unreadable.
+
+The wait stays. Even with no vault, the password still has to be turned
+into the proof the server checks at sign-in, and that is the same slow
+work. What changes is only what the screen says while it happens: it is
+making an account, not building a lock around something.
 
 In their place, one line saying what the account is: this account
 invites and removes people on this instance. It holds no financial data
@@ -134,13 +132,12 @@ The person lands in the admin area, signed in.
   so a person who holds both a user account and an administrator
   account signs in to them under two different names.
 - **The device is out of memory at that moment.** On the vault screen.
-  Any device, of any
-  kind, can be too busy right now to spare what setting up needs, with
-  enough other tabs and other apps open. The screen says so in terms of
-  the moment, not the password and not the device, makes clear that no
-  vault was created and the invite is still good, and offers a retry
-  after closing other tabs. It does not quietly set up a weaker vault
-  instead, and it never tells somebody their phone cannot do this.
+  Any device, of any kind, can be too busy right now to spare what
+  setting up needs. The screen says so in terms of the moment, not the
+  password and not the device, makes clear that no vault was created
+  and the invite is still good, and offers a retry after closing other
+  tabs. It does not quietly set up a weaker vault instead, and it never
+  tells somebody their phone cannot do this.
 - **The submit fails after the slow part.** Everything typed is still
   there. Nobody re-types a password and waits again because of a
   network blip.

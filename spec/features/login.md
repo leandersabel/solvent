@@ -29,10 +29,7 @@ area.
 **Kind is invisible until the credential verifies.** Steps 1 and 2
 below are byte-identical for a vault owner, an administrator, and a
 username that does not exist, and step 2 takes the same wall-clock
-time in all three cases. This is a hard property, not an incidental
-one. Rules and Acceptance criteria below both pin it, and the
-wall-clock half of it is the part that is easiest to lose (Rules, The
-sign-in wait).
+time in all three cases (Rules, The sign-in wait).
 
 ## Flow
 
@@ -44,10 +41,9 @@ sign-in wait).
    envelope, for an unknown one. Responses must be identically shaped
    and constant-time (architecture.md, Login enumeration). **The
    response carries no field naming, implying, or derivable into the
-   account's kind**, and there are only two fields, so adding one is
-   the failure mode to watch for. This endpoint answers an
-   unauthenticated caller, which is why `params` carries nothing secret
-   and the Auth Key hash is a separate column.
+   account's kind.** This endpoint answers an unauthenticated caller,
+   which is why `params` carries nothing secret and the Auth Key hash
+   is a separate column.
 2. Client derives Master Key + Auth Key in a Web Worker. **Both
    halves, always**, because the client does not yet know whether it
    will need the Master Key (architecture.md, Administrator
@@ -75,24 +71,21 @@ from the presence of `wrappedDek`. A client that branches on a missing
 field treats a truncated or malformed response as an administrator
 login, which is the one wrong guess that must not be cheap to make.
 The field is safe to return because it is read only after the
-credential verified: it tells the caller a fact about the account whose
-password they have just proven they know.
+credential verified.
 
 The wrapper lookup happens **after** verification, keyed on the
-credential id, and is an indexed read against an Argon2id verification
-that costs 64 MiB. It is not a timing signal and it is not on the
-pre-authentication path.
+credential id. An indexed read against a 64 MiB Argon2id verification
+is no timing signal, and it is not on the pre-authentication path.
 
 ## Stale-KDF upgrade
 
 **This is the only path by which an account's KDF parameters are
-raised**,
-and therefore the path by which the Argon2id memory parameter is raised
-if Safari's WebAssembly engine gets faster (architecture.md, Why 64 MiB
-and not more). The operator raises the server's default envelope, and
-every vault follows on its owner's next login, with no migration, no
-re-encryption, and no prompt. There is no other mechanism, which is why
-the envelope is stored per vault rather than compiled in.
+raised**, and therefore the path by which the Argon2id memory
+parameter is raised if Safari's WebAssembly engine gets faster
+(architecture.md, Why 64 MiB and not more). The operator raises the
+server's default envelope and every vault follows on its owner's next
+login, with no migration, no re-encryption, and no prompt. The envelope
+is stored per vault, not compiled in, so this path exists.
 
 When the stored envelope is weaker than the server's current default,
 the login response sets `kdfStale: true` and includes the target
@@ -114,14 +107,11 @@ successful sign-in the client, without user interaction:
    DEK is the same key afterwards and every other wrapper still opens
    it (architecture.md, One key, N wrappers).
 
-The endpoint is named for the upgrade rather than the re-wrap because
-the re-wrap is the half that an administrator does not have, while the
-KDF upgrade is the half that both need. The server discriminates on the
-session's principal kind, not on which fields the client sent: a vault
-owner's request without a wrapper is a Bad Request, and an
-administrator's with one is too. Letting the payload decide would let a
-client silently skip re-wrapping a real vault and leave its wrapper
-opening under a superseded Master Key.
+The server discriminates on the session's principal kind, not on which
+fields the client sent: a vault owner's request without a wrapper is a
+Bad Request, and an administrator's with one is too. Letting the
+payload decide would let a client silently skip re-wrapping a real
+vault and leave its wrapper opening under a superseded Master Key.
 
 The DEK itself does not change, so **no vault record is re-encrypted**.
 If the upgrade POST fails, the session continues normally on the old
@@ -174,16 +164,14 @@ never lock anyone out.
   own decoy (architecture.md, Credentials and vault key wrappers).
 - **Residual enumeration leak, accepted.** A decoy always carries the
   server's *current default* KDF envelope, while a real account can
-  carry a stale one — that is the whole reason the KDF upgrade above exists. So
-  any account not yet upgraded is distinguishable from a decoy by its
-  envelope, and the defense only fully holds once every user sits at
-  current parameters. This is accepted rather than closed: the audience
-  is a small invited household, registration already accepts enumeration
-  (register.md), and the alternative — decoys drawing from the set of
-  historical parameter sets — would mean the server tracking every
-  parameter set it has ever used, forever, for a threat this deployment
-  does not face. Do not write a test asserting a stale-envelope account
-  is indistinguishable; it is not.
+  carry a stale one, so any account not yet upgraded is distinguishable
+  from a decoy by its envelope, and the defense only fully holds once
+  every user sits at current parameters. It is accepted rather than
+  closed: the audience is a small invited household, registration
+  already accepts enumeration (register.md), and closing it would mean
+  the server keeping every parameter set it has ever used, forever, for
+  a threat this deployment does not face. Do not write a test asserting
+  that a stale-envelope account is indistinguishable. It is not.
   - **It leaks existence, never kind.** A stale envelope says an
     account was registered before the current default and nothing
     about whether it owns a vault, because both kinds carry an
@@ -222,8 +210,8 @@ never lock anyone out.
   administrator session is bounded by the absolute expiry and by
   signing out.
 - **Session lifetime**: server-side session expires 12 hours after
-  issue, absolute, not sliding. Both kinds, unchanged, and for an
-  administrator it is the only bound.
+  issue, absolute, not sliding. Both kinds, and for an administrator it
+  is the only bound.
 - A page refresh discards in-memory keys by definition and requires
   re-entering the password.
 - The session is rotated (new session id) on successful login.
@@ -250,8 +238,7 @@ never lock anyone out.
   render an empty vault. For an administrator there is nothing to
   prompt for and the admin area renders.
 - **A login response arrives with `kind` absent** → the client treats
-  it as a failed login rather than defaulting to either kind. TLS
-  makes this unreachable in practice. The rule exists so the client
+  it as a failed login rather than defaulting to either kind, so it
   never has a "kind absent" branch to get wrong.
 - **Clock skew / expired session mid-request** → API returns
   Unauthorized with a machine-readable code; the client prompts for

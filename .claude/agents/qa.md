@@ -62,3 +62,5 @@ An empty findings list is a valid and useful result.
 - Report what you saw, not what you assume the code does. You have not
   read it, and guessing about it is how a wrong finding reaches the
   engineer.
+- Never put a question to the client. It goes to `spec/questions.md`
+  tagged `qa`, and the product owner decides what reaches them.

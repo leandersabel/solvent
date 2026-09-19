@@ -54,10 +54,8 @@ payload:
   profile's dimension config (`account-settings.md`). It carries no
   display text: renaming "Cash" to "Bargeld" rewrites the profile and
   not one account record.
-- `note` is free text, optional, `null` when unset. It exists so that
-  what a user wants to jot about a holding — "joint with M", "sold half
-  in 2024" — has an honest home instead of being forced into a
-  taxonomy.
+- `note` is free text, optional, `null` when unset, so what a user
+  wants to jot about a holding is not forced into a taxonomy.
 - **There is no server-side dimension entity**: a server-side list would
   leak the classification graph. Everything the UI shows is derived
   client-side from the decrypted profile and accounts.
@@ -113,9 +111,8 @@ in the encrypted profile record (`account-settings.md`).
 
 ## Delete: the user chooses
 
-Deleting an account that has snapshots presents **two explicit options**
-— this is a user decision at delete time, not a fixed policy, because
-both are legitimate:
+Deleting an account that has snapshots is a user decision at delete
+time, not a fixed policy, because both options are legitimate:
 
 - **Archive** (default, preselected). Sets `archivedAt` and re-writes
   the account record. The account disappears from active lists and can
@@ -127,14 +124,14 @@ both are legitimate:
   was liquidated at a figure, `0` if it simply ended. This is the
   expected path, not a nicety: with it, the account's band reaches its
   closing value as recorded data, and the trend chart interpolates into
-  that value like any other snapshot (net-worth-view.md). It is a
+  that value like any other snapshot (`net-worth-view.md`). It is a
   recording action like any other, so it refreshes prices at
   `archivedAt`, the unit of the account being archived included, since
-  that account is still active at that moment. The user may
-  skip it, and then the band drops by the last known value on
-  `archivedAt` with nothing recorded to explain it — an artifact of a
-  flag rather than data the user entered. Either way the date carries an
-  archive annotation, so the drop is never mistaken for a bad snapshot.
+  that account is still active at that moment. The user may skip it,
+  and then the band drops by the last known value on `archivedAt` with
+  nothing recorded to explain it, an artifact of a flag rather than data
+  the user entered. Either way the date carries an archive annotation,
+  so the drop is never mistaken for a bad snapshot.
 - **Delete permanently.** Removes the account record and cascades to
   every snapshot carrying that `account_id`. **It deletes no price
   entry.** A price belongs to a symbol, another account may be measured
@@ -161,9 +158,9 @@ link, so nothing else can be swept up by it. Endpoint:
   quantities are counted in the old unit, and a new unit would also
   price the whole history off a different symbol's series
   (`record-rate.md`). Silently reinterpreting either would corrupt
-  history. The user must archive and
-  create a new account instead. (Renaming, re-classifying, and editing
-  the note are always allowed.) Like the password policy (register.md),
+  history. The user must archive and create a new account instead.
+  (Renaming, re-classifying, and editing the note are always allowed.)
+  Like the password policy (`register.md`),
   this is **client-enforced by construction**: `unit` lives inside the
   ciphertext, so the server cannot validate it and this spec does not
   pretend it is a server-side control.
@@ -198,12 +195,10 @@ link, so nothing else can be swept up by it. Endpoint:
   (`record-snapshot.md`): it prefills with the existing value rather
   than `0`, and saving replaces that record in place. The archive
   dialog does not get a private path around one-snapshot-per-date.
-  **No replace prompt fires here.** The prompt catches somebody
-  writing at a date they did not know was taken, and this field is
-  showing them the stored figure, so it fails the prompt's own
-  condition (`record-snapshot.md`, Same account, same date). The
-  dialog's own confirm is the confirmation, and a second one would
-  ask about a number already on screen.
+  **No replace prompt fires here**: the field is showing the stored
+  figure, so it fails the prompt's own condition (`record-snapshot.md`,
+  Same account, same date). The dialog's own confirm is the
+  confirmation.
 - **Archiving an account that is the last active one** → allowed; the
   net worth view shows its empty state.
 - **Unarchiving** → clears `archivedAt`; the account rejoins active
@@ -262,9 +257,9 @@ link, so nothing else can be swept up by it. Endpoint:
 - No account record contains a rate symbol distinct from its unit,
   asserted against the record shape: no such field exists, so the 31×
   mismatch has nowhere to live.
-- An account whose unit is free text triggers zero rate-lookup
-  requests; an account whose unit is a listed symbol triggers exactly
-  one per snapshot entry.
+- A free-text unit appears in no rate-lookup request, and a listed
+  symbol appears in the recording date's single request
+  (`record-rate.md`, The refresh).
 - Unarchiving restores the account to active lists and to the current
   total.
 - The dimension list offered in the UI is derived client-side from the

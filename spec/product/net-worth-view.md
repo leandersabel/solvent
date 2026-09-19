@@ -13,11 +13,10 @@ what you look at.
 
 ## How it should look
 
-The look is the one described in app shell: a private bank, which here
-means restraint. What this screen adds is where the restraint spends
-itself. The total is the largest thing in the product and nothing
-competes with it. Every other figure is quiet, aligned, and stated
-rather than decorated.
+The look is the one described in `app-shell.md`: a private bank, which
+here means restraint. The total is the largest thing in the product and
+nothing competes with it. Every other figure is quiet, aligned, and
+stated rather than decorated.
 
 The chart is the one place color carries meaning, and it is held to the
 same rule as everywhere else: every band is labeled, so a reader who
@@ -70,8 +69,8 @@ A two-position control beside the total:
   March's rate.
 
 Both sides are named rather than one being an unlabeled off state,
-because both are real questions and the default deserves a name as
-much as the alternative. It says latest rather than today's because
+because both are real questions. It says latest rather than today's
+because
 nothing here fetches anything: the newest rate you have is the one
 your last recording wrote.
 
@@ -87,10 +86,10 @@ the comparison working, not a disagreement.
 
 ### The chart
 
-A stacked area chart over time. One band per value of whichever axis you
-group by, the bands adding up to your net worth, assets stacking upward
-from zero and liabilities mirroring downward in the same color, with the
-net worth line drawn over the top.
+A stacked area chart over time. One band per value of whichever
+dimension you group by, the bands adding up to your net worth, assets
+stacking upward from zero and liabilities mirroring downward in the
+same color, with the net worth line drawn over the top.
 
 It answers two questions at once: how the total moved, and what it was
 made of while it moved. Grouped by nothing, it is a single band, which
@@ -105,8 +104,7 @@ What it is actually for, in order:
   let go, the total at the top becomes the change across exactly those
   two points, and every band in the legend gets its own change for the
   same span. This is how "what did my retirement do between 2019 and
-  2024" gets answered, and it is the reason the chart is worth building
-  rather than buying.
+  2024" gets answered.
 - **Composition drift.** Clicking a legend entry hides a band, hovering
   one highlights it, and the crosshair reads out every visible band and
   the total for the date under the cursor.
@@ -115,10 +113,10 @@ What it is actually for, in order:
   when the net figure is near zero.
 
 Beside the grouping control, the app states how much of your money the
-axis actually covers: "7 of 10 holdings assigned", clickable to see
-which ones are not. An axis you only ever filled in for three holdings
-draws a chart that is perfectly correct and completely misleading, and
-this line is what stops that being read as a bug.
+dimension actually covers: "7 of 10 holdings assigned", clickable to see
+which ones are not. A dimension you only ever filled in for three
+holdings draws a chart that is perfectly correct and completely
+misleading, and this line is what stops that being read as a bug.
 
 The crosshair's date is also the way back into that day. Where you
 recorded something on the date under the cursor, the chart opens that
@@ -158,8 +156,8 @@ chart rather than a hole in it.
 The dates you recorded something are marked on the chart from the
 moment it loads. They are the points the line is actually built from,
 and they are the dates that open a recording when you click them, so
-the marking earns its place twice over: it says which part of the line
-you gave it, and it shows you where there is something to go back to.
+the marking says which part of the line you gave it and where there is
+something to go back to.
 
 One control takes the marks away and leaves a clean line, for when you
 want to look at the shape rather than the evidence. The honest drawing
@@ -186,9 +184,9 @@ its latest figure in its own unit, the same figure in your main
 currency, and the date that figure is as of.
 
 The as of date is the date of the quantity, never of the rate. A
-holding has two ages now and only one of them is yours: the rate's age
-is one date for the whole screen rather than a column, because you
-cannot act on it and because it is the same for everything. The
+holding has two ages and only one of them is yours: the rate's age is
+one date for the whole screen rather than a column, because you cannot
+act on it and because it is the same for everything. The
 quantity's age sorts, which is how you find what you have not touched in
 a while without the app deciding for you what counts as too long. Each
 date in a holding's own list opens the screen of the recording that
@@ -199,13 +197,12 @@ valued", never as zero, because zero is a real figure that means
 something else. Archived holdings are hidden behind a toggle. Clicking a
 row opens that holding.
 
-There is no separate "Accounts" entry in the navigation. This list is
-the account list, and a fourth entry would either lead back to this
-screen or open a thinner copy of it.
+There is no separate "Accounts" entry in the navigation, because this
+list is the account list (`app-shell.md`, which owns the navigation).
 
 ### The breakdown
 
-At the foot, a bar per band of the axis you grouped by, in the same
+At the foot, a bar per band of the dimension you grouped by, in the same
 order as the chart so the two read as one thing, each bar labeled with
 its value and amount. Where the chart shows how the composition moved,
 this shows what it is right now, which is a different question.
@@ -238,10 +235,10 @@ the section needs no small print.
 - For every date in the chart, the visible bands add up to the net worth
   line at that date.
 - The breakdown bars add up to the total, with no disclaimer attached.
-- Every holding appears in exactly one band of the chosen axis, and the
-  bands together account for every holding.
-- Holdings not filed under the chosen axis appear in an "Unassigned"
-  band, which is visible and counted, never dropped.
+- Every holding appears in exactly one band of the chosen dimension,
+  and the bands together account for every holding.
+- Holdings not filed under the chosen dimension appear in an
+  "Unassigned" band, which is visible and counted, never dropped.
 - A holding with two entries, 100 in January and 200 in March, reads 150
   in February, and January and March carry a mark while February does
   not, without anybody turning anything on.
@@ -287,11 +284,11 @@ the section needs no small print.
 
 - **No warning that a figure is old.** No badge, no color, no threshold.
   Your holdings move at completely different speeds, a current account
-  monthly and a flat every few years, so any single threshold would flag
-  the slow ones permanently until you learned to ignore it, at which
-  point it would fail for the one that genuinely went quiet. Instead
-  every figure states its age in plain words next to the action that
-  records a new one.
+  monthly and a flat every few years, so any single threshold would
+  flag the slow ones permanently until you learned to ignore it, and
+  then fail for the one that genuinely went quiet. Instead every figure
+  states its age in plain words next to the action that records a new
+  one.
 
   This is about the age of a quantity, the only age that is yours. A
   rate's age is the app's to keep down and it is stated once for the
@@ -307,7 +304,7 @@ the section needs no small print.
   moved.
 - **No pie chart.** A pie cannot show a negative slice at all, and your
   mortgage is a negative slice.
-- **No fifth color in the chart.** An axis may hold as many values as
+- **No fifth color in the chart.** A dimension may hold as many values as
   you like, but past four the rest are folded into "Other", because
   beyond that no set of colors stays distinguishable, including for
   color blind readers.
@@ -319,11 +316,10 @@ them.
 
 - **The chart defaults to one year**, or everything when your history is
   shorter, and defaults to grouping by nothing until you have set up an
-  axis.
-- **The control that hides the marks is called Just the line.** The
-  name is a decision taken on your behalf. It has to say what it does
-  without claiming the marked chart is the untidy one, since the marked
-  chart is the accurate one.
+  dimension.
+- **The control that hides the marks is called Just the line.** It has
+  to say what it does without claiming the marked chart is the untidy
+  one, since the marked chart is the accurate one.
 - **The screen opens on latest rates.** That is the answer to what am I
   worth. The other position answers a question you go looking for, and
   opening on it would put a comparison where the headline belongs.

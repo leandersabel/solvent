@@ -14,10 +14,10 @@ given.
 ## Inputs
 
 - `spec/.compiled/<feature>.json` — the contract you implement. It
-  indexes the spec rather than restating it. `read` names the files and
-  headings to load, in order. `parameters` pins the exact values a test
-  asserts, each with the file that states it. `verify.criteria` points
-  at the technical acceptance list.
+  indexes the spec rather than restating it: `read` names what to load
+  and in what order, `parameters` pins the exact values a test asserts
+  with the file that states each, and `verify.criteria` is the
+  technical acceptance list.
 - `spec/architecture.md` — tech stack and, especially, the Security
   section: concrete, non-negotiable requirements that apply to any code
   you touch.

@@ -7,9 +7,8 @@
 -- DEK, timestamps, ...) is owned by register.md, not yet implemented.
 -- Only the columns the shell itself needs -- to resolve a session to a
 -- user and to decide which nav entries to render -- are created here.
--- See spec/questions.md, "app-shell: minimal users table" -- register.md's
--- implementation is expected to extend this table with its own columns
--- via migration rather than replace it.
+-- Register.md's implementation is expected to extend this table with
+-- its own columns via migration rather than replace it.
 CREATE TABLE IF NOT EXISTS users (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
     username TEXT NOT NULL UNIQUE,

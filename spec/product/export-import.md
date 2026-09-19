@@ -1,4 +1,4 @@
-# Backup and restore
+# Export and import
 
 ## What it does
 
@@ -27,8 +27,8 @@ machines or two people.
 
 Its own screen, reached from Settings through a row reading "Download
 your vault, or restore one from a file." It is also offered inside the
-delete-my-account dialog, where exporting first is the main action, not
-the small print (`account-settings.md`).
+delete-my-account dialog, where exporting first is the main action
+(`account-settings.md`).
 
 ### Download
 
@@ -46,7 +46,7 @@ the small print (`account-settings.md`).
 Four steps, each appearing as the one before it is done.
 
 1. **Choose the file.**
-2. **The password that file was exported under.** Labelled exactly that
+2. **The password that file was exported under.** Labeled exactly that
    way, never "your password". They can be different, and this is the
    one place in the app where people will be confused.
 3. **Review.** What is in the file, when it was exported, and next to
@@ -57,8 +57,8 @@ Four steps, each appearing as the one before it is done.
    discover afterwards.
 4. **Confirm.** You type `ERASE` and press "Replace my vault".
 
-Underneath, what does not change: your password stays the same, your
-login is unaffected, only the contents of the vault are replaced.
+Underneath, what does not change: your password and your login are
+unaffected, and only the contents of the vault are replaced.
 
 Restoring a large vault is the longest wait in the product. You see two
 named stages with real progress through them, the page stays usable, and
@@ -138,9 +138,9 @@ them.
 
   Telling you how long it has been, or putting a copy somewhere by
   itself, is wanted and is not in the first version. What the first
-  version owes either of them is that a backup stays a plain file the
-  person holds: nothing else may come to depend on the app knowing when
-  one was last made.
+  version owes them is that a backup stays a plain file the person
+  holds, with nothing else depending on the app knowing when one was
+  last made.
 - **There is a ceiling on how often the whole vault can be downloaded**,
   a few times an hour. It reads everything you own, and nobody backs up
   more often than that.
