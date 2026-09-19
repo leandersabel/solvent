@@ -244,8 +244,8 @@ two callers rather than two record writers.
 - Submitting without the "no password recovery" acknowledgement is
   blocked.
 - The AAD used for the profile blob equals `account_id ‖ record_type ‖
-  record_id ‖ schema_version ‖ monotonic_version` per architecture.md,
-  with `account_id` empty and `monotonic_version` = 1 — and is built
+  record_id ‖ schema_version ‖ version` per architecture.md,
+  with `account_id` empty and `version` = 1 — and is built
   entirely before the request is sent, asserted by encrypting the blob
   in a test with no server interaction at all.
 - A registration whose profile insert fails leaves no principal row,

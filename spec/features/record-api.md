@@ -53,7 +53,7 @@ never decrypts.
 
 - **Field order** is the one written in Key management:
   `account_id ‖ record_type ‖ record_id ‖ schema_version ‖ version`.
-  This differs from the column order in the storage table; Key
+  This differs from the column order in the storage table, and Key
   management wins.
 - **A new record type changes no byte of this encoding.** `rate` carries
   the empty `account_id` that `account` and `profile` carry, and

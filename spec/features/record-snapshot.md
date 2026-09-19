@@ -392,7 +392,7 @@ a quiet wrong number.
 - **Date precedes the account's `createdAt`** → allowed; backfilling
   history is a normal use.
 - **Editing a past snapshot** → allowed, versioned like any other write.
-  The AAD's `monotonic_version` binds each ciphertext to the version it
+  The AAD's `version` binds each ciphertext to the version it
   was written at, so the server cannot pass an old blob off as the
   current one. It does **not** prevent a rollback: re-serving the intact
   `(ciphertext, version)` pair from an earlier write is self-consistent

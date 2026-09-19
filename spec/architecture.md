@@ -654,7 +654,7 @@ Actors this design defends against vs. accepts:
     rotation only if a single vault ever approaches that bound.
   - **Data integrity (AAD binding)**: every blob's GCM Additional
     Authenticated Data is set to `account_id ‖ record_type ‖ record_id
-    ‖ schema_version ‖ monotonic_version`. Decryption fails if the
+    ‖ schema_version ‖ version`. Decryption fails if the
     server relocates, swaps, or rolls back a blob to a different
     logical slot within a vault — AES-GCM's per-blob authentication
     alone protects contents but not arrangement. `record-api.md` pins
