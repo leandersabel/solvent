@@ -108,8 +108,11 @@ What is absent is absent because there is no vault:
 - **No no-recovery acknowledgement.** The sentence a vault owner has to
   agree to is not true here. There is no vault to become permanently
   unreadable, because there is none to begin with.
-- **No deliberate wait.** Nothing is being locked, so the screen does
-  not spend a second and a half building a lock around it.
+The wait stays, and it is the one thing that does not fall away. Even
+with no vault, the password still has to be turned into the proof the
+server checks at sign-in, and that is the same slow work. What changes
+is only what the screen says while it happens: it is making an
+account, not building a lock around something.
 
 In their place, one line saying what the account is: this account
 invites and removes people on this instance. It holds no financial data

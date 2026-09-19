@@ -2,84 +2,208 @@
 
 ## Purpose
 
-Turn a valid invite link into a vault. Server-rendered (Jinja) at
-`GET /register?invite=<token>`; the page embeds the server's current
-default KDF envelope and the selectable currency list, so no extra
-round-trip is needed and nothing here calls a session-authenticated API
-(`register.md`).
+Turn an invite link into the account it was made for. Server-rendered
+(Jinja) at `GET /register?invite=<token>`, so nothing here calls an API
+that needs a session: the page embeds the server's current default KDF
+envelope, and, for a user invite, the currency list the main-currency
+picker offers (`register.md`).
+
+**The invite decides which of two forms renders.** Nothing on either
+form lets the person choose which kind of account they are making, and
+neither form mentions the other.
 
 Exercises: `spec/features/register.md`.
 
 ## Layout
 
-Same centered card as Unlock, max-width 480px, slightly taller.
+A single centered card on the warm ground, max-width 480px. No
+navigation, no marketing, nothing else on the page. The person arrived
+from a link and is here to do one thing.
+
+### Create your vault
+
+The form a user invite renders.
 
 1. Heading: "Create your vault".
-2. Username — 3–32 chars, `[a-z0-9._-]`, normalized to lowercase as the
-   user types (show the normalization, don't silently apply it later).
-3. Password + confirmation, with a **strength meter**.
-4. Main currency — a searchable select over the currency list the page
-   embeds (`register.md`), not all of ISO 4217.
-5. The no-recovery acknowledgement (below).
-6. Primary button: "Create vault".
+2. **Username**. 3 to 32 characters, `[a-z0-9._-]`, lowercased in the
+   field as it is typed rather than quietly changed on submit, so what
+   they see is what they will sign in with.
+3. **Password**, and **Confirm password**, with the strength gauge.
+4. **Main currency**.
+5. The no-recovery acknowledgement.
+6. Primary button: **Create vault**.
 
-## The strength meter
+### Create an administrator account
 
-The bar is ≥12 characters and zxcvbn ≥3, enforced client-side because
-the server never sees the password and cannot check it
-(`register.md`, Rules).
+The form an administrator invite renders, and a shorter one.
 
-- A four-segment bar, filling petrol-600. Not red-to-green — this is not
-  a status signal, it is a magnitude one.
-- Live label: the zxcvbn score word plus its own crack-time estimate.
-- Below the bar, one line of guidance: "Length beats symbols. A
-  four-word phrase you can remember is stronger than `P@ssw0rd!`."
-- The submit button stays disabled until both conditions pass, with the
-  unmet one named inline. Never a generic "password too weak".
+1. Heading: "Create an administrator account".
+2. One line beneath it, saying what the account is:
+
+   > This link creates an administrator account. It invites and removes
+   > people on this instance. It holds no financial data of its own and
+   > cannot read anybody else's. If you also want to keep your own
+   > finances in Solvent, that is a separate account and you need a
+   > separate invite for it.
+
+3. **Username**, the same rule and the same live lowercasing.
+4. **Password**, and **Confirm password**, with the same strength gauge
+   held to the same bar. This password protects the power to remove
+   every account on the instance, so it is not the place to relax it.
+5. Primary button: **Create account**.
+
+Three things on the vault form are absent here, and each is absent
+because there is no vault:
+
+- **No main currency.** Nothing in this account is ever counted in one.
+- **No no-recovery acknowledgement.** That sentence is not true of this
+  account. There is nothing that becomes permanently unreadable,
+  because there is nothing encrypted to begin with. Nothing takes its
+  place, and the form makes no claim about recovery in either
+  direction.
+- **No vault being built.** The account is made and that is the whole
+  of it (Setting up, below).
+
+## The strength gauge
+
+The bar is at least 12 characters and a strength rating that common
+passwords and obvious patterns do not reach however long they are.
+Both are enforced in the browser, because the server never sees the
+password and cannot check it (`register.md`, Rules). Both forms use it,
+unchanged.
+
+- A four-segment bar filling in petrol-600. It reads as a magnitude,
+  not a verdict: it fills, it does not run red to green. A password
+  that is not there yet is a distance left to cover, not a mistake the
+  person has made.
+- A live label beside it: the rating word and roughly how long the
+  password would hold up.
+- One line of guidance under it, the one place in the product where
+  advice changes the outcome: "Length beats symbols. A four-word phrase
+  you can remember is stronger than `P@ssw0rd!`."
+- The button stays disabled until both conditions pass, and whichever
+  one is unmet is named inline. Never a bare "password too weak".
 
 ## The acknowledgement
 
-A checkbox, not a dismissible notice, and the form cannot submit without
-it:
+On the vault form only. A checkbox, not a dismissible notice, and the
+form will not submit without it:
 
 > I understand that if I lose this password, my data is permanently
 > unreadable. Solvent has no way to reset it or recover my vault.
 
-Rendered in a tinted petrol-50 callout with a critical-colored icon.
-This is the single most consequential fact in the product and it gets
-the visual weight to match.
+Rendered in a tinted petrol-50 callout with a critical-colored icon. It
+carries the visual weight of the most consequential sentence in the
+product, because it is.
 
 ## Main currency
 
-A select, plus a 13px ink-secondary note directly beneath: **"This
-cannot be changed later."** Users pick this in five seconds and live
-with it for years — the warning belongs at the point of choice, not in
-settings afterwards (`account-settings.md`, Main currency).
+On the vault form only. A searchable select, with a 13px ink-secondary
+line directly beneath it: **"This cannot be changed later."** People
+choose this in five seconds and live with it for years, so the warning
+belongs at the point of choice and not in settings afterwards
+(`ui/settings.md`).
 
 The list holds only currencies the rate provider can quote into
 (`register.md`, Rules), so there is no "unsupported currency" state to
-design here: every option works for every future lookup.
+design: every option works for every conversion the vault will ever
+make.
+
+## Setting up
+
+Turning a password into a key is deliberately slow, and it is slow on
+both forms, because both accounts hold a password. Measured: **about a
+sixth of a second on a computer, and a little under two seconds on a
+phone or tablet**, where the browser runs this kind of work much more
+slowly on otherwise comparable hardware.
+
+- On submit the button becomes a working state and the form goes quiet.
+  On the vault form it reads "Setting up your vault". On the
+  administrator form it reads "Creating your account", because no vault
+  is being built and the copy must not say one is.
+- A 13px line beneath, on both: "This takes a moment by design. It is
+  what makes your password hard to attack."
+- The vault form is the longer of the two: the key, then the vault's own
+  key, then the first encrypted record. The administrator form stops
+  after the key.
+- The tab stays responsive throughout, and on a phone it stays
+  responsive to touch. It must never look like it has hung.
+- No spinner before the work actually starts.
 
 ## States
 
-- **Invalid invite**: the form never renders. A bare card: "This invite
-  link is not valid." Identical copy for invalid, expired, already-used,
-  and revoked (`register.md`) — the UI must not distinguish them.
-- **Loading**: none; server-rendered.
-- **Deriving**: same Worker progress treatment as Unlock, with copy
-  "Setting up your vault…". Longer here — key derivation plus DEK
-  generation plus the first encrypted record.
-- **Error — username taken**: inline, plain: "That username is taken."
-  Enumeration is accepted here (`register.md`, Edge cases); do not
-  contort the message.
-- **Error — cannot allocate memory for derivation**: same treatment as
-  Unlock, including that it is a defensive state rather than an expected
-  one (`ui/unlock.md`), but the copy must be clearer that no vault was
-  created: "Solvent could not set up your vault. This device does not
-  have enough memory available right now. Your invite is still valid.
-  Close other tabs and try again." The invite is untouched, since
-  nothing was submitted (`register.md`). Do not suggest another device.
-- **Error — submit failed after derivation**: the form retains every
-  field so nothing must be re-typed or re-derived.
-- **Populated**: success lands the user authenticated on the dashboard,
-  keys already in memory — never bounced back to a login screen.
+Both forms unless a state says otherwise.
+
+- **The link is no good**: no form renders at all. A bare card: "This
+  invite link is not valid." Identical wording for a link that is
+  wrong, already used, out of time, or called back (`register.md`), and
+  identical whichever kind of account it would have made. The UI must
+  not distinguish them, by wording, by layout, or by which form it
+  would have shown.
+- **Loading**: none. The page is server-rendered and fetches nothing.
+- **Working**: as above, Setting up.
+- **Error, that username is taken**: inline beneath the field, plain:
+  "That username is taken." A username is taken once across the whole
+  instance, whichever kind of account holds it, so somebody who holds
+  both picks a second name for the second one. Enumeration is accepted
+  here (`register.md`, Edge cases), so do not contort the message.
+- **Error, the passwords do not match**: inline beneath the
+  confirmation field, before anything is derived.
+- **Error, this browser cannot run the encryption**: a hard stop with a
+  plain explanation and no form. No fallback is offered, because none
+  exists.
+- **Error, not enough memory right now**: a separate state from the one
+  above. The browser can run the encryption, and the allocation was
+  refused anyway. The copy names the moment:
+  - On the vault form: "This device does not have enough memory
+    available right now. No vault was created and your invite link is
+    still good. Close some other tabs and try again."
+  - On the administrator form: "This device does not have enough memory
+    available right now. No account was created and your invite link is
+    still good. Close some other tabs and try again."
+  - A **Try again** button, because closing tabs genuinely can fix it.
+  - This is a moment, not a device class. Any device, of any kind, can
+    be too busy right now with enough else open. The copy never says a
+    phone, a tablet, or any other device cannot do this, and never
+    suggests moving to a different one.
+  - No weaker setup is offered. Falling back would create an account
+    permanently easier to break into and record that weakness as though
+    it had been chosen, because of one busy moment.
+- **Error, the submit failed after the slow part**: every field is still
+  filled, including the password. Nobody re-types a password and waits
+  again because of a network blip. The invite is untouched and the copy
+  says so.
+- **Populated**: success signs the person in and takes them where the
+  account belongs. A vault owner lands on the dashboard with their keys
+  already in memory. An administrator lands in the admin area
+  (`ui/admin.md`). Neither is ever bounced to the sign-in screen to
+  type the password they just chose.
+
+## Rules
+
+- Phones and tablets are supported targets, not a degraded case. The
+  form is reachable, usable, and submittable on a touch screen, and the
+  wait on one is stated above rather than apologized for.
+- The page drops the invite token out of the address bar as soon as the
+  form holds it, so a bookmark, a shared screen, or a synced browser
+  history afterwards carries nothing (`admin-invites.md`, Rules).
+- The password field is never logged and is cleared from the DOM on
+  success.
+- Autocomplete: `username` and `new-password`, so a password manager
+  can generate and store one. A manager-generated passphrase is the
+  most realistic protection a vault with no recovery can have.
+
+## What it deliberately does not show
+
+- **No way to choose the kind of account.** The link decides. Neither
+  form carries a control, a toggle, or a hint that the other exists.
+- **No email address, no phone number, no verification step.** Solvent
+  never sends anything, so an address would exist only to send a
+  recovery mail that cannot exist.
+- **No password recovery, reset, recovery code, or security question**,
+  and no link that implies one is coming later.
+- **No composition rules**, no required symbol, digit, or mixed case.
+  They push people toward short passwords with punctuation, which is
+  the wrong direction here.
+- **No sign-in link.** Somebody on this page holds an invite and does
+  not have an account yet.

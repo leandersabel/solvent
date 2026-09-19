@@ -182,8 +182,8 @@ with two callers rather than two record writers.
   holds for an administrator registration too: no vault does not mean
   no Argon2id, because `verifier` is attacked offline either way.
 - **Client can run WASM but cannot allocate the KDF's memory** → a
-  distinct hard failure naming the device, with a retry, and no vault
-  created. This is a **defensive path, not an expected one**: the 64 MiB
+  distinct hard failure naming the moment rather than the device, with
+  a retry, and no vault created. This is a **defensive path, not an expected one**: the 64 MiB
   allocation succeeds on every current target, and a device that refuses
   it is memory-starved at that moment rather than incapable. It is
   specified because the alternative to a designed state is a raw

@@ -2,122 +2,129 @@
 
 ## Purpose
 
-Record what one account was worth on one date. The highest-frequency
-screen in the product — everything else is setup, this is the recurring
-act — so it optimizes for speed and for not lying about where the rate
-came from.
+One holding, one date. The small form for everything the sweep is not
+for: an odd date, a March figure being added now that the statement has
+turned up, ten years of old statements being backfilled.
 
-Exercises: `spec/features/record-snapshot.md`, and the proposal half of
-`spec/features/rate-lookup.md`.
+Updating several holdings in one sitting is `update-values.md`, which
+is the primary route for a routine update and where the age of each
+figure is shown. This form is the other door, and the two write the
+same thing.
+
+Exercises: `spec/features/record-snapshot.md`, and the refresh half of
+`spec/features/record-rate.md`.
 
 ## Layout
 
-Modal, max-width 460px, reachable from any account row and from the
-account's detail screen. The same modal, pre-filled, is what edits an
-existing snapshot (`account-detail.md`).
-
-This is the **single-account** path: one holding, one date, including
-odd dates and backfilled history. Updating several accounts in one
-sitting is `update-values.md`, which is the primary entry point for a
-routine update and where the age of each figure is shown.
+Modal, max-width 460px, reachable from any account row on the dashboard
+and from the holding's own screen. The same modal, pre-filled, is what
+edits an existing entry (`account-detail.md`).
 
 - **Account** — preselected when opened from a row; otherwise a select.
-  Static when editing: a snapshot does not move between accounts, since
-  its value is denominated in one account's unit.
+  Static when editing: an entry does not move between holdings, since
+  its value is denominated in one holding's unit.
 - **Date** — defaults to today. Future dates blocked. Editable when
-  correcting an existing snapshot; moving it onto a date the account
+  correcting an existing entry. Moving it onto a date the holding
   already holds prompts before destroying the record already there (see
   below).
-- **Value** — the big field, in the account's native unit, unit shown as
-  a suffix inside the input. `inputmode="decimal"`.
-- **Rate** — pre-filled from the proposal where available, always
-  editable. Labelled with both units: "1 XAU-ozt = ___ CHF".
+- **Value**, the big field, in the holding's native unit, unit shown
+  as a suffix inside the input. `inputmode="decimal"`.
 - **Live result** — beneath, ink-secondary, updating as you type:
   "= 41 230.00 CHF". This is the number the user is actually reasoning
-  about and it should never require a save to see.
+  about and it should never require a save to see. It converts at the
+  price for **the date on the form**, which is the date's own price
+  where one exists and the proposal for that date otherwise
+  (`record-rate.md`).
 - **Note** — optional, collapsed behind "Add a note".
-- Primary "Save snapshot".
+- **The prices line**, folded, below. See next section.
+- Primary "Save".
 
-## Rate provenance
+**There is no rate field on this form.** A price belongs to a unit and
+is shared by every holding measured in it, so a rate beside one
+holding's figure would be one fact shown per holding, where two of them
+could be typed with two different numbers for one day
+(`record-rate.md`). The prices this save writes are on their own line,
+which is about the date rather than about this holding.
 
-The rate's origin is shown, not hidden, because a user auditing old
-figures needs to know which were guesses (`record-snapshot.md`,
-`rateSource`):
+## The prices line
 
-- **proposed** — a small brass chip "Market rate · 31 Jul" beside the
-  field.
-- **edited** — the chip changes to "Edited from 0.9312" the moment the
-  user changes the value, naming the rate stored as `proposedRate`
-  (`record-snapshot.md`), so the same chip renders identically a year
-  later on `account-detail.md`. Never silently keep the proposed badge.
-- **manual** — no chip; the label reads "Enter the rate".
+Recording something writes that date's prices, exactly as the sweep
+does (`record-rate.md`, The refresh), so the form says what it is about
+to write rather than doing it silently. One folded line, ink-secondary,
+which opens into the same rate lines the sweep carries at its foot
+(`update-values.md`):
 
-## The four rate situations
+- **A date holding no recording yet**: "Prices for 31 July will be
+  recorded with this", opening to the proposals. A figure dated 2019
+  takes 2019's prices, which is what makes a backfilled entry worth
+  anything at all. Changing a line here is the same act as changing one
+  on the sweep and carries the same announcement of what it moves.
+- **A date that already holds a recording**: "31 July already holds
+  prices. This figure joins them." It opens to that recording's stored
+  prices, read only, with a link to that recording
+  (`recording-detail.md`), where they are changed. **Nothing is looked
+  up and no price is rewritten**, because the figure being added is
+  joining a sitting that already priced its date.
+- **A holding measured in the main currency** still writes the date's
+  prices for every other unit in the vault. That is the case the whole
+  split exists for, and the line says so rather than being absent.
 
-Which rate applies in each is `record-snapshot.md`. What this screen
-adds is what the user sees:
+## Editing an existing entry
 
-1. **Account unit = main currency** → the rate field is **hidden
-   entirely**. A disabled "1" is noise.
-2. **A symbol with `lookup: true`** → a proposal is requested for that
-   unit and date. The value field never participates in or triggers the
-   request (`architecture.md`, Base-amount rule).
-3. **Free text** → no request. "This account has no price source —
-   enter the rate yourself", rather than an empty field with no
-   explanation.
-4. **A symbol with `lookup: false`** (silver, platinum, palladium in
-   v1) → no request either, because the client holds the symbol table
-   and knows none is coming. Copy names the metal — "No market rate for
-   silver yet — enter it yourself" — and must not reuse the outage
-   notice below, which says something is broken when nothing is.
+The same modal, pre-filled with the stored value, date and note.
 
-## Editing an existing snapshot
-
-The same modal, pre-filled — including the rate, which comes from the
-stored record and not from a fresh proposal (`record-snapshot.md`, The
-rate when editing). The chip shows the stored `rateSource`, so a
-snapshot saved as "Market rate · 31 Jul" still reads that way when
-reopened a year later.
-
-- Changing the **value** or the note touches no rate field and issues no
-  request.
-- Changing the **rate** flips a `proposed` chip to "Edited from …" as it
-  does at entry; a `manual` one stays chipless.
-- Changing the **date** fetches a proposal for the new date and offers
-  it as a one-click "Use the rate for 12 Aug" beside the field. It is
-  never applied on its own — declining keeps the stored rate, which is
-  the right outcome for the common case of a mistyped date. If no
-  proposal comes back, no offer appears and nothing is blocked.
+- **No edit here touches a price.** Changing the value, the note, or
+  the date issues no price request and writes no price record. Moving
+  an entry from 30 July to 31 July changes which price values it, only
+  because a price is looked up by date, and the prices themselves are
+  untouched (`record-snapshot.md`).
+- Correcting a price is a different act, done in the recording for its
+  date (`recording-detail.md`), where the holdings it moves are on the
+  screen.
+- The prices line reads, unfolded or not, as the date's stored prices,
+  read only.
 
 ## States
 
-- **Loading (proposal in flight)**: the rate field shows an inline
-  skeleton, not a spinner, and the value field is **immediately usable**
-  — the user should be typing the value while the rate loads.
-- **Error — provider down, rate-limited, or no data**: the field falls
-  back to manual with an inline ink-secondary notice: "Market rate
-  unavailable — enter it yourself." Not an error color. **Saving a
-  snapshot must never be blocked by the proxy being unavailable.**
-- **Error — duplicate date, entering**: on save, a confirm rather than a
+- **Loading (proposals in flight)**: the folded prices line shows an
+  inline skeleton, and the value field is **immediately usable**. The
+  user should be typing the value while prices resolve, and saving is
+  never gated on them.
+- **Error, a price source is unavailable**: the affected line inside
+  the fold says so in ink-secondary, never an error color, and nothing
+  is written for that unit. **Saving is never blocked by the proxy
+  being unavailable** (`update-values.md`, which owns the line states).
+- **Error, prices did not save**: the entry is saved and the message
+  says the prices were not updated, naming any unit the person typed
+  themselves. The entry is never rolled back for it.
+- **Error, duplicate date, entering**: on save, a confirm rather than a
   rejection: "You already recorded 12 450.00 USD for 31 July. Replace
-  it?" — the previously recorded value, in the account's native unit.
-  Confirming updates the existing record in place; declining leaves
-  the original untouched and returns to the form.
-- **Error — duplicate date, moving**: editing an existing snapshot onto
-  an occupied date is a different act and gets different copy, because a
+  it?", naming the previously recorded value in the holding's native
+  unit. Confirming updates the existing record in place. Declining
+  leaves the original untouched and returns to the form. This prompt
+  exists because the date here is chosen blind, and it is deliberately absent
+  from the sweep, where the stored figure is already in the field being
+  edited (`record-snapshot.md`).
+- **Error, duplicate date, moving**: editing an existing entry onto an
+  occupied date is a different act and gets different copy, because a
   second record dies: "30 July already holds a snapshot of 12 100.00
   USD. Moving this entry there will delete it." Destructive styling on
   the confirm. The client writes the move before deleting the displaced
-  record, so a failure leaves two snapshots on one date rather than none
-  — a visible fault the detail screen surfaces, not silent loss
-  (`record-snapshot.md`).
-- **Error — validation**: non-numeric or malformed value/rate, inline,
-  no submission. Future date, inline. Zero and negative values are
-  **valid** and must not be blocked — zero is a closed-out position,
+  record, so a failure leaves two entries on one date rather than none,
+  a visible fault the holding's screen and that date's recording both
+  surface, not silent loss (`record-snapshot.md`).
+- **Error, the date became taken while you were working**: the save is
+  refused whole and nothing is written. The wording names the date and
+  not the person, and one button opens that recording
+  (`update-values.md`, which owns the copy).
+- **Error, validation**: non-numeric or malformed value, inline, no
+  submission. More than twelve decimal places, rejected at input rather
+  than truncated. Future date, inline. Zero and negative values are
+  **valid** and must not be blocked: zero is a closed out position,
   negative is a mortgage.
-- **Error — archived account**: the entry point does not exist for
-  archived accounts; the only exception is the closing snapshot written
-  by the archive flow (`account-form.md`).
+- **Error, archived account**: the entry point does not exist for
+  archived holdings. The only exception is the closing value written by
+  the archive flow (`account-form.md`).
 - **Populated**: saved; the modal closes and the dashboard updates from
   local state with no refetch.
 
@@ -125,4 +132,4 @@ reopened a year later.
 
 `record-snapshot.md` applies unchanged: decimal strings end to end, a
 calendar date, and a value that is encrypted before it leaves the
-browser and appears in no rate request.
+browser and appears in no price request, in any field or any encoding.

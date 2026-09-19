@@ -195,7 +195,7 @@ age is stated in words rather than flagged.
 
 | Form | Mark | Where |
 |---|---|---|
-| Chart | tick marks under the x-axis, ink-muted, at the dates real snapshots exist | the trend chart (`dashboard.md`) |
+| Chart | tick marks under the x-axis, ink-muted, at the dates a real quantity was recorded | the trend chart (`dashboard.md`) |
 | Row | an "Estimated" chip — hairline `#d8dfe1` fill, ink-secondary text, otherwise the standard chip | a carried-forward figure (`update-values.md`) |
 
 The chart form is under the axis rather than in the fill because four
@@ -204,9 +204,17 @@ at the density of a decade of history. A row has no axis to hang a tick
 under, so the mark changes form; the meaning and the neutral register do
 not.
 
-Both forms ship **with wording, never as the mark alone** — "last
-updated about a year ago" beside the chip, the "Show what's estimated"
-caption beside the ticks (Accessibility).
+**The chart's ticks are on when the chart loads**, and the control that
+takes them away is **Just the line** (`dashboard.md`). The accurate
+drawing is the one nobody has to ask for, and the tick earns its place
+twice over: it says which part of the line the reader gave the app, and
+it is the click target that opens that date's recording
+(`recording-detail.md`).
+
+Both forms ship **with wording, never as the mark alone**: "last
+updated about a year ago" beside the chip, and beside the ticks the
+name of the control that removes them, which says what they are by
+saying what is left without them (Accessibility).
 
 ## Status
 
@@ -221,8 +229,28 @@ with an icon and a text label** — never color alone.
 
 `warning` has no consumer in v1. The token exists so the status triad is
 complete, but **nothing should reach for it without first checking that
-the thing it marks is really a warning.** Data that is merely old is
-not: figure age is stated in words, not flagged (`net-worth-view.md`).
+the thing it marks is really a warning.** Four states in this product
+get mistaken for one, and none of them is:
+
+- **Data that is merely old.** Figure age is stated in words, not
+  flagged (`net-worth-view.md`).
+- **A holding left alone on a sweep.** Leaving a row alone is a
+  first-class answer and a partial update is the ordinary case, so
+  nothing counts, flags or scores what was left (`update-values.md`).
+- **A recording holding no figures.** Its prices are why the date is
+  still there, which makes it an ordinary state rather than wreckage
+  (`recording-detail.md`).
+- **A price the source did not answer for, or a unit nobody has priced
+  yet.** The line says so in ink-secondary prose and nothing is
+  blocked (`update-values.md`). Marking an outage the product expects,
+  and degrades cleanly through, trains the reader to ignore the mark
+  before the day it means something.
+
+A write that actually failed is a failure and takes `critical`, not
+`warning`: a save that landed in part names what did not land
+(`update-values.md`), and a fault the client will not resolve on its
+own, such as two entries on one date, is flagged critical wherever it
+appears.
 
 `good` and `critical` clear 4.5:1 and may carry text. **`warning` may
 not**: at 3.96 it is an icon, border, and fill color only, and the label
@@ -244,17 +272,18 @@ icon+label pairing carries the distinction, not hue.
 
 ## Typography
 
-**System stack, no webfont:** `system-ui, -apple-system, "Segoe UI",
-sans-serif`.
+**The device's own typeface, everywhere:** `system-ui, -apple-system,
+"Segoe UI", sans-serif`. No webfont, no display face, no serif, and the
+wordmark is set in the same stack as the body. The client settled this
+(`product/app-shell.md`), so there is no wordmark exception to reach
+for.
 
-No display or serif face. This is a constraint the architecture already
-imposes, not a style preference: `spec/architecture.md` (Supply chain)
-requires every asset be self-hosted with SRI and forbids third-party
-CDNs, and the frontend has no build step. A webfont would add bytes, a
-pinning obligation, and a FOUT on the unlock screen for no functional
-gain. Elegance here comes from spacing and restraint. If a serif
-wordmark is ever wanted, it must be self-hosted with an SRI hash like
-any other asset.
+The architecture holds the same line from the other side.
+`spec/architecture.md` (Supply chain) requires every asset be
+self-hosted with SRI and forbids third-party CDNs, and the frontend has
+no build step, so a webfont would add bytes, a pinning obligation, and
+a flash of unstyled text on the slowest screen in the product. Elegance
+here comes from spacing and restraint.
 
 | Role | Size / weight | Notes |
 |---|---|---|
@@ -286,16 +315,33 @@ only its own content region.
   global **Update values** action and the lock button at the right.
   Both buttons take the chrome variant (Components), not the secondary
   one, which is specified for the light ground.
-- **Nav is three entries — Dashboard, Settings, and Admin for admins.**
-  There is deliberately **no "Accounts" entry**: the dashboard's own
-  table *is* the account list (`dashboard.md`), so a fourth entry would
-  either lead back to the screen the user is on or open a second,
-  thinner copy of it.
-- **Update values** is a global action rather than a nav destination —
-  it opens the sweep (`update-values.md`) from anywhere, which is what
-  makes the sweep reachable while the user is deep in one account. The
-  dashboard hero repeats it because that is where a user arrives
-  already intending to do it.
+- **Nav is two entries, Dashboard and Settings**, the same two for
+  everybody who has a vault.
+  - There is deliberately **no "Accounts" entry**: the dashboard's own
+    table *is* the account list (`dashboard.md`), so a third entry
+    would either lead back to the screen the user is on or open a
+    second, thinner copy of it.
+  - There is deliberately **no "Admin" entry, in any state.**
+    Administering the instance is done from a separate account with no
+    vault (`app-shell.md`), so a vault owner has nowhere
+    administrative to go and nothing in this bar leads there.
+- **Update values** is a global action rather than a nav destination. It
+  opens the sweep (`update-values.md`) at today, going straight into
+  editing today's recording with no screen in between, which is what
+  makes the sweep reachable while the user is deep in one account. It
+  is the fast path for the one act somebody performs every month, and a
+  page in front of it would add a step to exactly the thing the product
+  exists to make cheap.
+- **The dashboard does not repeat it.** The dashboard hero carries
+  **New recording**, which asks which date and routes on the answer
+  (`dashboard.md`). One control goes to today and one asks the
+  question, so neither screen carries two buttons for one thing.
+- **The administrator's frame** is the same bar carrying almost
+  nothing: the wordmark, and a single **Sign out** at the right. No nav
+  entries at all, no Update values, no Lock, because an administrator
+  has no vault, no holdings, and no keys to drop (`app-shell.md`). The
+  two bars are told apart by what they carry, never by looking
+  different, and movement inside the admin area belongs to `admin.md`.
 - **Lock button** — the idle lock, triggered by hand. One click
   discards the keys and all decrypted state and shows the re-unlock
   screen (`login.md`, Rules); the server session stays alive, so
@@ -303,7 +349,8 @@ only its own content region.
   the control someone reaches for when another person walks into the
   room, and a confirm step spends the seconds it exists to save.
 - Content max-width 1200px on the ground. Narrower screens set their
-  own width (forms 480px, the sweep and account detail 900px).
+  own width (forms 480px, and 900px for the sweep, a recording's own
+  screen, and account detail).
 - The shell is server-rendered Jinja (`architecture.md`, Components) and
   carries no plaintext — nav labels and the wordmark. The unauthenticated
   screens sit outside it (`unlock.md`, `register.md`) and embed the
@@ -323,13 +370,80 @@ only its own content region.
 - **Button, destructive**: critical text on transparent, critical border;
   filled critical only inside a confirmation dialog.
 - **Input**: white fill, hairline border, petrol-600 2px focus ring.
-  Never remove the focus ring.
+  Never remove the focus ring. **An inline rename is this same input
+  revealed in place** by an Edit action and saved by an explicit
+  action, not a control of its own. A field that saves on blur turns
+  clicking away into a write.
 - **Chip**: petrol-50 fill, petrol-700 text, 4px radius, 13px. Used for
-  a dimension assignment (`Liquidity: Cash`) and for status chips such
-  as "Archived".
+  a dimension assignment (`Liquidity: Cash`), for status chips such as
+  "Archived", and for a price's provenance, whose wording is owned by
+  `recording-detail.md`.
+- **Date picker, marked**: a month grid on a white surface, opening on
+  today. A date that already holds a recording carries a petrol-600 dot
+  under the numeral **and** says so in its accessible name ("31 July,
+  has a recording"), because a dot is a color and identity is never
+  color-alone. Future dates are not selectable at all, rather than
+  selectable and then refused (`record-snapshot.md`). Used by **New
+  recording** (`dashboard.md`).
 - **Card**: white surface, hairline border, 10px radius, 24px padding.
 - **Table**: no vertical rules; `rule` horizontal dividers; money columns
   right-aligned and tabular.
+- **Select**: the Input's box, border, radius and focus ring, with a
+  petrol-400 chevron. A native `select` wherever the list is short and
+  fixed, because it is the control every device already knows and it
+  costs nothing to operate. Used for a dimension, a grouping, a value
+  order.
+- **Combobox, searchable**: a Select that filters as you type, for a
+  list too long to scan. The typed text narrows the list and never
+  becomes the value on its own: **a free text value is only ever
+  committed by an explicit "use what I typed" option in the list**, so
+  a mistyped search can never be saved as a new thing by accident.
+  Filtering is local, over a table the client already holds, so it
+  contacts nothing. The unit picker is the consequential one, since a
+  holding's unit freezes once it has a figure (`account-form.md`, which
+  owns what goes in the list and in what order).
+- **Checkbox**: 16px, hairline border unchecked, petrol-600 fill with a
+  white check when checked, petrol-600 focus ring. The label is the
+  click target with it. Never a bare switch: a checkbox states what it
+  turns on in words beside itself.
+- **Dialog**: white surface, 10px radius, 32px padding, max-width
+  480px, centered on an ink-primary scrim at 40%. **The one place a
+  soft shadow is permitted.** It traps focus, restores it to whatever
+  opened it, closes on Escape, and its first line is a heading that
+  names the act rather than asking "Are you sure".
+  - **A destructive dialog** names the consequence in its body and
+    carries the filled critical confirm (Button, destructive). One
+    confirmation, never a ladder and never a word to type back.
+  - **At phone width it is a full-screen sheet**, same content and same
+    focus behavior, because a centered box inside a narrow viewport
+    leaves nothing for the scrim to show. The first version ships the
+    dialog, and nothing about the sheet is out of reach from it
+    (`app-shell.md`).
+- **Disclosure**: a label with a chevron that opens a section in place.
+  A real `button` with `aria-expanded`, never a bare chevron, and the
+  label says what is inside rather than "More". Closed by default only
+  where what is inside is genuinely secondary, and the count of what is
+  hidden is on the label where there is one to give. It carries the
+  archived list, "Add a note", a danger zone, the sweep's prices line,
+  and the chart's table fallback.
+- **Section switcher**: a row of links moving between the sections of
+  one screen. Active in brass-600 with a 2px brass-500 rule beneath it,
+  inactive in petrol-600, so the active one is marked by the rule as
+  well as by hue. **It is not navigation** and never appears in the top
+  bar. It exists because an administrator's bar carries no nav at all,
+  so movement inside the admin area belongs to the screen
+  (`app-shell.md`, `admin.md`).
+- **Progress, determinate**: a 4px track in petrol-100 with a
+  petrol-600 fill, under a label naming the phase in words and the
+  position within it. For work with known phases that runs long enough
+  that a spinner would say nothing, which in this product is the import
+  (`export-import.md`). The label is what carries the meaning: a bar
+  with no phase named is a spinner with extra steps.
+- **Reorder control**: a drag handle, plus **Move up** and **Move
+  down** on every item. The handle is never the only route. Order
+  changes announce themselves ("moved to position 2 of 5") so the
+  result is available without sight, and the buttons are what make the
+  control work on touch and from the keyboard (`dimensions.md`).
 
 ## States
 
@@ -360,6 +474,12 @@ upward from zero reads as a slot machine. Respect
   direct labels for ≤4; status carries an icon and a label.
 - All interactive elements reachable and operable by keyboard; modals
   trap focus and restore it on close.
+- **No drag is ever the only route.** Every drag interaction has a
+  keyboard and pointer equivalent doing the same job: a reorder ships
+  Move up and Move down (Components), and a file drop zone is always
+  paired with a real file input, which is the control that has to
+  work. A drop zone is a convenience laid over that input, which is
+  why it needs no component of its own.
 - **Decrypted content renders via `x-text`/`textContent` only** — never
   `x-html`, and never a chart library that takes an HTML string for
   labels or tooltips (`spec/architecture.md`, Application hardening).

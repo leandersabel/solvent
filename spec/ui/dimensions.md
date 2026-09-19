@@ -16,7 +16,7 @@ beside Export / import, and from the dashboard's "Group by" control when
 no dimension exists yet.
 
 One card per dimension, in the profile's configured order — which is
-also the order of the dashboard's "Group by" select, so dragging a card
+also the order of the dashboard's "Group by" select, so moving a card
 reorders that too.
 
 Each card carries:
@@ -29,13 +29,25 @@ Each card carries:
   list. A dimension covering a third of the accounts draws a chart that
   is correct and useless, and this is where that gets noticed — at the
   point of configuration, not after a confusing chart.
-- Its **values**, in band order, each with a drag handle, an editable
-  label, and an archive action. Order here is the stacking order in the
-  chart and must never be sorted by size (`net-worth-view.md`).
+  - Coverage counts **active accounts**, the same set the dashboard
+    table holds. An archived holding is a closed position and has no
+    say in whether a dimension is worth charting.
+  - It is stated in ink-secondary and carries **no status color and no
+    icon**. Low coverage is a fact about a setting, not a fault, and a
+    vault where nothing is filed is a complete vault
+    (`manage-accounts.md`).
+- Its **values**, in band order, each with a reorder control, an
+  editable label, and an archive action. Order here is the stacking
+  order in the chart and must never be sorted by size
+  (`net-worth-view.md`).
 - `+ Add value`, and an overflow menu holding **Archive dimension**.
 
 Beneath the cards: `+ Create a dimension`, and a collapsed **Archived**
 section when anything is archived.
+
+Every label on this screen is decrypted user text and renders through
+`x-text` / `textContent` only, in the card, in the dialogs, and in the
+Archived section (`design-system.md`, Accessibility).
 
 ## The >4 note
 
@@ -61,6 +73,35 @@ rendering constraint from the validated chart palette
   typing a tag once was — one field, one button.
 - Ids are generated, never asked for. The user never sees one.
 
+## Editing a label
+
+In place, committed on Enter or on blur, abandoned on Escape with the
+stored label still shown. One write, the profile.
+
+- A label may not be blank or whitespace alone. The field refuses the
+  commit inline and keeps what was typed, because a nameless band is
+  unreadable in a chart and unpickable on the account form.
+- **Two dimensions, or two values, may carry the same label.** Identity
+  is the id, the labels are display text, and a screen that refused a
+  duplicate would be refusing something the record shape allows and an
+  import can hold. Nothing on this screen deduplicates or renumbers
+  them.
+
+## Reordering
+
+Value order is the chart's band order and dimension order is the "Group
+by" order, so both are real data and both are reachable three ways:
+
+- Dragging the handle.
+- **Move up and move down on every handle**, keyboard-operable, never
+  drag-only: band order is load-bearing and a drag-only control puts it
+  out of reach (`design-system.md`, Accessibility).
+- The same two controls answer to touch, which is what makes the screen
+  usable on a phone without a drag gesture inside a scrolling page.
+
+A move writes the profile once, on drop or on the key press. There is no
+save button and no reorder mode.
+
 ## Archiving and restoring
 
 "Delete" is called **Archive**, and the dialog says why in one line:
@@ -73,6 +114,12 @@ rendering constraint from the validated chart palette
   for it — which is to say, it simply stops appearing.
 - Archiving a **value** moves its accounts to "Unassigned" in that
   dimension.
+- **Archiving the last active value of a dimension is allowed.** The
+  dimension stays, reads as covering nothing, and every account shows
+  "Unassigned" for it, which is exactly how it read before anything was
+  filed. Refusing would invent a rule the record shape does not hold,
+  and somebody who wants the dimension gone has the action for that one
+  menu away.
 - **Restoring either brings every assignment back exactly**, because
   nothing was ever removed from an account record.
 - There is no permanent delete and **no "remove from all accounts"
@@ -81,10 +128,27 @@ rendering constraint from the validated chart palette
   nobody reads (`account-settings.md`). The screen must not offer one;
   an archived definition is one line in the profile.
 
+The **Archived** section lists archived dimensions and, inside each
+live card, archived values, each with a restore action and no other
+control. An archived label is not editable and not reorderable: it is
+out of the chart, and its only question is whether it comes back.
+
+## At phone width
+
+The cards stack and each one keeps every control it has on a wide
+screen. The two things that would break are handled rather than dropped:
+
+- Reordering is the move-up and move-down controls, not a drag gesture
+  competing with the page scroll.
+- The coverage line wraps under the label instead of sitting beside it,
+  and its unassigned link stays a tap target of its own.
+
+Nothing here lives only in a wide layout (`app-shell.md`, On a phone).
+
 ## States
 
 - **Loading**: none. Dimensions come from the in-memory profile.
-- **Empty — no dimensions**: the most important state on this screen,
+- **Empty, no dimensions**: the most important state on this screen,
   because "dimension" is the least self-explanatory word in the product.
   One card explaining it concretely, with one primary action:
 
@@ -97,20 +161,38 @@ rendering constraint from the validated chart palette
 
   No nagging elsewhere in the app; a vault with no dimensions is fully
   usable and charts as a single "Total" band.
-- **Error — save failed**: inline on the card, the edit preserved, and
+- **Empty, no accounts yet**: the cards render normally and coverage
+  reads "0 of 0 accounts assigned". A dimension configured before the
+  first holding is a normal order of work, and nothing on the screen
+  treats it as premature.
+- **Saving**: the change is shown at once from local state, with the
+  control disabled until the write answers. No spinner for a write this
+  small (`design-system.md`, States).
+- **Error, save failed**: inline on the card, the edit preserved, and
   the previous value still shown as current. Every write here is a
   single record, so a failure changes nothing.
-- **Error — Conflict stale profile**: "Your settings were changed in
+- **Error, Conflict stale profile**: "Your settings were changed in
   another tab." The screen reloads the profile and asks the user to redo
   the edit rather than merging.
 - **Populated**: as above.
+
+## What it deliberately does not show
+
+- **No account names.** Coverage is a count with a link out to the
+  filtered list. Listing holdings inside a configuration screen would
+  make it a second, thinner account list.
+- **No ids**, anywhere, in any state. They are what `dims` stores and
+  they are never anybody's business.
+- **No value totals and no chart preview.** What a band is worth
+  belongs to the dashboard, which is one click away, and a figure here
+  would be a second place for the same number to be right or wrong.
+- **No permanent delete and no "remove from all accounts".**
+- **No cap on values**, only the note above.
 
 ## Rules
 
 - Every operation here writes at most one record, the profile
   (`account-settings.md`, Dimensions). Assert it in tests rather than
   assuming it.
-- Reordering is keyboard-operable, not drag-only: each handle exposes
-  move-up and move-down, since band order is load-bearing and a
-  drag-only control would make it unreachable (`design-system.md`,
-  Accessibility).
+- Nothing on this screen reads or writes an account record, so no
+  operation can fail partway across several of them.

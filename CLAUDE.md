@@ -10,7 +10,8 @@ talks to the client.
 | Agent | Owns | Hands to |
 |---|---|---|
 | `product-owner` | `spec/product/*.md` | architect |
-| `architect` | `spec/architecture.md`, `spec/features/*.md`, `security/` | compiler |
+| `architect` | `spec/architecture.md`, `spec/features/*.md`, `security/` | designer |
+| `designer` | `spec/ui/*.md`, the design system | compiler |
 | `compiler` | `spec/.compiled/*.json`, `spec/status.md` | engineer |
 | `engineer` | application code and its tests | reviewer |
 | `reviewer` | findings against the contract | release |
