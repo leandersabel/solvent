@@ -124,14 +124,23 @@ successfully**.
 These were not in anything you said. They are marked so you can overrule
 them.
 
-- **A file exported by one person can be restored into another person's
-  account on the same instance**, given that file's password. The file
-  says nothing about whose vault it was, which is also what makes it
-  portable at all. It means a household member can hand you their vault.
-  See the question raised with this batch.
+- **A file exported by one person can be restored into another
+  person's account on the same instance**, given that file's password.
+  The file says nothing about whose vault it was, and that is kept
+  rather than tolerated: it is what makes the file portable, it is why
+  a vault can move to a new account or a fresh install without anybody
+  helping, and it is why a backup found by a stranger names nobody.
+  Restoring still needs the password the file was made under, so it is
+  not something that can be done to you.
 - **Nothing reminds you to make a backup.** Every download is something
   you do deliberately, and the app neither schedules one nor tells you
-  how long it has been. See the question raised with this batch.
+  how long it has been.
+
+  Telling you how long it has been, or putting a copy somewhere by
+  itself, is wanted and is not in the first version. What the first
+  version owes either of them is that a backup stays a plain file the
+  person holds: nothing else may come to depend on the app knowing when
+  one was last made.
 - **There is a ceiling on how often the whole vault can be downloaded**,
   a few times an hour. It reads everything you own, and nobody backs up
   more often than that.
