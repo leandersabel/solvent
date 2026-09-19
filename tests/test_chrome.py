@@ -6,6 +6,7 @@ from __future__ import annotations
 import base64
 import hashlib
 import json
+import re
 from pathlib import Path
 
 import flask
@@ -13,6 +14,7 @@ import flask
 from solvent.config import DEFAULT_KDF_ENVELOPE
 from solvent.csrf import csrf_exempt
 from solvent.shell import ALPINE_SRI, nav_entries
+from tests.helpers import seed_session, seed_user
 
 
 def test_nav_shows_dashboard_and_settings_for_non_admin():
@@ -35,7 +37,28 @@ def test_nav_for_no_user_matches_non_admin():
     assert [e["label"] for e in entries] == ["Dashboard", "Settings"]
 
 
-def _render_shell_page(app):
+def test_rendered_nav_for_an_admin_adds_admin_third(app):
+    user_id = seed_user(app, "root", is_admin=True)
+    body = _render_shell_page(app, seed_session(app, user_id)).get_data(
+        as_text=True
+    )
+    assert _rendered_nav_labels(body) == ["Dashboard", "Settings", "Admin"]
+
+
+def test_rendered_nav_for_a_non_admin_omits_admin(app):
+    user_id = seed_user(app, "alice")
+    body = _render_shell_page(app, seed_session(app, user_id)).get_data(
+        as_text=True
+    )
+    assert _rendered_nav_labels(body) == ["Dashboard", "Settings"]
+
+
+def test_rendered_nav_without_a_session_matches_non_admin(app):
+    body = _render_shell_page(app).get_data(as_text=True)
+    assert _rendered_nav_labels(body) == ["Dashboard", "Settings"]
+
+
+def _render_shell_page(app, cookie=None):
     @app.route("/__test/chrome")
     @csrf_exempt
     def chrome_page():
@@ -44,7 +67,15 @@ def _render_shell_page(app):
             "{% block content %}<p>content</p>{% endblock %}"
         )
 
-    return app.test_client().get("/__test/chrome")
+    client = app.test_client()
+    if cookie is not None:
+        client.set_cookie("solvent_session", cookie)
+    return client.get("/__test/chrome")
+
+
+def _rendered_nav_labels(body):
+    nav = body[body.index("<nav") : body.index("</nav>")]
+    return re.findall(r'<a href="[^"]*">([^<]+)</a>', nav)
 
 
 def test_shell_page_embeds_current_default_kdf_envelope(app):
@@ -133,10 +164,22 @@ def test_alpine_asset_is_the_csp_safe_build_and_matches_pinned_sri():
     computed_sri = "sha384-" + base64.b64encode(digest).decode()
     assert computed_sri == ALPINE_SRI
 
-    # The CSP build's own marker: it ships without an eval-based
-    # expression compiler string present in the plain build.
+    # The CSP build ships its own parser and says so. These strings
+    # exist only in that build, where the plain build compiles
+    # expressions through the Function constructor instead.
     source = vendor_path.read_text(errors="ignore")
-    assert "new Function(" not in source
+    assert "prohibited in the CSP build" in source
+    assert "CSP Parser Error" in source
+
+
+def test_shell_js_is_loaded_before_the_alpine_bundle(app):
+    """The bundle calls `Alpine.start()` from a microtask, and the
+    microtask queue drains between two deferred scripts. A listener
+    registered after it would never see `alpine:init`, so `x-data` and
+    `$store.shell` would resolve to undefined and the lock button would
+    throw."""
+    body = _render_shell_page(app).get_data(as_text=True)
+    assert body.index("js/shell.js") < body.index("alpinejs-csp")
 
 
 def test_shell_page_references_the_vendored_alpine_with_integrity(app):
@@ -146,3 +189,51 @@ def test_shell_page_references_the_vendored_alpine_with_integrity(app):
     assert ALPINE_SRI in body
     assert "cdn.jsdelivr.net" not in body
     assert "unpkg.com" not in body
+
+
+def _contrast(first: str, second: str) -> float:
+    """WCAG relative-luminance contrast ratio for two `#rrggbb` colors."""
+
+    def luminance(color: str) -> float:
+        channels = [int(color[i : i + 2], 16) / 255 for i in (1, 3, 5)]
+        channels = [
+            c / 12.92 if c <= 0.04045 else ((c + 0.055) / 1.055) ** 2.4
+            for c in channels
+        ]
+        return (
+            0.2126 * channels[0] + 0.7152 * channels[1] + 0.0722 * channels[2]
+        )
+
+    lighter, darker = sorted(
+        (luminance(first), luminance(second)), reverse=True
+    )
+    return (lighter + 0.05) / (darker + 0.05)
+
+
+def _css_token(name: str) -> str:
+    css = (
+        Path(__file__).resolve().parent.parent
+        / "solvent"
+        / "static"
+        / "css"
+        / "tokens.css"
+    ).read_text()
+    return re.search(rf"--{name}:\s*(#[0-9a-f]{{6}})", css).group(1)
+
+
+def test_top_bar_controls_clear_their_contrast_floors():
+    """The chrome button exists because the secondary one does not
+    clear these on petrol-800 (design-system.md, Components,
+    Accessibility): body text 4.5:1, non-text 3:1."""
+    bar = _css_token("petrol-800")
+
+    assert _contrast("#ffffff", bar) >= 4.5  # chrome button label, and nav
+    assert _contrast(_css_token("petrol-400"), bar) >= 3.0  # its border
+    assert _contrast("#ffffff", bar) >= 3.0  # its focus ring
+
+
+def test_top_bar_uses_the_chrome_button_not_the_secondary_one(app):
+    body = _render_shell_page(app).get_data(as_text=True)
+    topbar = body[body.index('class="topbar"') : body.index("</header>")]
+    assert "btn-chrome" in topbar
+    assert "btn-secondary" not in topbar

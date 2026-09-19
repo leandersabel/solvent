@@ -45,10 +45,25 @@ hardening) is middleware: it applies to every route unless that route
 is named in the exempt list, and it runs before authentication.
 
 Exempt are the routes meant to be reached by navigation: the
-server-rendered shell pages themselves. Every JSON endpoint requires
-the header, `GET /api/export` included. An exemption is a named route,
-never a path pattern, so adding an endpoint under an existing prefix
-cannot inherit one.
+server-rendered shell pages themselves, and the static endpoint. Every
+JSON endpoint requires the header, `GET /api/export` included. An
+exemption is a named route, never a path pattern, so adding an endpoint
+under an existing prefix cannot inherit one.
+
+**The static endpoint is exempt because a browser cannot make it
+otherwise.** No subresource request carries a custom header, so a
+stylesheet or script fetched by `<link>` or `<script src>` would fail,
+and the unauthenticated screens have no session to offer either. It
+stays one named endpoint rather than a path pattern, and what it serves
+is public by construction: the design tokens, the client-side code, and
+the vendored Alpine build, all of which any visitor may read.
+
+**The check also runs before routing.** A request without the header is
+Forbidden whether or not the path resolves, so a probe cannot learn
+which routes exist by comparing Forbidden against Not Found. Not Found
+is reserved for a caller who got past the header (architecture.md,
+Status codes), which is the construction that makes its three
+conditions indistinguishable.
 
 ## Database
 
@@ -91,7 +106,8 @@ screen spec describes only its own content region.
 - **`SECRET_KEY` unset or empty** → the app does not start, and the
   failure names the variable without printing any value.
 - **A request to an unknown path** → Not Found carrying the same
-  headers as any other response.
+  headers as any other response, for a caller who sent the header.
+  Without it, Forbidden, the same as any other path.
 - **A state-changing request from a logged-out session** → Forbidden
   when the header is missing, because the check precedes authentication;
   Unauthorized when the header is present and the session is not.
@@ -109,6 +125,11 @@ screen spec describes only its own content region.
   Forbidden and changes nothing; a shell navigation route loads without
   it.
 - `GET /api/export` without the header returns Forbidden.
+- A shell page's stylesheet, `shell.js`, and the Alpine bundle are all
+  fetchable with no header and no session, and carry the same headers
+  as any other response.
+- A request without the header returns Forbidden for a path that exists
+  and for one that does not, so the two are indistinguishable.
 - The same request without the header returns Forbidden whether the
   session is valid, expired, or absent — asserted across all three,
   since the point of ordering the check first is that they are

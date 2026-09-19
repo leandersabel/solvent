@@ -69,6 +69,32 @@ def test_non_exempt_route_under_same_prefix_still_rejects(wired_app):
     assert resp.status_code == 403
 
 
+def test_static_assets_load_with_no_header_and_no_session(wired_app):
+    """No browser attaches a custom header to a subresource request, so
+    a shell page could not load its own stylesheet or scripts
+    (app-shell.md, CSRF)."""
+    client = wired_app.test_client()
+    for asset in (
+        "/static/css/tokens.css",
+        "/static/js/shell.js",
+        "/static/vendor/alpinejs-csp/3.15.12/cdn.min.js",
+    ):
+        assert client.get(asset).status_code == 200, asset
+
+
+def test_header_less_request_does_not_reveal_whether_a_route_exists(
+    wired_app,
+):
+    """The check runs before routing, so Forbidden is the answer either
+    way and a probe cannot map the route table (app-shell.md, CSRF)."""
+    client = wired_app.test_client()
+    existing = client.post("/__test/api/state-changing")
+    unknown = client.post("/__test/api/no-such-endpoint")
+
+    assert existing.status_code == unknown.status_code == 403
+    assert existing.data == unknown.data
+
+
 def test_present_header_but_no_session_is_unauthorized(wired_app):
     client = wired_app.test_client()
     resp = client.post(

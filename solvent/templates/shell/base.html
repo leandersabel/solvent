@@ -23,10 +23,10 @@
         </ul>
       </nav>
       <div class="topbar-actions">
-        <button type="button" class="btn-secondary">
+        <button type="button" class="btn-chrome">
           Update values
         </button>
-        <button type="button" class="btn-secondary"
+        <button type="button" class="btn-chrome"
                 @click="$store.shell.lock()">
           Lock
         </button>
@@ -37,8 +37,11 @@
     </main>
   </div>
 
+  {# shell.js first: the Alpine bundle starts in a microtask that drains
+     before the next deferred script runs, so a listener registered after
+     it would never see alpine:init. #}
+  <script src="{{ url_for('static', filename='js/shell.js') }}" defer></script>
   <script src="{{ url_for('static', filename='vendor/alpinejs-csp/' ~ alpine_version ~ '/cdn.min.js') }}"
           integrity="{{ alpine_sri }}" crossorigin="anonymous" defer></script>
-  <script src="{{ url_for('static', filename='js/shell.js') }}" defer></script>
 </body>
 </html>

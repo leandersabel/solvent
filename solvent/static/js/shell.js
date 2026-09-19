@@ -1,10 +1,11 @@
 // Solvent app shell: the global Alpine wiring every screen sits inside
 // (spec/ui/design-system.md, App shell).
 //
-// Uses only the CSP-safe subset (spec/architecture.md, Application
-// hardening): no expressions in markup, so every piece of state and
-// behavior is registered here and referenced from HTML by name
-// (`x-data="shell"`, `$store.shell...`).
+// Uses only the CSP-safe build (spec/architecture.md, Application
+// hardening), whose parser accepts property access and method calls but
+// no arbitrary expressions. Every piece of state and behavior is
+// registered here and reached from HTML by name (`x-data="shell"`,
+// `$store.shell.lock()`).
 document.addEventListener('alpine:init', () => {
   Alpine.data('shell', shellComponent);
   Alpine.store('shell', shellStore());

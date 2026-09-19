@@ -3,9 +3,10 @@
 Application hardening).
 
 A request to a route that is not named exempt must carry
-`X-Solvent-Request: 1` or it is rejected with Forbidden -- checked
-*before* the session is even looked up, so the response is identical
-whether the session is valid, expired, or absent entirely.
+`X-Solvent-Request: 1` or it is rejected with Forbidden. The check runs
+before the session is looked up and before routing, so the response is
+identical whether the session is valid, expired or absent, and whether
+or not the path exists.
 """
 from __future__ import annotations
 
@@ -16,6 +17,12 @@ from . import session as shell_session
 
 HEADER_NAME = "X-Solvent-Request"
 REQUIRED_VALUE = "1"
+
+# Flask registers this endpoint itself, so it cannot carry the decorator
+# below. It is still one named endpoint rather than a path pattern, and
+# it must be exempt because no browser attaches a custom header to a
+# subresource request (app-shell.md, CSRF).
+_FRAMEWORK_EXEMPT_ENDPOINTS = frozenset({"static"})
 
 
 def csrf_exempt(view_func):
@@ -32,8 +39,12 @@ def csrf_exempt(view_func):
 
 def _endpoint_is_exempt(app: flask.Flask, endpoint: "str | None") -> bool:
     if endpoint is None:
-        # No view matched at all -- routing itself will answer 404;
-        # this middleware has no route to enforce anything on.
+        # An unmatched path is not exempt. The check runs before routing
+        # (app-shell.md, CSRF), so a header-less probe gets the same
+        # Forbidden whether or not the route exists and cannot map the
+        # route table by comparing it against Not Found.
+        return False
+    if endpoint in _FRAMEWORK_EXEMPT_ENDPOINTS:
         return True
     view = app.view_functions.get(endpoint)
     return bool(getattr(view, "csrf_exempt", False))

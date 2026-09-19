@@ -66,11 +66,58 @@ def test_json_endpoint_carries_csp_and_hsts(wired_app):
     _assert_security_headers(resp)
 
 
+def test_csrf_rejection_carries_csp_and_hsts(wired_app):
+    resp = wired_app.test_client().get("/__test/json")
+    assert resp.status_code == 403
+    _assert_security_headers(resp)
+
+
+def test_unauthenticated_rejection_carries_csp_and_hsts(wired_app):
+    resp = wired_app.test_client().get("/__test/json", headers=_auth_headers())
+    assert resp.status_code == 401
+    _assert_security_headers(resp)
+
+
 def test_unknown_path_carries_csp_and_hsts(wired_app):
+    user_id = seed_user(wired_app, "erin")
+    cookie = seed_session(wired_app, user_id)
+
     client = wired_app.test_client()
-    resp = client.get("/__test/this-route-does-not-exist")
+    client.set_cookie("solvent_session", cookie)
+    resp = client.get(
+        "/__test/this-route-does-not-exist", headers=_auth_headers()
+    )
     assert resp.status_code == 404
     _assert_security_headers(resp)
+
+
+def test_static_asset_carries_csp_and_hsts(wired_app):
+    resp = wired_app.test_client().get("/static/css/tokens.css")
+    assert resp.status_code == 200
+    _assert_security_headers(resp)
+
+
+def test_hsts_carries_preload_only_when_the_operator_opts_in(
+    tmp_path, monkeypatch
+):
+    """`preload` is only valid on a fixed public domain that has served
+    the header through its probation period, so it is off unless the
+    operator sets it (architecture.md, Network & transport)."""
+    monkeypatch.setenv("SECRET_KEY", "test-only-secret-key-do-not-use-in-prod")
+
+    from solvent import create_app
+
+    for preload in (False, True):
+        app = create_app(
+            config_overrides={
+                "DATABASE_PATH": str(tmp_path / f"hsts-{preload}.db"),
+                "TESTING": True,
+                "HSTS_PRELOAD": preload,
+            }
+        )
+        resp = app.test_client().get("/__test/no-such-path")
+        hsts = resp.headers["Strict-Transport-Security"]
+        assert ("preload" in hsts) is preload
 
 
 def test_server_error_carries_csp_and_hsts(wired_app):

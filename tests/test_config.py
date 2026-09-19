@@ -22,6 +22,10 @@ from solvent.config import ConfigurationError, load_config
 
 REPO_ROOT = Path(__file__).resolve().parent.parent
 
+# Distinctive enough that finding it in process output means the app
+# echoed the key, not that the string occurred by chance.
+_SENTINEL_KEY = "sentinel-key-must-never-be-echoed-42"
+
 
 def test_load_config_raises_naming_the_variable_with_no_value():
     with pytest.raises(ConfigurationError) as excinfo:
@@ -71,9 +75,29 @@ def test_process_fails_to_start_with_secret_key_empty(tmp_path):
 def test_process_starts_with_secret_key_set(tmp_path):
     result = _run_app(
         {
-            "SECRET_KEY": "a-real-looking-secret-key-value",
+            "SECRET_KEY": _SENTINEL_KEY,
             "DATABASE_PATH": str(tmp_path / "solvent.db"),
         }
     )
 
     assert result.returncode == 0, result.stdout + result.stderr
+
+
+def test_no_key_material_reaches_process_output(tmp_path):
+    """The failure names the variable and prints no value
+    (app-shell.md, Acceptance criteria), and neither does a clean
+    start."""
+    started = _run_app(
+        {
+            "SECRET_KEY": _SENTINEL_KEY,
+            "DATABASE_PATH": str(tmp_path / "started.db"),
+        }
+    )
+    assert _SENTINEL_KEY not in started.stdout + started.stderr
+
+    # A key below the bar still must not be echoed back while the app
+    # explains why it refused.
+    refused = _run_app(
+        {"SECRET_KEY": "", "DATABASE_PATH": str(tmp_path / "refused.db")}
+    )
+    assert _SENTINEL_KEY not in refused.stdout + refused.stderr

@@ -472,9 +472,10 @@ Actors this design defends against vs. accepts:
   import, password change, logout, account deletion) **and `GET
   /api/export`**. Same-origin cookie auth is not implicitly CSRF-safe. A
   request missing the header is rejected with **Forbidden** and changes
-  nothing. The check runs **before authentication**, so the response is
-  identical whether or not the session is valid — a caller without the
-  header learns nothing about session state.
+  nothing. The check runs **before authentication and before routing**,
+  so the response is identical whether or not the session is valid and
+  whether or not the path exists — a caller without the header learns
+  nothing about session state and cannot map the route table.
   - **A header rather than a token.** A cross-origin page cannot set a
     custom header without a preflight, and the preflight fails because
     no CORS headers are served. Every endpoint in this product is called

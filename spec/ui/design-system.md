@@ -284,6 +284,8 @@ only its own content region.
 
 - **Top bar**, petrol-800: wordmark at the left, nav beside it, the
   global **Update values** action and the lock button at the right.
+  Both buttons take the chrome variant (Components), not the secondary
+  one, which is specified for the light ground.
 - **Nav is three entries — Dashboard, Settings, and Admin for admins.**
   There is deliberately **no "Accounts" entry**: the dashboard's own
   table *is* the account list (`dashboard.md`), so a fourth entry would
@@ -312,6 +314,12 @@ only its own content region.
 - **Button, primary**: brass-600 fill, white text, 6px radius. One per
   screen region.
 - **Button, secondary**: transparent, petrol-700 text, hairline border.
+  For the light ground only.
+- **Button, chrome**: transparent, white text, petrol-400 border, white
+  focus ring. The secondary button on the petrol-800 top bar, where
+  petrol-700 text measures 1.33:1 and petrol-600 focus 1.88:1, under
+  both floors. A surface this dark needs its own variant rather than a
+  darker step of the same one.
 - **Button, destructive**: critical text on transparent, critical border;
   filled critical only inside a confirmation dialog.
 - **Input**: white fill, hairline border, petrol-600 2px focus ring.

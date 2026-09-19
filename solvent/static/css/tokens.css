@@ -84,6 +84,11 @@ body {
 }
 
 .topbar nav a:focus-visible,
+.btn-chrome:focus-visible {
+  outline: 2px solid #ffffff;
+  outline-offset: 2px;
+}
+
 .btn-secondary:focus-visible {
   outline: 2px solid var(--petrol-600);
   outline-offset: 2px;
@@ -99,6 +104,18 @@ body {
   background: transparent;
   border: 1px solid var(--hairline);
   color: var(--petrol-700);
+  border-radius: var(--radius-input);
+  padding: 6px 12px;
+  font: inherit;
+  cursor: pointer;
+}
+
+/* The secondary button on the petrol-800 bar, where petrol-700 text
+   and a petrol-600 ring fall under their contrast floors. */
+.btn-chrome {
+  background: transparent;
+  border: 1px solid var(--petrol-400);
+  color: #ffffff;
   border-radius: var(--radius-input);
   padding: 6px 12px;
   font: inherit;
