@@ -205,6 +205,22 @@ A recording is **created** at a date holding none of the person's
 records, or **reopened** at a date that holds some. **A create never
 becomes an update behind the person's back.**
 
+**Which of the two happens is routing, decided before anything is
+typed.** Asking for a new recording and picking a date the model
+already holds records for opens that recording for editing, there and
+then. No create is attempted, so none can fail and nothing is lost.
+The refusal below is for the case where that choice turns out to have
+been stale: a date that became occupied after the client read its own
+model, which only another session can do.
+
+**The routing needs nothing from the server.** Every record is fetched
+on unlock and kept in memory (`net-worth-view.md`, Data flow), so which
+dates hold a recording is the same index a recording is defined by, and
+a date picker over it costs no request. The one gap is a record that
+cannot be decrypted: it carries no readable date, so it belongs to no
+recording and no date picker can show it. It is counted in the
+decryption warning rather than silently shaping the list.
+
 - **A create at a date another session has since recorded fails.** It
   does not become an update, does not merge, and is not retried. The
   person is told the date was recorded elsewhere and reaches it through
@@ -222,6 +238,12 @@ becomes an update behind the person's back.**
   `record-api.md` already prescribes) and re-checks. A session open
   since this morning is exactly the session whose model says the date
   is free.
+- **A sitting that creates nothing runs no reload.** Reopening a date
+  and changing what is there is updates alone, each under the version
+  rule in `record-api.md`, which is the check that catches another
+  session on exactly those records. The reload buys nothing there,
+  because there is no slot to claim. Adding a holding that has no
+  record at the date is a create, and it brings the reload with it.
 - **The reload runs once per sitting, not once per row.** After it, the
   date belongs to this session: another session's attempt to create a
   recording there is refused by its own reload, so the rows that follow
@@ -484,6 +506,11 @@ a quiet wrong number.
   reload, before the first row is written, and none after it.
 - Editing inside a reopened recording never shows the replace prompt,
   while the single-holding form at an occupied date still does.
+- Asking for a new recording and picking a date that already holds
+  records opens it for editing, issues no request while doing so, and
+  attempts no create.
+- A sitting that only changes and clears existing records issues no
+  type reload, and its writes are updates at stored `version` + 1.
 - A recording offers no way to change its own date, and moving one
   snapshot's date from the holding's page still works.
 - A Conflict on a snapshot inside a recording save reloads that row to
