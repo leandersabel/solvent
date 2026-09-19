@@ -243,7 +243,12 @@ Under `/api/admin/`, administrator session only, CSRF-protected, Not
 Found to a vault owner (`app-shell.md`, The two surfaces).
 
 - `GET /api/admin/symbols` → the full table including retired rows,
-  which `GET /api/rates/symbols` omits.
+  which `GET /api/rates/symbols` omits. Each row carries `symbol`,
+  `label`, `kind`, `lookup`, `retired`, and **`hasAdapter`**: whether
+  this deployment has a provider adapter configured for that symbol.
+  It is derived from the adapter registry rather than stored on the
+  row, it is read-only, and `POST` and `PATCH` reject it like any
+  other unknown field.
 - `POST /api/admin/symbols` `{ symbol, label, kind, lookup }` → adds a
   row. `symbol` must match the canonical form and not already exist.
 - `PATCH /api/admin/symbols/<symbol>` `{ label?, lookup?, retired? }`
@@ -275,8 +280,22 @@ unfixable without hand-editing an export.
 - **`lookup` is the mutable one that matters.** It is the flag that
   flips when a provider appears for a metal that had none, which is
   the main reason this surface exists at all. The server refuses
-  `lookup: true` for a symbol with no configured provider adapter, so
-  the flag cannot promise a proposal the proxy cannot serve.
+  `lookup: true` for a symbol with no configured provider adapter, on
+  `POST` and on `PATCH` alike, so the flag cannot promise a proposal
+  the proxy cannot serve.
+
+  **`hasAdapter` is what makes that refusal avoidable rather than
+  merely correct.** Without it the screen has no way to know which
+  rows can be switched on, so it has to offer the control everywhere
+  and explain a refusal afterwards. With it the control is disabled on
+  the rows that have no source, with the reason stated in place, and
+  the administrator learns what the deployment can do by reading the
+  table rather than by being turned down. The server keeps refusing
+  regardless: a page open since before an adapter was added or removed
+  is a stale page, and a client's knowledge of the registry is not a
+  control. It costs one derived boolean, and it is instance
+  configuration rather than anybody's data, so it crosses no part of
+  the admin boundary (`admin-invites.md`).
 - **`label` is display text and changes freely.** It is stored in no
   user record, so a rename rewrites nothing. It is rendered into the
   unit picker with `textContent`, never `innerHTML` (architecture.md,
@@ -473,7 +492,14 @@ reachable (architecture.md, SSRF hardening):
   measured in it still resolves a rate. Unretiring restores it to the
   picker.
 - `PATCH` setting `lookup: true` on a symbol with no configured
-  provider adapter is a Bad Request.
+  provider adapter is a Bad Request, and so is `POST` creating one
+  that way.
+- `GET /api/admin/symbols` reports `hasAdapter: true` on exactly the
+  symbols the adapter registry covers, asserted against the registry
+  itself rather than a fixture, so the two cannot drift. Every symbol
+  carrying `lookup: true` also carries `hasAdapter: true`.
+- `POST` or `PATCH` carrying `hasAdapter` is a Bad Request and
+  changes nothing.
 - No response from any `/api/admin/symbols` route contains a count,
   list, or any other indication of which accounts use a symbol,
   asserted against the full response shape.

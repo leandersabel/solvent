@@ -106,8 +106,19 @@ An invite row: `id`, `token_hash`, `kind`, `created_by`, `created_at`,
   runs with no session and no principal behind it. The sentinel is
   refused as a username at registration, so it can never name a real
   account of either kind. A sentinel rather than an empty
-  `created_by`, so provenance is always a value the invite list can
-  show and no reader has to special-case an absence.
+  `created_by`, so every row names its origin and nothing reading the
+  column has to special-case an absence.
+
+  **It is stored and never returned.** `GET /api/admin/invites`
+  leaves it out and no screen shows it. The product fixes what an
+  invite's row carries and a creator is not among those columns
+  (`product/admin-invites.md`, Outstanding invites). Every
+  administrator on an instance can do everything any other can, so
+  naming one on a row would sort the rows by a distinction that
+  changes nothing about what anybody may do with them. The field
+  stays stored because it is the one thing separating a CLI-minted
+  invite from one handed out in the app, and because the server
+  already holds the principal behind the request that wrote it.
 
 ## Endpoints
 

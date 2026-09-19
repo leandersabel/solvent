@@ -148,7 +148,8 @@ and doing nothing accepts and writes it.
   refreshes prices **at March**, so the chart's March is priced with
   March's prices. A backfill therefore inserts price knots
   into the past, which is more real data rather than less, and the
-  chart's estimated marker already said that stretch was inferred.
+  chart's entry marks already said that stretch was drawn rather than
+  recorded.
 - **Which symbols.** The distinct `unit` of every **active** account,
   minus any unit equal to the profile's `mainCurrency`, whose rate is
   `"1"` by definition and is stored nowhere and requested from nobody.
@@ -191,7 +192,9 @@ and doing nothing accepts and writes it.
     number the person is the sole source of.
   - **No entry exists yet and no proposal is available**, so the
     recording row asks for the price and the holding stays unpriced
-    until one exists (`net-worth-view.md`).
+    until one exists (`net-worth-view.md`). The row asks. It does not
+    require. The quantity saves with the line left empty
+    (`record-snapshot.md`, Edge cases).
 - **An edited rate never leaves the browser except as ciphertext.** It
   is not part of, and does not trigger, any request to `/api/rates`, in
   any field, in any encoding. Same rule and same reason as the
@@ -429,8 +432,10 @@ to win silently.
   account existing and that recording, the account has no quantity
   either, so it is "not yet valued" rather than unpriced.
 - **A free-text unit whose price the person has never entered** leaves
-  the holding unpriced until they do, and the recording row asks for
-  the number rather than saving a quantity that cannot be valued.
+  the holding unpriced until they do. The recording row asks for the
+  number and says why it is theirs to set, and the quantity saves
+  whether or not one is given: a missing price never blocks a quantity
+  (`record-snapshot.md`, Edge cases, which owns that rule).
 - **The provider revises a figure it already published.** Nothing
   rewrites a stored entry. The revision reaches the vault only if the
   person records at that date again, which finds an entry and writes

@@ -196,9 +196,14 @@ link, so nothing else can be swept up by it. Endpoint:
 - **Archiving an account that already has a snapshot on the archive
   date** → the closing-snapshot field follows the ordinary upsert rule
   (`record-snapshot.md`): it prefills with the existing value rather
-  than `0`, and saving replaces that record in place after the same
-  confirm. The archive dialog does not get a private path around
-  one-snapshot-per-date.
+  than `0`, and saving replaces that record in place. The archive
+  dialog does not get a private path around one-snapshot-per-date.
+  **No replace prompt fires here.** The prompt catches somebody
+  writing at a date they did not know was taken, and this field is
+  showing them the stored figure, so it fails the prompt's own
+  condition (`record-snapshot.md`, Same account, same date). The
+  dialog's own confirm is the confirmation, and a second one would
+  ask about a number already on screen.
 - **Archiving an account that is the last active one** → allowed; the
   net worth view shows its empty state.
 - **Unarchiving** → clears `archivedAt`; the account rejoins active
@@ -231,6 +236,10 @@ link, so nothing else can be swept up by it. Endpoint:
 - **Archive**: the account record gains `archivedAt`, no snapshot record
   is deleted, and the trend chart for dates before the archive is
   unchanged.
+- Archiving onto a date that already holds a snapshot for that account
+  prefills the field with the stored figure, shows no replace prompt,
+  and leaves exactly one snapshot for that (account, date) at
+  `version` + 1.
 - Archiving with the offered closing snapshot accepted writes one
   snapshot dated `archivedAt`; the account's band runs into that value
   and ends there, instead of dropping by the last known value.

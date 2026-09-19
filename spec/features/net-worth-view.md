@@ -37,17 +37,22 @@ last recorded in March is not stuck at March's exchange rate.
 
 The view has a **pricing mode**, and it selects the price:
 
-- **At today's prices** (the default): the **latest** entry for that
+- **Latest rates** (the default): the **latest** entry for that
   account's unit, whatever date it carries.
-- **At the prices recorded with each holding**: the latest entry for
-  that unit **at or before** the date of the account's own latest
-  snapshot. This is what the holding was worth when it was last
-  recorded, which is a real question and a different number.
+- **Rates as of each figure**: the latest entry for that unit **at or
+  before** the date of the account's own latest snapshot. This is what
+  the holding was worth when it was last recorded, which is a real
+  question and a different number.
 
 Both modes use the same quantity. The mode changes only which price is
 paired with it, and switching modes makes no network request, because
-both series are already in memory. The product file owns what the
-control is called.
+both series are already in memory.
+
+**The mode reaches the total, the account list and the breakdown, and
+nothing else.** It is not a chart control (Trend chart, Ranges and
+modes). It is named for the latest rate rather than today's rate
+because nothing on this screen fetches a price: the newest entry in the
+vault is whatever the last recording wrote.
 
 - **Latest means the greatest `date`**, in either series, never the most
   recently written.
@@ -56,8 +61,8 @@ control is called.
 - Each account's figure carries its **quantity's as-of date** wherever
   it appears, because that is the date the person acts on
   (`ui/update-values.md`). A row whose price is older than the newest
-  price in the vault also carries **its price's date**, since "at
-  today's prices" is then not true of that row. That case is a holding
+  price in the vault also carries **its price's date**, since latest
+  rates is then not true of that row. That case is a holding
   with no rate source, whose price only moves when its owner revisits
   it.
 - **There is no staleness threshold and no stale-account warning.** No
@@ -170,16 +175,29 @@ a band between two quantity entries bends over them exactly as it does
 over any other price entry. A date nobody recorded a quantity at is
 still a date somebody priced.
 
-Every stretch where **either factor is inferred** is marked by the "Show
-what's estimated" toggle, default off. A date whose quantity is
-interpolated is estimated even if its price is recorded, and the
-reverse. Marking only one factor would claim more than the data
-supports.
+**The dates a quantity was recorded are marked from the moment the
+chart loads.** The entry marks are ticks under the x-axis, one at every
+date carrying at least one snapshot, so a stretch running between two
+ticks is a stretch that was drawn rather than recorded.
+`ui/design-system.md` owns the mark, `ui/dashboard.md` the one control
+that takes them off, **Just the line**. They are on by default because
+the accurate drawing is the one nobody should have to ask for, and
+because they are the chart's way into a recording
+(`record-snapshot.md`): hidden by default, they would hide that route
+with them.
 
-**The tick marks under the x-axis stay quantity entries.** They answer
-"when did I actually go and look this holding up", which is the question
-the sweep is built around, and a tick for every price entry would put
-one under every month for every account and bury the ones that matter.
+**A tick means a quantity, never a price.** It answers "when did I
+actually go and look this holding up", which is the question the sweep
+is built around, and a tick for every price entry would put one under
+every month for every account and bury the ones that matter. A date
+carrying rate entries and no snapshots bends the bands and takes no
+tick.
+
+**The marks do not separate an interpolated quantity from an
+interpolated price.** A tick sits on a date shared by every band, so a
+per-factor mark would need one per band per date, which is unreadable
+across a decade of history. Where one figure's own provenance matters,
+the row form of the mark carries it (`ui/update-values.md`).
 
 ### Grouping by dimension
 
@@ -223,9 +241,10 @@ archive flow's closing snapshot at that date (`manage-accounts.md`) is
 the expected path, and the value **interpolates into it** like any other
 snapshot rather than holding flat and stepping.
 
-That interpolated run-down is inferred, and the estimated-data toggle
-marks it as such. A user who wound a position down on one specific day
-can record an intermediate snapshot and get the sharp edge honestly.
+That interpolated run-down lies between two entry marks like any other
+inferred stretch, so the chart already says it was drawn rather than
+recorded. A user who wound a position down on one specific day can
+record an intermediate snapshot and get the sharp edge honestly.
 When the closing snapshot is skipped, the band still drops at
 `archivedAt` and the UI marks the point as an archive, not a valuation.
 
@@ -236,9 +255,18 @@ an otherwise smooth chart is indistinguishable from a bad snapshot.
 ### Ranges and modes
 
 - Ranges: 1M, 6M, 1Y, All. Default: 1Y, or All if history is shorter.
-- **Pricing mode** toggle, shared with the rest of the view (Current net
-  worth). It reprices every point of every band, so the chart and the
-  headline figure can never disagree about which prices they used.
+- **Pricing mode is not a chart control.** Every chart point is already
+  drawn at the prices of its own date, by the formula above, so there
+  is nothing for the mode to do here and switching it moves no pixel.
+  On latest rates the chart's right hand edge **is** the total: the
+  edge carries each account's last quantity carried forward at its
+  symbol's last price carried forward, which is the total's own
+  definition. On rates as of each figure the total is deliberately not
+  the edge, and the gap between them is the whole point of the mode. It
+  says how much of the move since the person last looked was their
+  money and how much was the rates, which is the one thing the default
+  mode cannot show. A chart that repriced with the control would close
+  that gap and answer nothing.
 - **Absolute / percentage** toggle. The percentage view normalizes each
   side against itself — asset bands against total assets, liability
   bands against total liabilities — because a share of a signed net
@@ -321,11 +349,10 @@ an otherwise smooth chart is indistinguishable from a bad snapshot.
   priced, excluded from the total, and never counted at its bare
   quantity.
 - **A chart date before any price entry for a symbol** → priced at that
-  symbol's first entry, carried backward, and marked estimated.
+  symbol's first entry, carried backward.
 - **Two entries for one (symbol, date) that are not byte-identical** →
   the pair drops out of that symbol's series, the neighboring entries
-  interpolate across the date, and the stretch is marked estimated.
-  The fault is named on screen and resolved in that date's recording
+  interpolate across the date. The fault is named on screen and resolved in that date's recording
   (`record-rate.md`). When the pair is the symbol's only entry, its
   holdings are listed as not priced rather than counted at either
   figure.
@@ -365,8 +392,7 @@ an otherwise smooth chart is indistinguishable from a bad snapshot.
   of the symbols it prices, asserted against the same date with those
   entries removed.
 - A symbol with two differing entries on one date prices that date from
-  its neighboring entries, marks the stretch estimated, and the view
-  names the fault.
+  its neighboring entries, and the view names the fault.
 - An account whose unit has a quantity but no price entry is listed as
   not priced, is excluded from the total, and its quantity never appears
   in the total unconverted.
@@ -379,16 +405,27 @@ an otherwise smooth chart is indistinguishable from a bad snapshot.
   snapshot; adding ten years of an old account's history does not create
   a step at the chart's left edge.
 - An account with snapshots of 100 on 1 January and 200 on 1 March,
-  measured in the main currency, reads 150 on 1 February, and that
-  stretch is marked as estimated when the toggle is on.
+  measured in the main currency, reads 150 on 1 February, with 1
+  January and 1 March carrying an entry mark and 1 February carrying
+  none, and with nobody having turned anything on.
 - The same account measured in a unit whose price is 1.00 on 1 January
   and 2.00 on 1 March reads 150 × 1.50 on 1 February, not the chord
   between 100 and 400. This is the assertion that the band bends.
 - A chart date before a symbol's first price entry is priced at that
-  first entry and is marked estimated. The band does not start at zero
-  and does not vanish.
+  first entry. The band does not start at zero and does not vanish.
 - The axis ticks mark quantity entries only: adding a price entry adds
   no tick.
+- The chart loads with its entry marks showing, with nothing turned on
+  and no stored preference consulted. Just the line removes them and
+  changes nothing else about the drawing.
+- Switching the pricing mode changes the total, the account list and
+  the breakdown, and changes no chart point. Asserted over every
+  sample of every band, not only the right hand edge.
+- On latest rates the chart's right hand edge equals the total exactly,
+  in decimal. With a holding last recorded in March and a price entry
+  from this week at a different figure, rates as of each figure gives
+  a total that is not the edge, and nothing on screen reports that
+  difference as a fault.
 - Two accounts whose histories start years apart produce a chart where
   the later account's first snapshot raises only its own band — summing
   before interpolating would instead bend the whole series.

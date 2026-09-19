@@ -90,8 +90,11 @@ stay random UUIDv4; deriving them from the date would let the server
 brute-force which dates a user holds data for.
 
 This is the path where the date is chosen blind. Where the stored
-figure is already on screen, in the field being edited, the prompt does
-not appear (Reopening and editing a recording).
+figure is already on screen, in the field being edited, the prompt
+does not appear. Two places do that: a reopened recording
+(Reopening and editing a recording), and the archive dialog's
+closing-snapshot field, which prefills with the stored figure and
+carries a confirm of its own (`manage-accounts.md`).
 
 ## Confirming a previous value
 
@@ -383,13 +386,17 @@ a quiet wrong number.
 
 ## Edge cases
 
-- **Provider is down, rate-limited, or has no data for that symbol** →
-  the quantity saves regardless. Recording is never blocked by the proxy
-  being unavailable, and the price half degrades on its own terms
-  (`record-rate.md`).
-- **Account's unit has never been priced** → the quantity still saves,
-  and the account is listed as not priced rather than counted wrong
-  (`net-worth-view.md`).
+- **No price is available for the unit**, because the provider is down,
+  rate-limited or has no data for that date, because the unit is free
+  text nobody has priced, or because the person left the rate line
+  empty → **the quantity saves regardless**. **Nothing in the price half
+  ever blocks a quantity**, in any form: no disabled save, no required
+  rate field, no warning to dismiss first. This is the single rule for
+  it, and `record-rate.md` points at it rather than restating it. The
+  price half degrades on its own terms (`record-rate.md`, The refresh),
+  the rate line says quietly that nothing was written for that unit, and
+  the holding is listed as **not priced** rather than counted wrong,
+  which `net-worth-view.md` owns.
 - **Date is in the future** → blocked. A snapshot describes what was.
 - **Date precedes the account's `createdAt`** → allowed; backfilling
   history is a normal use.
@@ -453,6 +460,10 @@ a quiet wrong number.
   field, in any encoding.
 - With the rate proxy stubbed to 503, the snapshot still saves, and the
   screen reports that prices were not updated rather than blocking.
+- A quantity in a unit with no price entry at all, and none typed,
+  saves: the save control is live throughout, one `snapshot` record is
+  written, and the holding is listed as not priced. Asserted for a
+  free-text unit and for a symbol whose lookup returned nothing.
 - A future-dated snapshot is rejected.
 - Attempting to record against an archived account is blocked, except
   for the closing snapshot written by the archive flow itself.
