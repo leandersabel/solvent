@@ -1,0 +1,21 @@
+{% extends "shell/outside.html" %}
+{% block title %}Create your Solvent account{% endblock %}
+{# The token rides in this page's URL, so it is this page's outbound
+   navigations that could carry it in a Referer header
+   (admin-invites.md, Rules). #}
+{% block meta %}<meta name="referrer" content="no-referrer">{% endblock %}
+{% block body %}
+  {% if error %}
+    <div class="outside">
+      <div class="card card-narrow">
+        <h1 class="card-heading">{{ error }}</h1>
+      </div>
+    </div>
+  {% else %}
+    <div id="app"
+         data-kind="{{ invite_kind }}"
+         data-token="{{ invite_token }}"
+         data-currencies="{{ currencies | tojson }}"></div>
+    <script type="module" src="{{ url_for('static', filename='js/page-register.js') }}"></script>
+  {% endif %}
+{% endblock %}

@@ -1,0 +1,26 @@
+Vendored dependency -- self-hosted per spec/architecture.md, Supply chain
+(no third-party CDN sits inside the trust boundary).
+
+Package:  argon2id (openpgpjs), the one Argon2id implementation the
+          browser runs. spec/architecture.md, Key management states why
+          this one and not hash-wasm or libsodium.js.
+Version:  1.0.1
+Source:   npm pack argon2id@1.0.1
+SRI:      sha384-STUmJDURIwAiKH+yqPUtZ/E6HZmrEvZoQG7X51r+FjJl1vinyhEyrqHLVkofdrh1
+
+The published package is several ES modules plus two loose .wasm
+binaries. An SRI hash covers one file, so tools/vendor-argon2id.py
+flattens it into the single module here with both binaries inlined as
+base64. Nothing else edits that file.
+
+argon2id.js is hashed here and in solvent/crypto.py's ARGON2ID_SRI,
+recomputed from the file on disk in the test suite, and asserted against
+the RFC 9106 section 5.3 test vector -- the known-answer test that is
+what makes a small library as trustworthy here as a large one.
+
+Re-pin by re-running the build against the new version:
+  npm pack argon2id@<version> && tar xzf argon2id-<version>.tgz
+  python3 tools/vendor-argon2id.py package
+and updating this file and ARGON2ID_SRI with the hash it prints.
+This dependency is in the auth path, so a version bump needs manual
+review and never auto-merge (architecture.md, Tech stack).

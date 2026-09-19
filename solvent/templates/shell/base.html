@@ -5,11 +5,13 @@
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>{% block title %}Solvent{% endblock %}</title>
   <link rel="stylesheet" href="{{ url_for('static', filename='css/tokens.css') }}">
-  {% block head %}{% endblock %}
-  {# The server's current default KDF envelope, embedded so a client-side
-     flow on this page (e.g. a password change) can derive at current
-     parameters with no extra round-trip (architecture.md, Key management). #}
+  {# The server's current default KDF envelope, embedded so a
+     client-side flow on this page can derive at current parameters
+     with no extra round-trip (architecture.md, Key management). It
+     rides on an administrator's page too, because changing their
+     password derives like any other account's. #}
   <script id="kdf-envelope" type="application/json">{{ kdf_envelope | tojson }}</script>
+  {% block head %}{% endblock %}
 </head>
 <body>
   <div x-data="shell">
@@ -17,31 +19,37 @@
       <span class="wordmark">Solvent</span>
       <nav aria-label="Primary">
         <ul>
-          {% for entry in nav_entries(g.get('user')) %}
+          {% for entry in nav_entries(g.get('principal')) %}
           <li><a href="{{ entry.href }}">{{ entry.label }}</a></li>
           {% endfor %}
         </ul>
       </nav>
       <div class="topbar-actions">
-        <button type="button" class="btn-chrome">
+        {% if g.get('principal') and g.principal.kind == 'vault_owner' %}
+        <button type="button" class="btn-chrome" @click="$store.shell.update()">
           Update values
         </button>
-        <button type="button" class="btn-chrome"
-                @click="$store.shell.lock()">
+        <button type="button" class="btn-chrome" @click="$store.shell.lock()">
           Lock
         </button>
+        {% else %}
+        <button type="button" class="btn-chrome" @click="$store.shell.signOut()">
+          Sign out
+        </button>
+        {% endif %}
       </div>
     </header>
-    <main class="content">
+    <main class="content{% block content_class %}{% endblock %}">
       {% block content %}{% endblock %}
     </main>
   </div>
 
-  {# shell.js first: the Alpine bundle starts in a microtask that drains
-     before the next deferred script runs, so a listener registered after
-     it would never see alpine:init. #}
+  {# shell.js first: the Alpine bundle starts in a microtask that
+     drains before the next deferred script runs, so a listener
+     registered after it would never see alpine:init. #}
   <script src="{{ url_for('static', filename='js/shell.js') }}" defer></script>
   <script src="{{ url_for('static', filename='vendor/alpinejs-csp/' ~ alpine_version ~ '/cdn.min.js') }}"
           integrity="{{ alpine_sri }}" crossorigin="anonymous" defer></script>
+  {% block scripts %}{% endblock %}
 </body>
 </html>

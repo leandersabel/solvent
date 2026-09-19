@@ -1,0 +1,18 @@
+Vendored dependency -- self-hosted per spec/architecture.md, Supply chain
+(no third-party CDN sits inside the trust boundary).
+
+Package:  zxcvbn, the password strength estimator behind the registration
+          and change-password score bar.
+Version:  4.4.2
+Source:   npm pack zxcvbn@4.4.2, dist/zxcvbn.js verbatim
+SRI:      sha384-LXuP8lknSGBOLVn4fwVOl+rWR+zOEtZx6CF9ZLaN6gKBgLByU4D79VWWjV4/gefq
+
+It is the largest file the browser loads, most of it the frequency
+lists, which is why only the two screens that score a password pull it
+in and the app shell does not (architecture.md, Supply chain). It is a
+UMD bundle setting window.zxcvbn, and it uses neither eval nor Function,
+so it runs under the CSP unchanged.
+
+Re-pin by re-downloading dist/zxcvbn.js, recomputing:
+  openssl dgst -sha384 -binary zxcvbn.js | openssl base64 -A
+and updating this file and ZXCVBN_SRI in solvent/shell.py.

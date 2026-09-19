@@ -1,0 +1,19 @@
+{# Unlock and register sit outside the shell: one centered card on the
+   warm ground under the wordmark, no navigation and no marketing
+   (spec/ui/design-system.md, App shell). Having no session with which
+   to fetch one, each embeds the server's current default KDF
+   envelope. #}
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>{% block title %}Solvent{% endblock %}</title>
+  {% block meta %}{% endblock %}
+  <link rel="stylesheet" href="{{ url_for('static', filename='css/tokens.css') }}">
+  <script id="kdf-envelope" type="application/json">{{ kdf_envelope | tojson }}</script>
+</head>
+<body class="outside-body">
+  {% block body %}{% endblock %}
+</body>
+</html>

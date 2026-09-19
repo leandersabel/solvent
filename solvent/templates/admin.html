@@ -1,0 +1,9 @@
+{% extends "shell/base.html" %}
+{% block title %}Administration{% endblock %}
+{% block content_class %} content-medium{% endblock %}
+{% block content %}
+  <div id="app" data-username="{{ g.principal.username }}"></div>
+{% endblock %}
+{% block scripts %}
+  <script type="module" src="{{ url_for('static', filename='js/page-admin.js') }}"></script>
+{% endblock %}

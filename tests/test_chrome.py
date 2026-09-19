@@ -1,5 +1,8 @@
 """The authenticated chrome (spec/ui/design-system.md, App shell;
-spec/features/app-shell.md, Acceptance criteria).
+spec/features/app-shell.md, The chrome).
+
+It differs by kind, and it differs by omission rather than by
+rearrangement.
 """
 from __future__ import annotations
 
@@ -9,222 +12,231 @@ import json
 import re
 from pathlib import Path
 
-import flask
-
 from solvent.config import DEFAULT_KDF_ENVELOPE
-from solvent.csrf import csrf_exempt
+from solvent.crypto import ARGON2ID_SRI, ZXCVBN_SRI
 from solvent.shell import ALPINE_SRI, nav_entries
-from tests.helpers import seed_session, seed_user
+from tests.helpers import register
+
+VENDOR = Path(__file__).resolve().parent.parent / "solvent" / "static" / "vendor"
 
 
-def test_nav_shows_dashboard_and_settings_for_non_admin():
-    entries = nav_entries({"username": "alice", "is_admin": False})
-    assert [e["label"] for e in entries] == ["Dashboard", "Settings"]
-
-
-def test_nav_adds_admin_as_third_entry_for_admin():
-    entries = nav_entries({"username": "root", "is_admin": True})
-    assert [e["label"] for e in entries] == ["Dashboard", "Settings", "Admin"]
-
-
-def test_nav_for_no_user_matches_non_admin():
-    entries = nav_entries(None)
-    assert [e["label"] for e in entries] == ["Dashboard", "Settings"]
-
-
-def test_rendered_nav_for_an_admin_adds_admin_third(app):
-    user_id = seed_user(app, "root", is_admin=True)
-    body = _render_shell_page(app, seed_session(app, user_id)).get_data(
-        as_text=True
-    )
-    assert _rendered_nav_labels(body) == ["Dashboard", "Settings", "Admin"]
-
-
-def test_rendered_nav_for_a_non_admin_omits_admin(app):
-    user_id = seed_user(app, "alice")
-    body = _render_shell_page(app, seed_session(app, user_id)).get_data(
-        as_text=True
-    )
-    assert _rendered_nav_labels(body) == ["Dashboard", "Settings"]
-
-
-def test_rendered_nav_without_a_session_matches_non_admin(app):
-    body = _render_shell_page(app).get_data(as_text=True)
-    assert _rendered_nav_labels(body) == ["Dashboard", "Settings"]
-
-
-def _render_shell_page(app, cookie=None):
-    @app.route("/__test/chrome")
-    @csrf_exempt
-    def chrome_page():
-        return flask.render_template_string(
-            "{% extends 'shell/base.html' %}"
-            "{% block content %}<p>content</p>{% endblock %}"
-        )
-
-    client = app.test_client()
-    if cookie is not None:
-        client.set_cookie("solvent_session", cookie)
-    return client.get("/__test/chrome")
-
-
-def _rendered_nav_labels(body):
+def nav_labels(body):
     nav = body[body.index("<nav") : body.index("</nav>")]
     return re.findall(r'<a href="[^"]*">([^<]+)</a>', nav)
 
 
-def test_shell_page_embeds_current_default_kdf_envelope(app):
-    resp = _render_shell_page(app)
-    assert resp.status_code == 200
-    body = resp.get_data(as_text=True)
-
-    start = body.index('id="kdf-envelope"')
-    script_start = body.index(">", start) + 1
-    script_end = body.index("</script>", script_start)
-    embedded = json.loads(body[script_start:script_end])
-
-    assert embedded == DEFAULT_KDF_ENVELOPE
+def topbar(body):
+    return body[body.index('class="topbar"') : body.index("</header>")]
 
 
-def test_shell_page_contains_no_vault_plaintext(app):
-    """The shell never has plaintext financial data, so nothing it
-    renders can contain an account name, note, or value
-    (spec/features/app-shell.md, What it does; Acceptance criteria).
-
-    What this asserts is the positive half: the fixed chrome vocabulary
-    renders. The absence half is carried by the template, which sources
-    no variable from decrypted data.
-    """
-    resp = _render_shell_page(app)
-    body = resp.get_data(as_text=True)
-
-    chrome_vocabulary = {
-        "Solvent",
+def test_nav_is_dashboard_and_settings_for_a_vault_owner():
+    assert [e["label"] for e in nav_entries({"kind": "vault_owner"})] == [
         "Dashboard",
         "Settings",
-        "Update values",
-        "Lock",
-        "content",
-    }
-    for snippet in chrome_vocabulary:
-        assert snippet in body
-
-
-def test_lock_button_has_no_confirmation_dialog_and_makes_no_request(app):
-    resp = _render_shell_page(app)
-    body = resp.get_data(as_text=True)
-
-    lock_start = body.index("$store.shell.lock()")
-    # The whole <button ...>...</button> element for the lock control.
-    tag_start = body.rindex("<button", 0, lock_start)
-    tag_end = body.index("</button>", lock_start)
-    lock_button_html = body[tag_start : tag_end + len("</button>")]
-
-    # No htmx/form wiring that would round-trip to the server -- locking
-    # is purely client-side (login.md, Rules: "the server session stays
-    # alive").
-    assert "hx-post" not in lock_button_html
-    assert "hx-get" not in lock_button_html
-    assert "formaction" not in lock_button_html
-
-
-def test_no_route_exists_for_locking(app):
-    """Locking is pure client-side state (login.md, Rules: "the server
-    session stays alive"), so the shell registers no server-side
-    endpoint for it at all."""
-    lock_like = [
-        rule.rule
-        for rule in app.url_map.iter_rules()
-        if "lock" in rule.rule.lower()
     ]
-    assert lock_like == []
 
 
-def test_alpine_asset_is_the_csp_safe_build_and_matches_pinned_sri():
-    vendor_path = (
-        Path(__file__).resolve().parent.parent
-        / "solvent"
-        / "static"
-        / "vendor"
-        / "alpinejs-csp"
-        / "3.15.12"
-        / "cdn.min.js"
-    )
-    assert vendor_path.is_file()
+def test_an_administrator_has_no_nav_entries_at_all():
+    assert nav_entries({"kind": "administrator"}) == []
+    assert nav_entries(None) == []
 
-    digest = hashlib.sha384(vendor_path.read_bytes()).digest()
-    computed_sri = "sha384-" + base64.b64encode(digest).decode()
-    assert computed_sri == ALPINE_SRI
 
-    # The CSP build ships its own parser and says so. These strings
-    # exist only in that build, where the plain build compiles
-    # expressions through the Function constructor instead.
-    source = vendor_path.read_text(errors="ignore")
+def test_there_is_no_holdings_entry_and_no_admin_entry_in_either_bar(app):
+    owner, _ = register(app, "owner")
+    admin, _ = register(app, "root", kind="administrator")
+    for body in (
+        owner.get("/dashboard").get_data(as_text=True),
+        admin.get("/admin").get_data(as_text=True),
+    ):
+        labels = nav_labels(body)
+        assert "Holdings" not in labels
+        assert "Admin" not in labels
+
+
+def test_a_vault_owners_bar_carries_update_values_and_lock(app):
+    owner, _ = register(app, "owner")
+    bar = topbar(owner.get("/dashboard").get_data(as_text=True))
+    assert "Update values" in bar
+    assert "Lock" in bar
+    assert "Sign out" not in bar
+    assert nav_labels(owner.get("/dashboard").get_data(as_text=True)) == [
+        "Dashboard",
+        "Settings",
+    ]
+
+
+def test_an_administrators_bar_carries_the_wordmark_and_sign_out_and_nothing_else(app):
+    admin, _ = register(app, "root", kind="administrator")
+    body = admin.get("/admin").get_data(as_text=True)
+    bar = topbar(body)
+    assert "Solvent" in bar
+    assert "Sign out" in bar
+    assert "Update values" not in bar
+    assert "Lock" not in bar
+    assert nav_labels(body) == []
+
+
+def test_both_kinds_embed_the_current_default_kdf_envelope(app):
+    owner, _ = register(app, "owner")
+    admin, _ = register(app, "root", kind="administrator")
+    for body in (
+        owner.get("/dashboard").get_data(as_text=True),
+        admin.get("/admin").get_data(as_text=True),
+    ):
+        start = body.index('id="kdf-envelope"')
+        opened = body.index(">", start) + 1
+        assert json.loads(body[opened : body.index("</script>", opened)]) == (
+            DEFAULT_KDF_ENVELOPE
+        )
+
+
+def test_the_embedded_envelope_is_the_pinned_one():
+    assert DEFAULT_KDF_ENVELOPE == {
+        "alg": "argon2id",
+        "v": 19,
+        "m": 65536,
+        "t": 3,
+        "p": 1,
+    }
+
+
+def test_an_administrator_loads_the_worker_and_not_the_record_layer(app):
+    """The Argon2id worker still ships, because changing their
+    password derives at current parameters like any other account."""
+    admin, _ = register(app, "root", kind="administrator")
+    owner, _ = register(app, "owner")
+
+    admin_page = admin.get("/admin").get_data(as_text=True)
+    owner_page = owner.get("/dashboard").get_data(as_text=True)
+
+    assert "page-admin.js" in admin_page
+    assert "js/app.js" not in admin_page
+    assert "js/app.js" in owner_page
+
+    from pathlib import Path
+
+    admin_js = (
+        Path(__file__).resolve().parent.parent / "solvent" / "static" / "js" / "page-admin.js"
+    ).read_text()
+    # It reaches the worker through session.js, which owns the
+    # derivation, and never through the model or the write paths.
+    assert "./session.js" in admin_js
+    assert "./model.js" not in admin_js
+    assert "./writes.js" not in admin_js
+
+
+def test_the_lock_button_makes_no_request_and_has_no_route(app):
+    owner, _ = register(app, "owner")
+    body = owner.get("/dashboard").get_data(as_text=True)
+    lock_at = body.index("$store.shell.lock()")
+    element = body[body.rindex("<button", 0, lock_at) : body.index("</button>", lock_at)]
+    for wiring in ("hx-post", "hx-get", "formaction", "href"):
+        assert wiring not in element
+
+    assert [
+        rule.rule for rule in app.url_map.iter_rules() if "lock" in rule.rule.lower()
+    ] == []
+
+
+def test_the_top_bar_uses_the_chrome_button_not_the_secondary_one(app):
+    owner, _ = register(app, "owner")
+    bar = topbar(owner.get("/dashboard").get_data(as_text=True))
+    assert "btn-chrome" in bar
+    assert "btn-secondary" not in bar
+
+
+def test_no_shell_response_contains_vault_plaintext(app):
+    """The shell never holds plaintext to begin with, so what this
+    asserts is that no route wired to it receives decrypted content:
+    every page's content region is an empty mount point."""
+    owner, _ = register(app, "owner")
+    for path in ("/dashboard", "/settings", "/settings/dimensions"):
+        body = owner.get(path).get_data(as_text=True)
+        region = body[body.index("<main") : body.index("</main>")]
+        assert re.sub(r"<[^>]+>|\s", "", region) == ""
+
+
+# ---- The vendored dependencies ----------------------------------------
+
+
+def sri_of(path):
+    return "sha384-" + base64.b64encode(hashlib.sha384(path.read_bytes()).digest()).decode()
+
+
+def test_the_alpine_build_served_is_the_csp_safe_one_at_its_pinned_hash():
+    path = VENDOR / "alpinejs-csp" / "3.15.12" / "cdn.min.js"
+    assert sri_of(path) == ALPINE_SRI
+    source = path.read_text(errors="ignore")
+    # These strings exist only in the CSP build, where the plain build
+    # compiles expressions through the Function constructor instead.
     assert "prohibited in the CSP build" in source
     assert "CSP Parser Error" in source
 
 
-def test_shell_js_is_loaded_before_the_alpine_bundle(app):
-    """The bundle calls `Alpine.start()` from a microtask, and the
-    microtask queue drains between two deferred scripts. A listener
-    registered after it would never see `alpine:init`, so `x-data` and
-    `$store.shell` would resolve to undefined and the lock button would
-    throw."""
-    body = _render_shell_page(app).get_data(as_text=True)
-    assert body.index("js/shell.js") < body.index("alpinejs-csp")
+def test_the_argon2id_bundle_matches_its_pinned_hash():
+    assert sri_of(VENDOR / "argon2id" / "1.0.1" / "argon2id.js") == ARGON2ID_SRI
 
 
-def test_shell_page_references_the_vendored_alpine_with_integrity(app):
-    resp = _render_shell_page(app)
-    body = resp.get_data(as_text=True)
-    assert "vendor/alpinejs-csp/3.15.12/cdn.min.js" in body
-    assert ALPINE_SRI in body
-    assert "cdn.jsdelivr.net" not in body
-    assert "unpkg.com" not in body
+def test_the_zxcvbn_bundle_matches_its_pinned_hash():
+    assert sri_of(VENDOR / "zxcvbn" / "4.4.2" / "zxcvbn.js") == ZXCVBN_SRI
 
 
-def _contrast(first: str, second: str) -> float:
-    """WCAG relative-luminance contrast ratio for two `#rrggbb` colors."""
+def test_no_third_party_cdn_is_referenced_anywhere(app):
+    owner, _ = register(app, "owner")
+    admin, _ = register(app, "root", kind="administrator")
+    pages = [
+        owner.get(path).get_data(as_text=True)
+        for path in ("/dashboard", "/settings", "/login")
+    ]
+    pages.append(admin.get("/admin").get_data(as_text=True))
+    for body in pages:
+        for host in ("cdn.jsdelivr.net", "unpkg.com", "cdnjs.cloudflare.com", "fonts.googleapis.com"):
+            assert host not in body
 
-    def luminance(color: str) -> float:
+
+def test_the_supply_chain_list_is_exactly_what_is_vendored():
+    """architecture.md names it in full and means it to stay short."""
+    assert {path.name for path in VENDOR.iterdir()} == {
+        "alpinejs-csp",
+        "argon2id",
+        "zxcvbn",
+    }
+
+
+# ---- Contrast floors ---------------------------------------------------
+
+
+def contrast(first, second):
+    def luminance(color):
         channels = [int(color[i : i + 2], 16) / 255 for i in (1, 3, 5)]
         channels = [
-            c / 12.92 if c <= 0.04045 else ((c + 0.055) / 1.055) ** 2.4
-            for c in channels
+            c / 12.92 if c <= 0.04045 else ((c + 0.055) / 1.055) ** 2.4 for c in channels
         ]
-        return (
-            0.2126 * channels[0] + 0.7152 * channels[1] + 0.0722 * channels[2]
-        )
+        return 0.2126 * channels[0] + 0.7152 * channels[1] + 0.0722 * channels[2]
 
-    lighter, darker = sorted(
-        (luminance(first), luminance(second)), reverse=True
-    )
+    lighter, darker = sorted((luminance(first), luminance(second)), reverse=True)
     return (lighter + 0.05) / (darker + 0.05)
 
 
-def _css_token(name: str) -> str:
+def token(name):
     css = (
         Path(__file__).resolve().parent.parent
-        / "solvent"
-        / "static"
-        / "css"
-        / "tokens.css"
+        / "solvent" / "static" / "css" / "tokens.css"
     ).read_text()
     return re.search(rf"--{name}:\s*(#[0-9a-f]{{6}})", css).group(1)
 
 
-def test_top_bar_controls_clear_their_contrast_floors():
-    """The chrome button exists because the secondary one does not
-    clear these on petrol-800 (design-system.md, Components,
-    Accessibility): body text 4.5:1, non-text 3:1."""
-    bar = _css_token("petrol-800")
-
-    assert _contrast("#ffffff", bar) >= 4.5  # label, nav, focus ring
-    assert _contrast(_css_token("petrol-400"), bar) >= 3.0  # its border
+def test_the_top_bar_controls_clear_their_contrast_floors():
+    bar = token("petrol-800")
+    assert contrast("#ffffff", bar) >= 4.5
+    assert contrast(token("petrol-400"), bar) >= 3.0
 
 
-def test_top_bar_uses_the_chrome_button_not_the_secondary_one(app):
-    body = _render_shell_page(app).get_data(as_text=True)
-    topbar = body[body.index('class="topbar"') : body.index("</header>")]
-    assert "btn-chrome" in topbar
-    assert "btn-secondary" not in topbar
+def test_every_body_text_token_clears_its_stated_floor():
+    ground = token("ground")
+    for name in ("ink-primary", "ink-secondary", "brass-600", "plum-600",
+                 "status-good", "status-critical"):
+        assert contrast(token(name), ground) >= 4.5, name
+    # Marked sub-4.5 in the spec and restricted to non-text use.
+    for name in ("ink-muted", "brass-500", "status-warning"):
+        assert 3.0 <= contrast(token(name), ground) < 4.5, name

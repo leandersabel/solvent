@@ -1,0 +1,6 @@
+{% extends "shell/outside.html" %}
+{% block title %}Sign in to Solvent{% endblock %}
+{% block body %}
+  <div id="app"></div>
+  <script type="module" src="{{ url_for('static', filename='js/page-login.js') }}"></script>
+{% endblock %}

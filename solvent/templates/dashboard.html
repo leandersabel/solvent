@@ -1,0 +1,8 @@
+{% extends "shell/base.html" %}
+{% block title %}Solvent{% endblock %}
+{% block content %}
+  <div id="app" data-username="{{ g.principal.username }}"></div>
+{% endblock %}
+{% block scripts %}
+  <script type="module" src="{{ url_for('static', filename='js/app.js') }}"></script>
+{% endblock %}

@@ -13,3 +13,6 @@ venv/
 instance/
 *.db
 .env
+
+# Vendored node package unpacked for tools/vendor-argon2id.py
+package/

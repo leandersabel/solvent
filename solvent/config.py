@@ -1,5 +1,11 @@
 """Environment and secret loading (spec/features/app-shell.md,
 Configuration; spec/architecture.md, Tech stack, Container hardening).
+
+Every operator-tunable number lives here with the default the spec
+names. What the spec pins as a compiled-contract parameter -- the
+storage caps, the KDF envelope -- is a constant instead, because a
+boundary that moves per deployment is one the acceptance tests cannot
+state (architecture.md, Storage & data handling).
 """
 from __future__ import annotations
 
@@ -21,23 +27,65 @@ class Config:
     database_path: str
     hsts_preload: bool
     hsts_max_age: int
+    login_attempts_per_account: int
+    login_account_window_minutes: int
+    login_lockout_threshold: int
+    login_lockout_window_minutes: int
+    login_lockout_minutes: int
+    login_requests_per_ip_hour: int
+    verify_concurrency: int
+    rate_requests_per_hour: int
+    rate_breaker_failures: int
+    rate_breaker_cooloff_minutes: int
 
 
-# Embedded in every server-rendered page, so a client-side flow needing
-# *current* parameters reads it from the page it is on (architecture.md,
-# Key management). Public input to a derivation, not a secret.
-# `memoryKib` matches the unit most Argon2id bindings expect natively.
+# The client's key derivation, embedded in every server-rendered page so
+# a flow needing *current* parameters reads it from the page it is on
+# (architecture.md, Key management). Public input to a derivation, not a
+# secret.
+#
+# The field names are pinned rather than descriptive: the envelope
+# travels verbatim into credentials.params and from there into the
+# export file, so renaming a key here rewrites a stored format. `v` is
+# Argon2's own version number, 19 (0x13).
 DEFAULT_KDF_ENVELOPE = {
-    "algorithm": "argon2id",
-    "version": 1,
-    "memoryKib": 256 * 1024,
-    "iterations": 3,
-    "parallelism": 1,
+    "alg": "argon2id",
+    "v": 19,
+    "m": 65536,
+    "t": 3,
+    "p": 1,
 }
+
+# What a client may register itself at. A weaker envelope is a Bad
+# Request even though the UI would never send one (register.md).
+MIN_KDF_ENVELOPE = dict(DEFAULT_KDF_ENVELOPE)
+
+# Server-side Argon2id over the already-high-entropy Auth Key: defense
+# in depth, not the work factor (login.md, Rules).
+SERVER_VERIFY_PARAMS = {"m": 65536, "t": 2, "p": 1}
 
 # Two years, the conventional HSTS max-age. The spec does not pin it,
 # unlike the CSP string and the header names.
 _DEFAULT_HSTS_MAX_AGE = 63072000
+
+_TRUTHY = ("1", "true", "yes")
+
+
+def _flag(env: "dict[str, str]", name: str) -> bool:
+    return env.get(name, "false").strip().lower() in _TRUTHY
+
+
+def _number(env: "dict[str, str]", name: str, default: int) -> int:
+    raw = env.get(name)
+    if raw is None or not raw.strip():
+        return default
+    try:
+        return int(raw)
+    except ValueError:
+        raise ConfigurationError(
+            f"{name} must be a whole number. Fix it in the deployment's "
+            "environment before starting the app."
+        ) from None
 
 
 def load_config(env: "dict[str, str] | None" = None) -> Config:
@@ -57,18 +105,26 @@ def load_config(env: "dict[str, str] | None" = None) -> Config:
             "starting the app."
         )
 
-    database_path = env.get("DATABASE_PATH", "instance/solvent.db")
-
-    hsts_preload = env.get("HSTS_PRELOAD", "false").strip().lower() in (
-        "1",
-        "true",
-        "yes",
-    )
-    hsts_max_age = int(env.get("HSTS_MAX_AGE", str(_DEFAULT_HSTS_MAX_AGE)))
-
     return Config(
         secret_key=secret_key,
-        database_path=database_path,
-        hsts_preload=hsts_preload,
-        hsts_max_age=hsts_max_age,
+        database_path=env.get("DATABASE_PATH", "instance/solvent.db"),
+        hsts_preload=_flag(env, "HSTS_PRELOAD"),
+        hsts_max_age=_number(env, "HSTS_MAX_AGE", _DEFAULT_HSTS_MAX_AGE),
+        # architecture.md, Rate limiting: per account, 10 attempts per 15
+        # minutes, then a 15-minute lockout once 20 fail within an hour.
+        login_attempts_per_account=_number(env, "LOGIN_ATTEMPTS_PER_ACCOUNT", 10),
+        login_account_window_minutes=_number(env, "LOGIN_ACCOUNT_WINDOW_MINUTES", 15),
+        login_lockout_threshold=_number(env, "LOGIN_LOCKOUT_THRESHOLD", 20),
+        login_lockout_window_minutes=_number(env, "LOGIN_LOCKOUT_WINDOW_MINUTES", 60),
+        login_lockout_minutes=_number(env, "LOGIN_LOCKOUT_MINUTES", 15),
+        # Per IP, across salt and login together, because splitting the
+        # budget lets an attacker spend twice.
+        login_requests_per_ip_hour=_number(env, "LOGIN_REQUESTS_PER_IP_HOUR", 60),
+        # architecture.md, Concurrency cap: 4 parallel verifications, so
+        # peak Argon2id memory stays near 256 MiB.
+        verify_concurrency=_number(env, "VERIFY_CONCURRENCY", 4),
+        # rate-lookup.md, Rate limiting and failure.
+        rate_requests_per_hour=_number(env, "RATE_REQUESTS_PER_HOUR", 120),
+        rate_breaker_failures=_number(env, "RATE_BREAKER_FAILURES", 5),
+        rate_breaker_cooloff_minutes=_number(env, "RATE_BREAKER_COOLOFF_MINUTES", 5),
     )

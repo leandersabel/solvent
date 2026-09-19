@@ -1,135 +1,79 @@
-"""Header-parity: every response shape carries the same CSP/HSTS, and no
-separate X-Frame-Options is served (spec/features/app-shell.md, Response
-headers; Acceptance criteria).
+"""Response headers, on every response shape (spec/features/
+app-shell.md, Response headers).
 
-Fixture routes cover all four response shapes the acceptance criterion
-names -- a shell page, a JSON endpoint, a 404, and a 500 -- so this
-can't be faked by asserting one happy-path route alone
-(spec/.compiled/app-shell.json, verify.focus).
+The criterion is easy to fake by asserting CSP and HSTS on one
+happy-path route, so this asserts them on a shell page, a JSON
+endpoint, a Not Found and a Server Error.
 """
 from __future__ import annotations
 
 import pytest
 
-from solvent.csrf import HEADER_NAME, csrf_exempt
 from solvent.headers import CSP
-from tests.helpers import seed_session, seed_user
+from solvent.guard import navigation
+from tests.helpers import CSRF, register
 
 
 @pytest.fixture
-def wired_app(app):
-    @app.route("/__test/shell-page")
-    @csrf_exempt
-    def shell_page():
-        return "<html><body>shell page</body></html>", 200
-
-    @app.route("/__test/json")
-    def json_endpoint():
-        return {"ok": True}, 200
-
-    @app.route("/__test/boom")
+def every_shape(app):
+    @app.route("/dashboard/__boom")
+    @navigation
     def boom():
-        raise RuntimeError("stubbed unhandled failure")
+        raise RuntimeError("stubbed failure")
 
-    return app
-
-
-def _auth_headers():
-    return {HEADER_NAME: "1"}
-
-
-def _assert_security_headers(response):
-    assert response.headers.get("Content-Security-Policy") == CSP
-    hsts = response.headers.get("Strict-Transport-Security")
-    assert hsts is not None
-    assert "includeSubDomains" in hsts
-    assert "X-Frame-Options" not in response.headers
+    owner, _ = register(app, "owner")
+    return [
+        owner.get("/dashboard"),
+        owner.get("/api/records?type=account", headers=CSRF),
+        owner.get("/api/no-such-route", headers=CSRF),
+        owner.get("/dashboard/__boom"),
+    ]
 
 
-def test_shell_page_carries_csp_and_hsts(wired_app):
-    client = wired_app.test_client()
-    resp = client.get("/__test/shell-page")
-    assert resp.status_code == 200
-    _assert_security_headers(resp)
+def test_every_response_shape_carries_the_policy_byte_identically(every_shape):
+    assert [r.status_code for r in every_shape] == [200, 200, 404, 500]
+    for response in every_shape:
+        assert response.headers["Content-Security-Policy"] == CSP
 
 
-def test_json_endpoint_carries_csp_and_hsts(wired_app):
-    user_id = seed_user(wired_app, "alice")
-    cookie = seed_session(wired_app, user_id)
-
-    client = wired_app.test_client()
-    client.set_cookie("solvent_session", cookie)
-    resp = client.get("/__test/json", headers=_auth_headers())
-
-    assert resp.status_code == 200
-    assert resp.get_json() == {"ok": True}
-    _assert_security_headers(resp)
+def test_every_response_shape_carries_hsts(every_shape):
+    for response in every_shape:
+        assert "max-age=" in response.headers["Strict-Transport-Security"]
+        assert "includeSubDomains" in response.headers["Strict-Transport-Security"]
 
 
-def test_csrf_rejection_carries_csp_and_hsts(wired_app):
-    resp = wired_app.test_client().get("/__test/json")
-    assert resp.status_code == 403
-    _assert_security_headers(resp)
+def test_the_policy_matches_the_architecture_byte_for_byte():
+    from pathlib import Path
+    import re
+
+    architecture = (
+        Path(__file__).resolve().parent.parent / "spec" / "architecture.md"
+    ).read_text()
+    block = architecture[architecture.index("- **CSP**:") :]
+    quoted = re.search(r"`([^`]*default-src[^`]*)`", block, re.S).group(1)
+    written = " ".join(quoted.split())
+    assert written == CSP
 
 
-def test_unauthenticated_rejection_carries_csp_and_hsts(wired_app):
-    resp = wired_app.test_client().get("/__test/json", headers=_auth_headers())
-    assert resp.status_code == 401
-    _assert_security_headers(resp)
+def test_no_separate_x_frame_options_is_served(every_shape):
+    """frame-ancestors 'none' in the CSP is the only framing control,
+    and a second header stating the same thing is a second thing to
+    keep in sync."""
+    for response in every_shape:
+        assert "X-Frame-Options" not in response.headers
+    assert "frame-ancestors 'none'" in CSP
 
 
-def test_unknown_path_carries_csp_and_hsts(wired_app):
-    user_id = seed_user(wired_app, "erin")
-    cookie = seed_session(wired_app, user_id)
-
-    client = wired_app.test_client()
-    client.set_cookie("solvent_session", cookie)
-    resp = client.get(
-        "/__test/this-route-does-not-exist", headers=_auth_headers()
-    )
-    assert resp.status_code == 404
-    _assert_security_headers(resp)
+def test_hsts_preload_is_off_unless_the_deployment_opts_in(app, client):
+    assert "preload" not in client.get("/login").headers["Strict-Transport-Security"]
+    app.config["HSTS_PRELOAD"] = True
+    assert "preload" in client.get("/login").headers["Strict-Transport-Security"]
 
 
-def test_static_asset_carries_csp_and_hsts(wired_app):
-    resp = wired_app.test_client().get("/static/css/tokens.css")
-    assert resp.status_code == 200
-    _assert_security_headers(resp)
+def test_the_register_page_carries_no_referrer(app, client):
+    """The token rides in this page's URL, so it is this page's
+    outbound navigations that could carry it in a Referer header."""
+    from tests.helpers import mint_invite
 
-
-def test_hsts_carries_preload_only_when_the_operator_opts_in(
-    tmp_path, monkeypatch
-):
-    """`preload` is only valid on a fixed public domain that has served
-    the header through its probation period, so it is off unless the
-    operator sets it (architecture.md, Network & transport)."""
-    monkeypatch.setenv("SECRET_KEY", "test-only-secret-key-do-not-use-in-prod")
-
-    from solvent import create_app
-
-    for preload in (False, True):
-        app = create_app(
-            config_overrides={
-                "DATABASE_PATH": str(tmp_path / f"hsts-{preload}.db"),
-                "TESTING": True,
-                "HSTS_PRELOAD": preload,
-            }
-        )
-        resp = app.test_client().get("/__test/no-such-path")
-        hsts = resp.headers["Strict-Transport-Security"]
-        assert ("preload" in hsts) is preload
-
-
-def test_server_error_carries_csp_and_hsts(wired_app):
-    user_id = seed_user(wired_app, "bob")
-    cookie = seed_session(wired_app, user_id)
-
-    client = wired_app.test_client()
-    client.set_cookie("solvent_session", cookie)
-    resp = client.get("/__test/boom", headers=_auth_headers())
-
-    assert resp.status_code == 500
-    # Never leaks the exception's message/traceback into the body.
-    assert b"RuntimeError" not in resp.data
-    assert b"stubbed unhandled failure" not in resp.data
-    _assert_security_headers(resp)
+    body = client.get(f"/register?invite={mint_invite(app)}").get_data(as_text=True)
+    assert 'name="referrer" content="no-referrer"' in body

@@ -133,3 +133,643 @@ body {
     transition: none !important;
   }
 }
+
+/* ---- Typography scale (design-system.md, Typography) ---- */
+
+h1, h2, h3 {
+  margin: 0 0 8px;
+  font-weight: 600;
+}
+
+.screen-heading { font-size: 20px; }
+.section-heading { font-size: 20px; }
+.group-heading { font-size: 15px; color: var(--ink-secondary); }
+.card-heading { font-size: 20px; margin-bottom: 16px; }
+
+.hint,
+.axis-tick {
+  font-size: 13px;
+  color: var(--ink-secondary);
+  margin: 4px 0;
+}
+
+.muted { color: var(--ink-muted); }
+.strong { font-weight: 600; }
+
+/* Anything that must align vertically is tabular. The hero figure
+   keeps proportional figures. */
+.numeric,
+.quantity,
+.data-table td,
+.data-table th,
+.inline-input {
+  font-variant-numeric: tabular-nums;
+}
+
+.content-narrow { max-width: 720px; }
+.content-medium { max-width: 900px; }
+.screen-wide { max-width: var(--content-max-width); }
+
+/* ---- Outside the shell ---- */
+
+.outside-body {
+  display: flex;
+  min-height: 100vh;
+  align-items: center;
+  justify-content: center;
+}
+
+.outside {
+  width: 100%;
+  max-width: 480px;
+  padding: 24px;
+}
+
+.outside-footnote {
+  margin-top: 16px;
+  font-size: 13px;
+  color: var(--ink-muted);
+  text-align: center;
+}
+
+/* ---- Cards, hairlines, no shadows ---- */
+
+.card {
+  background: var(--surface);
+  border: 1px solid var(--hairline);
+  border-radius: var(--radius-card);
+  padding: 24px;
+  margin-bottom: 24px;
+}
+
+.card-narrow { max-width: 480px; }
+.card-centered { text-align: center; }
+
+.card-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+}
+
+.callout {
+  background: var(--surface-tinted);
+  border-radius: var(--radius-input);
+  padding: 12px 16px;
+  margin: 0 0 16px;
+}
+
+.callout-critical {
+  border-left: 3px solid var(--status-critical);
+}
+
+.banner {
+  background: var(--surface-tinted);
+  border-radius: var(--radius-input);
+  padding: 12px 16px;
+  margin-bottom: 16px;
+}
+
+.banner-critical {
+  background: var(--surface);
+  border: 1px solid var(--status-critical);
+  color: var(--status-critical);
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+/* ---- Fields ---- */
+
+.field { margin-bottom: 16px; }
+
+.field label,
+.settings-label {
+  display: block;
+  font-size: 13px;
+  font-weight: 500;
+  color: var(--ink-secondary);
+  margin-bottom: 4px;
+}
+
+.field-inline {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+}
+
+input[type="text"],
+input[type="password"],
+input[type="date"],
+input[type="file"],
+select,
+textarea {
+  width: 100%;
+  background: var(--surface);
+  border: 1px solid var(--hairline);
+  border-radius: var(--radius-input);
+  padding: 8px 12px;
+  font: inherit;
+  color: var(--ink-primary);
+}
+
+/* Never remove the focus ring (design-system.md, Components). */
+input:focus-visible,
+select:focus-visible,
+textarea:focus-visible,
+button:focus-visible,
+a:focus-visible,
+svg:focus-visible {
+  outline: 2px solid var(--petrol-600);
+  outline-offset: 2px;
+}
+
+.inline-input {
+  border-color: transparent;
+  background: transparent;
+  padding: 4px 8px;
+  font-weight: 600;
+}
+
+.inline-input:hover { border-color: var(--hairline); }
+
+.password-field {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+}
+
+.quantity-field {
+  position: relative;
+  display: flex;
+  align-items: center;
+}
+
+.quantity-field .unit-suffix {
+  position: absolute;
+  right: 12px;
+  font-size: 13px;
+  color: var(--ink-secondary);
+}
+
+.quantity.carried { color: var(--ink-secondary); }
+.quantity.recorded { color: var(--ink-primary); }
+
+.checkbox {
+  display: flex;
+  align-items: flex-start;
+  gap: 8px;
+  margin-bottom: 8px;
+}
+
+.checkbox input {
+  width: 16px;
+  height: 16px;
+  margin-top: 2px;
+  accent-color: var(--petrol-600);
+  flex: none;
+}
+
+.field-error {
+  color: var(--status-critical);
+  font-size: 13px;
+  margin: 4px 0;
+}
+
+.field-error::before { content: "\26a0  "; }
+
+fieldset {
+  border: 1px solid var(--hairline);
+  border-radius: var(--radius-input);
+  margin: 0 0 16px;
+  padding: 12px 16px;
+}
+
+/* ---- Buttons ---- */
+
+.btn-primary,
+.btn-secondary,
+.btn-destructive {
+  border-radius: var(--radius-input);
+  padding: 8px 16px;
+  font: inherit;
+  cursor: pointer;
+  text-decoration: none;
+  display: inline-block;
+}
+
+.btn-primary {
+  background: var(--brass-600);
+  border: 1px solid var(--brass-600);
+  color: #ffffff;
+}
+
+.btn-primary:disabled {
+  background: var(--petrol-200);
+  border-color: var(--petrol-200);
+  color: var(--ink-secondary);
+  cursor: not-allowed;
+}
+
+.btn-destructive {
+  background: transparent;
+  border: 1px solid var(--status-critical);
+  color: var(--status-critical);
+}
+
+.dialog .btn-destructive {
+  background: var(--status-critical);
+  color: #ffffff;
+}
+
+.btn-inline,
+.link-button {
+  background: none;
+  border: none;
+  padding: 0 8px 0 0;
+  font: inherit;
+  color: var(--petrol-600);
+  cursor: pointer;
+  text-decoration: underline;
+}
+
+.link-button.back { margin-bottom: 16px; }
+
+.link-row {
+  display: block;
+  padding: 12px 0;
+  border-bottom: 1px solid var(--hairline);
+  color: var(--ink-primary);
+  text-decoration: none;
+}
+
+.link-quiet {
+  font-size: 13px;
+  color: var(--petrol-600);
+  margin-left: 8px;
+}
+
+.form-actions,
+.table-actions {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+  flex-wrap: wrap;
+  margin-top: 16px;
+}
+
+/* A row of links moving between the sections of one screen. It is
+   not navigation and never appears in the top bar. */
+.section-switcher {
+  display: flex;
+  gap: 24px;
+  margin-bottom: 24px;
+  border-bottom: 1px solid var(--hairline);
+}
+
+.switcher-link {
+  background: none;
+  border: none;
+  border-bottom: 2px solid transparent;
+  padding: 8px 0;
+  font: inherit;
+  color: var(--petrol-600);
+  cursor: pointer;
+}
+
+.switcher-link.active {
+  color: var(--brass-600);
+  border-bottom-color: var(--brass-500);
+}
+
+.switch {
+  display: inline-flex;
+  border: 1px solid var(--hairline);
+  border-radius: var(--radius-input);
+  overflow: hidden;
+}
+
+.switch-option {
+  background: transparent;
+  border: none;
+  padding: 6px 12px;
+  font: inherit;
+  cursor: pointer;
+  color: var(--petrol-600);
+}
+
+.switch-option.active {
+  background: var(--surface-tinted);
+  color: var(--petrol-800);
+  font-weight: 600;
+}
+
+/* ---- Chips ---- */
+
+.chip {
+  display: inline-block;
+  background: var(--petrol-50);
+  color: var(--petrol-700);
+  border-radius: 4px;
+  padding: 2px 8px;
+  font-size: 13px;
+  margin-right: 4px;
+}
+
+.chip-archived {
+  background: var(--hairline);
+  color: var(--ink-secondary);
+}
+
+.chips { margin-bottom: 8px; }
+
+/* ---- Tables: no vertical rules, money right-aligned ---- */
+
+.data-table {
+  width: 100%;
+  border-collapse: collapse;
+}
+
+.data-table th,
+.data-table td {
+  text-align: left;
+  padding: 8px 12px 8px 0;
+  border-bottom: 1px solid var(--rule);
+  vertical-align: top;
+}
+
+.data-table th {
+  font-size: 13px;
+  font-weight: 500;
+  color: var(--ink-secondary);
+}
+
+.data-table .numeric,
+th.numeric {
+  text-align: right;
+}
+
+.data-table tr.dimmed td { color: var(--ink-secondary); }
+.data-table tr.flagged td { border-left: 3px solid var(--status-critical); }
+
+.flag-note {
+  display: block;
+  font-size: 13px;
+  color: var(--status-critical);
+}
+
+.plain-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+
+.table-group { margin-top: 24px; }
+
+.settings-row {
+  display: flex;
+  justify-content: space-between;
+  gap: 16px;
+  padding: 8px 0;
+  border-bottom: 1px solid var(--hairline);
+  margin: 0;
+}
+
+.empty-line {
+  color: var(--ink-secondary);
+  margin: 8px 0;
+}
+
+/* ---- Hero ---- */
+
+.hero {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: 24px;
+  margin-bottom: 24px;
+}
+
+.hero-figure {
+  font-size: 44px;
+  font-weight: 600;
+  margin: 0;
+}
+
+.hero-side {
+  display: flex;
+  flex-direction: column;
+}
+
+.hero-part,
+.hero-age,
+.hero-converted {
+  font-size: 13px;
+  color: var(--ink-secondary);
+}
+
+.hero-line {
+  display: flex;
+  gap: 16px;
+  align-items: baseline;
+  flex-wrap: wrap;
+}
+
+.detail-header .hero-figure { font-size: 24px; }
+
+/* ---- Chart ---- */
+
+.chart-controls {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 16px;
+  align-items: center;
+  margin-bottom: 16px;
+}
+
+.range-buttons { display: inline-flex; gap: 4px; }
+
+.trend {
+  width: 100%;
+  height: 320px;
+  display: block;
+}
+
+.gridline { stroke: var(--hairline); stroke-width: 1; }
+.zero-line { stroke: var(--rule); stroke-width: 1; }
+.net-line { fill: none; stroke: var(--ink-primary); stroke-width: 1.5; }
+.entry-mark { stroke: var(--ink-muted); stroke-width: 2; }
+.archive-annotation {
+  stroke: var(--ink-muted);
+  stroke-width: 1;
+  stroke-dasharray: 2 3;
+}
+.axis-tick { fill: var(--ink-muted); font-size: 12px; }
+
+.legend {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 16px;
+  list-style: none;
+  padding: 0;
+  margin: 8px 0 0;
+  font-size: 13px;
+}
+
+.legend li { display: flex; align-items: center; gap: 8px; }
+
+.swatch {
+  width: 12px;
+  height: 12px;
+  border-radius: 2px;
+  display: inline-block;
+}
+
+/* Nominal bars: every bar takes chart slot 1, and bar length carries
+   the value. A negative band grows leftward from the shared zero
+   baseline, at the liability opacity. */
+.bars { list-style: none; padding: 0; margin: 0; }
+
+.bar {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 4px 0;
+}
+
+.bar-fill {
+  height: 16px;
+  border-radius: 2px;
+  min-width: 2px;
+}
+
+.bar.negative { flex-direction: row-reverse; justify-content: flex-end; }
+.bar-label { font-size: 13px; }
+
+/* ---- Sweep ---- */
+
+.sweep-rows { margin-bottom: 24px; }
+
+.sweep-row {
+  display: grid;
+  grid-template-columns: 1fr 1fr auto;
+  gap: 16px;
+  align-items: start;
+  padding: 16px 0;
+  border-bottom: 1px solid var(--hairline);
+}
+
+.holding-name { font-weight: 600; }
+.row-state { font-size: 13px; color: var(--ink-secondary); margin: 4px 0 0; }
+
+.rate-block { margin-bottom: 16px; }
+
+.rate-line {
+  display: grid;
+  grid-template-columns: 6rem 1fr auto auto;
+  gap: 12px;
+  align-items: center;
+  padding: 8px 0;
+  border-bottom: 1px solid var(--hairline);
+}
+
+.rate-line .hint { grid-column: 1 / -1; margin: 0; }
+.rate-unit { font-weight: 500; }
+
+.value-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 4px 0;
+}
+
+/* ---- Dialog: the one place a soft shadow is permitted ---- */
+
+.scrim {
+  position: fixed;
+  inset: 0;
+  background: rgba(17, 29, 32, 0.4);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 24px;
+  z-index: 10;
+}
+
+.dialog {
+  background: var(--surface);
+  border-radius: var(--radius-card);
+  padding: 32px;
+  max-width: 480px;
+  width: 100%;
+  max-height: 90vh;
+  overflow-y: auto;
+  box-shadow: 0 8px 32px rgba(17, 29, 32, 0.18);
+}
+
+.dialog-heading { font-size: 20px; margin-bottom: 16px; }
+.dialog-actions {
+  display: flex;
+  gap: 8px;
+  justify-content: flex-end;
+  margin-top: 24px;
+  flex-wrap: wrap;
+}
+
+/* At phone width a dialog is a full-screen sheet: a centered box
+   inside a narrow viewport leaves nothing for the scrim to show. */
+@media (max-width: 600px) {
+  .scrim { padding: 0; align-items: stretch; }
+  .dialog { max-width: none; max-height: none; border-radius: 0; }
+  .sweep-row { grid-template-columns: 1fr; }
+  .rate-line { grid-template-columns: 1fr; }
+  .topbar { flex-wrap: wrap; gap: 12px; }
+}
+
+/* ---- The strength gauge: a magnitude, not a verdict ---- */
+
+.gauge { margin-bottom: 16px; }
+
+.gauge-track {
+  display: flex;
+  gap: 4px;
+  margin-bottom: 4px;
+}
+
+.gauge-segment {
+  height: 4px;
+  flex: 1;
+  background: var(--petrol-100);
+  border-radius: 2px;
+}
+
+.gauge-segment.filled { background: var(--petrol-600); }
+.gauge-label { font-size: 13px; color: var(--ink-secondary); }
+
+/* ---- Disclosure ---- */
+
+details { margin-bottom: 16px; }
+
+summary {
+  cursor: pointer;
+  font-size: 15px;
+  color: var(--petrol-600);
+  padding: 4px 0;
+}
+
+.danger-zone summary { color: var(--status-critical); }
+
+hr {
+  border: none;
+  border-top: 1px solid var(--hairline);
+  margin: 24px 0;
+}
+
+/* Transitions on hover, focus and expand only, at most 150ms. No
+   entrance animations and no number count-ups. */
+button,
+a,
+input,
+select {
+  transition: border-color 150ms, background 150ms, color 150ms;
+}

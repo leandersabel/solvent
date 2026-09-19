@@ -11,15 +11,31 @@ def app(tmp_path, monkeypatch):
 
     from solvent import create_app
 
-    application = create_app(
+    return create_app(
         config_overrides={
             "DATABASE_PATH": str(tmp_path / "solvent-test.db"),
             "TESTING": True,
         }
     )
-    return application
 
 
 @pytest.fixture
 def client(app):
     return app.test_client()
+
+
+@pytest.fixture(autouse=True)
+def cheap_argon2(monkeypatch):
+    """Server-side Argon2id at 64 MiB is defense in depth, not the work
+    factor, and paying it in every test would cost minutes. The shape
+    of what is stored and compared is unchanged."""
+    from argon2 import PasswordHasher, Type
+
+    import solvent.crypto as crypto
+
+    monkeypatch.setattr(
+        crypto,
+        "_hasher",
+        PasswordHasher(memory_cost=64, time_cost=1, parallelism=1, type=Type.ID),
+    )
+    monkeypatch.setattr(crypto, "_DECOY_VERIFIER", None)
