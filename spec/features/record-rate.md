@@ -385,12 +385,13 @@ to win silently.
   changing several rates confirms once, naming each symbol and its
   count, rather than queueing a dialog per line.
 - **Deleting an entry** is allowed, by clearing its line
-  (`record-snapshot.md`, Clearing a figure). The symbol then prices
-  from the neighboring entries, which for the newest entry means the
-  total falls back to the one before it. The confirmation says that
-  figures around that date will change, and, when the entry is the
-  symbol's only one, that every holding measured in it becomes unpriced
-  and leaves the total (`net-worth-view.md`).
+  (`record-snapshot.md`, Clearing a figure), and every entry at a date
+  goes together when the recording itself is deleted. The symbol then
+  prices from the neighboring entries, which for the newest entry
+  means the total falls back to the one before it. The confirmation
+  says that figures around that date will change, and, when the entry
+  is the symbol's only one, that every holding measured in it becomes
+  unpriced and leaves the total (`net-worth-view.md`).
 
 ## Inputs / outputs
 
@@ -411,9 +412,11 @@ to win silently.
 - **A recording is reopened and only a quantity is changed.** No rate
   record is written, no `version` moves, and no request reaches the
   proxy. The date keeps the prices it was recorded at.
-- **A date whose only records are rates**, because every quantity at it
-  was cleared, is still a recording and still reopens. Nothing tidies
-  it away, and the entries keep pricing the dates around them.
+- **A date whose only records are rates**, because every quantity at
+  it was cleared or none was ever entered, is still a recording and
+  still reopens. Nothing tidies it away, the entries keep pricing the
+  dates around them, and the only thing that removes them is deleting
+  the recording (`record-snapshot.md`, Deleting a recording).
 - **A symbol the recording date never priced**, because the provider
   was down that day or the account did not exist yet. The line is empty
   and says so. Recording a quantity at that date fills it, and somebody

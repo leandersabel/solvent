@@ -142,8 +142,11 @@ entries grouped by their own `date` field.
 Consequences, which are properties rather than gaps:
 
 - **A recording exists exactly as long as a record carries its date.**
-  Clearing every figure at a date does not leave an empty recording, it
-  leaves no recording. There is no tombstone and nothing to tidy up.
+  This is what lets it have contents and still be one thing. Clear
+  every quantity and the rates captured that day still carry the date,
+  so the recording is still there, holding what it still holds. Delete
+  every record at the date and it is gone with them, needing no
+  tombstone and nothing tidied up.
 - **A recording has no version and cannot conflict as a whole.**
   Concurrency stays per record, under the one rule in `record-api.md`.
 - **A recording has no author, no wall-clock time, and no note of its
@@ -255,16 +258,48 @@ go.
 - An empty field that was already empty is what it has always been: no
   change, and nothing written.
 - **Clearing a quantity clears no rate**, for the reason deleting a
-  snapshot deletes none (Edge cases). A date's prices survive the
-  deletion of every quantity at it, and the recording survives as its
-  rates.
-- **Clearing every figure at a date empties the recording**, through
-  the same deletions in the same save. When the last record carrying
-  that date is gone, so is the recording.
+  snapshot deletes none (Edge cases).
+- **Clearing every quantity leaves a recording with no values and its
+  rates intact**, which is an ordinary state and not a degenerate one.
+  The prices captured that day are what the app went and got, they are
+  still true of that day, and they still price the dates around them
+  (`net-worth-view.md`). The recording reopens, shows its rate lines,
+  and takes a value again whenever one turns up.
+- **Clearing is an ordinary edit and costs what one costs.** It
+  destroys no date, so it carries no more confirmation than any other
+  save. Destroying a date is its own action, below.
 - **A `DELETE` answering Not Found counts as done.** The record is
   gone, which is what was asked, and another session having got there
   first is not a failure the person can act on.
-- How a destructive save is confirmed is open (`questions.md`).
+
+### Deleting a recording
+
+A separate action on the recording removes **every record bearing that
+date**, the snapshots and the rate entries together. It is the only
+thing that removes a date, and it is never a consequence of clearing
+fields.
+
+- **One confirmation, stating that this is destructive and cannot be
+  restored.** There is no undo and no server-side copy: an exported
+  file is the only way back, and only if one was made.
+- It is a set of ordinary `DELETE` requests, one per record, with no
+  transaction spanning them, exactly like the deletions in a save
+  (`record-rate.md`, Saving an edited recording). Quantities go first
+  and rates after, so a run that stops partway leaves the date priced
+  rather than leaving quantities nothing can value.
+- **A partial delete leaves a recording, not a broken one.** The
+  records that went are gone, the rest are still there and still read
+  normally, and the screen names what is left and offers the action
+  again. Nothing is rolled back, and nothing marks the date as
+  half-deleted.
+- **The date is free afterwards** and is recorded again as though it
+  never had been (Creating and reopening are distinct acts). This is
+  the only way a date becomes free.
+- **It moves the chart further than clearing values does.** Removing
+  the date's rate entries reprices every holding measured in those
+  symbols across the stretches those entries anchored, which is every
+  band in those units and not only the holdings recorded that day. The
+  confirmation says so, and `net-worth-view.md` bounds the stretch.
 
 ## Editing an existing snapshot
 
@@ -352,12 +387,16 @@ a quiet wrong number.
   as zero. No price entry is deleted with it: a price belongs to a
   symbol, not to the holding that happened to prompt it.
 - **A recording whose every quantity is cleared** → the date keeps its
-  rate entries and is still a recording. Prices are not tidied away
-  behind a quantity, for the same reason a deleted snapshot takes none
-  with it.
-- **A date whose last record is deleted** → the recording is gone. It
-  appears in no list, leaves nothing behind, and the date is available
-  to be recorded again as though it never had been.
+  rate entries and is still a recording, reopens like any other, and
+  keeps pricing the dates around it. Prices are not tidied away behind
+  a quantity, for the same reason a deleted snapshot takes none with
+  it.
+- **A recording that never had a quantity**, because every row was left
+  alone while the rates were written, is the same state reached from
+  the other end and needs no separate handling.
+- **A recording deleted outright** → every snapshot and every rate
+  entry at that date goes, the recording appears in no list, and the
+  date is available to be recorded again as though it never had been.
 - **Value of zero** → valid and meaningful (a closed-out position). Not
   the same as having no snapshot.
 - **Negative value** → valid. Mortgages and loans are accounts with
@@ -426,9 +465,15 @@ a quiet wrong number.
 - Clearing a figure backed by a record at that date deletes exactly
   that record. Clearing a field prefilled from the holding's figure at
   another date deletes nothing and writes nothing.
-- Clearing every figure at a date leaves no record carrying it, and the
-  date is offered as a fresh recording afterwards rather than as an
-  empty one.
+- Clearing every quantity at a date leaves that date's rate entries
+  byte-identical, the recording reopens with its rate lines, and the
+  symbols still price the dates around it.
+- Deleting a recording removes every snapshot and every rate entry
+  bearing that date, and the date is offered as a fresh recording
+  afterwards.
+- A delete whose third `DELETE` is stubbed to fail leaves the remaining
+  records readable, rolls nothing back, and reports what is still
+  there.
 - A `DELETE` answering Not Found during a save is reported as saved,
   not as a failure.
 - A second session whose model predates the first session's recording

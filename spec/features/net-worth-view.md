@@ -156,6 +156,20 @@ Reopening and editing a recording): correcting a figure from eight
 months ago cannot move last year, and cannot move today unless the
 figure was the newest one.
 
+**Deleting a whole recording moves more than its own holdings.** It
+takes the date's rate entries with it (`record-snapshot.md`, Deleting a
+recording), and each removed entry frees the stretch between its
+neighbors in its own symbol's series. Every band measured in those
+symbols moves across those stretches, including holdings that were
+never recorded that day. The bound is the one above, applied once per
+removed entry.
+
+**A recording with rates and no values still shapes the chart.** Its
+rate entries are ordinary knots: they anchor their symbols' series, and
+a band between two quantity entries bends over them exactly as it does
+over any other price entry. A date nobody recorded a quantity at is
+still a date somebody priced.
+
 Every stretch where **either factor is inferred** is marked by the "Show
 what's estimated" toggle, default off. A date whose quantity is
 interpolated is estimated even if its price is recorded, and the
@@ -344,6 +358,12 @@ an otherwise smooth chart is indistinguishable from a bad snapshot.
   outside it moves, asserted for all three operations.
 - Deleting the newest entry of a series moves every point after the
   previous entry and none before it.
+- Deleting a whole recording moves every band measured in the symbols
+  it priced, across the stretches those entries anchored and no
+  further, including bands whose holdings had no entry at that date.
+- A date carrying rate entries and no snapshots still bends the bands
+  of the symbols it prices, asserted against the same date with those
+  entries removed.
 - A symbol with two differing entries on one date prices that date from
   its neighboring entries, marks the stretch estimated, and the view
   names the fault.
