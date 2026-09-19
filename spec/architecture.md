@@ -115,6 +115,14 @@ per the Security model — the server sees ciphertext, not these fields.
     Prices are written by default and quantities are not: a quantity has
     to be looked up on a statement, so the app never writes one nobody
     gathered, while nobody gathers a price.
+  - **A recording is a date, not a stored thing.** Everything recorded
+    at one date, quantities and prices together, is reopened and
+    edited as one act, and it is a client-side grouping of records by
+    their own `date` field. There is no fifth record type and no
+    grouping record, because one could disagree with the records it
+    claims to group. Creating a recording and reopening one are
+    distinct acts, and a create at a date that already holds records
+    fails rather than merging into it (record-snapshot.md).
   - Today's total is each holding's last recorded quantity at the most
     recent price for its unit.
 - Accounts don't need a snapshot on every date — updates are sparse by

@@ -159,6 +159,21 @@ and doing nothing accepts and writes it.
   are ensured once for the whole sitting, not once per row, so a
   fifteen-row sweep writes one set of prices and issues one rate
   request (`rate-lookup.md`).
+- **Recording a quantity refreshes. Reopening a recording does not.**
+  The refresh is an ensure over the recording date: it writes where the
+  date has no entry for a symbol and leaves every entry that is there
+  alone, so running it twice at one date is a no-op the second time.
+  Adding a value for a holding skipped at a past date is recording a
+  quantity, so it ensures that date's prices and can fill a symbol that
+  had none. Changing a figure, changing a rate, or clearing one is not
+  recording a quantity and ensures nothing.
+- **A rate request is issued only when a symbol the date needs has no
+  entry at it.** A date whose prices are complete asks the proxy
+  nothing, which is why opening an old recording is silent
+  (`record-snapshot.md`, Reopening and editing a recording). Somebody
+  who wants a missing line filled without recording any quantity asks
+  for it on that line, and that action, not the act of opening, is what
+  issues the request.
 - Per symbol, at that date:
   - **A proposal came back** and the person left it alone, or changed
     it, and either way it is written.
@@ -211,46 +226,113 @@ and the order is the whole of the guarantee.
 
 Against the optimistic-concurrency rule in `record-api.md`:
 
-- A price entry is an ordinary versioned record. Create at `version: 1`
-  when the client's model holds no entry for that (symbol, date),
-  update at stored `version` + 1 when it does.
-- **A Conflict on a `proposed` write is dropped, not retried.** Conflict
-  means another client already wrote an entry for that (symbol, date),
-  and that entry is exactly as good as this one, because both are the
-  same provider figure for the same day. Reload the type and adopt what
-  is there.
-- **A Conflict on an `edited` or `manual` write is retried once**
-  against the reloaded version, because the person typed that number
-  and it should land. A second Conflict is surfaced rather than
-  retried again.
+- A price entry is an ordinary versioned record. The refresh only ever
+  **creates**, at `version: 1`, because it writes exactly where the
+  date has no entry. Somebody editing a stored entry **updates** it, at
+  stored `version` + 1.
+- **A Conflict is surfaced, never retried.** It reaches an update
+  alone, since a create carries a fresh UUIDv4 no row can already hold,
+  and it means another session changed that entry. The line reloads to
+  what is stored and the message names the symbol. Writing the person's
+  figure over it at the reloaded version would clobber a number
+  somebody else typed, and nothing in this system merges
+  (`record-api.md`).
+- **A slot another session took is refused before the write, not by a
+  Conflict.** One entry per (symbol, date) is a client rule the server
+  cannot enforce, so it is enforced by the pre-create reload in
+  `record-snapshot.md`, Creating and reopening are distinct acts, which
+  covers the rate type as well as the snapshot type.
 - Content Too Large is surfaced like any other write failure. The
   refresh spends vault quota nobody asked to spend, which is what the
   headroom on the caps is for (architecture.md, Blob and quota limits).
 
+### Saving an edited recording
+
+One save of a reopened recording (`record-snapshot.md`) may touch
+several records: snapshots updated, snapshots created, rates updated or
+created, and records deleted. Each is its own request under its own
+version check, and nothing spans two of them. The order is fixed:
+
+0. If the save creates anything, the pre-create reload. Any slot taken
+   refuses the whole save before a single write.
+1. Quantity writes, creates and updates alike.
+2. Rate writes.
+3. Deletions, quantities first and rates after.
+
+A phase's requests may be issued together, and the next phase begins
+when every request in the previous one has answered.
+
+- **Quantities before prices**, for the reason a fresh recording has:
+  the figure the person went and looked up is the expensive half, and
+  the expensive half goes first.
+- **A rate the person typed does not wait on a quantity.** The gate
+  holding the refresh behind a successful quantity write exists because
+  the refresh writes figures nobody asked for. An entry the person
+  typed is their own act, and it is written whether or not the quantity
+  beside it landed. A refreshed entry is still gated, exactly as above.
+- **Deletions run last**, after every write in the save has been
+  attempted, so a save that fails partway has destroyed nothing and the
+  person still holds everything the screen offered to remove.
+- **No step is skipped because an earlier one failed.** Each record is
+  independent, and abandoning the rest would turn one failed write into
+  several unattempted ones.
+
+**An edit is half-applied more visibly than a first recording is.** Its
+figures are already in the chart, so a save that lands four changes of
+six moves the total to a number nobody asked for. That is reported,
+never hidden and never rolled back:
+
+- The screen **stays open**, and every change keeps its own state:
+  saved, or not saved with what the person typed still in front of
+  them.
+- The message **names both halves**: how many changes were saved, and
+  which ones were not, by holding name and by symbol. A count alone
+  leaves the person's vault in a state they cannot see.
+- Retrying reissues **only what failed**, at whatever version each
+  record now holds.
+- The in-memory model advances **per write, as each one succeeds**, so
+  the total and the chart on screen are always what the vault holds and
+  never what the save intended.
+- **Nothing in the vault records that a save was partial.** No pending
+  flag and no dirty marker: it would be a fifth thing to keep
+  consistent, it would outlive the tab that could resolve it, and the
+  unsaved half exists only in the open screen. Closing with changes
+  unsaved says so and names them.
+
 ## Two entries on one date
 
-Two clients recording the same date each generate a fresh UUIDv4, so
-two entries for one (symbol, date) is a reachable state, as two
-snapshots for one (account, date) is (`record-snapshot.md`).
+One entry per (symbol, date) is enforced the way one snapshot per
+(account, date) is: a create is refused when a fresh reload finds the
+slot taken, and a save whose reload finds the date taken is refused
+whole (`record-snapshot.md`, Creating and reopening are distinct acts).
+The server can enforce neither, because there is no plaintext symbol
+and no plaintext date to enforce it on.
 
-**A duplicate price is resolved, and a duplicate quantity is not.** The
-quantity rule exists because two figures the person gathered are two
-assertions and no algorithm may choose between them. Nobody gathered a
-price. Asking someone to adjudicate between two dollar rates they never
-typed is asking them to answer for a race inside the app.
+One path is left. Two sittings whose first creates cross inside that
+reload window each mint a fresh UUIDv4 at `version: 1`, so neither
+loses a version check and two entries for one (symbol, date) exist.
 
-Resolution, computed from decrypted content alone so two devices reach
-the same answer without talking to each other:
+- **Two entries whose decrypted payloads are byte-identical in every
+  field** are pure duplication, and the client deletes one, because
+  nothing can be lost. This is the likely pair by far: two sittings
+  recording one date both write the provider's figure for that day.
+- **Anything else is surfaced, never resolved.** Both are rendered in
+  the recording for that date, flagged, with an action to keep one, and
+  the pair drops out of the symbol's series until then, its neighbors
+  interpolating across the date (`net-worth-view.md`). Same treatment
+  as two quantities on one date, for the same reason: with the race
+  refused at the door, a pair that still lands is an anomaly, and there
+  is one way to show an anomaly at a date.
 
-1. `manual` or `edited` outranks `proposed`. A price the person touched
-   beats one written on their behalf.
-2. Then the greater `version`.
-3. Then the lexicographically smaller `record_id`.
-
-The loser is left in place and simply never read. The one exception:
-when both are `proposed` and their `rate` strings are byte-identical,
-the client deletes one, because nothing can be lost and the pair is
-pure duplication.
+**There is no provenance ranking and no automatic winner.** A rule
+picking `edited` over `proposed` and falling through to a version or an
+id would be a second way of resolving a duplicate, living beside the
+first, for a window one round trip wide. It would also pick silently
+between two figures the person typed, which is what the quantity rule
+exists to refuse. It could not even be stable: import resets every
+record to `version: 1` (`export-import.md`), so a ranking consulting
+the version would read one entry before an export and the other after,
+drawing a different chart from the same vault.
 
 ## Reading
 
@@ -270,15 +352,26 @@ Three definitions, used everywhere:
 A symbol with quantities and no entry at all leaves those accounts
 **unpriced**, which `net-worth-view.md` owns.
 
-## Editing a past price
+## Editing a captured rate
 
-A stored price is history. It is editable like any other record, from
-the holding's own page where the figure it priced is found
-(`ui/account-detail.md`), and it is an ordinary versioned write.
+A stored price is history. It is editable like any other record, as an
+ordinary versioned write, **inside the recording for its date**
+(`record-snapshot.md`, Reopening and editing a recording): one date,
+one line per symbol, beside the quantities that date prices.
+
+**There is no price-editing screen.** Not a per-symbol timeline, and no
+editable rate on a holding's row or a holding's page. A price is one
+fact about one symbol on one day, and the date is the only place where
+that fact has exactly one field. A screen listing holdings shows one
+symbol's price on as many rows as hold it, where two rows could be
+typed with two different figures for one day and one of them would have
+to win silently.
 
 - `rate`, `rateSource`, and `rateAsOf` open on the stored values, never
-  on a fresh proposal. Opening the page to read a figure must not
-  restamp anything.
+  on a fresh proposal, and opening a recording fetches no proposal at
+  all (The refresh). Reading an old figure must not restamp it, and a
+  provider that has since revised its published figure for that day
+  must not reach a stored entry by way of somebody looking at it.
 - **Editing the rate by hand** moves `rateSource` from `proposed` to
   `edited` and captures the replaced figure as `proposedRate`. It
   leaves both alone otherwise: `edited` already holds the original
@@ -288,11 +381,16 @@ the holding's own page where the figure it priced is found
 - **Editing one entry changes every holding measured in that symbol on
   that date.** That is what one price for one symbol on one day means,
   and the confirmation says so, naming how many holdings are affected.
-  The client can count them: it holds every account record.
-- **Deleting an entry** is allowed. The symbol then prices from the
-  neighboring entries, which for the newest entry means the total falls
-  back to the one before it. The confirmation says that figures around
-  that date will change.
+  The client can count them: it holds every account record. A save
+  changing several rates confirms once, naming each symbol and its
+  count, rather than queueing a dialog per line.
+- **Deleting an entry** is allowed, by clearing its line
+  (`record-snapshot.md`, Clearing a figure). The symbol then prices
+  from the neighboring entries, which for the newest entry means the
+  total falls back to the one before it. The confirmation says that
+  figures around that date will change, and, when the entry is the
+  symbol's only one, that every holding measured in it becomes unpriced
+  and leaves the total (`net-worth-view.md`).
 
 ## Inputs / outputs
 
@@ -310,6 +408,17 @@ the holding's own page where the figure it priced is found
 - **The person edits a price and then records again on the same date.**
   Nothing overwrites the edit: the refresh writes only where the date
   has no entry for that symbol.
+- **A recording is reopened and only a quantity is changed.** No rate
+  record is written, no `version` moves, and no request reaches the
+  proxy. The date keeps the prices it was recorded at.
+- **A date whose only records are rates**, because every quantity at it
+  was cleared, is still a recording and still reopens. Nothing tidies
+  it away, and the entries keep pricing the dates around them.
+- **A symbol the recording date never priced**, because the provider
+  was down that day or the account did not exist yet. The line is empty
+  and says so. Recording a quantity at that date fills it, and somebody
+  who only wants the line filled asks for the lookup on the line
+  itself.
 - **A symbol whose only holdings are archived** is not refreshed, and
   its existing entries stay. Historical points still price correctly.
 - **An account is created in a symbol nobody holds yet.** Its first
@@ -355,21 +464,21 @@ the holding's own page where the figure it priced is found
 - With every price `PUT` stubbed to fail, the quantity record exists,
   reads back exactly, and the screen reports that prices were not
   updated. Nothing about the row is rolled back.
-- With one price `PUT` stubbed to Conflict and `rateSource: proposed`,
-  no error is surfaced and the client ends holding the other write's
-  entry.
-- With the same stub and a price the person edited, the write is
-  retried once against the reloaded version and succeeds. A second
-  Conflict surfaces a message naming the symbol.
+- With a rate update stubbed to Conflict, nothing is retried, the line
+  reloads to the stored entry, and the message names the symbol.
+- A save whose pre-create reload finds the date recorded elsewhere
+  writes nothing at all, rates included, and reports the date rather
+  than updating any entry.
 - No request to `/api/rates` contains an edited rate, a quantity, or
   any account identifier, asserted over the full request including
   headers.
-- Two entries planted for one (symbol, date) with different provenance
-  resolve to the `edited` one, and two `proposed` ones with different
-  rates resolve to the smaller `record_id`, identically on two clients
-  given the same records in different order.
-- Two `proposed` entries for one (symbol, date) with byte-identical
-  `rate` strings leave exactly one record afterwards.
+- Two entries planted for one (symbol, date) with different `rate`
+  strings are both flagged, neither is read, and the symbol prices that
+  date from its neighboring entries. Identically on two clients given
+  the records in either order, and identically before and after an
+  export and import round trip.
+- Two entries for one (symbol, date) whose decrypted payloads are
+  byte-identical in every field leave exactly one record afterwards.
 - A symbol with no rate source and an existing entry writes no new
   entry on a recording, and the holding's price age on screen grows.
   Asserted for free text and for a `lookup: false` symbol, since the
@@ -378,6 +487,19 @@ the holding's own page where the figure it priced is found
   entry for that symbol and the previous entry stays the latest.
 - Editing a price entry from a second tab with a stale `version`
   returns Conflict and overwrites nothing.
+- Opening a recording of any age issues no request to `/api/rates` and
+  writes no record, asserted over the whole flow including the request
+  the provider has since revised its figure for.
+- Adding a value for a holding skipped at a past date leaves every rate
+  entry at that date byte-identical, and writes an entry only for a
+  symbol that had none.
+- A save changing one quantity and two rates issues the quantity `PUT`
+  before either rate `PUT`, and any `DELETE` in the same save after all
+  three.
+- With the second rate `PUT` stubbed to fail, the quantity and the
+  first rate are stored, nothing is rolled back, the deletions in the
+  same save still run, and the message names the symbol that did not
+  land.
 - Editing a `proposed` entry's rate stores `edited`, keeps `rateAsOf`,
   and stores the replaced figure as `proposedRate`. Editing an `edited`
   one a second time leaves `proposedRate` at the original proposal.

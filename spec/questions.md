@@ -92,40 +92,36 @@ product that one person can perform on another person's data, and the
 password is already something the administrator knows and the browser
 already knows how to check.
 
-## record-rate: where a price is corrected during a sweep   [asked by: architect]
+## record-snapshot: how much friction guards a destructive save   [asked by: architect]
 
-A price belongs to a symbol, not to a holding. Two dollar accounts are
-priced by one dollar rate on one date, and the split that separates
-quantities from prices is what makes that true.
+A recording is reopened and edited as one act, and clearing a figure in
+it deletes the record behind that figure. One save can therefore
+destroy several records at once, and clearing every figure at a date
+removes that date's recording entirely. There is no undo, no trash, and
+no server-side copy: an exported file is the only way back, and only if
+one was made.
 
-The sweep screen is one row per holding. If the price sits on the row
-and is editable there, two rows in the same symbol can be typed with two
-different prices for the same date, and one of them has to win silently.
-If the price does not sit on the row, the person has nowhere to correct
-a proposal they disagree with, and "the person sees a proposed rate and
-may overwrite it" is not met.
+The destructive half is what makes reopening worth having. The question
+is what stands between an ordinary correction and a date that is gone.
 
-This is a screen question created by the split, and it changes what the
-sweep looks like. It does not change how anything is stored: one entry
-per symbol per date either way.
+- **One confirmation per save, naming every record that will be
+  destroyed and what moves as a result.** One click destroys as many
+  records as the person cleared. Costs the dialog a single deletion
+  needs anyway.
+- **One confirmation per save, and a typed confirmation when the save
+  destroys more than one record.** An ordinary correction stays one
+  click, and a bulk clear asks for a word, the shape the vault-erasing
+  import already uses. Costs that dialog, a second form of it, and a
+  rule to explain on screen.
+- **A recording cannot delete.** Clearing a figure there is refused,
+  and a deletion stays a one-at-a-time act on the holding's own page.
+  Nothing can be destroyed in bulk. Costs the client's stated intent:
+  the reason for reopening a record is to fix what should not be in it,
+  and a correction that sends the person to a second screen is the
+  separate screen they rejected.
 
-- **A prices block on the sweep, separate from the holdings.** One line
-  per symbol for the sweep's date, showing the proposal and taking an
-  override, above or below the rows. Two holdings can never disagree,
-  because there is only one place to type. Costs a second region on a
-  screen that currently has one, and a person who never touches it never
-  notices it is there.
-- **The price stays on each holding's row, and editing it changes every
-  holding in that symbol.** Nothing new on the screen. The row has to
-  say what editing it will do, and the other rows have to visibly move
-  when it is edited, or the person has changed a figure they were not
-  looking at.
-- **The price is read-only on the sweep, and corrections happen on the
-  holding's own page afterwards.** The sweep stays exactly as wide as it
-  is today. A person who can see the proposal is wrong has to leave the
-  screen to fix it, and they will do the whole sweep at a price they
-  know is wrong rather than break the flow.
-
-Recommended: the first. A price is one fact about one symbol, and the
-only shape where the person can see what they are changing is one that
-names the symbol rather than a holding that happens to use it.
+Recommended: the second. Deleting one figure is an ordinary correction
+and should cost what an ordinary correction costs, while a save that
+removes a whole date is the only act in a vault that destroys history
+in bulk, and the product already has a typed confirmation for the other
+one.

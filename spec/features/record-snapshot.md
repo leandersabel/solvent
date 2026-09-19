@@ -89,6 +89,10 @@ snapshot for the account, and the server cannot see dates. Record ids
 stay random UUIDv4; deriving them from the date would let the server
 brute-force which dates a user holds data for.
 
+This is the path where the date is chosen blind. Where the stored
+figure is already on screen, in the field being edited, the prompt does
+not appear (Reopening and editing a recording).
+
 ## Confirming a previous value
 
 A snapshot can be written by **confirming** an account's last recorded
@@ -107,6 +111,161 @@ down, because nothing about it depends on a price resolving.
 Confirming is unavailable for an account with no snapshots. There is
 nothing to confirm.
 
+## A recording is a date
+
+The person's unit of work is a **recording**: one date, and everything
+recorded at it. Reopening 31 March means every record of theirs bearing
+that date, the quantities and the prices together, on one screen, where
+each of them can be changed, added, or cleared and saved as one act.
+
+**Nothing stores a recording.** There is no fifth record type and no
+grouping record. A recording is a client-side index over the model
+already in memory (`net-worth-view.md`, Data flow): snapshots and rate
+entries grouped by their own `date` field.
+
+- Every fact a grouping record could hold is already on its members.
+  The date is on each of them, and the two uniqueness rules, one
+  snapshot per (account, date) and one entry per (symbol, date),
+  already pin the identity such a record would be asserting.
+- **It could disagree with what it claims to group.** A member deleted
+  from the holding's own page, a member written by a second session, or
+  a member whose date moved would each leave a list naming records that
+  are not there and missing records that are. A derived index cannot be
+  wrong about its own contents.
+- It would carry a `version` of its own, so two sessions recording the
+  same date would lose an optimistic-concurrency check on a record
+  neither of them has any reason to care about, while both of their
+  real writes succeeded. A conflict over nothing.
+- It would have to be deleted when its last member goes, and that
+  cascade cannot run server-side, because the server cannot see a date.
+
+Consequences, which are properties rather than gaps:
+
+- **A recording exists exactly as long as a record carries its date.**
+  Clearing every figure at a date does not leave an empty recording, it
+  leaves no recording. There is no tombstone and nothing to tidy up.
+- **A recording has no version and cannot conflict as a whole.**
+  Concurrency stays per record, under the one rule in `record-api.md`.
+- **A recording has no author, no wall-clock time, and no note of its
+  own.** Two sittings on one day are one recording, because the date is
+  the identity.
+- Export carries recordings by carrying their members
+  (`export-import.md`), with no format change and no second section.
+
+## Reopening and editing a recording
+
+Opening a recording and saving it is one act covering three changes, in
+any combination:
+
+1. **Changing a quantity** already recorded at that date. An ordinary
+   versioned update of that snapshot, same `record_id`.
+2. **Adding a quantity** for a holding that has none at that date. An
+   ordinary create at a fresh UUIDv4 and `version: 1`. A holding
+   skipped at a date is a holding with no record there, so nothing
+   distinguishes adding one now from having recorded it then.
+3. **Changing a rate** captured at that date (`record-rate.md`, Editing
+   a captured rate).
+
+The write order across all three, and what the person is told when part
+of a save fails, is `record-rate.md`, Saving an edited recording.
+
+**Opening a recording writes nothing and fetches nothing.** Not a
+version bump, not a nonce, not a rate request. Reading your own history
+is a read, and a path where merely looking at March can reprice March
+is the one thing this screen must not have.
+
+**A recording's date does not move.** The date is the recording's
+identity, so changing it is not an edit of it, and a whole-date move
+onto an occupied date would have to resolve a collision per holding.
+Moving one entry between dates stays what it is, an edit of that
+snapshot from the holding's own page (Moving the date onto an occupied
+date).
+
+**The replace prompt does not fire here.** "You already recorded
+12 450.00 USD for 31 July. Replace it?" exists to catch someone writing
+at a date they did not know was taken. In a reopened recording the
+stored figure is on screen, in the field being edited, so the prompt
+would fire on every ordinary correction and tell the person what they
+are already looking at. The rule is that **it fires only where the
+stored figure is not already displayed in the field being edited**,
+which is the single-holding form at a date the person chose.
+
+**Two doors reach one snapshot.** The holding's own page edits one
+entry across that holding's whole history and can move its date
+(`ui/account-detail.md`). A recording edits one date across every
+holding and cannot. Both are the same record and the same versioned
+write, so neither door needs to know the other was used.
+
+### Creating and reopening are distinct acts
+
+A recording is **created** at a date holding none of the person's
+records, or **reopened** at a date that holds some. **A create never
+becomes an update behind the person's back.**
+
+- **A create at a date another session has since recorded fails.** It
+  does not become an update, does not merge, and is not retried. The
+  person is told the date was recorded elsewhere and reaches it through
+  the reopen flow, which is the only way an existing figure changes.
+- **Inside a reopened recording, a create whose slot another session
+  filled fails the same way.** The holding was not silent after all.
+- **The replace prompt is a different case** (Same account, same date).
+  There the stored figure is put in front of the person and they choose
+  to replace it, before anything is written. That is consent, not a
+  collision discovered at write time.
+- **The check runs against freshly reloaded records, never against the
+  model in memory.** Before the first record a sitting creates at a
+  date, the client reloads the types it will create in
+  (`GET /api/records?type=snapshot` and `type=rate`, the reload
+  `record-api.md` already prescribes) and re-checks. A session open
+  since this morning is exactly the session whose model says the date
+  is free.
+- **The reload runs once per sitting, not once per row.** After it, the
+  date belongs to this session: another session's attempt to create a
+  recording there is refused by its own reload, so the rows that follow
+  need no further check. A fifteen-row sweep costs one extra `GET`, not
+  fifteen.
+- **A save is refused whole** when the reload finds the date recorded
+  elsewhere, or finds any slot the save would create already taken.
+  Nothing is written, not even into slots that are still free. The
+  person is looking at a screen that no longer describes the vault, and
+  writing half of it against a date they have not seen is worse than
+  writing none of it.
+- **What they typed is lost, and that is accepted.** There is no draft
+  buffer, no merge, and no re-apply against the reloaded date. The
+  screen reloads to the recording as it now stands and the figures are
+  entered again. Two sessions recording one date is rare in a
+  single-owner vault, and retyping is cheap next to any machinery that
+  would avoid it.
+- The server cannot make this check. It cannot see a date, and record
+  ids are random by design (above), so one per slot is a client rule
+  and the reload is what enforces it.
+
+### Clearing a figure
+
+A quantity cleared in a reopened recording **deletes that snapshot**.
+Reopening exists to fix what should not be in the record, and a figure
+that should never have been recorded is the case with nowhere else to
+go.
+
+- **Only a field backed by a record at that date can be cleared.**
+  Emptying a field filled from the holding's last figure at some other
+  date deletes nothing, because there is nothing at this date to
+  delete. What the screen chose to prefill never decides whether a
+  record dies. The stored record does.
+- An empty field that was already empty is what it has always been: no
+  change, and nothing written.
+- **Clearing a quantity clears no rate**, for the reason deleting a
+  snapshot deletes none (Edge cases). A date's prices survive the
+  deletion of every quantity at it, and the recording survives as its
+  rates.
+- **Clearing every figure at a date empties the recording**, through
+  the same deletions in the same save. When the last record carrying
+  that date is gone, so is the recording.
+- **A `DELETE` answering Not Found counts as done.** The record is
+  gone, which is what was asked, and another session having got there
+  first is not a failure the person can act on.
+- How a destructive save is confirmed is open (`questions.md`).
+
 ## Editing an existing snapshot
 
 Value, note, and **date** are all editable (`ui/account-detail.md` is
@@ -117,8 +276,9 @@ except when the date moves onto a date the account already holds.
 moving an entry from 30 July to 31 July, changes which price the holding
 is valued at only because the price for a date is looked up by date. The
 prices themselves are untouched, none is fetched, and there is no
-proposal to accept or decline. Fixing a price is a separate act on a
-separate record (`record-rate.md`, Editing a past price).
+proposal to accept or decline. Fixing a price is a separate record,
+edited in the recording for its date (`record-rate.md`, Editing a
+captured rate).
 
 ### Moving the date onto an occupied date
 
@@ -136,14 +296,25 @@ nothing to show for it. Write-first risks a moment where two snapshots
 claim one date — harmless server-side, since one-per-date is a
 client-side rule, and visible to the client afterwards.
 
-**Two snapshots on one date is therefore a reachable state, and must be
-surfaced, never silently resolved.** A client that finds one takes no
-guess at which is authoritative — not the highest `version`, not the
-latest `updated_at`. It renders both in the account's history, flagged,
-with an action to keep one; and it excludes that date from
+**Two snapshots on one date is a reachable state, and must be surfaced,
+never silently resolved.** Two paths reach it, and no third one does:
+
+- **A date move whose `DELETE` failed**, above.
+- **Two sittings whose first creates cross inside the reload window.**
+  The pre-create reload (Creating and reopening are distinct acts)
+  refuses a create at a date taken before it ran, which is every
+  collision older than one round trip. Two creates that cross inside
+  that round trip each carry a fresh UUIDv4 at `version: 1`, so neither
+  loses a version check, and the server, which cannot see a date, has
+  nothing to refuse.
+
+A client that finds a pair takes no guess at which is authoritative,
+not the highest `version` and not the latest `updated_at`. It renders
+both in the account's history and in the recording for that date, both
+flagged, with an action to keep one, and it excludes that date from
 interpolation until resolved, because there is no correct curve through
-two values. Same family as a decryption failure: a visible fault beats a
-quiet wrong number.
+two values. Same family as a decryption failure: a visible fault beats
+a quiet wrong number.
 
 ## Inputs / outputs
 
@@ -174,11 +345,19 @@ quiet wrong number.
   version existed. Catching that needs the DEK-authenticated manifest
   deferred in architecture.md (Data integrity) — do not write a test
   asserting rollback is detected today.
-- **Deleting a snapshot** → allowed, single confirm. Deleting the only
-  snapshot for an account leaves the account with no current value; it
-  is excluded from the total rather than counted as zero. No price entry
-  is deleted with it: a price belongs to a symbol, not to the holding
-  that happened to prompt it.
+- **Deleting a snapshot** → allowed, single confirm, from the holding's
+  page or by clearing its figure in the recording for its date.
+  Deleting the only snapshot for an account leaves the account with no
+  current value, and it is excluded from the total rather than counted
+  as zero. No price entry is deleted with it: a price belongs to a
+  symbol, not to the holding that happened to prompt it.
+- **A recording whose every quantity is cleared** → the date keeps its
+  rate entries and is still a recording. Prices are not tidied away
+  behind a quantity, for the same reason a deleted snapshot takes none
+  with it.
+- **A date whose last record is deleted** → the recording is gone. It
+  appears in no list, leaves nothing behind, and the date is available
+  to be recorded again as though it never had been.
 - **Value of zero** → valid and meaningful (a closed-out position). Not
   the same as having no snapshot.
 - **Negative value** → valid. Mortgages and loans are accounts with
@@ -238,3 +417,30 @@ quiet wrong number.
   shows both flagged, the client picks neither, and that date is
   excluded from the interpolated series until resolved.
 - Deleting a snapshot deletes no `rate` record, asserted by count.
+- Opening a recording of any age issues no `PUT`, no `DELETE`, and no
+  request to `/api/rates`, and every record at that date is
+  byte-identical afterwards.
+- Adding a value for a holding with no record at a reopened date
+  creates one `snapshot` at `version: 1` and changes no other snapshot
+  at that date.
+- Clearing a figure backed by a record at that date deletes exactly
+  that record. Clearing a field prefilled from the holding's figure at
+  another date deletes nothing and writes nothing.
+- Clearing every figure at a date leaves no record carrying it, and the
+  date is offered as a fresh recording afterwards rather than as an
+  empty one.
+- A `DELETE` answering Not Found during a save is reported as saved,
+  not as a failure.
+- A second session whose model predates the first session's recording
+  is refused when it creates at that date: the reload runs, nothing is
+  written, and the message names the date. Asserted for a whole fresh
+  recording and for one holding added inside a reopened one.
+- A fifteen-row sweep at a new date issues exactly one extra type
+  reload, before the first row is written, and none after it.
+- Editing inside a reopened recording never shows the replace prompt,
+  while the single-holding form at an occupied date still does.
+- A recording offers no way to change its own date, and moving one
+  snapshot's date from the holding's page still works.
+- A Conflict on a snapshot inside a recording save reloads that row to
+  the stored record, retries nothing, and leaves the stored record
+  byte-identical.

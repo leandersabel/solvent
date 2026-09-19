@@ -16,7 +16,10 @@ the server has nothing to template here, because it has no plaintext.
    snapshots grouped by `account_id` and sorted by date, and prices
    grouped by `symbol` and sorted by date (`record-rate.md`).
 3. Compute totals and series locally. Subsequent writes update this
-   model directly — no refetch on every save.
+   model directly, with no refetch on every save. The one refetch in
+   the write path is the reload before the first record a sitting
+   creates at a date (`record-snapshot.md`, Creating and reopening are distinct
+   acts), which is what a stale model cannot substitute for.
 
 For the expected data volume (a household, manual snapshots, years of
 history) fetching everything once per session is the right call: it is
@@ -75,9 +78,10 @@ control is called.
   nothing either**, and is listed separately as **not priced**, with
   that as the stated reason rather than the other one. It is never
   counted at its bare quantity, which would silently value a holding as
-  though its unit were the main currency. The state is reachable two
-  ways: a recording whose price writes all failed (`record-rate.md`,
-  The write path), and a free-text unit nobody has priced yet.
+  though its unit were the main currency. The state is reached by a
+  recording whose price writes all failed (`record-rate.md`, The write
+  path), by a free-text unit nobody has priced yet, and by the deletion
+  or the flagged duplication of a symbol's only entry.
 - Negative balances (mortgages, loans) subtract. Net worth is a signed
   sum, and the UI shows gross assets, gross liabilities, and the net
   figure separately.
@@ -132,6 +136,25 @@ Two consequences for drawing it:
   linear there, so the error is the quadratic term alone, at most a
   quarter of the product of the two deltas across that segment, which at
   any realistic price cadence is below a pixel.
+
+**A change to one entry moves a bounded stretch, and only it.** Adding
+an entry to either series, changing one, and deleting one all affect
+the dates between that entry's neighbors in its own series, and no
+others:
+
+- An entry with a neighbor on each side affects the open stretch
+  between them.
+- The **last** entry of a series affects everything from the previous
+  entry onward, because what follows it is carried forward.
+- The **first** entry of a price series affects everything up to the
+  next entry, because what precedes it is carried backward. An
+  account's first snapshot instead moves where that account's band
+  starts, since nothing precedes it.
+
+This is what makes an edit safe to offer (`record-snapshot.md`,
+Reopening and editing a recording): correcting a figure from eight
+months ago cannot move last year, and cannot move today unless the
+figure was the newest one.
 
 Every stretch where **either factor is inferred** is marked by the "Show
 what's estimated" toggle, default off. A date whose quantity is
@@ -285,6 +308,13 @@ an otherwise smooth chart is indistinguishable from a bad snapshot.
   quantity.
 - **A chart date before any price entry for a symbol** → priced at that
   symbol's first entry, carried backward, and marked estimated.
+- **Two entries for one (symbol, date) that are not byte-identical** →
+  the pair drops out of that symbol's series, the neighboring entries
+  interpolate across the date, and the stretch is marked estimated.
+  The fault is named on screen and resolved in that date's recording
+  (`record-rate.md`). When the pair is the symbol's only entry, its
+  holdings are listed as not priced rather than counted at either
+  figure.
 - **Decryption fails for one record** → that record is skipped, the rest
   of the view renders, and a prominent warning names how many records
   could not be read. An unreadable price entry drops out of its series,
@@ -309,9 +339,14 @@ an otherwise smooth chart is indistinguishable from a bad snapshot.
 - A change in the provider's published rate, with nothing recorded,
   changes no figure anywhere: nothing was written, so there is nothing
   to read differently.
-- Adding an entry to either series changes only the stretch between it
-  and its neighbors in that series. No chart point before the previous
-  entry moves.
+- Adding, changing, or deleting an interior entry in either series
+  changes only the stretch between that entry's neighbors. No point
+  outside it moves, asserted for all three operations.
+- Deleting the newest entry of a series moves every point after the
+  previous entry and none before it.
+- A symbol with two differing entries on one date prices that date from
+  its neighboring entries, marks the stretch estimated, and the view
+  names the fault.
 - An account whose unit has a quantity but no price entry is listed as
   not priced, is excluded from the total, and its quantity never appears
   in the total unconverted.
