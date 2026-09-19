@@ -126,25 +126,59 @@ by its date and the dates are already in front of you.
 
 - **New recording**, a button on the main screen. It opens a date
   picker, set to today, with the dates that already hold a recording
-  marked in it. Pick a date nothing was recorded on and you are
-  starting one. Pick a marked one and the screen becomes that
-  recording, open for editing, with no warning and nothing to confirm.
-  You asked for that date and you get that date.
-- **A date in a holding's own list of values**, which opens the
-  recording it belongs to. This is where a typo from eight months ago
-  gets found.
+  marked in it. Pick a date nothing was recorded on and you go
+  straight to the sweep, starting one. Pick a marked one and you get
+  that recording's own screen, with no warning and nothing to confirm.
+  You asked for that date and you get that date, to look at first.
+- **A date in a holding's own list of values**, which opens the screen
+  of the recording it belongs to. This is where a typo from eight
+  months ago gets found.
 - **The chart**, which names a date wherever you put the crosshair and
-  opens the recording on it (`net-worth-view.md`).
+  opens the screen of the recording on it (`net-worth-view.md`).
 
-The same act from any other screen is the Update values action in the
-top bar (`app-shell.md`), which goes straight to today and asks
-nothing, because today is what it is for.
+The one route that skips all of that is the Update values action in
+the top bar (`app-shell.md`), which goes straight into editing today.
 
 Picking a taken date and being refused a taken date are not two
 answers to one question. The picker knows what is there before you
 have typed anything, so it opens it. The refusal is for a date that
 becomes taken while you are working, when something typed is at stake,
 and it is described under starting and editing being different acts.
+
+### A recording's own screen
+
+Every route above lands here, and it is for looking. One page, showing
+what that date holds.
+
+- **The date**, as the heading. That is the recording's name.
+- **The figures**, one line each: the holding, the figure in that
+  holding's own unit, and the same figure in your main currency. The
+  holding's name opens the holding, because "which account was that"
+  is the question this screen provokes.
+- **The prices**, one line each: the unit, the price, and where it
+  came from, in the same words as everywhere else. Proposed, changed
+  by you with what was proposed still shown, or typed by you because
+  nothing was available.
+
+Nothing on this screen contacts a price source. It shows the prices
+that were captured, and looking at an old day asks nobody anything.
+
+Two buttons. **Update** puts the recording into editing, which is the
+sweep for that date. **Delete** takes the recording away, prices and
+all, and is described under clearing and deleting below.
+
+Holdings you left silent that day are not on this screen. It shows
+what the date holds, and a holding with no figure on it holds nothing
+here. Filling one in is an edit, so it happens after Update.
+
+An empty recording has a screen like any other. It says it holds no
+figures and lists the prices captured that day, which is the reason
+the date is still there at all. Both buttons work: Update to put
+figures back into it, Delete to take the date away.
+
+Starting a recording is not routed through this screen. A date that
+holds nothing has nothing to look at, so the picker goes straight to
+the sweep.
 
 ### The sweep: updating in one sitting
 
@@ -247,19 +281,17 @@ lands. Pick a date that already holds a recording and the line shows
 that recording's rates rather than fresh ones, because the figure you
 are adding is joining it.
 
-### Going back to a recording
+### Changing a recording
 
-The routes in are above. The one you will use most is a holding's own
-page, which lists every value ever recorded for it with the date, the
-figure, the rate that applied on that date, the converted amount and
-where that rate came from.
+Everything below happens after Update, on a recording that already
+exists.
 
 #### It is the sweep
 
-Reopening is not another screen. It is the sweep, at that date, the
-same rows in the same order with the same rates at the foot, and
-everything you could do the evening you recorded it you can do again.
-That is what keeps this cheap.
+Press Update and you are in the sweep, at that date, the same rows in
+the same order with the same rates at the foot, and everything you
+could do the evening you recorded it you can do again. Editing is not
+a screen of its own. That is what keeps this cheap.
 
 What is different is that the rows arrive holding what was recorded
 rather than a proposal.
@@ -288,8 +320,8 @@ A rate line on a reopened recording saves by itself. On a new sweep
 the rates ride in with the first row you record, because until then
 there is nothing for them to belong to. On a recording that already
 exists there is, so filling in the rate that was missing is a
-complete act and needs no holding touched alongside it. Reopen a
-date, touch nothing, and nothing is written, the proposal on the
+complete act and needs no holding touched alongside it. Press Update,
+touch nothing and leave, and nothing is written, the proposal on the
 empty line included.
 
 #### Starting one and editing one are different acts
@@ -366,11 +398,12 @@ holds nothing and acting on nothing still writes nothing, so the app
 never makes one. Since no holding has a figure on that date, an empty
 recording appears in no holding's list of values, and the date picker
 is how you get back to it. It is marked there like any other
-recording, because it is one.
+recording, because it is one, and its own screen says what it holds.
 
-**Delete removes the recording outright, prices and all.** It is its
-own button on the reopened recording and a deliberate separate act,
-never a consequence of emptying the fields. It asks once, and the
+**Delete removes the recording outright, prices and all.** Its button
+is on the recording's own screen and not in the sweep, so an edit can
+never slip into a deletion, and it is a deliberate separate act rather
+than a consequence of emptying the fields. It asks once, and the
 confirmation says the two things that make it destructive: the prices
 go with it, so every holding measured in those units moves on that
 date and not only the holdings that had a figure, and there is no way
@@ -510,9 +543,25 @@ worth around that date will change.
   picker set to today.
 - The picker marks every date that already holds a recording, empty
   ones included.
-- Picking a marked date opens that recording for editing straight
-  away, with no warning, no question and nothing to confirm.
-- Picking a date nothing was recorded on starts a recording for it.
+- Picking a marked date opens that recording's own screen, with no
+  warning, no question and nothing to confirm.
+- Picking a date nothing was recorded on goes straight to the sweep,
+  with no screen in between, because there is nothing to look at.
+- A recording's own screen shows its date, every figure recorded with
+  the holding it belongs to, and every price captured with its unit
+  and where it came from.
+- A holding named on that screen opens that holding.
+- Update on that screen opens the sweep for that date, holding what
+  was recorded.
+- Delete is on that screen and nowhere else, so no edit can turn into
+  a deletion by a slip.
+- Opening a recording's own screen contacts no price source, however
+  old the date is.
+- An empty recording's screen says it holds no figures, lists the
+  prices captured that day, and offers both Update and Delete.
+- Every route to an existing recording lands on its own screen, except
+  Update values in the top bar, which goes straight into editing
+  today.
 - A date already taken when you pick it opens, and a date that becomes
   taken while you are working refuses. Both hold, and neither is an
   exception to the other.
@@ -587,6 +636,15 @@ them.
   about it, because it may be one you chose. A unit that went in empty
   is looked up again, because the outage that emptied it is the reason
   you came back.
+- **Update values in the top bar goes straight into editing today**,
+  skipping the recording's own screen. It is the fast path for the one
+  act somebody performs every month, and a page in front of it would
+  add a step to exactly the thing the product exists to make cheap.
+- **A figure on a recording's own screen opens its holding.** The line
+  names a holding, so the name is the link.
+- **Delete lives on the recording's own screen rather than in the
+  sweep**, so the screen you type into holds no button that destroys
+  a date.
 - **The date picker marks the dates that already hold a recording.**
   Without the marks, picking a date would be a guess at whether you
   are about to start one or open one, and the app already says where

@@ -23,8 +23,9 @@ this part of the app.
 
 ## The screens
 
-There is no screen of its own. Prices turn up inside three places, and
-this file says what you can expect of a price wherever you meet one.
+There is no screen of its own. Prices turn up inside the screens
+below, and this file says what you can expect of a price wherever you
+meet one.
 
 - **Recording a value** and **the sweep**, where the rates sit together
   in one place rather than on the row of the holding they belong to,
@@ -33,10 +34,14 @@ this file says what you can expect of a price wherever you meet one.
   ago. A reopened recording asks the sources about nothing it already
   holds a rate for. What each situation does, and how a rate you
   changed is marked afterwards, is `record-snapshot.md`.
+- **A recording's own screen**, which lists every price captured that
+  day with its unit and where it came from, and contacts no source
+  itself. Its Update button is the one route to changing a price
+  (`record-snapshot.md`).
 - **A holding's history**, where each entry shows the rate that applied
   on its date and where that rate came from, and the date opens the
-  recording that wrote that rate, which is the one place a price is
-  corrected (`record-snapshot.md`).
+  screen of the recording that wrote that rate
+  (`record-snapshot.md`).
 - **Setting up a holding**, where you choose what it is measured in from
   a list. That one choice also decides whether prices can be looked up
   for it. Things with no price source are in the list too, marked as
