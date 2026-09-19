@@ -291,11 +291,15 @@ and there is nothing to put right beyond opening the date and carrying
 on.
 
 What was typed into the attempt that lost is gone, and it is typed
-again on the reopened date. Nothing is held for them, nothing is merged, and
-the screen never claims to have saved anything it did not. A
-collision like that is rare enough that carrying half finished entries
-across it is not worth building, and a rescue that works only some of
-the time is worse than none.
+again on the reopened date. Nothing is held for them, and the screen
+never claims to have saved anything it did not. A rescue that works
+only some of the time is worse than none.
+
+Carrying those entries across, so the losing attempt opens the date
+with what was typed still in it, is wanted and is not in the first
+version. What the first version owes it is only that it does not stand
+in the way: the entries that lost are discarded because nothing keeps
+them yet, never because the date has been closed against them.
 
 #### What saving does to your history
 
