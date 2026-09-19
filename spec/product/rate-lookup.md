@@ -28,12 +28,15 @@ this file says what you can expect of a price wherever you meet one.
 
 - **Recording a value** and **the sweep**, where the rates sit together
   in one place rather than on the row of the holding they belong to,
-  each filled in, each editable, each labeled with both units. What
-  each situation does, and how a rate you changed is marked afterwards,
-  is `record-snapshot.md`.
+  each filled in, each editable, each labeled with both units, and the
+  same whether the recording is today's or one reopened from years
+  ago. A reopened recording asks the sources about nothing it already
+  holds a rate for. What each situation does, and how a rate you
+  changed is marked afterwards, is `record-snapshot.md`.
 - **A holding's history**, where each entry shows the rate that applied
-  on its date and where that rate came from, and the unit's own run of
-  rates is one click away (`record-snapshot.md`).
+  on its date and where that rate came from, and the date opens the
+  recording that wrote that rate, which is the one place a price is
+  corrected (`record-snapshot.md`).
 - **Setting up a holding**, where you choose what it is measured in from
   a list. That one choice also decides whether prices can be looked up
   for it. Things with no price source are in the list too, marked as
@@ -46,7 +49,8 @@ this file says what you can expect of a price wherever you meet one.
   price service off entirely and every figure in the product can still
   be entered by hand, with a sentence on screen explaining why the
   field is yours to fill. A unit whose source did not answer simply
-  gets no entry that day.
+  gets no entry that day, and that day can be filled in later by
+  opening its recording (`record-snapshot.md`).
 - **A lookup no longer says which holding you touched.** Every unit in
   your vault is asked about whenever you record anything, so the
   pattern of lookups is the same whether you updated one holding or

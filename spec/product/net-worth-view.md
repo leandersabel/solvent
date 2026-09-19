@@ -115,6 +115,11 @@ which ones are not. An axis you only ever filled in for three holdings
 draws a chart that is perfectly correct and completely misleading, and
 this line is what stops that being read as a bug.
 
+The crosshair's date is also the way back into that day. Where you
+recorded something on the date under the cursor, the chart opens that
+recording, which is where a figure or a rate from that day is
+corrected (`record-snapshot.md`, which owns that screen).
+
 Nothing you touch on the chart contacts the network. It is all already
 in front of you.
 
@@ -173,7 +178,10 @@ holding has two ages now and only one of them is yours: the rate's age
 is one date for the whole screen rather than a column, because you
 cannot act on it and because it is the same for everything. The
 quantity's age sorts, which is how you find what you have not touched in
-a while without the app deciding for you what counts as too long.
+a while without the app deciding for you what counts as too long. Each
+date in a holding's own list opens the recording that wrote it, which
+is how a wrong figure from last year gets put right
+(`record-snapshot.md`).
 Holdings you have never valued are listed separately as "not yet
 valued", never as zero, because zero is a real figure that means
 something else. Archived holdings are hidden behind a toggle. Clicking a
@@ -204,6 +212,11 @@ the section needs no small print.
   and the screen carries one date for the rates it used.
 - A rate written today adds a point at today and moves nothing before
   it. No past point in the chart and no quantity you recorded changes.
+- The chart's past moves only when you move it. Opening a recording
+  and correcting a figure or a rate changes the chart at that date,
+  which is the correction working and not the chart drifting
+  (`record-snapshot.md`). Correcting a rate moves every band measured
+  in that unit on that date.
 - Nothing on this screen contacts a price source. What it shows are the
   rates already in your vault, written by your last recording.
 - For every date in the chart, the visible bands add up to the net worth

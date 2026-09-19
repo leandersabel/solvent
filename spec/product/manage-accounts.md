@@ -89,8 +89,10 @@ the chart still drops on that date, with nothing recorded to explain
 why, so the app says that in the dialog rather than letting you find out
 in a chart six months later. Either way the date is annotated as an
 archive, so the drop is never mistaken for a bad entry. Accepting the
-closing value records something, so it refreshes the rates like any
-other recording does (`record-snapshot.md`).
+closing value records something, so it joins the recording for the
+archive date and refreshes the rates like any other recording does.
+Where that date already holds a recording, the rates it holds stand
+(`record-snapshot.md`).
 
 **Delete permanently** is the other answer, and it removes the holding
 and every value ever recorded against it. You type the holding's name to
@@ -120,6 +122,8 @@ and the current total.
   axis, which reads as a normal state and not as an error.
 - Archiving a holding leaves every net worth figure before the archive
   date exactly as it was, and removes the holding from today's total.
+- A closing value recorded onto a date that already has a recording
+  joins it and moves no rate, so no other holding shifts on that date.
 - Archiving the last holding measured in a unit stops that unit being
   refreshed when you record. Its rates so far stay and unarchiving
   resumes them.
@@ -132,6 +136,10 @@ and the current total.
   There is no state where half of it is gone.
 - A holding belonging to another household member can never be reached
   or deleted, and the app gives no hint that it exists.
+- A value recorded for a holding years ago can be put right by opening
+  the recording it belongs to, reached from the holding's own list of
+  values (`record-snapshot.md`). Nothing about a holding's history is
+  fixed once it is written.
 - Once a holding has recorded values, the app refuses to change what it
   is measured in and says why, rather than quietly reinterpreting
   figures you entered in the old unit and revaluing its whole history

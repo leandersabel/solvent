@@ -34,10 +34,14 @@ The two are joined at the moment a figure is shown. What a holding is
 worth on a date is the quantity on that date at the rate on that date,
 and either side can have moved since you last looked.
 
-Nothing is ever recalculated behind you. A rate entry is written for
-one date and never rewritten, so what your dollars were worth in 2019
-is what 2019's rate says, forever, whatever the dollar does tomorrow. A
-chart that changes its own past is not a record of anything.
+Nothing is ever recalculated behind you. What your dollars were worth
+in 2019 is what 2019's rate says, whatever the dollar does tomorrow,
+and no later recording touches it. A chart that changes its own past
+on its own is not a record of anything.
+
+The one thing that can change a past rate is you, and only by opening
+the recording that wrote it. The difference that matters is who acted:
+the app never moves your history, and you always can.
 
 Each rate entry says where it came from, and still says it a year
 later: the figure the app proposed, one you changed, with what was
@@ -80,6 +84,39 @@ Rates are written for the date being recorded, not for today. Adding a
 March figure from a statement you have just found writes March's rates,
 which is what makes a backfilled figure worth anything at all.
 
+The refresh fills a date that has none. Record onto a date that
+already carries rates and those rates stand as they are. They belong
+to that date's recording and they move when you move them there, never
+as a side effect of putting a figure in next to them.
+
+## A recording is a thing you can reopen
+
+A sitting is not a moment that has passed. It is a recording: the
+figures you entered that evening and the rates written alongside them,
+kept together under one date, and you can go back to it.
+
+A recording is identified by its date and nothing else. One value per
+holding per day and one rate per unit per day together mean that two
+sittings on the same day are one recording, so opening a date shows
+everything recorded for that date however many sittings it took. The
+second sitting joins the first by reopening it, which is the only way
+in once a date exists.
+
+Three things you might want to put right are the same act on the same
+screen:
+
+- **A figure you got wrong.** The balance you typed was the wrong
+  account's.
+- **A holding that was silent.** You skipped it that evening, so it has
+  no entry for that date, and the statement is in front of you now.
+- **A rate you disagree with.** The figure the source published that
+  day looks wrong to you, or nothing came back and the line went in
+  empty.
+
+All three are: open the recording, edit, save. A price is changed where
+it was captured, which is inside a recording, whether that recording is
+today's or one from four years ago.
+
 ## The screens
 
 ### The sweep: updating in one sitting
@@ -87,10 +124,12 @@ which is what makes a backfilled figure worth anything at all.
 The main way to record values, and the screen that decides how much your
 monthly update costs you.
 
-One date at the top for the whole sweep, defaulting to today. One row
-per active holding, each one showing its last recorded figure and how
-long ago that figure was recorded, in plain words: "3 weeks ago",
-"about a year ago", "never valued".
+One date at the top for the whole sweep, defaulting to today. That
+date is not a setting on the screen, it is which recording you are
+looking at: move it to a day you already recorded and the sweep fills
+with what is there. One row per active holding, each one showing its
+last recorded figure and how long ago that figure was recorded, in
+plain words: "3 weeks ago", "about a year ago", "never valued".
 
 You act on the rows you have a number for and leave the rest. Updating
 four holdings this month and the other eleven in March is an ordinary
@@ -177,30 +216,138 @@ This records something, so it writes rates like the sweep does, for the
 date on the form. They sit on one folded line stating what will be
 written, which opens if you want to change any of them. A figure dated
 2019 takes 2019's rates, so the entry is worth something the moment it
-lands.
+lands. Pick a date that already holds a recording and the line shows
+that recording's rates rather than fresh ones, because the figure you
+are adding is joining it.
 
-### Finding and fixing a wrong figure
+### Going back to a recording
 
-The holding's own page lists every value ever recorded for it, newest
-first, with the date, the figure, the rate that applied on that date,
-the converted amount, and where that rate came from. This is where a
-typo from eight months ago gets found and corrected.
+#### Finding one
 
-Correcting the number or the note touches no rate. Moving an entry to a
-different date moves it onto that date's rate, which is the right
-answer: the usual reason for a date correction is a mistyped day on a
-figure that was always about the day you meant.
+There is no list of recordings anywhere, because the dates are already
+listed in the places you would look, and each of them leads to the same
+screen.
 
-A wrong rate is corrected from the unit's own run of entries, reached
-from any holding measured in it, which lists every rate ever written
-for that unit with its date and where it came from. It is a separate
-act from correcting a figure because it is a shared one, and the app
-says so before it goes through: every holding measured in that unit
-moves on that date, and so does every total that used it. See the
-question raised with this batch.
+- **A holding's own page** lists every value ever recorded for it,
+  newest first, with the date, the figure, the rate that applied on
+  that date, the converted amount, and where that rate came from. Each
+  date opens the recording it belongs to. This is where a typo from
+  eight months ago gets found.
+- **The chart** names a date wherever you put the crosshair, and where
+  you recorded something on that date it opens that recording
+  (`net-worth-view.md`).
+- **Update values**, with the date moved back. If that day holds a
+  recording you get it, and if it does not you are starting one.
 
-Deleting a value asks once, naming what will happen: your net worth
-around that date will change.
+#### It is the sweep
+
+Reopening is not another screen. It is the sweep, at that date, the
+same rows in the same order with the same rates at the foot, and
+everything you could do the evening you recorded it you can do again.
+That is what keeps this cheap.
+
+What is different is that the rows arrive holding what was recorded
+rather than a proposal.
+
+- A holding with a figure for that date shows it. Type over it to
+  correct it, or clear it to take it out of your history.
+- A holding that was silent that date shows what the sweep always
+  shows for a holding with nothing on the date: its last figure before
+  then and how old that is. Type a figure and it is silent no longer.
+  Confirming such a row records the figure the holding carried into
+  that date, which is the last one before it and not the newest one
+  you have.
+- The rate lines show the rates this recording wrote and where each
+  came from. Change one and it becomes yours, with what was proposed
+  still shown beside it afterwards. Clear one and that date has no
+  rate for that unit, which moves the same holdings and is announced
+  the same way.
+- A unit that went in empty, because the source did not answer that
+  day, is the one thing the screen goes and asks about. It arrives
+  filled in if the source answers now, labeled with the day it is
+  actually for like any proposal, and you can take it, change it, or
+  leave the line empty. A rate that is already there is never looked
+  up again, because it may be one you chose.
+
+A rate line on a reopened recording saves by itself. On a new sweep
+the rates ride in with the first row you record, because until then
+there is nothing for them to belong to. On a recording that already
+exists there is, so filling in the rate that was missing is a
+complete act and needs no holding touched alongside it. Reopen a
+date, touch nothing, and nothing is written, the proposal on the
+empty line included.
+
+#### Starting one and editing one are different acts
+
+A date holds one recording and only the first attempt to start it
+succeeds. A vault open in two windows, or on a phone and a laptop at
+once, cannot start the same date twice. The second attempt does not
+quietly turn into an edit of the first. It stops, says the date
+already has a recording, and offers it in one click, which is the
+route every change goes through.
+
+The wording is not an accusation. Your other window got there first,
+and there is nothing to put right beyond opening the date and carrying
+on.
+
+What was typed into the attempt that lost is gone, and it is typed
+again on the reopened date. Nothing is held for them, nothing is merged, and
+the screen never claims to have saved anything it did not. A
+collision like that is rare enough that carrying half finished entries
+across it is not worth building, and a rescue that works only some of
+the time is worse than none.
+
+#### What saving does to your history
+
+- **A figure you changed** moves that holding on that date. Its line
+  bends there and the runs either side of it move with it. Your total
+  changes only if that date is the holding's newest figure.
+- **A figure you added to a silent holding** gives that holding a
+  point where it had none, so the straight run that used to cross that
+  date now bends at it.
+- **A figure you cleared** takes the point out, and the run straightens
+  back over it.
+- **A rate you changed** moves every holding measured in that unit on
+  that date, and every total that used it. Your net worth on that day
+  changes and the chart changes with it. The app says so before it goes
+  through, naming the holdings that move, and you watch it happen,
+  because those holdings are the rows in front of you.
+
+That last one is why a price is corrected here and nowhere else. The
+same edit made on a screen listing nothing but rates would move
+figures the person was not looking at.
+
+Nothing outside that date moves. March's rate is March's, and changing
+it leaves April alone. Nothing recalculates itself afterwards either: a
+figure you corrected today is not corrected again tomorrow by anything
+the app does.
+
+#### Emptying one out
+
+Clear every figure from a recording and there is nothing left for that
+date to be. The recording goes, its rates go with it, every holding's
+list loses that date, and the chart runs across it as though the
+sitting had never happened. That is the exact reverse of the rule that
+opening the sweep and acting on no row writes nothing. A date holds
+what somebody recorded, and with nothing recorded there is no date.
+
+Undoing a sitting you should never have made is one intention rather
+than eight, so a reopened recording offers to remove the whole thing in
+one action. It asks once and names what a person needs in order to
+answer: the holdings that lose a figure, and that every holding in a
+foreign unit moves on that date, because its rate goes too.
+
+#### Moving an entry to another date
+
+An entry can also be moved to another date, from the holding's page.
+That is the answer to a mistyped day rather than a wrong figure, and it
+moves the entry onto the rate of the day you meant, which is the point
+of the correction. The entry leaves the recording it was in and joins
+the one on its new date, or starts one there if that day holds nothing
+yet.
+
+Deleting a single value asks once, naming what will happen: your net
+worth around that date will change.
 
 ## What must be true
 
@@ -209,8 +356,8 @@ around that date will change.
 - The converted figure is visible while you type, before anything is
   saved.
 - A rate published tomorrow does not change any figure you already
-  recorded, or any point in the chart before today. A rate entry is
-  written for one date and never rewritten.
+  recorded, or any point in the chart before today. Nothing the app
+  does on its own rewrites a rate that is already in your history.
 - A value entered on one machine reads back identically on another,
   down to the last decimal. No figure ever drifts by a fraction of a
   cent through being stored and read back.
@@ -224,9 +371,11 @@ around that date will change.
   empty line with no explanation.
 - A holding measured in your main currency never shows a rate anywhere
   in the product.
-- Recording a second value for a holding on a date it already has asks
+- Recording a single figure onto a date the holding already has asks
   whether to replace the one that is there, naming the figure already
-  recorded, and ends with one value on that date either way.
+  recorded, and ends with one value on that date either way. Opening
+  that date's recording asks nothing, because the figure is in front
+  of you to type over.
 - Moving an entry onto a date that is already taken warns that the other
   entry will be destroyed, in different words than the ordinary replace,
   because a second record dies.
@@ -251,8 +400,10 @@ around that date will change.
   whether or not you looked at any of them.
 - A rate line you never touched is written and a holding row you never
   touched is not, on the same sweep.
-- Closing the sweep without acting on a single row writes nothing at
-  all, rates included.
+- Opening the sweep, acting on nothing and closing it writes nothing
+  at all, rates included. That holds whether the date was empty or
+  already held a recording, and a rate the screen proposed for an
+  empty line is not written either.
 - Backfilling a figure dated in March writes March's rates, not
   today's.
 - A unit only you can price keeps the figure and the date you last set
@@ -270,10 +421,50 @@ around that date will change.
   ten years of old statements is a normal thing to do.
 - The rate that applied to an entry recorded a year ago still says,
   today, whether it was proposed, changed by you, or typed by you.
-- Correcting a rate for a date is announced as moving every holding
-  measured in that unit on that date, before it goes through.
-- Entering the same value in two browser tabs does not silently lose one
-  of them.
+- A rate is changed by opening the recording for its date, where the
+  holdings it moves are the rows on the screen, and the change is
+  announced as moving every one of them before it goes through.
+- Nowhere in the product is there a screen that lists rates on their
+  own or lets one be changed away from the recording that wrote it.
+- Opening a date that already holds a recording shows every figure
+  recorded for it, including ones entered in a separate sitting the
+  same day, and starts no second recording for that date.
+- A holding you left alone on a past date can be given a figure for
+  that date by reopening it, and that figure joins your history
+  exactly as it would have at the time.
+- Correcting a figure recorded eight months ago moves the chart at
+  that date and leaves every other date alone.
+- Changing a rate on a reopened recording moves every holding measured
+  in that unit on that date, and those holdings are visibly the rows
+  on the screen.
+- A rate you changed still says, a year later, that you changed it,
+  and still shows what was proposed, whether you changed it the
+  evening it was written or four years afterwards.
+- Reopening a recording asks the source about no unit it already holds
+  a rate for. A rate you overrode a year ago is still yours when you
+  open that date again.
+- A unit left with no rate because nothing came back arrives filled in
+  when you reopen that date and the source answers, as a proposal you
+  can change or leave.
+- A rate filled in on a reopened recording is saved on its own, with
+  no holding row touched.
+- Adding a figure to a date that already carries rates uses those
+  rates. Nothing is looked up and no holding measured in those units
+  moves.
+- Clearing the last figure out of a recording removes that date
+  entirely, rates included, and the chart runs straight across it.
+- Removing a whole recording asks once and names what moves before it
+  goes.
+- Two sessions starting a recording for the same date end with one
+  recording. The second is refused, told the date already has one, and
+  given it in a single click.
+- A refused attempt leaves nothing behind. None of its figures appear
+  anywhere afterwards, and nothing on screen says anything was saved.
+- The refusal reads as the date already being taken, never as
+  something the person did wrong.
+- Entering the same value in two browser tabs never loses one of them
+  without saying so, and neither does editing the same recording in
+  two.
 
 ## What it deliberately does not do
 
@@ -300,6 +491,14 @@ around that date will change.
 - **No automatic price for things without a market.** Your flat, the
   wine, the private loan you made. Nobody publishes a price, so the app
   does not invent one.
+- **No rescue for a recording that was refused.** When a date turns
+  out to already have a recording, the figures typed into the attempt
+  that lost are not kept, offered back, or merged into the one that
+  stands. They are typed again on the reopened date.
+- **No screen of nothing but prices.** There is no list of rates to go
+  and edit. A rate belongs to the recording that wrote it and is
+  changed there, where the holdings it moves are on the screen in
+  front of you.
 - **No audit view across holdings.** "Show me every price I typed by
   hand" is a different question with a different shape, and it is not in
   this version. The provenance of each price is on the holding's page.
@@ -322,9 +521,17 @@ them.
   The rule you gave was about exchange rates, and this is where the
   line under it falls: a price you have to think about is gathered, and
   the app does not write things you did not gather.
-- **A rate is corrected from its unit's own run of entries**, not from
-  the holding's page, because the correction is shared by every holding
-  in that unit. See the question raised with this batch.
+- **Reopening looks up only what is missing.** A rate already written
+  for that date is shown as it stands and the source is not asked
+  about it, because it may be one you chose. A unit that went in empty
+  is looked up again, because the outage that emptied it is the reason
+  you came back.
+- **Emptying a recording takes its rates with it.** The alternative,
+  leaving rates on a date nobody recorded anything for, would keep
+  every foreign holding bending at a date that no longer exists.
+- **Confirming on a reopened recording records the figure the holding
+  carried into that date**, meaning its last figure before that date
+  rather than the newest one in its history.
 - **The closing value offered when archiving a holding** follows the
   same one value per date rule as everything else, so archiving on a
   date that already has a value offers to replace it.
