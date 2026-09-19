@@ -186,10 +186,22 @@ them.
 - **The closing value is prefilled at zero.** Zero is right for a
   position that simply ended and wrong for one you sold at a figure, so
   the field is editable and never saved without you looking at it.
-- **What a holding is measured in is frozen once it has values**, and
-  the only route to a different unit is to archive it and start a new
-  holding, which breaks the history in two. See the question raised with
-  this batch.
+- **What a holding is measured in is frozen once it has values.** A
+  unit is not a label. It decides which run of prices values the
+  holding, and grams of gold and troy ounces of gold are priced by
+  different runs, so changing it means both reinterpreting every
+  quantity recorded and repointing the holding at a different price
+  history. Until that exists, the only route to a different unit is to
+  archive the holding and start a new one, which breaks the history in
+  two. The picker earns its keep here by offering the ordinary choices
+  first and saying what an unusual one commits you to.
+
+  Changing a unit properly, by converting every recorded figure at a
+  factor you confirm and repointing the holding at the new unit's
+  prices, is wanted and is not in the first version. It is the one
+  operation in the product that would rewrite figures you personally
+  vouched for, which is why it needs the confirmation and why it is not
+  something to add in a hurry.
 - **A holding sits in at most one value of each axis.** This is what
   makes the chart's bands add up to your net worth. A holding that is
   half retirement and half cash has to be two holdings.
