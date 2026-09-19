@@ -42,10 +42,15 @@ the architect, who decides it and writes the reason into the spec.
   derivation. Row shapes, endpoints, byte encodings, and a technical
   acceptance list a test can assert.
 
-Some features have no product file and never will, because the client
-never asked for them: the record store, the app shell, the client-side
-crypto layer. The architect creates those and names which product
-features need them.
+Some features have no product file, because the client never asked for
+them and nothing about them is visible from outside: the record store
+and the client-side crypto layer. The architect creates those and names
+which product features need them.
+
+A feature the client cannot see is not the same as a feature with no
+screen. The app shell has no screen of its own, but the chrome it
+renders is where "looks like a private bank" is cashed out, so it has a
+product file like any other.
 
 ## Writing the spec
 
