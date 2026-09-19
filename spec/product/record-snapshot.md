@@ -119,17 +119,44 @@ today's or one from four years ago.
 
 ## The screens
 
+### Getting to a recording
+
+There is no list of recordings anywhere, because a recording is found
+by its date and the dates are already in front of you.
+
+- **New recording**, a button on the main screen. It opens a date
+  picker, set to today, with the dates that already hold a recording
+  marked in it. Pick a date nothing was recorded on and you are
+  starting one. Pick a marked one and the screen becomes that
+  recording, open for editing, with no warning and nothing to confirm.
+  You asked for that date and you get that date.
+- **A date in a holding's own list of values**, which opens the
+  recording it belongs to. This is where a typo from eight months ago
+  gets found.
+- **The chart**, which names a date wherever you put the crosshair and
+  opens the recording on it (`net-worth-view.md`).
+
+The same act from any other screen is the Update values action in the
+top bar (`app-shell.md`), which goes straight to today and asks
+nothing, because today is what it is for.
+
+Picking a taken date and being refused a taken date are not two
+answers to one question. The picker knows what is there before you
+have typed anything, so it opens it. The refusal is for a date that
+becomes taken while you are working, when something typed is at stake,
+and it is described under starting and editing being different acts.
+
 ### The sweep: updating in one sitting
 
 The main way to record values, and the screen that decides how much your
 monthly update costs you.
 
-One date at the top for the whole sweep, defaulting to today. That
-date is not a setting on the screen, it is which recording you are
-looking at: move it to a day you already recorded and the sweep fills
-with what is there. One row per active holding, each one showing its
-last recorded figure and how long ago that figure was recorded, in
-plain words: "3 weeks ago", "about a year ago", "never valued".
+The date you picked sits at the top of the sweep. It is not a control,
+it is which recording you are in, and changing your mind about it is
+the New recording button again. One row per active holding, each one
+showing its last recorded figure and how long ago that figure was
+recorded, in plain words: "3 weeks ago", "about a year ago", "never
+valued".
 
 You act on the rows you have a number for and leave the rest. Updating
 four holdings this month and the other eleven in March is an ordinary
@@ -222,22 +249,10 @@ are adding is joining it.
 
 ### Going back to a recording
 
-#### Finding one
-
-There is no list of recordings anywhere, because the dates are already
-listed in the places you would look, and each of them leads to the same
-screen.
-
-- **A holding's own page** lists every value ever recorded for it,
-  newest first, with the date, the figure, the rate that applied on
-  that date, the converted amount, and where that rate came from. Each
-  date opens the recording it belongs to. This is where a typo from
-  eight months ago gets found.
-- **The chart** names a date wherever you put the crosshair, and where
-  you recorded something on that date it opens that recording
-  (`net-worth-view.md`).
-- **Update values**, with the date moved back. If that day holds a
-  recording you get it, and if it does not you are starting one.
+The routes in are above. The one you will use most is a holding's own
+page, which lists every value ever recorded for it with the date, the
+figure, the rate that applied on that date, the converted amount and
+where that rate came from.
 
 #### It is the sweep
 
@@ -281,7 +296,10 @@ empty line included.
 
 A date holds one recording and only the first attempt to start it
 succeeds. A vault open in two windows, or on a phone and a laptop at
-once, cannot start the same date twice. The second attempt does not
+once, cannot start the same date twice. This is about a date that
+becomes taken while you are working, never about one that was taken
+when you picked it: the picker can see what is already there and
+simply opens it. The second attempt does not
 quietly turn into an edit of the first. It stops, says the date
 already has a recording, and offers it in one click, which is the
 route every change goes through.
@@ -345,9 +363,10 @@ same as changing a figure says what changing it does.
 
 An empty recording is always one you emptied. Opening a date that
 holds nothing and acting on nothing still writes nothing, so the app
-never makes one. And since no holding has a figure on that date, an
-empty recording appears in no holding's list of values. You reach it
-by its date, from the chart or by moving the sweep's date onto it.
+never makes one. Since no holding has a figure on that date, an empty
+recording appears in no holding's list of values, and the date picker
+is how you get back to it. It is marked there like any other
+recording, because it is one.
 
 **Delete removes the recording outright, prices and all.** It is its
 own button on the reopened recording and a deliberate separate act,
@@ -487,6 +506,16 @@ worth around that date will change.
 - A deleted recording leaves no trace. Its date is gone from every
   holding's list and from every unit's prices, and the chart runs
   across it.
+- The main screen carries a New recording button, and it opens a date
+  picker set to today.
+- The picker marks every date that already holds a recording, empty
+  ones included.
+- Picking a marked date opens that recording for editing straight
+  away, with no warning, no question and nothing to confirm.
+- Picking a date nothing was recorded on starts a recording for it.
+- A date already taken when you pick it opens, and a date that becomes
+  taken while you are working refuses. Both hold, and neither is an
+  exception to the other.
 - Two sessions starting a recording for the same date end with one
   recording. The second is refused, told the date already has one, and
   given it in a single click.
@@ -558,6 +587,14 @@ them.
   about it, because it may be one you chose. A unit that went in empty
   is looked up again, because the outage that emptied it is the reason
   you came back.
+- **The date picker marks the dates that already hold a recording.**
+  Without the marks, picking a date would be a guess at whether you
+  are about to start one or open one, and the app already says where
+  your recordings are.
+- **The main screen carries the New recording button and the top bar
+  carries Update values**, rather than both screens carrying both.
+  One place asks which date and one place goes to today, so the main
+  screen does not hold two buttons for the same thing.
 - **Confirming on a reopened recording records the figure the holding
   carried into that date**, meaning its last figure before that date
   rather than the newest one in its history.

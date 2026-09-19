@@ -102,9 +102,11 @@ administrative to go, so nothing in this bar leads there.
 "Update values" is an action in the bar, not a destination in the
 navigation. Pressing it opens the update sweep from wherever the person
 currently is, which is what keeps the sweep reachable while someone is
-deep inside a single account. The dashboard repeats the same action
-next to the net worth figure, because that is where a person arrives
-already meaning to do it.
+deep inside a single account. It goes to today and asks nothing. The
+dashboard carries the front door instead, a New recording button with
+a date picker, because that is where a person arrives already meaning
+to do it and where choosing the date is worth a click
+(`record-snapshot.md`).
 
 ### Lock
 
@@ -209,8 +211,9 @@ running app, with no access to the code.
 4. Every control in the top bar can be reached and operated with the
    keyboard alone, and shows a visible white outline while it has
    focus.
-5. Update values opens the update sweep from any screen, and it is the
-   same sweep the dashboard opens.
+5. Update values opens the update sweep for today from any screen, and
+   it is the same sweep the dashboard's New recording button opens
+   once a date has been picked.
 6. One press of Lock clears every figure from the screen and shows the
    password screen, with no confirmation step in between.
 7. After locking, entering the password alone returns the person to the

@@ -50,8 +50,12 @@ Recording anything refreshes every rate, so there is one rate date for
 the whole vault rather than one per holding (`record-snapshot.md`,
 which owns that rule).
 
-An "Update values" action sits here and in the top bar of every screen,
-because the total is where you arrive already intending to update it.
+A **New recording** button sits here, because the total is where you
+arrive already intending to update it. It opens a date picker for the
+day you are recording, and a date that already holds a recording opens
+for editing (`record-snapshot.md`, which owns that screen). The top
+bar's Update values action, here as on every screen, goes straight to
+today.
 
 ### Which rates the screen is using
 
