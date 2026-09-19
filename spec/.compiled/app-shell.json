@@ -28,7 +28,7 @@
     "surfaceCheckPlacement": {"value": "the check sits beside the CSRF middleware and runs immediately after authentication, once, so no individual endpoint repeats it. Membership is a prefix rule, not a list, and a route matching no group is unreachable", "cite": "spec/features/app-shell.md#the-two-surfaces"},
     "rootPath": {"value": "resolves by kind, the Dashboard for a vault owner and the Admin area for an administrator. It is the only route that resolves to different content per kind", "cite": "spec/features/app-shell.md#the-two-surfaces"},
     "chromeByKind": {"value": "vault owner: nav of Dashboard and Settings, Update values shown, right-hand control Lock, record and decryption layer loaded. Administrator: no nav entries at all, Update values absent rather than disabled, right-hand control Sign out, record and decryption layer not loaded. Both: the embedded KDF envelope and the Argon2id worker", "cite": "spec/features/app-shell.md#the-chrome"},
-    "navHasNoAdminOrAccountsEntry": {"value": "there is no Accounts entry and no Admin entry in either bar, in any state", "cite": "spec/ui/design-system.md#app-shell"},
+    "navHasNoAdminOrHoldingsEntry": {"value": "there is no Holdings entry and no Admin entry in either bar, in any state", "cite": "spec/ui/design-system.md#app-shell"},
     "contentMaxWidth": {"value": "1200px on the ground. Forms are 480px, and 900px covers the sweep, a recording's own screen and account detail", "cite": "spec/ui/design-system.md#app-shell"},
     "alpineBuild": {"value": "the CSP-safe build. The standard build needs unsafe-eval for x- expressions, which would gut the CSP", "cite": "spec/architecture.md#application-hardening"},
     "statusCodes": {

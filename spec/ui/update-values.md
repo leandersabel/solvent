@@ -190,12 +190,12 @@ Line states:
   the figure there may be one the person chose, and a provider that has
   since revised its published figure must not reach a stored entry by
   way of somebody looking at it (`record-rate.md`).
-- **A line that went in empty is the one thing that is looked up
-  again**, since the outage that emptied it is the reason for coming
-  back. It arrives filled in if the source answers now, labeled with
-  the day it is actually for like any proposal, and it can be taken,
-  changed, or left empty. It also carries its own **Look it up**
-  action, for somebody who wants only that line filled.
+- **A line that went in empty carries its own Look it up action**,
+  since the outage that emptied it is the reason for coming back.
+  Opening the recording fetches nothing. Pressing that action is what
+  issues the request, and what comes back is labeled with the day it
+  is actually for like any proposal, to be taken, changed or left
+  empty.
 - **A rate line on a reopened recording saves by itself.** On a new
   sweep the rates ride in with the first row recorded, because until
   then there is nothing for them to belong to. On a recording that

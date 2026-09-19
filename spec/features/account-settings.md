@@ -260,9 +260,9 @@ Found for an administrator session.
   request still leaves nothing readable in the tab.
 - **"Log out everywhere"** — `POST /api/auth/logout-all`. Invalidates
   every session for the user, **including the current one**. There is no
-  "all except this one" variant; the one place that keeps the current
-  session alive is a password change, which does it as part of its own
-  transaction.
+  "all except this one" variant. Two acts do keep the current session
+  alive, each as part of its own transaction: a password change, and an
+  import (`export-import.md`).
 - A settings row lists active sessions by issue time and last activity —
   `GET /api/sessions` → `[{ id, issuedAt, lastActiveAt, current }]`.
   No IP or user-agent is stored — it would be metadata the app does not

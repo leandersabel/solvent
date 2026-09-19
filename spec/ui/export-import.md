@@ -167,7 +167,7 @@ step). On a large vault this is the longest operation in the product.
   no schedule, no "it has been a while". The product does not know, and
   it is kept that way so a backup stays a plain file the person holds
   and nothing comes to depend on the app tracking it
-  (`export-import.md`, Decisions taken on your behalf). A screen
+  (`product/export-import.md`, Decisions taken on your behalf). A screen
   implying otherwise would be the first such dependency.
 - **No merge, and no control that could be read as one.** No "keep what
   I have", no per-record choice, no preview of what would survive.
@@ -181,10 +181,8 @@ step). On a large vault this is the longest operation in the product.
 - **No identity read off a file.** Not a username, not a vault name,
   not a device. The screen cannot show one because the file's contents
   carry none, which is what lets a backup found by a stranger name
-  nobody. The **default filename is the exception**, and it is not this
-  screen's to decide: it carries the account's username
-  (`export-import.md`, Export). The screen states the filename and
-  claims nothing beyond it.
+  nobody. The filename is dated and names nobody, the same as the
+  contents.
 
 ## Rules
 

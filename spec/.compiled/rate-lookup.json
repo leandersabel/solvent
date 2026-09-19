@@ -10,7 +10,7 @@
     {"file": "spec/features/register.md", "sections": ["Rules"], "role": "the kind: currency rows are the whole of the main-currency list"},
     {"file": "spec/features/admin-invites.md", "sections": ["The admin boundary", "Endpoints"], "role": "the boundary the symbol table clears without an exception"},
     {"file": "spec/ui/design-system.md", "sections": ["Components", "States", "App shell"], "role": "the combobox, chip, table and section-switcher conventions the unit picker and the admin Units screen use"},
-    {"file": "spec/ui/admin.md", "sections": ["Units", "Retiring, which is what this screen has instead of deleting", "States", "Rules", "What it deliberately does not show"], "role": "the symbol table's maintenance screen"},
+    {"file": "spec/ui/admin.md", "sections": ["Units", "Retiring, not deleting", "States", "Rules", "What it deliberately does not show"], "role": "the symbol table's maintenance screen"},
     {"file": "spec/ui/update-values.md", "sections": ["The rates, at the foot of the sweep", "Rate lines on a reopened recording", "States"], "role": "where a proposal is shown, accepted, overridden or reported missing"},
     {"file": "spec/ui/account-form.md", "sections": ["Layout", "Unit, once there are snapshots", "States", "Rules"], "role": "the unit picker built from this table"}
   ],

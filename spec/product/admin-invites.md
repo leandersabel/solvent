@@ -185,7 +185,7 @@ again.
 
 The same direct-on-the-machine step is also the instance's only way
 back if every administrator password is lost. On an instance that
-already has accounts it states how many there are and what it is about
+already has an administrator it says so, and what it is about
 to do, and proceeds only when told to go ahead anyway. That is a speed
 bump against an absent-minded command and not a security control:
 whoever can run it already holds the machine. It creates an

@@ -257,7 +257,8 @@ specified and owned by `manage-accounts.md`, not here.
   and in an exported file — asserted against both, since the two are
   written by different code paths.
 - A request body carrying an `aad` field is rejected rather than
-  ignored: the server builds the AAD it compares against from the row.
+  ignored. Sending one would invite a server that trusts the client's
+  copy of values it already holds.
 - A ciphertext over the per-record cap, a vault over the record-count
   cap, and a user over the byte quota each return Content Too Large with
   nothing written.

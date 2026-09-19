@@ -27,7 +27,7 @@ the holding's detail screen (`account-detail.md`). Form max-width
   can produce a holding measured in grams and priced per ounce.
 
   **The ordinary answers come first, and an unusual one says what it
-  commits you to** (`manage-accounts.md`, Decisions taken on your
+  commits you to** (`product/manage-accounts.md`, Decisions taken on your
   behalf).
 
   - **Order**: the vault's main currency, then the other currencies,

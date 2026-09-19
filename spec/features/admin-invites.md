@@ -302,8 +302,8 @@ invocation and nothing more.
   logging, and the deployment's reverse proxy / tunnel logging is
   documented as a place it may still appear — the invite's short expiry
   and single-use nature are what bound that exposure.
-- Revoking is available for `pending` invites only. A used invite cannot
-  be revoked; deleting the resulting user is the remedy.
+- Revoking is refused on a used invite, where deleting the resulting
+  account is the remedy, and is a no-op on an already revoked one.
 
 ## Edge cases
 

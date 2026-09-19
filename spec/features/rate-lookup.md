@@ -448,7 +448,7 @@ reachable (architecture.md, SSRF hardening):
   repeat, `"cached": true` with no second outbound request.
 - A request omitting `symbol` returns every symbol the proxy can price
   for that date and quote, with `lookup: false` symbols absent from the
-  map, and costs no more outbound requests than the gold path alone.
+  map, and costs at most one outbound request more than the gold path alone.
 - A whole-table request followed by a single-symbol request for a symbol
   in it makes no second outbound request: the two forms share one cache.
 - Recording across fifteen holdings in six symbols issues exactly one

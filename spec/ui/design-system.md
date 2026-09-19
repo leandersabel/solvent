@@ -513,8 +513,8 @@ upward from zero reads as a slot machine. Respect
   trap focus and restore it on close.
 - **Phones and tablets are supported targets, not a degraded case.**
   Every screen is reachable, usable and submittable on a touch screen,
-  and no action anywhere lives only in a wide layout (`app-shell.md`,
-  On a phone). A screen states only what changes shape at phone width.
+  and no action anywhere lives only in a wide layout
+  (`product/app-shell.md`, On a phone). A screen states only what changes shape at phone width.
 - **No drag is ever the only route.** Every drag interaction has a
   keyboard and pointer equivalent doing the same job: a reorder ships
   Move up and Move down (Components), and a file drop zone is always

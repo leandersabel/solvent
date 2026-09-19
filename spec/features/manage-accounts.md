@@ -261,9 +261,10 @@ whole reach of the cascade: no other record type carries an
 - No `account` record contains a rate symbol distinct from its unit,
   asserted against the record shape: no such field exists, so the 31×
   mismatch has nowhere to live.
-- A free-text unit appears in no rate-lookup request, and a listed
-  symbol appears in the recording date's single request
-  (`record-rate.md`, The refresh).
+- No rate-lookup request names any symbol, free text or listed.
+  Recording across holdings in several symbols issues one whole-table
+  request for the recording date (`rate-lookup.md`, The client never
+  names a symbol).
 - Unarchiving restores the holding to active lists and to the current
   total.
 - The dimension list offered in the UI is derived client-side from the
