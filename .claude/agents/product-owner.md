@@ -49,7 +49,9 @@ For each feature, write `spec/.compiled/<feature-name>.json` with:
 ```
 
 - **`read`** — every file the engineer must load, with the headings that
-  bear on this feature. Order it: read the first entry first.
+  bear on this feature. Order it: read the first entry first. For any
+  feature with a screen, `spec/ui/design-system.md` comes before that
+  screen — every screen assumes it and states only what it adds.
 - **`dependsOn`** — what must already exist for this feature to run or
   be tested: another feature's rows, routes, or session. Not citation —
   a feature file pointing at another for a payload shape or a rule

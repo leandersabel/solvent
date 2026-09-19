@@ -22,5 +22,5 @@ Spec-first: `spec/` is the design, everything else compiles from it.
 ## Tracking files
 
 - `spec/status.md` — state only: compiled, implemented, verified.
-- `spec/questions.md` — open questions, plus a one-line index of
-  decisions and the file stating each. Reasoning lives in that file.
+- `spec/questions.md` — open questions only. A decision is found in the
+  file that states it.

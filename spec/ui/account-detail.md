@@ -90,12 +90,9 @@ which is not the same as being worth 0 (`net-worth-view.md`).
 
 ## Rules
 
-- Every figure is computed client-side from decrypted records; no
-  request is issued by opening this screen, sorting it, or expanding a
-  note.
-- Account name, note, dimension labels, and snapshot notes render with
-  `x-text` (`architecture.md`, Application hardening).
-- Money arithmetic in decimal, rounded only for display.
+- No request is issued by opening this screen, sorting it, or
+  expanding a note. Every figure comes from the in-memory model.
+- `net-worth-view.md`, Rules applies unchanged.
 - The history table is the account's own snapshots only — it never
   reaches across accounts. A cross-account rate audit ("every rate I
   typed by hand") is deliberately **not** here: it is a different

@@ -107,12 +107,9 @@ rendering constraint from the validated chart palette
 
 ## Rules
 
-- Every operation on this screen writes **at most one record** — the
-  profile. Creating, renaming, reordering, archiving, and restoring all
-  touch no account record. This is the property opaque ids buy
-  (`account-settings.md`); assert it in tests rather than assuming it.
-- Labels are free text in any script and render with `x-text`
-  everywhere, including in the chart legend and every tooltip.
+- Every operation here writes at most one record, the profile
+  (`account-settings.md`, Dimensions). Assert it in tests rather than
+  assuming it.
 - Reordering is keyboard-operable, not drag-only: each handle exposes
   move-up and move-down, since band order is load-bearing and a
   drag-only control would make it unreachable (`design-system.md`,

@@ -54,26 +54,22 @@ figures needs to know which were guesses (`record-snapshot.md`,
 
 ## The four rate situations
 
+Which rate applies in each is `record-snapshot.md`. What this screen
+adds is what the user sees:
+
 1. **Account unit = main currency** → the rate field is **hidden
-   entirely**, rate fixed at `1`, `rateSource: manual`. Showing a
-   disabled "1" field is noise.
-2. **Account's unit is a symbol with `lookup: true`** → proposal
-   requested for that unit and date. The request carries **a fixed base
-   unit, never the value being entered** — enforce this in the client,
-   and never let the value field participate in or trigger a rate
-   request. The rate is always per one of *this account's* unit, which
-   is guaranteed rather than checked: the unit is the symbol
-   (`manage-accounts.md`).
-3. **The unit is free text** → no request is made at all. The form says
-   "This account has no price source — enter the rate yourself" rather
-   than presenting an empty field with no explanation.
-4. **The unit is a symbol with `lookup: false`** (silver, platinum,
-   palladium in v1) → **no request is made** either; the client knows
-   from the symbol table that none is coming, and a round-trip to be
-   told No Content only delays the form. Copy names the metal — "No
-   market rate for silver yet — enter it yourself" — and must not reuse
-   the outage notice below, which tells the user something is broken
-   when nothing is.
+   entirely**. A disabled "1" is noise.
+2. **A symbol with `lookup: true`** → a proposal is requested for that
+   unit and date. The value field never participates in or triggers the
+   request (`architecture.md`, Base-amount rule).
+3. **Free text** → no request. "This account has no price source —
+   enter the rate yourself", rather than an empty field with no
+   explanation.
+4. **A symbol with `lookup: false`** (silver, platinum, palladium in
+   v1) → no request either, because the client holds the symbol table
+   and knows none is coming. Copy names the metal — "No market rate for
+   silver yet — enter it yourself" — and must not reuse the outage
+   notice below, which says something is broken when nothing is.
 
 ## Editing an existing snapshot
 
@@ -127,8 +123,6 @@ reopened a year later.
 
 ## Rules
 
-- `value` and `rate` are decimal strings end to end. No float ever
-  touches them.
-- The value is encrypted before it leaves the browser and appears in no
-  rate request in any field or encoding.
-- Date is a calendar date — no time, no timezone.
+`record-snapshot.md` applies unchanged: decimal strings end to end, a
+calendar date, and a value that is encrypted before it leaves the
+browser and appears in no rate request.

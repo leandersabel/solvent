@@ -178,7 +178,7 @@ invocation, and it is honest that it cannot stop anything more.
   when another admin remains, and it ends their own session. No special
   case beyond the last-admin guard.
 - **Admin deletes a user who is currently logged in** → their sessions
-  go with the transaction; their next request is a Unauthorized.
+  go with the transaction; their next request is an Unauthorized.
 - **Deleting a username that does not exist** → Not Found, the same as
   any other admin route reached by a non-admin, so a probe distinguishes
   nothing.

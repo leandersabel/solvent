@@ -130,11 +130,7 @@ deleted outright.
 
 ## Rules
 
-- Every write re-encrypts the whole record with a fresh nonce and
-  increments `version`.
-- Name, note, and dimension labels render with `x-text` everywhere they
-  are echoed back — dimension and value labels are user-authored strings
-  like any other.
+- `manage-accounts.md`, Rules applies unchanged.
 - Creating a value or a dimension inline writes the profile record
   first. If that write fails, the account form keeps every field and
   says the value was not created; it never saves an account referencing

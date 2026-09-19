@@ -32,7 +32,7 @@ Response OK:
   "asOf": "2026-07-31", "source": "provider-name", "cached": true }
 ```
 
-Response No Content No Content` — no proposal available (a symbol with
+Response No Content — no proposal available (a symbol with
 no provider yet, no data for that date, provider unreachable). The
 client falls back to manual entry.
 

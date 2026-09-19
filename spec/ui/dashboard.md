@@ -168,12 +168,5 @@ section exists.
 
 ## Rules
 
-- Money arithmetic in decimal at full precision; rounded only for
-  display.
-- Every decrypted string — account name, note, dimension and value
-  label, tooltip label — renders with `x-text`. An account named
-  `<script>alert(1)</script>` appears as literal text in the table, the
-  chart legend, and every tooltip, as does a dimension value labelled
-  the same way.
-- Large histories downsample **for display only**; totals always compute
-  on the full data.
+`net-worth-view.md`, Rules applies unchanged: decimal arithmetic,
+`x-text` for every decrypted string, downsampling for display only.

@@ -164,49 +164,20 @@ party.
   before use, redirects are disabled, and egress has a timeout. This
   matters because the proxy runs in an environment with reachable
   internal NAS services.
-- **FX provider: Frankfurter's public instance at
-  `api.frankfurter.dev`.** Free, no API key, no daily or monthly quota,
-  aggregating 84 central banks across 201 currencies with history back
-  to 1948. Chosen over self-hosting the same open-source service on the
-  NAS because it adds no container, no writable volume, no `FROM` digest
-  for Dependabot to track, and nothing extra to pull by hand on a
-  platform with no auto-pull — while landing on the privacy line already
-  drawn above: it observes which currencies are queried, never an
-  amount, because the base-amount rule leaves no parameter an amount
-  could travel in. Cheap to unwind — self-hosting runs the same
-  software, so switching is one host constant in the server-side
-  whitelist.
-- **Gold provider: Narodowy Bank Polski's public API at
-  `api.nbp.pl`.** Same shape and same rationale as the FX choice
-  — a central bank, no API key, no quota, no vendor account, one host
-  constant to unwind — with dated history from 2013 and no restriction
-  on storing what it publishes. Three trade-offs were accepted
-  knowingly: it prices in PLN per gram, so a non-PLN quote composes a
-  second leg through Frankfurter at the `asOf` date; its price trails
-  the London fixing by one business day; and it covers gold only. The
-  lag is visible in `asOf` and overridable by the user, which is what
-  makes it acceptable — the proposal was never authority.
-  `rate-lookup.md` holds the adapter detail and the rejected
-  alternatives, chiefly **LBMA's own feeds, which are technically ideal
-  and licence-blocked**: ICE Benchmark Administration requires a licence
-  to use historical benchmark data for pricing and valuation, which is
-  exactly this use, and public reachability is not permission.
-- **Silver, platinum, and palladium have no provider in v1** — the user
-  enters those rates by hand. Their symbols are seeded into the symbol
-  table now anyway, because a symbol is written into encrypted user
-  records as an account's unit: letting users invent one would make
-  adding a provider later a migration over ciphertext the server cannot
-  read.
-- **Listed securities are not priced by lookup at all** — brokerage
-  holdings are depot-level accounts (see Account above), so there is no
-  equity rate to fetch. `rate-lookup.md` records the candidates and why
-  each fails, the licensing being largely closed. One constraint binds
-  every future provider: **a snapshot stores its rate permanently,
-  inside user ciphertext the server cannot read, enumerate, or delete.**
-  Terms requiring deletion of all data on termination are therefore
-  unsatisfiable by construction — not a cache-policy problem a shorter
-  TTL could fix. Neither Frankfurter nor NBP carries such a restriction,
-  which is a hard criterion rather than a happy accident.
+- **Providers**: FX from Frankfurter's public instance, gold from
+  Narodowy Bank Polski's. Both are keyless, quota-free public services
+  from central-bank data, so each is one host constant to unwind if it
+  has to change. Silver, platinum and palladium have no provider in v1
+  and are entered by hand, and listed securities have none by design,
+  because a brokerage holding is a depot-level account in a currency.
+  `rate-lookup.md` holds the adapters, the seeded symbol table, and the
+  rejected alternatives with the reason each fails.
+- **One constraint binds every future provider**: a snapshot stores its
+  rate permanently, inside user ciphertext the server cannot read,
+  enumerate, or delete. Terms requiring deletion of all data on
+  termination are therefore unsatisfiable by construction, not a
+  cache-policy problem a shorter TTL could fix. This is a hard
+  criterion, and it is what rules out the technically ideal feeds.
 
 ## Status codes
 
@@ -283,8 +254,7 @@ indistinguishable by construction rather than by convention.
   encryption. The disk file still deserves protection as defense in
   depth, but the security guarantee doesn't depend on it.
 - **Charting**: none. The trend chart is drawn directly in SVG
-  (net-worth-view.md, Rules), which keeps the strict CSP intact with one
-  less pinned bundle to audit.
+  (net-worth-view.md, Rules).
 - **Frontend**: hybrid. Flask + Jinja2 + htmx server-renders the app shell
   (navigation, login/registration, layout) — nothing sensitive passes
   through it. Data screens (balances, net worth charts) render
@@ -392,21 +362,15 @@ Actors this design defends against vs. accepts:
     ‖ schema_version ‖ monotonic_version`. Decryption fails if the
     server relocates, swaps, or rolls back a blob to a different
     logical slot within a vault — AES-GCM's per-blob authentication
-    alone protects contents but not arrangement, so this closes that
-    gap.
-  - **`user_id` is deliberately *not* in the AAD.** Cross-vault
-    relocation is already impossible without it: a blob moved into
-    another user's rows fails to decrypt under that user's DEK,
-    unconditionally. Binding `user_id` would add a second check on a
-    boundary the DEK already holds — and its only live case would be
-    the one place two users legitimately share a key, a vault transfer
-    through Export/Import. Import therefore **re-keys** rather than
-    re-binds (export-import.md): the imported vault is re-encrypted
-    under a freshly generated DEK, so the two vaults share no key
-    material afterwards and cross-injection is impossible rather than
-    merely detected. This removes a whole class of ordering problem:
-    **the client never needs to know its own `user_id`, and no endpoint
-    returns one.**
+    alone protects contents but not arrangement. `record-api.md` pins
+    the byte encoding.
+  - **`user_id` is deliberately *not* in the AAD**, because the DEK
+    boundary already makes a blob undecryptable in another user's
+    vault. Two things follow: **the client never needs to know its own
+    `user_id`, and no endpoint returns one**, and a vault transfer
+    **re-keys** rather than re-binds, so the two vaults share no key
+    material afterwards. `record-api.md` argues the first,
+    `export-import.md` the second.
   - A client-maintained, DEK-authenticated manifest (expected record
     IDs + versions) would additionally catch wholesale deletion of the
     set — worth revisiting post-v1, not required to ship.
@@ -594,12 +558,12 @@ Actors this design defends against vs. accepts:
   sit inside the trust boundary and could silently exfiltrate passwords
   via a malicious script. CI/CD supply-chain controls (image signing,
   dependency-merge policy) live under Tech stack.
-- **That list is two entries, and it is meant to stay short.** Decimal
-  arithmetic is written against `BigInt` rather than pulled in
-  (record-snapshot.md), and the trend chart is drawn in SVG rather than
-  charted (net-worth-view.md) — both for the same reason: every
-  third-party file in the browser is one more thing to pin, hash,
+- **That list is two entries, and it is meant to stay short**, because
+  every third-party file in the browser is one more thing to pin, hash,
   re-verify on a bump, and trust with a page that handles the password.
+  That is why decimal arithmetic is written against `BigInt`
+  (record-snapshot.md) and the trend chart is drawn in SVG
+  (net-worth-view.md) rather than pulled in.
 
 ## Non-goals
 

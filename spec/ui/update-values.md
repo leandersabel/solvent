@@ -11,16 +11,10 @@ Exercises: `spec/features/record-snapshot.md`, and the proposal half of
 
 ## No threshold, no warning
 
-A single threshold cannot be right for a product built on sparse, uneven
-updates. A current account moves monthly, gold yearly, unlisted property
-every few years. At any fixed number the slow assets are permanently
-flagged, and a warning that is always on for the same three rows is one
-the user stops reading — at which point it fails for the account that
-genuinely went quiet.
-
-So there is **no threshold, no chip, and no warning color**. Each row
-here states its own age in plain language, next to the control that
-fixes it.
+There is no staleness threshold anywhere in the product
+(`net-worth-view.md`, Current net worth). This is the screen that
+carries the alternative: each row states its own age in plain language,
+next to the control that fixes it. No chip, no warning color.
 
 ## Layout
 
@@ -77,23 +71,17 @@ follows from whether anything can contradict that
 - **Main currency** → no rate step at all; the row reads "Still
   12 450.00 CHF" and one click writes it.
 - **Unit with a live rate source** → the rate is fetched fresh for the
-  sweep date. The row's label reads "Still 12.5 XAU-ozt" — the user
-  vouches for the quantity, the provider for the price.
-  - **No proposal came back** → the row's Confirm becomes a rate field
-    with the previous value already filled in, and the label says what
-    is missing: "Still 12.5 XAU-ozt — enter today's rate". The old rate
-    is not offered, because a source exists for this unit and simply
-    is not answering (`record-snapshot.md`). Ink-secondary, not an
-    error color, and the row still saves.
+  sweep date, and the row's label reads "Still 12.5 XAU-ozt".
+  - **No proposal came back** → Confirm becomes a rate field with the
+    previous value already filled in: "Still 12.5 XAU-ozt — enter
+    today's rate". Ink-secondary, not an error color, and the row still
+    saves.
 - **Unit with no rate source** — free text, or a `lookup: false` symbol
-  → the previous rate carries, and the label says so: "Still worth about
-  the same", with the carried rate visible on the row and its age
-  beside it — "estimated 14 months ago". The user is asserting the
-  valuation too, which for a painting or a plot of land is a real thing
-  to assert and the only figure anyone has. It is never applied
-  invisibly.
+  → the previous rate carries and the label says so: "Still worth about
+  the same", with the carried rate visible on the row and its age beside
+  it, "estimated 14 months ago". Never applied invisibly.
 - Confirm is **disabled for an account with no snapshots**. There is no
-  previous value to confirm; the row asks for one.
+  previous value to confirm, so the row asks for one.
 - **There is no "confirm all".** Confirming asserts that you checked,
   and a button that asserts it for fifteen accounts at once makes that a
   lie. The estimated-data toggle exists precisely so inference stays
@@ -140,12 +128,6 @@ ordinary snapshot; the sweep is a different way to reach the same write.
 
 ## Rules
 
-- `value` and `rate` are decimal strings end to end; no float touches
-  them.
-- No value is sent anywhere before it is encrypted, and no value appears
-  in any rate request in any field or encoding (`architecture.md`,
-  Base-amount rule).
-- Recorded and carried-forward figures are distinguished by **marker and
-  wording, not color alone** (`design-system.md`, Accessibility).
-- The date is a calendar date — no time, no timezone.
-- Rows render decrypted names with `x-text`.
+`record-snapshot.md` applies unchanged. The one rule this screen adds:
+recorded and carried-forward figures are distinguished by **marker and
+wording, not color alone** (`design-system.md`, Accessibility).

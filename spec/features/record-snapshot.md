@@ -200,6 +200,8 @@ it silently.
     appears and the rate stays the user's to change or leave. Nothing
     blocks the save.
 
+### Moving the date onto an occupied date
+
 That case destroys a record, unlike the upsert above, which only
 replaces the one being written. It must read differently:
 

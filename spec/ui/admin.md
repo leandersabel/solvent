@@ -107,9 +107,6 @@ Columns: Username · Created · Role · Records · Last active · (action).
 - Non-admins never see the nav entry, and the route returns Not Found
   rather than Forbidden — an authenticated non-admin should not learn
   the route exists.
-- Invite tokens are ≥128-bit, single-use, time-limited, stored hashed,
-  and invalidated on first use (`architecture.md`, Storage & data
-  handling).
 - No control on this screen changes an existing user's role. `isAdmin`
-  is sent only on invite creation; the Role column stays display-only
-  (`admin-invites.md`).
+  is sent only on invite creation, and the Role column stays
+  display-only (`admin-invites.md`).
