@@ -89,10 +89,19 @@ in front of you.
 
 ### The chart is mostly inferred, and says so
 
-You record values a few times a year. The chart draws a line for every
-day. Everything between two of your entries is the app interpolating,
-and everything after a holding's last entry is the app carrying the
-figure forward.
+Each holding is recorded whenever you get around to it, which for some is
+monthly and for others every few years, and one update covers whatever
+you gathered that evening. So the chart has a handful of real points per
+holding and a great many days to draw. Between two of a holding's
+entries the app interpolates, and after its last entry it carries the
+figure forward. That is how the line is meant to work: record a holding
+in September after a figure from March and the line runs straight from
+the March figure to the September one.
+
+Neither the interpolation nor the carry forward is written down. They
+are the drawing. Your history holds the figures you recorded and
+nothing else (`record-snapshot.md`), so a long run between two entries
+is the normal shape of a correct chart rather than a hole in it.
 
 A "Show what's estimated" checkbox marks the dates where you actually
 recorded something. It is off by default, which is a decision taken on
@@ -101,8 +110,8 @@ your behalf and raised as a question with this batch.
 The chart is drawn as curves rather than steps deliberately. Real
 transfers are instant and sharp, but a decade of sparse entries drawn as
 steps is a field of cliffs that is harder to read than a smooth line and
-no more truthful. Where you do want the sharp edge, recording a value on
-the day it happened produces it honestly.
+no more truthful. Where you do want the sharp edge, record a value on
+the day it happened and you get one.
 
 A holding contributes nothing to dates before its first recorded value.
 Entering ten years of an old holding's history does not make a cliff at
@@ -158,6 +167,12 @@ the section needs no small print.
 - A holding with two entries, 100 in January and 200 in March, reads 150
   in February, and that stretch is marked when the estimated checkbox is
   on.
+- A holding recorded in March and then not again until September draws
+  a straight run between those two figures, and nothing on the screen
+  treats the months between as an omission.
+- An update that covered only some of your holdings moves only those
+  holdings' bands. Every other band carries on from its own last
+  recorded figure, with nothing recorded for it and nothing flagged.
 - Two holdings whose histories start years apart do not bend each
   other's shape. The later one's first entry lifts only its own band.
 - A holding you have never valued is listed as not yet valued and is not
@@ -191,8 +206,8 @@ the section needs no small print.
   monthly and a flat every few years, so any single threshold would flag
   the slow ones permanently until you learned to ignore it, at which
   point it would fail for the one that genuinely went quiet. Instead
-  every figure states its age in plain words next to the control that
-  fixes it. See the question raised with this batch.
+  every figure states its age in plain words next to the action that
+  records a new one. See the question raised with this batch.
 - **No forecast, no projection, no target.** The chart ends today.
 - **No benchmark and no performance figure.** Solvent does not tell you
   how you are doing against an index, which would need position level

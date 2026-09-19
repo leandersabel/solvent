@@ -10,6 +10,8 @@ history, which is what the chart draws and what the total is made of.
 This is the recurring act in Solvent. Everything else is setup. It is
 for the person who sits down at the end of a month or a quarter, opens
 the online banking of four banks, and wants to be done in a few minutes.
+What they gathered that evening is what gets recorded, and nothing else
+does.
 
 The number you type never leaves your browser in readable form, and it
 is never part of any price lookup the app makes. The app can ask what a
@@ -26,8 +28,8 @@ That last part is the whole point. The price is never recalculated
 later, so today's currency move does not rewrite what you were worth in
 2019. A chart that changes its own past is not a record of anything.
 
-The app is also honest about where each price came from, and stays
-honest a year later. Each entry says whether the price was the one the
+The app also says where each price came from, and still says it a year
+later. Each entry says whether the price was the one the
 app proposed, one you changed (and shows what was proposed), or one you
 typed because nothing was available. That is a question you will only
 ever ask about an old figure, which is why it is stored rather than
@@ -35,48 +37,64 @@ remembered by the tab that entered it.
 
 ## The screens
 
-### The sweep: updating everything in one sitting
+### The sweep: updating in one sitting
 
 The main way to record values, and the screen that decides how much your
 monthly update costs you.
 
 One date at the top for the whole sweep, defaulting to today. One row
-per active holding, each one showing what it is worth now, and how long
-ago that figure was actually recorded, in plain words: "3 weeks ago",
-"about a year ago", "never valued". A figure that has simply been
-carried forward since the last time you touched it says so, so you find
-out here rather than believing the chart.
+per active holding, each one showing its last recorded figure and how
+long ago that figure was recorded, in plain words: "3 weeks ago",
+"about a year ago", "never valued".
 
-Each row offers two ways to be done with it:
+You act on the rows you have a number for and leave the rest. Updating
+four holdings this month and the other eleven in March is an ordinary
+pair of sittings, and the screen treats it as one. It counts nothing,
+marks nothing as outstanding, and never comes back to the rows you left.
+
+Each row offers three answers, and the third one is free:
 
 - **Type the new number.** The unit is on the field, and the converted
-  figure appears as you type. Nothing is saved until you act on the row.
+  figure appears as you type. Nothing is recorded until you act on the
+  row.
 - **Confirm.** One click, meaning "this is still the same". The quantity
-  is written again at today's date without you retyping it.
+  is recorded again at the sweep's date without you retyping it. It is
+  the right answer whenever the quantity has not moved. You still own
+  the same 12.5 troy ounces, and what moved is the gold price, which is
+  the app's job and not yours.
+- **Leave it alone.** The holding gets no entry for this date and keeps
+  exactly the history it has. A figure you have not gone and looked up
+  is not a figure, and the app will not put one in your history on your
+  behalf.
 
-Confirm is not a shortcut for lazy people, it is the correct answer for
-most holdings. You still own the same 12.5 troy ounces. What moved is
-the gold price, and that is the app's job, not yours. What it costs you
-depends only on whether anything can contradict you:
+A number showing in a row is not a number in your history. The field may
+already carry your last recorded figure, so that confirming it or
+adjusting it is quick, and showing it there records nothing whatsoever.
+Only Confirm, or typing a figure and saving that row, writes an entry.
+Scroll past a row with your last figure sitting in it and that holding
+has no entry for that date.
+
+What a confirmation costs you depends only on whether a price is
+involved:
 
 - **Already in your main currency.** One click, no price question at
-  all, because there is nothing that could be wrong.
+  all, because there is no conversion to make.
 - **Something with a live price source**, like a foreign currency or
   gold. One click, and the app fetches the price for the new date. It
-  never reuses the old price. Stamping a new date onto a price a known
-  source disagrees with looks like a measurement and is not one.
+  never reuses the old price, which would put a conversion into your
+  history that no source stands behind.
 - **Something with no price source**, like your flat or the wine. One
-  click, and your last price carries forward, shown to you before you
-  save. You are the only authority on that number, so your last estimate
-  is the best figure there is.
+  click, and your last price carries forward, shown to you before it is
+  recorded. You are the only source for that number, so your last
+  estimate is the best figure there is.
 - **A live source that does not answer** (the provider is down, or has
   nothing for that date). The one click steps aside and the row asks for
   the price, with the quantity already filled in. You are only asked for
   the part nothing can supply, and the click comes back as soon as
   prices do.
 
-Rows save one at a time as you finish them. You can stop halfway through
-and keep everything you entered, and a row that fails to save says so on
+Rows record one at a time as you finish them. You can stop anywhere and
+keep every row you acted on, and a row that fails to record says so on
 itself and leaves the others alone.
 
 On a phone this is the screen that changes shape rather than simply
@@ -85,13 +103,13 @@ computer's answer, and a phone may walk you through one holding at a
 time instead. Same sweep, not a cut-down one, and it comes after the
 first version (`app-shell.md`, which owns the rule). Nothing here
 stands in its way: every question the sweep asks belongs to a single
-holding, and rows already save one at a time.
+holding, and rows already record one at a time.
 
 ### One holding, one date
 
-A small form for everything the sweep is not for: an odd date, a value
-you forgot to enter in March, history you are backfilling from old
-statements. Holding, date, value, price, an optional note. The converted
+A small form for everything the sweep is not for: an odd date, a March
+figure you are adding now that the statement is in front of you,
+history you are backfilling from old statements. Holding, date, value, price, an optional note. The converted
 figure updates as you type, because that is the number you are actually
 reasoning about.
 
@@ -142,10 +160,21 @@ around that date will change.
   both entries flagged and asks you which to keep, and the chart leaves
   that date out until you answer, rather than picking one and putting a
   number you never chose into your history.
+- A row you did not act on produces no entry. Leave eleven of fifteen
+  rows alone, finish the sweep, and those eleven holdings have exactly
+  the history they had before you opened it.
+- A figure the screen pre-filled into a row and you did not confirm
+  appears nowhere afterwards. The holding's own list of values has
+  nothing new on that date.
+- Two sweeps that each covered a different half of your holdings leave
+  entries only for the halves they covered, and neither one is treated
+  as unfinished at any point.
+- Nothing on the sweep counts, scores, flags or later mentions how many
+  holdings you left alone.
 - Confirming a holding with a live price source stores the new date's
   price, never the old one.
 - Confirming a holding with no price source carries your last price
-  forward and shows it to you before saving.
+  forward and shows it to you before recording it.
 - Confirming is unavailable for a holding that has never been valued.
   There is nothing to confirm.
 - A value of zero is accepted and means a closed out position, which is
@@ -168,10 +197,13 @@ around that date will change.
 - **No more than one value per holding per day.** A date holds what it
   was worth that day. Intraday movement is not what this measures.
 - **No future dates.** An entry describes what was.
-- **No confirming everything at once.** Confirming is a statement that
-  you checked, and a button that makes that statement for fifteen
-  holdings at once would put figures into your history that nobody
-  looked at. See the question raised with this batch.
+- **No button that records every holding at once.** There is nothing
+  for one to do. A holding you did not go and look up needs no action
+  at all, and one you did look up is a single click on its own row.
+- **No value carried into your history.** A holding without an entry
+  for a date has no entry for that date, and the app never writes one
+  from the last figure it happens to know. What the chart and the total
+  do across a gap is in `net-worth-view.md`.
 - **No automatic price for things without a market.** Your flat, the
   wine, the private loan you made. Nobody publishes a price, so the app
   does not invent one.

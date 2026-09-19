@@ -138,7 +138,7 @@ and the current total.
   no cost basis, no per holding performance. A depot is one figure you
   read off your broker, the same act as updating a bank balance. This is
   the single largest scope decision in the product and it is what keeps
-  a monthly update to a few minutes.
+  an update sitting to a few minutes.
 - **No automatic connection to any bank.** A third party cannot encrypt
   on your behalf, so a bank feed and a vault only you can read cannot
   both exist. Values are entered by hand, and the sweep screen (record a
