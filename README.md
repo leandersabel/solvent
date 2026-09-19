@@ -47,17 +47,24 @@ docker run --rm -p 8000:8000 \
 
 ## Layout
 
-- `spec/` — the design: architecture, features, screens. Human-edited.
-- `spec/.compiled/` — per-feature implementation contracts, agent-generated.
-- `.claude/agents/` — the agents that compile, implement, and review.
+- `spec/product/` — what the client asked for, in their words.
+- `spec/` — the technical design: architecture, features, screens.
+- `spec/.compiled/` — per-feature implementation contracts.
+- `security/` — design-review reports.
+- `.claude/agents/` — the pipeline that specifies, builds, reviews,
+  deploys and tests.
 
 ## Workflow
 
-1. Edit `spec/architecture.md`, `spec/features/*.md`, or `spec/ui/*.md`.
-2. Run the product-owner agent to recompile into `spec/.compiled/`.
-3. Resolve anything logged in `spec/questions.md`.
-4. Run the engineer agent against a compiled contract.
-5. Run the reviewer agent on the result and resolve its findings.
+The client states what they want. `product-owner` turns it into
+`spec/product/` and asks whatever it cannot infer. `architect` designs
+against it. Once the client approves both, the rest runs to a deployed
+URL: `compiler` writes the contracts, `engineer` builds, `reviewer`
+checks the code against the contract, `release` builds and runs the
+image, and `qa` drives the running app against the client's own
+acceptance list.
+
+See `CLAUDE.md` for ownership and how questions reach the client.
 
 ---
 
