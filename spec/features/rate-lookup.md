@@ -189,9 +189,62 @@ choosing, only by hand-editing an export.
   user enters the rate by hand, and `/api/rates` answers No Content, not
   Bad Request. This is a designed state, not a degraded one.
 
-The table is operator configuration, not user data: it is identical for
-every user, reveals nothing about who holds what, and adding a symbol
-remains an operator action.
+The table is platform configuration, not user data: it is identical
+for every account and reveals nothing about who holds what.
+**Maintaining it is an administrator task** (`admin-invites.md`), and
+it clears the admin boundary without an exception: no row of it is
+anyone's data, and reading or writing one touches no vault.
+
+### Maintaining the table
+
+Under `/api/admin/`, administrator session only, CSRF-protected, Not
+Found to a vault owner (`app-shell.md`, The two surfaces).
+
+- `GET /api/admin/symbols` → the full table including retired rows,
+  which `GET /api/rates/symbols` omits.
+- `POST /api/admin/symbols` `{ symbol, label, kind, lookup }` → adds a
+  row. `symbol` must match the canonical form and not already exist.
+- `PATCH /api/admin/symbols/<symbol>` `{ label?, lookup?, retired? }`
+  → changes only those three.
+
+**`symbol` and `kind` are immutable, and there is no delete.** This is
+the hard rule of the whole surface and it follows from one fact: a
+symbol is written into user records as an account's `unit`, inside
+ciphertext the server cannot read. So the server cannot tell whether a
+symbol is in use, cannot migrate the records that use it, and cannot
+warn the administrator who is about to strand them. Renaming `XAU-ozt`
+or deleting it would leave accounts measured in something that no
+longer exists, discoverable only by their owner, one at a time, and
+unfixable without hand-editing an export.
+
+- **`kind` is immutable for the same reason plus one more**: `quote`
+  on every rate request must be a `kind: currency` row, and a vault's
+  main currency is fixed at registration (`register.md`). Flipping a
+  currency to a metal would break every lookup a vault has ever made
+  and cannot make again.
+- **`retired: true` is the substitute for deleting.** A retired symbol
+  is dropped from `GET /api/rates/symbols`, so no new account can be
+  measured in it, and stays fully valid everywhere else: `/api/rates`
+  still prices it, existing accounts keep working, and unretiring it
+  restores it exactly. Same shape as archiving a dimension
+  (`account-settings.md`, Deleting is archiving), and for the same
+  reason: reversibility costs one flag, and the destructive version
+  cannot be undone.
+- **`lookup` is the mutable one that matters.** It is the flag that
+  flips when a provider appears for a metal that had none, which is
+  the main reason this surface exists at all. The server refuses
+  `lookup: true` for a symbol with no configured provider adapter, so
+  the flag cannot promise a proposal the proxy cannot serve.
+- **`label` is display text and changes freely.** It is stored in no
+  user record, so a rename rewrites nothing. It is rendered into the
+  unit picker with `textContent`, never `innerHTML` (architecture.md,
+  Application hardening), because server-controlled text is still
+  text and the rule is not worth a second code path.
+
+**No response here counts how many accounts use a symbol**, and none
+could: the server cannot read a `unit`. An administrator retiring a
+symbol is told what it means rather than shown who it affects, which
+is the boundary holding by construction rather than by restraint.
 
 ### Seeded symbols
 
@@ -307,7 +360,8 @@ reachable (architecture.md, SSRF hardening):
   server answers correctly regardless, the same reason a
   `lookup: false` symbol answers No Content rather than Bad Request.
 - **Symbol not in the server's symbol table** → Bad Request. Adding a
-  symbol is an operator config change, not a user action.
+  symbol is an administrator action, not a user one
+  (`admin-invites.md`).
 - **Symbol in the table with `lookup: false`** (`XAG-ozt` and the rest)
   → No Content, no outbound request, no error log. The client should not
   have asked — it holds the table — but the server must answer this way
@@ -349,6 +403,23 @@ reachable (architecture.md, SSRF hardening):
   closes again after the cool-off.
 - An unauthenticated request returns Unauthorized and makes no outbound
   request.
+- Every `/api/admin/symbols` route returns Not Found to a vault owner
+  session, and `GET /api/rates/symbols` returns Not Found to an
+  administrator session.
+- `PATCH /api/admin/symbols/<symbol>` carrying a new `symbol` or a new
+  `kind` is a Bad Request and changes nothing. There is no route that
+  deletes a symbol, asserted by enumerating the registered routes.
+- Retiring a symbol removes it from `GET /api/rates/symbols` and
+  leaves `/api/rates` pricing it unchanged, so an account already
+  measured in it still resolves a rate. Unretiring restores it to the
+  picker.
+- `PATCH` setting `lookup: true` on a symbol with no configured
+  provider adapter is a Bad Request.
+- No response from any `/api/admin/symbols` route contains a count,
+  list, or any other indication of which accounts use a symbol,
+  asserted against the full response shape.
+- An administrator adding a currency makes it available in the next
+  registration's main-currency picker (`register.md`) with no restart.
 - No log line, response body, or error page contains the provider API
   key.
 - Exceeding the per-user rate limit returns Too Many Requests.

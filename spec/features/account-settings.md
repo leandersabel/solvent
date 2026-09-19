@@ -290,7 +290,7 @@ Found for an administrator session.
   is unchanged, so its writes still decrypt; only its session cookie is
   invalidated and it must log in again.
 - **Password change on a vault with stale KDF parameters** → the change
-  itself performs the upgrade, so the stale-KDF re-wrap (login.md) is
+  itself performs the upgrade, so the stale-KDF upgrade (login.md) is
   redundant afterwards.
 - **Account deletion while an export is downloading** → the export
   either completed or it did not; the deletion transaction does not wait.

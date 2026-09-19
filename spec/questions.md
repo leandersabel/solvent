@@ -16,6 +16,48 @@ Format:
 What is undecided, and what it changes.
 ```
 
+## login: the administrator sign-in wait   [asked by: architect]
+
+`spec/product/login.md`, "Signing in as an administrator", says an
+administrator sign-in is quick because there is no key to build. The
+same section says the screen must not reveal, before a correct
+password has been typed, that a username belongs to an administrator.
+
+Those two cannot both hold. The wait happens in the browser, before
+anything is sent to the server. For the browser to skip it, it has to
+know the account is an administrator, and the only thing that could
+tell it is the response to typing the username, which the app hands
+to anybody who asks. A quick sign-in for administrators is therefore
+a stopwatch that reads out which usernames are administrators, to
+somebody who never has to guess a password. It is a better oracle
+than the one the decoy design exists to close, because it needs no
+network access and no tooling.
+
+`spec/features/login.md` currently resolves it the second way, and
+the product file needs to change to match whichever is chosen.
+
+- **Administrators wait too.** One or two seconds on a phone, a
+  fraction of a second on a desktop, spent building a key that is
+  thrown away. Nobody can time the screen to find the
+  administrators. Costs nothing to build, because it is the flow that
+  already exists.
+- **Administrators sign in fast, and the instance accepts that
+  administrator usernames are discoverable.** Anybody who can reach
+  the sign-in page can find out who administers the instance, then
+  aim password guessing at exactly those names. The rate limits still
+  apply. Costs nothing to build either.
+- **Administrators sign in fast, and the wait is faked for
+  everybody.** The screen holds the fast path back for the same
+  duration. Only as good as the fake, which has to match a real
+  derivation on hardware the developer does not have, and it is the
+  kind of control that quietly stops matching after any change to the
+  key parameters.
+
+Recommended: the first. The wait is the one thing on this screen the
+product already explains to the person in plain words, and an
+administrator paying it two or three times a week is a small price
+for the property.
+
 ## admin-invites: re-entering the password to remove an account   [asked by: architect]
 
 An administrator account now holds exactly one kind of power: creating

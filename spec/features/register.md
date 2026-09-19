@@ -190,7 +190,7 @@ with two callers rather than two record writers.
   allocation error shown to a user. Registration must **not** fall back
   to weaker parameters here: that would mint a vault permanently weaker
   than the policy and the KDF envelope would record the weakness as if
-  it were chosen. The stale-KDF re-wrap (login.md) upgrades parameters
+  it were chosen. The stale-KDF upgrade (login.md) raises parameters
   later, but it cannot retroactively justify a vault created below the
   minimum.
 - **KDF derivation is slow** → show a busy state; the tab must not

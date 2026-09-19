@@ -19,10 +19,20 @@ that credential is the wrapper this flow returns when one exists. The
 `principals` table is touched for identity and `last_login_at` alone.
 v1 has no other credential method, and this feature specifies none.
 
+**One sign-in screen at one address, for both kinds.** There is no
+administrator login page and no kind selector. The screen looks and
+behaves identically until a correct password has been supplied, and
+diverges only after: a vault owner unwraps their DEK and lands on the
+dashboard, an administrator unwraps nothing and lands in the admin
+area.
+
 **Kind is invisible until the credential verifies.** Steps 1 and 2
 below are byte-identical for a vault owner, an administrator, and a
-username that does not exist. This is a hard property, not an
-incidental one, and Rules and Acceptance criteria below both pin it.
+username that does not exist, and step 2 takes the same wall-clock
+time in all three cases. This is a hard property, not an incidental
+one. Rules and Acceptance criteria below both pin it, and the
+wall-clock half of it is the part that is easiest to lose (Rules, The
+sign-in wait).
 
 ## Flow
 
@@ -129,6 +139,30 @@ never lock anyone out.
 
 ## Rules
 
+- **The sign-in wait is the same for both kinds, and that is what
+  costs.** Argon2id at 64 MiB takes about two seconds on an iPhone
+  and a fraction of a second on a desktop (architecture.md, Key
+  management). An administrator has no key to build, so that wait
+  buys them nothing and skipping it is the obvious optimization. **Do
+  not.** The wait happens in the browser before the Auth Key is sent,
+  so the only way to skip it is to know the kind before
+  authenticating, and the only thing that could say so is
+  `/api/auth/salt`, which answers anyone who asks. A fast sign-in for
+  administrators and a slow one for everybody else turns the sign-in
+  screen into a stopwatch that reads out which usernames are
+  administrators, to an attacker who never has to guess a password.
+  - The channel is wall-clock time at the keyboard, not response
+    timing on the wire, which is why the server-side constant-time
+    work does not close it. It is closed by the client doing the same
+    work for everyone.
+  - **What an administrator does save is the vault**: no DEK unwrap,
+    no record fetch, no decryption pass. Their sign-in is genuinely
+    shorter than a vault owner's, by everything after the
+    verification and by nothing before it. That is the only
+    divergence, and it is entirely post-authentication.
+  - The same rule binds registration (`register.md`), where the
+    derivation is likewise identical and the Master Key is likewise
+    discarded.
 - **Nothing pre-authentication branches on kind.** The salt response,
   the client derivation, the Auth Key on the wire, the server-side
   Argon2id over it, the rate-limit keying, and the lockout response
@@ -254,6 +288,12 @@ never lock anyone out.
   asserted by running the derivation against an administrator's salt
   and envelope and a vault owner's and comparing the code path taken,
   not only the output.
+- The wall-clock time from submitting the sign-in form to the Auth Key
+  leaving the browser is statistically indistinguishable for an
+  administrator username, a vault owner username, and an unknown one.
+  Measured in the browser, not on the server, because that is where
+  the channel is. This is the test that fails if somebody later makes
+  the administrator path skip the derivation.
 - An administrator's stored `verifier` is an Argon2id hash over an
   Auth Key derived through the same HKDF split as a vault owner's, and
   the raw Argon2id output is not what was hashed, asserted by

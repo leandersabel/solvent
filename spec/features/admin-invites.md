@@ -2,17 +2,36 @@
 
 ## What it does
 
-An administrator generates single-use, time-limited invite links, each
-naming the **kind of account** it will create. Registration requires a
-valid unused invite; there is no self-service sign-up (architecture.md,
-Components). An administrator can list and revoke outstanding invites,
-see the accounts on the instance, and remove one — and nothing else.
+An administrator runs the platform. This file owns the part of that
+job that provisions accounts: single-use, time-limited invite links,
+each naming the **kind of account** it will create. Registration
+requires a valid unused invite, and there is no self-service sign-up
+(architecture.md, Components). An administrator lists and revokes
+outstanding invites, sees the accounts on the instance, and removes
+one.
 
 **An administrator account is a kind of account, not a capability on a
 vault-owning one** (architecture.md, Accounts on this instance). Several
 exist at once. One person doing both jobs holds two accounts with two
 usernames and two passwords, and nothing in the system records that
 they are the same person.
+
+**The job is not a fixed list of tasks.** Running a platform means
+whatever running this platform turns out to need, and the set grows.
+What bounds the role is the admin boundary below, and a new
+administrator task is judged against that rather than against the
+tasks that came before it. Two tasks exist today beyond provisioning:
+
+- **The instance-wide unit and symbol table** (`rate-lookup.md`, The
+  symbol table), which is platform configuration in the plainest
+  sense: one list, identical for every account, revealing nothing
+  about who holds what.
+- **Rotating their own password** (An administrator's own credential,
+  below), because an administrator has no settings screen and a
+  credential nobody can rotate is a defect.
+
+Neither is provisioning, and neither needed a rule bent to admit it,
+because both clear the boundary on their own.
 
 ## The admin boundary
 
@@ -43,7 +62,18 @@ and "their" vault is the one field that would make an administrator
 the owner of something encrypted, and the first feature to read it
 would be the one that crosses this line.
 
-Any future admin feature must be checked against all of the above.
+**This is the test a new administrator task has to pass**, and it is
+the only one. A task belongs to the role if it touches no vault: no
+record ciphertext, no credential field, no wrapper, and no fact about
+what is inside anyone's vault. It does not have to resemble anything
+already on the list.
+
+Two things make the test cheap to apply rather than a matter of
+judgement each time. An administrator session holds no key material,
+so there is nothing for a new endpoint to leak even by accident. And
+the vault surface answers that session Not Found before any handler
+runs, so a new administrator endpoint cannot reach vault data by
+calling into one that does.
 
 ## Invite lifecycle
 
@@ -81,10 +111,12 @@ An invite row: `id`, `token_hash`, `kind`, `created_by`, `created_at`,
 
 ## Endpoints
 
-All require a session whose principal is an `administrator`, and all
-writes are CSRF-protected. A vault owner session gets Not Found from
-every one of them, at the routing layer (`app-shell.md`, The two
-surfaces).
+The provisioning endpoints. `rate-lookup.md` owns the symbol table's,
+and more will be added as the platform needs them. All require a
+session whose principal is an `administrator`, and all writes are
+CSRF-protected. A vault owner session gets Not Found from every
+endpoint under `/api/admin/`, at the routing layer (`app-shell.md`,
+The two surfaces), whether or not this file names it.
 
 - `POST /api/admin/invites` `{ expiresInDays, label, kind }` →
   `{ id, token, url, expiresAt, kind }`. The only response that ever
@@ -200,16 +232,17 @@ provisioning: Change password.**
   the one that already performs it.
 - There is no session list for an administrator and no
   `POST /api/auth/logout-all`. Both are on the vault surface
-  (`app-shell.md`, The two surfaces). Keeping the administrator
-  surface to provisioning plus this one credential control is the
-  point: the fewer things that session can do, the less a stolen one
-  is worth.
+  (`app-shell.md`, The two surfaces), and the password change already
+  does the one thing an administrator would reach for them to do.
 
 **An administrator who has forgotten their password is not recovered,
 they are replaced.** Another administrator removes the account and
 issues a fresh administrator invite, which costs nothing because the
-account held nothing. With no other administrator to do it, the
-bootstrap CLI below is the path.
+account held nothing. There is deliberately no power for one
+administrator to reset another's password: removal and re-invitation
+reaches the same end state without anyone ever holding a credential
+they did not derive themselves. On an instance with a single
+administrator, the bootstrap CLI below is the way back.
 
 ## Bootstrap: the first administrator, and the locked-out one
 
@@ -346,10 +379,13 @@ invocation, and it is honest that it cannot stop anything more.
   status.
 - A vault owner session receives Not Found from every `/api/admin/*`
   endpoint.
-- No admin endpoint returns any field of any account's credential row
-  or any wrapper, or any record ciphertext, asserted by inspecting the
-  full response shape of every admin endpoint, so the test fails if
-  one is added later.
+- No endpoint under `/api/admin/` returns any field of any account's
+  credential row, any wrapper, or any record ciphertext. Asserted by
+  enumerating the registered routes at test time and inspecting each
+  one's full response shape, so an endpoint added later is tested by
+  it automatically instead of needing to be added to a list. **This
+  is the executable form of the admin boundary**, and it is the test
+  that has to keep passing as the role grows.
 - `flask create-invite --kind administrator` on an instance with no
   administrator produces a working invite whose account is an
   administrator. With an administrator present it exits non-zero and
@@ -382,9 +418,10 @@ invocation, and it is honest that it cannot stop anything more.
   current one survives.
 - An administrator session receives Not Found from `GET /api/sessions`
   and `POST /api/auth/logout-all`.
-- The admin area's controls are exactly invites, the account list,
-  account removal, and change password, asserted against the rendered
-  area rather than only the API.
+- Every control in the rendered admin area maps to a route under
+  `/api/admin/` or to `POST /api/auth/change-password`, asserted
+  against the rendered area, so a control wired to a vault route
+  fails the test whatever it is for.
 - Two concurrent `DELETE /api/admin/accounts/*` requests, each
   targeting one of the only two administrators, leave exactly one
   administrator: one succeeds and one returns Conflict. Asserted with
@@ -406,7 +443,9 @@ invocation, and it is honest that it cannot stop anything more.
 - `GET /api/admin/accounts` lists both kinds, and an administrator's
   row carries no `recordCount` field at all, asserted against the row's
   full key set rather than against its value.
-- No endpoint changes an account's kind; the admin API surface is
-  exactly invites plus the account list and account delete, asserted
-  by enumerating the registered routes under `/api/admin/`.
+- No endpoint changes an account's kind, asserted by enumerating the
+  registered routes under `/api/admin/` and attempting it through
+  each. The enumeration is over whatever routes exist at the time the
+  test runs, not against a fixed list, so a route added later is
+  covered by it rather than exempt from it.
 - The invite token does not appear in the application's own log output.

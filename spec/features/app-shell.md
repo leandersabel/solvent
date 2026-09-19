@@ -109,16 +109,17 @@ individual endpoint repeats it.
   credential and a session: `/login`, `/api/auth/salt`,
   `/api/auth/login`, `/api/auth/logout`, `/api/auth/upgrade-kdf`, and
   `/api/auth/change-password`. Both kinds reach these.
-- **Vault**, the record store, the rate lookup, export, import,
-  `/api/sessions`, `/api/auth/logout-all`,
-  `DELETE /api/auth/account`, the `/settings` shell page, the
-  dashboard, and every screen that renders vault data. A vault owner
-  reaches these. **An administrator gets Not Found**, `/settings`
-  included: settings exists only inside a vault
+- **Vault**, the record store, the rate lookup including
+  `GET /api/rates/symbols`, export, import, `/api/sessions`,
+  `/api/auth/logout-all`, `DELETE /api/auth/account`, the `/settings`
+  shell page, the dashboard, and every screen that renders vault
+  data. A vault owner reaches these. **An administrator gets Not
+  Found**, `/settings` included: settings exists only inside a vault
   (`account-settings.md`).
-- **Administration**, the `/admin` shell page and every
-  `/api/admin/*` endpoint. An administrator reaches these. **A vault
-  owner gets Not Found.**
+- **Administration**, the `/admin` shell page and **every**
+  `/api/admin/*` endpoint, including ones no feature file has been
+  written for yet. An administrator reaches these. **A vault owner
+  gets Not Found.**
 
 Not Found in both directions, never Forbidden, and for the same reason
 in both: Forbidden confirms the route exists (architecture.md, Status
@@ -130,9 +131,13 @@ the Admin area for an administrator. It is the only route that
 resolves to different content per kind, and it does so because a
 bookmark of the bare host has to work for both.
 
-A route added later belongs to a named group in this list. A route
-that belongs to no group is unreachable, which is the safe direction
-to fail.
+**The membership rule is a prefix, not a list.** Everything under
+`/api/admin/` is administration and everything else that touches a
+vault is vault, so a route added later is placed by where it sits
+rather than by being added here. The administrator role is expected to
+grow (`admin-invites.md`), and a surface rule that had to be edited
+for each new task would eventually be edited wrong. A route matching
+no group is unreachable, which is the safe direction to fail.
 
 ## The chrome
 

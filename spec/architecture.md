@@ -38,8 +38,10 @@ A net worth tracker, self-hosted on the owner's own NAS.
 - **Admin panel**: account provisioning is invite-only. An
   administrator generates an invite link naming the kind of account it
   creates, and registration requires a valid, unused invite. There is
-  no self-service sign-up. Reachable only by an administrator session,
-  which holds no key material of any kind.
+  no self-service sign-up. The panel is also where instance-wide
+  platform configuration lives, such as the symbol table
+  (rate-lookup.md). Reachable only by an administrator session, which
+  holds no key material of any kind.
 - **Export/Import**: user-initiated export of a vault (ciphertext blobs
   plus the password credential's wrapper) to a local file, still
   fully encrypted, so the file
@@ -450,11 +452,16 @@ Actors this design defends against vs. accepts:
   principal has no credential wrapping any key, no `dek_wrappers` row,
   and no `records` row, so there is no key material in that session
   for an endpoint to leak by accident and nothing for a future admin
-  feature to reach toward. What they hold is the power to create and
-  destroy accounts, and destroying one destroys its vault rather than
-  opening it (admin-invites.md, The admin boundary). An administrator
-  who is also a vault owner under a second account gets exactly what
-  that second account's password gets them, in a separate session.
+  feature to reach toward. What they hold is the running of the
+  platform, and the set of tasks that means is expected to grow:
+  provisioning accounts, removing them, and maintaining the
+  instance-wide symbol table today. Removing an account destroys its
+  vault rather than opening it. The bound on the role is the admin
+  boundary rather than the list of tasks, and it is what every new one
+  is checked against (admin-invites.md, The admin boundary). An
+  administrator who is also a vault owner under a second account gets
+  exactly what that second account's password gets them, in a separate
+  session.
 - **Another vault owner of the same instance**: defended — per-account
   salts and keys throughout; no vault is decryptable with another
   account's password.
@@ -541,7 +548,7 @@ Actors this design defends against vs. accepts:
     `params` alongside its salt, not in a constant, so a login can
     detect stale parameters and transparently re-wrap the DEK after a
     successful unlock. **That re-wrap is the mechanism by which the
-    memory parameter is raised** (login.md, Stale-KDF re-wrap): raising
+    memory parameter is raised** (login.md, Stale-KDF upgrade): raising
     the server's default envelope upgrades each vault on its owner's
     next login, re-encrypting no record and breaking no existing vault.
     A faster WebAssembly engine on the slowest supported device is
