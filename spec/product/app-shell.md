@@ -126,6 +126,36 @@ A content region arrives empty and fills once the browser has decrypted
 what belongs in it. That is why a screen shows its skeleton first, and
 why a page refresh always costs a fresh decryption.
 
+## On a phone
+
+Every screen works on a phone. Not a reduced set of them, and not
+reading only: entering figures works too, the monthly update sweep
+included. Somebody who unlocks a vault on a phone lands in an app they
+can use, not in a wide page they have to pan around.
+
+Working on a phone does not mean one layout that stretches. A screen is
+allowed two designs that do the same job in different shapes, and the
+app chooses between them by the width of the screen it is on. The
+update sweep is the example the client gave: on a computer it is a wide
+table with every holding in view, and on a phone it may instead be a
+step at a time, one holding per step. Same act, same figures recorded
+at the end, different screen. So a screen is described at each size
+wherever the two differ, rather than described once and assumed to fit.
+
+Phone layouts are not in the first version. The first version ships the
+wide-screen ones and is judged on those. What it may not do is put the
+phone ones out of reach: no action exists only inside a wide table, and
+no screen has a single route to something a narrow screen could not
+offer.
+
+What the top bar becomes at phone width is still open. It is a design
+decision for whoever draws the phone layouts, not a question for the
+client.
+
+When those layouts are built, the test is that every screen can be read
+and operated end to end on a phone, the update sweep included, without
+panning sideways.
+
 ## What must be true
 
 Every line here is checkable by a person sitting in front of the
@@ -211,8 +241,7 @@ running app, with no access to the code.
   device provides. A downloaded typeface would have to be hosted and
   version-pinned like every other asset, and it would flash unstyled
   text on the password screen, which is the slowest screen in the
-  product. Elegance here comes from spacing and restraint instead. See
-  the open question below.
+  product. Elegance here comes from spacing and restraint instead.
 - **The shell shows no financial data at all, and could not.** The
   server that renders it holds no readable copy of anything in the
   vault. This is not a rule the shell follows, it is a thing it is

@@ -67,10 +67,10 @@ reported plainly.
 #### Session and lock
 
 - **Idle lock**, five to sixty minutes, fifteen unless changed. One
-  line of honest tradeoff beneath it: shorter is safer, and unlocking
-  takes a few seconds because turning a password into a key is
-  deliberately slow. There is no "never", and the control does not
-  offer one.
+  line of honest tradeoff beneath it: shorter is safer, and every
+  unlock costs the deliberate wait while the password becomes a key
+  (`login.md`, which owns how long that is). There is no "never", and
+  the control does not offer one.
 - **You are signed out twelve hours after signing in, regardless of
   activity.** Stated, not adjustable.
 - **Open sessions**, listed by when each started and when it was last
@@ -221,6 +221,13 @@ single total.
   a toggle. Restoring a vault from a file is the one exception, and it
   is not a loophole: an import replaces the currency and the whole
   history together, so nothing is left over to mix.
+
+  The cost is accepted rather than overlooked, and it falls on one
+  person: somebody who moves country, or who picks the wrong currency
+  in the moment they spend on that list at sign-up. Their route out is
+  a new vault and their history entered again by hand. What earns that
+  cost is the warning at the point of choice, which sits directly under
+  the field and says the choice is permanent.
 - **No password recovery here either.** Changing a password needs the
   current one. See `register.md`.
 - **No "sign out everywhere except this one".** The only operation that
@@ -244,7 +251,7 @@ single total.
 
 - **The idle lock is fifteen minutes unless changed, adjustable between
   five and sixty, and cannot be switched off.** Both ends are chosen.
-  Unlocking costs a real wait, so a fixed fifteen is a tax on a long
+  Unlocking is never free, so a fixed fifteen would be a tax on a long
   sitting, and no lock at all would undo the defense against somebody
   walking up to an open screen.
 - **Changing a password signs out other sessions but not this one.**

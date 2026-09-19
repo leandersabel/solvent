@@ -79,6 +79,14 @@ Rows save one at a time as you finish them. You can stop halfway through
 and keep everything you entered, and a row that fails to save says so on
 itself and leaves the others alone.
 
+On a phone this is the screen that changes shape rather than simply
+getting narrower. The wide table with every holding in view is the
+computer's answer, and a phone may walk you through one holding at a
+time instead. Same sweep, not a cut-down one, and it comes after the
+first version (`app-shell.md`, which owns the rule). Nothing here
+stands in its way: every question the sweep asks belongs to a single
+holding, and rows already save one at a time.
+
 ### One holding, one date
 
 A small form for everything the sweep is not for: an odd date, a value

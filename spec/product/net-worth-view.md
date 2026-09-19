@@ -23,6 +23,11 @@ The chart is the one place color carries meaning, and it is held to the
 same rule as everywhere else: every band is labeled, so a reader who
 cannot tell two colors apart loses nothing.
 
+Everything described here is the screen on a computer. It works on a
+phone too, where picking a span by dragging across the chart needs an
+answer of its own. That shape is a later design and not part of the
+first version (`app-shell.md`, which owns the rule).
+
 ## The screens
 
 ### The total
