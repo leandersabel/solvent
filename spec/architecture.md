@@ -246,6 +246,11 @@ indistinguishable by construction rather than by convention.
   ciphertext blobs (IV, nonce, tag, wrapped DEK) use Pydantic for
   validation, added directly into Flask rather than adopting FastAPI for
   that one benefit.
+- **WSGI server**: gunicorn, serving `app:app`. Flask's built-in
+  server is single-threaded and explicitly not for deployment, and
+  gunicorn is the sync-worker default for a Flask app with no async
+  code. Its worker heartbeat needs a writable directory, which is
+  the one thing the read-only root filesystem has to make room for.
 - **Storage**: SQLite. The server only stores opaque values (ciphertext
   blobs, wrapped DEKs, Auth Key hashes, per-user salts) and never holds
   plaintext, so no server-side encryption-at-rest layer (e.g. SQLCipher)

@@ -50,11 +50,19 @@ def test_absent_tampered_and_expired_cookies_are_all_refused(app):
         user_id,
         issued_at=datetime.now(timezone.utc) - timedelta(hours=13),
     )
-    tampered = valid[:-1] + ("A" if valid[-1] != "A" else "B")
+    # Edit the token, not the signature: itsdangerous base64url-decodes
+    # the signature, and the last character of that encoding carries
+    # unused padding bits, so changing it can decode to the same bytes.
+    tampered = ("A" if valid[0] != "A" else "B") + valid[1:]
 
-    for cookie in (None, tampered, expired, "not-even-signed"):
+    for case, cookie in (
+        ("absent", None),
+        ("tampered", tampered),
+        ("expired", expired),
+        ("unsigned", "not-even-signed"),
+    ):
         headers = {} if cookie is None else {"Cookie": f"{COOKIE_NAME}={cookie}"}
         with app.test_request_context(headers=headers):
-            assert load_into_g() is False
-            assert flask.g.user is None
-            assert flask.g.session is None
+            assert load_into_g() is False, case
+            assert flask.g.user is None, case
+            assert flask.g.session is None, case
