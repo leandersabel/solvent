@@ -4,7 +4,8 @@
 import * as api from './api.js';
 import * as decimal from './decimal.js';
 import * as writes from './writes.js';
-import { dialog, el, shortDate, today } from './dom.js';
+import { dialog, el, today } from './dom.js';
+import { dateField } from './datepicker.js';
 
 let symbolTable = null;
 
@@ -186,11 +187,14 @@ export function snapshotDialog(vault, holding, existing, onSaved) {
     value: existing ? existing.payload.value : '',
     id: 'snapshot-value',
   });
-  const date = el('input', {
-    type: 'date',
+  const date = dateField(vault.format, {
+    id: 'snapshot-date',
     max: today(),
     value: existing ? existing.payload.date : today(),
-    id: 'snapshot-date',
+    onChange: () => {
+      describePrices();
+      describeConverted();
+    },
   });
   const note = el('textarea', { rows: '2', text: existing ? existing.payload.note || '' : '' });
   const converted = el('p', { class: 'hint' });
@@ -200,8 +204,8 @@ export function snapshotDialog(vault, holding, existing, onSaved) {
   const describePrices = () => {
     const recording = vault.recording(date.value);
     pricesLine.textContent = recording.prices.length
-      ? `${shortDate(date.value)} already holds prices. This figure joins them.`
-      : `Prices for ${shortDate(date.value)} will be recorded with this.`;
+      ? `${vault.format.longDate(date.value)} already holds prices. This figure joins them.`
+      : `Prices for ${vault.format.longDate(date.value)} will be recorded with this.`;
   };
   const describeConverted = () => {
     const quantity = decimal.parse(value.value);
@@ -209,13 +213,9 @@ export function snapshotDialog(vault, holding, existing, onSaved) {
     converted.textContent =
       quantity === null || !price
         ? ''
-        : `${decimal.toDisplay(decimal.multiply(quantity, price.rate), 2)} ${vault.mainCurrency}`;
+        : `${vault.format.money(decimal.multiply(quantity, price.rate))} ${vault.mainCurrency}`;
   };
   value.addEventListener('input', describeConverted);
-  date.addEventListener('change', () => {
-    describePrices();
-    describeConverted();
-  });
   describePrices();
   describeConverted();
 
@@ -227,6 +227,11 @@ export function snapshotDialog(vault, holding, existing, onSaved) {
       const quantity = decimal.parse(value.value);
       if (quantity === null) {
         error.textContent = 'Enter a number, with at most twelve decimal places.';
+        error.hidden = false;
+        return;
+      }
+      if (!date.value) {
+        error.textContent = `Enter a date, written ${vault.format.datePlaceholder()}.`;
         error.hidden = false;
         return;
       }
@@ -271,11 +276,11 @@ export function snapshotDialog(vault, holding, existing, onSaved) {
       if (atDate && !existing) {
         // The date here is chosen blind, so the stored figure is put
         // in front of the person before anything is written.
-        confirmReplace(atDate, holding, () => write(atDate));
+        confirmReplace(atDate, holding, vault.format, () => write(atDate));
         return;
       }
       if (atDate && existing) {
-        confirmMove(atDate, holding, () => write(atDate));
+        confirmMove(atDate, holding, vault.format, () => write(atDate));
         return;
       }
       await write(null);
@@ -285,7 +290,10 @@ export function snapshotDialog(vault, holding, existing, onSaved) {
   const close = dialog({
     heading: existing ? 'Edit this value' : `Record a value for ${holding.payload.name}`,
     body: [
-      el('div', { class: 'field' }, [el('label', { for: 'snapshot-date', text: 'Date' }), date]),
+      el('div', { class: 'field' }, [
+        el('label', { for: 'snapshot-date', text: 'Date' }),
+        date.element,
+      ]),
       el('div', { class: 'field' }, [
         el('label', { for: 'snapshot-value', text: `Value in ${holding.payload.unit}` }),
         value,
@@ -299,12 +307,12 @@ export function snapshotDialog(vault, holding, existing, onSaved) {
   });
 }
 
-function confirmReplace(stored, holding, onConfirm) {
+function confirmReplace(stored, holding, format, onConfirm) {
   const close = dialog({
     heading: 'Replace the figure already recorded?',
     body: [
       el('p', {
-        text: `You already recorded ${decimal.toDisplay(decimal.parse(stored.payload.value), 2)} ${holding.payload.unit} for ${shortDate(stored.payload.date)}. Replace it?`,
+        text: `You already recorded ${format.quantity(decimal.parse(stored.payload.value))} ${holding.payload.unit} for ${format.longDate(stored.payload.date)}. Replace it?`,
       }),
     ],
     actions: [
@@ -321,12 +329,12 @@ function confirmReplace(stored, holding, onConfirm) {
   });
 }
 
-function confirmMove(stored, holding, onConfirm) {
+function confirmMove(stored, holding, format, onConfirm) {
   const close = dialog({
     heading: 'Move this entry onto an occupied date?',
     body: [
       el('p', {
-        text: `${shortDate(stored.payload.date)} already holds a snapshot of ${decimal.toDisplay(decimal.parse(stored.payload.value), 2)} ${holding.payload.unit}. Moving this entry there will delete it.`,
+        text: `${format.longDate(stored.payload.date)} already holds a snapshot of ${format.quantity(decimal.parse(stored.payload.value))} ${holding.payload.unit}. Moving this entry there will delete it.`,
       }),
     ],
     actions: [
@@ -423,7 +431,7 @@ export function deleteHoldingDialog(vault, holding, onDone) {
       el('p', {
         text: 'Archive keeps every value you recorded. Your past net worth stays accurate. You can undo this.',
       }),
-      el('p', { class: 'hint', text: `Archive date: ${shortDate(archiveDate)}` }),
+      el('p', { class: 'hint', text: `Archive date: ${vault.format.longDate(archiveDate)}` }),
       el('div', { class: 'field' }, [
         el('label', { text: 'What was it worth when you closed it?' }),
         closing,

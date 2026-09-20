@@ -104,11 +104,13 @@ no individual endpoint repeats it.
   `/api/auth/change-password`. Both kinds reach these.
 - **Vault**, the record store, the rate lookup including
   `GET /api/rates/symbols`, export, import, `/api/sessions`,
-  `/api/auth/logout-all`, `DELETE /api/auth/account`, the `/settings`
-  shell page, the dashboard, and every screen that renders vault
-  data. A vault owner reaches these. **An administrator gets Not
+  `/api/auth/logout-all`, `DELETE /api/auth/account`, `/settings` and
+  `/settings/dimensions`, the dashboard, and every screen that renders
+  vault data. A vault owner reaches these. **An administrator gets Not
   Found**, `/settings` included: settings exists only inside a vault
-  (`account-settings.md`).
+  (`account-settings.md`). The surface is decided before routing, so
+  an address that answers a vault owner with a redirect still answers
+  an administrator with Not Found.
 - **Administration**, the `/admin` shell page and **every**
   `/api/admin/*` endpoint, including ones no feature file has been
   written for yet. An administrator reaches these. **A vault owner
@@ -182,6 +184,14 @@ rearrangement:
   the client-side data layer.
 - The Alpine build served is the CSP-safe one (architecture.md,
   Application hardening).
+- The vault surface is **one shell page**. `/dashboard` carries every
+  screen behind the gate, settings and dimensions included, as
+  in-page addresses. The keys live in that page's memory and nowhere
+  else, so a second shell page would discard them and charge the
+  Argon2id derivation again in the same sitting (`ui/unlock.md`).
+  `/settings` and `/settings/dimensions` remain routes on the vault
+  surface, each redirecting to the view it names, so a bookmark or a
+  typed address still lands on that screen.
 - A screen's content region is never server-rendered from vault data,
   because the server has no plaintext to render.
 

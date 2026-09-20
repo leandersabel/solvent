@@ -5,7 +5,7 @@
 // looked up from it, at any age. Every figure comes from the model.
 import * as decimal from './decimal.js';
 import * as writes from './writes.js';
-import { ageInWords, dialog, el, shortDate } from './dom.js';
+import { ageInWords, dialog, el } from './dom.js';
 import { deleteHoldingDialog, holdingForm, snapshotDialog } from './view-forms.js';
 
 export function holdingView(vault, accountId, { onOpenRecording, onChanged, onGone }) {
@@ -26,12 +26,12 @@ export function holdingView(vault, accountId, { onOpenRecording, onChanged, onGo
         text:
           value.state === 'unvalued'
             ? 'Not yet valued'
-            : `${decimal.toDisplay(value.quantity, 2)} ${holding.payload.unit}`,
+            : `${vault.format.quantity(value.quantity)} ${holding.payload.unit}`,
       }),
       value.state === 'valued'
         ? el('span', {
             class: 'hero-converted',
-            text: `${decimal.toDisplay(value.converted, 2)} ${vault.mainCurrency}`,
+            text: `${vault.format.money(value.converted)} ${vault.mainCurrency}`,
           })
         : value.state === 'unpriced'
           ? el('span', { class: 'hero-converted', text: 'Not priced' })
@@ -39,11 +39,11 @@ export function holdingView(vault, accountId, { onOpenRecording, onChanged, onGo
       value.asOf
         ? el('span', {
             class: 'hero-age',
-            text: `as of ${shortDate(value.asOf)}, ${ageInWords(value.asOf)}`,
+            text: `as of ${vault.format.longDate(value.asOf)}, ${ageInWords(value.asOf)}`,
           })
         : null,
       value.state === 'valued' && value.priceDate
-        ? el('span', { class: 'hero-age', text: `priced at ${shortDate(value.priceDate)}` })
+        ? el('span', { class: 'hero-age', text: `priced at ${vault.format.longDate(value.priceDate)}` })
         : null,
     ]),
   ]);
@@ -137,7 +137,7 @@ function chipsFor(vault, holding) {
     chips.push(
       el('span', {
         class: 'chip chip-archived',
-        text: `Archived ${shortDate(holding.payload.archivedAt)}`,
+        text: `Archived ${vault.format.longDate(holding.payload.archivedAt)}`,
       }),
     );
   }
@@ -153,7 +153,7 @@ function historyRow(vault, holding, snapshot, flagged, { onOpenRecording, onChan
     el('td', {}, [
       el('button', {
         class: 'link-button',
-        text: shortDate(snapshot.payload.date),
+        text: vault.format.longDate(snapshot.payload.date),
         onclick: () => onOpenRecording(snapshot.payload.date),
       }),
       duplicate
@@ -163,11 +163,11 @@ function historyRow(vault, holding, snapshot, flagged, { onOpenRecording, onChan
           })
         : null,
     ]),
-    el('td', { class: 'numeric', text: decimal.toDisplay(quantity, 2) }),
+    el('td', { class: 'numeric', text: vault.format.quantity(quantity) }),
     el('td', {
       class: 'numeric',
       text: price
-        ? decimal.toDisplay(decimal.multiply(quantity, price.rate), 2)
+        ? vault.format.money(decimal.multiply(quantity, price.rate))
         : 'not priced',
     }),
     el('td', {}, [
@@ -211,7 +211,7 @@ function confirmDeleteSnapshot(vault, holding, snapshot, error, onChanged) {
     heading: 'Delete this snapshot?',
     body: [
       el('p', {
-        text: `Delete the snapshot of ${decimal.toDisplay(decimal.parse(snapshot.payload.value), 2)} ${holding.payload.unit} for ${shortDate(snapshot.payload.date)}?`,
+        text: `Delete the snapshot of ${vault.format.quantity(decimal.parse(snapshot.payload.value))} ${holding.payload.unit} for ${vault.format.longDate(snapshot.payload.date)}?`,
       }),
       el('p', {
         text: only

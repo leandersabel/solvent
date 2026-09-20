@@ -457,6 +457,19 @@ only its own content region.
   that a spinner would say nothing, which in this product is the import
   (`export-import.md`). The label is what carries the meaning: a bar
   with no phase named is a spinner with extra steps.
+- **Date field**: a text input carrying the date in the reader's own
+  order, a button beside it opening a month grid, and the expected
+  order as the placeholder and as a screen-reader label. Hand-built
+  rather than `input type=date`, which is the only control in the
+  product the platform already provides: that one is written in the
+  browser's locale, no page can change it, and a reader whose browser
+  is in English could otherwise never be given the dates they chose
+  (`settings.md`). It keeps what the platform does well. A typed date
+  is accepted without the calendar ever opening, the calendar is
+  reachable from the keyboard, Escape closes it and returns focus to
+  the button, and a date outside the allowed range is disabled in the
+  grid and named on blur. A field that does not parse reports no
+  value, so nothing saves an old date under a new one.
 - **Reorder control**: a drag handle, plus **Move up** and **Move
   down** on every item. The handle is never the only route. Order
   changes announce themselves ("moved to position 2 of 5") so the

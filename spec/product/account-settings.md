@@ -30,6 +30,37 @@ it was fixed when the vault was created, every rate recorded since
 converts into it, so changing it would mix two currencies in the same
 history. There is no field here, not a disabled one.
 
+#### Dates and numbers
+
+How figures and dates are written for you, and nothing else. Every
+figure is stored exactly as you entered it and every date is stored
+the same way for everyone, so changing anything here rewrites nothing
+and can be changed back.
+
+- **Language**, which sets the rest. It starts as whatever your
+  browser is set to, so most people never touch it.
+- **Dates**, the order and separator: 20.09.2026, 2026-09-20 or
+  09/20/2026. This also sets the calendar you pick a date from, which
+  is why Solvent draws its own: the one built into a browser is
+  written in the browser's language and no site can change it.
+- **Thousands**, the mark between groups of three: a thin space, an
+  apostrophe, a comma, a period, or nothing.
+- **Decimals on money**, two or none. None is for people who do not
+  want to look at centimes. It rounds what is shown, never what is
+  held, and quantities of things that are not money keep their
+  decimals regardless: a holding of 12.5 ounces of gold is never
+  written as 13.
+
+Each of the last three starts at whatever the language does and can
+be set against it, because a language is a coarse guess at taste. A
+Swiss reader may want an apostrophe between thousands and no
+centimes, and no language says that.
+
+A sample line shows the choice before it is saved.
+
+The settings live in the vault, so they follow you to any browser you
+sign in from.
+
 #### Organizing
 
 Link rows out to screens that do not belong inside a settings card:
@@ -157,6 +188,19 @@ single total.
 
 - The main currency is shown and cannot be changed, and the screen says
   why.
+- Getting to settings from the top bar does not ask for the password
+  again. Nowhere a vault owner can navigate to asks twice in one
+  sitting.
+- Dates and figures on every screen are written the way the settings
+  say, the calendar you pick a date from included.
+- A date typed the way the settings write it is accepted. A date that
+  does not exist is refused rather than quietly moved.
+- Changing any of the date or number settings and changing it back
+  leaves every stored figure and date exactly as it was.
+- Rounding money to whole units never rounds a quantity of something
+  that is not money.
+- The settings come back the same on another browser, because they
+  live in the vault.
 - Changing the password works, and afterwards everything written under
   the old password still reads correctly, in the same session and after
   signing in fresh.

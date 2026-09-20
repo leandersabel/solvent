@@ -12,6 +12,29 @@ export const MIN_SCORE = 3;
 
 const RATINGS = ['very weak', 'weak', 'fair', 'strong', 'very strong'];
 
+/** Fetch zxcvbn if this page was handed where to find it and has not
+ *  got it already. Resolves either way: a gauge that cannot score
+ *  still enforces the length floor, and the submit rule below refuses
+ *  anything it could not score. */
+let fetching = null;
+function ensureZxcvbn() {
+  if (window.zxcvbn) return Promise.resolve();
+  if (fetching) return fetching;
+  const source = document.getElementById('zxcvbn-source');
+  if (!source) return Promise.resolve();
+  const { src, integrity } = JSON.parse(source.textContent);
+  fetching = new Promise((resolve) => {
+    const tag = document.createElement('script');
+    tag.src = src;
+    tag.integrity = integrity;
+    tag.crossOrigin = 'anonymous';
+    tag.addEventListener('load', resolve);
+    tag.addEventListener('error', resolve);
+    document.head.append(tag);
+  });
+  return fetching;
+}
+
 export function strengthGauge(input, onChange) {
   const segments = [0, 1, 2, 3].map(() => el('span', { class: 'gauge-segment' }));
   const label = el('span', { class: 'gauge-label' });
@@ -45,6 +68,7 @@ export function strengthGauge(input, onChange) {
   };
 
   input.addEventListener('input', evaluate);
+  ensureZxcvbn().then(evaluate);
 
   return {
     element: el('div', { class: 'gauge' }, [

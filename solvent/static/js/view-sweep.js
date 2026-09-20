@@ -7,7 +7,7 @@
 // own age in plain language instead.
 import * as decimal from './decimal.js';
 import * as writes from './writes.js';
-import { ageInWords, dialog, el, shortDate } from './dom.js';
+import { ageInWords, dialog, el } from './dom.js';
 
 export function sweepView(vault, date, { onDone }) {
   const banner = el('p', { class: 'banner', hidden: true, role: 'status' });
@@ -34,7 +34,7 @@ export function sweepView(vault, date, { onDone }) {
   });
 
   return el('section', { class: 'screen' }, [
-    el('h1', { class: 'screen-heading', text: shortDate(date) }),
+    el('h1', { class: 'screen-heading', text: vault.format.longDate(date) }),
     banner,
     holdings.length
       ? table
@@ -91,7 +91,7 @@ function sweepRow(vault, holding, date, ensurePrices) {
       control.disabled = !history.length && !field.value.trim();
     }
     const age = reference
-      ? `${ageInWords(reference.payload.date)}${current ? '' : `, from ${shortDate(reference.payload.date)}`}`
+      ? `${ageInWords(reference.payload.date)}${current ? '' : `, from ${vault.format.longDate(reference.payload.date)}`}`
       : 'never valued';
     converted.textContent = describeConverted(vault, holding, date, field.value) + ' · ' + age;
   };
@@ -173,7 +173,7 @@ function describeConverted(vault, holding, date, text) {
   if (quantity === null) return '';
   const price = vault.priceOn(holding.payload.unit, date);
   if (!price) return 'not priced';
-  return `${decimal.toDisplay(decimal.multiply(quantity, price.rate), 2)} ${vault.mainCurrency}`;
+  return `${vault.format.money(decimal.multiply(quantity, price.rate))} ${vault.mainCurrency}`;
 }
 
 function showError(node, text) {
@@ -247,7 +247,7 @@ function rateLine(vault, unit, date) {
       field.value = proposal.rate;
       line.proposal = proposal;
       provenance.textContent =
-        proposal.asOf === date ? 'Market rate' : `Market rate as of ${shortDate(proposal.asOf)}`;
+        proposal.asOf === date ? 'Market rate' : `Market rate as of ${vault.format.longDate(proposal.asOf)}`;
     },
   });
 
@@ -258,7 +258,7 @@ function rateLine(vault, unit, date) {
     line.stored = stored || null;
     if (stored) {
       field.value = stored.payload.rate;
-      provenance.textContent = provenanceChip(stored.payload);
+      provenance.textContent = provenanceChip(stored.payload, vault.format);
       lookup.hidden = true;
       const previous = vault.entriesFor(unit).filter((e) => e.payload.date < date);
       explanation.textContent = '';
@@ -290,11 +290,11 @@ function rateLine(vault, unit, date) {
   return line;
 }
 
-export function provenanceChip(payload) {
+export function provenanceChip(payload, format) {
   if (payload.rateSource === 'manual') return 'Typed by you';
   if (payload.rateSource === 'edited') return `Edited from ${payload.proposedRate}`;
   return payload.rateAsOf && payload.rateAsOf !== payload.date
-    ? `Market rate as of ${shortDate(payload.rateAsOf)}`
+    ? `Market rate as of ${format.longDate(payload.rateAsOf)}`
     : 'Market rate';
 }
 
@@ -331,8 +331,8 @@ async function saveRates(vault, date, rateLines, banner) {
     body: counts.map((change) =>
       el('p', {
         text: change.clearing
-          ? `Clearing the ${change.unit} price for ${shortDate(date)} leaves that date with no price for it. ${change.holdings} holdings measured in ${change.unit} move on that date.`
-          : `Changing the ${change.unit} rate for ${shortDate(date)} moves ${change.holdings} holdings measured in ${change.unit} on that date. Your net worth on that day changes with them.`,
+          ? `Clearing the ${change.unit} price for ${vault.format.longDate(date)} leaves that date with no price for it. ${change.holdings} holdings measured in ${change.unit} move on that date.`
+          : `Changing the ${change.unit} rate for ${vault.format.longDate(date)} moves ${change.holdings} holdings measured in ${change.unit} on that date. Your net worth on that day changes with them.`,
       }),
     ),
     actions: [

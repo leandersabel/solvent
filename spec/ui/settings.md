@@ -22,6 +22,13 @@ owns live on their own screens and are linked from here: dimensions
 Standard app shell, reached from **Settings** in the nav. Content
 max-width 720px, one card per section, stacked in the order below.
 
+The nav entry is an in-page address, not a second page. The keys live
+in one page's memory, so a page load here would charge the derivation
+a second time in one sitting, on top of the one that opened the vault
+(`unlock.md`). `/settings` and `/settings/dimensions` stay real
+addresses, each redirecting to the view it names, so a bookmark or a
+typed address still works.
+
 ### Profile
 
 - **Username**, shown, not editable.
@@ -31,6 +38,37 @@ max-width 720px, one card per section, stacked in the order below.
 
   This is not a control disabled for now. An editable field here would
   quietly corrupt years of history, so there is no field.
+
+### Dates and numbers
+
+Four selects, a sample line, and **Save**. Saving writes the profile
+record and re-renders the surface, so every figure and date already on
+screen changes with it.
+
+- **Language**. A short list rather than free text, because a tag
+  nobody can spell is worse than a list: the browser's setting (the
+  default), Deutsch (Schweiz), Deutsch (Deutschland), Français
+  (Suisse), Italiano (Svizzera), English (UK), English (US).
+- **Dates**. The language's own order (the default), 20.09.2026,
+  2026-09-20, 09/20/2026. The chosen order is what the date field
+  writes, accepts and draws its calendar in.
+- **Thousands**. The language's own mark (the default), then each
+  option shown as the figure it produces: 1 234 567, 1'234'567,
+  1,234,567, 1.234.567, 1234567.
+- **Decimals on money**. The currency's own (the default, two), none,
+  or two.
+
+A 13px note above them: "Display only. Every figure is stored exactly
+as you entered it, and every date is stored the same way for everyone,
+so changing any of this rewrites nothing."
+
+The sample line underneath shows the current choice applied to a
+figure and a date in the main currency, and updates as each select
+changes, before anything is saved.
+
+A thousands mark that is also the language's decimal point is not
+applied, because 1.234 would then mean two things. The language's own
+pairing stands.
 
 ### Organizing
 

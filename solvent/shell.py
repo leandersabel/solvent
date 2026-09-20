@@ -27,9 +27,13 @@ ALPINE_SRI = "sha384-MKLWq9B+VC0W3U8kDIBEsSu8uCnQ1B0UQpRaB+F7uR5ocXFbymMUKuLRntu
 # *is* the list of holdings. And no Admin entry in any state, because
 # administering the instance is done from a separate account with no
 # vault, so a vault owner has nowhere administrative to go.
+# In-page addresses, because the vault surface is one page: the keys
+# live in its memory and a page load would charge the Argon2id
+# derivation again (ui/unlock.md). Both are real addresses on the
+# server too, and either one typed or bookmarked lands here.
 NAV_ENTRIES: "tuple[dict, ...]" = (
-    {"label": "Dashboard", "href": "/dashboard"},
-    {"label": "Settings", "href": "/settings"},
+    {"label": "Dashboard", "href": "#/"},
+    {"label": "Settings", "href": "#/settings"},
 )
 
 

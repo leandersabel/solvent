@@ -5,7 +5,7 @@
 // being opened is the one thing this screen must not be.
 import * as decimal from './decimal.js';
 import * as writes from './writes.js';
-import { dialog, el, shortDate } from './dom.js';
+import { dialog, el } from './dom.js';
 import { provenanceChip } from './view-sweep.js';
 
 export function recordingView(vault, date, { onUpdate, onOpenHolding, onDeleted }) {
@@ -13,7 +13,7 @@ export function recordingView(vault, date, { onUpdate, onOpenHolding, onDeleted 
   const error = el('p', { class: 'field-error', hidden: true });
 
   return el('section', { class: 'screen' }, [
-    el('h1', { class: 'screen-heading', text: shortDate(date) }),
+    el('h1', { class: 'screen-heading', text: vault.format.longDate(date) }),
     error,
     el('section', { class: 'card' }, [
       el('h2', { class: 'section-heading', text: 'Figures' }),
@@ -58,12 +58,12 @@ function figureRow(vault, { holding, snapshot }, onOpenHolding) {
     ]),
     el('td', {
       class: 'numeric',
-      text: `${decimal.toDisplay(quantity, 2)} ${holding.payload.unit}`,
+      text: `${vault.format.quantity(quantity)} ${holding.payload.unit}`,
     }),
     el('td', {
       class: 'numeric',
       text: price
-        ? `${decimal.toDisplay(decimal.multiply(quantity, price.rate), 2)} ${vault.mainCurrency}`
+        ? `${vault.format.money(decimal.multiply(quantity, price.rate))} ${vault.mainCurrency}`
         : 'not priced',
     }),
   ]);
@@ -73,7 +73,7 @@ function priceRow(vault, entry) {
   return el('tr', {}, [
     el('td', { text: entry.payload.symbol }),
     el('td', { class: 'numeric', text: entry.payload.rate }),
-    el('td', {}, [el('span', { class: 'chip', text: provenanceChip(entry.payload) })]),
+    el('td', {}, [el('span', { class: 'chip', text: provenanceChip(entry.payload, vault.format) })]),
   ]);
 }
 
@@ -105,7 +105,7 @@ function confirmDelete(vault, date, error, onDeleted) {
   body.push(el('p', { text: 'This cannot be undone.' }));
 
   const close = dialog({
-    heading: `Delete the recording for ${shortDate(date)}?`,
+    heading: `Delete the recording for ${vault.format.longDate(date)}?`,
     body,
     actions: [
       el('button', { class: 'btn-secondary', text: 'Cancel', onclick: () => close() }),

@@ -5,7 +5,8 @@
 // band visibility and selection all read a model already in memory.
 import * as decimal from './decimal.js';
 import { chartTable, drawChart, fillFor } from './chart.js';
-import { ageInWords, dialog, el, mount, shortDate, today } from './dom.js';
+import { ageInWords, dialog, el, mount, today } from './dom.js';
+import { dateField } from './datepicker.js';
 import { dayNumber, isoFromDay } from './model.js';
 import { holdingForm, snapshotDialog } from './view-forms.js';
 
@@ -95,7 +96,7 @@ function duplicateBanner(vault, actions) {
     faults.map((fault) =>
       el('button', {
         class: 'link-button',
-        text: `Two entries on ${shortDate(fault.date)} for ${fault.label}. Open the recording.`,
+        text: `Two entries on ${vault.format.longDate(fault.date)} for ${fault.label}. Open the recording.`,
         onclick: () => actions.openRecording(fault.date),
       }),
     ),
@@ -110,22 +111,22 @@ function hero(vault, state, render, actions) {
     el('p', {
       class: 'hero-figure',
       text: totals.valued
-        ? `${decimal.toDisplay(totals.net, 2)} ${vault.mainCurrency}`
+        ? `${vault.format.money(totals.net)} ${vault.mainCurrency}`
         : '—',
     }),
     el('div', { class: 'hero-side' }, [
       el('span', {
         class: 'hero-part',
-        text: `Assets ${decimal.toDisplay(totals.assets, 2)}`,
+        text: `Assets ${vault.format.money(totals.assets)}`,
       }),
       el('span', {
         class: 'hero-part',
-        text: `Liabilities ${decimal.toDisplay(totals.liabilities, 2)}`,
+        text: `Liabilities ${vault.format.money(totals.liabilities)}`,
       }),
     ]),
     el('div', { class: 'switch', role: 'group', 'aria-label': 'Which rates' }, [
       switchButton(
-        rateDate ? `Latest rates, ${shortDate(rateDate)}` : 'Latest rates',
+        rateDate ? `Latest rates, ${vault.format.longDate(rateDate)}` : 'Latest rates',
         state.mode === 'latest',
         () => {
           state.mode = 'latest';
@@ -160,26 +161,33 @@ function switchButton(label, active, onclick) {
  *  is there (ui/dashboard.md). */
 function datePicker(vault, actions) {
   const marked = new Set(vault.recordingDates());
-  const input = el('input', { type: 'date', max: today(), value: today() });
   const note = el('p', { class: 'hint' });
-
   const describe = () => {
+    if (!input.value) {
+      note.textContent = '';
+      return;
+    }
     note.textContent = marked.has(input.value)
-      ? `${shortDate(input.value)} already holds a recording. Opening it.`
-      : `${shortDate(input.value)} holds nothing yet. Starting a recording there.`;
+      ? `${vault.format.longDate(input.value)} already holds a recording. Opening it.`
+      : `${vault.format.longDate(input.value)} holds nothing yet. Starting a recording there.`;
   };
-  input.addEventListener('change', describe);
+  const input = dateField(vault.format, {
+    id: 'recording-date',
+    max: today(),
+    value: today(),
+    onChange: describe,
+  });
   describe();
 
   const close = dialog({
     heading: 'New recording',
     body: [
-      input,
+      input.element,
       note,
       marked.size
         ? el('p', {
             class: 'hint',
-            text: `Dates already holding a recording: ${[...marked].map(shortDate).join(', ')}`,
+            text: `Dates already holding a recording: ${[...marked].map((d) => vault.format.longDate(d)).join(', ')}`,
           })
         : null,
     ],
@@ -189,6 +197,7 @@ function datePicker(vault, actions) {
         class: 'btn-primary',
         text: 'Open',
         onclick: () => {
+          if (!input.value) return;
           close();
           if (marked.has(input.value)) actions.openRecording(input.value);
           else actions.openSweep(input.value);
@@ -272,15 +281,15 @@ function chartSection(vault, state, render, dimension, actions) {
           return;
         }
         const parts = bands.map(
-          (band) => `${band.label} ${decimal.toDisplay(band.points[index], 2)}`,
+          (band) => `${band.label} ${vault.format.money(band.points[index])}`,
         );
         const net = bands.reduce((sum, band) => sum + band.points[index], 0n);
-        readout.textContent = `${isoFromDay(days[index])} · ${parts.join(' · ')} · Net ${decimal.toDisplay(net, 2)}`;
+        readout.textContent = `${vault.format.date(isoFromDay(days[index]))} · ${parts.join(' · ')} · Net ${vault.format.money(net)}`;
       },
     }),
     readout,
     bands.length > 1 ? legend(bands) : null,
-    el('details', {}, [el('summary', { text: 'View as table' }), chartTable(days, bands)]),
+    el('details', {}, [el('summary', { text: 'View as table' }), chartTable(days, bands, vault.format)]),
   ]);
 }
 
@@ -377,18 +386,18 @@ function holdingsTable(vault, state, render, actions) {
               : null,
             el('td', {
               class: 'numeric',
-              text: `${decimal.toDisplay(value.quantity, 2)} ${holding.payload.unit}`,
+              text: `${vault.format.quantity(value.quantity)} ${holding.payload.unit}`,
             }),
-            el('td', { class: 'numeric', text: decimal.toDisplay(value.converted, 2) }),
+            el('td', { class: 'numeric', text: vault.format.money(value.converted) }),
             el('td', {}, [
-              el('span', { text: `${shortDate(value.asOf)} · ${ageInWords(value.asOf)}` }),
+              el('span', { text: `${vault.format.longDate(value.asOf)} · ${ageInWords(value.asOf)}` }),
               // A row priced older than the vault's newest rate
               // carries that price's date too, because "latest rates"
               // is not true of that row.
               value.priceDate && newestRate && value.priceDate < newestRate
                 ? el('span', {
                     class: 'hint',
-                    text: `priced ${shortDate(value.priceDate)}`,
+                    text: `priced ${vault.format.longDate(value.priceDate)}`,
                   })
                 : null,
             ]),
@@ -489,7 +498,7 @@ function breakdown(vault, dimension, state) {
           }),
           el('span', {
             class: 'bar-label',
-            text: `${band.label} · ${decimal.toDisplay(band.total, 2)}`,
+            text: `${band.label} · ${vault.format.money(band.total)}`,
           }),
         ]);
       }),

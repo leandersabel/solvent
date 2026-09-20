@@ -4,47 +4,24 @@
 // Nothing on this screen reads or writes an account record, so no
 // operation can fail partway across several of them.
 import * as writes from './writes.js';
-import { dialog, el, mount, revealChrome } from './dom.js';
-import { currentVault, isUnlocked, lock, onLock, signOut } from './session.js';
-import { unlockCard } from './unlock.js';
-
-const container = document.getElementById('app');
-const username = container.dataset.username;
+import { dialog, el } from './dom.js';
 
 function newId() {
   const bytes = crypto.getRandomValues(new Uint8Array(8));
   return [...bytes].map((byte) => (byte % 36).toString(36)).join('');
 }
 
-function render() {
-  if (!isUnlocked()) {
-    mount(
-      container,
-      unlockCard({
-        knownUsername: username,
-        onUnlocked: (result) => {
-          if (result.kind === 'administrator') {
-            window.location.href = '/admin';
-            return;
-          }
-          // These two screens hold no sweep of their own, so the
-          // top bar's Update values goes to the dashboard's.
-          revealChrome('vault_owner', {
-            onUpdate: () => (window.location.href = '/dashboard'),
-            onLock: () => window.location.reload(),
-            onSignOut: () => signOut().finally(() => (window.location.href = '/login')),
-          });
-          render();
-        },
-      }),
-    );
-    return;
-  }
-  const vault = currentVault();
+// Set when the screen is built and read by the write helpers below,
+// which are reached from a dozen controls and would otherwise all
+// have to carry it. One screen is on at a time, so there is one.
+let reload = () => {};
+
+export function dimensionsView(vault, { reload: onChanged }) {
+  reload = onChanged;
   const live = vault.dimensions.filter((d) => !d.archivedAt);
   const archived = vault.dimensions.filter((d) => d.archivedAt);
 
-  mount(container, [
+  return [
     el('h1', { class: 'screen-heading', text: 'Dimensions' }),
     live.length
       ? el('div', {}, live.map((dimension) => dimensionCard(vault, dimension)))
@@ -69,7 +46,7 @@ function render() {
           ),
         ])
       : null,
-  ]);
+  ];
 }
 
 function emptyState(vault) {
@@ -192,7 +169,7 @@ function inlineLabel(text, onCommit) {
 
 async function writeProfile(vault, dimensions) {
   await writes.saveProfile(vault, { ...vault.profile, dimensions });
-  render();
+  reload();
 }
 
 function patch(vault, dimensionId, change) {
@@ -303,30 +280,3 @@ function archiveDimension(vault, dimension) {
     ],
   });
 }
-
-// The chrome is server-rendered on every authenticated page, so every
-// page has to give it something to call. Registered either way round:
-// this is a module script, so whether `alpine:init` has already fired
-// depends on when Alpine starts, and a listener alone would silently
-// leave the top bar's controls doing nothing.
-function registerVaultStore() {
-  window.Alpine.store('vault', {
-    clear: lock,
-    // Neither of these screens holds a sweep, so the one control that
-    // opens one hands over to the dashboard, which does.
-    updateValues() {
-      window.location.href = '/dashboard';
-    },
-    signOut() {
-      signOut().finally(() => {
-        window.location.href = '/login';
-      });
-    },
-  });
-}
-
-if (window.Alpine) registerVaultStore();
-else document.addEventListener('alpine:init', registerVaultStore);
-
-onLock(render);
-render();

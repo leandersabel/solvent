@@ -151,7 +151,9 @@ def test_no_shell_response_contains_vault_plaintext(app):
     every page's content region is an empty mount point."""
     owner, _ = register(app, "owner")
     for path in ("/dashboard", "/settings", "/settings/dimensions"):
-        body = owner.get(path).get_data(as_text=True)
+        # Followed, because the last two are views of the first and
+        # answer with a redirect to it.
+        body = owner.get(path, follow_redirects=True).get_data(as_text=True)
         region = body[body.index("<main") : body.index("</main>")]
         assert re.sub(r"<[^>]+>|\s", "", region) == ""
 

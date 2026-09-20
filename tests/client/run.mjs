@@ -329,6 +329,71 @@ await check('a record written through the write path carries its payload', async
   );
 });
 
+// ---- Dates and numbers -------------------------------------------------
+
+await check('the locale supplies the defaults and each control overrules it', async () => {
+  const { formatter } = await load('format.js');
+  const million = 1234567890000000000n;
+  assert.equal(formatter({ locale: 'de-DE' }).money(million), '1.234.567,89');
+  assert.equal(formatter({ locale: 'en-US' }).money(million), '1,234,567.89');
+  assert.equal(
+    formatter({ locale: 'de-CH', groupSeparator: 'apostrophe', moneyPlaces: '0' }).money(million),
+    "1'234'568",
+  );
+  assert.equal(formatter({ locale: 'en-US', groupSeparator: 'none' }).money(million), '1234567.89');
+});
+
+await check('a quantity keeps its places whatever money is set to', async () => {
+  const { formatter } = await load('format.js');
+  // Rounding 12.5 ounces of gold to 13 would lose the holding.
+  const shape = formatter({ locale: 'en-US', moneyPlaces: '0' });
+  assert.equal(shape.quantity(12500000000000n), '12.50');
+  // 12 rather than 13: display rounding is half-even like every other
+  // rounding in the product, and 12.5 lies on the tie.
+  assert.equal(shape.money(12500000000000n), '12');
+  assert.equal(shape.money(12600000000000n), '13');
+});
+
+await check('a thousands separator never collides with the decimal point', async () => {
+  const { formatter } = await load('format.js');
+  // German writes 1.234,56, so a period between thousands would make
+  // the figure ambiguous. The locale's own pairing wins.
+  const shape = formatter({ locale: 'de-DE', groupSeparator: 'period' });
+  assert.notEqual(shape.group, shape.point);
+  assert.equal(shape.money(1234567890000000000n), '1.234.567,89');
+});
+
+await check('a date round-trips through the format the reader types', async () => {
+  const { formatter } = await load('format.js');
+  for (const settings of [
+    { locale: 'de-CH' },
+    { locale: 'en-US' },
+    { locale: 'en-GB' },
+    { locale: 'de-DE', dateStyle: 'ymd' },
+  ]) {
+    const shape = formatter(settings);
+    const written = shape.date('2026-09-20');
+    assert.equal(shape.parseDate(written), '2026-09-20', `${JSON.stringify(settings)} wrote ${written}`);
+  }
+});
+
+await check('a date that does not exist is refused rather than rolled forward', async () => {
+  const { formatter } = await load('format.js');
+  const shape = formatter({ locale: 'de-CH' });
+  assert.equal(shape.parseDate('31.02.2026'), null);
+  assert.equal(shape.parseDate('20.13.2026'), null);
+  assert.equal(shape.parseDate('20.09.26'), null);
+  assert.equal(shape.parseDate('nonsense'), null);
+  assert.equal(shape.parseDate(''), null);
+});
+
+await check('an unknown language falls back rather than throwing', async () => {
+  const { formatter } = await load('format.js');
+  const shape = formatter({ locale: 'not-a-language-tag' });
+  assert.equal(typeof shape.money(1000000000000n), 'string');
+  assert.equal(shape.date('2026-09-20').length, 10);
+});
+
 // ---- Report -----------------------------------------------------------
 
 for (const [state, name] of results) console.log(`${state} ${name}`);

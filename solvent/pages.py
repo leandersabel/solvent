@@ -53,13 +53,20 @@ def dashboard():
 @bp.get("/settings")
 @navigation
 def settings():
-    return render_template("settings.html")
+    """A redirect rather than a page of its own.
+
+    The vault surface is one page, because the keys live in that
+    page's memory and a second page would mean deriving them again
+    (ui/unlock.md). The address stays real so that a bookmark of it
+    lands on the screen it names.
+    """
+    return redirect("/dashboard#/settings")
 
 
 @bp.get("/settings/dimensions")
 @navigation
 def dimensions():
-    return render_template("dimensions.html")
+    return redirect("/dashboard#/settings/dimensions")
 
 
 @bp.get("/admin")

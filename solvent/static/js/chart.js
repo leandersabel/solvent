@@ -267,7 +267,7 @@ function compact(value) {
 /** The table fallback. A static aria-label on the SVG is not
  *  sufficient for the primary screen of the app, so the same series is
  *  exposed as a real table behind a disclosure. */
-export function chartTable(days, bands) {
+export function chartTable(days, bands, format) {
   return el('table', { class: 'data-table' }, [
     el('thead', {}, [
       el('tr', {}, [
@@ -280,11 +280,11 @@ export function chartTable(days, bands) {
       {},
       days.map((day, index) =>
         el('tr', {}, [
-          el('td', { text: isoFromDay(day) }),
+          el('td', { text: format.date(isoFromDay(day)) }),
           ...bands.map((band) =>
             el('td', {
               class: 'numeric',
-              text: decimal.toDisplay(band.points[index], 2),
+              text: format.money(band.points[index]),
             }),
           ),
         ]),

@@ -69,8 +69,10 @@ export function interpolate(x, x0, y0, x1, y1) {
 }
 
 // Display rounding is a separate, later step applied to a figure
-// already exact at scale 12.
-export function toDisplay(value, places) {
+// already exact at scale 12. The separators are the reader's, from
+// static/js/format.js. Nothing parses a figure back out of this
+// form, so they reach no arithmetic.
+export function toDisplay(value, places, group = '\u2009', point = '.') {
   const factor = 10n ** BigInt(SCALE - places);
   const rounded = rescale(value, factor);
   const negative = rounded < 0n;
@@ -79,6 +81,6 @@ export function toDisplay(value, places) {
     .padStart(places + 1, '0');
   const whole = places ? digits.slice(0, -places) : digits;
   const fraction = places ? digits.slice(-places) : '';
-  const grouped = whole.replace(/\B(?=(\d{3})+(?!\d))/g, " ");
-  return (negative ? '-' : '') + grouped + (fraction ? '.' + fraction : '');
+  const grouped = group ? whole.replace(/\B(?=(\d{3})+(?!\d))/g, group) : whole;
+  return (negative ? '-' : '') + grouped + (fraction ? point + fraction : '');
 }

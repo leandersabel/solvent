@@ -33,6 +33,10 @@ registration, and the complete payload is:
   "mainCurrency": "CHF",
   "createdAt": "2026-07-31T09:14:00Z",
   "idleLockMinutes": 15,
+  "locale": "de-CH",
+  "dateStyle": "dmy",
+  "groupSeparator": "apostrophe",
+  "moneyPlaces": "0",
   "dimensions": []
 }
 ```
@@ -44,6 +48,17 @@ registration, and the complete payload is:
   rewritten.
 - **`idleLockMinutes`** — optional, 5–60, absent means 15 (Session and
   lock).
+- **`locale`** — optional, a BCP 47 tag, absent or unrecognized means
+  the browser's (Dates and numbers). Never validated against a fixed
+  list: the screen offers a short one, and a tag from an import that
+  this engine does not know falls back rather than failing.
+- **`dateStyle`** — optional, one of `locale` (the default), `dmy`,
+  `ymd`, `mdy`.
+- **`groupSeparator`** — optional, one of `locale` (the default),
+  `thin`, `apostrophe`, `comma`, `period`, `none`.
+- **`moneyPlaces`** — optional, one of `locale` (the default, meaning
+  two), `0`, `2`. A string rather than a number, so that `locale` and
+  a count share one field without a second one to disagree with it.
 - **`dimensions`** — optional. The grouping configuration (Dimensions,
   below), which is where its own shape is defined; absent or empty means
   no dimensions.
@@ -53,6 +68,37 @@ Registration writes the two required keys and nothing else
 sets one. Two things read the *whole* payload and need its bounds:
 `schema_version` migration (`record-api.md`) and import validation
 (`export-import.md`).
+
+## Dates and numbers
+
+Display only, and entirely client-side. The server stores the profile
+record as ciphertext like any other and never learns any of it.
+
+Every figure reaches the screen through one formatter built from the
+profile, so a setting cannot apply on one screen and not another.
+The formatter answers:
+
+- **money** — a currency figure at `moneyPlaces`, grouped and pointed
+  as configured. Rounding is half-even, like every other rounding in
+  the product (`net-worth-view.md`).
+- **quantity** — a figure in a unit that is not money, always at two
+  places. It does not follow `moneyPlaces`, because rounding 12.5
+  ounces of gold to 13 loses the holding.
+- **rate** — six places, because a currency pair moves in the fourth.
+- **date** and **parseDate** — an ISO date written in the configured
+  order, and the reverse. `parseDate` returns nothing rather than
+  guessing: a two-digit year is refused, and 31 February is refused
+  rather than rolled into March.
+
+Defaults come from `Intl` for the chosen locale, read at run time
+rather than tabulated, so there is no second and staler copy of what
+the engine already knows. A `groupSeparator` equal to that locale's
+decimal point is not applied, because `1.234` would then mean two
+things; the locale's own pairing stands.
+
+Nothing here touches stored data. Values stay exact at scale 12 and
+dates stay ISO, so any of these settings can be changed and changed
+back with no write to any record but the profile.
 
 ## Change password
 

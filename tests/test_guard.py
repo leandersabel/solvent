@@ -98,7 +98,7 @@ def test_static_assets_need_no_header_and_no_session(client):
 def test_an_exemption_is_a_named_route_not_a_prefix(sessions):
     """/settings is exempt and /api/sessions is not, so a pattern-based
     implementation passes the first half and fails here."""
-    assert sessions["owner"].get("/settings").status_code == 200
+    assert sessions["owner"].get("/settings").status_code == 302
     assert sessions["owner"].get("/api/sessions").status_code == 403
 
 
@@ -161,16 +161,28 @@ def test_a_vault_page_carries_its_own_sign_in_card(client):
     """The one derivation that buys a session buys the keys with it.
     Bouncing through a separate address would cost that wait twice, on
     the screen the wait defines."""
-    for path in ("/dashboard", "/settings", "/settings/dimensions"):
-        response = client.get(path)
-        assert response.status_code == 200, path
-        body = response.get_data(as_text=True)
-        # No chrome, because there is no kind to draw one for.
-        assert "Update values" not in body
-        assert "Sign out" not in body
-        assert 'id="app"' in body
+    response = client.get("/dashboard")
+    assert response.status_code == 200
+    body = response.get_data(as_text=True)
+    # No chrome, because there is no kind to draw one for.
+    assert "Update values" not in body
+    assert "Sign out" not in body
+    assert 'id="app"' in body
 
     assert client.get("/").headers["Location"] == "/dashboard"
+
+
+def test_the_vault_surface_is_one_page(client):
+    """Settings and dimensions are views of the dashboard, not pages of
+    their own: the keys live in one page's memory, and a second page
+    would charge the derivation again."""
+    for path, target in (
+        ("/settings", "/dashboard#/settings"),
+        ("/settings/dimensions", "/dashboard#/settings/dimensions"),
+    ):
+        response = client.get(path)
+        assert response.status_code == 302, path
+        assert response.headers["Location"] == target
 
 
 def test_the_admin_area_is_not_confirmed_to_anyone_who_may_not_reach_it(app, client):

@@ -1,9 +1,14 @@
-// The vault application: the unlock gate, and the views behind it.
+// The vault application: the unlock gate, and every view behind it.
 //
 // Everything past the gate is client-rendered from decrypted records,
 // so the views are hash routes rather than server routes: the server
 // has no plaintext to render at any of them (spec/features/
 // app-shell.md, Rules).
+//
+// One page holds all of them, settings and dimensions included,
+// because the keys live in this page's memory and nothing else. A
+// second server page would mean a second derivation, and the wait is
+// long by design (ui/unlock.md).
 import { clear, dialog, el, mount, revealChrome } from './dom.js';
 import { onLock, currentVault, isUnlocked, lock, signOut } from './session.js';
 import { unlockCard } from './unlock.js';
@@ -12,9 +17,13 @@ import { holdingForm } from './view-forms.js';
 import { holdingView } from './view-holding.js';
 import { recordingView } from './view-recording.js';
 import { resetSweepState, sweepView } from './view-sweep.js';
+import { settingsView } from './view-settings.js';
+import { dimensionsView } from './view-dimensions.js';
 
 const container = document.getElementById('app');
 const username = container ? container.dataset.username : null;
+const kdfNode = document.getElementById('kdf-envelope');
+const kdf = kdfNode ? JSON.parse(kdfNode.textContent) : null;
 
 function render() {
   if (!isUnlocked()) {
@@ -43,6 +52,23 @@ function render() {
   }
   const vault = currentVault();
   const [, view, argument] = (window.location.hash || '#/').split('/');
+
+  if (view === 'settings' && argument === 'dimensions') {
+    mount(container, [backLink(), ...dimensionsView(vault, { reload: render })]);
+    return;
+  }
+  if (view === 'settings') {
+    mount(container, [
+      backLink(),
+      ...settingsView(vault, {
+        username,
+        kdf,
+        reload: render,
+        openDimensions: () => go('#/settings/dimensions'),
+      }),
+    ]);
+    return;
+  }
 
   const actions = {
     reload: render,

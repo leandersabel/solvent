@@ -320,7 +320,15 @@ try {
   await click('Record a value');
   await page.waitUntil("document.querySelector('.dialog')");
   await page.settle(300);
-  await setValue('#snapshot-date', BACKDATE);
+  // Typed in the reader's own format, which is what the field accepts:
+  // writing an ISO date into it would test a control nobody uses.
+  const asWritten = await page.eval(`(async () => {
+    const f = await import('/static/js/format.js');
+    const s = await import('/static/js/session.js');
+    return f.formatter(s.currentVault().profile).date('${BACKDATE}');
+  })()`);
+  check('the date field shows the reader\'s own format', asWritten !== BACKDATE, asWritten);
+  await setValue('#snapshot-date', asWritten);
   await setValue('#snapshot-value', '11000.00');
   await page.settle(400);
   await page.eval("document.querySelectorAll('.dialog details').forEach(d => (d.open = true))");
@@ -341,15 +349,72 @@ try {
 
   // ---- Settings ----------------------------------------------------------
 
-  await page.goto(`${BASE}/settings`);
-  await enterPassword(VAULT_PASSWORD);
-  await page.waitUntil("document.body.innerText.includes('Main currency')", { timeout: 90000, label: 'settings' });
+  // Reached the way a person reaches it, from the top bar. The keys
+  // live in this page's memory, so a second server page would charge
+  // the derivation again.
+  await page.eval(`document.querySelector('.topbar nav a[href="#/settings"]').click()`);
+  await page.waitUntil("document.body.innerText.includes('Main currency')", { timeout: 20000, label: 'settings' });
   await page.settle(700);
+  check(
+    'opening settings does not ask for the password again',
+    !(await page.eval("Boolean(document.querySelector('#unlock-password'))")),
+  );
   check('the main currency is shown and fixed', (await text()).includes('Fixed when you created your vault'));
   check('the change-password card explains the speed', (await text()).includes('Your data is not re-encrypted'));
   check('it warns that old export files still open', (await text()).includes('still open with your old password'));
   check('the absence of IP records is volunteered', (await text()).includes('Solvent records no IP addresses'));
   check('the session list marks this one', (await text()).includes('This one'));
+
+  // ---- Dates and numbers -------------------------------------------------
+
+  const setSelect = async (id, value) => {
+    await page.eval(`(() => {
+      const node = document.getElementById('${id}');
+      node.value = ${JSON.stringify(value)};
+      node.dispatchEvent(new Event('change', { bubbles: true }));
+    })()`);
+  };
+  await setSelect('format-locale', 'de-CH');
+  await setSelect('format-group', 'apostrophe');
+  await setSelect('format-places', '0');
+  await setSelect('format-dates', 'dmy');
+  await page.settle(200);
+  const sample = await page.eval(
+    "[...document.querySelectorAll('#format-places')][0].closest('.card').querySelector('.hint ~ .hint, .hint').textContent",
+  );
+  check('the card previews the choice before it is saved', true, sample);
+
+  await page.eval("[...document.querySelectorAll('.card')].find(c => c.textContent.includes('Dates and numbers')).querySelector('.btn-primary').click()");
+  await page.waitUntil("document.body.innerText.includes('Main currency')", { label: 'settings after saving the format' });
+  await page.settle(600);
+
+  const written = await page.eval(`(async () => {
+    const s = await import('/static/js/session.js');
+    const f = s.currentVault().format;
+    return JSON.stringify({ money: f.money(1234567890000000000n), date: f.date('2026-09-20') });
+  })()`);
+  check(
+    'the saved format is what every figure and date now uses',
+    written === JSON.stringify({ money: "1'234'568", date: '20.09.2026' }),
+    written,
+  );
+
+  await page.eval(`document.querySelector('.topbar nav a[href="#/"]').click()`);
+  await page.waitUntil("document.querySelector('svg.trend')", { timeout: 20000, label: 'the dashboard in the chosen format' });
+  await page.settle(600);
+  check(
+    'the dashboard total carries the apostrophe and no decimals',
+    /\d'\d{3}(?!\.)/.test(await page.eval("document.querySelector('.hero-figure, .hero').textContent")),
+    await page.eval("document.querySelector('.hero-figure, .hero').textContent"),
+  );
+  check(
+    'going back to the dashboard did not ask for the password again',
+    !(await page.eval("Boolean(document.querySelector('#unlock-password'))")),
+  );
+
+  await page.eval(`document.querySelector('.topbar nav a[href="#/settings"]').click()`);
+  await page.waitUntil("document.body.innerText.includes('Main currency')", { timeout: 20000, label: 'settings once more' });
+  await page.settle(400);
   check('the danger zone is collapsed', !(await page.eval("document.querySelector('.danger-zone').open")));
   await page.eval("document.querySelector('.danger-zone').open = true");
   await page.settle(200);
@@ -382,12 +447,15 @@ try {
 
   // ---- Dimensions ---------------------------------------------------------
 
-  await page.goto(`${BASE}/settings/dimensions`);
-  await enterPassword(VAULT_PASSWORD);
+  await page.eval(`document.querySelector('.link-row[href="/settings/dimensions"]').click()`);
   await page.waitUntil("document.body.innerText.includes('Dimensions are how')", {
-    timeout: 90000,
+    timeout: 20000,
     label: 'the dimensions empty state',
   });
+  check(
+    'opening dimensions does not ask for the password again',
+    !(await page.eval("Boolean(document.querySelector('#unlock-password'))")),
+  );
   check('the empty state explains what a dimension is', true);
 
   await click('Create a dimension');
@@ -531,9 +599,12 @@ try {
 
   // ---- Export, then import it back ---------------------------------------
 
+  // A bookmark of the old address, which is still a real address and
+  // still lands on the screen it names.
   await page.goto(`${BASE}/settings`);
   await enterPassword(VAULT_PASSWORD);
   await page.waitUntil("document.body.innerText.includes('Main currency')", { timeout: 90000, label: 'settings again' });
+  check('the settings address lands on the settings view', (await page.eval('location.hash')) === '#/settings');
   await page.settle(600);
 
   const beforeImport = JSON.parse(await page.eval(`(async () => {

@@ -5,54 +5,28 @@
 import * as api from './api.js';
 import * as crypto from './crypto.js';
 import * as writes from './writes.js';
-import { el, mount, shortDate, revealChrome } from './dom.js';
-import { changePassword, currentVault, isUnlocked, lock, onLock, signOut } from './session.js';
-import { unlockCard, passwordWithToggle } from './unlock.js';
+import { el, mount } from './dom.js';
+import * as format from './format.js';
+import { changePassword, signOut } from './session.js';
+import { passwordWithToggle } from './unlock.js';
 import { strengthGauge } from './strength.js';
 import { exportCard, importCard } from './page-transfer.js';
 
-const container = document.getElementById('app');
-const username = container.dataset.username;
-const kdf = JSON.parse(document.getElementById('kdf-envelope').textContent);
-
-function render() {
-  if (!isUnlocked()) {
-    mount(
-      container,
-      unlockCard({
-        knownUsername: username,
-        onUnlocked: (result) => {
-          if (result.kind === 'administrator') {
-            window.location.href = '/admin';
-            return;
-          }
-          // These two screens hold no sweep of their own, so the
-          // top bar's Update values goes to the dashboard's.
-          revealChrome('vault_owner', {
-            onUpdate: () => (window.location.href = '/dashboard'),
-            onLock: () => window.location.reload(),
-            onSignOut: () => signOut().finally(() => (window.location.href = '/login')),
-          });
-          render();
-        },
-      }),
-    );
-    return;
-  }
-  const vault = currentVault();
-  mount(container, [
+export function settingsView(vault, { username, kdf, reload, openDimensions }) {
+  return [
     el('h1', { class: 'screen-heading', text: 'Settings' }),
-    profileCard(vault),
-    organizingCard(vault),
-    changePasswordCard(vault),
-    sessionCard(vault, render),
+    profileCard(vault, username),
+    formatCard(vault, reload),
+    organizingCard(vault, openDimensions),
+    changePasswordCard(vault, kdf),
+    sessionCard(vault, reload),
     exportCard(vault),
-    importCard(vault, render),
-    dangerZone(vault),
-  ]);
+    importCard(vault, reload),
+    dangerZone(vault, username),
+  ];
 }
 
-function profileCard(vault) {
+function profileCard(vault, username) {
   return el('section', { class: 'card' }, [
     el('h2', { class: 'section-heading', text: 'Profile' }),
     row('Username', username),
@@ -64,6 +38,110 @@ function profileCard(vault) {
   ]);
 }
 
+/** Dates and numbers (spec/ui/settings.md, Dates and numbers).
+ *
+ *  The language supplies the defaults and each control can overrule
+ *  it, because a locale tag is a coarse guess about taste: a Swiss
+ *  reader may want an apostrophe between thousands and no centimes,
+ *  and no tag says that. Saved into the profile record, so the
+ *  settings follow the vault to any browser rather than staying on
+ *  one machine.
+ */
+function formatCard(vault, reload) {
+  const settings = vault.profile || {};
+  const error = el('p', { class: 'field-error', hidden: true });
+  const sample = el('p', { class: 'hint' });
+
+  const language = el('select', { id: 'format-locale' });
+  for (const tag of LANGUAGES) {
+    language.append(
+      el('option', {
+        value: tag.value,
+        text: tag.label,
+        selected: (settings.locale || '') === tag.value,
+      }),
+    );
+  }
+
+  const choose = (id, options, chosen) => {
+    const select = el('select', { id });
+    for (const option of options) {
+      select.append(
+        el('option', {
+          value: option.value,
+          text: option.label,
+          selected: (chosen || 'locale') === option.value,
+        }),
+      );
+    }
+    return select;
+  };
+  const group = choose('format-group', format.GROUPS, settings.groupSeparator);
+  const places = choose('format-places', format.PLACES, settings.moneyPlaces);
+  const dates = choose('format-dates', format.DATE_STYLES, settings.dateStyle);
+
+  const preview = () => {
+    const shape = format.formatter({
+      locale: language.value || undefined,
+      groupSeparator: group.value,
+      moneyPlaces: places.value,
+      dateStyle: dates.value,
+    });
+    sample.textContent = `${shape.money(1234567890000000000n)} ${vault.mainCurrency} on ${shape.date('2026-09-20')}`;
+  };
+  for (const control of [language, group, places, dates]) {
+    control.addEventListener('change', preview);
+  }
+  preview();
+
+  const save = el('button', { class: 'btn-primary', text: 'Save' });
+  save.addEventListener('click', async () => {
+    error.hidden = true;
+    save.disabled = true;
+    try {
+      await writes.saveProfile(vault, {
+        ...vault.profile,
+        locale: language.value || null,
+        groupSeparator: group.value,
+        moneyPlaces: places.value,
+        dateStyle: dates.value,
+      });
+      reload();
+    } catch (failure) {
+      error.textContent = 'That did not save. Nothing changed.';
+      error.hidden = false;
+      save.disabled = false;
+    }
+  });
+
+  return el('section', { class: 'card' }, [
+    el('h2', { class: 'section-heading', text: 'Dates and numbers' }),
+    el('p', {
+      class: 'hint',
+      text: 'Display only. Every figure is stored exactly as you entered it, and every date is stored the same way for everyone, so changing any of this rewrites nothing.',
+    }),
+    field('Language', language),
+    field('Dates', dates),
+    field('Thousands', group),
+    field('Decimals on money', places),
+    sample,
+    error,
+    el('div', { class: 'form-actions' }, [save]),
+  ]);
+}
+
+/** Offered rather than free text, because a tag nobody can spell is
+ *  worse than a short list. An empty value means the browser's. */
+const LANGUAGES = [
+  { value: '', label: "Whatever this browser is set to" },
+  { value: 'de-CH', label: 'Deutsch (Schweiz)' },
+  { value: 'de-DE', label: 'Deutsch (Deutschland)' },
+  { value: 'fr-CH', label: 'Fran\u00e7ais (Suisse)' },
+  { value: 'it-CH', label: 'Italiano (Svizzera)' },
+  { value: 'en-GB', label: 'English (UK)' },
+  { value: 'en-US', label: 'English (US)' },
+];
+
 function row(label, value) {
   return el('p', { class: 'settings-row' }, [
     el('span', { class: 'settings-label', text: label }),
@@ -71,11 +149,18 @@ function row(label, value) {
   ]);
 }
 
-function organizingCard(vault) {
+function organizingCard(vault, openDimensions) {
   const count = vault.activeDimensions().length;
   return el('section', { class: 'card' }, [
     el('h2', { class: 'section-heading', text: 'Organizing' }),
-    el('a', { class: 'link-row', href: '/settings/dimensions' }, [
+    el('a', {
+      class: 'link-row',
+      href: '/settings/dimensions',
+      onclick: (event) => {
+        event.preventDefault();
+        openDimensions();
+      },
+    }, [
       el('span', { text: 'Dimensions' }),
       el('span', {
         class: 'hint',
@@ -87,7 +172,7 @@ function organizingCard(vault) {
   ]);
 }
 
-function changePasswordCard(vault) {
+function changePasswordCard(vault, kdf) {
   const current = el('input', { type: 'password', autocomplete: 'current-password' });
   const next = el('input', { type: 'password', autocomplete: 'new-password' });
   const confirm = el('input', { type: 'password', autocomplete: 'new-password' });
@@ -185,7 +270,7 @@ function sessionCard(vault, rerender) {
         sessions.map((session) =>
           el('p', { class: 'settings-row' }, [
             el('span', {
-              text: `Started ${shortDate(session.issuedAt.slice(0, 10))}, last used ${shortDate(session.lastActiveAt.slice(0, 10))}`,
+              text: `Started ${vault.format.longDate(session.issuedAt.slice(0, 10))}, last used ${vault.format.longDate(session.lastActiveAt.slice(0, 10))}`,
             }),
             session.current ? el('span', { class: 'chip', text: 'This one' }) : null,
           ]),
@@ -235,7 +320,7 @@ function sessionCard(vault, rerender) {
  *  session. The dialog's primary action is Export first: somebody who
  *  came here wanting a backup and left with a wiped vault has been
  *  failed by the dialog. */
-function dangerZone(vault) {
+function dangerZone(vault, username) {
   const password = el('input', { type: 'password', autocomplete: 'current-password' });
   const typed = el('input', { type: 'text' });
   const error = el('p', { class: 'field-error', hidden: true });
@@ -278,30 +363,3 @@ function dangerZone(vault) {
     ]),
   ]);
 }
-
-// The chrome is server-rendered on every authenticated page, so every
-// page has to give it something to call. Registered either way round:
-// this is a module script, so whether `alpine:init` has already fired
-// depends on when Alpine starts, and a listener alone would silently
-// leave the top bar's controls doing nothing.
-function registerVaultStore() {
-  window.Alpine.store('vault', {
-    clear: lock,
-    // Neither of these screens holds a sweep, so the one control that
-    // opens one hands over to the dashboard, which does.
-    updateValues() {
-      window.location.href = '/dashboard';
-    },
-    signOut() {
-      signOut().finally(() => {
-        window.location.href = '/login';
-      });
-    },
-  });
-}
-
-if (window.Alpine) registerVaultStore();
-else document.addEventListener('alpine:init', registerVaultStore);
-
-onLock(render);
-render();

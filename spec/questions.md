@@ -53,3 +53,27 @@ What is undecided, and what it changes.
   only the credential fields opt back in by declaring `autocomplete`.
   Whether that default belongs in the design system's Fields section is
   the architect's to settle.
+
+- **engineer**: the client asked for settings not to charge the
+  password a second time, and for a locale setting defaulting to the
+  browser, covering dates and money, with the thousands mark and the
+  decimals on money settable against the language. Both are built.
+  Three files state the target: `product/account-settings.md` (Dates
+  and numbers), `features/account-settings.md` (the profile record's
+  four new keys, and how the one formatter answers), and
+  `ui/settings.md` plus `ui/design-system.md` (the Date field
+  component). Two contracts name what changed and were not re-emitted:
+  `app-shell.json`, whose `surfaceVault` names `/settings` as a shell
+  page where it is now a redirect onto the one vault page, and
+  `account-settings.json`, which does not yet carry the profile
+  record's new keys. The compiler owns both.
+
+- **engineer**: the date field is hand-built, which is the only
+  control in the product that reimplements one the platform provides.
+  `input type=date` is written in the browser's locale and no page can
+  change it, so an in-app locale setting cannot reach it. The
+  alternative is to keep the native control and let the setting govern
+  displayed dates only, which would mean a reader whose browser is in
+  English types American dates into a product showing them Swiss ones.
+  The designer owns confirming the component, which is specified in
+  `design-system.md`, Components.

@@ -8,6 +8,7 @@
 import * as api from './api.js';
 import * as crypto from './crypto.js';
 import * as decimal from './decimal.js';
+import { formatter as makeFormatter } from './format.js';
 
 export const RECORD_TYPES = ['profile', 'account', 'snapshot', 'rate'];
 export const SCHEMA_VERSION = 1;
@@ -105,6 +106,17 @@ export class Vault {
 
   get mainCurrency() {
     return this.profile ? this.profile.mainCurrency : null;
+  }
+
+  /** How this reader writes figures and dates (static/js/format.js).
+   *  Rebuilt whenever the profile record changes, because every
+   *  setting behind it lives in that record. */
+  get format() {
+    if (!this._format || this._formatFrom !== this.profile) {
+      this._format = makeFormatter(this.profile);
+      this._formatFrom = this.profile;
+    }
+    return this._format;
   }
 
   get idleLockMinutes() {

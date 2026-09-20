@@ -115,6 +115,10 @@ export function ageInWords(isoDate, today = new Date()) {
   return `about ${Math.round(years)} years ago`;
 }
 
+/** A date for the administration surface, which has no vault and so
+ *  no settings to read: the browser's own locale is all there is.
+ *  Everything behind a vault goes through `vault.format`
+ *  (static/js/format.js) instead. */
 export function shortDate(isoDate) {
   const date = new Date(isoDate + 'T00:00:00Z');
   return date.toLocaleDateString(undefined, {
@@ -146,8 +150,8 @@ export function revealChrome(kind, { onUpdate, onLock, onSignOut }) {
     bar.append(
       el('nav', { 'aria-label': 'Primary' }, [
         el('ul', {}, [
-          el('li', {}, [el('a', { href: '/dashboard', text: 'Dashboard' })]),
-          el('li', {}, [el('a', { href: '/settings', text: 'Settings' })]),
+          el('li', {}, [el('a', { href: '#/', text: 'Dashboard' })]),
+          el('li', {}, [el('a', { href: '#/settings', text: 'Settings' })]),
         ]),
       ]),
       el('div', { class: 'topbar-actions' }, [
