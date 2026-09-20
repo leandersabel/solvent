@@ -13,6 +13,13 @@ import flask
 
 SCHEMA_PATH = Path(__file__).parent / "schema.sql"
 
+#: The version schema.sql stamps into `PRAGMA user_version`.
+SCHEMA_VERSION = 1
+
+
+class SchemaMismatch(RuntimeError):
+    """A database file this build cannot serve."""
+
 
 def utcnow() -> str:
     """The server clock, in the one format every timestamp column
@@ -31,16 +38,43 @@ def init_db(app: flask.Flask) -> None:
     Idempotent, so it is safe on every process start: each statement in
     schema.sql is `IF NOT EXISTS`, and the seed inserts only rows that
     are absent.
+
+    That idempotence is also why an existing file is checked first.
+    `IF NOT EXISTS` leaves a table written by another version of this
+    schema exactly as it found it, so the process would start against a
+    database it cannot write and fail at the first request instead.
     """
     db_path = Path(app.config["DATABASE_PATH"])
     db_path.parent.mkdir(parents=True, exist_ok=True)
     conn = sqlite3.connect(db_path)
     try:
+        _check_version(conn, db_path)
         conn.executescript(SCHEMA_PATH.read_text())
         _seed_symbols(conn)
         conn.commit()
     finally:
         conn.close()
+
+
+def _check_version(conn: sqlite3.Connection, db_path: Path) -> None:
+    version = conn.execute("PRAGMA user_version").fetchone()[0]
+    if version == SCHEMA_VERSION:
+        return
+    empty = (
+        conn.execute(
+            "SELECT count(*) FROM sqlite_master WHERE type = 'table' "
+            "AND name NOT LIKE 'sqlite_%'"
+        ).fetchone()[0]
+        == 0
+    )
+    if empty:
+        return
+    raise SchemaMismatch(
+        f"{db_path} holds schema version {version}, and this build serves "
+        f"version {SCHEMA_VERSION}. Point DATABASE_PATH at a new file, or "
+        f"export the vaults from a build that serves version {version} and "
+        f"import them into a fresh one."
+    )
 
 
 def _seed_symbols(conn: sqlite3.Connection) -> None:

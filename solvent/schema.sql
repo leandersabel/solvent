@@ -148,3 +148,8 @@ WHEN (
 BEGIN
     SELECT RAISE(ABORT, 'an administrator has no vault');
 END;
+
+-- The version this file creates. `init_db` refuses to serve a database
+-- stamped with any other, because every statement above is
+-- `IF NOT EXISTS` and so leaves an older table exactly as it found it.
+PRAGMA user_version = 1;

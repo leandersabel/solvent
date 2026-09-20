@@ -12,6 +12,7 @@ import uuid
 
 import pytest
 
+from solvent import db
 from tests.helpers import connect, register
 
 
@@ -104,3 +105,33 @@ def test_deleting_a_principal_cascades_to_everything_it_owns(app):
             assert conn.execute(f"SELECT COUNT(*) FROM {table}").fetchone()[0] == 0
     finally:
         conn.close()
+
+
+def test_a_fresh_file_is_stamped_with_the_schema_version(app):
+    conn = connect(app)
+    try:
+        assert conn.execute("PRAGMA user_version").fetchone()[0] == db.SCHEMA_VERSION
+    finally:
+        conn.close()
+
+
+def test_a_database_from_another_schema_version_refuses_to_start(tmp_path, monkeypatch):
+    """The failure this catches is silent otherwise: every statement in
+    schema.sql is `IF NOT EXISTS`, so a table an older build wrote
+    survives the run and the first write to it raises mid-request."""
+    monkeypatch.setenv("SECRET_KEY", "test-only-secret-key-do-not-use-in-prod")
+    stale = tmp_path / "stale.db"
+    conn = sqlite3.connect(stale)
+    conn.executescript(
+        "CREATE TABLE sessions (id TEXT PRIMARY KEY, user_id TEXT NOT NULL);"
+        "PRAGMA user_version = 0;"
+    )
+    conn.close()
+
+    from solvent import create_app
+
+    with pytest.raises(db.SchemaMismatch, match="schema version 0"):
+        create_app(config_overrides={"DATABASE_PATH": str(stale), "TESTING": True})
+
+    columns = sqlite3.connect(stale).execute("PRAGMA table_info(sessions)").fetchall()
+    assert [row[1] for row in columns] == ["id", "user_id"]
