@@ -6,7 +6,7 @@ import * as api from './api.js';
 import * as crypto from './crypto.js';
 import * as writes from './writes.js';
 import { el, mount, shortDate, revealChrome } from './dom.js';
-import { changePassword, currentVault, isUnlocked, onLock, signOut } from './session.js';
+import { changePassword, currentVault, isUnlocked, lock, onLock, signOut } from './session.js';
 import { unlockCard, passwordWithToggle } from './unlock.js';
 import { strengthGauge } from './strength.js';
 import { exportCard, importCard } from './page-transfer.js';
@@ -278,6 +278,30 @@ function dangerZone(vault) {
     ]),
   ]);
 }
+
+// The chrome is server-rendered on every authenticated page, so every
+// page has to give it something to call. Registered either way round:
+// this is a module script, so whether `alpine:init` has already fired
+// depends on when Alpine starts, and a listener alone would silently
+// leave the top bar's controls doing nothing.
+function registerVaultStore() {
+  window.Alpine.store('vault', {
+    clear: lock,
+    // Neither of these screens holds a sweep, so the one control that
+    // opens one hands over to the dashboard, which does.
+    updateValues() {
+      window.location.href = '/dashboard';
+    },
+    signOut() {
+      signOut().finally(() => {
+        window.location.href = '/login';
+      });
+    },
+  });
+}
+
+if (window.Alpine) registerVaultStore();
+else document.addEventListener('alpine:init', registerVaultStore);
 
 onLock(render);
 render();

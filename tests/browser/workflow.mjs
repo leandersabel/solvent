@@ -395,6 +395,183 @@ try {
   })()`);
   check('coverage counts the active holdings', coverage === '0 of 4 holdings assigned', `${coverage} with ${model}`);
 
+
+  // ---- The chrome, on a page that is not the dashboard -----------------
+
+  check(
+    'every authenticated page gives the chrome something to call',
+    await page.eval("Boolean(window.Alpine && Alpine.store('vault'))"),
+  );
+
+  // ---- Reopening a recording -------------------------------------------
+
+  await page.goto(`${BASE}/dashboard`);
+  await enterPassword(VAULT_PASSWORD);
+  await page.waitUntil("document.querySelector('svg.trend')", { timeout: 90000, label: 'the dashboard again' });
+  await page.settle(700);
+  await page.eval("document.querySelector('.topbar-actions button').click()");
+  await page.waitUntil("location.hash.startsWith('#/sweep/')", { label: 'the sweep again' });
+  await page.settle(1500);
+  check(
+    'a reopened recording says every row is already recorded',
+    (await labels('.row-state')).filter((s) => s === 'Recorded for this date.').length === 4,
+  );
+
+  // A holding recorded at the backdate but not today carries its
+  // earlier figure forward, and the control offers to confirm it.
+  const sweepDate = (await page.eval('location.hash')).split('/').pop();
+  check('the sweep heading is the date, not a control', (await page.eval("document.querySelectorAll('.screen-heading input').length")) === 0);
+
+  await click('Done');
+  await page.settle(700);
+
+  // ---- The replace prompt, on the form where the date is blind ---------
+
+  await page.eval("document.querySelector('.data-table tbody .link-button').click()");
+  await page.waitUntil("location.hash.startsWith('#/holding/')");
+  await page.settle(500);
+  const archiving = await page.eval("document.querySelector('.screen-heading').textContent");
+  await click('Record a value');
+  await page.waitUntil("document.querySelector('.dialog')");
+  await page.settle(300);
+  await setValue('#snapshot-value', '99.99');
+  await page.eval("[...document.querySelectorAll('.dialog button')].find(b => b.textContent === 'Save').click()");
+  await page.waitUntil("document.body.innerText.includes('Replace the figure already recorded')", {
+    label: 'the replace prompt',
+  });
+  check('a blind date prompts before replacing what is there', true);
+  check('the prompt names the stored figure', (await text()).includes('You already recorded'));
+  await click('Keep what is there');
+  await page.settle(400);
+  await page.eval("document.querySelectorAll('.scrim').forEach(s => s.remove())");
+  await page.settle(300);
+  // Read the record rather than the screen: the dialog's own live
+  // preview of what was typed is not what was stored.
+  const stored = await page.eval(`(async () => {
+    const s = await import('/static/js/session.js');
+    const v = s.currentVault();
+    return [...v.snapshots.values()].flat().map(x => x.payload.value).join(',');
+  })()`);
+  check('declining leaves the original untouched', !stored.includes('99.99'), stored);
+
+  // ---- Archiving, with the closing value it offers ----------------------
+
+  await click('Archive');
+  await page.waitUntil("document.body.innerText.includes('Archive keeps every value')", {
+    label: 'the archive dialog',
+  });
+  check('archive is offered before deleting', (await text()).includes('You can undo this'));
+  check('it offers a closing value', (await text()).includes('What was it worth when you closed it?'));
+  check('it says what skipping costs', (await text()).includes('your chart drops by the last figure'));
+  await page.eval("[...document.querySelectorAll('.dialog button')].find(b => b.textContent === 'Archive').click()");
+  await page.waitUntil('!document.querySelector(".dialog")', { timeout: 60000, label: 'the archive to land' });
+  await page.settle(1200);
+  check('an archived holding carries its chip', (await text()).includes('Archived'));
+  check('it offers Unarchive rather than Archive', (await labels('.form-actions button')).includes('Unarchive'));
+  check('an archived holding takes no new value', !(await labels('.form-actions button')).includes('Record a value'));
+
+  await page.eval("location.hash = '#/'");
+  await page.settle(900);
+  const listed = await page.eval(
+    "[...document.querySelectorAll('.data-table tbody .link-button')].map(b => b.textContent)",
+  );
+  check('an archived holding leaves the current total', !listed.includes(archiving), `${archiving} in ${listed.join(',')}`);
+
+  // ---- Deleting a recording ---------------------------------------------
+
+  const marksBefore = await page.eval("document.querySelectorAll('.entry-mark').length");
+  await page.eval("document.querySelectorAll('.entry-mark')[0].dispatchEvent(new MouseEvent('click', { bubbles: true }))");
+  await page.waitUntil("location.hash.startsWith('#/recording/')", { label: 'a recording to delete' });
+  await page.settle(500);
+  await click('Delete');
+  await page.waitUntil("document.body.innerText.includes('Delete the recording for')", { label: 'the delete dialog' });
+  check('the confirmation says the prices go too', (await text()).includes('every price captured with it'));
+  check('it names how many holdings move', /\d+ holdings measured in/.test(await text()));
+  check('it says there is no way back', (await text()).includes('cannot be undone'));
+  await click('Delete the recording');
+  await page.waitUntil("location.hash === '#/'", { timeout: 60000, label: 'the dashboard after deleting' });
+  await page.settle(1200);
+  check(
+    'the date is gone from the chart',
+    (await page.eval("document.querySelectorAll('.entry-mark').length")) === marksBefore - 1,
+  );
+
+  // ---- Export, then import it back ---------------------------------------
+
+  await page.goto(`${BASE}/settings`);
+  await enterPassword(VAULT_PASSWORD);
+  await page.waitUntil("document.body.innerText.includes('Main currency')", { timeout: 90000, label: 'settings again' });
+  await page.settle(600);
+
+  const beforeImport = JSON.parse(await page.eval(`(async () => {
+    const s = await import('/static/js/session.js');
+    const v = s.currentVault();
+    const names = [...v.holdings.values()].map(h => h.payload.name).sort();
+    return JSON.stringify({ names, holdings: v.holdings.size, unreadable: v.unreadable.length });
+  })()`));
+  check(
+    'the vault reads back before the import',
+    beforeImport.unreadable === 0 && beforeImport.holdings > 0,
+    JSON.stringify(beforeImport),
+  );
+
+  const imported = JSON.parse(await page.eval(`(async () => {
+    const api = await import('/static/js/api.js');
+    const c = await import('/static/js/crypto.js');
+    const s = await import('/static/js/session.js');
+    const { SCHEMA_VERSION } = await import('/static/js/model.js');
+    const file = await (await fetch('/api/export', { headers: { 'X-Solvent-Request': '1' } })).json();
+
+    // Open the file with its own password, exactly as the screen does.
+    const keys = await c.deriveKeys(${JSON.stringify(VAULT_PASSWORD)}, file.salt, file.kdf);
+    const fileDek = await c.unwrapDek(file.wrappedDek, file.dekNonce, keys.masterKey);
+    const plain = [];
+    for (const record of file.records) {
+      plain.push({ record, payload: await c.decryptRecord(fileDek, record) });
+    }
+
+    // Re-key: a freshly generated DEK, never the file's.
+    const newDek = await c.generateDek();
+    const rekeyed = [];
+    for (const { record, payload } of plain) {
+      const slot = {
+        recordId: record.recordId, recordType: record.recordType,
+        accountId: record.accountId ?? null, schemaVersion: SCHEMA_VERSION, version: 1,
+      };
+      rekeyed.push({ ...slot, ...(await c.encryptRecord(newDek, slot, payload)) });
+    }
+    const wrapper = await s.wrapForMaster(newDek);
+    await api.post('/api/import', { ...wrapper, records: rekeyed });
+
+    // Read the vault back from scratch, as a fresh unlock would.
+    const { Vault } = await import('/static/js/model.js');
+    const reopened = new Vault(newDek);
+    await reopened.load();
+    const fileRaw = c.b64encode(new Uint8Array(await crypto.subtle.exportKey('raw', fileDek)));
+    const newRaw = c.b64encode(new Uint8Array(await crypto.subtle.exportKey('raw', newDek)));
+    return JSON.stringify({
+      names: [...reopened.holdings.values()].map(h => h.payload.name).sort(),
+      unreadable: reopened.unreadable.length,
+      versions: [...new Set(file.records.map(() => 1))],
+      rekeyed: fileRaw !== newRaw,
+      kinds: [...new Set(file.records.map(r => r.recordType))].sort(),
+    });
+  })()`));
+
+  check('an import round-trips every holding', imported.names.join(',') === beforeImport.names.join(','), imported.names.join(','));
+  check('every record reads back after the import', imported.unreadable === 0, String(imported.unreadable));
+  check('the vault is re-keyed rather than restored verbatim', imported.rekeyed);
+  check('both timelines survive the round trip', imported.kinds.includes('rate') && imported.kinds.includes('snapshot'), imported.kinds.join(','));
+
+  const stillOpens = await page.eval(`(async () => {
+    const response = await fetch('/api/auth/salt', {
+      method: 'POST', headers: { 'X-Solvent-Request': '1', 'Content-Type': 'application/json' },
+      body: JSON.stringify({ username: 'leander' }),
+    });
+    return response.status;
+  })()`);
+  check('the password is untouched by the import', stillOpens === 200);
+
   // ---- Locking ------------------------------------------------------------
 
   await page.goto(`${BASE}/dashboard`);

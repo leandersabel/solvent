@@ -261,7 +261,12 @@ def test_the_guard_and_the_delete_are_one_transaction(app, admin):
 
     remaining = rows(app, "SELECT * FROM principals WHERE kind = 'administrator'")
     assert len(remaining) == 1, results
-    assert sorted(results) == [200, 409] or sorted(results) == [200, 500], results
+
+    # One wins. The other is refused by the guard, or finds its own
+    # session already gone with the account it belonged to, which is
+    # the same edge case reached from the losing side.
+    assert sorted(results)[0] == 200, results
+    assert sorted(results)[1] in (401, 409), results
 
 
 # ---- The bootstrap CLI ------------------------------------------------

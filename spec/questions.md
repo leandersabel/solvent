@@ -31,3 +31,15 @@ What is undecided, and what it changes.
   cannot run under is not a policy. The architect owns confirming the
   wording, and the compiler owns re-emitting `app-shell.json`, whose
   `csp` parameter was edited by hand to match.
+
+- **engineer**: six features are implemented and exercised but not
+  fully verified, and the gap is the same shape in each. Three kinds
+  of criterion have no harness yet. **Timing**, meaning the sign-in
+  wait and the salt and login responses being statistically
+  indistinguishable across both kinds and a stranger, which needs a
+  sampling harness rather than a single call. **Two entries on one
+  date**, for a holding and for a symbol, which needs records planted
+  behind the client's own rules to reach the state at all. **The idle
+  lock firing on its own timer**, which needs a clock the test can
+  move. Each is a test to write rather than a behaviour to change, and
+  the behaviour each one covers is built.

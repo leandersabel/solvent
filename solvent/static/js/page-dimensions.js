@@ -5,7 +5,7 @@
 // operation can fail partway across several of them.
 import * as writes from './writes.js';
 import { dialog, el, mount, revealChrome } from './dom.js';
-import { currentVault, isUnlocked, onLock, signOut } from './session.js';
+import { currentVault, isUnlocked, lock, onLock, signOut } from './session.js';
 import { unlockCard } from './unlock.js';
 
 const container = document.getElementById('app');
@@ -303,6 +303,30 @@ function archiveDimension(vault, dimension) {
     ],
   });
 }
+
+// The chrome is server-rendered on every authenticated page, so every
+// page has to give it something to call. Registered either way round:
+// this is a module script, so whether `alpine:init` has already fired
+// depends on when Alpine starts, and a listener alone would silently
+// leave the top bar's controls doing nothing.
+function registerVaultStore() {
+  window.Alpine.store('vault', {
+    clear: lock,
+    // Neither of these screens holds a sweep, so the one control that
+    // opens one hands over to the dashboard, which does.
+    updateValues() {
+      window.location.href = '/dashboard';
+    },
+    signOut() {
+      signOut().finally(() => {
+        window.location.href = '/login';
+      });
+    },
+  });
+}
+
+if (window.Alpine) registerVaultStore();
+else document.addEventListener('alpine:init', registerVaultStore);
 
 onLock(render);
 render();

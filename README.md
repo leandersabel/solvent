@@ -4,10 +4,9 @@ A self-hosted net worth tracker with an end-to-end encrypted vault. The
 server only ever stores ciphertext; balances are decrypted in the browser
 with a key derived from your password.
 
-**Status: the app shell is built and the container runs it. No screen
-exists yet, so every path answers Forbidden without the
-`X-Solvent-Request` header and Unauthorized with it. See
-`spec/status.md` for what is next.**
+**Status: every feature in `spec/status.md` is built and runs. Six of
+the twelve are not yet marked verified, and `spec/questions.md` names
+the criteria still without a harness.**
 
 ## Stack
 
@@ -27,7 +26,21 @@ The app refuses to start without `SECRET_KEY` (spec/features/app-shell.md,
 Configuration). `DATABASE_PATH` defaults to `instance/solvent.db`, which
 is created on first start.
 
-Tests: `.venv/bin/python -m pytest`.
+The first account is created out of band, because registration needs
+an invite and invites need an administrator:
+
+```
+.venv/bin/python -m flask --app app create-invite --kind administrator
+```
+
+It prints a path to open in the browser. From there an administrator
+invites everybody else.
+
+Tests: `.venv/bin/python -m pytest`. The suite covers the server, the
+client-side rules that two implementations would drift on, and the
+workflows end to end in a real browser. The last two need Node, and
+the browser tests also need Chrome installed; both are skipped where
+they are absent.
 
 ## Build it
 

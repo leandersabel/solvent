@@ -4,18 +4,25 @@ Maintained by the compiler agent. Rows are in build order.
 
 | Feature | Compiled | Implemented | Verified |
 |---|---|---|---|
-| app-shell | x | | |
-| record-api | x | | |
-| rate-lookup | x | | |
-| admin-invites | x | | |
-| register | x | | |
-| login | x | | |
-| account-settings | x | | |
-| manage-accounts | x | | |
-| record-rate | x | | |
-| record-snapshot | x | | |
-| net-worth-view | x | | |
-| export-import | x | | |
+| app-shell | x | x | x |
+| record-api | x | x | x |
+| rate-lookup | x | x | x |
+| admin-invites | x | x | x |
+| register | x | x | x |
+| login | x | x | |
+| account-settings | x | x | |
+| manage-accounts | x | x | |
+| record-rate | x | x | |
+| record-snapshot | x | x | |
+| net-worth-view | x | x | |
+| export-import | x | x | |
+
+Verified means every acceptance criterion in the feature file is
+asserted. The six rows without it are asserted in the parts a server
+and a browser can reach, and carry named gaps in `spec/questions.md`:
+the timing comparisons that need a statistical harness, the
+two-entries-on-one-date fault, and the idle lock firing on its own
+timer.
 
 `admin-invites` comes before `register` because registration consumes
 an invite, and the invite table and `flask create-invite` are what
