@@ -2,6 +2,13 @@
    Every screen that extends templates/shell/base.html shares this file;
    a screen's own stylesheet adds only what its content region needs. */
 
+/* Before everything else. The UA rule behind the `hidden` attribute is
+   a bare `display: none`, which any later rule setting a display wins
+   against, so a button carrying `hidden` stays on screen. */
+[hidden] {
+  display: none !important;
+}
+
 :root {
   /* Ground and surfaces */
   --ground: #faf9f7;

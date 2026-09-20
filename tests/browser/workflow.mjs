@@ -165,10 +165,21 @@ try {
   check('an empty vault points at the first holding', true);
   check('no chart and no zero total on an empty vault', !(await page.eval("Boolean(document.querySelector('svg.trend'))")));
 
+  // A manager that fills one of these writes a stored login into an
+  // encrypted record, and its inline button invites exactly that.
+  const fieldsOffered = [];
   const addHolding = async (name, unit) => {
     await click('Add a holding');
     await page.waitUntil("document.querySelector('.dialog')");
     await page.settle(350);
+    fieldsOffered.push(await page.eval(`(() => {
+      const credential = ['username', 'current-password', 'new-password'];
+      return [...document.querySelectorAll('.dialog input, .dialog textarea, .dialog select')]
+        .filter((f) => !credential.includes(f.getAttribute('autocomplete')))
+        .filter((f) => !f.hasAttribute('data-1p-ignore'))
+        .map((f) => f.id || f.type)
+        .join(',');
+    })()`));
     await setValue('#holding-name', name);
     await setValue('#holding-unit', unit);
     await page.eval("document.querySelector('.dialog button[type=submit]').click()");
@@ -178,6 +189,11 @@ try {
   await addHolding('Cantonal account', 'CHF');
   await addHolding('UBS dollar account', 'USD');
   await addHolding('Gold bars', 'XAU-ozt');
+  check(
+    'no vault field offers itself to a password manager',
+    fieldsOffered.every((f) => f === ''),
+    fieldsOffered.join(' | '),
+  );
   await addHolding('Mortgage', 'CHF');
 
   check('every holding is listed as not yet valued', (await text()).includes('Not yet valued'));
@@ -401,6 +417,23 @@ try {
   check(
     'every authenticated page gives the chrome something to call',
     await page.eval("Boolean(window.Alpine && Alpine.store('vault'))"),
+  );
+
+  // ---- What the stylesheet and the password managers do to a form ------
+
+  // The attribute is honoured by a UA rule a class setting a display
+  // beats, so this asks the engine rather than the markup.
+  check(
+    'an element carrying hidden is off the screen',
+    await page.eval(`(() => {
+      const probe = document.createElement('button');
+      probe.className = 'btn-secondary';
+      probe.hidden = true;
+      document.body.append(probe);
+      const shown = getComputedStyle(probe).display;
+      probe.remove();
+      return shown === 'none';
+    })()`),
   );
 
   // ---- Reopening a recording -------------------------------------------

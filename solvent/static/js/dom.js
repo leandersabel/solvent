@@ -6,8 +6,27 @@
 // Master Key capture rather than session theft. There is no helper
 // that takes markup, so there is nothing to reach for by mistake.
 
+// Password managers fill any text field they like the look of, and
+// almost every field here holds vault content rather than a credential:
+// a manager that fills one writes a stored login into an encrypted
+// record, and its inline button invites exactly that. Marked off for
+// each of the major managers, which read their own attribute and not
+// `autocomplete`. A field that really is a credential sets
+// `autocomplete` itself and keeps its offer.
+const NOT_A_CREDENTIAL = {
+  autocomplete: 'off',
+  'data-1p-ignore': '',
+  'data-lpignore': 'true',
+  'data-bwignore': '',
+  'data-form-type': 'other',
+};
+const FILLABLE = new Set(['input', 'textarea', 'select']);
+
 export function el(tag, props = {}, children = []) {
   const node = document.createElement(tag);
+  if (FILLABLE.has(tag) && !('autocomplete' in props)) {
+    props = { ...NOT_A_CREDENTIAL, ...props };
+  }
   for (const [key, value] of Object.entries(props)) {
     if (value === null || value === undefined || value === false) continue;
     if (key === 'text') node.textContent = value;

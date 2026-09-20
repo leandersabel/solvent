@@ -43,3 +43,13 @@ What is undecided, and what it changes.
   lock firing on its own timer**, which needs a clock the test can
   move. Each is a test to write rather than a behaviour to change, and
   the behaviour each one covers is built.
+
+- **engineer**: `design-system.md` says nothing about password
+  managers, and every field the product builds is a fill target until
+  it says otherwise. A manager offering to fill a holding name writes a
+  stored login into an encrypted record, and the vault is the one place
+  that content cannot be reviewed later by anyone but its owner. The
+  implementation now marks every field off-limits by default and lets
+  only the credential fields opt back in by declaring `autocomplete`.
+  Whether that default belongs in the design system's Fields section is
+  the architect's to settle.
