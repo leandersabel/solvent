@@ -727,9 +727,18 @@ Actors this design defends against vs. accepts:
 
 ### Application hardening
 
-- **CSP**: `default-src 'none'; script-src 'self'; connect-src 'self';
-  img-src 'self'; style-src 'self'; frame-ancestors 'none'; base-uri
-  'none'; form-action 'self'` — no `unsafe-inline`/`unsafe-eval`.
+- **CSP**: `default-src 'none'; script-src 'self' 'wasm-unsafe-eval';
+  connect-src 'self'; img-src 'self'; style-src 'self'; frame-ancestors
+  'none'; base-uri 'none'; form-action 'self'` — no
+  `unsafe-inline`/`unsafe-eval`.
+  `'wasm-unsafe-eval'` is what lets the browser compile the Argon2id
+  WebAssembly module (Key management). Compiling one is gated by
+  `script-src` in every engine, from a byte buffer and from a
+  same-origin URL alike, so without this token the key derivation
+  cannot run at all. It is the narrow token for exactly that: it
+  permits WebAssembly compilation and nothing else, and in particular
+  it does not enable `eval` or the `Function` constructor, which is
+  why the line above still holds.
   `connect-src` is `'self'` alone: the rate provider is reached through
   the server-side proxy (see Data model), so the browser never contacts
   it directly and whitelisting its host would open a hole with no user.

@@ -4,8 +4,8 @@
 // Nothing on this screen reads or writes an account record, so no
 // operation can fail partway across several of them.
 import * as writes from './writes.js';
-import { dialog, el, mount } from './dom.js';
-import { currentVault, isUnlocked, onLock } from './session.js';
+import { dialog, el, mount, revealChrome } from './dom.js';
+import { currentVault, isUnlocked, onLock, signOut } from './session.js';
 import { unlockCard } from './unlock.js';
 
 const container = document.getElementById('app');
@@ -18,7 +18,26 @@ function newId() {
 
 function render() {
   if (!isUnlocked()) {
-    mount(container, unlockCard({ knownUsername: username, onUnlocked: render }));
+    mount(
+      container,
+      unlockCard({
+        knownUsername: username,
+        onUnlocked: (result) => {
+          if (result.kind === 'administrator') {
+            window.location.href = '/admin';
+            return;
+          }
+          // These two screens hold no sweep of their own, so the
+          // top bar's Update values goes to the dashboard's.
+          revealChrome('vault_owner', {
+            onUpdate: () => (window.location.href = '/dashboard'),
+            onLock: () => window.location.reload(),
+            onSignOut: () => signOut().finally(() => (window.location.href = '/login')),
+          });
+          render();
+        },
+      }),
+    );
     return;
   }
   const vault = currentVault();

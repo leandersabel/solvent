@@ -2,7 +2,7 @@
 {% block title %}Dimensions{% endblock %}
 {% block content_class %} content-narrow{% endblock %}
 {% block content %}
-  <div id="app" data-username="{{ g.principal.username }}"></div>
+  <div id="app"{% if g.get('principal') %} data-username="{{ g.principal.username }}"{% endif %}></div>
 {% endblock %}
 {% block scripts %}
   <script type="module" src="{{ url_for('static', filename='js/page-dimensions.js') }}"></script>

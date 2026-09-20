@@ -4,7 +4,7 @@
 // so the views are hash routes rather than server routes: the server
 // has no plaintext to render at any of them (spec/features/
 // app-shell.md, Rules).
-import { clear, dialog, el, mount } from './dom.js';
+import { clear, dialog, el, mount, revealChrome } from './dom.js';
 import { onLock, currentVault, isUnlocked, lock, signOut } from './session.js';
 import { unlockCard } from './unlock.js';
 import { dashboardView } from './view-dashboard.js';
@@ -18,7 +18,27 @@ const username = container ? container.dataset.username : null;
 
 function render() {
   if (!isUnlocked()) {
-    mount(container, unlockCard({ knownUsername: username, onUnlocked: render }));
+    mount(
+      container,
+      unlockCard({
+        knownUsername: username,
+        onUnlocked: (result) => {
+          if (result.kind === 'administrator') {
+            window.location.href = '/admin';
+            return;
+          }
+          revealChrome('vault_owner', {
+            onUpdate: () => {
+              resetSweepState();
+              go(`#/sweep/${new Date().toISOString().slice(0, 10)}`);
+            },
+            onLock: lock,
+            onSignOut: signOut,
+          });
+          render();
+        },
+      }),
+    );
     return;
   }
   const vault = currentVault();
@@ -97,7 +117,13 @@ window.addEventListener('hashchange', render);
 
 // The chrome reaches the data layer through this store and knows
 // nothing of what it holds (static/js/shell.js).
-document.addEventListener('alpine:init', () => {
+//
+// Registered either way round: this is a module script, so it runs
+// after the deferred classic scripts that boot Alpine, and whether
+// `alpine:init` has already fired depends on when Alpine starts. A
+// listener alone would silently miss it and leave the top bar's two
+// controls doing nothing.
+function registerVaultStore() {
   window.Alpine.store('vault', {
     clear: lock,
     updateValues() {
@@ -110,7 +136,10 @@ document.addEventListener('alpine:init', () => {
       });
     },
   });
-});
+}
+
+if (window.Alpine) registerVaultStore();
+else document.addEventListener('alpine:init', registerVaultStore);
 
 onLock(() => {
   if (container) clear(container);

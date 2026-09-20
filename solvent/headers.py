@@ -16,9 +16,9 @@ import flask
 # route needing a looser policy is a design change, not a local
 # override (app-shell.md, Response headers).
 CSP = (
-    "default-src 'none'; script-src 'self'; connect-src 'self'; "
-    "img-src 'self'; style-src 'self'; frame-ancestors 'none'; "
-    "base-uri 'none'; form-action 'self'"
+    "default-src 'none'; script-src 'self' 'wasm-unsafe-eval'; "
+    "connect-src 'self'; img-src 'self'; style-src 'self'; "
+    "frame-ancestors 'none'; base-uri 'none'; form-action 'self'"
 )
 
 

@@ -299,6 +299,36 @@ await check('migration is a pure function on decrypted plaintext', () => {
   assert.deepEqual(migrate('profile', SCHEMA_VERSION, payload), payload);
 });
 
+// ---- The write path ---------------------------------------------------
+
+await check('a record written through the write path carries its payload', async () => {
+  // The record store is the one place a dropped argument is invisible:
+  // an empty payload encrypts, stores and decrypts without error, and
+  // surfaces only as a vault that reads back blank.
+  const sent = [];
+  globalThis.fetch = async (url, init) => {
+    sent.push({ url, body: JSON.parse(init.body) });
+    return { ok: true, status: 200, json: async () => ({}) };
+  };
+  const writes = await load('writes.js');
+  const { Vault } = await load('model.js');
+
+  const vault = new Vault(await cryptoModule.generateDek());
+  vault.profileRecord = null;
+  const payload = { name: 'UBS dollar account', unit: 'USD', dims: {}, note: null, archivedAt: null, createdAt: '2026-01-01T00:00:00Z' };
+  const entry = await writes.saveHolding(vault, null, payload);
+
+  const stored = sent[0].body;
+  assert.deepEqual(
+    await cryptoModule.decryptRecord(vault.dek, { ...entry, ...stored }),
+    payload,
+  );
+  assert.ok(
+    cryptoModule.b64decode(stored.ciphertext).length > 16,
+    'an empty payload encrypts to the authentication tag alone',
+  );
+});
+
 // ---- Report -----------------------------------------------------------
 
 for (const [state, name] of results) console.log(`${state} ${name}`);

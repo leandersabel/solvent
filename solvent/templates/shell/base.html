@@ -15,17 +15,21 @@
 </head>
 <body>
   <div x-data="shell">
+    {# A visitor with no session has no kind, so there is no bar to
+       draw for them: the page carries the sign-in card alone until
+       one derivation has bought both the session and the keys. #}
     <header class="topbar">
       <span class="wordmark">Solvent</span>
+      {% if g.get('principal') %}
       <nav aria-label="Primary">
         <ul>
-          {% for entry in nav_entries(g.get('principal')) %}
+          {% for entry in nav_entries(g.principal) %}
           <li><a href="{{ entry.href }}">{{ entry.label }}</a></li>
           {% endfor %}
         </ul>
       </nav>
       <div class="topbar-actions">
-        {% if g.get('principal') and g.principal.kind == 'vault_owner' %}
+        {% if g.principal.kind == 'vault_owner' %}
         <button type="button" class="btn-chrome" @click="$store.shell.update()">
           Update values
         </button>
@@ -38,6 +42,7 @@
         </button>
         {% endif %}
       </div>
+      {% endif %}
     </header>
     <main class="content{% block content_class %}{% endblock %}">
       {% block content %}{% endblock %}

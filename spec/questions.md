@@ -22,3 +22,12 @@ What is undecided, and what it changes.
   property intact and lets the seeded table resolve. Which of the two
   the spec means is the architect's to settle: the regex, the unit
   suffixes, or the pairing.
+
+- **engineer**: the CSP in `architecture.md`, Application hardening
+  forbade WebAssembly compilation, so the Argon2id derivation threw a
+  `CompileError` in every browser and no account could be created or
+  unlocked. `'wasm-unsafe-eval'` was added to `script-src` and the
+  reason written into that section, because a policy the product
+  cannot run under is not a policy. The architect owns confirming the
+  wording, and the compiler owns re-emitting `app-shell.json`, whose
+  `csp` parameter was edited by hand to match.

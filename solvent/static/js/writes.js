@@ -11,7 +11,7 @@ import * as crypto from './crypto.js';
 import { SCHEMA_VERSION } from './model.js';
 
 export async function putRecord(vault, slot, payload) {
-  const blob = await crypto.encryptRecord(vault.dek, slot);
+  const blob = await crypto.encryptRecord(vault.dek, slot, payload);
   await api.put(`/api/records/${slot.recordId}`, {
     recordType: slot.recordType,
     accountId: slot.accountId ?? null,

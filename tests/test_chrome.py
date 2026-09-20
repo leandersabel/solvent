@@ -240,3 +240,16 @@ def test_every_body_text_token_clears_its_stated_floor():
     # Marked sub-4.5 in the spec and restricted to non-text use.
     for name in ("ink-muted", "brass-500", "status-warning"):
         assert 3.0 <= contrast(token(name), ground) < 4.5, name
+
+
+def test_the_register_page_hands_the_currency_list_to_the_browser_intact(app, client):
+    """`tojson` marks its output safe, so autoescaping does not run on
+    it: a double-quoted attribute would be closed by the first quote
+    the list carries and the page would parse nothing."""
+    from tests.helpers import mint_invite
+
+    body = client.get(f"/register?invite={mint_invite(app)}").get_data(as_text=True)
+    attribute = re.search(r"data-currencies='([^']*)'", body)
+    assert attribute, body[body.index("data-currencies") - 80 : body.index("data-currencies") + 200]
+    parsed = json.loads(attribute.group(1))
+    assert {"symbol": "CHF", "label": "Swiss Franc"} in parsed

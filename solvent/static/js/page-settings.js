@@ -5,7 +5,7 @@
 import * as api from './api.js';
 import * as crypto from './crypto.js';
 import * as writes from './writes.js';
-import { el, mount, shortDate } from './dom.js';
+import { el, mount, shortDate, revealChrome } from './dom.js';
 import { changePassword, currentVault, isUnlocked, onLock, signOut } from './session.js';
 import { unlockCard, passwordWithToggle } from './unlock.js';
 import { strengthGauge } from './strength.js';
@@ -17,7 +17,26 @@ const kdf = JSON.parse(document.getElementById('kdf-envelope').textContent);
 
 function render() {
   if (!isUnlocked()) {
-    mount(container, unlockCard({ knownUsername: username, onUnlocked: render }));
+    mount(
+      container,
+      unlockCard({
+        knownUsername: username,
+        onUnlocked: (result) => {
+          if (result.kind === 'administrator') {
+            window.location.href = '/admin';
+            return;
+          }
+          // These two screens hold no sweep of their own, so the
+          // top bar's Update values goes to the dashboard's.
+          revealChrome('vault_owner', {
+            onUpdate: () => (window.location.href = '/dashboard'),
+            onLock: () => window.location.reload(),
+            onSignOut: () => signOut().finally(() => (window.location.href = '/login')),
+          });
+          render();
+        },
+      }),
+    );
     return;
   }
   const vault = currentVault();

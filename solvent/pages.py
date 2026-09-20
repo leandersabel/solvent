@@ -15,10 +15,18 @@ bp = Blueprint("pages", __name__)
 
 @bp.get("/")
 @navigation
+@public
 def root():
     """The only route that resolves to different content per kind, and
     it does so because a bookmark of the bare host has to work for
-    both."""
+    both.
+
+    With no session there is no kind to resolve by, so it hands the
+    visitor to the dashboard, which carries the sign-in card and sends
+    an administrator on once it knows which they are.
+    """
+    if not g.get("principal"):
+        return redirect("/dashboard")
     if g.principal["kind"] == "administrator":
         return redirect("/admin")
     return redirect("/dashboard")

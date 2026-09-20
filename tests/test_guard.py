@@ -155,3 +155,50 @@ def test_the_admin_surface_is_a_prefix_not_a_list():
     assert surface_of("/api/admin/something-nobody-has-written-yet") == ADMINISTRATION
     assert surface_of("/api/auth/logout") == SHARED
     assert surface_of("/api/auth/logout-all") == VAULT
+
+
+def test_a_vault_page_carries_its_own_sign_in_card(client):
+    """The one derivation that buys a session buys the keys with it.
+    Bouncing through a separate address would cost that wait twice, on
+    the screen the wait defines."""
+    for path in ("/dashboard", "/settings", "/settings/dimensions"):
+        response = client.get(path)
+        assert response.status_code == 200, path
+        body = response.get_data(as_text=True)
+        # No chrome, because there is no kind to draw one for.
+        assert "Update values" not in body
+        assert "Sign out" not in body
+        assert 'id="app"' in body
+
+    assert client.get("/").headers["Location"] == "/dashboard"
+
+
+def test_the_admin_area_is_not_confirmed_to_anyone_who_may_not_reach_it(app, client):
+    """A caller past the header gets the answer an unknown path gives,
+    whether they hold a vault owner's session or none at all. The
+    vault pages carry a sign-in card instead, because those are the
+    ones a person is meant to be able to navigate to."""
+    owner, _ = register(app, "owner")
+    unknown = client.get("/nope", headers=CSRF)
+    for caller in (client, owner):
+        answer = caller.get("/admin", headers=CSRF)
+        assert answer.status_code == unknown.status_code == 404
+        assert answer.get_data() == unknown.get_data()
+
+
+def test_every_json_endpoint_still_answers_unauthorized(app, client):
+    """Which is what the client branches on, so the redirect above
+    must not reach one."""
+    checked = 0
+    for rule in app.url_map.iter_rules():
+        if not rule.rule.startswith("/api/") or "<" in rule.rule:
+            continue
+        for method in sorted(rule.methods - {"HEAD", "OPTIONS"}):
+            response = client.open(rule.rule, method=method, headers=CSRF, json={})
+            # The pre-authentication endpoints are the exception, by
+            # definition: they exist to get a session.
+            if surface_of(str(rule)) == SHARED and response.status_code != 401:
+                continue
+            assert response.status_code == 401, (rule.rule, method, response.status_code)
+            checked += 1
+    assert checked

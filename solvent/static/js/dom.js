@@ -109,3 +109,38 @@ export function shortDate(isoDate) {
 export function today() {
   return new Date().toISOString().slice(0, 10);
 }
+
+/** Draw the chrome the server had no kind to draw.
+ *
+ *  A page reached without a session carries the wordmark alone, so
+ *  that one derivation buys both the session and the keys
+ *  (spec/features/app-shell.md, The chrome). Once the kind is known
+ *  the rest of the bar goes in, carrying the same entries and the
+ *  same controls the server renders for a session it already had.
+ *  It holds no plaintext either way: nav labels and the wordmark.
+ */
+export function revealChrome(kind, { onUpdate, onLock, onSignOut }) {
+  const bar = document.querySelector('.topbar');
+  if (!bar || bar.querySelector('nav')) return;
+
+  if (kind === 'vault_owner') {
+    bar.append(
+      el('nav', { 'aria-label': 'Primary' }, [
+        el('ul', {}, [
+          el('li', {}, [el('a', { href: '/dashboard', text: 'Dashboard' })]),
+          el('li', {}, [el('a', { href: '/settings', text: 'Settings' })]),
+        ]),
+      ]),
+      el('div', { class: 'topbar-actions' }, [
+        el('button', { type: 'button', class: 'btn-chrome', text: 'Update values', onclick: onUpdate }),
+        el('button', { type: 'button', class: 'btn-chrome', text: 'Lock', onclick: onLock }),
+      ]),
+    );
+    return;
+  }
+  bar.append(
+    el('div', { class: 'topbar-actions' }, [
+      el('button', { type: 'button', class: 'btn-chrome', text: 'Sign out', onclick: onSignOut }),
+    ]),
+  );
+}

@@ -147,6 +147,17 @@ class _NoRedirect(urllib.request.HTTPRedirectHandler):
 
 _opener = urllib.request.build_opener(_NoRedirect)
 
+# Named outbound requests. Both providers front their public instance
+# with a CDN that refuses urllib's default agent outright, so an
+# unnamed request is a 403 and no rate ever resolves.
+USER_AGENT = "Solvent/1.0 (self-hosted net worth tracker)"
+
+
+def _request(url: str) -> urllib.request.Request:
+    return urllib.request.Request(
+        url, headers={"User-Agent": USER_AGENT, "Accept": "application/json"}
+    )
+
 
 class _Breaker:
     """Opens after N consecutive provider failures and serves No
@@ -190,7 +201,7 @@ def _fetch_json(url: str) -> "object | None":
     if breaker.is_open(timedelta(minutes=config["RATE_BREAKER_COOLOFF_MINUTES"])):
         return None
     try:
-        with _opener.open(url, timeout=EGRESS_TIMEOUT_SECONDS) as response:
+        with _opener.open(_request(url), timeout=EGRESS_TIMEOUT_SECONDS) as response:
             if response.status != 200:
                 raise urllib.error.URLError(f"status {response.status}")
             payload = json.loads(response.read(MAX_RESPONSE_BYTES))

@@ -405,3 +405,35 @@ def test_an_administrator_adding_a_currency_reaches_the_next_registration(app, a
     )
     page = app.test_client().get(f"/register?invite={mint_invite(app)}").get_data(as_text=True)
     assert "Testland Dollar" in page
+
+
+def test_every_outbound_request_is_named(monkeypatch):
+    """Both providers front their public instance with a CDN that
+    refuses urllib's default agent outright, so an unnamed request is
+    a 403 and no rate ever resolves."""
+    seen = []
+
+    class Response:
+        status = 200
+
+        def read(self, _size=None):
+            return b"{}"
+
+        def __enter__(self):
+            return self
+
+        def __exit__(self, *_):
+            return False
+
+    monkeypatch.setattr(
+        rates._opener, "open", lambda request, timeout=None: (seen.append(request), Response())[1]
+    )
+    from flask import Flask
+
+    scratch = Flask(__name__)
+    scratch.config.update(RATE_BREAKER_COOLOFF_MINUTES=5, RATE_BREAKER_FAILURES=5)
+    rates.breaker.record_success()
+    with scratch.app_context():
+        rates._fetch_json("https://api.frankfurter.dev/v1/2026-01-01?base=CHF")
+
+    assert seen[0].get_header("User-agent") == rates.USER_AGENT

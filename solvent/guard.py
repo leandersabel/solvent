@@ -11,7 +11,7 @@ once, so no individual endpoint repeats it.
 from __future__ import annotations
 
 import flask
-from flask import abort, g, request
+from flask import abort, g, redirect, request
 
 from . import session as sessions
 
@@ -132,6 +132,17 @@ def init_app(app: flask.Flask) -> None:
 
         if not sessions.load_into_g():
             if _flag(app, endpoint, "public"):
+                return
+            if _flag(app, endpoint, "csrf_exempt"):
+                # A vault page renders its sign-in card itself, so the
+                # one derivation that buys a session also buys the
+                # keys. Bouncing through a separate address would cost
+                # the wait twice, on the screen that wait defines.
+                if surface_of(str(request.url_rule)) == ADMINISTRATION:
+                    # Except the admin area, which answers a caller
+                    # with no session exactly as an unknown path does.
+                    # Nothing anywhere hints that it exists.
+                    abort(404)
                 return
             abort(401)
 
