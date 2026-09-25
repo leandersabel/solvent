@@ -358,8 +358,12 @@ reachable (architecture.md, SSRF hardening):
   part of the outbound URL's scheme, host, or port is derived from
   client input.
 - `symbol` is validated against a strict allowlist before use: it must
-  match `^[A-Z0-9][A-Z0-9._-]{0,15}$` **and** be present in the
-  server's configured symbol table. Regex alone is not sufficient.
+  match `^(?=.{1,16}$)[A-Z0-9][A-Z0-9._]*(-[a-z]+)?$` **and** be present
+  in the server's configured symbol table. Regex alone is not
+  sufficient. The pattern is the canonical form of Seeded symbols: an
+  upper-case code and an optional lower-case unit. It admits `XAU-ozt`
+  and refuses `usd` and `xau-ozt`, so the table cannot hold two
+  spellings of one symbol.
 - `quote` must be a `kind: currency` row of the server's symbol table —
   the same set registration offers as a main currency (`register.md`).
   "A known ISO 4217 code" is the looser check and the wrong one: ISO

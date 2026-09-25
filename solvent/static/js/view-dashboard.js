@@ -5,7 +5,7 @@
 // band visibility and selection all read a model already in memory.
 import * as decimal from './decimal.js';
 import { chartTable, drawChart, fillFor } from './chart.js';
-import { ageInWords, dialog, el, mount, today } from './dom.js';
+import { ageInWords, dialog, el, mount, resumable, today } from './dom.js';
 import { dateField } from './datepicker.js';
 import { dayNumber, isoFromDay } from './model.js';
 import { holdingForm, snapshotDialog } from './view-forms.js';
@@ -181,6 +181,7 @@ function datePicker(vault, actions) {
 
   const close = dialog({
     heading: 'New recording',
+    resume: resumable(reopenDatePicker),
     body: [
       input.element,
       note,
@@ -205,6 +206,10 @@ function datePicker(vault, actions) {
       }),
     ],
   });
+}
+
+function reopenDatePicker(context) {
+  datePicker(context.vault, context);
 }
 
 function chartSection(vault, state, render, dimension, actions) {

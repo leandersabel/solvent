@@ -12,6 +12,7 @@ import { formatter as makeFormatter } from './format.js';
 
 export const RECORD_TYPES = ['profile', 'account', 'snapshot', 'rate'];
 export const SCHEMA_VERSION = 1;
+export const IDLE_LOCK_PERIODS = [5, 10, 15, 30, 45, 60];
 
 export function dayNumber(isoDate) {
   return Math.round(Date.parse(isoDate + 'T00:00:00Z') / 86400000);
@@ -119,10 +120,14 @@ export class Vault {
     return this._format;
   }
 
+  /** The offered period nearest the stored one, the shorter on a tie
+   *  (account-settings.md, Session and lock). */
   get idleLockMinutes() {
     const stored = this.profile && this.profile.idleLockMinutes;
-    if (!Number.isInteger(stored)) return 15;
-    return Math.min(60, Math.max(5, stored));
+    if (typeof stored !== 'number' || !Number.isFinite(stored)) return 15;
+    return IDLE_LOCK_PERIODS.reduce((best, period) =>
+      Math.abs(period - stored) < Math.abs(best - stored) ? period : best,
+    );
   }
 
   get dimensions() {

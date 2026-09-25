@@ -4,9 +4,9 @@ A self-hosted net worth tracker with an end-to-end encrypted vault. The
 server only ever stores ciphertext; balances are decrypted in the browser
 with a key derived from your password.
 
-**Status: every feature in `spec/status.md` is built and runs. Six of
-the twelve are not yet marked verified, and `spec/questions.md` names
-the criteria still without a harness.**
+**Status: every feature in `spec/status.md` is built and runs. The
+ones not yet marked verified carry the criteria still without a
+harness in `spec/questions.md`.**
 
 ## Stack
 

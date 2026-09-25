@@ -376,7 +376,12 @@ only its own content region.
   Never remove the focus ring. **An inline rename is this same input
   revealed in place** by an Edit action and saved by an explicit
   action, not a control of its own. A field that saves on blur turns
-  clicking away into a write.
+  clicking away into a write. **Every field refuses password managers
+  unless it is a credential**: `autocomplete="off"` plus each major
+  manager's own ignore attribute, because a manager that fills a
+  holding name writes a stored login into an encrypted record nobody
+  but its owner can ever review. A Password field opts back in by
+  naming its autocomplete tokens.
 - **Quantity field**: the money input. The holding's own unit sits as a
   suffix inside the box, `inputmode="decimal"`, and the converted
   main-currency figure appears beneath it in ink-secondary as you type,

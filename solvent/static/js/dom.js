@@ -56,9 +56,17 @@ export function byId(id) {
   return document.getElementById(id);
 }
 
+// Every dialog open right now, so a lock can close them all.
+const openDialogs = new Set();
+
 /** A focus-trapping dialog with the Escape and restore behaviour every
- *  one in the product shares (spec/ui/design-system.md, Components). */
-export function dialog({ heading, body, actions }) {
+ *  one in the product shares (spec/ui/design-system.md, Components).
+ *
+ *  `resume`, from `resumable` below, reopens the same form against the
+ *  vault a later unlock builds. A dialog without one is closed by a
+ *  lock and not reopened, which is right for a confirmation: it holds
+ *  nothing the person typed. */
+export function dialog({ heading, body, actions, resume = null }) {
   const opener = document.activeElement;
   const panel = el('div', { class: 'dialog', role: 'dialog', 'aria-modal': 'true' }, [
     el('h2', { class: 'dialog-heading', text: heading }),
@@ -67,11 +75,14 @@ export function dialog({ heading, body, actions }) {
   ]);
   const scrim = el('div', { class: 'scrim' }, [panel]);
 
-  const close = () => {
+  const entry = { panel, resume, close: null };
+  const close = ({ refocus = true } = {}) => {
+    openDialogs.delete(entry);
     scrim.remove();
     document.removeEventListener('keydown', onKey);
-    if (opener && opener.focus) opener.focus();
+    if (refocus && opener && opener.focus) opener.focus();
   };
+  entry.close = close;
   const onKey = (event) => {
     if (event.key === 'Escape') close();
     if (event.key !== 'Tab') return;
@@ -92,9 +103,117 @@ export function dialog({ heading, body, actions }) {
 
   document.addEventListener('keydown', onKey);
   document.body.append(scrim);
+  openDialogs.add(entry);
+  trackEdits(panel);
   const focusTarget = panel.querySelector('input, button');
   if (focusTarget) focusTarget.focus();
   return close;
+}
+
+/** A dialog's way back after a lock: `reopen(context, ...ids)`, called
+ *  with the vault the next unlock builds.
+ *
+ *  Built here rather than as an arrow at the call site on purpose. V8
+ *  gives every closure in one function the same scope object, so an
+ *  arrow written beside a handler that uses `vault` would keep the old
+ *  vault, keys and all, alive across the lock. This scope holds the
+ *  function and the ids and nothing else, and the ids are record ids
+ *  and dates, never plaintext. */
+export function resumable(reopen, ...ids) {
+  return (context) => reopen(context, ...ids);
+}
+
+// ---- What a lock keeps --------------------------------------------------
+//
+// Unsaved input is the one thing a lock keeps (spec/features/login.md,
+// Rules). That means what the person typed or chose, and only where it
+// differs from what the form was built with: a field prefilled from the
+// vault and left alone is vault content read back, and goes with the
+// rest. A password never survives, shown or not.
+
+const edited = new WeakSet();
+const baselines = new WeakMap();
+const watched = new WeakSet();
+
+function fieldsOf(root) {
+  return [...root.querySelectorAll('input, select, textarea')];
+}
+
+function valueOf(field) {
+  return field.type === 'checkbox' || field.type === 'radio' ? String(field.checked) : field.value;
+}
+
+function kindOf(field) {
+  return `${field.tagName}:${field.type}`;
+}
+
+function markEdited(event) {
+  edited.add(event.target);
+}
+
+/** Note what every field under `root` holds now, as the form was
+ *  built. Called for each dialog and after each screen is mounted. */
+export function trackEdits(root) {
+  for (const field of fieldsOf(root)) baselines.set(field, valueOf(field));
+  if (watched.has(root)) return;
+  root.addEventListener('input', markEdited, true);
+  root.addEventListener('change', markEdited, true);
+  watched.add(root);
+}
+
+/** The fields under `root` the person changed, as plain values keyed
+ *  by position. Nothing in the result refers to the form or the vault
+ *  it was built from. */
+export function editedFields(root) {
+  const kept = [];
+  fieldsOf(root).forEach((field, index) => {
+    if (!edited.has(field)) return;
+    if (field.type === 'password' || field.type === 'file' || field.closest('.password-field')) return;
+    const value = valueOf(field);
+    if (value === baselines.get(field)) return;
+    kept.push({ index, kind: kindOf(field), value });
+  });
+  return kept;
+}
+
+/** Put kept values back into a form rebuilt the same way, announcing
+ *  each so whatever is derived from a field (the converted figure under
+ *  a quantity) follows it. A field that is no longer the same kind at
+ *  that position is left alone rather than guessed at. */
+export function restoreFields(root, kept) {
+  const fields = fieldsOf(root);
+  for (const { index, kind, value } of kept) {
+    const field = fields[index];
+    if (!field || kindOf(field) !== kind) continue;
+    if (field.type === 'checkbox' || field.type === 'radio') field.checked = value === 'true';
+    else field.value = value;
+    field.dispatchEvent(new Event('input', { bubbles: true }));
+    field.dispatchEvent(new Event('change', { bubbles: true }));
+  }
+}
+
+/** On a lock: close every dialog without handing focus back to a
+ *  screen that is about to go, and keep only the edited fields of those
+ *  that can be reopened. */
+export function closeDialogsForLock() {
+  const kept = [];
+  for (const entry of [...openDialogs]) {
+    const fields = entry.resume ? editedFields(entry.panel) : [];
+    if (fields.length) kept.push({ resume: entry.resume, fields });
+    entry.close({ refocus: false });
+  }
+  return kept;
+}
+
+/** After an unlock: reopen each kept dialog against the new vault and
+ *  write its kept values back. */
+export function reopenDialogs(kept, context) {
+  for (const { resume, fields } of kept) {
+    const before = new Set(openDialogs);
+    resume(context);
+    const reopened = [...openDialogs].find((entry) => !before.has(entry));
+    if (reopened) restoreFields(reopened.panel, fields);
+  }
 }
 
 /** "3 weeks ago", "about a year ago" (spec/ui/update-values.md, Age).

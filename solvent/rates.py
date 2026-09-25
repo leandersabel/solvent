@@ -31,13 +31,9 @@ from .validation import Payload, parse
 
 bp = Blueprint("rates", __name__)
 
-# rate-lookup.md, SSRF hardening pins this as `^[A-Z0-9][A-Z0-9._-]{0,15}$`,
-# which rejects every metal that file seeds: the generative naming rule
-# is `<ISO 4217 metal code>-<unit>` with unit `ozt` or `g`. The case
-# range is widened here so the seeded table resolves; nothing else about
-# the check changes, and the table lookup below is the control the spec
-# itself names as the sufficient one. Raised in spec/questions.md.
-SYMBOL_PATTERN = re.compile(r"^[A-Za-z0-9][A-Za-z0-9._-]{0,15}$")
+# The canonical form (rate-lookup.md, Seeded symbols): an upper-case code
+# and an optional lower-case unit, so `usd` cannot sit beside `USD`.
+SYMBOL_PATTERN = re.compile(r"^(?=.{1,16}$)[A-Z0-9][A-Z0-9._]*(-[a-z]+)?$")
 
 # Frankfurter's own currency list, which is what the spec seeds the
 # currency half of the table from: not the full ISO 4217 set, because a

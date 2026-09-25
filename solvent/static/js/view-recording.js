@@ -8,7 +8,7 @@ import * as writes from './writes.js';
 import { dialog, el } from './dom.js';
 import { provenanceChip } from './view-sweep.js';
 
-export function recordingView(vault, date, { onUpdate, onOpenHolding, onDeleted }) {
+export function recordingView(vault, date, { onUpdate, onOpenHolding, onDeleted, onChanged }) {
   const { figures, prices } = vault.recording(date);
   const error = el('p', { class: 'field-error', hidden: true });
 
@@ -19,7 +19,7 @@ export function recordingView(vault, date, { onUpdate, onOpenHolding, onDeleted 
       el('h2', { class: 'section-heading', text: 'Figures' }),
       figures.length
         ? el('table', { class: 'data-table' }, [
-            el('tbody', {}, figures.map((figure) => figureRow(vault, figure, onOpenHolding))),
+            el('tbody', {}, figures.map((figure) => figureRow(vault, figure, onOpenHolding, onChanged))),
           ])
         : el('p', { class: 'empty-line', text: 'No figures recorded on this date' }),
     ]),
@@ -27,7 +27,7 @@ export function recordingView(vault, date, { onUpdate, onOpenHolding, onDeleted 
       el('h2', { class: 'section-heading', text: 'Prices' }),
       prices.length
         ? el('table', { class: 'data-table' }, [
-            el('tbody', {}, prices.map((entry) => priceRow(vault, entry))),
+            el('tbody', {}, prices.map((entry) => priceRow(vault, entry, onChanged))),
           ])
         : el('p', {
             class: 'empty-line',
@@ -45,10 +45,13 @@ export function recordingView(vault, date, { onUpdate, onOpenHolding, onDeleted 
   ]);
 }
 
-function figureRow(vault, { holding, snapshot }, onOpenHolding) {
+function figureRow(vault, { holding, snapshot }, onOpenHolding, onChanged) {
   const quantity = decimal.parse(snapshot.payload.value);
   const price = vault.priceOn(holding.payload.unit, snapshot.payload.date);
-  return el('tr', {}, [
+  const rivals = vault
+    .snapshotsFor(holding.recordId)
+    .filter((s) => s.payload.date === snapshot.payload.date && s.recordId !== snapshot.recordId);
+  return el('tr', { class: rivals.length ? 'flagged' : null }, [
     el('td', {}, [
       el('button', {
         class: 'link-button',
@@ -66,14 +69,37 @@ function figureRow(vault, { holding, snapshot }, onOpenHolding) {
         ? `${vault.format.money(decimal.multiply(quantity, price.rate))} ${vault.mainCurrency}`
         : 'not priced',
     }),
+    keepCell(vault, rivals, 'Two figures for this holding share this date. Keep one.', onChanged),
   ]);
 }
 
-function priceRow(vault, entry) {
-  return el('tr', {}, [
+function priceRow(vault, entry, onChanged) {
+  const rivals = vault
+    .entriesFor(entry.payload.symbol)
+    .filter((e) => e.payload.date === entry.payload.date && e.recordId !== entry.recordId);
+  return el('tr', { class: rivals.length ? 'flagged' : null }, [
     el('td', { text: entry.payload.symbol }),
     el('td', { class: 'numeric', text: entry.payload.rate }),
     el('td', {}, [el('span', { class: 'chip', text: provenanceChip(entry.payload, vault.format) })]),
+    keepCell(vault, rivals, 'Two prices for this unit share this date. Keep one.', onChanged),
+  ]);
+}
+
+/** The fault named, and the one way out of it: keeping this entry
+ *  deletes the others for its date (recording-detail.md, Error, two
+ *  entries at this date). */
+function keepCell(vault, rivals, note, onChanged) {
+  if (!rivals.length) return el('td', {});
+  return el('td', {}, [
+    el('span', { class: 'flag-note', text: note }),
+    el('button', {
+      class: 'btn-inline',
+      text: 'Keep this one',
+      onclick: async () => {
+        for (const rival of rivals) await writes.deleteRecord(vault, rival);
+        onChanged();
+      },
+    }),
   ]);
 }
 

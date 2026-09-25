@@ -4,7 +4,7 @@
 import * as api from './api.js';
 import * as decimal from './decimal.js';
 import * as writes from './writes.js';
-import { dialog, el, today } from './dom.js';
+import { dialog, el, resumable, today } from './dom.js';
 import { dateField } from './datepicker.js';
 
 let symbolTable = null;
@@ -289,6 +289,7 @@ export function snapshotDialog(vault, holding, existing, onSaved) {
 
   const close = dialog({
     heading: existing ? 'Edit this value' : `Record a value for ${holding.payload.name}`,
+    resume: resumable(reopenSnapshot, holding.recordId, existing ? existing.recordId : null),
     body: [
       el('div', { class: 'field' }, [
         el('label', { for: 'snapshot-date', text: 'Date' }),
@@ -305,6 +306,15 @@ export function snapshotDialog(vault, holding, existing, onSaved) {
     ],
     actions: [el('button', { class: 'btn-secondary', text: 'Cancel', onclick: () => close() }), submit],
   });
+}
+
+function reopenSnapshot({ vault, reload }, holdingId, snapshotId) {
+  const holding = vault.holdings.get(holdingId);
+  const existing = snapshotId
+    ? vault.snapshotsFor(holdingId).find((s) => s.recordId === snapshotId)
+    : null;
+  if (!holding || (snapshotId && !existing)) return;
+  snapshotDialog(vault, holding, existing, reload);
 }
 
 function confirmReplace(stored, holding, format, onConfirm) {
@@ -353,8 +363,10 @@ function confirmMove(stored, holding, format, onConfirm) {
 
 /** Deleting a holding is the user's choice between two real options,
  *  archive preselected. A holding with no snapshots skips the dialog
- *  and is deleted outright. */
-export function deleteHoldingDialog(vault, holding, onDone) {
+ *  and is deleted outright. `then` names where a dialog reopened after
+ *  a lock goes when it is done, `onDone` being gone with the old
+ *  screen by then. */
+export function deleteHoldingDialog(vault, holding, onDone, then = 'reload') {
   const snapshots = vault.snapshotsFor(holding.recordId);
   if (!snapshots.length) {
     writes.purgeHolding(vault, holding).then(onDone);
@@ -427,6 +439,7 @@ export function deleteHoldingDialog(vault, holding, onDone) {
 
   const close = dialog({
     heading: `Archive or delete ${holding.payload.name}?`,
+    resume: resumable(reopenDeleteHolding, holding.recordId, then),
     body: [
       el('p', {
         text: 'Archive keeps every value you recorded. Your past net worth stays accurate. You can undo this.',
@@ -456,4 +469,9 @@ export function deleteHoldingDialog(vault, holding, onDone) {
       archive,
     ],
   });
+}
+
+function reopenDeleteHolding(context, holdingId, then) {
+  const holding = context.vault.holdings.get(holdingId);
+  if (holding) deleteHoldingDialog(context.vault, holding, context[then], then);
 }

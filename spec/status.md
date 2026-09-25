@@ -18,11 +18,8 @@ Maintained by the compiler agent. Rows are in build order.
 | export-import | x | x | |
 
 Verified means every acceptance criterion in the feature file is
-asserted. The six rows without it are asserted in the parts a server
-and a browser can reach, and carry named gaps in `spec/questions.md`:
-the timing comparisons that need a statistical harness, the
-two-entries-on-one-date fault, and the idle lock firing on its own
-timer.
+asserted. A row without it is asserted in the parts a server and a
+browser can reach, and its named gaps are in `spec/questions.md`.
 
 `admin-invites` comes before `register` because registration consumes
 an invite, and the invite table and `flask create-invite` are what

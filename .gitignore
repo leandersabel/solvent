@@ -16,3 +16,6 @@ instance/
 
 # Vendored node package unpacked for tools/vendor-argon2id.py
 package/
+
+# Real credentials for a manual tester run -- never committed
+*.local.json

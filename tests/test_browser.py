@@ -43,7 +43,14 @@ def instance(tmp_path_factory):
     """A real server on a throwaway database, bound to the loopback
     address Chrome resolves `localhost` to first."""
     database = tmp_path_factory.mktemp("browser") / "solvent.db"
-    env = dict(os.environ, SECRET_KEY="browser-test-key", DATABASE_PATH=str(database))
+    env = dict(
+        os.environ,
+        SECRET_KEY="browser-test-key",
+        DATABASE_PATH=str(database),
+        # The sampled sign-ins spend one salt request each from the
+        # per-IP budget. The limiter still runs on every request.
+        LOGIN_REQUESTS_PER_IP_HOUR="100000",
+    )
     port = free_port()
 
     minted = subprocess.run(
@@ -57,7 +64,9 @@ def instance(tmp_path_factory):
     server = subprocess.Popen(
         [sys.executable, "-m", "flask", "--app", "app", "run",
          "--host", "::1", "--port", str(port)],
-        cwd=REPO_ROOT, env=env, stdout=subprocess.PIPE, stderr=subprocess.STDOUT, text=True,
+        # Nothing reads the request log, and a pipe nobody drains stalls
+        # the server once its buffer fills.
+        cwd=REPO_ROOT, env=env, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL,
     )
     base = f"http://localhost:{port}"
     for _ in range(80):

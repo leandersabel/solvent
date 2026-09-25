@@ -1,6 +1,6 @@
 {
   "feature": "account-settings",
-  "summary": "A vault owner's own settings: the profile record, a change-password path both kinds share, a read-only main currency, dimension configuration, session listing and the idle lock, and self-service account deletion.",
+  "summary": "A vault owner's own settings: the profile record, how dates and numbers read, a change-password path both kinds share, a read-only main currency, dimension configuration, session listing and the idle lock, and self-service account deletion.",
   "read": [
     {"file": "spec/features/account-settings.md", "sections": ["all"]},
     {"file": "spec/architecture.md", "sections": ["Key management", "Credentials and vault key wrappers", "Application hardening", "Data model", "Storage & data handling", "Status codes"]},
@@ -17,8 +17,9 @@
   ],
   "dependsOn": ["app-shell", "record-api", "register", "login", "admin-invites", "export-import"],
   "parameters": {
-    "profilePayload": {"value": "{ mainCurrency required, createdAt required, idleLockMinutes optional 5 to 60 with absent meaning 15, dimensions optional with absent or empty meaning none }. Registration writes the two required keys and nothing else, and both optional keys appear the first time the user sets one", "cite": "spec/features/record-api.md#edge-cases"},
+    "profilePayload": {"value": "{ mainCurrency required, createdAt required, idleLockMinutes optional 5 to 60 with absent meaning 15, locale optional BCP 47 with absent or unrecognized meaning the browser's and never validated against a list, dateStyle optional one of locale dmy ymd mdy, groupSeparator optional one of locale thin apostrophe comma period none, moneyPlaces optional string one of locale 0 2 with locale meaning two, dimensions optional with absent or empty meaning none }. Registration writes the two required keys and nothing else, and each optional key appears the first time the user sets it", "cite": "spec/features/account-settings.md#the-profile-record"},
     "profileSingleton": {"value": "one profile record per vault, the only record guaranteed to exist after registration. The API enforces no singleton, and clients treat the highest version as authoritative", "cite": "spec/features/record-api.md#edge-cases"},
+    "oneFormatter": {"value": "every figure and date reaches the screen through one formatter built from the profile, answering money at moneyPlaces, quantity always at two places, rate at six places, date, and parseDate. Rounding is half-even. parseDate returns nothing rather than guessing: a two-digit year and an impossible date are refused. Defaults are read from Intl at run time, never tabulated. A groupSeparator equal to the locale's decimal point is not applied. No setting writes any record but the profile", "cite": "spec/features/account-settings.md#dates-and-numbers"},
     "changePasswordEndpoint": {"value": "POST /api/auth/change-password { currentAuthKey, salt, kdf, authKey, wrappedDek, dekNonce }. The server verifies currentAuthKey against the stored hash, then replaces the password credential row's params and verifier and, for a vault owner, that credential's one dek_wrappers row, in one transaction. No other row is written", "cite": "spec/features/account-settings.md#change-password"},
     "changePasswordDerivesAtCurrentParameters": {"value": "the client derives the new keys with the server's current default KDF parameters read from the envelope the app shell embeds, not the old ones. A password change is also a KDF upgrade", "cite": "spec/features/account-settings.md#change-password"},
     "changePasswordBar": {"value": "at least 12 characters and zxcvbn at least 3, the same bar as registration", "cite": "spec/features/account-settings.md#change-password"},
@@ -58,6 +59,7 @@
       "hand-built requests that skip the dialog entirely: change-password with a wrong currentAuthKey, and DELETE /api/auth/account with a wrong authKey and with a mismatched confirmUsername",
       "profile records carrying idleLockMinutes of 0, 500 and a non-integer, for the clamping assertion",
       "a profile with no dimensions key at all, for the Total-only dashboard",
+      "profile records carrying each value of dateStyle, groupSeparator and moneyPlaces, a locale tag this engine does not know, and a groupSeparator equal to the locale's decimal point, for the formatter assertions",
       "a profile with an archived dimension and an archived value, plus accounts carrying entries that name them, with every account record captured before and after for byte comparison"
     ],
     "focus": [
@@ -68,7 +70,8 @@
       "archiving a dimension and restoring it must return every account to its band with no account record written in either direction, which is the assertion that catches a tidy-up write",
       "GET /api/sessions must be asserted against the endpoint's full response shape, so the test fails if an IP address or user-agent field is added later. Asserting the absence of a value is not the same as asserting the absence of a field",
       "the password change must keep the initiating session alive while killing every other one, asserted from both sides, because an implementation that kills all of them still passes the half of the criterion people write",
-      "the idle-lock setting must be shown to appear in plaintext nowhere in the database, which means scanning the stored rows rather than trusting that it went into the profile payload"
+      "the idle-lock setting must be shown to appear in plaintext nowhere in the database, which means scanning the stored rows rather than trusting that it went into the profile payload",
+      "the formatter must be asserted on every screen that shows a figure, not on the formatter alone. A screen that formats a number itself passes every formatter test while ignoring the setting"
     ]
   },
   "openQuestions": []

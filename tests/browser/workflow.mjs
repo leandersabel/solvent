@@ -65,6 +65,126 @@ const enterPassword = async (password) => {
   await submit();
 };
 
+// Export the vault, open the file with its own password, and import it
+// back under a freshly generated DEK, exactly as the transfer screen
+// does. Returns what a fresh unlock reads back.
+const importOwnExport = () =>
+  page.eval(`(async () => {
+    const api = await import('/static/js/api.js');
+    const c = await import('/static/js/crypto.js');
+    const s = await import('/static/js/session.js');
+    const { SCHEMA_VERSION } = await import('/static/js/model.js');
+    const file = await (await fetch('/api/export', { headers: { 'X-Solvent-Request': '1' } })).json();
+
+    // Open the file with its own password, exactly as the screen does.
+    const keys = await c.deriveKeys(${JSON.stringify(VAULT_PASSWORD)}, file.salt, file.kdf);
+    const fileDek = await c.unwrapDek(file.wrappedDek, file.dekNonce, keys.masterKey);
+    const plain = [];
+    for (const record of file.records) {
+      plain.push({ record, payload: await c.decryptRecord(fileDek, record) });
+    }
+
+    // Re-key: a freshly generated DEK, never the file's.
+    const newDek = await c.generateDek();
+    const rekeyed = [];
+    for (const { record, payload } of plain) {
+      const slot = {
+        recordId: record.recordId, recordType: record.recordType,
+        accountId: record.accountId ?? null, schemaVersion: SCHEMA_VERSION, version: 1,
+      };
+      rekeyed.push({ ...slot, ...(await c.encryptRecord(newDek, slot, payload)) });
+    }
+    const wrapper = await s.wrapForMaster(newDek);
+    await api.post('/api/import', { ...wrapper, records: rekeyed });
+
+    // Read the vault back from scratch, as a fresh unlock would.
+    const { Vault } = await import('/static/js/model.js');
+    const reopened = new Vault(newDek);
+    await reopened.load();
+    const fileRaw = c.b64encode(new Uint8Array(await crypto.subtle.exportKey('raw', fileDek)));
+    const newRaw = c.b64encode(new Uint8Array(await crypto.subtle.exportKey('raw', newDek)));
+    return JSON.stringify({
+      names: [...reopened.holdings.values()].map(h => h.payload.name).sort(),
+      unreadable: reopened.unreadable.length,
+      rekeyed: fileRaw !== newRaw,
+      kinds: [...new Set(file.records.map(r => r.recordType))].sort(),
+    });
+  })()`);
+
+// Records the client's own rules would never write, encrypted with the
+// page's own crypto under the unlocked vault's DEK and PUT straight to
+// the record API. Each is { type, payload, accountId?, recordId?,
+// version? }; the ids come back in order.
+const plant = (records) =>
+  page.eval(`(async () => {
+    const api = await import('/static/js/api.js');
+    const c = await import('/static/js/crypto.js');
+    const s = await import('/static/js/session.js');
+    const { SCHEMA_VERSION } = await import('/static/js/model.js');
+    const dek = s.currentVault().dek;
+    const ids = [];
+    for (const r of ${JSON.stringify(records)}) {
+      const slot = {
+        recordId: r.recordId || c.uuid4(), recordType: r.type, accountId: r.accountId ?? null,
+        schemaVersion: SCHEMA_VERSION, version: r.version || 1,
+      };
+      const blob = await c.encryptRecord(dek, slot, r.payload);
+      await api.put('/api/records/' + slot.recordId, {
+        recordType: slot.recordType, accountId: slot.accountId,
+        schemaVersion: slot.schemaVersion, version: slot.version, ...blob,
+      });
+      ids.push(slot.recordId);
+    }
+    return ids;
+  })()`);
+
+// A clock the test can move, installed before any page script runs.
+// Every timer still fires on its own in real time; `advance` moves the
+// clock forward and fires whatever has fallen due, so a fifteen-minute
+// idle period passes in a call.
+const CLOCK = `(() => {
+  const realSet = window.setTimeout.bind(window);
+  const realClear = window.clearTimeout.bind(window);
+  const pending = new Map();
+  let offset = 0;
+  window.setTimeout = (fn, delay = 0, ...args) => {
+    const id = realSet(() => { pending.delete(id); fn(...args); }, delay);
+    pending.set(id, { fn, args, due: performance.now() + offset + Number(delay) });
+    return id;
+  };
+  window.clearTimeout = (id) => { pending.delete(id); realClear(id); };
+  window.testClock = {
+    advance(ms) {
+      offset += ms;
+      const now = performance.now() + offset;
+      for (const [id, timer] of [...pending]) {
+        if (timer.due > now) continue;
+        pending.delete(id);
+        realClear(id);
+        timer.fn(...timer.args);
+      }
+    },
+  };
+})();`;
+const MINUTE = 60000;
+
+// Which of `needles` a devtools user could still find: every string
+// reachable from the page's heap, after a collection.
+const reachable = async (needles) => {
+  const chunks = [];
+  const collect = (message) => {
+    if (message.method === 'HeapProfiler.addHeapSnapshotChunk') chunks.push(message.params.chunk);
+  };
+  page.on(collect);
+  await page.send('HeapProfiler.enable');
+  await page.send('HeapProfiler.collectGarbage');
+  await page.send('HeapProfiler.takeHeapSnapshot', { reportProgress: false });
+  await page.send('HeapProfiler.disable');
+  page.handlers = page.handlers.filter((h) => h !== collect);
+  const { strings } = JSON.parse(chunks.join(''));
+  return needles.filter((needle) => strings.some((s) => s.includes(needle)));
+};
+
 try {
   // ---- The administrator, from the bootstrap invite ---------------
 
@@ -619,48 +739,7 @@ try {
     JSON.stringify(beforeImport),
   );
 
-  const imported = JSON.parse(await page.eval(`(async () => {
-    const api = await import('/static/js/api.js');
-    const c = await import('/static/js/crypto.js');
-    const s = await import('/static/js/session.js');
-    const { SCHEMA_VERSION } = await import('/static/js/model.js');
-    const file = await (await fetch('/api/export', { headers: { 'X-Solvent-Request': '1' } })).json();
-
-    // Open the file with its own password, exactly as the screen does.
-    const keys = await c.deriveKeys(${JSON.stringify(VAULT_PASSWORD)}, file.salt, file.kdf);
-    const fileDek = await c.unwrapDek(file.wrappedDek, file.dekNonce, keys.masterKey);
-    const plain = [];
-    for (const record of file.records) {
-      plain.push({ record, payload: await c.decryptRecord(fileDek, record) });
-    }
-
-    // Re-key: a freshly generated DEK, never the file's.
-    const newDek = await c.generateDek();
-    const rekeyed = [];
-    for (const { record, payload } of plain) {
-      const slot = {
-        recordId: record.recordId, recordType: record.recordType,
-        accountId: record.accountId ?? null, schemaVersion: SCHEMA_VERSION, version: 1,
-      };
-      rekeyed.push({ ...slot, ...(await c.encryptRecord(newDek, slot, payload)) });
-    }
-    const wrapper = await s.wrapForMaster(newDek);
-    await api.post('/api/import', { ...wrapper, records: rekeyed });
-
-    // Read the vault back from scratch, as a fresh unlock would.
-    const { Vault } = await import('/static/js/model.js');
-    const reopened = new Vault(newDek);
-    await reopened.load();
-    const fileRaw = c.b64encode(new Uint8Array(await crypto.subtle.exportKey('raw', fileDek)));
-    const newRaw = c.b64encode(new Uint8Array(await crypto.subtle.exportKey('raw', newDek)));
-    return JSON.stringify({
-      names: [...reopened.holdings.values()].map(h => h.payload.name).sort(),
-      unreadable: reopened.unreadable.length,
-      versions: [...new Set(file.records.map(() => 1))],
-      rekeyed: fileRaw !== newRaw,
-      kinds: [...new Set(file.records.map(r => r.recordType))].sort(),
-    });
-  })()`));
+  const imported = JSON.parse(await importOwnExport());
 
   check('an import round-trips every holding', imported.names.join(',') === beforeImport.names.join(','), imported.names.join(','));
   check('every record reads back after the import', imported.unreadable === 0, String(imported.unreadable));
@@ -694,6 +773,583 @@ try {
     const blob = JSON.stringify(localStorage) + JSON.stringify(sessionStorage);
     return blob === '{}{}' || (!blob.includes('Dek') && !blob.includes('authKey') && !blob.includes('key'));
   })()`));
+
+  // ---- Two entries on one date -------------------------------------------
+
+  // The client refuses to create this state, so it is planted behind
+  // the client and read back by a fresh unlock. Everything sits in
+  // 2020, before any other figure in the vault, so every chart point
+  // there is the probes' alone.
+  const unlockDashboard = async (label) => {
+    await page.goto(`${BASE}/dashboard`);
+    await enterPassword(VAULT_PASSWORD);
+    await page.waitUntil("document.querySelector('svg.trend')", { timeout: 90000, label });
+    await page.settle(1000);
+  };
+  const holding = (name, unit) => ({
+    type: 'account',
+    payload: { name, unit, dims: {}, note: null, archivedAt: null, createdAt: '2020-01-01T00:00:00Z' },
+  });
+  const figure = (accountId, date, value) => ({ type: 'snapshot', accountId, payload: { date, value, note: null } });
+  const price = (symbol, date, rate) => ({
+    type: 'rate',
+    payload: { symbol, date, rate, rateTarget: 'CHF', rateSource: 'manual', rateAsOf: date, proposedRate: null },
+  });
+
+  await enterPassword(VAULT_PASSWORD);
+  await page.waitUntil("document.querySelector('svg.trend')", { timeout: 90000, label: 'the dashboard to plant into' });
+  const [euro, sterling, francs] = await plant([
+    holding('Probe euro', 'PROBE-E'),
+    holding('Probe sterling', 'PROBE-S'),
+    holding('Probe francs', 'CHF'),
+  ]);
+  const planted = await plant([
+    // Two differing prices at 11 January between 1.00 and 1.20.
+    figure(euro, '2020-01-01', '1000'),
+    figure(euro, '2020-01-11', '1000'),
+    price('PROBE-E', '2020-01-01', '1.00'),
+    price('PROBE-E', '2020-01-11', '1.40'),
+    price('PROBE-E', '2020-01-11', '1.60'),
+    price('PROBE-E', '2020-01-21', '1.20'),
+    price('PROBE-E', '2020-03-11', '1.00'),
+    // A pair that is the symbol's only entry.
+    figure(sterling, '2020-02-01', '500'),
+    price('PROBE-S', '2020-02-01', '1.10'),
+    price('PROBE-S', '2020-02-01', '1.30'),
+    // Two differing figures at 11 March between 1000 and 2000.
+    figure(francs, '2020-03-01', '1000'),
+    figure(francs, '2020-03-11', '5000'),
+    figure(francs, '2020-03-11', '7000'),
+    figure(francs, '2020-03-21', '2000'),
+    // Pure duplication, byte for byte.
+    price('PROBE-I', '2020-04-01', '2.00'),
+    price('PROBE-I', '2020-04-01', '2.00'),
+  ]);
+  const identical = planted.slice(-2);
+  // One of the differing prices carries a higher version, so a rule
+  // preferring it would read one entry before an export and the other
+  // after, since import resets every version to 1.
+  await plant([{ ...price('PROBE-E', '2020-01-11', '1.60'), recordId: planted[4], version: 2 }]);
+  await unlockDashboard('the dashboard over the planted pairs');
+
+  const moneyOf = (value) =>
+    `(await import('/static/js/session.js')).currentVault().format.money((await import('/static/js/decimal.js')).parse('${value}'))`;
+  // The chart's own table, read at one date, beside the figure that
+  // date should carry.
+  const chartAt = (date, expected) =>
+    page.eval(`(async () => {
+      const v = (await import('/static/js/session.js')).currentVault();
+      [...document.querySelectorAll('.range-buttons button')].find(b => b.textContent === 'All').click();
+      await new Promise(r => setTimeout(r, 300));
+      const row = [...document.querySelectorAll('details table tbody tr')]
+        .find(r => r.cells[0].textContent === v.format.date('${date}'));
+      return JSON.stringify({ shown: row ? row.cells[1].textContent : null, expected: ${moneyOf(expected)} });
+    })()`).then(JSON.parse);
+  const banner = () => labels('.banner-critical button');
+  // What the screens make of the planted pairs, for comparing one
+  // client's reading with another's.
+  const picture = async () => {
+    await page.eval("[...document.querySelectorAll('.range-buttons button')].find(b => b.textContent === 'All').click()");
+    await page.settle(300);
+    return JSON.stringify({
+      banner: (await banner()).filter((line) => !line.includes('PROBE-I')).sort(),
+      chart: (await page.eval("[...document.querySelectorAll('details table tbody tr')].map(r => r.textContent)"))
+        .filter((row) => row.includes('2020')),
+      notPriced: await page.eval(`(() => {
+        const group = [...document.querySelectorAll('.table-group')].find(g => g.textContent.includes('Not priced'));
+        return group ? [...group.querySelectorAll('.link-button')].map(b => b.textContent).sort() : [];
+      })()`),
+      hero: await page.eval("document.querySelector('.hero-figure').textContent"),
+    });
+  };
+
+  const between = await chartAt('2020-01-11', '1100');
+  check(
+    'a symbol with two differing prices on one date prices it from its neighbours',
+    between.shown !== null && between.shown === between.expected,
+    JSON.stringify(between),
+  );
+  check(
+    'the dashboard names the price fault',
+    (await banner()).some((line) => line.includes('PROBE-E') && line.startsWith('Two entries on')),
+    (await banner()).join(' | '),
+  );
+  const notPriced = JSON.parse(await picture()).notPriced;
+  check(
+    'a pair that is its symbol\'s only entry leaves the holding not priced',
+    notPriced.includes('Probe sterling'),
+    notPriced.join(','),
+  );
+  const figuresAt = await chartAt('2020-03-11', '2500');
+  check(
+    'the chart leaves two figures on one date out and runs between their neighbours',
+    figuresAt.shown !== null && figuresAt.shown === figuresAt.expected,
+    JSON.stringify(figuresAt),
+  );
+  check(
+    'the dashboard names the figure fault',
+    (await banner()).some((line) => line.includes('Probe francs') && line.startsWith('Two entries on')),
+    (await banner()).join(' | '),
+  );
+  const identicalLeft = await page.eval(`(async () => {
+    const api = await import('/static/js/api.js');
+    const rows = await api.get('/api/records?type=rate');
+    return rows.filter(r => ${JSON.stringify(identical)}.includes(r.recordId)).length;
+  })()`);
+  check('a byte-identical pair of prices leaves exactly one record', identicalLeft === 1, `${identicalLeft} left`);
+  const inOrder = await picture();
+
+  await page.eval(`location.hash = '#/holding/${francs}'`);
+  await page.waitUntil("document.querySelector('.card .data-table')", { label: "the probe holding's screen" });
+  await page.settle(400);
+  const history = JSON.parse(await page.eval(`JSON.stringify([...document.querySelectorAll('.card .data-table tbody tr')]
+    .map(r => ({ flagged: r.classList.contains('flagged'), keep: r.textContent.includes('Keep this one'), text: r.textContent })))`));
+  const pair = history.filter((row) => row.flagged);
+  check(
+    'the holding page shows both figures on one date flagged, each offering Keep this one',
+    history.length === 4 && pair.length === 2 && pair.every((row) => row.keep),
+    history.map((row) => `${row.flagged ? 'flagged ' : ''}${row.text}`).join(' | '),
+  );
+
+  const flaggedOnRecording = async (date, symbolOrName) => {
+    await page.eval(`location.hash = '#/recording/${date}'`);
+    await page.waitUntil("document.querySelector('.screen-heading')", { label: `the recording for ${date}` });
+    await page.settle(400);
+    return JSON.parse(await page.eval(`JSON.stringify([...document.querySelectorAll('.data-table tbody tr')]
+      .filter(r => r.cells[0].textContent === ${JSON.stringify(symbolOrName)})
+      .map(r => ({ flagged: r.classList.contains('flagged'), keep: r.textContent.includes('Keep this one') })))`));
+  };
+  const prices = await flaggedOnRecording('2020-01-11', 'PROBE-E');
+  check(
+    'the recording shows both differing prices flagged, each offering Keep this one',
+    prices.length === 2 && prices.every((row) => row.flagged && row.keep),
+    JSON.stringify(prices),
+  );
+  const figures = await flaggedOnRecording('2020-03-11', 'Probe francs');
+  check(
+    'the recording shows both figures on one date flagged, each offering Keep this one',
+    figures.length === 2 && figures.every((row) => row.flagged && row.keep),
+    JSON.stringify(figures),
+  );
+
+  // A second client, handed every record list in the opposite order.
+  await page.send('Fetch.enable', { patterns: [{ urlPattern: '*/api/records*', requestStage: 'Response' }] });
+  const reverse = async (message) => {
+    if (message.method !== 'Fetch.requestPaused') return;
+    const { requestId, request, responseHeaders = [] } = message.params;
+    if (request.method !== 'GET' || !request.url.includes('?type=')) {
+      await page.send('Fetch.continueRequest', { requestId });
+      return;
+    }
+    const { body, base64Encoded } = await page.send('Fetch.getResponseBody', { requestId });
+    const rows = JSON.parse(base64Encoded ? Buffer.from(body, 'base64').toString() : body);
+    await page.send('Fetch.fulfillRequest', {
+      requestId,
+      responseCode: 200,
+      responseHeaders: responseHeaders.filter((h) => h.name.toLowerCase() !== 'content-length'),
+      body: Buffer.from(JSON.stringify(rows.reverse())).toString('base64'),
+    });
+  };
+  page.on(reverse);
+  try {
+    await unlockDashboard('the dashboard over reversed records');
+    const reversed = await picture();
+    check('the planted pairs read the same in either order', reversed === inOrder, `${inOrder} vs ${reversed}`);
+  } finally {
+    page.handlers = page.handlers.filter((h) => h !== reverse);
+    await page.send('Fetch.disable');
+  }
+
+  const roundTrip = JSON.parse(await importOwnExport());
+  check('the planted vault survives the round trip', roundTrip.unreadable === 0, String(roundTrip.unreadable));
+  await unlockDashboard('the dashboard after the round trip');
+  const afterImport = await picture();
+  check('the planted pairs read the same after an export and import', afterImport === inOrder, `${inOrder} vs ${afterImport}`);
+
+  // ---- The idle lock ----------------------------------------------------
+
+  // Every document from here on carries the movable clock. Real input
+  // through the protocol is the activity, so the reset is the one a
+  // person's keystroke triggers.
+  await page.send('Page.addScriptToEvaluateOnNewDocument', { source: CLOCK });
+  const advance = (ms) => page.eval(`window.testClock.advance(${ms})`);
+  const activity = async () => {
+    for (const type of ['keyDown', 'keyUp']) {
+      await page.send('Input.dispatchKeyEvent', { type, key: 'Shift', code: 'ShiftLeft', windowsVirtualKeyCode: 16 });
+    }
+  };
+  const locked = () => page.eval("Boolean(document.querySelector('#unlock-password'))");
+  // Short of the period by a margin wider than the real time the checks
+  // take, and then past it.
+  const MARGIN = MINUTE;
+  const lockPeriod = async (minutes) => {
+    await activity();
+    await advance(minutes * MINUTE - MARGIN);
+    const early = await locked();
+    await advance(MARGIN);
+    return { early, late: await locked() };
+  };
+
+  await unlockDashboard('the dashboard under the movable clock');
+  const heroFigure = await page.eval("document.querySelector('.hero-figure').textContent");
+  // The strings a devtools user would look for: every holding name and
+  // every figure distinctive enough not to occur by chance.
+  const secrets = JSON.parse(await page.eval(`(async () => {
+    const v = (await import('/static/js/session.js')).currentVault();
+    const names = [...v.holdings.values()].map(h => h.payload.name);
+    const values = [...v.snapshots.values()].flat().map(s => s.payload.value).filter(x => x.length >= 7);
+    return JSON.stringify([...new Set([...names, ...values])]);
+  })()`));
+  const seen = await reachable(secrets);
+  check(
+    'the heap probe finds the decrypted vault while unlocked',
+    seen.length === secrets.length,
+    secrets.filter((secret) => !seen.includes(secret)).join(','),
+  );
+
+  await activity();
+  await advance(15 * MINUTE - MARGIN);
+  check('the vault stays unlocked short of fifteen idle minutes', !(await locked()));
+  await activity();
+  await advance(15 * MINUTE - MARGIN);
+  check('activity starts the idle period again', !(await locked()));
+  await advance(MARGIN);
+  check('the vault locks itself after fifteen idle minutes', await locked());
+
+  check('the idle lock shows the unlock card', (await text()).includes('Solvent cannot recover a lost password'));
+  check('unlocking after the idle lock asks only for the password', !(await page.eval("Boolean(document.querySelector('#unlock-username'))")));
+  const screen = await text();
+  check(
+    'the idle lock leaves no decrypted name or figure on screen',
+    [...secrets, heroFigure].every((secret) => !screen.includes(secret)),
+    [...secrets, heroFigure].filter((secret) => screen.includes(secret)).join(','),
+  );
+  check(
+    'the idle lock drops the in-memory vault',
+    await page.eval("(async () => (await import('/static/js/session.js')).currentVault() === null)()"),
+  );
+  const left = await reachable(secrets);
+  check('nothing decrypted is reachable after the idle lock', left.length === 0, left.join(','));
+
+  const reads = () => page.eval("performance.getEntriesByType('resource').filter(e => e.name.includes('/api/records?type=')).length");
+  const readsBefore = await reads();
+  await enterPassword(VAULT_PASSWORD);
+  await page.waitUntil("document.querySelector('svg.trend')", { timeout: 90000, label: 'the dashboard after the idle lock' });
+  check('unlocking after the idle lock re-reads every record type', (await reads()) - readsBefore === 4, `${(await reads()) - readsBefore} reads`);
+
+  // A period chosen on the settings screen.
+  await page.eval(`document.querySelector('.topbar nav a[href="#/settings"]').click()`);
+  await page.waitUntil("document.body.innerText.includes('Session and lock')", { label: 'the session card' });
+  await page.settle(400);
+  const idleSelect = "[...document.querySelectorAll('.card')].find(c => c.textContent.includes('Session and lock')).querySelector('select')";
+  // The keystroke that chose it is the last activity there is, so the
+  // new period has to count from the save rather than wait for more.
+  await activity();
+  await page.eval(`(() => {
+    const select = ${idleSelect};
+    select.value = '5';
+    select.dispatchEvent(new Event('change', { bubbles: true }));
+  })()`);
+  await page.settle(1500);
+  await advance(5 * MINUTE - MARGIN);
+  const chosenEarly = await locked();
+  await advance(MARGIN);
+  check(
+    'a changed period locks at the new one with no activity after the change',
+    !chosenEarly && (await locked()),
+    `locked before five minutes: ${chosenEarly}`,
+  );
+
+  // Signed out, and signed back in with the username.
+  await page.eval(`fetch('/api/auth/logout', {
+    method: 'POST', headers: { 'X-Solvent-Request': '1', 'Content-Type': 'application/json' }, body: '{}',
+  }).then(r => r.status)`);
+  await page.goto(`${BASE}/dashboard`);
+  await setValue('#unlock-username', 'leander');
+  await enterPassword(VAULT_PASSWORD);
+  await page.waitUntil("document.querySelector('svg.trend')", { timeout: 90000, label: 'the dashboard after signing in again' });
+  await page.settle(700);
+  const again = await lockPeriod(5);
+  check('the chosen period survives signing out and back in', !again.early && again.late, JSON.stringify(again));
+
+  // Another device: a second browser with a profile of its own.
+  const other = await launch();
+  try {
+    const second = await Session.connect(other.target);
+    await second.send('Page.enable');
+    await second.send('Runtime.enable');
+    await second.goto(`${BASE}/settings`);
+    await second.eval(`(() => {
+      const set = (selector, value) => {
+        const node = document.querySelector(selector);
+        node.value = value;
+        node.dispatchEvent(new Event('input', { bubbles: true }));
+      };
+      set('#unlock-username', 'leander');
+      set('#unlock-password', ${JSON.stringify(VAULT_PASSWORD)});
+      document.querySelector('button[type=submit]').click();
+    })()`);
+    await second.waitUntil("document.body.innerText.includes('Session and lock')", { timeout: 90000, label: 'settings on the second device' });
+    await second.settle(400);
+    const shown = await second.eval(
+      "[...document.querySelectorAll('.card')].find(c => c.textContent.includes('Session and lock')).querySelector('select').value",
+    );
+    check('the chosen period follows you to another device', shown === '5', shown);
+  } finally {
+    other.child.kill();
+  }
+
+  // Values the settings screen cannot write, planted in the profile.
+  const plantIdle = (value) =>
+    page.eval(`(async () => {
+      const v = (await import('/static/js/session.js')).currentVault();
+      return JSON.stringify({ recordId: v.profileRecord.recordId, version: v.profileRecord.version, profile: v.profile });
+    })()`).then(JSON.parse).then(({ recordId, version, profile }) =>
+      plant([{ type: 'profile', recordId, version: version + 1, payload: { ...profile, idleLockMinutes: value } }]));
+  for (const [stored, minutes] of [[0, 5], [500, 60], [7, 5], [7.5, 5]]) {
+    await unlockDashboard(`the dashboard to store ${stored}`);
+    await plantIdle(stored);
+    await unlockDashboard(`the dashboard with ${stored} stored`);
+    await page.eval(`document.querySelector('.topbar nav a[href="#/settings"]').click()`);
+    await page.waitUntil("document.body.innerText.includes('Session and lock')", { label: `settings with ${stored} stored` });
+    await page.settle(300);
+    const shown = await page.eval(`${idleSelect}.value`);
+    const clamped = await lockPeriod(minutes);
+    check(
+      `a stored idle lock of ${stored} locks at ${minutes} minutes and the select shows ${minutes}`,
+      !clamped.early && clamped.late && shown === String(minutes),
+      JSON.stringify({ ...clamped, shown }),
+    );
+  }
+
+  // An open form with typed input, which is the one thing a lock keeps.
+  const unlockInPlace = async (label) => {
+    await enterPassword(VAULT_PASSWORD);
+    await page.waitUntil("!document.querySelector('#unlock-password')", { timeout: 90000, label });
+    await page.settle(600);
+  };
+  const idleLock = async () => {
+    await activity();
+    await advance(60 * MINUTE);
+    await page.settle(200);
+  };
+  await unlockDashboard('the dashboard before typing');
+  await page.eval("document.querySelector('.data-table tbody .link-button').click()");
+  await page.waitUntil("location.hash.startsWith('#/holding/')", { label: 'a holding to type into' });
+  await page.settle(400);
+  const typedAt = await page.eval('location.hash');
+  const typedFor = await page.eval("document.querySelector('.screen-heading').textContent");
+  await click('Record a value');
+  await page.waitUntil("document.querySelector('#snapshot-value')", { label: 'the value form' });
+  await setValue('#snapshot-value', '777.12');
+  await page.settle(300);
+  await idleLock();
+  check('an open form is idle-locked too', await locked());
+  check('the lock closes the open form', !(await page.eval("Boolean(document.querySelector('.dialog'))")));
+  const withForm = await text();
+  check(
+    'an open form leaves no decrypted name or figure on screen after the idle lock',
+    secrets.every((secret) => !withForm.includes(secret)),
+    secrets.filter((secret) => withForm.includes(secret)).join(','),
+  );
+  const leftWithForm = await reachable(secrets);
+  check('an open form keeps nothing decrypted reachable after the idle lock', leftWithForm.length === 0, leftWithForm.join(','));
+  await unlockInPlace('the vault after unlocking over the form');
+  check('unlocking returns to the screen the lock found', (await page.eval('location.hash')) === typedAt);
+  check(
+    'the same form is open again after unlocking',
+    (await page.eval("document.querySelector('.dialog-heading')?.textContent")) === `Record a value for ${typedFor}`,
+  );
+  check(
+    'typed input is still there after unlocking',
+    (await page.eval("document.querySelector('#snapshot-value')?.value")) === '777.12',
+  );
+  await click('Cancel');
+  await page.settle(300);
+
+  // A prefilled field left alone is vault content, not typing.
+  await click('Edit');
+  await page.waitUntil("document.querySelector('#holding-name')", { label: 'the holding editor' });
+  await page.settle(400);
+  await page.eval("document.querySelectorAll('#app details').forEach(d => (d.open = true))");
+  await setValue('#app textarea', 'typed before the lock');
+  await idleLock();
+  const leftWithEditor = await reachable(secrets);
+  check(
+    'a prefilled field left alone keeps nothing decrypted reachable across the lock',
+    leftWithEditor.length === 0,
+    leftWithEditor.join(','),
+  );
+  await unlockInPlace('the vault after unlocking over the editor');
+  const editor = JSON.parse(await page.eval(`JSON.stringify({
+    hash: location.hash,
+    name: document.querySelector('#holding-name')?.value,
+    note: document.querySelector('#app textarea')?.value,
+  })`));
+  check(
+    'the holding editor comes back with the edited note and the name read afresh',
+    editor.hash === `${typedAt}/edit` && editor.name === typedFor && editor.note === 'typed before the lock',
+    JSON.stringify(editor),
+  );
+
+  // Figures typed on the sweep, the case the exception exists for.
+  await page.eval("[...document.querySelectorAll('.topbar-actions button')].find(b => b.textContent.trim() === 'Update values').click()");
+  await page.waitUntil("location.hash.startsWith('#/sweep/')", { label: 'the sweep to type into' });
+  await page.settle(1200);
+  const typeRow = (index, value) =>
+    page.eval(`(() => {
+      const field = document.querySelectorAll('.sweep-row input')[${index}];
+      field.value = ${JSON.stringify(value)};
+      field.dispatchEvent(new Event('input', { bubbles: true }));
+    })()`);
+  await typeRow(0, '4321.09');
+  await typeRow(1, '98.7654');
+  const sweepAt = await page.eval('location.hash');
+  const sweepRows = () =>
+    page.eval(`JSON.stringify([...document.querySelectorAll('.sweep-row')].slice(0, 2)
+      .map(r => [r.querySelector('input').value, r.querySelector('.hint').textContent]))`);
+  const typedRows = await sweepRows();
+  await idleLock();
+  check('the sweep is idle-locked', await locked());
+  await unlockInPlace('the vault after unlocking over the sweep');
+  const backRows = await sweepRows();
+  check(
+    'figures typed on the sweep are back after unlocking, with what they convert to',
+    (await page.eval('location.hash')) === sweepAt && backRows === typedRows && typedRows.includes('4321.09'),
+    `${typedRows} vs ${backRows}`,
+  );
+
+  // A password never survives, typed or shown.
+  await page.eval(`document.querySelector('.topbar nav a[href="#/settings"]').click()`);
+  await page.waitUntil("document.querySelector('input[autocomplete=current-password]')", { label: 'the password card' });
+  await page.settle(400);
+  const passwordCard = "[...document.querySelectorAll('.card')].find(c => c.querySelector('input[autocomplete=new-password]'))";
+  // Made up inside the page, so no script source the test sent carries
+  // them and the heap search below finds only what the page kept.
+  const typedPasswords = JSON.parse(await page.eval(`(() => {
+    const fields = ${passwordCard}.querySelectorAll('input');
+    const type = (field) => {
+      field.value = 'pw-' + crypto.randomUUID();
+      field.dispatchEvent(new Event('input', { bubbles: true }));
+      return field.value;
+    };
+    const typed = [type(fields[0])];
+    fields[1].closest('.password-field').querySelector('button').click();
+    typed.push(type(fields[1]));
+    return JSON.stringify(typed);
+  })()`));
+  const shownType = await page.eval(`${passwordCard}.querySelectorAll('input')[1].type`);
+  await idleLock();
+  const keptPasswords = await reachable(typedPasswords);
+  check(
+    'no password typed into settings is kept across the lock, shown or not',
+    shownType === 'text' && keptPasswords.length === 0,
+    `${keptPasswords.length} kept, the second field was ${shownType}`,
+  );
+  await unlockInPlace('the vault after unlocking over the password card');
+  const passwords = await page.eval(`JSON.stringify([...${passwordCard}.querySelectorAll('input')].map(f => f.value))`);
+  check(
+    'no password field is refilled after unlocking',
+    JSON.parse(passwords).every((value) => value === ''),
+    passwords,
+  );
+
+  // ---- The sign-in wait ---------------------------------------------------
+
+  // login.md: the time from submitting the sign-in form to the Auth Key
+  // leaving the browser is statistically indistinguishable for an
+  // administrator, a vault owner and a stranger. The stopwatch runs in
+  // the page, from the form's submit event to the call that hands the
+  // login request to the network. That call is held back, so no
+  // sampled attempt reaches the login endpoint or counts against an
+  // account. The salt request goes out for real, because its answer is
+  // what the derivation runs on.
+  //
+  // The method is tests/test_timing.py's: one sign-in per case per
+  // round in a fresh random order, the first round discarded because
+  // it starts the worker and loads the WebAssembly, and every pair of
+  // medians held within one interquartile range of a single sign-in.
+  // The round count keeps the standard error of a median difference
+  // at about a fifth of that range, so noise alone does not reach the
+  // margin, while skipping the derivation for one case moves its
+  // median by the whole derivation.
+  const timing = await launch();
+  try {
+    const clean = await Session.connect(timing.target);
+    await clean.send('Page.enable');
+    await clean.send('Runtime.enable');
+    await clean.goto(`${BASE}/login`);
+    await clean.eval(`(() => {
+      window.__waits = [];
+      let started = 0;
+      document.addEventListener('submit', () => { started = performance.now(); }, true);
+      const send = window.fetch;
+      window.fetch = (input, init) => {
+        if (String(input).endsWith('/api/auth/login')) {
+          window.__waits.push(performance.now() - started);
+          return Promise.reject(new TypeError('held back by the timing harness'));
+        }
+        return send(input, init);
+      };
+    })()`);
+    const signIn = (username) =>
+      clean.eval(`(async () => {
+        const set = (selector, value) => {
+          const node = document.querySelector(selector);
+          node.value = value;
+          node.dispatchEvent(new Event('input', { bubbles: true }));
+        };
+        const before = window.__waits.length;
+        set('#unlock-username', ${JSON.stringify(username)});
+        set('#unlock-password', ${JSON.stringify(VAULT_PASSWORD)});
+        const button = document.querySelector('button[type=submit]');
+        button.click();
+        while (window.__waits.length === before || button.disabled) {
+          await new Promise((r) => setTimeout(r, 25));
+        }
+        return window.__waits[before];
+      })()`);
+
+    const cases = { 'vault owner': 'leander', administrator: 'ops.leander', unknown: 'nobody-at-all' };
+    const waits = Object.fromEntries(Object.keys(cases).map((name) => [name, []]));
+    const ROUNDS = 44;
+    for (let round = 0; round <= ROUNDS; round++) {
+      const order = Object.keys(cases).sort(() => Math.random() - 0.5);
+      for (const name of order) {
+        const wait = await signIn(cases[name]);
+        if (round) waits[name].push(wait);
+      }
+    }
+
+    const median = (values) => {
+      const sorted = [...values].sort((a, b) => a - b);
+      const middle = Math.floor(sorted.length / 2);
+      return sorted.length % 2 ? sorted[middle] : (sorted[middle - 1] + sorted[middle]) / 2;
+    };
+    const iqr = (values) => {
+      const sorted = [...values].sort((a, b) => a - b);
+      const half = Math.floor(sorted.length / 2);
+      return median(sorted.slice(sorted.length - half)) - median(sorted.slice(0, half));
+    };
+    const summary = Object.entries(waits)
+      .map(([name, values]) => `${name} ${median(values).toFixed(1)} ms, spread ${iqr(values).toFixed(1)} ms`)
+      .join(', ');
+    console.log(`sign-in wait: ${summary}`);
+    const names = Object.keys(waits);
+    for (const [i, a] of names.entries()) {
+      for (const b of names.slice(i + 1)) {
+        const gap = Math.abs(median(waits[a]) - median(waits[b]));
+        const spread = (iqr(waits[a]) + iqr(waits[b])) / 2;
+        check(
+          `the sign-in wait is the same for ${a} and ${b}`,
+          gap <= spread,
+          `${gap.toFixed(1)} ms apart against a spread of ${spread.toFixed(1)} ms, ${summary}`,
+        );
+      }
+    }
+  } finally {
+    timing.child.kill();
+  }
 } catch (error) {
   check('the workflow ran to the end', false, error.message);
 } finally {

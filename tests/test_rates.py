@@ -351,6 +351,20 @@ def test_has_adapter_is_read_only(admin):
     ).status_code == 400
 
 
+def test_a_symbol_has_one_spelling(admin):
+    for symbol in ("usd", "xau-ozt", "XAU-OZT", "XAU-ozt-g", "-XAU", "X" * 17):
+        assert admin.post(
+            "/api/admin/symbols",
+            json={"symbol": symbol, "label": "X", "kind": "metal", "lookup": False},
+            headers=CSRF,
+        ).status_code == 400, symbol
+    assert admin.post(
+        "/api/admin/symbols",
+        json={"symbol": "XRH-ozt", "label": "Rhodium", "kind": "metal", "lookup": False},
+        headers=CSRF,
+    ).status_code in (200, 201)
+
+
 def test_lookup_cannot_promise_a_proposal_the_proxy_cannot_serve(admin):
     assert admin.patch(
         "/api/admin/symbols/XAG-ozt", json={"lookup": True}, headers=CSRF

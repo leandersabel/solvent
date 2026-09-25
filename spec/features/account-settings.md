@@ -46,7 +46,7 @@ registration, and the complete payload is:
   import (Main currency, below).
 - **`createdAt`** — required. Written once at registration, never
   rewritten.
-- **`idleLockMinutes`** — optional, 5–60, absent means 15 (Session and
+- **`idleLockMinutes`** — optional, one of the offered periods, absent means 15 (Session and
   lock).
 - **`locale`** — optional, a BCP 47 tag, absent or unrecognized means
   the browser's (Dates and numbers). Never validated against a fixed
@@ -64,8 +64,8 @@ registration, and the complete payload is:
   no dimensions.
 
 Registration writes the two required keys and nothing else
-(`register.md`), and both optional keys appear the first time the user
-sets one. Two things read the *whole* payload and need its bounds:
+(`register.md`), and each optional key appears the first time the user
+sets it. Two things read the *whole* payload and need its bounds:
 `schema_version` migration (`record-api.md`) and import validation
 (`export-import.md`).
 
@@ -283,7 +283,12 @@ Found for an administrator session.
   - **User-configurable, 5–60 minutes, default 15.** Stored as
     `idleLockMinutes` in the encrypted profile record, so it follows the
     user across devices and the server never sees it; absent means 15.
-    Values outside the range are clamped client-side.
+    The period is one of the values the Idle lock select offers
+    (`ui/settings.md`). Any other stored number, a fraction included,
+    locks at the nearest of them and the shorter on a tie, because
+    shorter is the safe direction. A stored value that is not a number
+    means 15. A changed period applies at once, not from the next
+    activity.
   - The range is bounded at both ends deliberately. Re-unlocking costs a
     full Argon2id derivation, a fraction of a second on a desktop
     browser and about two seconds on an iPhone (architecture.md, Key
@@ -388,8 +393,11 @@ Found for an administrator session.
 - The idle-lock setting defaults to 15 minutes, survives a re-login, and
   appears in plaintext nowhere in the DB — it lives in the encrypted
   profile record.
-- A profile record with `idleLockMinutes` set to 0, 500, or a
-  non-integer still locks, at the clamped bound.
+- A profile record with `idleLockMinutes` set to 0, 500, 7 or 7.5
+  still locks, at 5, 60, 5 and 5 respectively, and the select shows
+  that value.
+- Changing the period locks at the new one with no activity after the
+  change.
 - Reordering a dimension's values reorders the chart's bands and writes
   one record — no `account` record is touched.
 - Renaming a dimension's label, or a value's label, writes one record

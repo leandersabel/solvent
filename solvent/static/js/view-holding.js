@@ -5,16 +5,30 @@
 // looked up from it, at any age. Every figure comes from the model.
 import * as decimal from './decimal.js';
 import * as writes from './writes.js';
-import { ageInWords, dialog, el } from './dom.js';
+import { ageInWords, dialog, el, trackEdits } from './dom.js';
 import { deleteHoldingDialog, holdingForm, snapshotDialog } from './view-forms.js';
 
-export function holdingView(vault, accountId, { onOpenRecording, onChanged, onGone }) {
+export function holdingView(vault, accountId, { editing = false, onOpenRecording, onChanged, onGone }) {
   const holding = vault.holdings.get(accountId);
   if (!holding) return el('p', { class: 'empty-line', text: 'That holding is gone.' });
 
   const value = vault.valueOf(holding, 'latest');
   const error = el('p', { class: 'field-error', hidden: true });
   const panel = el('div', {});
+
+  // The open editor is part of the address, so a lock taken mid-edit
+  // comes back to it rather than to the bare holding. Written without
+  // a hashchange, because nothing needs to redraw.
+  const address = `#/holding/${accountId}`;
+  const openEditor = () => {
+    window.history.replaceState(null, '', `${address}/edit`);
+    panel.replaceChildren(
+      holdingForm(vault, holding, () => {
+        window.history.replaceState(null, '', address);
+        onChanged();
+      }),
+    );
+  };
 
   const header = el('header', { class: 'detail-header' }, [
     el('h1', { class: 'screen-heading', text: holding.payload.name }),
@@ -60,7 +74,8 @@ export function holdingView(vault, accountId, { onOpenRecording, onChanged, onGo
       class: 'btn-secondary',
       text: 'Edit',
       onclick: () => {
-        panel.replaceChildren(holdingForm(vault, holding, onChanged));
+        openEditor();
+        trackEdits(panel);
       },
     }),
     holding.payload.archivedAt
@@ -83,12 +98,14 @@ export function holdingView(vault, accountId, { onOpenRecording, onChanged, onGo
     el('button', {
       class: 'btn-destructive',
       text: 'Delete',
-      onclick: () => deleteHoldingDialog(vault, holding, onGone),
+      onclick: () => deleteHoldingDialog(vault, holding, onGone, 'home'),
     }),
   ]);
 
   const flagged = vault.duplicateSnapshotDates(accountId);
   const history = vault.snapshotsFor(accountId).slice().reverse();
+
+  if (editing) openEditor();
 
   return el('section', { class: 'screen' }, [
     header,

@@ -8,6 +8,7 @@
 import * as api from './api.js';
 import * as crypto from './crypto.js';
 import { Vault } from './model.js';
+import { deleteRecord } from './writes.js';
 
 let masterKey = null;
 let vault = null;
@@ -77,6 +78,12 @@ export async function signIn(username, password) {
   masterKey = keys.masterKey;
   vault = new Vault(dek);
   await vault.load();
+  // A byte-identical pair loses nothing by going (record-rate.md, Two
+  // entries on one date). One that fails to go is still read as a
+  // pair, and tried again next unlock.
+  for (const extra of vault.redundantRateEntries()) {
+    await deleteRecord(vault, extra).catch(() => {});
+  }
 
   if (answer.kdfStale) {
     // A failed upgrade must never lock anyone out: the session
@@ -149,20 +156,23 @@ export function lock() {
   for (const listener of lockListeners) listener();
 }
 
+let listening = false;
+
 function startIdleTimer() {
-  const reset = () => {
-    if (!vault) return;
-    clearTimeout(idleTimer);
-    idleTimer = setTimeout(lock, vault.idleLockMinutes * 60000);
-  };
-  for (const event of ['pointerdown', 'keydown', 'scroll']) {
-    document.addEventListener(event, reset, { passive: true });
+  if (!listening) {
+    for (const event of ['pointerdown', 'keydown', 'scroll']) {
+      document.addEventListener(event, restartIdleTimer, { passive: true });
+    }
+    listening = true;
   }
-  reset();
+  restartIdleTimer();
 }
 
+/** Counts the period from now, at whatever the profile holds now. */
 export function restartIdleTimer() {
-  if (vault) startIdleTimer();
+  if (!vault) return;
+  clearTimeout(idleTimer);
+  idleTimer = setTimeout(lock, vault.idleLockMinutes * 60000);
 }
 
 export function signOut() {

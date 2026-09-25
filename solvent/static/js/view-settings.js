@@ -7,7 +7,8 @@ import * as crypto from './crypto.js';
 import * as writes from './writes.js';
 import { el, mount } from './dom.js';
 import * as format from './format.js';
-import { changePassword, signOut } from './session.js';
+import { changePassword, restartIdleTimer, signOut } from './session.js';
+import { IDLE_LOCK_PERIODS } from './model.js';
 import { passwordWithToggle } from './unlock.js';
 import { strengthGauge } from './strength.js';
 import { exportCard, importCard } from './page-transfer.js';
@@ -245,7 +246,7 @@ function sessionCard(vault, rerender) {
   const list = el('div', {}, [el('p', { class: 'hint', text: 'Loading…' })]);
   const error = el('p', { class: 'field-error', hidden: true });
 
-  const idle = el('select', {}, [5, 10, 15, 30, 45, 60].map((minutes) =>
+  const idle = el('select', {}, IDLE_LOCK_PERIODS.map((minutes) =>
     el('option', { value: String(minutes), text: `${minutes} minutes` }),
   ));
   idle.value = String(vault.idleLockMinutes);
@@ -255,6 +256,7 @@ function sessionCard(vault, rerender) {
         ...vault.profile,
         idleLockMinutes: Number(idle.value),
       });
+      restartIdleTimer();
     } catch {
       idle.value = String(vault.idleLockMinutes);
       error.textContent = 'That did not save. The lock keeps running at its stored value.';

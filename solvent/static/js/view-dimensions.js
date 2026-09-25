@@ -4,7 +4,7 @@
 // Nothing on this screen reads or writes an account record, so no
 // operation can fail partway across several of them.
 import * as writes from './writes.js';
-import { dialog, el } from './dom.js';
+import { dialog, el, resumable } from './dom.js';
 
 function newId() {
   const bytes = crypto.getRandomValues(new Uint8Array(8));
@@ -202,6 +202,7 @@ function createDimension(vault) {
   const first = el('input', { type: 'text' });
   const close = dialog({
     heading: 'Create a dimension',
+    resume: resumable(reopenCreateDimension),
     body: [
       el('div', { class: 'field' }, [el('label', { text: 'Name' }), label]),
       el('div', { class: 'field' }, [el('label', { text: 'First value' }), first]),
@@ -237,6 +238,7 @@ function addValue(vault, dimension) {
   const label = el('input', { type: 'text' });
   const close = dialog({
     heading: `Add a value to ${dimension.label}`,
+    resume: resumable(reopenAddValue, dimension.id),
     body: [el('div', { class: 'field' }, [el('label', { text: 'Label' }), label])],
     actions: [
       el('button', { class: 'btn-secondary', text: 'Cancel', onclick: () => close() }),
@@ -254,6 +256,15 @@ function addValue(vault, dimension) {
       }),
     ],
   });
+}
+
+function reopenCreateDimension({ vault }) {
+  createDimension(vault);
+}
+
+function reopenAddValue({ vault }, dimensionId) {
+  const dimension = vault.dimensions.find((d) => d.id === dimensionId);
+  if (dimension) addValue(vault, dimension);
 }
 
 function archiveDimension(vault, dimension) {
