@@ -5,7 +5,7 @@
 // balance or a holding's name, because none is reachable from this
 // session.
 import * as api from './api.js';
-import { dialog, el, mount, shortDate } from './dom.js';
+import { dialog, el, inlineRename, mount, shortDate } from './dom.js';
 import { changePassword } from './session.js';
 import { passwordWithToggle } from './unlock.js';
 import { strengthGauge } from './strength.js';
@@ -398,21 +398,14 @@ async function unitTable(body) {
 
 function unitRow(row, body) {
   const error = el('p', { class: 'field-error', hidden: true });
-  const name = el('input', { type: 'text', value: row.label, class: 'inline-input' });
-  name.addEventListener('blur', async () => {
-    if (name.value === row.label || !name.value.trim()) {
-      name.value = row.label;
-      return;
-    }
-    try {
-      await api.patch(`/api/admin/symbols/${row.symbol}`, { label: name.value.trim() });
-      row.label = name.value.trim();
-    } catch {
-      name.value = row.label;
-      error.textContent = 'That rename did not save.';
-      error.hidden = false;
-    }
-  });
+  const name = inlineRename(
+    row.label,
+    async (label) => {
+      await api.patch(`/api/admin/symbols/${row.symbol}`, { label });
+      row.label = label;
+    },
+    () => 'That rename did not save.',
+  );
 
   const lookup = el('select', {}, [
     el('option', { value: 'true', text: 'Automatic' }),

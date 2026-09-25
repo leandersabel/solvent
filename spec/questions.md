@@ -34,11 +34,3 @@ What is undecided, and what it changes.
     change but not that the vault still opens.
   - an upgrade answered with Server Error leaves the caller signed in
     and able to sign in again at the old parameters.
-
-- **engineer**: `ui/dimensions.md` commits an inline rename on Enter
-  or on blur, and `ui/design-system.md`, Components, says an inline
-  rename is saved by an explicit action because a field that saves on
-  blur turns clicking away into a write. The implementation follows
-  `dimensions.md`. The two cannot both hold, and the designer owns
-  both files. `dimensions.md` also says a blank label keeps what was
-  typed, where the implementation restores the stored label.

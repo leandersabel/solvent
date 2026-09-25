@@ -4,7 +4,7 @@
 // Nothing on this screen reads or writes an account record, so no
 // operation can fail partway across several of them.
 import * as writes from './writes.js';
-import { dialog, el, resumable } from './dom.js';
+import { dialog, el, inlineRename, resumable } from './dom.js';
 
 function newId() {
   const bytes = crypto.getRandomValues(new Uint8Array(8));
@@ -147,24 +147,12 @@ function dimensionCard(vault, dimension) {
   ]);
 }
 
-function inlineLabel(text, onCommit) {
-  const input = el('input', { type: 'text', value: text, class: 'inline-input' });
-  const commit = () => {
-    if (!input.value.trim()) {
-      input.value = text;
-      return;
-    }
-    if (input.value !== text) onCommit(input.value.trim());
-  };
-  input.addEventListener('blur', commit);
-  input.addEventListener('keydown', (event) => {
-    if (event.key === 'Enter') input.blur();
-    if (event.key === 'Escape') {
-      input.value = text;
-      input.blur();
-    }
-  });
-  return input;
+function inlineLabel(text, save) {
+  return inlineRename(text, save, (failure) =>
+    failure.status === 409
+      ? 'Your settings were changed in another tab. Reload to see them.'
+      : 'That rename did not save.',
+  );
 }
 
 async function writeProfile(vault, dimensions) {

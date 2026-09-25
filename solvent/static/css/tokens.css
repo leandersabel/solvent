@@ -168,8 +168,7 @@ h1, h2, h3 {
 .numeric,
 .quantity,
 .data-table td,
-.data-table th,
-.inline-input {
+.data-table th {
   font-variant-numeric: tabular-nums;
 }
 
@@ -290,15 +289,6 @@ svg:focus-visible {
   outline: 2px solid var(--petrol-600);
   outline-offset: 2px;
 }
-
-.inline-input {
-  border-color: transparent;
-  background: transparent;
-  padding: 4px 8px;
-  font-weight: 600;
-}
-
-.inline-input:hover { border-color: var(--hairline); }
 
 .password-field {
   display: flex;

@@ -75,8 +75,10 @@ validated chart palette (`design-system.md`), not a limit on the data
 
 ## Editing a label
 
-In place, committed on Enter or on blur, abandoned on Escape with the
-stored label still shown. One write, the profile.
+An inline rename (`design-system.md`, Components): Edit reveals the
+field, Save or Enter commits it, Cancel or Escape abandons it with the
+stored label still shown. Clicking away leaves the field open and
+writes nothing. One write, the profile.
 
 - A label may not be blank or whitespace alone. The field refuses the
   commit inline and keeps what was typed, because a nameless band is

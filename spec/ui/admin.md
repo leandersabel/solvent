@@ -219,8 +219,8 @@ action.
 
 - **Code** is tabular and static. `XAU-ozt`, `CHF`. It is never
   editable and there is no control anywhere that renames one.
-- **Name** is the display text, editable in place in an inline input.
-  Saving writes only this field. It is rendered with `textContent`,
+- **Name** is the display text, changed by an inline rename
+  (`design-system.md`, Components). Saving writes only this field. It is rendered with `textContent`,
   never as markup (`design-system.md`, Accessibility).
 - **Kind** reads "Currency" or "Metal", static.
 - **Rate lookup** is a two-state control on each row: **Automatic** or
@@ -346,8 +346,8 @@ gauge).
 
 - **Loading**: skeleton rows.
 - **Empty**: unreachable. The table is seeded.
-- **Error, rename failed**: inline on the row, the old name restored in
-  the field.
+- **Error, rename failed**: inline on the row, the field still open
+  with what was typed and the old name still shown as current.
 - **Error, the source went away while the page was open**: the control
   was enabled when the table loaded and the adapter registry changed
   underneath. Inline on the row, and the control goes back to Entered

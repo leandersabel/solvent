@@ -599,6 +599,44 @@ try {
   })()`);
   check('coverage counts the active holdings', coverage === '0 of 4 holdings assigned', `${coverage} with ${model}`);
 
+  // An inline rename writes only on Save (design-system.md, Components).
+  // Every PUT the page sends from here on is counted.
+  await page.eval(`(() => {
+    const send = window.fetch;
+    window.__puts = 0;
+    window.fetch = (path, init) => {
+      if (init && init.method === 'PUT') window.__puts += 1;
+      return send(path, init);
+    };
+  })()`);
+  const renameField = "document.querySelector('.card-head input')";
+  const renameButton = (label) =>
+    page.eval(
+      `[...document.querySelectorAll('.card-head button')].find(b => b.textContent === ${JSON.stringify(label)}).click()`,
+    );
+  await renameButton('Edit');
+  await setValue('.card-head input', 'Liquid assets');
+  await page.eval(`${renameField}.blur(); document.body.click()`);
+  await page.settle(300);
+  check(
+    'clicking away from a rename writes nothing and leaves it open',
+    (await page.eval('window.__puts')) === 0 && !(await page.eval(`Boolean(${renameField}.closest('[hidden]'))`)),
+  );
+  await setValue('.card-head input', '   ');
+  await renameButton('Save');
+  await page.settle(300);
+  check(
+    'a blank rename is refused and keeps what was typed',
+    (await page.eval('window.__puts')) === 0 &&
+      (await page.eval(`${renameField}.value`)) === '   ' &&
+      (await text()).includes('A name cannot be blank.'),
+  );
+  await setValue('.card-head input', 'Liquid assets');
+  await renameButton('Save');
+  await page.waitUntil("document.body.innerText.includes('Liquid assets')", { label: 'the renamed dimension' });
+  await page.settle(400);
+  check('saving a rename writes one record', (await page.eval('window.__puts')) === 1);
+
 
   // ---- The chrome, on a page that is not the dashboard -----------------
 
