@@ -225,8 +225,9 @@ never lock anyone out.
 - **Wrong password** → derivation succeeds, Auth Key mismatches; generic
   "Invalid username or password."
 - **Correct Auth Key but DEK unwrap fails** → treated as a failed login
-  and logged server-side as an anomaly; this indicates corruption or
-  tampering, not a typo.
+  with the same error. It indicates corruption or tampering, not a typo.
+  Nothing is logged: the unwrap happens in the browser after the login
+  already answered OK, so the server never sees it fail.
 - **Rate limiting**: per-account and per-IP on both `/api/auth/salt` and
   `/api/auth/login`, then a lockout with operator alerting. The lockout
   is the escalation, and there is no backoff (architecture.md, Rate

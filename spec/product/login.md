@@ -183,8 +183,7 @@ that could lock somebody out would be worse than no upgrade.
   asked and without touching anything inside the vault. If that step
   fails you are still signed in and can still sign in next time.
 - A password that is correct but opens nothing is treated as a failed
-  sign-in with the same message, and reported to the operator as an
-  anomaly rather than shown to you.
+  sign-in with the same message.
 - Someone already signed in to a user account who returns to the
   sign-in address goes to their dashboard, and is asked to unlock
   rather than shown an empty vault. An administrator already signed in

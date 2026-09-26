@@ -99,9 +99,9 @@ moment it is shown the screen does not know which it is.
   speed for both cases, and identical again whichever kind of account
   the name belongs to. The screen must not distinguish them, including
   by how fast it gives up.
-- **Error, the vault would not open**: the same generic message. This
-  is logged server-side as an anomaly and never surfaced to the person,
-  because it means corruption or tampering rather than a typo.
+- **Error, the vault would not open**: the same generic message.
+  Nothing is logged: the unwrap fails in the browser after the server
+  has already answered, so the server never sees it.
 - **Error, too many attempts**: "Too many attempts. Try again in a few
   minutes." Same shape and same words whether or not the account
   exists.
