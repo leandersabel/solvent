@@ -681,11 +681,20 @@ try {
   check('the danger zone is collapsed', !(await page.eval("document.querySelector('.danger-zone').open")));
   await page.eval("document.querySelector('.danger-zone').open = true");
   await page.settle(200);
-  check('export is offered as the primary action in it', (await text()).includes('Export first'));
+  check(
+    'the danger zone holds one destructive button, and nothing to type into',
+    (await page.eval("document.querySelector('.danger-zone .btn-destructive').textContent")) === 'Delete my account' &&
+      (await page.eval("document.querySelectorAll('.danger-zone input').length")) === 0,
+  );
+  await page.eval("document.querySelector('.danger-zone .btn-destructive').click()");
+  await page.settle(200);
+  check('export is offered as the primary action in the dialog it opens', (await page.eval("document.querySelector('.dialog .btn-primary').textContent")) === 'Export first');
   check(
     'deleting is the destructive secondary action',
-    await page.eval("Boolean(document.querySelector('.danger-zone .btn-destructive'))"),
+    (await page.eval("document.querySelector('.dialog .btn-destructive').textContent")) === 'Delete my vault',
   );
+  await page.eval("[...document.querySelectorAll('.dialog button')].find((b) => b.textContent === 'Cancel').click()");
+  await page.settle(200);
 
   const exported = JSON.parse(
     await page.eval(`(async () => {
@@ -1178,15 +1187,17 @@ try {
 
   // Delete my vault waits for the password and the exact username.
   await page.eval("document.querySelector('.danger-zone').open = true");
+  await page.eval("document.querySelector('.danger-zone .btn-destructive').click()");
+  await page.settle(200);
   const deleteState = (password, typed) =>
     page.eval(`(() => {
-      const zone = document.querySelector('.danger-zone');
-      const [pw, name] = zone.querySelectorAll('input');
+      const dialog = document.querySelector('.dialog');
+      const [pw, name] = dialog.querySelectorAll('input');
       pw.value = ${JSON.stringify(password)};
       pw.dispatchEvent(new Event('input', { bubbles: true }));
       name.value = ${JSON.stringify(typed)};
       name.dispatchEvent(new Event('input', { bubbles: true }));
-      return zone.querySelector('.btn-destructive').disabled;
+      return dialog.querySelector('.btn-destructive').disabled;
     })()`);
   const gates = [
     await deleteState('', 'leander'),
@@ -1201,8 +1212,10 @@ try {
   );
   check(
     'the deletion offers Export first as its primary action',
-    (await page.eval("document.querySelector('.danger-zone .btn-primary').textContent")) === 'Export first',
+    (await page.eval("document.querySelector('.dialog .btn-primary').textContent")) === 'Export first',
   );
+  await page.eval("[...document.querySelectorAll('.dialog button')].find((b) => b.textContent === 'Cancel').click()");
+  await page.settle(200);
 
   // ---- Account settings: changing the password -------------------------
 
@@ -1427,14 +1440,18 @@ try {
 
     const fillDelete = () =>
       other.eval(`(() => {
-        const zone = document.querySelector('.danger-zone');
-        zone.open = true;
-        const [pw, name] = zone.querySelectorAll('input');
+        if (!document.querySelector('.dialog')) {
+          const zone = document.querySelector('.danger-zone');
+          zone.open = true;
+          zone.querySelector('.btn-destructive').click();
+        }
+        const dialog = document.querySelector('.dialog');
+        const [pw, name] = dialog.querySelectorAll('input');
         pw.value = ${JSON.stringify(LEAVING_PASSWORD)};
         pw.dispatchEvent(new Event('input', { bubbles: true }));
         name.value = 'leaving';
         name.dispatchEvent(new Event('input', { bubbles: true }));
-        zone.querySelector('.btn-destructive').click();
+        dialog.querySelector('.btn-destructive').click();
       })()`);
     const releaseDelete = await intercept(other, '*/api/auth/account', (request) =>
       request.method === 'DELETE' ? { status: 500 } : null,

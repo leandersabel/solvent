@@ -4,7 +4,7 @@
 // administrator never reaches this address at all.
 import * as api from './api.js';
 import * as writes from './writes.js';
-import { el, icon, mount, today } from './dom.js';
+import { dialog, el, icon, mount, resumable, today } from './dom.js';
 import * as format from './format.js';
 import {
   WrongPasswordError,
@@ -380,14 +380,31 @@ function sessionCard(vault) {
   ]);
 }
 
+/** The Danger zone holds one destructive button, and the deletion is
+ *  its dialog (spec/ui/settings.md, Delete my account). */
+function dangerZone(username, open) {
+  return el('details', { class: 'card danger-zone' }, [
+    el('summary', { text: 'Danger zone' }),
+    el('div', { class: 'form-actions' }, [
+      el('button', {
+        class: 'btn-destructive',
+        text: 'Delete my account',
+        onclick: () => deleteAccountDialog(username, open),
+      }),
+    ]),
+  ]);
+}
+
 /** Deleting takes the account, everything in the vault, and every
  *  session. The dialog's primary action is Export first: somebody who
  *  came here wanting a backup and left with a wiped vault has been
- *  failed by the dialog. */
-function dangerZone(username, open) {
+ *  failed by the dialog. The typed username is one of the few typed
+ *  confirmations the product asks for, because nothing could bring the
+ *  vault back (spec/ui/design-system.md, Dialog). */
+function deleteAccountDialog(username, open) {
   const password = el('input', { type: 'password', autocomplete: 'current-password' });
-  const typed = el('input', { type: 'text' });
-  const error = el('p', { class: 'field-error', hidden: true });
+  const typed = el('input', { type: 'text', autocomplete: 'off', spellcheck: 'false' });
+  const error = el('p', { class: 'field-error', role: 'alert', hidden: true });
   const remove = el('button', { class: 'btn-destructive', text: 'Delete my vault', disabled: true });
 
   const check = () => {
@@ -409,29 +426,42 @@ function dangerZone(username, open) {
     } catch {
       error.textContent = 'Nothing was deleted. Your vault is unchanged and you are still signed in.';
       error.hidden = false;
-      remove.disabled = false;
+      check();
     }
   });
 
-  return el('details', { class: 'card danger-zone' }, [
-    el('summary', { text: 'Danger zone' }),
-    el('p', {
-      text: 'Deleting takes the account, everything in the vault, and every session you have open. It happens all at once and it cannot be undone. Nothing is kept in reserve, and there is no vault left for anybody to recover.',
-    }),
-    field('Your password', passwordWithToggle(password)),
-    field('Type your username to confirm', typed),
-    error,
-    el('div', { class: 'form-actions' }, [
+  const close = dialog({
+    heading: 'Delete your account',
+    resume: resumable(reopenDeleteAccount, username),
+    body: [
+      el('p', {
+        text: 'Deleting takes the account, everything in the vault, and every session you have open. It happens all at once and it cannot be undone. Nothing is kept in reserve, and there is no vault left for anybody to recover.',
+      }),
+      error,
+      field('Your password', passwordWithToggle(password)),
+      field('Type your username to confirm', typed),
+    ],
+    actions: [
+      el('button', { class: 'btn-secondary', text: 'Cancel', onclick: () => close() }),
+      remove,
       el('a', {
         class: 'btn-primary',
         href: '/settings/export-import',
         text: 'Export first',
         onclick: (event) => {
           event.preventDefault();
+          close();
           open('export-import');
         },
       }),
-      remove,
-    ]),
-  ]);
+    ],
+  });
+}
+
+/** After an unlock, back into the dialog the lock closed. The username
+ *  is the signed-in account's own, which the page already holds. */
+function reopenDeleteAccount(_context, username) {
+  deleteAccountDialog(username, (address) => {
+    window.location.hash = `#/settings/${address}`;
+  });
 }

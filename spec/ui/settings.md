@@ -124,9 +124,12 @@ Said here, in the order somebody would be surprised to learn them:
 ### Delete my account
 
 Behind a collapsed **Danger zone** disclosure, destructive styling.
+Opened, the disclosure holds one destructive button, **Delete my
+account**, and that button opens the dialog. Nothing is typed into the
+disclosure itself.
 
-The dialog asks for the password and the username, and states plainly
-what happens:
+The dialog, headed **Delete your account**, asks for the password and
+the username, and states plainly what happens:
 
 > Deleting takes the account, everything in the vault, and every
 > session you have open. It happens all at once and it cannot be

@@ -445,7 +445,17 @@ only its own content region.
   names the act rather than asking "Are you sure".
   - **A destructive dialog** names the consequence in its body and
     carries the filled critical confirm (Button, destructive). One
-    confirmation, never a ladder and never a word to type back.
+    confirmation, never a ladder.
+  - **A word typed back is asked for only where the act destroys
+    something that cannot be recovered at all**: deleting an account,
+    by typing its username (`settings.md`, and `admin.md` where an
+    administrator removes one), deleting a holding permanently, by
+    typing its name (`account-form.md`), and replacing a vault that
+    holds records, by typing `ERASE` (`export-import.md`). Nothing the
+    product holds could bring any of those back, so the typed word
+    stops a slip of the hand before it costs everything. Anywhere else
+    a typed word would only teach people to type it without reading,
+    and the confirm button alone is the confirmation.
   - **At phone width it is a full-screen sheet**, same content and same
     focus behavior, because a centered box inside a narrow viewport
     leaves nothing for the scrim to show. The first version ships the

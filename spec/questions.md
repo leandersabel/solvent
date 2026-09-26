@@ -27,17 +27,6 @@ tells the client that such a password is "reported to the operator as
 an anomaly rather than shown to you", so dropping the log changes a
 product statement as well, which is the product owner's to change.
 
-## account-settings: deletion as a dialog with a typed username  [asked by: engineer]
-
-`ui/settings.md`, Delete my account, calls the deletion form "the
-dialog" and has it ask for the username typed back.
-`ui/design-system.md`, Components, Dialog, says a destructive dialog
-is "one confirmation, never a ladder and never a word to type back".
-`features/account-settings.md` requires `confirmUsername`, and the
-Settings artboard draws only the collapsed Danger zone. The screen
-today puts the password, the username and both buttons inline in the
-opened Danger zone, with no dialog.
-
 ## account-settings: the note past four values             [asked by: engineer]
 
 `ui/dimensions.md`, The >4 note, quotes "All five are still tracked."
@@ -61,14 +50,6 @@ commas. Which is the copy?
   refused or goes through with the field ignored. Until it is settled
   the criterion is asserted only in its first half, so export-import
   is not marked verified.
-- **engineer**: `ui/design-system.md`, Components, Dialog, says a
-  destructive dialog is "one confirmation, never a ladder and never a
-  word to type back". `features/manage-accounts.md` requires typing the
-  holding's name to delete it permanently, and
-  `features/export-import.md` requires typing `ERASE` to replace a
-  vault that holds records. The code follows the feature files. Is
-  the design-system rule meant to exempt these two, or should one of
-  them change?
 - **engineer**: `features/export-import.md`, Edge cases, says an empty
   vault exports "a file with an empty `records` array", and the review
   and the `ERASE` rule in `ui/export-import.md` speak of a vault that
