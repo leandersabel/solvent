@@ -52,10 +52,13 @@ Archived section (`design-system.md`, Accessibility).
 ## The >4 note
 
 Once a dimension holds a fifth value, an inline note appears under its
-list — not a warning, and not a cap:
+list. It is not a warning, and not a cap:
 
 > The chart shows the first four values and folds the rest into "Other".
-> All five are still tracked.
+> All of them are still tracked.
+
+The copy counts nothing past the four the chart shows, so it stays true
+however many values the dimension holds.
 
 The list is not capped: four is a rendering constraint from the
 validated chart palette (`design-system.md`), not a limit on the data
@@ -142,8 +145,8 @@ beside it, and its unassigned link stays a tap target of its own.
   because "dimension" is the least self-explanatory word in the product.
   One card explaining it concretely, with one primary action:
 
-  > Dimensions are how your net worth splits up. Give one a name —
-  > "Liquidity" — and values like Cash, Investments, Retirement. Each
+  > Dimensions are how your net worth splits up. Give one a name,
+  > "Liquidity", and values like Cash, Investments, Retirement. Each
   > holding gets one value, so the bands of your chart add up to
   > exactly your net worth.
   >

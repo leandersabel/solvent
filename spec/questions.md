@@ -27,18 +27,6 @@ tells the client that such a password is "reported to the operator as
 an anomaly rather than shown to you", so dropping the log changes a
 product statement as well, which is the product owner's to change.
 
-## account-settings: the note past four values             [asked by: engineer]
-
-`ui/dimensions.md`, The >4 note, quotes "All five are still tracked."
-for a note that appears once a dimension holds a fifth value, so it is
-wrong at six and beyond. The screen shows the quoted copy verbatim.
-
-## account-settings: dashes in the empty-state copy          [asked by: engineer]
-
-`ui/dimensions.md`, States, Empty, sets "Liquidity" off with a dash
-on either side in the example sentence. The screen sets it off with
-commas. Which is the copy?
-
 - **engineer**: `features/export-import.md`, Acceptance criteria, says a
   `POST /api/import` payload with a `principalId` field naming another
   user "writes nothing into that user's vault" and that "the records

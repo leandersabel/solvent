@@ -212,7 +212,7 @@ function dimensionCard(vault, dimension, { index, count, busy, failed }) {
     live.length > 4
       ? el('p', {
           class: 'hint',
-          text: 'The chart shows the first four values and folds the rest into "Other". All five are still tracked.',
+          text: 'The chart shows the first four values and folds the rest into "Other". All of them are still tracked.',
         })
       : null,
     archived.length
