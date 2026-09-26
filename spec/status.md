@@ -9,8 +9,8 @@ Maintained by the compiler agent. Rows are in build order.
 | rate-lookup | x | x | x |
 | admin-invites | x | x | x |
 | register | x | x | x |
-| login | x | x | |
-| account-settings | x | x | |
+| login | x | x | x |
+| account-settings | x | x | x |
 | manage-accounts | x | x | |
 | record-rate | x | x | |
 | record-snapshot | x | x | |
