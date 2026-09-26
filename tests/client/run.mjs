@@ -943,33 +943,33 @@ await check('net-worth-view: a date with prices and no figures still bends the b
 });
 
 await check('net-worth-view: interpolation is linear by day between entries, in both factors, and the band bends', () => {
-  // The span from 1 January to 1 March 2024 has sixty days, so its
-  // midpoint is 31 January.
+  // The span from 1 January to 31 January 2026 has thirty days, so its
+  // midpoint by day is 16 January.
   const vault = model({
     holdings: [
       { name: 'Francs', unit: 'CHF' },
       { name: 'Units', unit: 'PROBE' },
     ],
     figures: [
-      ['Francs', '2024-01-01', '100'],
-      ['Francs', '2024-03-01', '200'],
-      ['Units', '2024-01-01', '100'],
-      ['Units', '2024-03-01', '200'],
+      ['Francs', '2026-01-01', '100'],
+      ['Francs', '2026-01-31', '200'],
+      ['Units', '2026-01-01', '100'],
+      ['Units', '2026-01-31', '200'],
     ],
     prices: [
-      ['PROBE', '2024-01-01', '1.00'],
-      ['PROBE', '2024-03-01', '2.00'],
+      ['PROBE', '2026-01-01', '1.00'],
+      ['PROBE', '2026-01-31', '2.00'],
     ],
   });
   const at = (name, iso) => {
     const holding = vault.holdings.get(vault.ids[name]);
     return decimal.multiply(vault.quantityAt(holding.recordId, day(iso)), vault.priceAt(holding.payload.unit, day(iso)));
   };
-  assert.equal(decimal.format(at('Francs', '2024-01-31')), '150');
-  assert.equal(decimal.format(at('Units', '2024-01-31')), '225');
-  // Linear by day, so 1 February sits one day past the midpoint.
-  assert.equal(decimal.format(at('Francs', '2024-02-01')), '151.666666666667');
-  assert.deepEqual(vault.quantityDates(), ['2024-01-01', '2024-03-01']);
+  assert.equal(decimal.format(at('Francs', '2026-01-16')), '150');
+  // 150 x 1.50, not the chord between 100 and 400.
+  assert.equal(decimal.format(at('Units', '2026-01-16')), '225');
+  // Only the two figures carry an entry mark.
+  assert.deepEqual(vault.quantityDates(), ['2026-01-01', '2026-01-31']);
 });
 
 await check('net-worth-view: before a symbol\'s first price the band takes that first price', () => {

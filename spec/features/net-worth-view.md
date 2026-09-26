@@ -397,13 +397,15 @@ an otherwise smooth chart is indistinguishable from a bad snapshot.
 - A holding contributes nothing to chart dates before its first
   snapshot; adding ten years of an old holding's history does not create
   a step at the chart's left edge.
-- A holding with snapshots of 100 on 1 January and 200 on 1 March,
-  measured in the main currency, reads 150 on 1 February, with 1
-  January and 1 March carrying an entry mark and 1 February carrying
-  none, and with nobody having turned anything on.
+- A holding with snapshots of 100 on 1 January 2026 and 200 on 31
+  January 2026, measured in the main currency, reads 150 on 16 January
+  2026, the midpoint by day, with 1 January and 31 January carrying an
+  entry mark and 16 January carrying none, and with nobody having
+  turned anything on.
 - The same holding measured in a unit whose price is 1.00 on 1 January
-  and 2.00 on 1 March reads 150 × 1.50 on 1 February, not the chord
-  between 100 and 400. This is the assertion that the band bends.
+  2026 and 2.00 on 31 January 2026 reads 150 × 1.50 on 16 January 2026,
+  not the chord between 100 and 400. This is the assertion that the
+  band bends.
 - A chart date before a symbol's first price entry is priced at that
   first entry. The band does not start at zero and does not vanish.
 - The axis ticks mark quantity entries only: adding a price entry adds

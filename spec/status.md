@@ -14,7 +14,7 @@ Maintained by the compiler agent. Rows are in build order.
 | manage-accounts | x | x | x |
 | record-rate | x | x | x |
 | record-snapshot | x | x | x |
-| net-worth-view | x | x | |
+| net-worth-view | x | x | x |
 | export-import | x | x | x |
 
 Verified means every acceptance criterion in the feature file is

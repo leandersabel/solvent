@@ -27,16 +27,6 @@ tells the client that such a password is "reported to the operator as
 an anomaly rather than shown to you", so dropping the log changes a
 product statement as well, which is the product owner's to change.
 
-- **engineer**: `features/net-worth-view.md`, Acceptance criteria, reads
-  150 on 1 February between 100 on 1 January and 200 on 1 March, and
-  150 × 1.50 for the priced case. Values between entries are
-  interpolated linearly by day (Values between entries), which is also
-  the only reading under which a straight segment on the chart's time
-  axis is exact. By day, 150 is the value at the span's midpoint, 31
-  January in a leap year, and 1 February 2026 reads 152.542372881356.
-  The suite asserts the midpoint. The criterion's date or its figure
-  needs restating, and `net-worth-view` is not marked verified until
-  it is.
 - **engineer**: `features/record-rate.md`, Saving an edited recording,
   and its criteria on a save of one quantity and two rates, describe
   one save spanning quantities, rates and deletions. `ui/update-values.md`
@@ -79,7 +69,3 @@ product statement as well, which is the product owner's to change.
   valued included, following `features/record-rate.md` (the client
   holds every `account` record). A holding with no quantity at that
   date does not move on it.
-- **engineer**: `ui/dashboard.md`, States, Loading, asks for skeleton
-  blocks while records decrypt. Decryption runs inside the unlock
-  card's working state (`ui/unlock.md`), and the dashboard is drawn only
-  once the total is final, so no skeleton is ever shown.

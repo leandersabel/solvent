@@ -216,9 +216,10 @@ currency · As of · (row action).
 
 ## States
 
-- **Loading**: skeleton blocks for hero, chart, and table while
-  records decrypt. The hero figure must never render a wrong
-  intermediate number and appears only when the total is final.
+- **Loading**: none, and no skeleton. The records decrypt inside the
+  unlock card's working state (`unlock.md`, The derivation wait), and
+  the dashboard is drawn only once the total is final, so the hero
+  figure never renders a wrong intermediate number.
 - **Empty — no holdings**: single centered card, "Add your first
   holding", primary button. No chart, no table, no zero total, and no
   New recording: there is nothing to record against yet.
