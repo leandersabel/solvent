@@ -4622,13 +4622,15 @@ try {
     await plantHere([snap('Fund 2', DF, '101'), price('USD', DF, '0.88', 'proposed')]);
     await reread();
     const usdAtDP = bytes(on(await stored('rate'), DF));
+    await openForm('Fund 1');
+    // Counted from the date being chosen, since the form opens on today.
+    await quiet();
     traffic.length = 0;
-    await openForm('Fund 3');
     await set('#snapshot-date', await format('date', DF));
     await rec.waitUntil(`${line('XAU-ozt')} && ${line('XAU-ozt')}.querySelector('input') && ${line('XAU-ozt')}.querySelector('input').value !== ''`, { label: 'the missing gold price proposed' });
     const fillingLine = await ev("document.querySelector('.prices-line').textContent");
     const usdTypable = await ev(`Boolean(${line('USD')}.querySelector('input'))`);
-    await set('#snapshot-value', '102');
+    await set('#snapshot-value', '100');
     await formSave();
     const atDP = on(await stored('rate'), DF);
     check(
@@ -4638,7 +4640,7 @@ try {
         bytes(atDP.filter((r) => r.payload.symbol === 'USD')) === usdAtDP &&
         atDP.map((r) => r.payload.symbol).sort().join(',') === 'USD,XAU-ozt' &&
         atDP.find((r) => r.payload.symbol === 'XAU-ozt').payload.rateSource === 'proposed' &&
-        on(await stored('snapshot'), DF).some((s) => s.accountId === id['Fund 3']),
+        on(await stored('snapshot'), DF).some((s) => s.accountId === id['Fund 1']),
       `${fillingLine} | ${atDP.map((r) => r.payload.symbol).join(',')} | asks ${rateAsks().length}`,
     );
 
