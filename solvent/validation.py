@@ -16,7 +16,7 @@ import uuid
 from flask import abort
 from pydantic import BaseModel, ConfigDict, ValidationError
 
-from .config import MIN_KDF_ENVELOPE
+from .config import DEFAULT_KDF_ENVELOPE, MIN_KDF_ENVELOPE
 
 USERNAME_PATTERN = re.compile(r"^[a-z0-9._-]{3,32}$")
 
@@ -99,6 +99,6 @@ def envelope_is_stale(stored: object) -> bool:
     """Whether a login should trigger the upgrade (login.md,
     Stale-KDF upgrade): weaker than the server's current default in any
     parameter, or shaped like an envelope from before a field existed."""
-    if not isinstance(stored, dict) or set(stored) != set(MIN_KDF_ENVELOPE):
+    if not isinstance(stored, dict) or set(stored) != set(DEFAULT_KDF_ENVELOPE):
         return True
-    return any(stored[field] < MIN_KDF_ENVELOPE[field] for field in ("m", "t", "p"))
+    return any(stored[field] < DEFAULT_KDF_ENVELOPE[field] for field in ("m", "t", "p"))

@@ -4,6 +4,7 @@ spec/features/login.md, spec/features/account-settings.md).
 """
 from __future__ import annotations
 
+import base64
 import json
 import uuid
 
@@ -17,6 +18,7 @@ from tests.helpers import (
     credential,
     mint_invite,
     params_of,
+    put_record,
     register,
     rows,
     sign_in,
@@ -247,28 +249,64 @@ def test_a_vault_owner_login_returns_the_one_wrapper_and_the_kind(app):
 def test_an_administrator_login_carries_no_wrapper(app):
     register(app, "root", kind="administrator")
     admin, auth_key = register(app, "root2", kind="administrator")
-    _, body = sign_in(app, "root2", auth_key)
+    signed_in, body = sign_in(app, "root2", auth_key)
     assert body["kind"] == "administrator"
     assert "wrappedDek" not in body
     assert "dekNonce" not in body
+    # The session that login issued is the one that reaches the admin
+    # area, page and API alike.
+    assert signed_in.get("/").headers["Location"] == "/admin"
+    assert signed_in.get("/admin").status_code == 200
+    assert signed_in.get("/api/admin/invites", headers=CSRF).status_code == 200
+
+
+def shape_of(value):
+    """The structure of a JSON value with every leaf replaced by its
+    type, so two bodies compare on their full field set at every
+    depth and not on their top-level keys alone."""
+    if isinstance(value, dict):
+        return {key: shape_of(item) for key, item in value.items()}
+    if isinstance(value, list):
+        return [shape_of(item) for item in value]
+    return type(value).__name__
 
 
 def test_the_salt_response_is_identically_shaped_for_both_kinds_and_a_stranger(app, client):
+    """Three ways, over the status, the header names and the full body
+    shape, so a field added later for one case breaks it."""
     register(app, "owner")
     register(app, "root", kind="administrator")
-    shapes = set()
+    seen = {}
     for username in ("owner", "root", "nobody-at-all"):
-        body = client.post("/api/auth/salt", json={"username": username}, headers=CSRF).get_json()
-        shapes.add(json.dumps(sorted(body)))
-        assert sorted(body["kdf"]) == sorted(DEFAULT_KDF_ENVELOPE)
-    assert len(shapes) == 1
+        response = client.post("/api/auth/salt", json={"username": username}, headers=CSRF)
+        body = response.get_json()
+        seen[username] = (
+            response.status_code,
+            sorted(name for name, _ in response.headers if name != "Date"),
+            response.headers["Content-Length"],
+            json.dumps(shape_of(body), sort_keys=True),
+            len(base64.b64decode(body["salt"])),
+            json.dumps(body["kdf"], sort_keys=True),
+        )
+    assert len(set(map(repr, seen.values()))) == 1, seen
 
 
 def test_no_field_of_the_salt_response_names_or_implies_a_kind(app, client):
+    register(app, "owner")
     register(app, "root", kind="administrator")
-    body = client.post("/api/auth/salt", json={"username": "root"}, headers=CSRF).get_json()
-    assert set(body) == {"salt", "kdf"}
-    assert "administrator" not in json.dumps(body)
+    for username in ("owner", "root", "nobody-at-all"):
+        body = client.post("/api/auth/salt", json={"username": username}, headers=CSRF).get_json()
+        # The full shape, pinned: an added field anywhere fails here.
+        assert shape_of(body) == {
+            "salt": "str",
+            "kdf": {"alg": "str", "v": "int", "m": "int", "t": "int", "p": "int"},
+        }
+        assert body["kdf"] == DEFAULT_KDF_ENVELOPE
+        # The salt is random bytes and may spell anything, so it is
+        # the one value left out of the word check.
+        words = json.dumps(dict(body, salt="")).lower()
+        for word in ("administrator", "vault", "owner", "admin", "wrapper", "kind"):
+            assert word not in words
 
 
 def test_the_decoy_salt_for_a_username_is_stable_across_calls(client):
@@ -305,6 +343,84 @@ def test_the_login_body_carries_no_field_describing_another_credential(app):
     assert not any("credential" in key.lower() for key in body)
 
 
+def answers(response):
+    """What a caller can observe of one response."""
+    return (
+        response.status_code,
+        response.get_data(),
+        sorted((k, v) for k, v in response.headers if k != "Date"),
+    )
+
+
+@pytest.mark.parametrize(
+    "limits",
+    [
+        # The per-account attempt limit.
+        {"LOGIN_ATTEMPTS_PER_ACCOUNT": 3, "LOGIN_LOCKOUT_THRESHOLD": 10**9},
+        # The lockout once enough fail within the longer window.
+        {"LOGIN_ATTEMPTS_PER_ACCOUNT": 10**9, "LOGIN_LOCKOUT_THRESHOLD": 3},
+    ],
+    ids=["attempt limit", "lockout"],
+)
+def test_exceeding_the_account_limit_locks_it_the_same_way_for_a_stranger(app, limits, caplog):
+    """Asserted at whatever the configured value is, never at a count:
+    the limit engages, it holds against the right Auth Key too, and
+    the throttled answer is the same for either kind and for a
+    username nobody has."""
+    app.config.update(limits)
+    _, owner_key = register(app, "owner")
+    _, admin_key = register(app, "root", kind="administrator")
+    ceiling = min(limits.values())
+    client = app.test_client()
+
+    for username in ("owner", "root", "nobody-at-all"):
+        for _ in range(ceiling):
+            assert client.post(
+                "/api/auth/login", json={"username": username, "authKey": b64()}, headers=CSRF
+            ).status_code == 401
+
+    with caplog.at_level("WARNING"):
+        seen = {
+            (endpoint, username): answers(
+                client.post(endpoint, json={"username": username, "authKey": key}, headers=CSRF)
+                if endpoint.endswith("login")
+                else client.post(endpoint, json={"username": username}, headers=CSRF)
+            )
+            for endpoint in ("/api/auth/login", "/api/auth/salt")
+            for username, key in (
+                ("owner", owner_key),
+                ("root", admin_key),
+                ("nobody-at-all", b64()),
+            )
+        }
+    # The right Auth Key is refused while the account is locked.
+    assert {answer[0] for answer in seen.values()} == {429}
+    for endpoint in ("/api/auth/login", "/api/auth/salt"):
+        same = {repr(answer) for (path, _), answer in seen.items() if path == endpoint}
+        assert len(same) == 1, endpoint
+
+    if limits["LOGIN_LOCKOUT_THRESHOLD"] == ceiling:
+        # Alerting is a structured log line with a stable name, the
+        # account and the window.
+        events = [r.getMessage() for r in caplog.records if r.getMessage().startswith("auth.lockout ")]
+        assert "auth.lockout account=owner window_minutes=15" in events
+        assert "auth.lockout account=nobody-at-all window_minutes=15" in events
+
+
+def test_a_login_cookie_carries_its_flags_and_no_key_material(app):
+    _, auth_key = register(app, "owner")
+    client = app.test_client()
+    response = client.post(
+        "/api/auth/login", json={"username": "owner", "authKey": auth_key}, headers=CSRF
+    )
+    header = response.headers["Set-Cookie"]
+    for flag in ("HttpOnly", "Secure", "SameSite=Lax"):
+        assert flag in header
+    body = response.get_json()
+    for value in (auth_key, body["wrappedDek"], body["dekNonce"], rows(app, "SELECT id FROM principals")[0]["id"]):
+        assert value not in header
+
+
 # ---- Stale-KDF upgrade ------------------------------------------------
 
 
@@ -338,33 +454,80 @@ def test_a_stale_envelope_is_reported_with_the_target(app):
     assert body["kdf"] == DEFAULT_KDF_ENVELOPE
 
 
+KEY_TABLES = ("principals", "credentials", "dek_wrappers")
+EVERY_TABLE = KEY_TABLES + ("records", "sessions", "invites")
+
+
+def snapshot(app, tables=KEY_TABLES):
+    """Every row of each table, keyed by its primary key, so a
+    comparison names exactly which rows a request changed."""
+    keys = {
+        "principals": ("id",),
+        "credentials": ("id",),
+        "dek_wrappers": ("credential_id",),
+        "records": ("principal_id", "record_id"),
+        "sessions": ("id",),
+        "invites": ("id",),
+    }
+    return {
+        table: {
+            tuple(row[column] for column in keys[table]): row
+            for row in rows(app, f"SELECT * FROM {table}")
+        }
+        for table in tables
+    }
+
+
+def changed_rows(before, after):
+    """(table, key) for every row added, removed or altered."""
+    changed = set()
+    for table in before:
+        for key in set(before[table]) | set(after[table]):
+            if before[table].get(key) != after[table].get(key):
+                changed.add((table, key))
+    return changed
+
+
+def rotation(**extra):
+    return {"salt": b64(16), "kdf": dict(DEFAULT_KDF_ENVELOPE), "authKey": b64(), **extra}
+
+
 def test_the_upgrade_replaces_the_credential_and_its_one_wrapper(app):
     owner, auth_key = register(app, "owner")
-    other, _ = register(app, "other")
+    register(app, "other")
+    register(app, "root", kind="administrator")
     stale(app, "owner")
     client, _ = sign_in(app, "owner", auth_key)
+    own = credential(app, "owner")
 
-    before_other = rows(app, "SELECT * FROM credentials WHERE principal_id = "
-                        "(SELECT id FROM principals WHERE username = 'other')")
+    before = snapshot(app)
     new_key = b64()
     response = client.post(
         "/api/auth/upgrade-kdf",
-        json={
-            "salt": b64(16),
-            "kdf": dict(DEFAULT_KDF_ENVELOPE),
-            "authKey": new_key,
-            "wrappedDek": b64(48),
-            "dekNonce": b64(12),
-        },
+        json=rotation(authKey=new_key, wrappedDek=b64(48), dekNonce=b64(12)),
         headers=CSRF,
     )
     assert response.status_code == 200
-    assert params_of(credential(app, "owner"))["kdf"] == DEFAULT_KDF_ENVELOPE
-    # No other row changed.
-    assert rows(app, "SELECT * FROM credentials WHERE principal_id = "
-                "(SELECT id FROM principals WHERE username = 'other')") == before_other
+    after = snapshot(app)
+
+    # The password credential row and its one wrapper, and nothing else
+    # in principals, credentials or dek_wrappers.
+    assert changed_rows(before, after) == {
+        ("credentials", (own["id"],)),
+        ("dek_wrappers", (own["id"],)),
+    }
+    old_row, new_row = before["credentials"][(own["id"],)], after["credentials"][(own["id"],)]
+    old_params, new_params = json.loads(old_row["params"]), json.loads(new_row["params"])
+    assert new_params["salt"] != old_params["salt"]
+    assert new_params["kdf"] == DEFAULT_KDF_ENVELOPE != old_params["kdf"]
+    assert new_row["verifier"] != old_row["verifier"]
+    old_wrapper, new_wrapper = before["dek_wrappers"][(own["id"],)], after["dek_wrappers"][(own["id"],)]
+    assert new_wrapper["wrapped_dek"] != old_wrapper["wrapped_dek"]
+    assert new_wrapper["dek_nonce"] != old_wrapper["dek_nonce"]
+
     # The new Auth Key signs in and the old one does not.
-    sign_in(app, "owner", new_key)
+    _, body = sign_in(app, "owner", new_key)
+    assert body["kdfStale"] is False
     assert app.test_client().post(
         "/api/auth/login", json={"username": "owner", "authKey": auth_key}, headers=CSRF
     ).status_code == 401
@@ -372,16 +535,61 @@ def test_the_upgrade_replaces_the_credential_and_its_one_wrapper(app):
 
 def test_an_administrator_upgrade_creates_no_wrapper(app):
     register(app, "root", kind="administrator")
+    register(app, "owner")
     admin, auth_key = register(app, "root2", kind="administrator")
     stale(app, "root2")
     client, _ = sign_in(app, "root2", auth_key)
+    own = credential(app, "root2")
 
+    before = snapshot(app)
+    new_key = b64()
     assert client.post(
-        "/api/auth/upgrade-kdf",
-        json={"salt": b64(16), "kdf": dict(DEFAULT_KDF_ENVELOPE), "authKey": b64()},
-        headers=CSRF,
+        "/api/auth/upgrade-kdf", json=rotation(authKey=new_key), headers=CSRF
     ).status_code == 200
-    assert rows(app, "SELECT * FROM dek_wrappers") == []
+    after = snapshot(app)
+
+    assert changed_rows(before, after) == {("credentials", (own["id"],))}
+    old_row, new_row = before["credentials"][(own["id"],)], after["credentials"][(own["id"],)]
+    assert json.loads(new_row["params"])["salt"] != json.loads(old_row["params"])["salt"]
+    assert json.loads(new_row["params"])["kdf"] == DEFAULT_KDF_ENVELOPE
+    assert new_row["verifier"] != old_row["verifier"]
+    assert not any(key == (own["id"],) for key in after["dek_wrappers"])
+
+    # The upgraded credential still signs them in, to the admin area.
+    signed_in, body = sign_in(app, "root2", new_key)
+    assert body == {"kind": "administrator", "kdfStale": False}
+    assert signed_in.get("/admin").status_code == 200
+
+
+def test_raising_the_server_default_upgrades_an_account_at_the_old_one(app, monkeypatch):
+    """The operator raises the default memory parameter, and the next
+    sign-in is told to upgrade to it: the parameter has a live upgrade
+    path rather than a documented one."""
+    owner, auth_key = register(app, "owner")
+    admin, admin_key = register(app, "root", kind="administrator")
+    records_before = rows(app, "SELECT * FROM records")
+    raised = DEFAULT_KDF_ENVELOPE["m"] * 2
+    monkeypatch.setitem(DEFAULT_KDF_ENVELOPE, "m", raised)
+
+    for username, key, wrapper in (
+        ("owner", auth_key, {"wrappedDek": b64(48), "dekNonce": b64(12)}),
+        ("root", admin_key, {}),
+    ):
+        client, body = sign_in(app, username, key)
+        assert body["kdfStale"] is True, username
+        assert body["kdf"]["m"] == raised
+        new_key = b64()
+        assert client.post(
+            "/api/auth/upgrade-kdf",
+            json=rotation(kdf=dict(body["kdf"]), authKey=new_key, **wrapper),
+            headers=CSRF,
+        ).status_code == 200
+        assert params_of(credential(app, username))["kdf"]["m"] == raised
+        _, again = sign_in(app, username, new_key)
+        assert again["kdfStale"] is False, username
+
+    # No record is re-encrypted by either upgrade.
+    assert rows(app, "SELECT * FROM records") == records_before
 
 
 def test_the_server_discriminates_on_kind_not_on_which_fields_arrived(app):
@@ -390,6 +598,8 @@ def test_the_server_discriminates_on_kind_not_on_which_fields_arrived(app):
     owner, owner_key = register(app, "owner")
 
     admin_client, _ = sign_in(app, "root2", admin_key)
+    owner_client, _ = sign_in(app, "owner", owner_key)
+    before = snapshot(app, EVERY_TABLE)
     with_wrapper = admin_client.post(
         "/api/auth/upgrade-kdf",
         json={
@@ -398,7 +608,6 @@ def test_the_server_discriminates_on_kind_not_on_which_fields_arrived(app):
         },
         headers=CSRF,
     )
-    owner_client, _ = sign_in(app, "owner", owner_key)
     without_wrapper = owner_client.post(
         "/api/auth/upgrade-kdf",
         json={"salt": b64(16), "kdf": dict(DEFAULT_KDF_ENVELOPE), "authKey": b64()},
@@ -406,8 +615,8 @@ def test_the_server_discriminates_on_kind_not_on_which_fields_arrived(app):
     )
     assert with_wrapper.status_code == 400
     assert without_wrapper.status_code == 400
-    # Nothing written by either.
-    assert params_of(credential(app, "root2"))["kdf"] == DEFAULT_KDF_ENVELOPE
+    # Nothing written by either, in any table.
+    assert snapshot(app, EVERY_TABLE) == before
 
 
 # ---- Change password and delete ---------------------------------------
@@ -415,33 +624,107 @@ def test_the_server_discriminates_on_kind_not_on_which_fields_arrived(app):
 
 def test_changing_a_password_rewrites_the_credential_and_the_wrapper_only(app):
     owner, auth_key = register(app, "owner")
-    record = rows(app, "SELECT * FROM records")[0]
+    other, _ = register(app, "other")
+    register(app, "root", kind="administrator")
+    for client in (owner, other):
+        for record_type in ("account", "rate"):
+            put_record(client, record_type=record_type)
+    own = credential(app, "owner")
     new_key = b64()
 
+    before = snapshot(app, EVERY_TABLE)
     response = owner.post(
         "/api/auth/change-password",
-        json={
-            "currentAuthKey": auth_key,
-            "salt": b64(16),
-            "kdf": dict(DEFAULT_KDF_ENVELOPE),
-            "authKey": new_key,
-            "wrappedDek": b64(48),
-            "dekNonce": b64(12),
-        },
+        json=rotation(currentAuthKey=auth_key, authKey=new_key, wrappedDek=b64(48), dekNonce=b64(12)),
         headers=CSRF,
     )
     assert response.status_code == 200
-    # Every record's ciphertext is byte-identical.
-    assert rows(app, "SELECT * FROM records")[0] == record
+    after = snapshot(app, EVERY_TABLE)
+
+    # The password credential row and its wrapper, and no other row.
+    # Sessions are the one other table a password change writes, and
+    # only by ending this account's other sessions (asserted below).
+    assert {(t, k) for t, k in changed_rows(before, after) if t != "sessions"} == {
+        ("credentials", (own["id"],)),
+        ("dek_wrappers", (own["id"],)),
+    }
+    old_row, new_row = before["credentials"][(own["id"],)], after["credentials"][(own["id"],)]
+    assert json.loads(new_row["params"])["salt"] != json.loads(old_row["params"])["salt"]
+    assert new_row["verifier"] != old_row["verifier"]
+    assert (
+        after["dek_wrappers"][(own["id"],)]["wrapped_dek"]
+        != before["dek_wrappers"][(own["id"],)]["wrapped_dek"]
+    )
+    # Every record's ciphertext is byte-identical, this vault's included.
+    assert after["records"] == before["records"]
+
     sign_in(app, "owner", new_key)
     assert app.test_client().post(
         "/api/auth/login", json={"username": "owner", "authKey": auth_key}, headers=CSRF
     ).status_code == 401
 
 
-def test_a_wrong_current_auth_key_is_refused_server_side(app):
+def test_a_password_change_on_old_parameters_lands_on_the_current_default(app):
     owner, auth_key = register(app, "owner")
-    before = credential(app, "owner")["verifier"]
+    stale(app, "owner")
+    assert owner.post(
+        "/api/auth/change-password",
+        json=rotation(currentAuthKey=auth_key, wrappedDek=b64(48), dekNonce=b64(12)),
+        headers=CSRF,
+    ).status_code == 200
+    assert params_of(credential(app, "owner"))["kdf"] == DEFAULT_KDF_ENVELOPE
+
+
+def test_an_administrator_changes_their_password_without_a_wrapper(app):
+    register(app, "root", kind="administrator")
+    register(app, "owner")
+    admin, auth_key = register(app, "root2", kind="administrator")
+    own = credential(app, "root2")
+    new_key = b64()
+
+    before = snapshot(app)
+    assert admin.post(
+        "/api/auth/change-password",
+        json=rotation(currentAuthKey=auth_key, authKey=new_key),
+        headers=CSRF,
+    ).status_code == 200
+    after = snapshot(app)
+
+    assert changed_rows(before, after) == {("credentials", (own["id"],))}
+    assert (own["id"],) not in after["dek_wrappers"]
+    signed_in, body = sign_in(app, "root2", new_key)
+    assert body["kind"] == "administrator"
+    assert app.test_client().post(
+        "/api/auth/login", json={"username": "root2", "authKey": auth_key}, headers=CSRF
+    ).status_code == 401
+
+
+def test_the_change_password_wrapper_follows_the_session_kind(app):
+    """An administrator carrying a wrapper, and a vault owner without
+    one, are each a Bad Request that writes nothing."""
+    register(app, "root", kind="administrator")
+    admin, admin_key = register(app, "root2", kind="administrator")
+    owner, owner_key = register(app, "owner")
+
+    before = snapshot(app, EVERY_TABLE)
+    assert admin.post(
+        "/api/auth/change-password",
+        json=rotation(currentAuthKey=admin_key, wrappedDek=b64(48), dekNonce=b64(12)),
+        headers=CSRF,
+    ).status_code == 400
+    assert owner.post(
+        "/api/auth/change-password",
+        json=rotation(currentAuthKey=owner_key),
+        headers=CSRF,
+    ).status_code == 400
+    assert snapshot(app, EVERY_TABLE) == before
+
+
+def test_a_wrong_current_auth_key_is_refused_server_side(app):
+    """Called directly, with no client-side unwrap in front of it."""
+    owner, auth_key = register(app, "owner")
+    sign_in(app, "owner", auth_key)
+    before = snapshot(app, EVERY_TABLE)
     assert owner.post(
         "/api/auth/change-password",
         json={
@@ -454,7 +737,7 @@ def test_a_wrong_current_auth_key_is_refused_server_side(app):
         },
         headers=CSRF,
     ).status_code == 400
-    assert credential(app, "owner")["verifier"] == before
+    assert snapshot(app, EVERY_TABLE) == before
 
 
 def test_a_password_change_ends_every_other_session_and_keeps_this_one(app):
@@ -480,10 +763,38 @@ def test_a_password_change_ends_every_other_session_and_keeps_this_one(app):
 
 
 def test_sessions_report_no_ip_and_no_user_agent(app):
-    owner, _ = register(app, "owner")
+    from solvent.session import COOKIE_NAME
+
+    owner, auth_key = register(app, "owner")
+    second, _ = sign_in(app, "owner", auth_key)
     body = owner.get("/api/sessions", headers=CSRF).get_json()
-    assert set(body[0]) == {"id", "issuedAt", "lastActiveAt", "current"}
-    assert body[0]["current"] is True
+    # The full shape of every entry, so an added field fails here.
+    assert len(body) == 2
+    for entry in body:
+        assert shape_of(entry) == {"id": "str", "issuedAt": "str", "lastActiveAt": "str", "current": "bool"}
+    assert [entry["current"] for entry in body].count(True) == 1
+
+    # No cookie value and no stored token hash, for either session.
+    cookies = {
+        c.value for client in (owner, second) for c in client._cookies.values() if c.key == COOKIE_NAME
+    }
+    hashes = {row["token_hash"] for row in rows(app, "SELECT token_hash FROM sessions")}
+    listed = json.dumps(body)
+    for secret in cookies | hashes | {c.rsplit(".", 1)[0] for c in cookies}:
+        assert secret not in listed
+
+
+def test_sessions_list_only_the_callers_own(app):
+    owner, owner_key = register(app, "owner")
+    other, other_key = register(app, "other")
+    sign_in(app, "other", other_key)
+    own_ids = {row["id"] for row in rows(
+        app,
+        "SELECT sessions.id FROM sessions JOIN principals ON principals.id = sessions.principal_id "
+        "WHERE principals.username = 'owner'",
+    )}
+    listed = {entry["id"] for entry in owner.get("/api/sessions", headers=CSRF).get_json()}
+    assert listed == own_ids
 
 
 def test_log_out_everywhere_ends_the_current_session_too(app):
@@ -494,28 +805,106 @@ def test_log_out_everywhere_ends_the_current_session_too(app):
 
 
 def test_logout_ends_only_the_calling_session(app):
+    from solvent.session import COOKIE_NAME
+
     owner, auth_key = register(app, "owner")
     second, _ = sign_in(app, "owner", auth_key)
+    calling = next(c.value for c in owner._cookies.values() if c.key == COOKIE_NAME)
     owner.post("/api/auth/logout", json={}, headers=CSRF)
     assert second.get("/api/sessions", headers=CSRF).status_code == 200
+    # The calling session is gone on the server, not only its cookie.
+    replay = app.test_client()
+    replay.set_cookie(COOKIE_NAME, calling)
+    assert replay.get("/api/sessions", headers=CSRF).status_code == 401
 
 
 def test_deleting_an_account_needs_the_auth_key_and_the_typed_username(app):
+    """Called directly, since a client bypassing the dialog is the case
+    that matters."""
     owner, auth_key = register(app, "owner")
+    put_record(owner)
+    register(app, "other")
+    before = snapshot(app, EVERY_TABLE)
     for body in (
         {"authKey": b64(), "confirmUsername": "owner"},
         {"authKey": auth_key, "confirmUsername": "someone-else"},
+        {"authKey": auth_key, "confirmUsername": "other"},
     ):
         assert owner.delete("/api/auth/account", json=body, headers=CSRF).status_code == 400
-    assert rows(app, "SELECT * FROM principals")
+        assert snapshot(app, EVERY_TABLE) == before, body
 
+    own_id = rows(app, "SELECT id FROM principals WHERE username = 'owner'")[0]["id"]
     assert owner.delete(
         "/api/auth/account",
         json={"authKey": auth_key, "confirmUsername": "owner"},
         headers=CSRF,
     ).status_code == 200
-    for table in ("principals", "credentials", "dek_wrappers", "records", "sessions"):
-        assert rows(app, f"SELECT * FROM {table}") == [], table
+    for table, column in (
+        ("principals", "id"),
+        ("credentials", "principal_id"),
+        ("records", "principal_id"),
+        ("sessions", "principal_id"),
+    ):
+        assert rows(app, f"SELECT * FROM {table} WHERE {column} = ?", (own_id,)) == [], table
+    assert len(rows(app, "SELECT * FROM dek_wrappers")) == 1
+    # The other vault is untouched.
+    assert rows(app, "SELECT username FROM principals") == [{"username": "other"}]
+
+    # The same credentials no longer sign in, and the old session is dead.
+    assert app.test_client().post(
+        "/api/auth/login", json={"username": "owner", "authKey": auth_key}, headers=CSRF
+    ).status_code == 401
+    assert owner.get("/api/sessions", headers=CSRF).status_code == 401
+
+
+def test_an_administrator_cannot_delete_through_the_vault_owners_path(app):
+    """Not Found and nothing deleted, including when they are not the
+    last administrator."""
+    register(app, "root", kind="administrator")
+    register(app, "root2", kind="administrator")
+    admin, auth_key = register(app, "root3", kind="administrator")
+    register(app, "owner")
+    before = snapshot(app, EVERY_TABLE)
+    response = admin.delete(
+        "/api/auth/account",
+        json={"authKey": auth_key, "confirmUsername": "root3"},
+        headers=CSRF,
+    )
+    assert response.status_code == 404
+    assert snapshot(app, EVERY_TABLE) == before
+
+
+@pytest.mark.parametrize(
+    "method, path",
+    [
+        ("POST", "/api/auth/change-password"),
+        ("GET", "/api/sessions"),
+        ("POST", "/api/auth/logout-all"),
+        ("DELETE", "/api/auth/account"),
+    ],
+)
+def test_the_settings_endpoints_need_a_session(client, method, path):
+    assert client.open(path, method=method, json={}, headers=CSRF).status_code == 401
+
+
+@pytest.mark.parametrize(
+    "method, path, body",
+    [
+        ("POST", "/api/auth/change-password", "rotation"),
+        ("POST", "/api/auth/logout", {}),
+        ("POST", "/api/auth/logout-all", {}),
+        ("DELETE", "/api/auth/account", "delete"),
+    ],
+)
+def test_the_settings_writes_need_the_request_header(app, method, path, body):
+    owner, auth_key = register(app, "owner")
+    if body == "rotation":
+        body = rotation(currentAuthKey=auth_key, wrappedDek=b64(48), dekNonce=b64(12))
+    elif body == "delete":
+        body = {"authKey": auth_key, "confirmUsername": "owner"}
+    before = snapshot(app, EVERY_TABLE)
+    assert owner.open(path, method=method, json=body).status_code == 403
+    assert snapshot(app, EVERY_TABLE) == before
 
 
 def test_an_already_authenticated_caller_at_login_is_sent_to_the_root(app):

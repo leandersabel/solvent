@@ -60,31 +60,32 @@ def test_absent_tampered_expired_and_unsigned_cookies_are_all_refused(app):
         assert response.status_code == 401, case
 
 
-def test_a_session_past_the_absolute_lifetime_is_refused(app):
-    owner, _ = register(app, "owner")
+def issued_long_ago_and_busy_since(app):
+    """Issued past the absolute lifetime, and active a moment ago, so
+    only the issue time can be what ends it."""
+    now = datetime.now(timezone.utc)
     conn = connect(app)
     try:
         conn.execute(
-            "UPDATE sessions SET issued_at = ?",
-            ((datetime.now(timezone.utc) - timedelta(hours=13)).isoformat(),),
+            "UPDATE sessions SET issued_at = ?, last_active_at = ?",
+            ((now - timedelta(hours=12, minutes=1)).isoformat(), now.isoformat()),
         )
         conn.commit()
     finally:
         conn.close()
+
+
+def test_a_session_past_the_absolute_lifetime_is_refused(app):
+    owner, _ = register(app, "owner")
+    assert owner.get("/api/records?type=account", headers=CSRF).status_code == 200
+    issued_long_ago_and_busy_since(app)
     assert owner.get("/api/records?type=account", headers=CSRF).status_code == 401
 
 
 def test_the_absolute_expiry_binds_an_administrator_the_same_way(app):
     admin, _ = register(app, "root", kind="administrator")
-    conn = connect(app)
-    try:
-        conn.execute(
-            "UPDATE sessions SET issued_at = ?",
-            ((datetime.now(timezone.utc) - timedelta(hours=13)).isoformat(),),
-        )
-        conn.commit()
-    finally:
-        conn.close()
+    assert admin.get("/api/admin/invites", headers=CSRF).status_code == 200
+    issued_long_ago_and_busy_since(app)
     assert admin.get("/api/admin/invites", headers=CSRF).status_code == 401
 
 
