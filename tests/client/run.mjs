@@ -374,6 +374,15 @@ await check('an administrator whose upgrade fails is still signed in', async () 
   assert.deepEqual(posted, ['/api/auth/salt', '/api/auth/login', '/api/auth/upgrade-kdf']);
 });
 
+await check('a locked account reads as too many attempts at the salt request too', async () => {
+  // The limiter answers the salt request before the derivation, so
+  // that is where a locked account is usually met.
+  const session = await load('session.js');
+  globalThis.fetch = async () => ({ ok: false, status: 429, json: async () => ({}) });
+  await assert.rejects(session.signIn('anyone', 'a password'), (error) =>
+    error instanceof session.SignInError && error.message === 'throttled');
+});
+
 // ---- Migration --------------------------------------------------------
 
 await check('migration is a pure function on decrypted plaintext', () => {

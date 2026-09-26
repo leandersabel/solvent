@@ -11,6 +11,10 @@ import { Vault } from './model.js';
 import { deleteRecord } from './writes.js';
 
 let masterKey = null;
+// The DEK as the server holds it, wrapped under the Master Key: what a
+// password change unwraps to prove the current password before sending
+// anything. Ciphertext, as public as the row it came from.
+let wrapper = null;
 let vault = null;
 let idleTimer = null;
 const lockListeners = [];
@@ -29,6 +33,10 @@ export function onLock(listener) {
 
 export class SignInError extends Error {}
 
+/** The current password did not open the vault, found in the browser
+ *  before anything was sent (account-settings.md, Change password). */
+export class WrongPasswordError extends Error {}
+
 /** The sign-in flow, identical for both kinds until a credential
  *  verifies.
  *
@@ -39,7 +47,14 @@ export class SignInError extends Error {}
  *  has to guess a password (login.md, Rules, The sign-in wait).
  */
 export async function signIn(username, password) {
-  const { salt, kdf } = await api.post('/api/auth/salt', { username });
+  let salt, kdf;
+  try {
+    ({ salt, kdf } = await api.post('/api/auth/salt', { username }));
+  } catch (error) {
+    // The limiter answers the salt request too, and a locked account
+    // reads the same there as at the login.
+    throw new SignInError(error.status === 429 ? 'throttled' : 'invalid');
+  }
   const keys = await crypto.deriveKeys(password, salt, kdf);
 
   let answer;
@@ -76,6 +91,7 @@ export async function signIn(username, password) {
   }
 
   masterKey = keys.masterKey;
+  wrapper = { wrappedDek: answer.wrappedDek, dekNonce: answer.dekNonce };
   vault = new Vault(dek);
   await vault.load();
   // A byte-identical pair loses nothing by going (record-rate.md, Two
@@ -107,9 +123,13 @@ async function upgradeKdf(password, targetKdf, dek) {
   const salt = crypto.b64encode(crypto.randomBytes(16));
   const keys = await crypto.deriveKeys(password, salt, targetKdf);
   const body = { salt, kdf: targetKdf, authKey: keys.authKey };
-  if (dek) Object.assign(body, await crypto.wrapDek(dek, keys.masterKey));
+  const rewrapped = dek ? await crypto.wrapDek(dek, keys.masterKey) : null;
+  Object.assign(body, rewrapped);
   await api.post('/api/auth/upgrade-kdf', body);
-  if (dek) masterKey = keys.masterKey;
+  if (dek) {
+    masterKey = keys.masterKey;
+    wrapper = rewrapped;
+  }
 }
 
 /** Change password: the DEK does not change, so no vault record is
@@ -121,6 +141,16 @@ export async function changePassword(username, currentPassword, newPassword, kdf
     username,
   });
   const current = await crypto.deriveKeys(currentPassword, currentSalt, currentKdf);
+  // For a vault owner the unwrap is the first of the two checks, and
+  // a failure stops here with nothing sent. An administrator has
+  // nothing to unwrap, so the server's check is their only one.
+  if (wrapper) {
+    try {
+      await crypto.unwrapDek(wrapper.wrappedDek, wrapper.dekNonce, current.masterKey);
+    } catch {
+      throw new WrongPasswordError();
+    }
+  }
 
   const salt = crypto.b64encode(crypto.randomBytes(16));
   const next = await crypto.deriveKeys(newPassword, salt, kdf);
@@ -130,9 +160,13 @@ export async function changePassword(username, currentPassword, newPassword, kdf
     kdf,
     authKey: next.authKey,
   };
-  if (vault) Object.assign(body, await crypto.wrapDek(vault.dek, next.masterKey));
+  const rewrapped = vault ? await crypto.wrapDek(vault.dek, next.masterKey) : null;
+  Object.assign(body, rewrapped);
   await api.post('/api/auth/change-password', body);
-  if (vault) masterKey = next.masterKey;
+  if (vault) {
+    masterKey = next.masterKey;
+    wrapper = rewrapped;
+  }
 }
 
 export function authKeyFor(username, password) {
@@ -154,6 +188,7 @@ export function wrapForMaster(dek) {
  *  at the unlocked machine, who can open devtools. */
 export function lock() {
   masterKey = null;
+  wrapper = null;
   vault = null;
   clearTimeout(idleTimer);
   idleTimer = null;

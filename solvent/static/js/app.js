@@ -23,6 +23,7 @@ import {
   revealChrome,
   trackEdits,
 } from './dom.js';
+import { whenUnauthorized } from './api.js';
 import { onLock, currentVault, isUnlocked, lock, signOut } from './session.js';
 import { unlockCard } from './unlock.js';
 import { dashboardView } from './view-dashboard.js';
@@ -234,6 +235,13 @@ function registerVaultStore() {
 
 if (window.Alpine) registerVaultStore();
 else document.addEventListener('alpine:init', registerVaultStore);
+
+// A session that ran out mid-action is met by the lock: the card in its
+// unlocking-again shape, with what was typed held until it is answered
+// (ui/unlock.md, States).
+whenUnauthorized(() => {
+  if (isUnlocked()) lock();
+});
 
 onLock(() => {
   if (container && vaultShown) {

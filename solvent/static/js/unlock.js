@@ -31,15 +31,14 @@ export function unlockCard({ knownUsername = null, onUnlocked }) {
   });
   const button = el('button', { type: 'submit', class: 'btn-primary btn-block', text: 'Unlock' });
   const note = el('p', { class: 'hint', hidden: true, text: WAIT_NOTE });
+  // Closing other tabs genuinely can free the memory, so this runs the
+  // derivation again rather than only clearing the message.
   const retry = el('button', {
     type: 'button',
     class: 'btn-secondary',
     text: 'Try again',
     hidden: true,
-    onclick: () => {
-      retry.hidden = true;
-      error.hidden = true;
-    },
+    onclick: () => form.requestSubmit(),
   });
 
   const identity = knownUsername
@@ -76,25 +75,37 @@ export function unlockCard({ knownUsername = null, onUnlocked }) {
     // The button becomes a working state and the form goes quiet. The
     // wait is the screen's defining moment and it must never look like
     // a hang.
-    button.disabled = true;
+    const typed = password.value;
+    quiet(true);
     button.textContent = 'Deriving your key';
     note.hidden = false;
 
+    let stopped = false;
     try {
-      const result = await signIn(name, password.value);
+      const result = await signIn(name, typed);
       password.value = '';
       onUnlocked(result);
     } catch (failure) {
       show(error, messageFor(failure));
-      if (failure instanceof DerivationError && failure.outOfMemory) {
-        retry.hidden = false;
+      if (failure instanceof DerivationError) {
+        // Out of memory is a moment, and Try again can meet it. A
+        // browser that cannot run the encryption at all is a hard
+        // stop, because there is no weaker unlock to fall back to.
+        if (failure.outOfMemory) retry.hidden = false;
+        else stopped = true;
       }
     } finally {
-      button.disabled = false;
       button.textContent = 'Unlock';
       note.hidden = true;
+      quiet(stopped);
     }
   });
+
+  function quiet(on) {
+    for (const control of [username, password, button, ...form.querySelectorAll('.password-field button')]) {
+      control.disabled = on;
+    }
+  }
 
   return el('div', { class: 'outside' }, [
     form,

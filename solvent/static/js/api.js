@@ -8,6 +8,21 @@
 
 const HEADER = { 'X-Solvent-Request': '1' };
 
+// A session that ran out mid-action answers Unauthorized, and the vault
+// asks for the password again rather than losing what was typed
+// (spec/ui/unlock.md, States). A wrong password at sign-in answers
+// Unauthorized too, which is that screen's own answer and not this.
+let unauthorized = () => {};
+
+export function whenUnauthorized(listener) {
+  unauthorized = listener;
+}
+
+function failed(status, path) {
+  if (status === 401 && path !== '/api/auth/login') unauthorized();
+  return new ApiError(status);
+}
+
 export class ApiError extends Error {
   constructor(status) {
     super(`request failed with status ${status}`);
@@ -22,7 +37,7 @@ async function call(method, path, body) {
     init.body = JSON.stringify(body);
   }
   const response = await fetch(path, init);
-  if (!response.ok) throw new ApiError(response.status);
+  if (!response.ok) throw failed(response.status, path);
   if (response.status === 204) return null;
   return response.json();
 }
@@ -41,7 +56,7 @@ export async function getRates(params) {
     credentials: 'same-origin',
   });
   if (response.status === 204) return null;
-  if (!response.ok) throw new ApiError(response.status);
+  if (!response.ok) throw failed(response.status, '/api/rates');
   return response.json();
 }
 
@@ -53,7 +68,7 @@ export async function downloadExport() {
     headers: { ...HEADER },
     credentials: 'same-origin',
   });
-  if (!response.ok) throw new ApiError(response.status);
+  if (!response.ok) throw failed(response.status, '/api/export');
   const disposition = response.headers.get('Content-Disposition') || '';
   const named = /filename="([^"]+)"/.exec(disposition);
   return { blob: await response.blob(), filename: named ? named[1] : 'solvent-vault.json' };
