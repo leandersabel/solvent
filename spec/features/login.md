@@ -228,9 +228,10 @@ never lock anyone out.
   and logged server-side as an anomaly; this indicates corruption or
   tampering, not a typo.
 - **Rate limiting**: per-account and per-IP on both `/api/auth/salt` and
-  `/api/auth/login`, exponential backoff, lockout with operator alerting
-  (architecture.md, Rate limiting). Lockout responses must not reveal
-  whether the account exists.
+  `/api/auth/login`, then a lockout with operator alerting. The lockout
+  is the escalation, and there is no backoff (architecture.md, Rate
+  limiting). Lockout responses must not reveal whether the account
+  exists.
 - **Already-authenticated caller hits `/login`** → redirect to the
   root path, which resolves by kind (app-shell.md, The two surfaces).
   For a vault owner, keys are still only in memory, so if they were
@@ -241,8 +242,10 @@ never lock anyone out.
   it as a failed login rather than defaulting to either kind, so it
   never has a "kind absent" branch to get wrong.
 - **Clock skew / expired session mid-request** → API returns
-  Unauthorized with a machine-readable code; the client prompts for
-  re-unlock rather than discarding unsaved input.
+  Unauthorized, and the status alone is the signal, with no code in the
+  body, because Unauthorized has one meaning (architecture.md, Status
+  codes). The client prompts for re-unlock rather than discarding
+  unsaved input.
 
 ## Acceptance criteria
 

@@ -6,6 +6,8 @@ from __future__ import annotations
 
 import base64
 import json
+import threading
+import time
 import uuid
 
 import pytest
@@ -910,3 +912,68 @@ def test_the_settings_writes_need_the_request_header(app, method, path, body):
 def test_an_already_authenticated_caller_at_login_is_sent_to_the_root(app):
     owner, _ = register(app, "owner")
     assert owner.get("/login").headers["Location"] == "/"
+
+
+def verify_gate(app):
+    """The app's one verification gate, made the way the first
+    verification makes it."""
+    from solvent.crypto import _slot
+
+    with app.test_request_context():
+        with _slot():
+            pass
+    return app.extensions["solvent.verify_gate"]
+
+
+def test_a_verification_over_the_cap_waits_for_a_slot(app):
+    """architecture.md, Concurrency cap: a request over the cap queues,
+    and a slot freed inside the wait is taken."""
+    app.config.update(VERIFY_CONCURRENCY=1, VERIFY_WAIT_SECONDS=5)
+    _, auth_key = register(app, "owner")
+    gate = verify_gate(app)
+    assert gate.acquire(timeout=1)
+    freed = threading.Timer(0.2, gate.release)
+    freed.start()
+    try:
+        response = app.test_client().post(
+            "/api/auth/login", json={"username": "owner", "authKey": auth_key}, headers=CSRF
+        )
+    finally:
+        freed.join()
+    assert response.status_code == 200
+
+
+def test_a_verification_that_waits_past_the_bound_is_throttled(app):
+    """A request that finds every slot taken for the whole wait answers
+    with the ordinary throttle response rather than waiting on, and
+    the next one takes the slot once it is free."""
+    app.config.update(VERIFY_CONCURRENCY=1, VERIFY_WAIT_SECONDS=0.3)
+    _, auth_key = register(app, "owner")
+    gate = verify_gate(app)
+    client = app.test_client()
+    login = {"username": "owner", "authKey": auth_key}
+
+    assert gate.acquire(timeout=1)
+    try:
+        started = time.monotonic()
+        waited = client.post("/api/auth/login", json=login, headers=CSRF)
+        elapsed = time.monotonic() - started
+    finally:
+        gate.release()
+    assert waited.status_code == 429
+    assert elapsed >= 0.3
+
+    assert client.post("/api/auth/login", json=login, headers=CSRF).status_code == 200
+
+    # The same answer the rate limiter gives.
+    app.config.update(LOGIN_REQUESTS_PER_IP_HOUR=0)
+    limited = client.post("/api/auth/login", json=login, headers=CSRF)
+    assert answers(waited) == answers(limited)
+
+
+def test_logout_without_a_session_answers_ok(client):
+    """account-settings.md, Session and lock: signing out of nothing is
+    harmless, and asking twice is the same as asking once."""
+    for _ in range(2):
+        response = client.post("/api/auth/logout", json={}, headers=CSRF)
+        assert response.status_code == 200

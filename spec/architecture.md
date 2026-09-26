@@ -821,11 +821,14 @@ Actors this design defends against vs. accepts:
     just proven they are entitled to. The resulting size difference on
     the wire falls under the accepted request-size metadata leak in
     Threat model, and is not treated as a control.
-- **Rate limiting**: per-account and per-IP limits with exponential
-  backoff and lockout on the login and salt-fetch endpoints. The
-  expensive Argon2id derivation runs client-side, so an attacker
-  scripting the API directly pays nothing per guess — throttling is the
-  only thing standing between them and unlimited guesses.
+- **Rate limiting**: per-account and per-IP limits and a lockout on the
+  login and salt-fetch endpoints. The expensive Argon2id derivation
+  runs client-side, so an attacker scripting the API directly pays
+  nothing per guess. Throttling is the only thing standing between them
+  and unlimited guesses.
+  - **The lockout is the escalation.** An account over its limit is
+    throttled, and one that keeps failing is locked out. There is no
+    backoff between the two.
   - **Defaults**: per account, 10 attempts per 15 minutes, then a
     15-minute lockout once 20 fail within an hour. Per IP, 60 requests
     per hour across `/api/auth/login` and `/api/auth/salt` together —
@@ -842,11 +845,16 @@ Actors this design defends against vs. accepts:
   cost is *not* negligible. Every `/api/auth/login`, for a real account
   or a decoy, runs Argon2id over the Auth Key at 64 MiB (login.md), so N
   parallel attempts allocate N × 64 MiB before the rate limiter's
-  verdict matters — a memory-exhaustion lever on a NAS. Verifications
-  run behind a concurrency limit — **default 4**, so peak Argon2id
-  memory is ~256 MiB — and requests over it queue, then fail with the
-  ordinary throttle response. The memory ceiling is then a bound the box
-  can hold rather than a consequence of how fast the limiter reacts.
+  verdict matters, which is a memory-exhaustion lever on a NAS.
+  Verifications run behind a concurrency limit, **default 4**, so peak
+  Argon2id memory is ~256 MiB. The memory ceiling is then a bound the
+  box can hold rather than a consequence of how fast the limiter
+  reacts.
+  - **A verification waits at most 10 seconds for a slot**, by default,
+    then answers with the ordinary throttle response. The bound decides
+    when an attacker holding every slot starts being throttled instead
+    of slowing everyone else down, and it keeps a queued request from
+    holding its connection open for as long as the slots stay taken.
 - **Alerting means a structured log line**, not a notification: lockout
   emits an event with a stable name, the affected account, and the
   window, at a level the operator's existing container-log tooling can

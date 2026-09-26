@@ -55,6 +55,7 @@ def create_app(config_overrides: dict | None = None) -> flask.Flask:
         LOGIN_LOCKOUT_MINUTES=config.login_lockout_minutes,
         LOGIN_REQUESTS_PER_IP_HOUR=config.login_requests_per_ip_hour,
         VERIFY_CONCURRENCY=config.verify_concurrency,
+        VERIFY_WAIT_SECONDS=config.verify_wait_seconds,
         RATE_REQUESTS_PER_HOUR=config.rate_requests_per_hour,
         RATE_BREAKER_FAILURES=config.rate_breaker_failures,
         RATE_BREAKER_COOLOFF_MINUTES=config.rate_breaker_cooloff_minutes,

@@ -34,6 +34,7 @@ class Config:
     login_lockout_minutes: int
     login_requests_per_ip_hour: int
     verify_concurrency: int
+    verify_wait_seconds: int
     rate_requests_per_hour: int
     rate_breaker_failures: int
     rate_breaker_cooloff_minutes: int
@@ -124,6 +125,9 @@ def load_config(env: "dict[str, str] | None" = None) -> Config:
         # architecture.md, Concurrency cap: 4 parallel verifications, so
         # peak Argon2id memory stays near 256 MiB.
         verify_concurrency=_number(env, "VERIFY_CONCURRENCY", 4),
+        # How long a verification waits for a slot before it is
+        # throttled like any other attempt over a limit.
+        verify_wait_seconds=_number(env, "VERIFY_WAIT_SECONDS", 10),
         # rate-lookup.md, Rate limiting and failure.
         rate_requests_per_hour=_number(env, "RATE_REQUESTS_PER_HOUR", 120),
         rate_breaker_failures=_number(env, "RATE_BREAKER_FAILURES", 5),

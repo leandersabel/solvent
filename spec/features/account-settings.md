@@ -308,7 +308,9 @@ Found for an administrator session.
   Rules owns the value.
 - **Log out** — `POST /api/auth/logout`. Invalidates the current server
   session; the client discards its in-memory keys first, so a failed
-  request still leaves nothing readable in the tab.
+  request still leaves nothing readable in the tab. Without a session it
+  answers OK, because signing out of nothing is harmless and asking
+  twice is the same as asking once.
 - **"Log out everywhere"** — `POST /api/auth/logout-all`. Invalidates
   every session for the user, **including the current one**. There is no
   "all except this one" variant. Two acts do keep the current session
@@ -385,8 +387,11 @@ Found for an administrator session.
   none belonging to another user appear.
 - `POST /api/auth/logout` invalidates the calling session only; a second
   session for the same user still works afterwards.
-- All four endpoints return Unauthorized unauthenticated, and the three
-  writes return Forbidden without the `X-Solvent-Request` header.
+- Change password, `GET /api/sessions`, logout everywhere and account
+  deletion return Unauthorized unauthenticated. `POST /api/auth/logout`
+  without a session answers OK.
+- The writes, change password, logout, logout everywhere and account
+  deletion, return Forbidden without the `X-Solvent-Request` header.
 - After the configured idle period, in-memory keys are gone and reading
   vault data prompts to unlock; after 12 hours, the server session
   answers Unauthorized regardless of activity.

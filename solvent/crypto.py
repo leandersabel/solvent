@@ -14,10 +14,11 @@ import hashlib
 import hmac
 import secrets
 import threading
+from contextlib import contextmanager
 
 from argon2 import PasswordHasher, Type
 from argon2.exceptions import VerificationError, VerifyMismatchError
-from flask import current_app
+from flask import abort, current_app
 
 from .config import SERVER_VERIFY_PARAMS
 
@@ -39,30 +40,37 @@ _hasher = PasswordHasher(
 
 # architecture.md, Concurrency cap: N parallel verifications allocate
 # N x 64 MiB before the rate limiter's verdict matters, which is a
-# memory-exhaustion lever on a NAS. Requests over the cap queue.
-_verify_gate: "threading.Semaphore | None" = None
+# memory-exhaustion lever on a NAS. A request over the cap waits for a
+# slot, and a wait past the bound answers Too Many Requests, the same
+# answer any other limit gives. One gate per app, sized by its config.
 _gate_lock = threading.Lock()
 
 
-def _gate() -> threading.Semaphore:
-    global _verify_gate
+@contextmanager
+def _slot():
+    app = current_app._get_current_object()
     with _gate_lock:
-        if _verify_gate is None:
-            _verify_gate = threading.Semaphore(
-                current_app.config["VERIFY_CONCURRENCY"]
-            )
-    return _verify_gate
+        gate = app.extensions.get("solvent.verify_gate")
+        if gate is None:
+            gate = threading.Semaphore(app.config["VERIFY_CONCURRENCY"])
+            app.extensions["solvent.verify_gate"] = gate
+    if not gate.acquire(timeout=app.config["VERIFY_WAIT_SECONDS"]):
+        abort(429)
+    try:
+        yield
+    finally:
+        gate.release()
 
 
 def hash_auth_key(auth_key: str) -> str:
-    with _gate():
+    with _slot():
         return _hasher.hash(auth_key)
 
 
 def verify_auth_key(verifier: str, auth_key: str) -> bool:
     """Constant-time in the sense that matters: Argon2id's own compare,
     and the same wall-clock work whether or not it matches."""
-    with _gate():
+    with _slot():
         try:
             return _hasher.verify(verifier, auth_key)
         except (VerifyMismatchError, VerificationError):

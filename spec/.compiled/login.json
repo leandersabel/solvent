@@ -33,11 +33,11 @@
     "noIdleRuleForAdministrator": {"value": "nothing is decrypted, so there is nothing for a lock to take away. An administrator session is bounded by the absolute expiry and by signing out", "cite": "spec/features/login.md#rules"},
     "sessionLifetime": {"value": "the server-side session expires 12 hours after issue, absolute and not sliding, for both kinds. The session is rotated on successful login", "cite": "spec/features/login.md#rules"},
     "rateLimits": {"value": "per account 10 attempts per 15 minutes, then a 15-minute lockout once 20 fail within an hour. Per IP 60 requests per hour across /api/auth/login and /api/auth/salt together. Operator config with those defaults, so tests assert the behaviour at whatever value is configured and no criterion asserts a count", "cite": "spec/architecture.md#application-hardening"},
-    "concurrencyCap": {"value": "Auth Key verifications run behind a concurrency limit, default 4, so peak Argon2id memory is bounded. Requests over it queue and then fail with the ordinary throttle response", "cite": "spec/architecture.md#application-hardening"},
+    "concurrencyCap": {"value": "Auth Key verifications run behind a concurrency limit, default 4, so peak Argon2id memory is bounded. A verification over it waits at most 10 seconds for a slot by default, then answers with the ordinary throttle response", "cite": "spec/architecture.md#application-hardening"},
     "lockoutAlerting": {"value": "a structured log line with a stable name, the affected account and the window, not a notification", "cite": "spec/architecture.md#application-hardening"},
     "statusCodes": {
       "lockedOutOrOverLimit": {"value": 429, "cite": "spec/architecture.md#status-codes", "condition": "a rate limit engaged. The response shape must not reveal whether the account exists (spec/features/login.md#edge-cases)"},
-      "sessionExpiredMidRequest": {"value": 401, "cite": "spec/architecture.md#status-codes", "condition": "returned with a machine-readable code so the client prompts for re-unlock rather than discarding unsaved input (spec/features/login.md#edge-cases)"},
+      "sessionExpiredMidRequest": {"value": 401, "cite": "spec/architecture.md#status-codes", "condition": "the status alone is the signal, with no code in the body. The client prompts for re-unlock rather than discarding unsaved input (spec/features/login.md#edge-cases)"},
       "upgradeKdfFieldMismatch": {"value": 400, "cite": "spec/architecture.md#status-codes", "condition": "a wrapper from an administrator session, or none from a vault owner session (spec/features/login.md#stale-kdf-upgrade)"}
     }
   },

@@ -22,45 +22,10 @@ login already answered OK, so the server never sees it fail, and no
 endpoint exists for the client to report it. Today the card shows the
 generic error and nothing is logged. Either an endpoint is specified
 for the report, with what it may carry, or the server-side log is
-dropped from both files.
-
-## login: how long a verification may queue                [asked by: engineer]
-
-`architecture.md`, Application hardening, Concurrency cap: requests
-over the cap "queue, then fail with the ordinary throttle response".
-No wait is stated, so a queued request today waits for a slot however
-long that takes and never answers Too Many Requests. The bound decides
-when an attacker holding every slot starts getting throttled instead
-of slowing everyone down.
-
-## login: the shape of the exponential backoff              [asked by: engineer]
-
-`architecture.md`, Application hardening, Rate limiting, and
-`features/login.md`, Edge cases, name exponential backoff alongside
-the per-account limit and the lockout. Neither states a base, a factor
-or what resets it, so the limiter has fixed windows and the lockout
-and no backoff.
-
-## login: the machine-readable code on an expired session  [asked by: engineer]
-
-`features/login.md`, Edge cases, and the login contract's
-`sessionExpiredMidRequest` ask for Unauthorized "with a
-machine-readable code". `architecture.md`, Status codes, names none,
-and Unauthorized has one meaning there, so the client treats the
-status itself as the signal and the response carries no body code. If
-a body field is meant, its name and value belong in Status codes.
-
-## account-settings: which four endpoints need a session     [asked by: engineer]
-
-`features/account-settings.md`, Acceptance criteria: "All four
-endpoints return Unauthorized unauthenticated, and the three writes
-return Forbidden without the `X-Solvent-Request` header." The feature
-has five: change password, `GET /api/sessions`, logout, logout
-everywhere and deleting the account. The tests read the four as change
-password, the session list, logout everywhere and deletion, and assert
-Forbidden on all four writes. `POST /api/auth/logout` answers OK
-without a session. If it is one of the four, it must answer
-Unauthorized instead.
+dropped from both files. `product/login.md`, What must be true, also
+tells the client that such a password is "reported to the operator as
+an anomaly rather than shown to you", so dropping the log changes a
+product statement as well, which is the product owner's to change.
 
 ## account-settings: deletion as a dialog with a typed username  [asked by: engineer]
 
