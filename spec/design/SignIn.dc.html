@@ -1,0 +1,50 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Sign in</title>
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<style>
+body{margin:0;background:#faf9f7;font-family:system-ui,-apple-system,"Segoe UI",sans-serif;color:#111d20;-webkit-font-smoothing:antialiased}
+a{color:#2c6471;text-decoration:none}a:hover{color:#184d59;text-decoration:underline}
+.field{display:flex;flex-direction:column;gap:6px}
+.field label{font-size:13px;font-weight:500;color:#4d575a}
+.input{font:inherit;font-size:15px;color:#111d20;background:#fff;border:1px solid #d8dfe1;border-radius:6px;height:44px;padding:0 12px;box-sizing:border-box;width:100%}
+</style>
+</helmet>
+<div style="width: 1280px; height: 800px; background: #faf9f7; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 28px">
+  <div style="display: flex; flex-direction: column; align-items: center; gap: 12px">
+    <div style="font-size: 28px; font-weight: 600; color: #0c3943; letter-spacing: 0.01em">Solvent</div>
+  </div>
+
+  <form style="width: 420px; box-sizing: border-box; background: #ffffff; border: 1px solid #d8dfe1; border-radius: 10px; padding: 32px; display: flex; flex-direction: column; gap: 20px">
+    <div class="field">
+      <label for="u">Username</label>
+      <input id="u" class="input" value="leander" autocomplete="username">
+    </div>
+    <div class="field">
+      <label for="p">Password</label>
+      <div style="display: flex; align-items: center; border: 1px solid #2c6471; box-shadow: 0 0 0 1px #2c6471; border-radius: 6px; height: 44px; padding: 0 4px 0 12px; box-sizing: border-box">
+        <input id="p" type="password" value="xxxxxxxxxxxxxxxxxx" autocomplete="current-password" style="font: inherit; font-size: 15px; border: 0; outline: 0; flex-grow: 1; background: transparent">
+        <button type="button" style="font: inherit; font-size: 13px; font-weight: 500; color: #2c6471; background: transparent; border: 0; padding: 8px 10px; cursor: pointer">Show</button>
+      </div>
+    </div>
+    <button type="submit" style="font: inherit; font-size: 15px; font-weight: 600; color: #ffffff; background: #876b36; border: 0; border-radius: 6px; height: 46px; cursor: pointer; margin-top: 4px">Unlock</button>
+  </form>
+
+  <p style="margin: 0; font-size: 13px; color: #798285">Solvent cannot recover a lost password.</p>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props='{"$preview":{"width":1280,"height":800}}'>
+class Component extends DCLogic {
+  renderVals() {
+    return {};
+  }
+}
+</script>
+</body>
+</html>

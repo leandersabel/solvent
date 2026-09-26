@@ -20,17 +20,23 @@ Regions, top to bottom:
 
 ### 1. Hero figure
 
-- The net worth total, 44px/600, ink-primary, proportional figures, in
-  the main currency.
+Summary figures read in whole units of the main currency: the total,
+the change, gross assets and liabilities here, the legend and the
+breakdown below. The holdings table carries the money places, because
+it is where a figure is checked against a statement.
+
+- The net worth total, ink-primary, proportional figures, in the main
+  currency, under the section label "Net worth" (`design-system.md`,
+  Typography).
 - Beneath it, the change over the selected chart range: an arrow icon,
   the signed absolute change, and the percentage — in status good or
   critical, **with the arrow icon carrying the sign, not the color
   alone**.
-- Beside the total, two smaller figures in ink-secondary: gross assets
-  and gross liabilities. Net worth is a signed sum and the UI must show
+- Beside the total, two smaller figures under their own section
+  labels: gross assets and gross liabilities. Net worth is a signed sum and the UI must show
   both sides (`net-worth-view.md`).
-- **Which rates**, a two-position control beside the total, both
-  positions named:
+- **Which rates**, a two-position control on its own row beneath the
+  total, both positions named:
   - **"Latest rates, 31 July"**, every holding's last figure at the
     newest rate there is. The position the screen opens in, and the
     answer to what am I worth. The date in the label is the one rate
@@ -138,45 +144,7 @@ bands mirror down, the net-worth line runs over the top.
 - **No control here issues a network request** — range, dimension, mode,
   band visibility, selection. The whole model is already in memory.
 
-### 3. Holdings table
-
-Columns: Name · Dimensions · Latest value (native unit) · In main
-currency · As of · (row action).
-
-- The Dimensions column shows one chip per assignment
-  (`Liquidity: Cash`), omitting dimensions the holding has no value for
-  rather than printing "Unassigned" on every row. With no dimensions
-  configured, the column is absent entirely.
-- Money columns right-aligned, `tabular-nums`.
-- **"As of" is the date of the quantity, never of the rate.** A holding
-  has two ages and only one of them is the user's: the rate's age is
-  one date for the whole screen (Hero figure), because it is the same
-  for everything and nobody can act on it. The quantity's age sorts,
-  which is what answers "what have I not touched in a while" without a
-  threshold deciding it for the user. Shown plainly, at any age.
-  - A row whose unit is priced **older than the vault's newest rate**
-    carries that price's date as well, because "latest rates" is not
-    true of that row. That is a holding nobody publishes a price for,
-    whose price moves only when its owner revisits it
-    (`net-worth-view.md`).
-- Holdings with no snapshots are listed in a separate "Not yet valued"
-  group below the table — **not shown as 0**, which is a real value
-  meaning something different.
-- Holdings whose unit has no price at all are listed in a separate
-  **"Not priced"** group, with that as the stated reason rather than
-  the other one, and excluded from the total. Never counted at their
-  bare quantity, which would value a holding as though its unit were
-  the main currency (`net-worth-view.md`).
-- Archived holdings are hidden by default behind a "Show archived"
-  toggle; when shown they are dimmed with an "Archived" chip.
-- Row click → the holding's detail screen (`account-detail.md`), which
-  owns that holding's own list of values. A "Record a value" action per
-  row opens the single-holding form at that holding
-  (`snapshot-entry.md`). It is not a second New recording: that button
-  asks which date and sweeps every holding, this one takes one holding
-  to one date, which is what an odd date or a backfill needs.
-
-### 4. Breakdown by dimension
+### 3. Breakdown by dimension
 
 Where the chart above shows how composition **moved**, this shows what
 it is made of **right now** — a different question, which is why the
@@ -205,6 +173,46 @@ section exists.
   label directly.
 - With "Group by" on "Total", this section is absent — a single bar
   equal to the hero figure says nothing.
+
+### 4. Holdings table
+
+Columns: Name · Dimensions · Latest value (native unit) · In main
+currency · As of · (row action).
+
+- The Dimensions column shows one chip per assignment
+  (`Liquidity: Cash`), omitting dimensions the holding has no value for
+  rather than printing "Unassigned" on every row. With no dimensions
+  configured, the column is absent entirely.
+- Money columns right-aligned, `tabular-nums`.
+- Rows in the order the holdings were created, oldest first. A row
+  never moves because its figure changed.
+- **"As of" is the date of the quantity, never of the rate.** A holding
+  has two ages and only one of them is the user's: the rate's age is
+  one date for the whole screen (Hero figure), because it is the same
+  for everything and nobody can act on it. The quantity's age sorts,
+  which is what answers "what have I not touched in a while" without a
+  threshold deciding it for the user. Shown plainly, at any age.
+  - A row whose unit is priced **older than the vault's newest rate**
+    carries that price's date as well, because "latest rates" is not
+    true of that row. That is a holding nobody publishes a price for,
+    whose price moves only when its owner revisits it
+    (`net-worth-view.md`).
+- Holdings with no snapshots are listed in a separate "Not yet valued"
+  group below the table — **not shown as 0**, which is a real value
+  meaning something different.
+- Holdings whose unit has no price at all are listed in a separate
+  **"Not priced"** group, with that as the stated reason rather than
+  the other one, and excluded from the total. Never counted at their
+  bare quantity, which would value a holding as though its unit were
+  the main currency (`net-worth-view.md`).
+- Archived holdings are hidden by default behind a "Show archived"
+  toggle; when shown they are dimmed with an "Archived" chip.
+- Row click → the holding's detail screen (`account-detail.md`), which
+  owns that holding's own list of values. A "Record a value" action per
+  row opens the single-holding form at that holding
+  (`snapshot-entry.md`). It is not a second New recording: that button
+  asks which date and sweeps every holding, this one takes one holding
+  to one date, which is what an odd date or a backfill needs.
 
 ## States
 

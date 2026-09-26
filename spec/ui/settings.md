@@ -25,8 +25,8 @@ max-width 720px, one card per section, stacked in the order below.
 The nav entry is an in-page address, not a second page. The keys live
 in one page's memory, so a page load here would charge the derivation
 a second time in one sitting, on top of the one that opened the vault
-(`unlock.md`). `/settings` and `/settings/dimensions` stay real
-addresses, each redirecting to the view it names, so a bookmark or a
+(`unlock.md`). `/settings`, `/settings/dimensions` and
+`/settings/export-import` stay real addresses, each redirecting to the view it names, so a bookmark or a
 typed address still works.
 
 ### Profile
@@ -76,7 +76,8 @@ Two link rows, each one line of explanation and a chevron. Neither
 belongs inside a settings card, so neither is a section.
 
 - **Dimensions** (`ui/dimensions.md`). "How your holdings split up in
-  the chart." Beneath it, how many exist right now, or "None yet".
+  the chart." At the right of the row, how many exist right now, or
+  "None yet".
 - **Export and import** (`ui/export-import.md`). "Download your vault,
   or restore one from a file."
 
@@ -106,7 +107,7 @@ Said here, in the order somebody would be surprised to learn them:
 - **Idle lock**, a select: 5, 10, 15, 30, 45, or 60 minutes, with 15
   selected on a vault that has never set it. A vault carrying a value
   outside that range shows the nearest allowed one, and locks at it.
-  - Beneath it, the tradeoff in one line: "Shorter is safer. Every
+  - Beside it, the tradeoff in one line: "Shorter is safer. Every
     unlock costs the deliberate wait while your password becomes a key
     (`ui/unlock.md`, which owns how long that is)."
   - There is no "never" and the control does not offer one.

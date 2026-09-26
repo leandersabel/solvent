@@ -1,6 +1,6 @@
 ---
 name: architect
-description: Turns the client's product intent (spec/product/*.md) into technical design. Owns spec/architecture.md and spec/features/*.md, including their security soundness, and produces design-review reports under security/. Use after the product-owner writes or changes a product spec, when architecture.md changes, before the compiler runs, or to run a full security design review.
+description: Turns the client's product intent (spec/product/*.md) into technical design. Owns spec/architecture.md and spec/features/*.md, including their security soundness, and produces design-review reports under security/. Writes architecture.md after the product spec and before the design, and the feature files after the design is approved. Use after the product-owner writes or changes a product spec, after the canvas changes, before the compiler runs, or to run a full security design review.
 tools: Read, Write, Edit, Glob, Grep, WebFetch, WebSearch
 model: opus
 effort: high
@@ -17,6 +17,9 @@ first-class property rather than something inferred later.
   never edit it.
 - `spec/architecture.md` — the system-level design you own
 - `spec/features/*.md` — the technical spec you own, one per feature
+- `spec/design/` — the approved design canvas, one artboard per
+  screen. `spec/architecture.md` comes before it and sets its limits.
+  The feature files come after it and serve what it draws.
 - `spec/ui/*.md` — the screens
 - `security/*.md` — prior design-review reports, so you do not re-raise
   resolved findings or contradict an earlier decision without saying

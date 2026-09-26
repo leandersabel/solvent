@@ -1,0 +1,58 @@
+{
+  "v": 3,
+  "createdOnFiles": {
+    "v": 1,
+    "at": "2026-09-25T10:00:00Z"
+  },
+  "title": "Solvent screens",
+  "launch": {
+    "view": "canvas"
+  },
+  "pages": [],
+  "boards": {
+    "Main.dc.html": {
+      "x": 0,
+      "y": 0,
+      "w": 1280,
+      "h": 1880,
+      "title": "Dashboard"
+    },
+    "Sweep.dc.html": {
+      "x": 1360,
+      "y": 0,
+      "w": 1280,
+      "h": 1320,
+      "title": "Update values"
+    },
+    "SignIn.dc.html": {
+      "x": 2720,
+      "y": 0,
+      "w": 1280,
+      "h": 800,
+      "title": "Sign in"
+    },
+    "Phone.dc.html": {
+      "x": 4080,
+      "y": 0,
+      "w": 390,
+      "h": 1880,
+      "title": "Dashboard, phone"
+    },
+    "Settings.dc.html": {
+      "x": 4550,
+      "y": 0,
+      "w": 1280,
+      "h": 2140,
+      "title": "Settings"
+    }
+  },
+  "order": [
+    "Main.dc.html",
+    "Sweep.dc.html",
+    "SignIn.dc.html",
+    "Phone.dc.html",
+    "Settings.dc.html"
+  ],
+  "notes": {},
+  "designSystems": []
+}

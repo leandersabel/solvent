@@ -127,10 +127,8 @@ resolving.
 
 "3 weeks ago", "about a year ago", "never valued". Relative, not a raw
 date: the question on this screen is how long this has been sitting,
-and a date makes the reader do the arithmetic. A figure the chart is
-carrying forward rather than measuring takes the row form of the
-estimated marker, an "Estimated" chip (`design-system.md`), with the
-wording beside it and never the chip alone.
+and a date makes the reader do the arithmetic. The age is the only
+mark a row carries (`design-system.md`, The estimated marker).
 
 ## The rates, at the foot of the sweep
 

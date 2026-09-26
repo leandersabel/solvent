@@ -18,6 +18,11 @@ given.
   and in what order, `parameters` pins the exact values a test asserts
   with the file that states each, and `verify.criteria` is the
   technical acceptance list.
+- The artboards in `spec/design/` that the contract's `read` names —
+  how each screen looks. Build the look from the artboard, not from
+  prose, and where a screen file disagrees with its artboard about
+  appearance, the artboard wins. A disagreement about behavior goes to
+  `spec/questions.md` tagged `engineer`.
 - `spec/architecture.md` — tech stack and, especially, the Security
   section: concrete, non-negotiable requirements that apply to any code
   you touch.

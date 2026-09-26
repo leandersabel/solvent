@@ -4,6 +4,15 @@ Shared visual foundations and shared behavior. Every screen spec in
 this directory assumes this file and states only what it adds. It is
 not a screen, and nothing compiles against it alone.
 
+**The design canvas is how every screen looks.** It is drawn in Claude
+Design at https://claude.ai/artifact/NFxzA1ngFuYB53FHnMizn3 and
+mirrored artboard for artboard in `spec/design/`, which is what the
+engineer builds against. Sizes, spacing, arrangement and component
+styling are read off the canvas. This file holds what a drawing cannot
+carry: the tokens and why they are what they are, the contrast floors,
+and the rules for what each component means. A screen with no artboard
+yet takes its components from the ones drawn.
+
 ## The look
 
 Clean and elegant, in the register of a private bank: light ground, deep
@@ -130,8 +139,7 @@ value never gets a generated hue. Re-validate with the skill's
     negative band grows **leftward** from that same baseline — slot 1
     again, at 45% opacity, matching the stacked chart's liability
     treatment so the sign reads identically in both places. The
-    baseline is drawn a step darker than a gridline, as the chart's
-    zero line is. The direct label stays on the outboard end of the
+    baseline is drawn in ink-muted, as the chart's zero line is. The direct label stays on the outboard end of the
     bar, carrying the signed amount.
   - The bars and the stacked chart show the same dimension, so a reader
     could expect the band colors to carry over. They deliberately do
@@ -155,9 +163,10 @@ reordered by size**, which would make the stack unreadable over time.
 
 - **Asset bands** fill at 85% opacity; **liability bands** mirror below
   the zero line in **the same group color** at 45%. Same hue means same
-  group; the side of the axis carries the sign. The zero line is drawn a
-  step darker than a gridline.
-- The **net-worth line** runs over the stack in ink-primary at 1.5px.
+  group; the side of the axis carries the sign. The zero line is drawn in
+  ink-muted, over the bands.
+- The **net-worth line** runs over the stack in ink-primary at 1.75px, ending in a dot at
+  the latest point.
   It is a summary of the bands, not a fifth series, so it takes no chart
   slot.
 - **Estimated stretches** take the estimated marker below — never a
@@ -171,7 +180,7 @@ are neutral, and they must not collide with each other:
 
 | Band | Fill | Meaning |
 |---|---|---|
-| Unassigned | hairline gray `#d8dfe1` | no value for this dimension — normal |
+| Unassigned | rule gray `#c4cccf` | no value for this dimension — normal |
 | Other | ink-muted `#798285` | the fifth-and-beyond value, folded |
 
 Both always carry a direct label. A chart showing both at once is
@@ -188,21 +197,19 @@ gets reused for the wrong thing later.
 ### The estimated marker
 
 Inferred figures — every stretch between two snapshots, and everything
-after a holding's last one (`net-worth-view.md`) — are marked one way
-across the product, in two forms of the same mark. Never in a status
-color: data that is inferred is not a warning, the same reason figure
-age is stated in words rather than flagged.
+after a holding's last one (`net-worth-view.md`) — are marked on the
+trend chart (`dashboard.md`): tick marks under the x-axis, ink-muted,
+at the dates a real quantity was recorded. Never in a status color:
+data that is inferred is not a warning, the same reason figure age is
+stated in words rather than flagged.
 
-| Form | Mark | Where |
-|---|---|---|
-| Chart | tick marks under the x-axis, ink-muted, at the dates a real quantity was recorded | the trend chart (`dashboard.md`) |
-| Row | an "Estimated" chip — hairline `#d8dfe1` fill, ink-secondary text, otherwise the standard chip | a carried-forward figure (`update-values.md`) |
+The mark is under the axis rather than in the fill because four dashed
+stacked bands are unreadable, and the distinction has to survive at the
+density of a decade of history.
 
-The chart form is under the axis rather than in the fill because four
-dashed stacked bands are unreadable, and the distinction has to survive
-at the density of a decade of history. A row has no axis to hang a tick
-under, so the mark changes form; the meaning and the neutral register do
-not.
+**A row carries no mark.** On the sweep every row not yet recorded for
+the date is carried forward, so a mark there would sit on nearly every
+row and say nothing its age in words does not (`update-values.md`).
 
 **The chart's ticks are on when the chart loads**, and the control that
 takes them away is **Just the line** (`dashboard.md`). The accurate
@@ -211,9 +218,8 @@ twice over: it says which part of the line the reader gave the app, and
 it is the click target that opens that date's recording
 (`recording-detail.md`).
 
-Both forms ship **with wording, never as the mark alone**: "last
-updated about a year ago" beside the chip, and beside the ticks the
-name of the control that removes them, which says what they are by
+The ticks ship **with wording, never as the mark alone**: beside them
+the name of the control that removes them, which says what they are by
 saying what is left without them (Accessibility).
 
 ## Status
@@ -287,10 +293,12 @@ here comes from spacing and restraint.
 
 | Role | Size / weight | Notes |
 |---|---|---|
-| Hero figure (net worth) | 40–48px, 600 | proportional figures |
+| Hero figure (net worth) | 52px, 600 | proportional figures, the currency code beside it at 22px/500 ink-secondary |
+| Screen heading | 32px, 600 | |
 | Section heading | 20px, 600 | |
 | Body | 15px, 400 | |
 | Label / meta | 13px, 500 | ink-secondary |
+| Section label | 12px, 600, uppercase, 0.08em tracking | ink-secondary, over a figure or a group |
 | Axis tick | 12px, 400 | ink-muted |
 
 **`font-variant-numeric: tabular-nums` on every money column, table row,
@@ -363,7 +371,7 @@ only its own content region.
 
 - **Button, primary**: brass-600 fill, white text, 6px radius. One per
   screen region.
-- **Button, secondary**: transparent, petrol-700 text, hairline border.
+- **Button, secondary**: transparent, petrol-700 text, rule border.
   For the light ground only.
 - **Button, chrome**: transparent, white text, petrol-400 border, white
   focus ring. The secondary button on the petrol-800 top bar, where
@@ -397,7 +405,8 @@ only its own content region.
   screen, so a password manager can generate, store and update the
   password. A manager-generated passphrase is the most realistic
   protection a vault with no recovery can have.
-- **Chip**: petrol-50 fill, petrol-700 text, 4px radius, 13px. Used for
+- **Chip**: petrol-50 fill, petrol-200 border, petrol-700 text, 4px
+  radius, 12px. Used for
   a dimension assignment (`Liquidity: Cash`), for status chips such as
   "Archived", and for a price's provenance, whose wording is owned by
   `recording-detail.md`.

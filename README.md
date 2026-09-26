@@ -61,6 +61,8 @@ docker run --rm -p 8000:8000 \
 ## Layout
 
 - `spec/product/` — what the client asked for, in their words.
+- `spec/design/` — the design canvas, one artboard per screen. It is
+  how the product looks.
 - `spec/` — the technical design: architecture, features, screens.
 - `spec/.compiled/` — per-feature implementation contracts.
 - `security/` — design-review reports.
@@ -69,10 +71,12 @@ docker run --rm -p 8000:8000 \
 
 ## Workflow
 
-A chain of agents turns what the client asks for into a deployed URL:
-product spec, architecture, screens, contracts, code, review, image,
-and a test pass against the client's own acceptance list. The client
-approves the product spec and the architecture, and the rest runs on
+A chain of agents turns what the client asks for into a deployed URL.
+The high-level spec comes first: the product spec and the
+architecture. Then the design, drawn as a canvas. Then the low-level
+spec derived from both, the code, review, image, and a test pass
+against the client's own acceptance list. The client approves the
+product spec, the architecture and the design, and the rest runs on
 its own.
 
 See `CLAUDE.md` for who owns each step and how questions reach the

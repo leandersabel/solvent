@@ -35,6 +35,7 @@ For each feature, write `spec/.compiled/<feature-name>.json`:
   "read": [
     {"file": "spec/features/x.md", "sections": ["all"]},
     {"file": "spec/architecture.md", "sections": ["Key management"]},
+    {"file": "spec/design/Y.dc.html", "role": "how the screen looks"},
     {"file": "spec/ui/y.md", "sections": ["all"], "role": "screen this feature drives"}
   ],
   "dependsOn": ["feature-whose-rows-or-routes-this-one-needs"],
@@ -51,7 +52,9 @@ For each feature, write `spec/.compiled/<feature-name>.json`:
 
 - **`read`** — every file the engineer must load, with the headings
   that bear on this feature, first entry first. For any feature with a
-  screen, `spec/ui/design-system.md` comes before that screen.
+  screen, `spec/ui/design-system.md` comes before that screen, and the
+  screen's artboard in `spec/design/` comes before its `spec/ui/` file.
+  `spec/design/canvas.json` names which artboard is which screen.
 - **`dependsOn`** — what must already exist for this feature to run or
   be tested. Coupling is many-to-many and may be circular; the
   invite/registration bootstrap genuinely is. Record it as it is. Build

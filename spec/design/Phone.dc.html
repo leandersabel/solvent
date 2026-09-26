@@ -1,0 +1,145 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Solvent dashboard, phone</title>
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<style>
+body{margin:0;background:#faf9f7;font-family:system-ui,-apple-system,"Segoe UI",sans-serif;color:#111d20;-webkit-font-smoothing:antialiased}
+a{color:#2c6471;text-decoration:none}a:hover{color:#184d59;text-decoration:underline}
+.num{font-variant-numeric:tabular-nums}
+.label{font-size:11px;font-weight:600;letter-spacing:.08em;text-transform:uppercase;color:#4d575a}
+.seg{display:flex;border:1px solid #d8dfe1;border-radius:6px;overflow:hidden;background:#fff}
+.seg button{font:inherit;font-size:13px;font-weight:500;color:#4d575a;background:transparent;border:0;border-left:1px solid #d8dfe1;padding:0 10px;min-height:36px;cursor:pointer;flex-grow:1}
+.seg button:first-child{border-left:0}
+.seg button.on{background:#0c3943;color:#fff}
+.card{background:#fff;border:1px solid #d8dfe1;border-radius:10px;padding:16px}
+.hrow{display:flex;justify-content:space-between;align-items:flex-start;gap:12px;padding:14px 0;border-top:1px solid #d8dfe1;min-height:44px;box-sizing:border-box}
+.hrow:first-child{border-top:0;padding-top:0}
+.chip{display:inline-flex;font-size:11px;font-weight:500;color:#184d59;background:#eff7f9;border:1px solid #c4dde3;border-radius:4px;padding:1px 6px}
+</style>
+</helmet>
+<div style="width: 390px; height: 1880px; background: #faf9f7; display: flex; flex-direction: column">
+
+  <header style="background: #0c3943; padding: 0 16px; flex-shrink: 0">
+    <div style="height: 56px; display: flex; align-items: center; justify-content: space-between">
+      <div style="color: #ffffff; font-size: 18px; font-weight: 600; letter-spacing: 0.02em">Solvent</div>
+      <div style="display: flex; gap: 8px">
+        <button style="font: inherit; font-size: 14px; font-weight: 500; color: #ffffff; background: transparent; border: 1px solid #71a1ae; border-radius: 6px; padding: 0 12px; height: 44px; cursor: pointer">Update values</button>
+        <button aria-label="Lock" style="display: flex; align-items: center; justify-content: center; width: 44px; height: 44px; color: #ffffff; background: transparent; border: 1px solid #71a1ae; border-radius: 6px; cursor: pointer">
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="4" y="11" width="16" height="10" rx="2"></rect><path d="M8 11V7a4 4 0 0 1 8 0v4"></path></svg>
+        </button>
+      </div>
+    </div>
+    <nav style="display: flex; gap: 24px; height: 44px; align-items: stretch">
+      <a href="#" style="color: #ffffff; font-size: 14px; font-weight: 500; display: flex; align-items: center; border-bottom: 2px solid #a08147">Dashboard</a>
+      <a href="#" style="color: #c4dde3; font-size: 14px; font-weight: 500; display: flex; align-items: center; border-bottom: 2px solid transparent">Settings</a>
+    </nav>
+  </header>
+
+  <main style="padding: 24px 16px 40px; display: flex; flex-direction: column; gap: 20px">
+    <section style="display: flex; flex-direction: column; gap: 8px">
+      <div class="label">Net worth</div>
+      <div style="display: flex; align-items: baseline; gap: 8px">
+        <span style="font-size: 18px; font-weight: 500; color: #4d575a">CHF</span>
+        <span style="font-size: 40px; font-weight: 600; letter-spacing: -0.02em; line-height: 1.05">1’206’294</span>
+      </div>
+      <div style="display: flex; align-items: center; gap: 6px; font-size: 14px; flex-wrap: wrap">
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#1d7635" stroke-width="2.25" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 19V5"></path><path d="M5 12l7-7 7 7"></path></svg>
+        <span class="num" style="color: #1d7635; font-weight: 600">CHF +740’094 · +158.8%</span>
+        <span style="color: #4d575a">since March 2021</span>
+      </div>
+      <div style="display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 12px; margin-top: 8px; padding-top: 12px; border-top: 1px solid #d8dfe1">
+        <div><div class="label">Assets</div><div class="num" style="font-size: 16px; font-weight: 500; margin-top: 4px">CHF 2’004’694</div></div>
+        <div><div class="label">Liabilities</div><div class="num" style="font-size: 16px; font-weight: 500; margin-top: 4px">CHF −798’400</div></div>
+      </div>
+    </section>
+
+    <div class="seg" role="group" aria-label="Which rates">
+      <button class="on">Latest rates, 24 Sep</button>
+      <button>Rates as of each figure</button>
+    </div>
+    <button style="font: inherit; font-size: 15px; font-weight: 600; color: #ffffff; background: #876b36; border: 0; border-radius: 6px; height: 48px; cursor: pointer">New recording</button>
+
+    <section class="card">
+      <h2 style="margin: 0 0 12px; font-size: 17px; font-weight: 600">Net worth by Liquidity</h2>
+      <div style="display: flex; flex-direction: column; gap: 10px; margin-bottom: 16px">
+        <div class="seg" role="group" aria-label="Range"><button>1M</button><button>6M</button><button>1Y</button><button class="on">All</button></div>
+        <div style="display: flex; gap: 8px; align-items: center; justify-content: space-between">
+          <select aria-label="Group by" style="font: inherit; font-size: 13px; color: #111d20; background: #ffffff; border: 1px solid #d8dfe1; border-radius: 6px; padding: 0 10px; height: 36px"><option>Liquidity</option><option>Total</option></select>
+          <a href="#" style="font-size: 13px">8 of 9 assigned</a>
+        </div>
+        <div style="display: flex; gap: 12px; align-items: center; justify-content: space-between">
+          <div class="seg" role="group" aria-label="Scale" style="flex-grow: 1"><button class="on">Absolute</button><button>Percentage</button></div>
+          <label style="display: flex; align-items: center; gap: 6px; font-size: 13px; color: #4d575a; font-weight: 500; min-height: 44px"><input type="checkbox" style="accent-color: #2c6471; margin: 0">Just the line</label>
+        </div>
+      </div>
+      <svg width="326" height="206" viewBox="0 0 326 206" role="img" aria-label="Net worth by Liquidity, March 2021 to September 2026" style="display: block">
+        <g stroke="#d8dfe1"><line x1="0" x2="326" y1="5.5" y2="5.5"></line><line x1="0" x2="326" y1="60.3" y2="60.3"></line><line x1="0" x2="326" y1="170" y2="170"></line></g>
+        <path fill="#0098b7" fill-opacity="0.85" d="M0.0,108.7 L14.8,107.3 L29.6,106.7 L44.5,106.0 L59.3,104.7 L74.1,103.5 L88.9,103.0 L103.7,102.1 L118.5,100.7 L133.4,111.6 L148.2,111.4 L163.0,111.3 L177.8,110.5 L192.6,109.9 L207.5,109.9 L222.3,109.5 L237.1,108.7 L251.9,108.3 L266.7,108.3 L281.5,107.7 L296.4,106.9 L311.2,106.7 L326.0,106.4 L326.0,115.2 L0.0,115.2 Z"></path>
+        <path fill="#ad7d00" fill-opacity="0.85" d="M0.0,103.3 L14.8,101.9 L29.6,101.0 L44.5,99.2 L59.3,97.2 L74.1,96.1 L88.9,95.0 L103.7,93.0 L118.5,91.2 L133.4,103.5 L148.2,103.3 L163.0,102.4 L177.8,101.3 L192.6,101.0 L207.5,100.7 L222.3,99.6 L237.1,98.7 L251.9,98.6 L266.7,98.0 L281.5,96.8 L296.4,96.2 L311.2,96.1 L326.0,95.1 L326.0,106.4 L311.2,106.7 L296.4,106.9 L281.5,107.7 L266.7,108.3 L251.9,108.3 L237.1,108.7 L222.3,109.5 L207.5,109.9 L192.6,109.9 L177.8,110.5 L163.0,111.3 L148.2,111.4 L133.4,111.6 L118.5,100.7 L103.7,102.1 L88.9,103.0 L74.1,103.5 L59.3,104.7 L44.5,106.0 L29.6,106.7 L14.8,107.3 L0.0,108.7 Z"></path>
+        <path fill="#964265" fill-opacity="0.85" d="M0.0,89.6 L14.8,87.7 L29.6,86.2 L44.5,83.9 L59.3,81.3 L74.1,79.7 L88.9,78.0 L103.7,75.4 L118.5,73.1 L133.4,85.1 L148.2,84.3 L163.0,82.7 L177.8,81.0 L192.6,80.1 L207.5,79.1 L222.3,77.3 L237.1,75.8 L251.9,75.0 L266.7,73.8 L281.5,71.9 L296.4,70.7 L311.2,69.9 L326.0,68.3 L326.0,95.1 L311.2,96.1 L296.4,96.2 L281.5,96.8 L266.7,98.0 L251.9,98.6 L237.1,98.7 L222.3,99.6 L207.5,100.7 L192.6,101.0 L177.8,101.3 L163.0,102.4 L148.2,103.3 L133.4,103.5 L118.5,91.2 L103.7,93.0 L88.9,95.0 L74.1,96.1 L59.3,97.2 L44.5,99.2 L29.6,101.0 L14.8,101.9 L0.0,103.3 Z"></path>
+        <path fill="#7f79d1" fill-opacity="0.85" d="M118.5,73.1 L133.4,22.1 L148.2,21.3 L163.0,19.7 L177.8,17.9 L192.6,17.0 L207.5,16.0 L222.3,14.2 L237.1,12.7 L251.9,12.0 L266.7,10.7 L281.5,8.9 L296.4,7.6 L311.2,6.9 L326.0,5.2 L326.0,68.3 L311.2,69.9 L296.4,70.7 L281.5,71.9 L266.7,73.8 L251.9,75.0 L237.1,75.8 L222.3,77.3 L207.5,79.1 L192.6,80.1 L177.8,81.0 L163.0,82.7 L148.2,84.3 L133.4,85.1 L118.5,73.1 Z"></path>
+        <path fill="#7f79d1" fill-opacity="0.45" d="M118.5,115.2 L326.0,115.2 L326.0,157.9 L311.2,158.5 L296.4,159.1 L281.5,159.7 L266.7,160.3 L251.9,160.9 L237.1,161.5 L222.3,162.1 L207.5,162.7 L192.6,163.3 L177.8,163.8 L163.0,164.4 L148.2,165.0 L133.4,165.6 L118.5,115.2 Z"></path>
+        <path fill="#c4cccf" d="M222.3,162.1 L237.1,161.5 L251.9,160.9 L266.7,160.3 L281.5,159.7 L296.4,159.1 L311.2,158.5 L326.0,157.9 L326.0,158.9 L311.2,159.6 L296.4,160.3 L281.5,161.0 L266.7,161.7 L251.9,162.4 L237.1,163.1 L222.3,162.1 Z"></path>
+        <line x1="0" x2="326" y1="115.2" y2="115.2" stroke="#798285"></line>
+        <path fill="none" stroke="#111d20" stroke-width="1.5" stroke-linejoin="round" d="M0.0,89.6 L14.8,87.7 L29.6,86.2 L44.5,83.9 L59.3,81.3 L74.1,79.7 L88.9,78.0 L103.7,75.4 L118.5,73.1 L133.4,72.5 L148.2,71.1 L163.0,68.9 L177.8,66.6 L192.6,65.1 L207.5,63.5 L222.3,61.2 L237.1,60.7 L251.9,59.2 L266.7,57.3 L281.5,54.7 L296.4,52.8 L311.2,51.3 L326.0,49.0"></path>
+        <g font-size="11" fill="#798285"><text x="2" y="19">2M</text><text x="2" y="74">1M</text><text x="2" y="129">0</text><text x="2" y="167">−1M</text></g>
+        <g stroke="#798285" stroke-width="1.25">
+          <line x1="0.6" x2="0.6" y1="175" y2="181"></line><line x1="14.8" x2="14.8" y1="175" y2="181"></line><line x1="29.6" x2="29.6" y1="175" y2="181"></line><line x1="59.3" x2="59.3" y1="175" y2="181"></line><line x1="74.1" x2="74.1" y1="175" y2="181"></line><line x1="88.9" x2="88.9" y1="175" y2="181"></line><line x1="103.7" x2="103.7" y1="175" y2="181"></line><line x1="118.5" x2="118.5" y1="175" y2="181"></line><line x1="133.4" x2="133.4" y1="175" y2="181"></line><line x1="148.2" x2="148.2" y1="175" y2="181"></line><line x1="163.0" x2="163.0" y1="175" y2="181"></line><line x1="177.8" x2="177.8" y1="175" y2="181"></line><line x1="207.5" x2="207.5" y1="175" y2="181"></line><line x1="222.3" x2="222.3" y1="175" y2="181"></line><line x1="237.1" x2="237.1" y1="175" y2="181"></line><line x1="251.9" x2="251.9" y1="175" y2="181"></line><line x1="266.7" x2="266.7" y1="175" y2="181"></line><line x1="281.5" x2="281.5" y1="175" y2="181"></line><line x1="296.4" x2="296.4" y1="175" y2="181"></line><line x1="311.2" x2="311.2" y1="175" y2="181"></line><line x1="325.4" x2="325.4" y1="175" y2="181"></line>
+        </g>
+        <g font-size="11" fill="#798285" text-anchor="middle"><text x="54.3" y="198">2022</text><text x="113.6" y="198">2023</text><text x="172.9" y="198">2024</text><text x="232.2" y="198">2025</text><text x="291.5" y="198">2026</text></g>
+      </svg>
+      <div style="display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 8px 12px; margin-top: 12px; padding-top: 12px; border-top: 1px solid #d8dfe1; font-size: 13px">
+        <div style="display: flex; align-items: center; gap: 6px"><span style="width: 10px; height: 10px; border-radius: 2px; background: #0098b7"></span><span style="font-weight: 500">Cash</span></div>
+        <div style="display: flex; align-items: center; gap: 6px"><span style="width: 10px; height: 10px; border-radius: 2px; background: #ad7d00"></span><span style="font-weight: 500">Investments</span></div>
+        <div style="display: flex; align-items: center; gap: 6px"><span style="width: 10px; height: 10px; border-radius: 2px; background: #964265"></span><span style="font-weight: 500">Retirement</span></div>
+        <div style="display: flex; align-items: center; gap: 6px"><span style="width: 10px; height: 10px; border-radius: 2px; background: #7f79d1"></span><span style="font-weight: 500">Property</span></div>
+        <div style="display: flex; align-items: center; gap: 6px"><span style="width: 10px; height: 10px; border-radius: 2px; background: #c4cccf"></span><span style="font-weight: 500">Unassigned</span></div>
+      </div>
+      <div style="display: flex; align-items: center; gap: 8px; margin-top: 12px; font-size: 13px; color: #4d575a"><svg width="10" height="12" viewBox="0 0 10 12" aria-hidden="true"><line x1="5" x2="5" y1="2" y2="10" stroke="#798285" stroke-width="1.5"></line></svg>A date you recorded</div>
+      <details style="margin-top: 12px; font-size: 14px"><summary style="color: #2c6471; font-weight: 500; cursor: pointer; min-height: 44px; display: flex; align-items: center">View as table</summary></details>
+    </section>
+
+    <section class="card">
+      <h2 style="margin: 0 0 16px; font-size: 17px; font-weight: 600">Liquidity today</h2>
+      <div style="display: flex; flex-direction: column; gap: 14px; font-size: 13px">
+        <div><div style="display: flex; justify-content: space-between; margin-bottom: 4px"><span style="font-weight: 600">Cash</span><span class="num" style="color: #4d575a">CHF 160’610</span></div><svg width="326" height="14"><line x1="12" x2="12" y1="0" y2="14" stroke="#798285"></line><rect x="12" y="1" width="103.3" height="12" rx="2" fill="#0098b7"></rect></svg></div>
+        <div><div style="display: flex; justify-content: space-between; margin-bottom: 4px"><span style="font-weight: 600">Investments</span><span class="num" style="color: #4d575a">CHF 205’654</span></div><svg width="326" height="14"><line x1="12" x2="12" y1="0" y2="14" stroke="#798285"></line><rect x="12" y="1" width="132.2" height="12" rx="2" fill="#0098b7"></rect></svg></div>
+        <div><div style="display: flex; justify-content: space-between; margin-bottom: 4px"><span style="font-weight: 600">Retirement</span><span class="num" style="color: #4d575a">CHF 488’430</span></div><svg width="326" height="14"><line x1="12" x2="12" y1="0" y2="14" stroke="#798285"></line><rect x="12" y="1" width="314" height="12" rx="2" fill="#0098b7"></rect></svg></div>
+        <div><div style="display: flex; justify-content: space-between; margin-bottom: 4px"><span style="font-weight: 600">Property</span><span class="num" style="color: #4d575a">CHF 370’000</span></div><svg width="326" height="14"><line x1="12" x2="12" y1="0" y2="14" stroke="#798285"></line><rect x="12" y="1" width="237.9" height="12" rx="2" fill="#0098b7"></rect></svg></div>
+        <div><div style="display: flex; justify-content: space-between; margin-bottom: 4px"><span style="font-weight: 600">Unassigned</span><span class="num" style="color: #4d575a">CHF −18’400</span></div><svg width="326" height="14"><rect x="0.2" y="1" width="11.8" height="12" rx="2" fill="#0098b7" fill-opacity="0.45"></rect><line x1="12" x2="12" y1="0" y2="14" stroke="#798285"></line></svg></div>
+      </div>
+    </section>
+
+    <section class="card">
+      <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 12px"><h2 style="margin: 0; font-size: 17px; font-weight: 600">Holdings</h2><label style="display: flex; align-items: center; gap: 6px; font-size: 13px; color: #4d575a; font-weight: 500; min-height: 44px"><input type="checkbox" style="accent-color: #2c6471; margin: 0">Show archived</label></div>
+      <div>
+        <div class="hrow"><div><div style="font-weight: 500">Current account</div><div style="margin-top: 4px"><span class="chip">Liquidity: Cash</span></div></div><div style="text-align: right"><div class="num" style="font-weight: 500">48’210.35</div><div class="num" style="font-size: 12px; color: #4d575a; margin-top: 4px">2 Sep 2026</div></div></div>
+        <div class="hrow"><div><div style="font-weight: 500">Savings account</div><div style="margin-top: 4px"><span class="chip">Liquidity: Cash</span></div></div><div style="text-align: right"><div class="num" style="font-weight: 500">112’400.00</div><div class="num" style="font-size: 12px; color: #4d575a; margin-top: 4px">2 Sep 2026</div></div></div>
+        <div class="hrow"><div><div style="font-weight: 500">Brokerage</div><div style="margin-top: 4px"><span class="chip">Liquidity: Investments</span></div></div><div style="text-align: right"><div class="num" style="font-weight: 500">171’904.10</div><div class="num" style="font-size: 12px; color: #4d575a; margin-top: 4px">USD 214’880.12 · 2 Sep 2026</div></div></div>
+        <div class="hrow"><div><div style="font-weight: 500">Gold bars</div><div style="margin-top: 4px"><span class="chip">Liquidity: Investments</span></div></div><div style="text-align: right"><div class="num" style="font-weight: 500">33’750.00</div><div class="num" style="font-size: 12px; color: #4d575a; margin-top: 4px">12.50 ozt · 30 Jun 2026</div></div></div>
+        <div class="hrow"><div><div style="font-weight: 500">Pillar 3a</div><div style="margin-top: 4px"><span class="chip">Liquidity: Retirement</span></div></div><div style="text-align: right"><div class="num" style="font-weight: 500">86’312.40</div><div class="num" style="font-size: 12px; color: #4d575a; margin-top: 4px">2 Sep 2026</div></div></div>
+        <div class="hrow"><div><div style="font-weight: 500">Pension fund</div><div style="margin-top: 4px"><span class="chip">Liquidity: Retirement</span></div></div><div style="text-align: right"><div class="num" style="font-weight: 500">402’118.00</div><div class="num" style="font-size: 12px; color: #4d575a; margin-top: 4px">31 Dec 2025</div></div></div>
+        <div class="hrow"><div><div style="font-weight: 500">Flat, Zurich</div><div style="margin-top: 4px"><span class="chip">Liquidity: Property</span></div></div><div style="text-align: right"><div class="num" style="font-weight: 500">1’150’000.00</div><div class="num" style="font-size: 12px; color: #4d575a; margin-top: 4px">15 Jun 2023</div></div></div>
+        <div class="hrow"><div><div style="font-weight: 500">Mortgage</div><div style="margin-top: 4px"><span class="chip">Liquidity: Property</span></div></div><div style="text-align: right"><div class="num" style="font-weight: 500">−780’000.00</div><div class="num" style="font-size: 12px; color: #4d575a; margin-top: 4px">30 Jun 2026</div></div></div>
+        <div class="hrow"><div><div style="font-weight: 500">Car lease</div></div><div style="text-align: right"><div class="num" style="font-weight: 500">−18’400.00</div><div class="num" style="font-size: 12px; color: #4d575a; margin-top: 4px">2 Sep 2026</div></div></div>
+      </div>
+      <button style="font: inherit; font-size: 14px; font-weight: 500; color: #184d59; background: transparent; border: 1px solid #c4cccf; border-radius: 6px; height: 44px; padding: 0 16px; margin-top: 12px; cursor: pointer">Add a holding</button>
+    </section>
+  </main>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props='{"$preview":{"width":390,"height":1880}}'>
+class Component extends DCLogic {
+  renderVals() {
+    return {};
+  }
+}
+</script>
+</body>
+</html>

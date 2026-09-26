@@ -104,8 +104,8 @@ no individual endpoint repeats it.
   `/api/auth/change-password`. Both kinds reach these.
 - **Vault**, the record store, the rate lookup including
   `GET /api/rates/symbols`, export, import, `/api/sessions`,
-  `/api/auth/logout-all`, `DELETE /api/auth/account`, `/settings` and
-  `/settings/dimensions`, the dashboard, and every screen that renders
+  `/api/auth/logout-all`, `DELETE /api/auth/account`, `/settings`,
+  `/settings/dimensions` and `/settings/export-import`, the dashboard, and every screen that renders
   vault data. A vault owner reaches these. **An administrator gets Not
   Found**, `/settings` included: settings exists only inside a vault
   (`account-settings.md`). The surface is decided before routing, so
@@ -189,8 +189,8 @@ rearrangement:
   in-page addresses. The keys live in that page's memory and nowhere
   else, so a second shell page would discard them and charge the
   Argon2id derivation again in the same sitting (`ui/unlock.md`).
-  `/settings` and `/settings/dimensions` remain routes on the vault
-  surface, each redirecting to the view it names, so a bookmark or a
+  `/settings`, `/settings/dimensions` and `/settings/export-import`
+  remain routes on the vault surface, each redirecting to the view it names, so a bookmark or a
   typed address still lands on that screen.
 - A screen's content region is never server-rendered from vault data,
   because the server has no plaintext to render.

@@ -1,26 +1,32 @@
 # Solvent
 
-Spec-first: `spec/` is the design, everything else compiles from it.
+Spec-first. A high-level spec says what the product is, a design
+shows it, and the low-level spec and the code are derived from both.
 
 ## The pipeline
 
-The client writes vague. Each agent narrows it, and only one of them
+The client writes vague. Each stage narrows it, and only one agent
 talks to the client.
 
-| Agent | Owns | Hands to |
+| Stage | Agent | Owns |
 |---|---|---|
-| `product-owner` | `spec/product/*.md` | architect |
-| `architect` | `spec/architecture.md`, `spec/features/*.md`, `security/` | designer |
-| `designer` | `spec/ui/*.md`, the design system | compiler |
-| `compiler` | `spec/.compiled/*.json`, `spec/status.md` | engineer |
-| `engineer` | application code and its tests | reviewer |
-| `reviewer` | findings against the contract | release |
-| `release` | `Dockerfile`, a running instance | qa |
-| `qa` | findings against the client's intent | product-owner |
+| High-level spec | `product-owner` | `spec/product/*.md` |
+| | `architect` | `spec/architecture.md`, `security/` |
+| Design | `designer` | the design canvas, `spec/design/` |
+| Low-level spec | `architect` | `spec/features/*.md` |
+| | `designer` | `spec/ui/*.md`, the design system |
+| | `compiler` | `spec/.compiled/*.json`, `spec/status.md` |
+| Code | `engineer` | application code and its tests |
+| | `reviewer` | findings against the contract |
+| | `release` | `Dockerfile`, a running instance |
+| | `qa` | findings against the client's intent, back to `product-owner` |
 
-The gate is after the spec. The client approves `spec/product/` and the
-architecture; from the compiler onward the pipeline runs to a deployed
-URL and a findings report.
+The architecture comes before the design because it sets what a screen
+may use at all, such as which assets a page can load.
+
+The gate is after the design. The client approves `spec/product/`, the
+architecture and the canvas. From the low-level spec onward the
+pipeline runs to a deployed URL and a findings report.
 
 ## Who asks the client
 
@@ -42,9 +48,18 @@ the architect, who decides it and writes the reason into the spec.
 - `spec/features/*.md` holds the technical derivation. Row shapes,
   endpoints, byte encodings, and a technical acceptance list a test can
   assert.
+- `spec/design/` holds the design canvas: one artboard per screen,
+  drawn in Claude Design at
+  https://claude.ai/artifact/NFxzA1ngFuYB53FHnMizn3 and mirrored here
+  file for file, with `canvas.json` naming each artboard. **The canvas
+  is how the product looks.** A change to how anything looks is made on
+  the canvas first, and the low-level spec and the code follow it.
+  Edits made on the live canvas are copied back here before anything
+  is derived from them.
 - `spec/ui/*.md` holds one file per screen, plus the design system:
-  what is on the screen, in what arrangement, and every state it must
-  handle.
+  what a drawing cannot carry. Every state a screen must handle, the
+  exact copy, what each control does, and the tokens and contrast
+  floors. Layout and styling are read off the canvas, not restated.
 
 `spec/architecture.md` sits above all three and holds what is true
 system-wide. The same subject at two altitudes is the design, not

@@ -1,0 +1,128 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Update values</title>
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<style>
+body{margin:0;background:#faf9f7;font-family:system-ui,-apple-system,"Segoe UI",sans-serif;color:#111d20;-webkit-font-smoothing:antialiased}
+a{color:#2c6471;text-decoration:none}a:hover{color:#184d59;text-decoration:underline}
+.num{font-variant-numeric:tabular-nums}
+.label{font-size:12px;font-weight:600;letter-spacing:.08em;text-transform:uppercase;color:#4d575a}
+.row{display:grid;grid-template-columns:minmax(0,1fr) 260px 112px;gap:24px;align-items:center;padding:18px 24px;border-top:1px solid #d8dfe1}
+.row:first-child{border-top:0}
+.name{font-size:15px;font-weight:600}
+.state{font-size:13px;margin-top:4px}
+.qty{display:flex;align-items:center;border:1px solid #d8dfe1;border-radius:6px;background:#fff;height:40px;padding:0 12px;font-size:15px;font-variant-numeric:tabular-nums}
+.qty input{border:0;outline:0;font:inherit;background:transparent;width:100%;text-align:right;padding:0;color:inherit}
+.qty .unit{color:#4d575a;font-size:13px;font-weight:500;margin-left:10px}
+.conv{font-size:12px;color:#4d575a;text-align:right;margin-top:4px;font-variant-numeric:tabular-nums}
+.btn{font:inherit;font-size:14px;font-weight:500;border-radius:6px;padding:9px 0;width:100%;cursor:pointer}
+.btn-sec{color:#184d59;background:transparent;border:1px solid #c4cccf}
+.btn-pri{color:#fff;background:#876b36;border:1px solid #876b36;font-weight:600}
+.btn-off{color:#798285;background:transparent;border:1px solid #d8dfe1;cursor:default}
+.prov{display:inline-flex;align-items:center;font-size:12px;font-weight:500;color:#184d59;background:#eff7f9;border:1px solid #c4dde3;border-radius:4px;padding:2px 8px;white-space:nowrap}
+</style>
+</helmet>
+<div style="width: 1280px; height: 1320px; background: #faf9f7; display: flex; flex-direction: column">
+
+  <header style="height: 64px; background: #0c3943; display: flex; align-items: center; padding: 0 40px; gap: 40px; flex-shrink: 0">
+    <div style="color: #ffffff; font-size: 19px; font-weight: 600; letter-spacing: 0.02em">Solvent</div>
+    <nav style="display: flex; gap: 28px; height: 64px; align-items: stretch; flex-grow: 1">
+      <a href="Main.dc.html" style="color: #c4dde3; font-size: 14px; font-weight: 500; display: flex; align-items: center; border-bottom: 2px solid transparent; padding-top: 2px">Dashboard</a>
+      <a href="#" style="color: #c4dde3; font-size: 14px; font-weight: 500; display: flex; align-items: center; border-bottom: 2px solid transparent; padding-top: 2px">Settings</a>
+    </nav>
+    <div style="display: flex; gap: 12px; align-items: center">
+      <button style="font: inherit; font-size: 14px; font-weight: 500; color: #ffffff; background: rgba(255,255,255,0.08); border: 1px solid #71a1ae; border-radius: 6px; padding: 8px 16px; cursor: pointer">Update values</button>
+      <button aria-label="Lock" style="display: flex; align-items: center; gap: 8px; font: inherit; font-size: 14px; font-weight: 500; color: #ffffff; background: transparent; border: 1px solid #71a1ae; border-radius: 6px; padding: 8px 14px; cursor: pointer">
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="4" y="11" width="16" height="10" rx="2"></rect><path d="M8 11V7a4 4 0 0 1 8 0v4"></path></svg>
+        Lock
+      </button>
+    </div>
+  </header>
+
+  <main style="width: 900px; margin: 0 auto; padding: 48px 0 64px; display: flex; flex-direction: column; gap: 28px">
+    <div style="display: flex; flex-direction: column; gap: 8px">
+      <div class="label">Recording</div>
+      <h1 style="margin: 0; font-size: 32px; font-weight: 600; letter-spacing: -0.01em">25 September 2026</h1>
+    </div>
+
+    <section style="background: #ffffff; border: 1px solid #d8dfe1; border-radius: 10px">
+      <div class="row">
+        <div><div class="name">Current account</div><div class="state"><span style="color: #111d20; font-weight: 600">Recorded for this date.</span> <span style="color: #4d575a">Today.</span></div></div>
+        <div><div class="qty"><input value="48’210.35" aria-label="Current account"><span class="unit">CHF</span></div></div>
+        <button class="btn btn-off" disabled>Save</button>
+      </div>
+      <div class="row">
+        <div><div class="name">Savings account</div><div class="state" style="color: #4d575a">Nothing recorded for this date. Last figure 2 Sep 2026, 3 weeks ago.</div></div>
+        <div><div class="qty" style="color: #4d575a"><input value="112’400.00" aria-label="Savings account"><span class="unit">CHF</span></div></div>
+        <button class="btn btn-sec">Confirm</button>
+      </div>
+      <div class="row">
+        <div><div class="name">Brokerage</div><div class="state" style="color: #4d575a">Nothing recorded for this date. Last figure 2 Sep 2026, 3 weeks ago.</div></div>
+        <div><div class="qty" style="border-color: #2c6471; box-shadow: 0 0 0 1px #2c6471"><input value="221’304.50" aria-label="Brokerage"><span class="unit">USD</span></div><div class="conv">CHF 176’379.69</div></div>
+        <button class="btn btn-pri">Record</button>
+      </div>
+      <div class="row">
+        <div><div class="name">Gold bars</div><div class="state" style="color: #4d575a">Nothing recorded for this date. Last figure 30 Jun 2026, about 3 months ago.</div></div>
+        <div><div class="qty" style="color: #4d575a"><input value="12.50" aria-label="Gold bars"><span class="unit">ozt</span></div><div class="conv">CHF 33’750.00</div></div>
+        <button class="btn btn-sec">Confirm</button>
+      </div>
+      <div class="row">
+        <div><div class="name">Pillar 3a</div><div class="state" style="color: #4d575a">Nothing recorded for this date. Last figure 2 Sep 2026, 3 weeks ago.</div></div>
+        <div><div class="qty" style="color: #4d575a"><input value="86’312.40" aria-label="Pillar 3a"><span class="unit">CHF</span></div></div>
+        <button class="btn btn-sec">Confirm</button>
+      </div>
+      <div class="row">
+        <div><div class="name">Pension fund</div><div class="state" style="color: #4d575a">Nothing recorded for this date. Last figure 31 Dec 2025, about 9 months ago.</div></div>
+        <div><div class="qty" style="color: #4d575a"><input value="402’118.00" aria-label="Pension fund"><span class="unit">CHF</span></div></div>
+        <button class="btn btn-sec">Confirm</button>
+      </div>
+      <div class="row">
+        <div><div class="name">Flat, Zurich</div><div class="state" style="color: #4d575a">Nothing recorded for this date. Last figure 15 Jun 2023, about 3 years ago.</div></div>
+        <div><div class="qty" style="color: #4d575a"><input value="1’150’000.00" aria-label="Flat, Zurich"><span class="unit">CHF</span></div></div>
+        <button class="btn btn-sec">Confirm</button>
+      </div>
+      <div class="row">
+        <div><div class="name">Mortgage</div><div class="state" style="color: #4d575a">Nothing recorded for this date. Last figure 30 Jun 2026, about 3 months ago.</div></div>
+        <div><div class="qty" style="color: #4d575a"><input value="−780’000.00" aria-label="Mortgage"><span class="unit">CHF</span></div></div>
+        <button class="btn btn-sec">Confirm</button>
+      </div>
+      <div class="row">
+        <div><div class="name">Car lease</div><div class="state"><span style="color: #111d20; font-weight: 600">Recorded for this date.</span> <span style="color: #4d575a">Today.</span></div></div>
+        <div><div class="qty"><input value="−18’400.00" aria-label="Car lease"><span class="unit">CHF</span></div></div>
+        <button class="btn btn-off" disabled>Save</button>
+      </div>
+    </section>
+
+    <section style="display: flex; flex-direction: column; gap: 12px">
+      <h2 style="margin: 0; font-size: 20px; font-weight: 600">Rates for this date</h2>
+      <div style="background: #ffffff; border: 1px solid #d8dfe1; border-radius: 10px">
+        <div class="row" style="grid-template-columns: minmax(0,1fr) 260px 112px">
+          <div><div class="name">US dollar</div><div class="state" style="color: #4d575a">1 USD in CHF</div></div>
+          <div><div class="qty"><input value="0.797000" aria-label="US dollar rate"><span class="unit">CHF</span></div></div>
+          <span class="prov">Market rate as of 24 Sep</span>
+        </div>
+        <div class="row" style="grid-template-columns: minmax(0,1fr) 260px 112px">
+          <div><div class="name">Gold</div><div class="state" style="color: #4d575a">1 troy ounce in CHF</div></div>
+          <div><div class="qty"><input value="2’700.000000" aria-label="Gold rate"><span class="unit">CHF</span></div></div>
+          <span class="prov">Market rate as of 24 Sep</span>
+        </div>
+      </div>
+    </section>
+  </main>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props='{"$preview":{"width":1280,"height":1320}}'>
+class Component extends DCLogic {
+  renderVals() {
+    return {};
+  }
+}
+</script>
+</body>
+</html>

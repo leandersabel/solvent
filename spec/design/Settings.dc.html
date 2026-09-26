@@ -1,0 +1,155 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Settings</title>
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<style>
+body{margin:0;background:#faf9f7;font-family:system-ui,-apple-system,"Segoe UI",sans-serif;color:#111d20;-webkit-font-smoothing:antialiased}
+a{color:#2c6471;text-decoration:none}a:hover{color:#184d59;text-decoration:underline}
+.num{font-variant-numeric:tabular-nums}
+.label{font-size:12px;font-weight:600;letter-spacing:.08em;text-transform:uppercase;color:#4d575a}
+.card{background:#fff;border:1px solid #d8dfe1;border-radius:10px;padding:24px;display:flex;flex-direction:column;gap:20px}
+.card h2{margin:0;font-size:20px;font-weight:600}
+.note{margin:0;font-size:13px;color:#4d575a;line-height:1.5}
+.pair{display:grid;grid-template-columns:160px minmax(0,1fr);gap:16px;align-items:baseline;padding:12px 0;border-top:1px solid #d8dfe1}
+.pair:first-child{border-top:0;padding-top:0}
+.pair dt{font-size:13px;font-weight:500;color:#4d575a}
+.pair dd{margin:0;font-size:15px}
+.field{display:flex;flex-direction:column;gap:6px}
+.field label{font-size:13px;font-weight:500;color:#4d575a}
+.input,.select{font:inherit;font-size:15px;color:#111d20;background:#fff;border:1px solid #d8dfe1;border-radius:6px;height:44px;padding:0 12px;box-sizing:border-box;width:100%}
+.btn-pri{font:inherit;font-size:15px;font-weight:600;color:#fff;background:#876b36;border:0;border-radius:6px;height:44px;padding:0 20px;cursor:pointer}
+.btn-sec{font:inherit;font-size:14px;font-weight:500;color:#184d59;background:transparent;border:1px solid #c4cccf;border-radius:6px;height:40px;padding:0 16px;cursor:pointer}
+.chip{display:inline-flex;align-items:center;font-size:12px;font-weight:500;color:#184d59;background:#eff7f9;border:1px solid #c4dde3;border-radius:4px;padding:2px 8px}
+.link-row{display:flex;align-items:center;gap:16px;padding:18px 24px;border-top:1px solid #d8dfe1;color:#111d20}
+.link-row:first-child{border-top:0}
+.link-row:hover{background:#eff7f9;text-decoration:none;color:#111d20}
+.sess{display:grid;grid-template-columns:minmax(0,1fr) 200px 200px;gap:16px;padding:12px 0;border-top:1px solid #d8dfe1;font-size:14px}
+</style>
+</helmet>
+<div style="width: 1280px; height: 2140px; background: #faf9f7; display: flex; flex-direction: column">
+
+  <header style="height: 64px; background: #0c3943; display: flex; align-items: center; padding: 0 40px; gap: 40px; flex-shrink: 0">
+    <div style="color: #ffffff; font-size: 19px; font-weight: 600; letter-spacing: 0.02em">Solvent</div>
+    <nav style="display: flex; gap: 28px; height: 64px; align-items: stretch; flex-grow: 1">
+      <a href="Main.dc.html" style="color: #c4dde3; font-size: 14px; font-weight: 500; display: flex; align-items: center; border-bottom: 2px solid transparent; padding-top: 2px">Dashboard</a>
+      <a href="#" style="color: #ffffff; font-size: 14px; font-weight: 500; display: flex; align-items: center; border-bottom: 2px solid #a08147; padding-top: 2px">Settings</a>
+    </nav>
+    <div style="display: flex; gap: 12px; align-items: center">
+      <button style="font: inherit; font-size: 14px; font-weight: 500; color: #ffffff; background: transparent; border: 1px solid #71a1ae; border-radius: 6px; padding: 8px 16px; cursor: pointer">Update values</button>
+      <button aria-label="Lock" style="display: flex; align-items: center; gap: 8px; font: inherit; font-size: 14px; font-weight: 500; color: #ffffff; background: transparent; border: 1px solid #71a1ae; border-radius: 6px; padding: 8px 14px; cursor: pointer">
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="4" y="11" width="16" height="10" rx="2"></rect><path d="M8 11V7a4 4 0 0 1 8 0v4"></path></svg>
+        Lock
+      </button>
+    </div>
+  </header>
+
+  <main style="width: 720px; margin: 0 auto; padding: 48px 0 64px; display: flex; flex-direction: column; gap: 24px">
+    <h1 style="margin: 0 0 8px; font-size: 32px; font-weight: 600; letter-spacing: -0.01em">Settings</h1>
+
+    <section class="card">
+      <h2>Profile</h2>
+      <dl style="margin: 0">
+        <div class="pair"><dt>Username</dt><dd>leander</dd></div>
+        <div class="pair"><dt>Main currency</dt><dd><div style="font-weight: 500">CHF</div><p class="note" style="margin-top: 6px">Fixed when you created your vault. Every rate you have recorded converts into it, so changing it would mix two currencies in your history.</p></dd></div>
+      </dl>
+    </section>
+
+    <section class="card">
+      <h2>Dates and numbers</h2>
+      <p class="note">Display only. Every figure is stored exactly as you entered it, and every date is stored the same way for everyone, so changing any of this rewrites nothing.</p>
+      <div style="display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 16px 20px">
+        <div class="field"><label for="lang">Language</label><select id="lang" class="select"><option>Browser setting</option><option>Deutsch (Schweiz)</option></select></div>
+        <div class="field"><label for="dates">Dates</label><select id="dates" class="select"><option>The language’s own order</option><option>20.09.2026</option></select></div>
+        <div class="field"><label for="thou">Thousands</label><select id="thou" class="select"><option>1’234’567</option><option>The language’s own mark</option></select></div>
+        <div class="field"><label for="dec">Decimals on money</label><select id="dec" class="select"><option>The currency’s own</option><option>None</option></select></div>
+      </div>
+      <div style="display: flex; align-items: center; justify-content: space-between; gap: 16px; background: #eff7f9; border-radius: 6px; padding: 14px 16px">
+        <div style="display: flex; align-items: baseline; gap: 20px">
+          <span class="label" style="font-size: 11px">Sample</span>
+          <span class="num" style="font-size: 17px; font-weight: 600">CHF 1’234’567.89</span>
+          <span class="num" style="font-size: 15px; color: #4d575a">25 Sep 2026</span>
+        </div>
+        <button class="btn-pri">Save</button>
+      </div>
+    </section>
+
+    <section style="background: #ffffff; border: 1px solid #d8dfe1; border-radius: 10px; overflow: hidden">
+      <a class="link-row" href="#">
+        <div style="flex-grow: 1"><div style="font-size: 15px; font-weight: 600">Dimensions</div><div class="note" style="margin-top: 2px">How your holdings split up in the chart.</div></div>
+        <span style="font-size: 13px; color: #4d575a">1 dimension</span>
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#4d575a" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M9 6l6 6-6 6"></path></svg>
+      </a>
+      <a class="link-row" href="#">
+        <div style="flex-grow: 1"><div style="font-size: 15px; font-weight: 600">Export and import</div><div class="note" style="margin-top: 2px">Download your vault, or restore one from a file.</div></div>
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#4d575a" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M9 6l6 6-6 6"></path></svg>
+      </a>
+    </section>
+
+    <section class="card">
+      <h2>Change password</h2>
+      <p style="margin: 0; font-size: 14px; line-height: 1.5; color: #184d59; background: #eff7f9; border-radius: 6px; padding: 12px 16px">Your data is not re-encrypted. Only the lock around your key is rebuilt, which is why this is fast even on a large vault.</p>
+      <div style="display: flex; flex-direction: column; gap: 16px; max-width: 420px">
+        <div class="field"><label for="cur">Current password</label><input id="cur" class="input" type="password" autocomplete="current-password"></div>
+        <div class="field">
+          <label for="new">New password</label>
+          <input id="new" class="input" type="password" value="xxxxxxxxxxxxxxxxxxxxxx" autocomplete="new-password">
+          <div style="display: flex; align-items: center; gap: 12px; margin-top: 4px">
+            <div style="display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 4px; flex-grow: 1">
+              <span style="height: 4px; border-radius: 2px; background: #2c6471"></span><span style="height: 4px; border-radius: 2px; background: #2c6471"></span><span style="height: 4px; border-radius: 2px; background: #2c6471"></span><span style="height: 4px; border-radius: 2px; background: #2c6471"></span>
+            </div>
+            <span style="font-size: 13px; color: #111d20; font-weight: 500; white-space: nowrap">very strong, centuries</span>
+          </div>
+          <p class="note">Length beats symbols. A four-word phrase you can remember is stronger than P@ssw0rd!.</p>
+        </div>
+        <div class="field"><label for="conf">Confirm new password</label><input id="conf" class="input" type="password" autocomplete="new-password"></div>
+        <div><button class="btn-pri">Change password</button></div>
+      </div>
+      <div style="display: flex; gap: 10px; align-items: flex-start; font-size: 14px; line-height: 1.5; padding-top: 16px; border-top: 1px solid #d8dfe1">
+        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#ac312c" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="flex-shrink: 0; margin-top: 2px" aria-hidden="true"><path d="M12 3l9.5 17h-19z"></path><path d="M12 10v4"></path><path d="M12 17.5v.01"></path></svg>
+        <span>Export files you have already saved still open with your old password. They carry their own copy of the lock, and changing it here does not reach back and protect them.</span>
+      </div>
+    </section>
+
+    <section class="card">
+      <h2>Session and lock</h2>
+      <div style="display: grid; grid-template-columns: 200px minmax(0, 1fr); gap: 20px; align-items: start">
+        <div class="field"><label for="idle">Idle lock</label><select id="idle" class="select"><option>15 minutes</option><option>5 minutes</option></select></div>
+        <p class="note" style="padding-top: 28px">Shorter is safer. Every unlock costs the deliberate wait while your password becomes a key.</p>
+      </div>
+      <p style="margin: 0; font-size: 14px">You are signed out 12 hours after signing in, however busy you have been.</p>
+      <div>
+        <div style="display: flex; justify-content: space-between; align-items: baseline; margin-bottom: 4px">
+          <div class="label">Open sessions</div>
+        </div>
+        <div class="sess" style="border-top: 0; font-size: 12px; font-weight: 600; letter-spacing: 0.06em; text-transform: uppercase; color: #4d575a; padding-bottom: 8px; border-bottom: 1px solid #c4cccf"><span></span><span>Started</span><span>Last used</span></div>
+        <div class="sess" style="border-top: 0"><span><span class="chip">This session</span></span><span class="num">25 Sep 2026, 09:12</span><span class="num">Just now</span></div>
+        <div class="sess"><span></span><span class="num">24 Sep 2026, 20:41</span><span class="num">24 Sep 2026, 21:03</span></div>
+        <p class="note" style="margin-top: 12px">Solvent records no IP addresses and no devices.</p>
+      </div>
+      <div style="display: flex; gap: 12px">
+        <button class="btn-sec">Sign out</button>
+        <button class="btn-sec">Sign out everywhere</button>
+      </div>
+    </section>
+
+    <details style="background: #ffffff; border: 1px solid #d8dfe1; border-radius: 10px; padding: 18px 24px">
+      <summary style="font-size: 15px; font-weight: 600; color: #ac312c; cursor: pointer">Danger zone</summary>
+    </details>
+  </main>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props='{"$preview":{"width":1280,"height":2140}}'>
+class Component extends DCLogic {
+  renderVals() {
+    return {};
+  }
+}
+</script>
+</body>
+</html>
