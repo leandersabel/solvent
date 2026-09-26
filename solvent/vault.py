@@ -12,7 +12,6 @@ can be swept up by it.
 from __future__ import annotations
 
 import json
-from typing import Literal, Optional
 
 from flask import Blueprint, abort, g, jsonify, request
 
@@ -32,10 +31,6 @@ bp = Blueprint("vault", __name__)
 
 EXPORT_FORMAT = "solvent-vault"
 EXPORT_FORMAT_VERSION = 1
-
-# export-import.md, Rules: a full vault read, and nobody backs up five
-# times an hour.
-EXPORTS_PER_HOUR = 5
 
 NONCE_BYTES = 12
 
@@ -84,17 +79,7 @@ def export_vault():
     reachable by navigation: the client fetches it and saves the
     response through a blob URL.
     """
-    ratelimit.record(f"export:{g.principal['id']}")
-    if (
-        get_db()
-        .execute(
-            "SELECT COUNT(*) FROM attempts WHERE bucket = ? AND at >= datetime('now', '-1 hour')",
-            (f"export:{g.principal['id']}",),
-        )
-        .fetchone()[0]
-        > EXPORTS_PER_HOUR
-    ):
-        abort(429)
+    ratelimit.guard_export(g.principal["id"])
 
     credential = credential_for(g.principal["id"])
     wrapper = get_db().execute(
@@ -130,17 +115,12 @@ def export_vault():
     return response
 
 
-class ImportRecord(Payload):
+class ImportRecord(RecordWrite):
+    """The record shape `PUT /api/records` validates, plus the id the
+    route would otherwise carry in its path, so an import and a single
+    write are held to one set of field rules."""
+
     recordId: str
-    # The same closed vocabulary the store holds, so an unknown type
-    # is refused when the payload is parsed rather than part-way
-    # through writing it.
-    recordType: Literal["account", "snapshot", "rate", "profile"]
-    accountId: Optional[str] = None
-    schemaVersion: int
-    version: int
-    nonce: str
-    ciphertext: str
 
 
 class ImportRequest(Payload):
@@ -184,19 +164,7 @@ def import_vault():
         # before.
         ordered = sorted(body.records, key=lambda r: r.recordType != "account")
         for record in ordered:
-            store(
-                conn,
-                g.principal["id"],
-                record.recordId,
-                RecordWrite(
-                    recordType=record.recordType,
-                    accountId=record.accountId,
-                    schemaVersion=record.schemaVersion,
-                    version=record.version,
-                    nonce=record.nonce,
-                    ciphertext=record.ciphertext,
-                ),
-            )
+            store(conn, g.principal["id"], record.recordId, record)
         # Import is the one flow that changes the DEK, so it is the one
         # bound by the rewrite-every-wrapper rule. In v1 the password
         # method is the only one and the importing session holds its

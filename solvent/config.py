@@ -37,6 +37,7 @@ class Config:
     rate_requests_per_hour: int
     rate_breaker_failures: int
     rate_breaker_cooloff_minutes: int
+    exports_per_user_hour: int
 
 
 # The client's key derivation, embedded in every server-rendered page so
@@ -127,4 +128,7 @@ def load_config(env: "dict[str, str] | None" = None) -> Config:
         rate_requests_per_hour=_number(env, "RATE_REQUESTS_PER_HOUR", 120),
         rate_breaker_failures=_number(env, "RATE_BREAKER_FAILURES", 5),
         rate_breaker_cooloff_minutes=_number(env, "RATE_BREAKER_COOLOFF_MINUTES", 5),
+        # export-import.md, Rules: a full vault read, and nobody backs up
+        # five times an hour.
+        exports_per_user_hour=_number(env, "EXPORTS_PER_USER_HOUR", 5),
     )
