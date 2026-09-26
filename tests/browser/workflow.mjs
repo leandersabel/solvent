@@ -6,13 +6,19 @@
 // records, so this is the only place those screens can be checked.
 // Run by tests/test_browser.py, which starts the server and mints the
 // bootstrap invite first.
+import { DatabaseSync } from 'node:sqlite';
 import { launch, Session } from './cdp.mjs';
 
 const BASE = process.env.SOLVENT_BASE;
 const BOOTSTRAP = process.env.SOLVENT_INVITE;
-const ADMIN_PASSWORD = 'orchard lantern quiet ribbon';
-const VAULT_PASSWORD = 'harbour crescent tundra oblige';
+// Set by tests/test_browser.py, which also checks the stored verifiers
+// against them once this has run.
+const ADMIN_PASSWORD = process.env.SOLVENT_ADMIN_PASSWORD;
+const VAULT_PASSWORD = process.env.SOLVENT_VAULT_PASSWORD;
 const BACKDATE = process.env.SOLVENT_BACKDATE;
+// The same server as Node reaches it: the loopback address it is bound
+// to, which Node does not always resolve localhost to first.
+const DIRECT = BASE.replace('//localhost', '//[::1]');
 
 const checks = [];
 const problems = [];
@@ -34,7 +40,10 @@ page.on((message) => {
     // prove the endpoint is not navigable. Both are the gate
     // answering correctly.
     const url = entry.url || '';
-    const noise = url.endsWith('/favicon.ico') || url.endsWith('/api/export');
+    const noise =
+      url.endsWith('/favicon.ico') ||
+      url.endsWith('/api/export') ||
+      [...expectedFailures].some((path) => url.includes(path));
     if (entry.level === 'error' && !noise) {
       problems.push(`${entry.url || ''} ${entry.text}`);
     }
@@ -43,6 +52,143 @@ page.on((message) => {
     problems.push(message.params.exceptionDetails.exception?.description || 'exception');
   }
 });
+
+// ---- Login: what leaves the browser, and what it keeps -------------
+
+// A request a section fails on purpose, by path, for as long as it is
+// listed. The browser logs each failed response as an error.
+const expectedFailures = new Set();
+
+// Every request a page sends, with its body, and every write to web
+// storage, over the whole run. Read back in the login checks, since
+// login.md asks it of the whole flow and not only the first sign-in.
+async function watch(session) {
+  const requests = [];
+  const storage = [];
+  session.on((message) => {
+    if (message.method === 'Network.requestWillBeSent') {
+      const { request } = message.params;
+      requests.push({
+        url: request.url,
+        method: request.method,
+        headers: JSON.stringify(request.headers),
+        body: request.postData || '',
+      });
+    }
+    if (message.method === 'DOMStorage.domStorageItemAdded' || message.method === 'DOMStorage.domStorageItemUpdated') {
+      storage.push(message.params);
+    }
+  });
+  await session.send('Network.enable', { maxPostDataSize: 64 * 1024 * 1024 });
+  await session.send('DOMStorage.enable');
+  return { requests, storage };
+}
+const watched = [await watch(page)];
+
+// Another browser with a profile of its own, watched like the first.
+async function openBrowser(url) {
+  const opened = await launch();
+  const session = await Session.connect(opened.target);
+  await session.send('Page.enable');
+  await session.send('Runtime.enable');
+  watched.push(await watch(session));
+  if (url) await session.goto(url);
+  return { session, close: () => opened.child.kill() };
+}
+
+// The database the server runs on, read and written the way an
+// operator's shell would.
+function sql(statement, ...args) {
+  const db = new DatabaseSync(process.env.DATABASE_PATH);
+  try {
+    db.exec('PRAGMA busy_timeout = 5000');
+    return db.prepare(statement).all(...args);
+  } finally {
+    db.close();
+  }
+}
+const credentialOf = (username) =>
+  sql(
+    `SELECT c.id, c.params, c.verifier, w.wrapped_dek, w.dek_nonce, p.id AS principal
+     FROM credentials c JOIN principals p ON p.id = c.principal_id
+     LEFT JOIN dek_wrappers w ON w.credential_id = c.id WHERE p.username = ?`,
+    username,
+  )[0];
+const recordsOf = (principal) =>
+  JSON.stringify(sql('SELECT * FROM records WHERE principal_id = ? ORDER BY record_id', principal));
+
+// Answers each request matching `pattern` with what `respond` returns
+// for it, { status, body } to fulfil or null to let it through, until
+// the returned function is called. `respond` may take its time, which
+// holds the request that long.
+async function intercept(session, pattern, respond) {
+  const handler = async (message) => {
+    if (message.method !== 'Fetch.requestPaused') return;
+    const { requestId, request } = message.params;
+    const answer = await respond(request);
+    if (!answer) {
+      await session.send('Fetch.continueRequest', { requestId });
+      return;
+    }
+    await session.send('Fetch.fulfillRequest', {
+      requestId,
+      responseCode: answer.status,
+      responseHeaders: [{ name: 'Content-Type', value: 'application/json' }],
+      body: Buffer.from(answer.body || '{}').toString('base64'),
+    });
+  };
+  session.on(handler);
+  await session.send('Fetch.enable', { patterns: [{ urlPattern: pattern, requestStage: 'Request' }] });
+  return async () => {
+    session.handlers = session.handlers.filter((h) => h !== handler);
+    await session.send('Fetch.disable');
+  };
+}
+
+// An account at a KDF envelope below the server default, the state of
+// one registered before the default was raised. No endpoint stores a
+// weak envelope, so the credential is rotated through the upgrade
+// endpoint with its salt, Auth Key and wrapper all made at the weak
+// memory parameter, and the database then records that parameter. It
+// signs in exactly as such an account would. Run in a page signed in
+// as `username`, which for a vault owner must hold the unlocked vault.
+const WEAK_MEMORY = 32768;
+async function makeStale(session, username, password) {
+  await session.eval(`(async () => {
+    const api = await import('/static/js/api.js');
+    const c = await import('/static/js/crypto.js');
+    const s = await import('/static/js/session.js');
+    const kdf = JSON.parse(document.getElementById('kdf-envelope').textContent);
+    const salt = c.b64encode(c.randomBytes(16));
+    const keys = await c.deriveKeys(${JSON.stringify(password)}, salt, { ...kdf, m: ${WEAK_MEMORY} });
+    const body = { salt, kdf, authKey: keys.authKey };
+    const vault = s.currentVault();
+    if (vault) Object.assign(body, await c.wrapDek(vault.dek, keys.masterKey));
+    await api.post('/api/auth/upgrade-kdf', body);
+  })()`);
+  sql(
+    `UPDATE credentials SET params = json_set(params, '$.kdf.m', ?)
+     WHERE principal_id = (SELECT id FROM principals WHERE username = ?)`,
+    WEAK_MEMORY,
+    username,
+  );
+}
+
+// The sign-in card on any page, filled and submitted. The username is
+// typed only where the card asks for it.
+const signInOn = (session, password, username = null) =>
+  session.eval(`(() => {
+    const set = (selector, value) => {
+      const node = document.querySelector(selector);
+      node.value = value;
+      node.dispatchEvent(new Event('input', { bubbles: true }));
+    };
+    if (${JSON.stringify(username)} && document.querySelector('#unlock-username')) {
+      set('#unlock-username', ${JSON.stringify(username)});
+    }
+    set('#unlock-password', ${JSON.stringify(password)});
+    document.querySelector('button[type=submit]').click();
+  })()`);
 
 const text = () => page.eval('document.body.innerText');
 const labels = (selector) =>
@@ -574,6 +720,25 @@ try {
 
   // ---- Dimensions ---------------------------------------------------------
 
+  // A profile as registration writes it, with no dimensions key at all.
+  const ungrouped = JSON.parse(await page.eval(`(async () => {
+    const v = (await import('/static/js/session.js')).currentVault();
+    location.hash = '#/';
+    await new Promise((r) => setTimeout(r, 800));
+    return JSON.stringify({
+      key: 'dimensions' in v.profile,
+      options: [...document.querySelectorAll('.chart-controls select option')].map((o) => o.textContent),
+      chart: Boolean(document.querySelector('svg.trend')),
+    });
+  })()`));
+  check(
+    'a profile with no dimensions key draws the dashboard with Total as the only grouping',
+    !ungrouped.key && ungrouped.chart && ungrouped.options.join(',') === 'Total',
+    JSON.stringify(ungrouped),
+  );
+  await page.eval(`document.querySelector('.topbar nav a[href="#/settings"]').click()`);
+  await page.waitUntil("document.body.innerText.includes('Main currency')", { label: 'settings for dimensions' });
+
   await page.eval(`document.querySelector('.link-row[href="/settings/dimensions"]').click()`);
   await page.waitUntil("document.body.innerText.includes('Dimensions are how')", {
     timeout: 20000,
@@ -584,6 +749,12 @@ try {
     !(await page.eval("Boolean(document.querySelector('#unlock-password'))")),
   );
   check('the empty state explains what a dimension is', true);
+  const createActions = await labels('button');
+  check(
+    'the empty state carries one action, to create a dimension',
+    createActions.filter((label) => label.includes('Create a dimension')).length === 1,
+    createActions.join(','),
+  );
 
   await click('Create a dimension');
   await page.waitUntil("document.querySelector('.dialog')");
@@ -643,6 +814,664 @@ try {
   await page.waitUntil("document.body.innerText.includes('Liquid assets')", { label: 'the renamed dimension' });
   await page.settle(400);
   check('saving a rename writes one record', (await page.eval('window.__puts')) === 1);
+
+  // ---- Account settings: every dimension operation writes one record --
+
+  // What the screen and the chart read, and every account record as the
+  // database holds it, byte for byte.
+  const dims = () =>
+    page.eval("(async () => JSON.stringify((await import('/static/js/session.js')).currentVault().dimensions))()").then(JSON.parse);
+  const accountRecords = () =>
+    JSON.stringify(sql("SELECT record_id, version, nonce, ciphertext FROM records WHERE record_type = 'account' ORDER BY record_id"));
+  const bandsOf = (dimensionId) =>
+    page.eval(`(async () => {
+      const v = (await import('/static/js/session.js')).currentVault();
+      const d = v.dimensions.find((x) => x.id === ${JSON.stringify(dimensionId)});
+      return JSON.stringify(Object.fromEntries(v.activeHoldings().map((h) => [h.payload.name, v.bandOf(h, d).label])));
+    })()`).then(JSON.parse);
+  const settled = "!document.querySelector('.dimension-list[aria-busy]') && !document.querySelector('.dialog')";
+  // One operation, and the PUTs it sent.
+  const writesOf = async (label, act) => {
+    const before = await page.eval('window.__puts');
+    await act();
+    await page.settle(150);
+    await page.waitUntil(settled, { label });
+    await page.settle(250);
+    return (await page.eval('window.__puts')) - before;
+  };
+  const inCard = (dimension, button) =>
+    page.eval(`(() => {
+      const card = [...document.querySelectorAll('.dimension-card')]
+        .find((c) => c.querySelector('.card-head .strong').textContent === ${JSON.stringify(dimension)});
+      [...card.querySelector('.card-head').querySelectorAll('button')]
+        .find((b) => b.textContent === ${JSON.stringify(button)} || b.getAttribute('aria-label') === ${JSON.stringify(button)})
+        .click();
+    })()`);
+  const inRow = (value, button) =>
+    page.eval(`(() => {
+      const row = [...document.querySelectorAll('li.value-row')]
+        .find((r) => r.querySelector('.strong').textContent === ${JSON.stringify(value)});
+      [...row.querySelectorAll('button')].find((b) => b.textContent === ${JSON.stringify(button)}).click();
+    })()`);
+  const inDialog = async (fields, button) => {
+    await page.waitUntil("document.querySelector('.dialog')");
+    await page.settle(200);
+    for (const [index, value] of fields.entries()) await setValue('.dialog input', value, index);
+    await page.eval(`[...document.querySelectorAll('.dialog button')].find((b) => b.textContent === ${JSON.stringify(button)}).click()`);
+  };
+  const restore = (label) =>
+    page.eval(`(() => {
+      document.querySelectorAll('#app details').forEach((d) => (d.open = true));
+      const row = [...document.querySelectorAll('.settings-row')].find((r) => r.firstChild.textContent === ${JSON.stringify(label)});
+      row.querySelector('button').click();
+    })()`);
+  // The first dimension's card, the one every value below belongs to.
+  const firstCard = () => `document.querySelector('.dimension-card[data-dimension=${JSON.stringify(liquidity.id)}]')`;
+  const liveValues = () =>
+    page.eval(`JSON.stringify([...${firstCard()}.querySelectorAll('li.value-row .strong')].map((n) => n.textContent))`).then(JSON.parse);
+
+  const addValue = (label) =>
+    writesOf(`the value ${label}`, async () => {
+      await click('+ Add value');
+      await inDialog([label], 'Add');
+    });
+  const writeCounts = {
+    'add a value': await addValue('Investments'),
+    'add another value': await addValue('Retirement'),
+  };
+
+  // Holdings filed under the values, which is the holding form's write
+  // and not this screen's.
+  const [liquidity] = await dims();
+  await page.eval(`(async () => {
+    const s = await import('/static/js/session.js');
+    const writes = await import('/static/js/writes.js');
+    const v = s.currentVault();
+    const d = v.dimensions.find((x) => x.id === ${JSON.stringify(liquidity.id)});
+    const valueOf = (label) => d.values.find((x) => x.label === label).id;
+    const filing = { 'Cantonal account': 'Cash', 'UBS dollar account': 'Investments', 'Gold bars': 'Investments', Mortgage: 'Retirement' };
+    for (const h of v.activeHoldings()) {
+      await writes.saveHolding(v, h, { ...h.payload, dims: { ...h.payload.dims, [d.id]: valueOf(filing[h.payload.name]) } });
+    }
+  })()`);
+  const holdingsBefore = accountRecords();
+
+  writeCounts['reorder a value'] = await writesOf('the reorder', () => inRow('Cash', 'Move down'));
+  const reordered = await liveValues();
+  await page.eval("location.hash = '#/'");
+  await page.waitUntil("document.querySelector('.chart-controls select')", { label: 'the dashboard to group' });
+  await page.eval(`(() => {
+    const select = document.querySelector('.chart-controls select');
+    select.value = ${JSON.stringify(liquidity.id)};
+    select.dispatchEvent(new Event('change', { bubbles: true }));
+  })()`);
+  await page.settle(500);
+  const bandOrder = await labels('.legend-name');
+  check(
+    "reordering a dimension's values reorders the chart's bands",
+    reordered.join(',') === 'Investments,Cash,Retirement' && bandOrder.join(',') === reordered.join(','),
+    `${reordered.join(',')} against the legend ${bandOrder.join(',')}`,
+  );
+  await page.eval(`(() => {
+    const select = document.querySelector('.chart-controls select');
+    select.value = '';
+    select.dispatchEvent(new Event('change', { bubbles: true }));
+  })()`);
+  await page.eval("location.hash = '#/settings/dimensions'");
+  await page.waitUntil("document.querySelector('.dimension-card')", { label: 'the dimensions screen again' });
+
+  writeCounts['rename a value'] = await writesOf('the value rename', async () => {
+    await inRow('Retirement', 'Edit');
+    await page.eval(`(() => {
+      const input = [...document.querySelectorAll('li.value-row input')].find((i) => !i.closest('[hidden]'));
+      input.value = 'Pension';
+      input.dispatchEvent(new Event('input', { bubbles: true }));
+      [...input.parentElement.querySelectorAll('button')].find((b) => b.textContent === 'Save').click();
+    })()`);
+  });
+  check('a renamed value keeps its place', (await liveValues()).join(',') === 'Investments,Cash,Pension');
+
+  // The next id the page mints is made to collide with one the profile
+  // already holds, which the uniqueness check has to catch.
+  await page.eval(`(() => {
+    const real = crypto.getRandomValues.bind(crypto);
+    const taken = ${JSON.stringify(liquidity.id)};
+    let armed = true;
+    crypto.getRandomValues = (array) => {
+      if (armed && array.length === 8) {
+        armed = false;
+        [...taken].forEach((c, i) => (array[i] = parseInt(c, 36)));
+        return array;
+      }
+      return real(array);
+    };
+  })()`);
+  writeCounts['create a flag'] = await writesOf('the flag', async () => {
+    await click('+ Create a dimension');
+    await inDialog(['Emergency fund'], 'Create a flag');
+  });
+  const afterFlag = await dims();
+  const ids = afterFlag.flatMap((d) => [d.id, ...d.values.map((v) => v.id)]);
+  const words = afterFlag.flatMap((d) => [d.label, ...d.values.map((v) => v.label)]);
+  const flag = afterFlag.find((d) => d.label === 'Emergency fund');
+  check(
+    'two dimensions created in one session hold different ids, and no id is a label',
+    new Set(ids).size === ids.length && ids.every((id) => /^[a-z0-9]{8}$/.test(id) && !words.includes(id)),
+    JSON.stringify(afterFlag.map((d) => [d.id, d.values.map((v) => v.id)])),
+  );
+  check(
+    'a flag is one field and one button, a dimension with one value',
+    flag && flag.values.length === 1 && flag.values[0].label === 'Emergency fund',
+    JSON.stringify(flag),
+  );
+
+  writeCounts['reorder a dimension'] = await writesOf('the dimension reorder', () => inCard('Emergency fund', 'Move up'));
+  await page.eval("location.hash = '#/'");
+  await page.waitUntil("document.querySelector('.chart-controls select')", { label: 'the dashboard after the reorder' });
+  await page.settle(400);
+  const groupings = await labels('.chart-controls select option');
+  check(
+    'the order of dimensions is the order of the Group by select',
+    groupings.join(',') === 'Total,Emergency fund,Liquid assets',
+    groupings.join(','),
+  );
+  await page.eval("location.hash = '#/settings/dimensions'");
+  await page.waitUntil("document.querySelector('.dimension-card')", { label: 'the dimensions screen once more' });
+
+  const filed = await bandsOf(liquidity.id);
+  writeCounts['archive a value'] = await writesOf('the value archive', () => inRow('Cash', 'Archive'));
+  const whileArchived = await bandsOf(liquidity.id);
+  check(
+    'archiving a value moves its holdings to Unassigned',
+    whileArchived['Cantonal account'] === 'Unassigned' && whileArchived['Gold bars'] === 'Investments',
+    JSON.stringify(whileArchived),
+  );
+  const archivedLabel = await page.eval("[...document.querySelectorAll('summary')].map((n) => n.textContent).join(',')");
+  check('an archived section counts what it hides', archivedLabel.includes('Archived values (1)'), archivedLabel);
+
+  // With the archived value between them, a move is still a visible one.
+  writeCounts['reorder past an archived value'] = await writesOf('the move past an archived value', () => inRow('Investments', 'Move down'));
+  check(
+    'a move among live values skips an archived one',
+    (await liveValues()).join(',') === 'Pension,Investments',
+    (await liveValues()).join(','),
+  );
+  writeCounts['restore a value'] = await writesOf('the value restore', () => restore('Cash'));
+  check(
+    'restoring a value moves its holdings back',
+    JSON.stringify(await bandsOf(liquidity.id)) === JSON.stringify(filed),
+    JSON.stringify(await bandsOf(liquidity.id)),
+  );
+
+  writeCounts['archive a dimension'] = await writesOf('the dimension archive', async () => {
+    await inCard('Liquid assets', 'Actions for Liquid assets');
+    await inCard('Liquid assets', 'Archive dimension');
+    await inDialog([], 'Archive');
+  });
+  const hidden = await page.eval("[...document.querySelectorAll('summary')].map((n) => n.textContent).join(',')");
+  check('an archived dimension is listed under Archived with its count', hidden.includes('Archived (1)'), hidden);
+  writeCounts['restore a dimension'] = await writesOf('the dimension restore', () => restore('Liquid assets'));
+  check(
+    'archiving a dimension and restoring it returns every holding to its band',
+    JSON.stringify(await bandsOf(liquidity.id)) === JSON.stringify(filed),
+    JSON.stringify(await bandsOf(liquidity.id)),
+  );
+
+  // The drag handle, the reorder control's other route.
+  writeCounts['drag a value'] = await writesOf('the drag', () =>
+    page.eval(`(() => {
+      const rows = [...${firstCard()}.querySelectorAll('li.value-row')];
+      const from = rows.find((r) => r.querySelector('.strong').textContent === 'Investments');
+      const transfer = new DataTransfer();
+      from.querySelector('.drag-handle').dispatchEvent(new DragEvent('dragstart', { bubbles: true, dataTransfer: transfer }));
+      rows[0].dispatchEvent(new DragEvent('dragover', { bubbles: true, cancelable: true, dataTransfer: transfer }));
+      rows[0].dispatchEvent(new DragEvent('drop', { bubbles: true, cancelable: true, dataTransfer: transfer }));
+    })()`),
+  );
+  const announced = await page.eval("document.querySelector('[aria-live]').textContent");
+  check(
+    'dragging a value moves it and says where it went',
+    (await liveValues()).join(',') === 'Investments,Pension,Cash' && announced === 'Moved to position 1 of 3.',
+    `${(await liveValues()).join(',')}: ${announced}`,
+  );
+
+  check(
+    'no operation on the dimensions screen writes more than one record',
+    Object.values(writeCounts).every((count) => count === 1),
+    JSON.stringify(writeCounts),
+  );
+  check(
+    'no dimension operation touches an account record',
+    accountRecords() === holdingsBefore,
+  );
+
+  // A write shown at once and held: the controls wait for it, and a
+  // failure puts the stored order back and says so on the card.
+  let answer;
+  const answered = new Promise((resolve) => (answer = resolve));
+  expectedFailures.add('/api/records/');
+  const releaseWrites = await intercept(page, '*/api/records/*', (request) =>
+    request.method === 'PUT' ? answered.then(() => ({ status: 500 })) : null,
+  );
+  const storedOrder = await liveValues();
+  await inRow('Investments', 'Move down');
+  await page.settle(300);
+  const whileSaving = JSON.parse(await page.eval(`JSON.stringify({
+    order: [...${firstCard()}.querySelectorAll('li.value-row .strong')].map((n) => n.textContent),
+    disabled: [...${firstCard()}.querySelectorAll('li.value-row button')].filter((b) => /Move|Archive/.test(b.textContent)).every((b) => b.disabled),
+  })`));
+  check(
+    'a move is shown at once, with the controls disabled until it answers',
+    whileSaving.order.join(',') === 'Pension,Investments,Cash' && whileSaving.disabled,
+    JSON.stringify(whileSaving),
+  );
+  answer();
+  await page.waitUntil(settled, { label: 'the failed move to answer' });
+  await page.settle(300);
+  const afterFailure = await text();
+  check(
+    'a write that fails says so on its card and shows the stored order',
+    afterFailure.includes('That did not save. Nothing changed.') && (await liveValues()).join(',') === storedOrder.join(','),
+    `${(await liveValues()).join(',')}`,
+  );
+  await releaseWrites();
+  expectedFailures.delete('/api/records/');
+
+  // Another tab writes the profile first.
+  const otherTab = 'Liquidity, from another tab';
+  await page.eval(`(async () => {
+    const v = (await import('/static/js/session.js')).currentVault();
+    const api = await import('/static/js/api.js');
+    const c = await import('/static/js/crypto.js');
+    const { SCHEMA_VERSION } = await import('/static/js/model.js');
+    const record = v.profileRecord;
+    const payload = { ...v.profile, dimensions: v.dimensions.map((d) => (d.id === ${JSON.stringify(liquidity.id)} ? { ...d, label: ${JSON.stringify(otherTab)} } : d)) };
+    const slot = { recordId: record.recordId, recordType: 'profile', accountId: null, schemaVersion: SCHEMA_VERSION, version: record.version + 1 };
+    await api.put('/api/records/' + slot.recordId, { recordType: 'profile', accountId: null, schemaVersion: slot.schemaVersion, version: slot.version, ...(await c.encryptRecord(v.dek, slot, payload)) });
+  })()`);
+  expectedFailures.add('/api/records/');
+  await inRow('Pension', 'Edit');
+  await page.eval(`(() => {
+    const input = [...document.querySelectorAll('li.value-row input')].find((i) => !i.closest('[hidden]'));
+    input.value = 'Retirement';
+    input.dispatchEvent(new Event('input', { bubbles: true }));
+    [...input.parentElement.querySelectorAll('button')].find((b) => b.textContent === 'Save').click();
+  })()`);
+  await page.waitUntil("document.body.innerText.includes('Your settings were changed in another tab.')", { label: 'the conflict' });
+  await page.settle(300);
+  check(
+    'a conflict names the other tab and reloads the profile',
+    (await labels('.dimension-card .card-head .strong')).includes(otherTab),
+    (await labels('.dimension-card .card-head .strong')).join(','),
+  );
+  expectedFailures.delete('/api/records/');
+
+
+  // ---- Account settings: the settings screen's own states --------------
+
+  const toSettings = async (label) => {
+    await page.eval(`document.querySelector('.topbar nav a[href="#/settings"]').click()`);
+    await page.waitUntil("document.body.innerText.includes('Main currency')", { label });
+    await page.settle(400);
+  };
+  const cardWith = (words) => `[...document.querySelectorAll('.card')].find((c) => c.textContent.includes(${JSON.stringify(words)}))`;
+  await toSettings('settings for its own states');
+  check(
+    'the main currency is shown and offers no control to change it',
+    await page.eval(`!${cardWith('Main currency')}.querySelector('input, select, textarea, button')`),
+  );
+
+  // The session list waits on its own fetch, alone.
+  let listAnswer;
+  const listAnswered = new Promise((resolve) => (listAnswer = resolve));
+  expectedFailures.add('/api/sessions');
+  const releaseList = await intercept(page, '*/api/sessions', () => listAnswered.then(() => ({ status: 500 })));
+  await page.eval("location.hash = '#/'");
+  await page.settle(300);
+  await toSettings('settings with the session list held');
+  const waiting = JSON.parse(await page.eval(`JSON.stringify({
+    skeleton: ${cardWith('Session and lock')}.querySelectorAll('.skeleton-row').length,
+    elsewhere: document.querySelectorAll('.skeleton-row').length,
+  })`));
+  check(
+    'the session card alone shows skeleton rows while its list loads',
+    waiting.skeleton > 0 && waiting.elsewhere === waiting.skeleton,
+    JSON.stringify(waiting),
+  );
+  listAnswer();
+  await page.waitUntil("document.body.innerText.includes('The session list would not load.')", { label: 'the list error' });
+  await releaseList();
+  expectedFailures.delete('/api/sessions');
+  // Something chosen in another card, unsaved, which a retry of this
+  // card alone leaves where it is.
+  await page.eval(`(() => {
+    const select = document.getElementById('format-places');
+    select.value = '2';
+    select.dispatchEvent(new Event('change', { bubbles: true }));
+  })()`);
+  await page.eval(`[...${cardWith('Session and lock')}.querySelectorAll('button')].find((b) => b.textContent === 'Retry').click()`);
+  await page.waitUntil("document.body.innerText.includes('This session')", { label: 'the list after a retry' });
+  check(
+    'a retry reloads the session card alone',
+    (await page.eval("document.getElementById('format-places').value")) === '2',
+  );
+
+  // Signing out everywhere, failed.
+  expectedFailures.add('/api/auth/logout-all');
+  const releaseEverywhere = await intercept(page, '*/api/auth/logout-all', () => ({ status: 500 }));
+  await click('Sign out everywhere');
+  await page.waitUntil("document.body.innerText.includes('Nothing was signed out.')", { label: 'the sign-out error' });
+  await releaseEverywhere();
+  expectedFailures.delete('/api/auth/logout-all');
+  const stillIn = await page.eval("fetch('/api/sessions', { headers: { 'X-Solvent-Request': '1' } }).then((r) => r.status)");
+  check(
+    'a failed sign out everywhere says so and leaves this session open',
+    stillIn === 200 && (await page.eval('location.hash')) === '#/settings' && !(await page.eval("Boolean(document.querySelector('#unlock-password'))")),
+    String(stillIn),
+  );
+
+  // Delete my vault waits for the password and the exact username.
+  await page.eval("document.querySelector('.danger-zone').open = true");
+  const deleteState = (password, typed) =>
+    page.eval(`(() => {
+      const zone = document.querySelector('.danger-zone');
+      const [pw, name] = zone.querySelectorAll('input');
+      pw.value = ${JSON.stringify(password)};
+      pw.dispatchEvent(new Event('input', { bubbles: true }));
+      name.value = ${JSON.stringify(typed)};
+      name.dispatchEvent(new Event('input', { bubbles: true }));
+      return zone.querySelector('.btn-destructive').disabled;
+    })()`);
+  const gates = [
+    await deleteState('', 'leander'),
+    await deleteState('something', 'Leander'),
+    await deleteState('something', 'leander'),
+  ];
+  await deleteState('', '');
+  check(
+    'Delete my vault stays disabled until the password is filled and the username matches exactly',
+    gates.join(',') === 'true,true,false',
+    gates.join(','),
+  );
+  check(
+    'the deletion offers Export first as its primary action',
+    (await page.eval("document.querySelector('.danger-zone .btn-primary').textContent")) === 'Export first',
+  );
+
+  // ---- Account settings: changing the password -------------------------
+
+  // At old parameters, kept there by an upgrade that fails, so the
+  // change is also what upgrades it.
+  const unlockHere = async (password, label) => {
+    await enterPassword(password);
+    await page.waitUntil("!document.querySelector('#unlock-password')", { timeout: 90000, label });
+    await page.settle(800);
+  };
+  await makeStale(page, 'leander', VAULT_PASSWORD);
+  expectedFailures.add('/api/auth/upgrade-kdf');
+  let releaseUpgrade = await intercept(page, '*/api/auth/upgrade-kdf', () => ({ status: 500 }));
+  await page.goto(`${BASE}/settings`);
+  await unlockHere(VAULT_PASSWORD, 'settings at old parameters');
+  await releaseUpgrade();
+  expectedFailures.delete('/api/auth/upgrade-kdf');
+  const beforeChange = credentialOf('leander');
+  check('the vault is at old parameters before the change', JSON.parse(beforeChange.params).kdf.m === WEAK_MEMORY);
+  const recordsBeforeChange = recordsOf(beforeChange.principal);
+  const namesBeforeChange = await page.eval(
+    "(async () => JSON.stringify([...(await import('/static/js/session.js')).currentVault().holdings.values()].map((h) => h.payload.name).sort()))()",
+  );
+
+  // A second session for the same account, held outside the browser.
+  const otherSession = async (username, password) => {
+    const authKey = await page.eval(
+      `(async () => (await import('/static/js/session.js')).authKeyFor(${JSON.stringify(username)}, ${JSON.stringify(password)}))()`,
+    );
+    const response = await fetch(`${DIRECT}/api/auth/login`, {
+      method: 'POST',
+      headers: { 'X-Solvent-Request': '1', 'Content-Type': 'application/json' },
+      body: JSON.stringify({ username, authKey }),
+    });
+    return response.headers.getSetCookie().map((c) => c.split(';')[0]).join('; ');
+  };
+  const statusWith = (cookie) =>
+    fetch(`${DIRECT}/api/sessions`, { headers: { 'X-Solvent-Request': '1', cookie } }).then((r) => r.status);
+  const elsewhere = await otherSession('leander', VAULT_PASSWORD);
+  check('the other session is open before the change', (await statusWith(elsewhere)) === 200);
+
+  const NEW_PASSWORD = 'marble quarry violet anchor';
+  const passwordForm = cardWith('Change password');
+  const fillPasswords = async (current, next) => {
+    await page.eval(`(() => {
+      const card = ${passwordForm};
+      const set = (selector, value) => {
+        const node = card.querySelector(selector);
+        node.value = value;
+        node.dispatchEvent(new Event('input', { bubbles: true }));
+      };
+      set('input[autocomplete=current-password]', ${JSON.stringify(current)});
+      const [next, confirm] = card.querySelectorAll('input[autocomplete=new-password]');
+      for (const node of [next, confirm]) {
+        node.value = ${JSON.stringify(next)};
+        node.dispatchEvent(new Event('input', { bubbles: true }));
+      }
+    })()`);
+    await page.waitUntil(`!${passwordForm}.querySelector('.btn-primary').disabled`, { label: 'the strength gauge' });
+  };
+  const changeRequests = () =>
+    watched[0].requests.filter((r) => r.url.endsWith('/api/auth/change-password'));
+
+  await fillPasswords('not the password at all', NEW_PASSWORD);
+  await page.eval(`${passwordForm}.querySelector('.btn-primary').click()`);
+  await page.waitUntil("document.body.innerText.includes('That is not your current password.')", {
+    timeout: 60000,
+    label: 'the wrong current password',
+  });
+  const wrongCurrent = JSON.parse(await page.eval(`(() => {
+    const card = ${passwordForm};
+    const error = card.querySelector('.field-error:not([hidden])');
+    const first = card.querySelector('input');
+    return JSON.stringify({
+      above: Boolean(error.compareDocumentPosition(first) & Node.DOCUMENT_POSITION_FOLLOWING),
+      kept: [...card.querySelectorAll('input')].map((i) => i.value),
+    });
+  })()`));
+  check(
+    'a wrong current password is caught in the browser, above the first field, and nothing is sent',
+    wrongCurrent.above && changeRequests().length === 0,
+    `${JSON.stringify(wrongCurrent.above)}, ${changeRequests().length} sent`,
+  );
+  check(
+    'every field is kept after a wrong current password',
+    wrongCurrent.kept.join('|') === ['not the password at all', NEW_PASSWORD, NEW_PASSWORD].join('|'),
+  );
+
+  await fillPasswords(VAULT_PASSWORD, NEW_PASSWORD);
+  const working = JSON.parse(await page.eval(`(() => {
+    const card = ${passwordForm};
+    const button = card.querySelector('.btn-primary');
+    button.click();
+    return JSON.stringify({
+      label: button.textContent,
+      quiet: [...card.querySelectorAll('input, .password-field button')].every((n) => n.disabled),
+    });
+  })()`));
+  check(
+    'changing the password shows its working state and the form goes quiet',
+    working.label === 'Changing your password' && working.quiet,
+    JSON.stringify(working),
+  );
+  await page.waitUntil("document.body.innerText.includes('Your password is changed.')", {
+    timeout: 60000,
+    label: 'the changed password',
+  });
+  check(
+    'the change confirms what else happened',
+    (await text()).includes('Every other session was signed out, and this one is still open.'),
+  );
+  const afterChange = credentialOf('leander');
+  const embedded = await page.eval("document.getElementById('kdf-envelope').textContent");
+  check(
+    'a password change rewrites salt, envelope, verifier and wrapper, at the current default',
+    JSON.parse(afterChange.params).salt !== JSON.parse(beforeChange.params).salt &&
+      JSON.stringify(JSON.parse(afterChange.params).kdf) === JSON.stringify(JSON.parse(embedded)) &&
+      afterChange.verifier !== beforeChange.verifier &&
+      afterChange.wrapped_dek !== beforeChange.wrapped_dek,
+    `${afterChange.params} against ${embedded}`,
+  );
+  check('a password change leaves every record byte-identical', recordsOf(afterChange.principal) === recordsBeforeChange);
+  const sentChange = changeRequests();
+  check(
+    'the change-password request carries keys and a wrapper and nothing else',
+    sentChange.length === 1 &&
+      Object.keys(JSON.parse(sentChange[0].body)).sort().join(',') === 'authKey,currentAuthKey,dekNonce,kdf,salt,wrappedDek',
+    sentChange.map((r) => r.body).join(' | '),
+  );
+  check(
+    'a password change ends the other session and keeps this one',
+    (await statusWith(elsewhere)) === 401 &&
+      (await page.eval("fetch('/api/sessions', { headers: { 'X-Solvent-Request': '1' } }).then((r) => r.status)")) === 200,
+  );
+  const sameSession = JSON.parse(await page.eval(`(async () => {
+    const { Vault } = await import('/static/js/model.js');
+    const again = await new Vault((await import('/static/js/session.js')).currentVault().dek).load();
+    return JSON.stringify({ names: [...again.holdings.values()].map((h) => h.payload.name).sort(), unreadable: again.unreadable.length });
+  })()`));
+  check(
+    'records written before the change still decrypt in the same session',
+    sameSession.unreadable === 0 && JSON.stringify(sameSession.names) === namesBeforeChange,
+    JSON.stringify(sameSession),
+  );
+
+  await page.goto(`${BASE}/dashboard`);
+  await unlockHere(NEW_PASSWORD, 'the dashboard with the new password');
+  const freshLogin = JSON.parse(await page.eval(`(async () => {
+    const v = (await import('/static/js/session.js')).currentVault();
+    return JSON.stringify({ names: [...v.holdings.values()].map((h) => h.payload.name).sort(), unreadable: v.unreadable.length });
+  })()`));
+  check(
+    'records written before the change still decrypt after a fresh sign-in with the new password',
+    freshLogin.unreadable === 0 && JSON.stringify(freshLogin.names) === namesBeforeChange,
+    JSON.stringify(freshLogin),
+  );
+  const oldPassword = await openBrowser(`${BASE}/login`);
+  try {
+    await signInOn(oldPassword.session, VAULT_PASSWORD, 'leander');
+    await oldPassword.session.waitUntil("document.body.innerText.includes('Invalid username or password.')", {
+      timeout: 60000,
+      label: 'the old password refused',
+    });
+    check('the old password no longer signs in', true);
+  } finally {
+    oldPassword.close();
+  }
+
+  // Back to the password the rest of the run signs in with.
+  await toSettings('settings to change the password back');
+  await fillPasswords(NEW_PASSWORD, VAULT_PASSWORD);
+  await page.eval(`${passwordForm}.querySelector('.btn-primary').click()`);
+  await page.waitUntil("document.body.innerText.includes('Your password is changed.')", {
+    timeout: 60000,
+    label: 'the password changed back',
+  });
+
+  // ---- Account settings: deleting a vault --------------------------------
+
+  // A vault of its own, from an invite the administrator mints, kept at
+  // old parameters so the deletion has to derive at the stored ones.
+  const LEAVING_PASSWORD = 'lantern harbour ribbon tundra';
+  const administrator = await openBrowser(`${BASE}/login`);
+  const leaving = await openBrowser();
+  try {
+    await signInOn(administrator.session, ADMIN_PASSWORD, 'ops.leander');
+    await administrator.session.waitUntil("location.pathname === '/admin'", { timeout: 90000, label: 'the admin area' });
+    const minted = JSON.parse(await administrator.session.eval(`(async () => JSON.stringify(
+      await (await import('/static/js/api.js')).post('/api/admin/invites', { kind: 'vault_owner', label: 'Leaving' })
+    ))()`));
+    const other = leaving.session;
+    await other.goto(`${BASE}/register?invite=${minted.token}`);
+    await other.eval(`(() => {
+      const set = (selector, value, index = 0) => {
+        const node = document.querySelectorAll(selector)[index];
+        node.value = value;
+        node.dispatchEvent(new Event('input', { bubbles: true }));
+        node.dispatchEvent(new Event('change', { bubbles: true }));
+      };
+      set('input[type=text]', 'leaving');
+      set('input[type=password]', ${JSON.stringify(LEAVING_PASSWORD)}, 0);
+      set('input[type=password]', ${JSON.stringify(LEAVING_PASSWORD)}, 1);
+      set('select', 'CHF');
+      const box = document.querySelector('input[type=checkbox]');
+      box.checked = true;
+      box.dispatchEvent(new Event('change', { bubbles: true }));
+    })()`);
+    await other.settle(400);
+    await other.eval("document.querySelector('button[type=submit]').click()");
+    await other.waitUntil("location.pathname === '/dashboard'", { timeout: 90000, label: 'the new vault' });
+    await other.settle(500);
+    await signInOn(other, LEAVING_PASSWORD);
+    await other.waitUntil("!document.querySelector('#unlock-password')", { timeout: 90000, label: 'the new vault unlocked' });
+    await makeStale(other, 'leaving', LEAVING_PASSWORD);
+    const releaseLeaving = await intercept(other, '*/api/auth/upgrade-kdf', () => ({ status: 500 }));
+    await other.goto(`${BASE}/settings`);
+    await signInOn(other, LEAVING_PASSWORD);
+    await other.waitUntil("document.body.innerText.includes('Main currency')", { timeout: 90000, label: 'settings of the new vault' });
+    await releaseLeaving();
+    const leavingRow = credentialOf('leaving');
+    check('the vault to delete is at old parameters', JSON.parse(leavingRow.params).kdf.m === WEAK_MEMORY);
+
+    const fillDelete = () =>
+      other.eval(`(() => {
+        const zone = document.querySelector('.danger-zone');
+        zone.open = true;
+        const [pw, name] = zone.querySelectorAll('input');
+        pw.value = ${JSON.stringify(LEAVING_PASSWORD)};
+        pw.dispatchEvent(new Event('input', { bubbles: true }));
+        name.value = 'leaving';
+        name.dispatchEvent(new Event('input', { bubbles: true }));
+        zone.querySelector('.btn-destructive').click();
+      })()`);
+    const releaseDelete = await intercept(other, '*/api/auth/account', (request) =>
+      request.method === 'DELETE' ? { status: 500 } : null,
+    );
+    await fillDelete();
+    await other.waitUntil("document.body.innerText.includes('Nothing was deleted.')", { timeout: 60000, label: 'the failed deletion' });
+    await releaseDelete();
+    check(
+      'a failed deletion says nothing was deleted, and the vault and session are still there',
+      (await other.eval("fetch('/api/sessions', { headers: { 'X-Solvent-Request': '1' } }).then((r) => r.status)")) === 200 &&
+        sql('SELECT id FROM principals WHERE username = ?', 'leaving').length === 1 &&
+        (await other.eval("document.body.innerText")).includes('Your vault is unchanged and you are still signed in.'),
+    );
+
+    await fillDelete();
+    await other.waitUntil("location.pathname === '/login'", { timeout: 60000, label: 'the sign-in card after deleting' });
+    await other.settle(400);
+    const left = ['credentials', 'records', 'sessions'].map((table) => [
+      table,
+      sql(`SELECT COUNT(*) AS n FROM ${table} WHERE principal_id = ?`, leavingRow.principal)[0].n,
+    ]);
+    check(
+      'deleting a vault at old parameters removes the account, its credential, wrapper, records and sessions',
+      sql('SELECT id FROM principals WHERE id = ?', leavingRow.principal).length === 0 &&
+        sql('SELECT credential_id FROM dek_wrappers WHERE credential_id = ?', leavingRow.id).length === 0 &&
+        left.every(([, n]) => n === 0),
+      JSON.stringify(left),
+    );
+    check(
+      'the sign-in card is all that is left after deleting',
+      (await other.eval("Boolean(document.querySelector('#unlock-username'))")) &&
+        !(await other.eval("document.body.innerText")).includes('leaving'),
+    );
+    await signInOn(other, LEAVING_PASSWORD, 'leaving');
+    await other.waitUntil("document.body.innerText.includes('Invalid username or password.')", {
+      timeout: 60000,
+      label: 'the deleted account refused',
+    });
+    check('a deleted account no longer signs in', true);
+  } finally {
+    administrator.close();
+    leaving.close();
+  }
 
 
   // ---- The chrome, on a page that is not the dashboard -----------------
@@ -1104,6 +1933,10 @@ try {
     !chosenEarly && (await locked()),
     `locked before five minutes: ${chosenEarly}`,
   );
+  // Stored in the encrypted profile, so no row of any table spells it.
+  const tables = sql("SELECT name FROM sqlite_master WHERE type = 'table'").map((row) => row.name);
+  const spelled = tables.filter((table) => JSON.stringify(sql(`SELECT * FROM ${table}`)).includes('idleLockMinutes'));
+  check('the idle-lock setting appears in plaintext nowhere in the database', spelled.length === 0, spelled.join(','));
 
   // Signed out, and signed back in with the username.
   await page.eval(`fetch('/api/auth/logout', {
@@ -1305,6 +2138,369 @@ try {
     'no password field is refilled after unlocking',
     JSON.parse(passwords).every((value) => value === ''),
     passwords,
+  );
+
+  // ---- Login: a session that runs out mid-action ------------------------
+
+  // Typing into an open form when the server session is gone: the save
+  // answers Unauthorized, the card asks only for the password, and the
+  // form comes back as it was.
+  await page.eval("location.hash = '#/'");
+  await page.waitUntil("document.querySelector('.data-table tbody .link-button')", { label: 'the dashboard before the session ends' });
+  await page.eval("document.querySelector('.data-table tbody .link-button').click()");
+  await page.waitUntil("location.hash.startsWith('#/holding/')", { label: 'a holding to edit' });
+  await page.settle(400);
+  await click('Edit');
+  await page.waitUntil("document.querySelector('#holding-name')", { label: 'the editor before the session ends' });
+  await page.settle(300);
+  const editing = await page.eval('location.hash');
+  await page.eval("document.querySelectorAll('#app details').forEach((d) => (d.open = true))");
+  await setValue('#app textarea', 'typed as the session ran out');
+  await page.eval("fetch('/api/auth/logout', { method: 'POST', headers: { 'X-Solvent-Request': '1', 'Content-Type': 'application/json' }, body: '{}' })");
+  expectedFailures.add('/api/records');
+  await page.eval("document.querySelector('#app button[type=submit]').click()");
+  await page.waitUntil("document.querySelector('#unlock-password')", { timeout: 20000, label: 'the card after the session ran out' });
+  check(
+    'a session that ran out mid-action shows the card with the username known',
+    !(await page.eval("Boolean(document.querySelector('#unlock-username'))")) &&
+      (await page.eval("document.querySelector('.known-username').textContent")).startsWith('leander'),
+  );
+  await unlockInPlace('the vault after the session ran out');
+  expectedFailures.delete('/api/records');
+  const resumed = JSON.parse(await page.eval(`JSON.stringify({
+    hash: location.hash,
+    note: document.querySelector('#app textarea')?.value,
+    alive: true,
+  })`));
+  const signedInAgain = await page.eval("fetch('/api/sessions', { headers: { 'X-Solvent-Request': '1' } }).then((r) => r.status)");
+  check(
+    'signing in again returns to the form with what was typed, on a new session',
+    resumed.hash === editing && resumed.note === 'typed as the session ran out' && signedInAgain === 200,
+    JSON.stringify({ ...resumed, signedInAgain }),
+  );
+  await page.eval("location.hash = '#/'");
+  await page.settle(500);
+
+  // ---- Login: arriving at the sign-in address already signed in ---------
+
+  await page.goto(`${BASE}/login`);
+  check(
+    'a signed-in vault owner at the sign-in address is sent to the dashboard and asked only for the password',
+    (await page.eval('location.pathname')) === '/dashboard' &&
+      (await page.eval("Boolean(document.querySelector('#unlock-password'))")) &&
+      !(await page.eval("Boolean(document.querySelector('#unlock-username'))")),
+  );
+  await unlockInPlace('the dashboard after arriving at the sign-in address');
+
+  // ---- Login: the one card, whatever the name -----------------------------
+
+  const cardBrowser = await openBrowser(`${BASE}/login`);
+  const card = cardBrowser.session;
+  try {
+    check(
+      'the card offers the username and current password to a password manager',
+      (await card.eval("document.querySelector('#unlock-username').getAttribute('autocomplete')")) === 'username' &&
+        (await card.eval("document.querySelector('#unlock-password').getAttribute('autocomplete')")) === 'current-password',
+    );
+    // One submission, what the card does at once, and what it shows
+    // once it has an answer.
+    const attempt = (username, password) =>
+      card.eval(`(async () => {
+        const set = (selector, value) => {
+          const node = document.querySelector(selector);
+          node.value = value;
+          node.dispatchEvent(new Event('input', { bubbles: true }));
+        };
+        set('#unlock-username', ${JSON.stringify(username)});
+        set('#unlock-password', ${JSON.stringify(password)});
+        const form = document.querySelector('form');
+        const button = form.querySelector('button[type=submit]');
+        const error = form.querySelector('.field-error');
+        button.click();
+        const working = {
+          label: button.textContent,
+          quiet: [...form.querySelectorAll('input, button[type=submit], .password-field button')].every((n) => n.disabled),
+          note: [...form.querySelectorAll('.hint')].some((n) => !n.hidden && n.textContent.startsWith('This takes a moment by design.')),
+        };
+        while (button.disabled || error.hidden) await new Promise((r) => setTimeout(r, 25));
+        return JSON.stringify({
+          working,
+          error: error.textContent,
+          above: Boolean(error.compareDocumentPosition(document.querySelector('#unlock-password')) & Node.DOCUMENT_POSITION_FOLLOWING),
+          form: form.innerHTML,
+        });
+      })()`).then(JSON.parse);
+
+    const failures = {
+      'a vault owner': await attempt('leander', 'not the password at all'),
+      'an administrator': await attempt('ops.leander', 'not the password at all'),
+      'a username nobody has': await attempt('nobody-at-all', 'not the password at all'),
+    };
+    const first = failures['a vault owner'];
+    check(
+      'the card shows the working state and goes quiet while the key is derived',
+      first.working.label === 'Deriving your key' && first.working.quiet && first.working.note,
+      JSON.stringify(first.working),
+    );
+    check(
+      'a wrong password and an unknown username read the same on the card, for either kind',
+      Object.values(failures).every(
+        (f) => f.error === 'Invalid username or password.' && f.above && f.form === first.form &&
+          JSON.stringify(f.working) === JSON.stringify(first.working),
+      ),
+      JSON.stringify(Object.fromEntries(Object.entries(failures).map(([k, f]) => [k, f.error]))),
+    );
+
+    // Enough failures on one name to reach the account limit, at
+    // whatever value it is configured to.
+    let throttled = null;
+    for (let tries = 0; tries < 40 && !throttled; tries++) {
+      const answer = await attempt('locked-probe', 'not the password at all');
+      if (answer.error !== 'Invalid username or password.') throttled = answer;
+    }
+    check(
+      'a name past the attempt limit reads as too many attempts',
+      throttled && throttled.error === 'Too many attempts. Try again in a few minutes.' && throttled.above,
+      JSON.stringify(throttled && throttled.error),
+    );
+
+    await signInOn(card, ADMIN_PASSWORD, 'ops.leander');
+    await card.waitUntil("location.pathname === '/admin'", { timeout: 60000, label: 'the admin area from the card' });
+    check('an administrator signs in through the one card and lands in the admin area', true);
+  } finally {
+    cardBrowser.close();
+  }
+
+  // A browser whose worker cannot derive, as one without WebAssembly or
+  // without the memory to spare would answer.
+  const brokenBrowser = await openBrowser();
+  const broken = brokenBrowser.session;
+  try {
+    await broken.send('Page.addScriptToEvaluateOnNewDocument', {
+      source: `window.__derivations = 0;
+        window.Worker = class {
+          constructor() { this.listeners = []; }
+          addEventListener(_type, listener) { this.listeners.push(listener); }
+          removeEventListener(_type, listener) { this.listeners = this.listeners.filter((l) => l !== listener); }
+          postMessage(message) {
+            window.__derivations += 1;
+            const answer = { id: message.id, ok: false, outOfMemory: Boolean(window.__outOfMemory), message: 'refused' };
+            setTimeout(() => this.listeners.forEach((l) => l({ data: answer })), 10);
+          }
+        };`,
+    });
+    const submitBroken = async () => {
+      await signInOn(broken, 'any password at all', 'leander');
+      await broken.waitUntil("!document.querySelector('.field-error').hidden", { label: 'the derivation failure' });
+      await broken.settle(100);
+      return JSON.parse(await broken.eval(`JSON.stringify({
+        error: document.querySelector('.field-error').textContent,
+        stopped: [...document.querySelectorAll('form input, form button[type=submit]')].every((n) => n.disabled),
+        retry: [...document.querySelectorAll('form button')].some((b) => b.textContent === 'Try again' && !b.hidden),
+      })`));
+    };
+    await broken.goto(`${BASE}/login`);
+    const unsupported = await submitBroken();
+    check(
+      'a browser that cannot run the encryption is a hard stop with no fallback',
+      unsupported.error === 'This browser cannot run the encryption Solvent needs. There is no weaker fallback.' &&
+        unsupported.stopped && !unsupported.retry,
+      JSON.stringify(unsupported),
+    );
+    await broken.goto(`${BASE}/login`);
+    await broken.eval('window.__outOfMemory = true');
+    const outOfMemory = await submitBroken();
+    check(
+      'not enough memory right now offers Try again and leaves the card usable',
+      outOfMemory.error === 'This device does not have enough memory available right now. Close some other tabs and try again.' &&
+        !outOfMemory.stopped && outOfMemory.retry,
+      JSON.stringify(outOfMemory),
+    );
+    await broken.eval("[...document.querySelectorAll('form button')].find((b) => b.textContent === 'Try again').click()");
+    await broken.settle(600);
+    check('Try again derives again', (await broken.eval('window.__derivations')) === 2);
+  } finally {
+    brokenBrowser.close();
+  }
+
+  // ---- Login: the stale-KDF upgrade, for a vault owner --------------------
+
+  const signInAgain = async (label) => {
+    await page.goto(`${BASE}/dashboard`);
+    await unlockInPlace(label);
+  };
+  const vaultNames = () =>
+    page.eval(`(async () => {
+      const v = (await import('/static/js/session.js')).currentVault();
+      return JSON.stringify({ names: [...v.holdings.values()].map((h) => h.payload.name).sort(), unreadable: v.unreadable.length });
+    })()`);
+  await makeStale(page, 'leander', VAULT_PASSWORD);
+  const staleOwner = credentialOf('leander');
+  const staleRecords = recordsOf(staleOwner.principal);
+  const beforeUpgrade = await vaultNames();
+
+  expectedFailures.add('/api/auth/upgrade-kdf');
+  releaseUpgrade = await intercept(page, '*/api/auth/upgrade-kdf', () => ({ status: 500 }));
+  await signInAgain('the vault with its upgrade failing');
+  const keptIn = await page.eval("fetch('/api/sessions', { headers: { 'X-Solvent-Request': '1' } }).then((r) => r.status)");
+  check(
+    'a vault owner whose upgrade answers Server Error stays signed in, on the old parameters',
+    keptIn === 200 && (await vaultNames()) === beforeUpgrade &&
+      JSON.stringify(credentialOf('leander')) === JSON.stringify(staleOwner),
+    String(keptIn),
+  );
+  await signInAgain('the vault at the old parameters again');
+  check(
+    'after a failed upgrade the vault owner still signs in with the old parameters',
+    (await vaultNames()) === beforeUpgrade && JSON.parse(credentialOf('leander').params).kdf.m === WEAK_MEMORY,
+  );
+  await releaseUpgrade();
+  expectedFailures.delete('/api/auth/upgrade-kdf');
+
+  const upgradesBefore = watched[0].requests.filter((r) => r.url.endsWith('/api/auth/upgrade-kdf')).length;
+  await signInAgain('the vault as it upgrades');
+  const upgradedOwner = credentialOf('leander');
+  const envelope = JSON.parse(await page.eval("document.getElementById('kdf-envelope').textContent"));
+  check(
+    'a stale vault is upgraded on sign-in: salt, envelope, Auth Key hash and wrapped DEK all change',
+    JSON.parse(upgradedOwner.params).salt !== JSON.parse(staleOwner.params).salt &&
+      JSON.stringify(JSON.parse(upgradedOwner.params).kdf) === JSON.stringify(envelope) &&
+      upgradedOwner.verifier !== staleOwner.verifier &&
+      upgradedOwner.wrapped_dek !== staleOwner.wrapped_dek,
+    upgradedOwner.params,
+  );
+  const upgradeSent = watched[0].requests.filter((r) => r.url.endsWith('/api/auth/upgrade-kdf')).slice(upgradesBefore);
+  check(
+    "a vault owner's upgrade sends the new salt, envelope, Auth Key and wrapper",
+    upgradeSent.length === 1 &&
+      Object.keys(JSON.parse(upgradeSent[0].body)).sort().join(',') === 'authKey,dekNonce,kdf,salt,wrappedDek',
+  );
+  check('the upgrade re-encrypts no record', recordsOf(upgradedOwner.principal) === staleRecords);
+  await signInAgain('the vault at the new parameters');
+  check(
+    'the DEK is unchanged by the upgrade: records written before it decrypt at the new parameters',
+    (await vaultNames()) === beforeUpgrade && JSON.parse(beforeUpgrade).unreadable === 0,
+    await vaultNames(),
+  );
+
+  // ---- Login: the stale-KDF upgrade, for an administrator ----------------
+
+  const adminBrowser = await openBrowser(`${BASE}/login`);
+  const admin = adminBrowser.session;
+  try {
+    const adminSignIn = async (label) => {
+      await admin.eval("fetch('/api/auth/logout', { method: 'POST', headers: { 'X-Solvent-Request': '1', 'Content-Type': 'application/json' }, body: '{}' })");
+      await admin.goto(`${BASE}/login`);
+      await signInOn(admin, ADMIN_PASSWORD, 'ops.leander');
+      await admin.waitUntil("location.pathname === '/admin'", { timeout: 90000, label });
+      await admin.settle(400);
+    };
+    await adminSignIn('the admin area');
+    await makeStale(admin, 'ops.leander', ADMIN_PASSWORD);
+    const staleAdmin = credentialOf('ops.leander');
+
+    const releaseAdmin = await intercept(admin, '*/api/auth/upgrade-kdf', () => ({ status: 500 }));
+    await adminSignIn('the admin area with its upgrade failing');
+    check(
+      'an administrator whose upgrade answers Server Error stays signed in',
+      (await admin.eval('location.pathname')) === '/admin' &&
+        JSON.stringify(credentialOf('ops.leander')) === JSON.stringify(staleAdmin),
+    );
+    await adminSignIn('the admin area at the old parameters again');
+    check('after a failed upgrade the administrator still signs in with the old parameters', true);
+    await releaseAdmin();
+
+    await adminSignIn('the admin area as it upgrades');
+    const upgradedAdmin = credentialOf('ops.leander');
+    check(
+      'a stale administrator is upgraded the same way: salt, envelope and Auth Key hash change, and no wrapper is made',
+      JSON.parse(upgradedAdmin.params).salt !== JSON.parse(staleAdmin.params).salt &&
+        JSON.stringify(JSON.parse(upgradedAdmin.params).kdf) === JSON.stringify(envelope) &&
+        upgradedAdmin.verifier !== staleAdmin.verifier &&
+        upgradedAdmin.wrapped_dek === null &&
+        sql('SELECT COUNT(*) AS n FROM dek_wrappers WHERE credential_id = ?', upgradedAdmin.id)[0].n === 0,
+      upgradedAdmin.params,
+    );
+    await adminSignIn('the admin area after the upgrade');
+    check('the upgraded administrator still signs in', true);
+
+    // No idle rule for an administrator: an hour and more of nothing
+    // leaves the admin area as it was.
+    await admin.send('Page.addScriptToEvaluateOnNewDocument', { source: CLOCK });
+    await admin.goto(`${BASE}/admin`);
+    await admin.settle(500);
+    await admin.eval(`window.testClock.advance(${61 * MINUTE})`);
+    await admin.settle(500);
+    check(
+      'an administrator session is unaffected by any idle period',
+      (await admin.eval('location.pathname')) === '/admin' &&
+        !(await admin.eval("Boolean(document.querySelector('#unlock-password'))")) &&
+        (await admin.eval("document.body.innerText")).includes('Invites'),
+    );
+  } finally {
+    adminBrowser.close();
+  }
+
+  // ---- Login: nothing but the Auth Key leaves, and nothing is kept --------
+
+  const everyRequest = watched.flatMap((w) => w.requests);
+  const loginBodies = everyRequest.filter((r) => r.method === 'POST' && r.url.endsWith('/api/auth/login'));
+  check(
+    'every login request carries the username and the Auth Key and nothing else',
+    loginBodies.length > 0 && loginBodies.every((r) => Object.keys(JSON.parse(r.body)).sort().join(',') === 'authKey,username'),
+    `${loginBodies.length} sign-ins`,
+  );
+  // Every password typed anywhere in the run, as typed and in the
+  // encodings a careless client would send it in.
+  const everyPassword = [ADMIN_PASSWORD, VAULT_PASSWORD, NEW_PASSWORD, LEAVING_PASSWORD, 'not the password at all'];
+  const forms = everyPassword.flatMap((pw) => [
+    pw,
+    encodeURIComponent(pw),
+    Buffer.from(pw).toString('base64'),
+    Buffer.from(pw).toString('hex'),
+  ]);
+  const leaked = everyRequest.filter((r) => forms.some((f) => r.url.includes(f) || r.headers.includes(f) || r.body.includes(f)));
+  check(
+    'no password appears in any request, in any form, over the whole run',
+    everyRequest.length > 0 && leaked.length === 0,
+    leaked.map((r) => r.url).join(','),
+  );
+  // The Master Key each account holds now, which only its own tab ever
+  // has, exported and looked for on the wire.
+  const masterKeys = JSON.parse(await page.eval(`(async () => {
+    const api = await import('/static/js/api.js');
+    const c = await import('/static/js/crypto.js');
+    const keys = [];
+    for (const [username, password] of ${JSON.stringify([['leander', VAULT_PASSWORD], ['ops.leander', ADMIN_PASSWORD]])}) {
+      const { salt, kdf } = await api.post('/api/auth/salt', { username });
+      const { masterKey } = await c.deriveKeys(password, salt, kdf);
+      keys.push(c.b64encode(new Uint8Array(await crypto.subtle.exportKey('raw', masterKey))));
+    }
+    return JSON.stringify(keys);
+  })()`));
+  check(
+    'no Master Key appears in any request',
+    everyRequest.every((r) => masterKeys.every((key) => !r.body.includes(key) && !r.headers.includes(key))),
+  );
+  const storageWrites = watched.flatMap((w) => w.storage);
+  check(
+    'nothing is written to localStorage or sessionStorage at any point, upgrades and re-unlocks included',
+    storageWrites.length === 0 && (await page.eval('localStorage.length + sessionStorage.length')) === 0,
+    JSON.stringify(storageWrites.map((w) => w.key)),
+  );
+
+  // ---- Login: someone else at the card ------------------------------------
+
+  await page.eval("[...document.querySelectorAll('.topbar-actions button')].find(b => b.textContent.trim() === 'Lock').click()");
+  await page.waitUntil("document.querySelector('.known-username a')", { label: 'the card after locking' });
+  await page.eval("document.querySelector('.known-username a').click()");
+  await page.waitUntil("location.pathname === '/login'", { label: 'the sign-in address after Not you' });
+  await page.settle(300);
+  expectedFailures.add('/api/sessions');
+  check(
+    'Not you? Sign out ends the session and offers the full card',
+    (await page.eval("Boolean(document.querySelector('#unlock-username'))")) &&
+      (await page.eval("fetch('/api/sessions', { headers: { 'X-Solvent-Request': '1' } }).then((r) => r.status)")) === 401,
   );
 
   // ---- The sign-in wait ---------------------------------------------------
