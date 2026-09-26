@@ -61,7 +61,7 @@ export async function signIn(username, password) {
   }
 
   if (answer.kind === 'administrator') {
-    if (answer.kdfStale) await upgradeKdf(password, answer.kdf, null);
+    if (answer.kdfStale) await upgradeQuietly(password, answer.kdf, null);
     return { kind: 'administrator' };
   }
 
@@ -85,20 +85,22 @@ export async function signIn(username, password) {
     await deleteRecord(vault, extra).catch(() => {});
   }
 
-  if (answer.kdfStale) {
-    // A failed upgrade must never lock anyone out: the session
-    // continues on the old parameters and retries next sign-in.
-    try {
-      await upgradeKdf(password, answer.kdf, dek);
-    } catch {
-      /* retried on the next sign-in */
-    }
-  }
+  if (answer.kdfStale) await upgradeQuietly(password, answer.kdf, dek);
 
   startIdleTimer();
   // The name that just verified, for every screen that shows or sends
   // it, since a page served without a session was never told it.
   return { kind: 'vault_owner', vault, username };
+}
+
+// A failed upgrade must never lock anyone out, of either kind: the
+// session continues on the old parameters and retries next sign-in.
+async function upgradeQuietly(password, targetKdf, dek) {
+  try {
+    await upgradeKdf(password, targetKdf, dek);
+  } catch {
+    /* retried on the next sign-in */
+  }
 }
 
 async function upgradeKdf(password, targetKdf, dek) {

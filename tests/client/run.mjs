@@ -17,6 +17,11 @@ async function check(name, body) {
   }
 }
 
+// When set, every step the sign-in takes is appended here: each call
+// into WebCrypto, each derivation handed to the worker, and each
+// request, by its shape and never its bytes.
+let trace = null;
+
 // A Worker stand-in, so the derivation under test is the real one
 // rather than a second copy of it written for the test.
 globalThis.Worker = class {
@@ -30,6 +35,7 @@ globalThis.Worker = class {
     this.listeners = this.listeners.filter((l) => l !== listener);
   }
   async postMessage(message) {
+    trace?.push(['worker', Object.keys(message).sort().join(','), JSON.stringify(message.kdf), message.salt.length]);
     const { default: loadArgon2id } = await import(
       new URL('../vendor/argon2id/1.0.1/argon2id.js', JS).href
     );
@@ -290,6 +296,82 @@ await check('the vendored library answers the RFC 9106 test vector', async () =>
     [...out].map((b) => b.toString(16).padStart(2, '0')).join(''),
     '0d640df58d78766c08c037a34a8b53c9d01ef0452d75b65eb52520e96b01e659',
   );
+});
+
+// ---- One sign-in for both kinds -----------------------------------------
+
+// Every WebCrypto call, by method, algorithm and HKDF info string.
+for (const method of ['importKey', 'deriveBits', 'decrypt', 'encrypt', 'exportKey']) {
+  const real = globalThis.crypto.subtle[method].bind(globalThis.crypto.subtle);
+  globalThis.crypto.subtle[method] = (...args) => {
+    const algorithm = args.find((a) => typeof a === 'string' && a !== 'raw') ?? args.find((a) => a && a.name);
+    trace?.push([
+      'subtle',
+      method,
+      typeof algorithm === 'string' ? algorithm : algorithm?.name,
+      algorithm?.info ? new TextDecoder().decode(algorithm.info) : '',
+    ]);
+    return real(...args);
+  };
+}
+
+// A server answering the salt the way the real one does for each case:
+// the account's own salt and envelope, or a decoy with the default one.
+// The login is refused, which is where the kind would first be known.
+const serve = (salt) => async (url, init) => {
+  const body = JSON.parse(init.body);
+  trace?.push(['fetch', url, Object.keys(body).sort().join(',')]);
+  if (url === '/api/auth/salt') {
+    return { ok: true, status: 200, json: async () => ({ salt, kdf: KDF }) };
+  }
+  return { ok: false, status: 401, json: async () => ({}) };
+};
+
+await check('the sign-in takes one code path whatever kind the username has', async () => {
+  const session = await load('session.js');
+  const salts = {
+    administrator: cryptoModule.b64encode(new Uint8Array(16).fill(1)),
+    'vault owner': cryptoModule.b64encode(new Uint8Array(16).fill(2)),
+    unknown: cryptoModule.b64encode(new Uint8Array(16).fill(3)),
+  };
+  const paths = {};
+  for (const [name, salt] of Object.entries(salts)) {
+    trace = [];
+    globalThis.fetch = serve(salt);
+    await assert.rejects(session.signIn(name.replace(' ', '-'), 'shared password'), session.SignInError);
+    paths[name] = JSON.stringify(trace);
+    trace = null;
+  }
+  // The trace holds the derivation and the HKDF split, not only its
+  // endpoints, so a shortcut for one kind is a different path.
+  assert.ok(paths.administrator.includes('solvent/master-key'), paths.administrator);
+  assert.ok(paths.administrator.includes('solvent/auth-key'), paths.administrator);
+  assert.ok(paths.administrator.includes('"worker"'), paths.administrator);
+  assert.equal(paths.administrator, paths['vault owner']);
+  assert.equal(paths.administrator, paths.unknown);
+});
+
+await check('an administrator whose upgrade fails is still signed in', async () => {
+  // login.md: a failed upgrade must never lock anyone out.
+  const session = await load('session.js');
+  const posted = [];
+  globalThis.fetch = async (url, init) => {
+    posted.push(url);
+    if (url === '/api/auth/salt') {
+      return { ok: true, status: 200, json: async () => ({ salt: SALT, kdf: KDF }) };
+    }
+    if (url === '/api/auth/login') {
+      return {
+        ok: true,
+        status: 200,
+        json: async () => ({ kind: 'administrator', kdfStale: true, kdf: { ...KDF, m: KDF.m * 2 } }),
+      };
+    }
+    return { ok: false, status: 500, json: async () => ({}) };
+  };
+  const result = await session.signIn('root', 'a password');
+  assert.equal(result.kind, 'administrator');
+  assert.deepEqual(posted, ['/api/auth/salt', '/api/auth/login', '/api/auth/upgrade-kdf']);
 });
 
 // ---- Migration --------------------------------------------------------
