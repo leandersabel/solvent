@@ -623,7 +623,7 @@ await check('net-worth-view: a figure with no price for its unit is not priced a
   assert.equal(decimal.format(bands[0].points[0]), '100');
 });
 
-await check('net-worth-view: a change to an interior entry moves only the stretch between its neighbours, in either series', () => {
+await check('net-worth-view: a change to an interior entry moves only the stretch between its neighbors, in either series', () => {
   const base = {
     holdings: [{ name: 'Dollars', unit: 'USD' }],
     figures: [

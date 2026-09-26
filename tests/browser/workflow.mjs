@@ -1061,7 +1061,7 @@ try {
     const D11 = ago(40);
 
     // What the proxy answers. Each date's figures differ from its
-    // neighbours', so the two pricing modes and every stretch between
+    // neighbors', so the two pricing modes and every stretch between
     // entries read differently.
     let rateMode = 'answer';
     let rateDelay = 0;
@@ -1757,7 +1757,7 @@ try {
         dayNumber('${D10}'), decimal.parse('${proposalsFor(D10).USD.rate}'))),
     }`);
     check(
-      'net-worth-view: one unreadable record is named in the warning, and its symbol prices from the neighbouring entries',
+      'net-worth-view: one unreadable record is named in the warning, and its symbol prices from the neighboring entries',
       warning === '1 record could not be read.' && listed.includes(corrupt) && priced.shown === priced.expected,
       JSON.stringify({ warning, listed, priced }),
     );
