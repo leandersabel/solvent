@@ -2681,13 +2681,17 @@ try {
     });
     check('at the export ceiling the button is disabled with the reason beside it', await page.eval("document.querySelector('#export').disabled"));
 
-    // A plain navigation to the endpoint, with a live session cookie.
+    // A plain navigation to the endpoint, with a live session cookie,
+    // away from the unlocked vault showing its holdings.
+    await page.eval("location.hash = '#/'");
+    await page.waitUntil("document.querySelector('.holdings-table')", { label: 'the dashboard before leaving it' });
+    await page.settle(300);
+    const leftNames = JSON.parse(await page.eval(`(async () => JSON.stringify(
+      [...(await import('/static/js/session.js')).currentVault().holdings.values()].map((h) => h.payload.name)
+    ))()`));
     const alive = await page.eval("fetch('/api/sessions', { headers: { 'X-Solvent-Request': '1' } }).then(r => r.status)");
     const navigated = join(dir, 'navigated');
     await page.send('Page.setDownloadBehavior', { behavior: 'allow', downloadPath: navigated });
-    // Locked first, because the page navigated away from can stay alive
-    // in the back-forward cache, and it should hold no decrypted vault.
-    await page.eval("[...document.querySelectorAll('.topbar-actions button')].find(b => b.textContent.trim() === 'Lock').click()");
     await page.goto(`${BASE}/api/export`);
     await page.settle(1500);
     const statuses = [await page.eval("performance.getEntriesByType('navigation')[0].responseStatus")];
@@ -2701,9 +2705,51 @@ try {
       `session ${alive}, answered ${statuses.join(',')}, files ${navigatedFiles.join(',')}`,
     );
 
+    // Back, to the page left while unlocked. Whether the browser restores
+    // it from its back-forward cache or loads it afresh, it holds no key
+    // and shows nothing from the vault.
+    await page.send('Page.navigateToHistoryEntry', {
+      entryId: await page.send('Page.getNavigationHistory').then(({ currentIndex, entries }) => entries[currentIndex - 1].id),
+    });
+    const backAt = Date.now() + 30000;
+    let back = null;
+    while (!back && Date.now() < backAt) {
+      await page.settle(250);
+      try {
+        back = JSON.parse(await page.eval(`(async () => {
+          if (location.pathname !== '/dashboard' || !document.querySelector('#unlock-password')) return 'null';
+          return JSON.stringify({
+            keys: (await import('/static/js/session.js')).currentVault() !== null,
+            text: document.body.innerText,
+            how: performance.getEntriesByType('navigation')[0].type,
+          });
+        })()`));
+      } catch {
+        // The page is still between documents.
+      }
+    }
+    check(
+      'Back to a page left while unlocked shows the unlock card and no vault data',
+      Boolean(back) && !back.keys && leftNames.length > 0 && leftNames.every((name) => !back.text.includes(name)),
+      back ? `${back.how}, names ${leftNames.filter((name) => back.text.includes(name)).join(',')}` : 'no unlock card',
+    );
+
     // -- Import: files and passwords that go nowhere ---------------------------
 
     await unlockAt('/settings/export-import', "document.querySelector('#import-file')");
+    // Leaving the page locks it, keys and decrypted state alike, the way
+    // the idle timer does, and unlocking brings the screen back.
+    await page.eval("window.dispatchEvent(new PageTransitionEvent('pagehide', { persisted: true }))");
+    await page.settle(300);
+    check(
+      'the vault locks on pagehide, discarding the keys and the decrypted state',
+      (await page.eval("(async () => (await import('/static/js/session.js')).currentVault() === null)()")) &&
+        (await page.eval("Boolean(document.querySelector('#unlock-password'))")) &&
+        !(await page.eval("Boolean(document.querySelector('#import-file'))")),
+    );
+    await enterPassword(VAULT_PASSWORD);
+    await page.waitUntil("document.querySelector('#import-file')", { timeout: 90000, label: 'the import screen after the pagehide lock' });
+    await page.settle(500);
     const rowsBefore = vaultRows();
     const uploads = () => apiCalls('/api/import');
 

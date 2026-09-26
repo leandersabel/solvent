@@ -774,6 +774,16 @@ Actors this design defends against vs. accepts:
   stops an attacker spraying guessed session tokens at the lookup, so a
   weak or leaked key turns guessing into forgery. A valid signature
   alone is still not a session: the token must hash to a stored row.
+- **A page left while unlocked keeps no keys.** The idle lock
+  (login.md, Rules) bounds how long an unlocked tab stays readable. A
+  page the person navigates away from must not outlive that in the
+  back-forward cache, where Back would show the decrypted vault again
+  without asking for the password. So the vault shell page is served
+  with `Cache-Control: no-store`, and the client locks on `pagehide`,
+  discarding the keys and the decrypted state the way the idle lock
+  does. Both, because a browser may keep a `no-store` page in that
+  cache anyway, and the lock on `pagehide` holds whatever the browser
+  decides. Back shows the unlock card and no vault data.
 - **CSRF**: `SameSite=Lax` plus **a required custom request header**,
   `X-Solvent-Request: 1`, on every endpoint that is not meant to be
   reached by navigation — every state-changing one (records, invite,

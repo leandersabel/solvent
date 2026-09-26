@@ -260,6 +260,14 @@ whenUnauthorized(() => {
   if (isUnlocked()) lock();
 });
 
+// A page left while unlocked keeps no keys. The browser may hold it for
+// Back in its back-forward cache, so leaving locks it the way the idle
+// timer does, and Back finds the unlock card (architecture.md,
+// Application hardening).
+window.addEventListener('pagehide', () => {
+  if (isUnlocked()) lock();
+});
+
 onLock(() => {
   if (container && vaultShown) {
     held = {

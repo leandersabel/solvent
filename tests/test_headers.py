@@ -77,3 +77,10 @@ def test_the_register_page_carries_no_referrer(app, client):
 
     body = client.get(f"/register?invite={mint_invite(app)}").get_data(as_text=True)
     assert 'name="referrer" content="no-referrer"' in body
+
+
+def test_the_vault_shell_page_is_not_kept_for_back(app):
+    """architecture.md, Application hardening: a page left while
+    unlocked keeps no keys, so the vault shell page is never stored."""
+    owner, _ = register(app, "owner")
+    assert owner.get("/dashboard").headers["Cache-Control"] == "no-store"

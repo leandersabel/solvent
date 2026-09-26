@@ -6,7 +6,7 @@ screen's content is never server-rendered from vault data.
 """
 from __future__ import annotations
 
-from flask import Blueprint, g, redirect, render_template
+from flask import Blueprint, g, make_response, redirect, render_template
 
 from .guard import navigation, public
 
@@ -47,7 +47,16 @@ def login_page():
 @bp.get("/dashboard")
 @navigation
 def dashboard():
-    return render_template("dashboard.html")
+    """The vault shell page, where the keys live once it is unlocked.
+
+    Served with `no-store`, so a browser does not keep it for Back once
+    the person has left it (architecture.md, Application hardening).
+    The client also locks on `pagehide`, which holds whatever the
+    browser decides to keep.
+    """
+    response = make_response(render_template("dashboard.html"))
+    response.headers["Cache-Control"] = "no-store"
+    return response
 
 
 @bp.get("/settings")
