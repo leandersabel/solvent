@@ -57,9 +57,17 @@ which opens into the same rate lines the sweep carries at its foot
 - **A date that already holds a recording**: "31 July already holds
   prices. This figure joins them." It opens to that recording's stored
   prices, read only, with a link to that recording
-  (`recording-detail.md`), where they are changed. **Nothing is looked
-  up and no price is rewritten**, because the figure being added is
-  joining a sitting that already priced its date.
+  (`recording-detail.md`), where they are changed. **No stored price is
+  looked up or rewritten**, because the figure being added is joining a
+  sitting that already priced its date.
+  - **A unit that date is missing is filled in**, the same way whether
+    the figure is added here or on the sweep (`record-rate.md`, The
+    refresh). Its line is looked up and offered like a line on a date
+    with no recording, and the save writes it behind the figure. The
+    lookup happens only when a unit the date needs has no price there,
+    so a date whose prices are complete asks the source nothing. The
+    folded line then adds: "The prices it is missing will be recorded
+    with this."
 - **A holding measured in the main currency** still writes the date's
   prices for every other unit in the vault. That is the case the whole
   split exists for, and the line says so rather than being absent.

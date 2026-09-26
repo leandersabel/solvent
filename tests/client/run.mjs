@@ -1337,54 +1337,57 @@ await check('record-rate: editing a proposed entry keeps the offer once, and edi
   assert.equal(typed.proposedRate, null);
 });
 
-await check('record-rate: a save writes the quantity, then the rates, then deletes, and a failed rate is named', async () => {
+await check('record-rate: the rate-lines save writes the rates, then deletes, and a failed rate is named', async () => {
   const server = recordServer();
   const vault = await storedVault(server, {
-    holdings: [['Dollars', 'USD'], ['Gold', 'XAU-ozt'], ['Francs', 'CHF']],
-    figures: [['Dollars', '2026-07-31', '100'], ['Francs', '2026-07-31', '5']],
-    prices: [['USD', '2026-07-31', '0.9', 'proposed'], ['XAU-ozt', '2026-07-31', '2700', 'proposed']],
+    holdings: [['Dollars', 'USD'], ['Gold', 'XAU-ozt'], ['Silver', 'XAG-ozt']],
+    figures: [['Dollars', '2026-07-31', '100']],
+    prices: [
+      ['USD', '2026-07-31', '0.9', 'proposed'],
+      ['XAU-ozt', '2026-07-31', '2700', 'proposed'],
+      ['XAG-ozt', '2026-07-31', '30', 'proposed'],
+    ],
   });
   const at = vault.recording('2026-07-31');
-  const figure = (name) => at.figures.find((f) => f.holding.payload.name === name).snapshot;
   const price = (symbol) => at.prices.find((e) => e.payload.symbol === symbol);
-  const plan = () => ({
-    quantities: [{ accountId: vault.ids.Dollars, existing: figure('Dollars'), payload: { ...figure('Dollars').payload, value: '110' }, name: 'Dollars' }],
+  const plan = {
     rates: [
       { existing: price('USD'), payload: writes.editedRatePayload(price('USD').payload, '0.91') },
       { existing: price('XAU-ozt'), payload: writes.editedRatePayload(price('XAU-ozt').payload, '2710') },
     ],
-    deletes: [{ entry: figure('Francs'), name: 'Francs' }],
-  });
+    deletes: [{ entry: price('XAG-ozt'), name: 'XAG-ozt' }],
+  };
   // The second rate fails, and nothing about the rest changes for it.
   let rateWrites = 0;
   server.faults.push((r) => (r.method === 'PUT' && r.body.recordType === 'rate' && (rateWrites += 1) === 2 ? 500 : null));
-  const result = await writes.saveRecording(vault, writes.sitting(vault, '2026-07-31'), plan());
+  const result = await writes.saveRateLines(vault, writes.sitting(vault, '2026-07-31'), plan);
   const order = server.writesIn().map((r) => `${r.method} ${r.body ? r.body.recordType : 'record'}`);
-  assert.deepEqual(order, ['PUT snapshot', 'PUT rate', 'PUT rate', 'DELETE record']);
+  assert.deepEqual(order, ['PUT rate', 'PUT rate', 'DELETE record']);
   // Only updates, so no reload ran.
   assert.equal(server.log.filter((r) => r.method === 'GET').length, 0);
   assert.deepEqual(result.failed.map((f) => f.name), ['XAU-ozt']);
   const reread = new Vault(vault.dek);
   await reread.load();
   const back = reread.recording('2026-07-31');
-  assert.equal(back.figures.find((f) => f.holding.payload.name === 'Dollars').snapshot.payload.value, '110');
   assert.equal(back.prices.find((e) => e.payload.symbol === 'USD').payload.rate, '0.91');
   assert.equal(back.prices.find((e) => e.payload.symbol === 'XAU-ozt').payload.rate, '2700');
-  assert.equal(back.figures.some((f) => f.holding.payload.name === 'Francs'), false);
+  assert.equal(back.prices.some((e) => e.payload.symbol === 'XAG-ozt'), false);
+  // The figure beside them is not part of the save.
+  assert.equal(back.figures.find((f) => f.holding.payload.name === 'Dollars').snapshot.version, 1);
   const copy = views.partialCopy(result);
   assert.ok(copy.includes('Not saved: XAU-ozt'), copy);
-  assert.ok(copy.includes('Saved: Dollars, USD, Francs'), copy);
+  assert.ok(copy.includes('Saved: USD, XAG-ozt'), copy);
 });
 
 await check('record-snapshot: a delete answering Not Found during a save counts as saved', async () => {
   const server = recordServer();
-  const vault = await storedVault(server, { holdings: [['Francs', 'CHF']], figures: [['Francs', '2026-07-31', '5']] });
-  const [gone] = vault.snapshotsFor(vault.ids.Francs);
+  const vault = await storedVault(server, { holdings: [['Dollars', 'USD']], prices: [['USD', '2026-07-31', '0.9']] });
+  const [gone] = vault.entriesFor('USD');
   server.rows.delete(gone.recordId);
-  const result = await writes.saveRecording(vault, writes.sitting(vault, '2026-07-31'), { deletes: [{ entry: gone, name: 'Francs' }] });
+  const result = await writes.saveRateLines(vault, writes.sitting(vault, '2026-07-31'), { deletes: [{ entry: gone, name: 'USD' }] });
   assert.deepEqual(result.failed, []);
-  assert.deepEqual(result.saved.map((s) => s.name), ['Francs']);
-  assert.equal(vault.snapshotsFor(vault.ids.Francs).length, 0);
+  assert.deepEqual(result.saved.map((s) => s.name), ['USD']);
+  assert.equal(vault.entriesFor('USD').length, 0);
 });
 
 await check('record-snapshot: a create at a date another session recorded is refused whole, and the claim runs once', async () => {
@@ -1397,8 +1400,8 @@ await check('record-snapshot: a create at a date another session recorded is ref
   await other.load();
   await writes.saveSnapshot(other, vault.ids.Dollars, null, { date: '2026-07-31', value: '1', note: null });
   server.reset();
-  const result = await writes.saveRecording(vault, sit, {
-    quantities: [{ accountId: vault.ids.Francs, existing: null, payload: { date: '2026-07-31', value: '5', note: null }, name: 'Francs' }],
+  const result = await writes.saveRateLines(vault, sit, {
+    rates: [{ existing: null, payload: writes.rateEntry(vault, 'USD', '2026-07-31', { rate: '0.9', rateSource: 'manual', rateAsOf: null, proposedRate: null }) }],
   });
   assert.equal(result.refused, true);
   assert.equal(server.writesIn().length, 0);
@@ -1457,7 +1460,7 @@ await check('record-rate: a Conflict reloads the whole type and overwrites nothi
   await writes.saveRate(other, other.entriesFor('USD')[0], writes.editedRatePayload(other.entriesFor('USD')[0].payload, '0.99'));
   const stored = { ...server.rows.get(stale.recordId) };
   server.reset();
-  const result = await writes.saveRecording(vault, writes.sitting(vault, '2026-07-31'), {
+  const result = await writes.saveRateLines(vault, writes.sitting(vault, '2026-07-31'), {
     rates: [{ existing: stale, payload: writes.editedRatePayload(stale.payload, '0.5') }],
   });
   assert.deepEqual(result.failed.map((f) => f.status), [409]);
@@ -1472,7 +1475,23 @@ await check('record-rate: the confirmation names each unit, how many holdings mo
     holdings: [
       { name: 'A', unit: 'USD' },
       { name: 'B', unit: 'USD' },
+      // Archived on the date itself, so that day's price still values it.
+      { name: 'Closed that day', unit: 'USD', archivedAt: '2026-07-31' },
+      // Archived before the date, so that day's price values nothing.
+      { name: 'Closed earlier', unit: 'USD', archivedAt: '2026-07-01' },
+      // First valued after the date, so it held nothing then.
+      { name: 'Opened later', unit: 'USD' },
+      // Never valued at all.
+      { name: 'Empty', unit: 'USD' },
       { name: 'Gold', unit: 'XAU-ozt' },
+    ],
+    figures: [
+      ['A', '2026-06-30', '100'],
+      ['B', '2026-07-31', '50'],
+      ['Closed that day', '2026-05-31', '10'],
+      ['Closed earlier', '2026-05-31', '10'],
+      ['Opened later', '2026-08-31', '10'],
+      ['Gold', '2026-06-30', '2'],
     ],
     prices: [
       ['USD', '2026-07-31', '0.9'],
@@ -1482,8 +1501,9 @@ await check('record-rate: the confirmation names each unit, how many holdings mo
   });
   vault.profile.locale = 'en-GB';
   const copy = views.rateChangeCopy(vault, '2026-07-31', [{ unit: 'USD' }, { unit: 'XAU-ozt', clearing: true }]);
-  assert.ok(copy[0].includes('moves 2 holdings measured in USD'), copy[0]);
+  assert.ok(copy[0].includes('moves 3 holdings measured in USD on that date'), copy[0]);
   assert.ok(copy[1].includes('Clearing the XAU-ozt price'), copy[1]);
+  assert.ok(copy[1].endsWith('1 holding measured in XAU-ozt moves on that date.'), copy[1]);
   assert.ok(copy[2].startsWith('This is the only price recorded for XAU-ozt.'), copy[2]);
 });
 

@@ -168,8 +168,10 @@ any combination:
 3. **Changing a rate** captured at that date (`record-rate.md`, Editing
    a captured rate).
 
-The write order across them, and what the person is told when part of a
-save fails, is `record-rate.md`, Saving an edited recording.
+Each is saved by its own control, a row's for a quantity and the rate
+lines' for the rates, and no save spans them. The write order inside
+each, and what the person is told when part of a save fails, is
+`record-rate.md`, Saving an edited recording.
 
 **Opening a recording writes nothing and fetches nothing.** Not a
 version bump, not a nonce, not a rate request. Reading your own history
@@ -202,8 +204,10 @@ becomes an update behind the person's back.**
 
 **Which of the two happens is routing, decided before anything is
 typed.** Asking for a new recording and picking a date the model
-already holds records for opens that recording for editing, there and
-then. No create is attempted, so none can fail and nothing is lost.
+already holds records for opens that recording's own screen
+(`ui/recording-detail.md`), there and then, with no request and nothing
+created. Editing it is one Update away. No create is attempted, so none
+can fail and nothing is lost.
 The refusal below is for the case where that choice turns out to have
 been stale: a date that became occupied after the client read its own
 model, which only another session can do.
@@ -505,8 +509,8 @@ a quiet wrong number.
 - Editing inside a reopened recording never shows the replace prompt,
   while the single-holding form at an occupied date still does.
 - Asking for a new recording and picking a date that already holds
-  records opens it for editing, issues no request while doing so, and
-  attempts no create.
+  records opens that recording's own screen, issues no request while
+  doing so, and attempts no create.
 - A sitting that only changes and clears existing records issues no
   type reload, and its writes are updates at stored `version` + 1.
 - A recording offers no way to change its own date, and moving one

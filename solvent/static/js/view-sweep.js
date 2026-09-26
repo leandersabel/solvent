@@ -401,8 +401,12 @@ function blockUnits(vault, date) {
  *  measured in it.
  *
  *  `readOnly` shows the stored prices and nothing to type into, which
- *  is what the single-holding form shows for a date already priced. */
-export function rateBlock(vault, date, { sit = null, readOnly = false, onChange = () => {} } = {}) {
+ *  is what the single-holding form shows for a date already priced.
+ *  `fillMissing` shows a unit the date holds a price for read only and
+ *  offers a proposal for each unit it is missing, as a date with no
+ *  recording does, which is what the form shows when a figure it adds
+ *  fills in the date's missing prices. */
+export function rateBlock(vault, date, { sit = null, readOnly = false, fillMissing = false, onChange = () => {} } = {}) {
   const element = el('div', { class: 'rate-block' });
   const units = blockUnits(vault, date);
   if (!units.length) {
@@ -410,7 +414,7 @@ export function rateBlock(vault, date, { sit = null, readOnly = false, onChange 
       el('p', { class: 'hint', text: 'Everything here is counted in your main currency, so there is nothing to convert.' }),
     );
   }
-  const lines = units.map((unit) => rateLine(vault, unit, date, { sit, readOnly, onChange }));
+  const lines = units.map((unit) => rateLine(vault, unit, date, { sit, readOnly, fillMissing, onChange }));
   element.append(...lines.map((line) => line.element));
 
   const lineFor = (unit) => lines.find((line) => line.unit === unit) || null;
@@ -447,8 +451,9 @@ export function rateBlock(vault, date, { sit = null, readOnly = false, onChange 
   };
 }
 
-function rateLine(vault, unit, date, { sit, readOnly, onChange }) {
+function rateLine(vault, unit, date, { sit, readOnly: blockReadOnly, fillMissing, onChange }) {
   const { format } = vault;
+  const readOnly = blockReadOnly || (fillMissing && vault.entriesFor(unit).some((e) => e.payload.date === date));
   const described = vault.unitOf(unit);
   const quotable = vault.quotable(unit);
   const field = el('input', {
@@ -481,7 +486,10 @@ function rateLine(vault, unit, date, { sit, readOnly, onChange }) {
     asked: false,
     pending: false,
   };
-  const reopened = () => !sit || !sit.dateWasEmpty;
+  // A line filled in on arrival reads as one on a date with no
+  // recording: what did not come back is an outage, not a gap left
+  // from an earlier sitting.
+  const reopened = () => !fillMissing && (!sit || !sit.dateWasEmpty);
   const parsed = (text) => decimal.parse(text);
 
   line.value = () => field.value.trim();
@@ -591,7 +599,7 @@ function rateLine(vault, unit, date, { sit, readOnly, onChange }) {
     } else if (reopened()) {
       explanation.textContent = `No rate was recorded for ${unit} on this date.`;
     } else {
-      explanation.textContent = `No market rate came back for ${unit}. Nothing will be recorded for it today.`;
+      explanation.textContent = `No market rate came back for ${unit}. Nothing will be recorded for it for this date.`;
     }
     // A line that went in empty carries its own lookup, since the
     // outage that emptied it is the reason for coming back.
@@ -730,11 +738,18 @@ export function provenanceChip(payload, format) {
     : 'Market rate';
 }
 
-/** How many holdings a change to one unit's price moves: every holding
- *  measured in it. The client holds every account record, so it can
- *  count them (record-rate.md, Editing a captured rate). */
-export function holdingsIn(vault, unit) {
-  return [...vault.holdings.values()].filter((h) => h.payload.unit === unit).length;
+/** How many holdings a change to one unit's price on `date` moves:
+ *  those whose value that day actually changes, meaning holdings
+ *  measured in the unit, not archived before the date, and holding a
+ *  figure at or before it (ui/update-values.md, Changing or clearing a
+ *  rate says what it moves). */
+export function holdingsIn(vault, unit, date) {
+  return [...vault.holdings.values()].filter(
+    (h) =>
+      h.payload.unit === unit &&
+      !(h.payload.archivedAt && h.payload.archivedAt.slice(0, 10) < date) &&
+      vault.usableSnapshots(h.recordId).some((s) => s.payload.date <= date),
+  ).length;
 }
 
 /** The confirmation for a save of rate lines: one per save, naming each
@@ -744,13 +759,13 @@ export function rateChangeCopy(vault, date, changes) {
   const on = vault.format.longDate(date);
   const lines = [];
   for (const { unit, clearing } of changes) {
-    const count = holdingsIn(vault, unit);
+    const count = holdingsIn(vault, unit, date);
     const holdings = `${count} ${count === 1 ? 'holding' : 'holdings'} measured in ${unit}`;
     if (!clearing) {
       lines.push(`Changing the ${unit} rate for ${on} moves ${holdings} on that date. Your net worth on that day changes with them.`);
       continue;
     }
-    lines.push(`Clearing the ${unit} price for ${on} leaves that date with no price for it. ${holdings} move on that date.`);
+    lines.push(`Clearing the ${unit} price for ${on} leaves that date with no price for it. ${holdings} ${count === 1 ? 'moves' : 'move'} on that date.`);
     if (vault.entriesFor(unit).length === 1) {
       lines.push(`This is the only price recorded for ${unit}. Clearing it leaves every holding measured in it with no price at all, and they leave the total until one exists.`);
     }
@@ -799,7 +814,7 @@ function saveRates(vault, sit, block, { say, refused, saveAll }) {
               .filter(({ change }) => change.remove)
               .map(({ line, change }) => ({ entry: change.remove, name: line.unit })),
           };
-          const result = await writes.saveRecording(vault, sit, plan);
+          const result = await writes.saveRateLines(vault, sit, plan);
           if (result.refused) {
             refused();
             return;

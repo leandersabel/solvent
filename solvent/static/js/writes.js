@@ -3,9 +3,9 @@
 // recording).
 //
 // No transaction spans two records, so the order is the whole of the
-// guarantee: the quantity the person went and looked up goes first,
-// prices after it, and deletions last, so a save that fails partway
-// has destroyed nothing.
+// guarantee: the quantity the person went and looked up goes before
+// the prices it brings, and a save's deletions go last, so a save that
+// fails partway has destroyed nothing.
 import * as api from './api.js';
 import * as crypto from './crypto.js';
 import * as decimal from './decimal.js';
@@ -293,26 +293,23 @@ export function confirmFigure(vault, holding, date) {
   return saveSnapshot(vault, holding.recordId, null, { date, value: carried.payload.value, note: null });
 }
 
-/** One save of a recording, in the fixed order: the pre-create reload
- *  if anything is being created, then quantities, then rates, then
- *  deletions.
+/** The rate lines' own save on a reopened recording, in the fixed
+ *  order: the pre-create reload if any line creates an entry, then the
+ *  rate writes, then the deletions of the lines cleared. A quantity is
+ *  never part of it, because each row saves on its own
+ *  (record-rate.md, Saving an edited recording).
  *
  *  No step is skipped because an earlier one failed. Each record is
  *  independent, and abandoning the rest would turn one failed write
  *  into several unattempted ones. */
-export async function saveRecording(vault, sit, plan) {
-  const quantities = plan.quantities || [];
+export async function saveRateLines(vault, sit, plan) {
   const rates = plan.rates || [];
   const deletes = plan.deletes || [];
-  const creates = {
-    snapshots: quantities.filter((q) => !q.existing).map((q) => q.accountId),
-    rates: rates.filter((r) => !r.existing).map((r) => r.payload.symbol),
-  };
+  const creates = rates.filter((r) => !r.existing).map((r) => r.payload.symbol);
   // A save that only changes and clears what is there claims nothing:
   // the version rule on each record is the check that catches another
   // session on exactly those records.
-  const creating = creates.snapshots.length > 0 || creates.rates.length > 0;
-  if (creating && (await claimDate(vault, sit, creates))) {
+  if (creates.length && (await claimDate(vault, sit, { rates: creates }))) {
     // Refused whole, before a single write. The person is looking at
     // a screen that no longer describes the vault.
     return { refused: true, date: sit.date, saved: [], failed: [] };
@@ -320,15 +317,6 @@ export async function saveRecording(vault, sit, plan) {
 
   const saved = [];
   const failed = [];
-
-  for (const change of quantities) {
-    try {
-      await saveSnapshot(vault, change.accountId, change.existing, change.payload);
-      saved.push({ kind: 'quantity', name: change.name });
-    } catch (error) {
-      failed.push({ kind: 'quantity', name: change.name, status: error.status });
-    }
-  }
   for (const change of rates) {
     try {
       await saveRate(vault, change.existing, change.payload);
@@ -337,15 +325,10 @@ export async function saveRecording(vault, sit, plan) {
       failed.push({ kind: 'rate', name: change.payload.symbol, status: error.status });
     }
   }
-  // Deletions last, so a save that fails partway has destroyed
-  // nothing and the person still holds everything the screen offered
-  // to remove. Quantities before rates, so a run that stops partway
-  // leaves the date priced rather than leaving quantities nothing can
-  // value.
-  const ordered = [...deletes].sort(
-    (a, b) => (a.entry.recordType === 'snapshot' ? 0 : 1) - (b.entry.recordType === 'snapshot' ? 0 : 1),
-  );
-  for (const { entry, name } of ordered) {
+  // Deletions last, so a save that fails partway has destroyed nothing
+  // and the person still holds every price the screen offered to
+  // remove.
+  for (const { entry, name } of deletes) {
     try {
       await deleteRecord(vault, entry);
       saved.push({ kind: 'deleted', name });

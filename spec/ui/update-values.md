@@ -158,25 +158,35 @@ Line states:
 - **A unit somebody publishes whose source did not answer.** The line
   stays empty and says so, in ink-secondary and never in an error
   color: "No market rate came back for USD. Nothing will be recorded
-  for it today." Nothing is written for that unit, the total carries on
-  at the most recent rate it has, and the line comes back filled in as
-  soon as the source does. Nobody is ever asked to type a dollar rate
-  in order to record a franc holding.
+  for it for this date." The copy names the date rather than today,
+  because a backdated sweep asks about a past date. Nothing is written
+  for that unit, the total carries on at the most recent rate it has,
+  and the line comes back filled in as soon as the source does. Nobody
+  is ever asked to type a dollar rate in order to record a franc
+  holding.
 - **A unit only its owner can price**, free text or a symbol the proxy
   has no provider for. The line shows the last figure and when it was
   set, "estimated 14 months ago", and writes nothing unless it is
   changed. An estimate of the flat does not get newer because a bank
-  balance was recorded. The copy names why, and a symbol with no
-  provider yet names the thing rather than borrowing the outage
-  wording, which would say something is broken when nothing is: "No
-  market price for silver yet. This one is yours to set."
+  balance was recorded. The copy names why, and never borrows the
+  outage wording, which would say something is broken when nothing is.
+  A symbol with no provider yet names the thing: "No market price for
+  silver yet. This one is yours to set." A free-text unit, which
+  nobody publishes a price for at all, says that: "Nobody publishes a
+  price for m2. This one is yours to set." With an earlier figure the
+  sentence follows its age, "Estimated 14 months ago. Nobody publishes
+  a price for m2. This one is yours to set.", and with none it follows
+  "No price for m2 yet."
 - **A unit with no rate at all, where this sitting is recording a
   quantity in it.** The one time a price is asked for rather than
   offered, because twelve troy ounces with no gold price is not a
   figure. The line moves to the head of the block and asks for the
-  number. **It never blocks the row.** The quantity records either way,
-  and until a price exists the holding is listed as not priced rather
-  than counted at its bare quantity (`net-worth-view.md`). Blocking
+  number: "What is 1 PAINT worth in CHF? Nothing prices PAINT yet. The
+  figure records either way, and until a price exists the holding is
+  listed as not priced." **It never blocks the row.** The quantity
+  records either way, and until a price exists the holding is listed
+  as not priced rather than counted at its bare quantity
+  (`net-worth-view.md`). Blocking
   would make a provider outage stop somebody recording what they went
   and looked up, which is the one thing this screen may not do.
 
@@ -188,7 +198,8 @@ Line states:
   the figure there may be one the person chose, and a provider that has
   since revised its published figure must not reach a stored entry by
   way of somebody looking at it (`record-rate.md`).
-- **A line that went in empty carries its own Look it up action**,
+- **A line that went in empty** says so, "No rate was recorded for
+  XAU-ozt on this date.", and **carries its own Look it up action**,
   since the outage that emptied it is the reason for coming back.
   Opening the recording fetches nothing. Pressing that action is what
   issues the request, and what comes back is labeled with the day it
@@ -219,6 +230,12 @@ so, and where the entry is that unit's only one it says that too:
 > This is the only price recorded for XAU-ozt. Clearing it leaves every
 > holding measured in it with no price at all, and they leave the
 > total until one exists.
+
+**The count is of holdings whose value on that date actually
+changes**: holdings measured in that unit, not archived before the
+date, and holding a figure at or before it. A holding archived earlier
+or first valued later is worth nothing that day whatever the price, so
+counting it would overstate what the change moves.
 
 Editing a filled line flips its provenance the moment it changes, to
 "Edited from 0.9312", naming the figure that was replaced
@@ -251,10 +268,13 @@ the price not updated, and where the person typed that price the
 message names the unit, because they typed that number and are entitled
 to know it did not land.
 
-**Saving a reopened recording** writes in a fixed order
-(`record-rate.md`, Saving an edited recording): the pre-create reload
-if anything is being created, then quantities, then rates, then
-deletions last, so a save that fails partway has destroyed nothing.
+**Saving a reopened recording** is one control at a time
+(`record-rate.md`, Saving an edited recording). A row's control saves
+that holding's figure, and clearing its field deletes that one entry.
+The rate lines' own save writes every changed line, with the pre-create
+reload first if any line creates an entry and the cleared lines deleted
+last, so a save that fails partway has destroyed nothing. No save spans
+a quantity, rates and deletions at once.
 
 **No record shape changes for this screen.** A confirmed figure is an
 ordinary entry, and the sweep is a different way to reach the same
@@ -293,16 +313,25 @@ write.
   What was typed into the refused attempt is gone and is typed again
   there. The screen does not offer to carry it across, because a rescue
   that works only sometimes is worse than none.
-- **A save that landed in part**: the screen **stays open** and every
-  change keeps its own state, saved or not saved with what was typed
-  still in front of the person. The message names both halves, the
-  changes that landed and the ones that did not, by holding name and by
-  unit. A count alone leaves somebody's vault in a state they cannot
-  see. Retrying reissues only what failed. Nothing is rolled back, and
-  the total on screen is always what the vault holds rather than what
-  the save intended.
-- **Closing with changes unsaved**: the screen says so and names them.
-  Nothing in the vault records that a save was partial.
+- **A rate-lines save that landed in part**: the screen **stays open**
+  and every line keeps its own state, saved or not saved with what was
+  typed still in front of the person. The message names both halves,
+  the changes that landed and the ones that did not, by unit. A count
+  alone leaves somebody's vault in a state they cannot see. Retrying
+  reissues only what failed. Nothing is rolled back, and the total on
+  screen is always what the vault holds rather than what the save
+  intended.
+- **Closing with changes unsaved**: nothing blocks leaving. There is no
+  confirmation and no prompt to stay, because what was typed and not
+  saved is the person's to abandon. The screen they land on carries a
+  critical notice at its head naming what was left unsaved, by holding
+  name and by unit:
+
+  > You left the recording for 31 July 2026 with changes that were not
+  > saved: Current account, the USD rate.
+
+  Nothing in the vault records that a save was partial, so the notice
+  is the whole of it and does not come back.
 - **Two entries on one date**: a holding or a unit with two entries at
   this date is rendered flagged, both of them, with **Keep this one**
   on each. The client picks neither (`recording-detail.md`, which owns

@@ -4387,7 +4387,7 @@ try {
     await pressRow('Current account');
     check(
       'record-snapshot: with the proxy down the figure still saves and the line says nothing will be recorded for the unit',
-      outage.says === 'No market rate came back for USD. Nothing will be recorded for it today.' &&
+      outage.says === 'No market rate came back for USD. Nothing will be recorded for it for this date.' &&
         on(await stored('snapshot'), D7).length === 1 && on(await stored('rate'), D7).length === 0,
       JSON.stringify(outage),
     );
@@ -4569,6 +4569,32 @@ try {
       pricesFailed,
     );
     await press('Done', '.dialog');
+
+    // A date another holding recorded, priced in dollars and not in
+    // gold: a figure added there fills in gold alone, as the sweep would.
+    const DF = ago(60);
+    await plantHere([snap('Fund 2', DF, '101'), price('USD', DF, '0.88', 'proposed')]);
+    await reread();
+    const usdAtDP = bytes(on(await stored('rate'), DF));
+    traffic.length = 0;
+    await openForm('Fund 3');
+    await set('#snapshot-date', await format('date', DF));
+    await rec.waitUntil(`${line('XAU-ozt')} && ${line('XAU-ozt')}.querySelector('input') && ${line('XAU-ozt')}.querySelector('input').value !== ''`, { label: 'the missing gold price proposed' });
+    const fillingLine = await ev("document.querySelector('.prices-line').textContent");
+    const usdTypable = await ev(`Boolean(${line('USD')}.querySelector('input'))`);
+    await set('#snapshot-value', '102');
+    await formSave();
+    const atDP = on(await stored('rate'), DF);
+    check(
+      'record-snapshot: a figure the form adds at a date already priced fills in only the units that date is missing',
+      fillingLine === `${await format('longDate', DF)} already holds prices. This figure joins them. The prices it is missing will be recorded with this.` &&
+        !usdTypable && rateAsks().length === 1 &&
+        bytes(atDP.filter((r) => r.payload.symbol === 'USD')) === usdAtDP &&
+        atDP.map((r) => r.payload.symbol).sort().join(',') === 'USD,XAU-ozt' &&
+        atDP.find((r) => r.payload.symbol === 'XAU-ozt').payload.rateSource === 'proposed' &&
+        on(await stored('snapshot'), DF).some((s) => s.accountId === id['Fund 3']),
+      `${fillingLine} | ${atDP.map((r) => r.payload.symbol).join(',')} | asks ${rateAsks().length}`,
+    );
 
     const ratesBeforeEdit = (await stored('rate')).length;
     traffic.length = 0;

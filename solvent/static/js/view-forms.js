@@ -27,9 +27,12 @@ export function snapshotDialog(vault, holding, existing, onSaved, onOpenRecordin
   let sit = null;
 
   // An empty date opens to its proposals, fetched for that date, and
-  // its lines are the ones the save writes. A date already priced, and
-  // every edit of an existing entry, reads the stored prices and looks
-  // nothing up.
+  // its lines are the ones the save writes. A figure added at a date
+  // already priced fills in only the units that date is missing, as the
+  // sweep does (record-rate.md, The refresh), and looks up nothing when
+  // none is. Every edit of an existing entry, and a figure replacing
+  // this holding's own at that date, changes a figure, which ensures no
+  // price: those read the stored prices and look nothing up.
   const describePrices = () => {
     const on = date.value;
     if (!on) {
@@ -39,16 +42,24 @@ export function snapshotDialog(vault, holding, existing, onSaved, onOpenRecordin
       return;
     }
     const occupied = vault.holdsRecording(on);
+    const adding = !existing && !vault.snapshotsFor(holding.recordId).some((s) => s.payload.date === on);
+    const filling = occupied && adding && vault.missingUnits(on).length > 0;
     const joining = existing || occupied;
-    sit = joining ? null : writes.sitting(vault, on);
-    block = rateBlock(vault, on, { sit, readOnly: Boolean(joining), onChange: describeConverted });
+    sit = existing || (occupied && !filling) ? null : writes.sitting(vault, on);
+    block = rateBlock(vault, on, {
+      sit,
+      readOnly: Boolean(joining) && !filling,
+      fillMissing: filling,
+      onChange: describeConverted,
+    });
     const main = holding.payload.unit === vault.mainCurrency;
     if (existing) {
       pricesLine.textContent = `The prices stored for ${vault.format.longDate(on)}. Editing this entry changes none of them.`;
     } else if (occupied) {
-      pricesLine.textContent = vault.recording(on).prices.length
+      const joins = vault.recording(on).prices.length
         ? `${vault.format.longDate(on)} already holds prices. This figure joins them.`
         : `${vault.format.longDate(on)} already holds a recording. This figure joins it.`;
+      pricesLine.textContent = filling ? `${joins} The prices it is missing will be recorded with this.` : joins;
     } else {
       pricesLine.textContent = main && block.lines.length
         ? `Prices for ${vault.format.longDate(on)} will be recorded with this, for every other unit in your vault, although this figure is in ${vault.mainCurrency}.`

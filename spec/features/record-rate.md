@@ -240,45 +240,57 @@ Against the optimistic-concurrency rule in `record-api.md`:
 
 ### Saving an edited recording
 
-One save of a reopened recording (`record-snapshot.md`) may touch
-several records: snapshots updated, snapshots created, rates updated or
-created, and records deleted. Each is its own request under its own
-version check, and nothing spans two of them. The order is fixed:
+A reopened recording (`record-snapshot.md`) is saved one control at a
+time, as `ui/update-values.md` lays it out: each row has its own
+control, and the rate lines have one save of their own. **No save
+spans a quantity, rates and deletions at once.** Each record is its own
+request under its own version check, and nothing spans two of them.
 
-0. If the save creates anything, the pre-create reload. Any slot taken
-   refuses the whole save before a single write.
-1. Quantity writes, creates and updates alike.
-2. Rate writes.
-3. Deletions, quantities first and rates after.
+- **A row's save** writes that holding's quantity and nothing else of
+  the recording.
+  - Changing a stored figure is an update at stored `version` + 1. It
+    is not recording a quantity, so it ensures no price (The refresh).
+  - Adding a figure for a holding silent at that date is a create. The
+    pre-create reload runs first if the sitting has not yet claimed the
+    date, and the refresh follows the quantity exactly as it does on a
+    first recording (The write path).
+  - Clearing a stored figure deletes that one record.
+- **The rate-lines save** writes every changed line together, after one
+  confirmation naming what each moves (`ui/update-values.md`, Changing
+  or clearing a rate says what it moves). Its order is fixed:
+  0. If any line creates an entry, the pre-create reload. Any slot
+     taken refuses the whole save before a single write.
+  1. Rate writes, creates and updates alike.
+  2. Deletions, for the lines cleared.
 
-A phase's requests may be issued together, and the next phase begins
-when every request in the previous one has answered.
+  A phase's requests may be issued together, and the next phase begins
+  when every request in the previous one has answered.
 
-- **Quantities before prices**, for the reason a fresh recording has
-  (The write path).
 - **A rate the person typed does not wait on a quantity.** The gate
   holding the refresh behind a successful quantity write exists because
-  the refresh writes figures nobody asked for. An entry the person
-  typed is their own act, and it is written whether or not the quantity
-  beside it landed. A refreshed entry is still gated, exactly as above.
+  the refresh writes figures nobody asked for. An entry typed into a
+  rate line is the person's own act, so the rate-lines save needs no
+  holding touched alongside it. A refreshed entry is still gated,
+  exactly as above.
 - **Deletions run last**, after every write in the save has been
   attempted, so a save that fails partway has destroyed nothing and the
-  person still holds everything the screen offered to remove.
+  person still holds every price the screen offered to remove.
 - **No step is skipped because an earlier one failed.** Each record is
   independent, and abandoning the rest would turn one failed write into
   several unattempted ones.
 
 **An edit is half-applied more visibly than a first recording is.** Its
-figures are already in the chart, so a save that lands four changes of
-six moves the total to a number nobody asked for. That is reported,
-never hidden and never rolled back:
+figures are already in the chart, so a rate-lines save that lands four
+changes of six moves the total to a number nobody asked for. That is
+reported, never hidden and never rolled back:
 
 - The screen **stays open**, and every change keeps its own state:
   saved, or not saved with what the person typed still in front of
   them.
-- The message **names both halves**: how many changes were saved, and
-  which ones were not, by holding name and by symbol. A count alone
-  leaves the person's vault in a state they cannot see.
+- The message **names both halves**: which changes were saved and
+  which were not, by symbol. A count alone leaves the person's vault in
+  a state they cannot see. A row reports on itself, since its save is
+  its own.
 - Retrying reissues **only what failed**, at whatever version each
   record now holds.
 - The in-memory model advances **per write, as each one succeeds**, so
@@ -287,8 +299,9 @@ never hidden and never rolled back:
 - **Nothing in the vault records that a save was partial.** No pending
   flag and no dirty marker: it would be another thing to keep
   consistent, it would outlive the tab that could resolve it, and the
-  unsaved half exists only in the open screen. Closing with changes
-  unsaved says so and names them.
+  unsaved half exists only in the open screen. What leaving with
+  changes unsaved does is `ui/update-values.md`'s (States, Closing with
+  changes unsaved).
 
 ## Two entries on one date
 
@@ -369,8 +382,10 @@ to win silently.
   departed from.
 - **Editing one entry changes every holding measured in that symbol on
   that date.** That is what one price for one symbol on one day means,
-  and the confirmation says so, naming how many holdings are affected.
-  The client can count them: it holds every `account` record. A save
+  and the confirmation says so, naming how many holdings are affected
+  (`ui/update-values.md`, Changing or clearing a rate says what it
+  moves, which says which ones count). The client can count them: it
+  holds every `account` and `snapshot` record. A save
   changing several rates confirms once, naming each symbol and its
   count, rather than queueing a dialog per line.
 - **Deleting an entry** is allowed, by clearing its line
@@ -487,13 +502,11 @@ to win silently.
 - Adding a value for a holding skipped at a past date leaves every rate
   entry at that date byte-identical, and writes an entry only for a
   symbol that had none.
-- A save changing one quantity and two rates issues the quantity `PUT`
-  before either rate `PUT`, and any `DELETE` in the same save after all
-  three.
-- With the second rate `PUT` stubbed to fail, the quantity and the
-  first rate are stored, nothing is rolled back, the deletions in the
-  same save still run, and the message names the symbol that did not
-  land.
+- A rate-lines save changing two rates and clearing a third issues both
+  rate `PUT`s before the `DELETE`.
+- With the second rate `PUT` of that save stubbed to fail, the first
+  rate is stored, nothing is rolled back, the deletion in the same save
+  still runs, and the message names the symbol that did not land.
 - Editing a `proposed` entry's rate stores `edited`, keeps `rateAsOf`,
   and stores the replaced figure as `proposedRate`. Editing an `edited`
   one a second time leaves `proposedRate` at the original proposal.
