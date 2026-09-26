@@ -76,6 +76,15 @@ export class Vault {
     return this;
   }
 
+  /** The profile record alone, read again after a write lost to
+   *  another tab (design-system.md, States, A conflict). */
+  async reloadProfile() {
+    for (const record of await api.get('/api/records?type=profile')) {
+      const entry = await this._decrypt(record);
+      if (entry) this._index(entry);
+    }
+  }
+
   async _decrypt(record) {
     // A schema_version above what this client knows is unreadable
     // rather than guessed at: guessing at a future shape is how data

@@ -1320,6 +1320,36 @@ th.numeric {
   padding: 4px 0;
 }
 
+/* The reorder control's handle, beside its Move up and Move down
+   (design-system.md, Components). */
+.drag-handle {
+  cursor: grab;
+  color: var(--petrol-400);
+  font-size: 18px;
+  line-height: 1;
+  padding: 0 4px;
+  user-select: none;
+}
+
+.dimension-card .card-head { justify-content: flex-start; gap: 8px 12px; }
+.dimension-card .card-head > div:nth-child(2) { flex: 1 1 auto; }
+
+.overflow-menu { position: relative; }
+
+.overflow-items {
+  position: absolute;
+  right: 0;
+  top: 100%;
+  z-index: 5;
+  min-width: 180px;
+  padding: 8px;
+  background: #ffffff;
+  border: 1px solid var(--hairline);
+  border-radius: 6px;
+}
+
+.overflow-items .btn-inline { display: block; width: 100%; text-align: left; }
+
 /* ---- Settings ---- */
 
 .pairs { margin: 0; }
@@ -1428,6 +1458,14 @@ th.numeric {
 .sessions-table th { padding-top: 0; font-size: 12px; }
 .sessions-table .chip { margin: 0; }
 .sessions .hint { margin-top: 12px; }
+/* A card waiting on its own fetch skeletons alone (design-system.md,
+   States). */
+.skeleton-row {
+  height: 20px;
+  margin: 12px 0;
+  border-radius: 4px;
+  background: var(--petrol-100);
+}
 
 .danger-zone { padding: 18px 24px; }
 .danger-zone[open] { padding-bottom: 24px; }

@@ -3,11 +3,16 @@
 // Nothing here is about the instance or about anybody else. An
 // administrator never reaches this address at all.
 import * as api from './api.js';
-import * as crypto from './crypto.js';
 import * as writes from './writes.js';
 import { el, icon, mount, today } from './dom.js';
 import * as format from './format.js';
-import { changePassword, restartIdleTimer, signOut } from './session.js';
+import {
+  WrongPasswordError,
+  authKeyFor,
+  changePassword,
+  restartIdleTimer,
+  signOut,
+} from './session.js';
 import { IDLE_LOCK_PERIODS } from './model.js';
 import { passwordWithToggle } from './unlock.js';
 import { strengthGauge } from './strength.js';
@@ -20,9 +25,9 @@ export function settingsView(vault, { username, kdf, reload, open }) {
     profileCard(vault, username),
     formatCard(vault, reload),
     organizingCard(vault, open),
-    changePasswordCard(vault, kdf, username),
-    sessionCard(vault, reload),
-    dangerZone(vault, username, kdf, open),
+    changePasswordCard(kdf, username),
+    sessionCard(vault),
+    dangerZone(username, open),
   ];
 }
 
@@ -188,49 +193,60 @@ function organizingCard(vault, open) {
   ]);
 }
 
-function changePasswordCard(vault, kdf, username) {
+function changePasswordCard(kdf, username) {
   const current = el('input', { type: 'password', autocomplete: 'current-password' });
   const next = el('input', { type: 'password', autocomplete: 'new-password' });
   const confirm = el('input', { type: 'password', autocomplete: 'new-password' });
-  const error = el('p', { class: 'field-error', hidden: true });
+  const error = el('p', { class: 'field-error', role: 'alert', hidden: true });
   const done = el('p', { class: 'banner', hidden: true, role: 'status' });
   const button = el('button', { class: 'btn-primary', text: 'Change password', disabled: true });
+  let strong = false;
   const gauge = strengthGauge(next, (ok) => {
+    strong = ok;
     button.disabled = !ok;
   });
+  const fields = [
+    field('Current password', passwordWithToggle(current)),
+    field('New password', passwordWithToggle(next), gauge.element),
+    field('Confirm new password', passwordWithToggle(confirm)),
+  ];
+  // The form goes quiet while both keys are derived.
+  const quiet = (on) => {
+    for (const control of fields.flatMap((f) => [...f.querySelectorAll('input, button')])) {
+      control.disabled = on;
+    }
+    button.disabled = on || !strong;
+  };
 
   button.addEventListener('click', async () => {
     error.hidden = true;
     done.hidden = true;
     if (next.value !== confirm.value) {
-      error.textContent = 'The two new passwords do not match.';
-      error.hidden = false;
+      show(error, 'The two new passwords do not match.');
       return;
     }
     if (next.value === current.value) {
-      error.textContent = 'The new password is your current one.';
-      error.hidden = false;
+      show(error, 'The new password is your current one.');
       return;
     }
-    button.disabled = true;
+    quiet(true);
     button.textContent = 'Changing your password';
     try {
       await changePassword(username, current.value, next.value, kdf);
       current.value = next.value = confirm.value = '';
-      done.textContent =
-        'Your password is changed. Every other session was signed out, and this one is still open.';
-      done.hidden = false;
+      show(done, 'Your password is changed. Every other session was signed out, and this one is still open.');
     } catch (failure) {
-      error.textContent =
-        failure.status === 400
+      // Every field is kept, so nothing is typed or derived twice.
+      show(
+        error,
+        failure instanceof WrongPasswordError || failure.status === 400
           ? 'That is not your current password.'
-          : 'Nothing was changed. Your current password still works.';
-      error.hidden = false;
+          : 'Nothing was changed. Your current password still works.',
+      );
     } finally {
-      button.disabled = false;
       button.textContent = 'Change password';
+      quiet(false);
     }
-    void vault;
   });
 
   return el('section', { class: 'card' }, [
@@ -239,14 +255,8 @@ function changePasswordCard(vault, kdf, username) {
       class: 'callout',
       text: 'Your data is not re-encrypted. Only the lock around your key is rebuilt, which is why this is fast even on a large vault.',
     }),
-    el('div', { class: 'form-narrow' }, [
-      field('Current password', passwordWithToggle(current)),
-      field('New password', passwordWithToggle(next), gauge.element),
-      field('Confirm new password', passwordWithToggle(confirm)),
-      error,
-      done,
-      button,
-    ]),
+    // An error sits above the first field (design-system.md, States).
+    el('div', { class: 'form-narrow' }, [error, ...fields, done, button]),
     el('p', { class: 'warning-line' }, [
       icon('alert', 18),
       el('span', {
@@ -256,13 +266,19 @@ function changePasswordCard(vault, kdf, username) {
   ]);
 }
 
+function show(node, text) {
+  node.textContent = text;
+  node.hidden = false;
+}
+
 function field(label, control, ...after) {
   return el('div', { class: 'field' }, [el('label', { text: label }), control, ...after]);
 }
 
-function sessionCard(vault, rerender) {
-  const list = el('div', {}, [el('p', { class: 'hint', text: 'Loading…' })]);
+function sessionCard(vault) {
+  const list = el('div', { class: 'session-list' });
   const error = el('p', { class: 'field-error', hidden: true });
+  const everywhereError = el('p', { class: 'field-error', role: 'alert', hidden: true });
 
   const idle = el('select', {}, IDLE_LOCK_PERIODS.map((minutes) =>
     el('option', { value: String(minutes), text: `${minutes} minutes` }),
@@ -282,7 +298,12 @@ function sessionCard(vault, rerender) {
     }
   });
 
-  api
+  // Fetched, so this card alone waits, on skeleton rows, and a retry
+  // reloads this card alone.
+  const load = () => {
+    mount(list, [1, 2].map(() => el('div', { class: 'skeleton-row', 'aria-hidden': 'true' })));
+    list.setAttribute('aria-busy', 'true');
+    return api
     .get('/api/sessions')
     .then((listed) => {
       // The session reading this first, then the rest by when each
@@ -310,9 +331,12 @@ function sessionCard(vault, rerender) {
     .catch(() => {
       mount(list, [
         el('p', { class: 'field-error', text: 'The session list would not load.' }),
-        el('button', { class: 'btn-secondary', text: 'Retry', onclick: rerender }),
+        el('button', { class: 'btn-secondary', text: 'Retry', onclick: load }),
       ]);
-    });
+    })
+    .finally(() => list.removeAttribute('aria-busy'));
+  };
+  load();
 
   return el('section', { class: 'card' }, [
     el('h2', { class: 'section-heading', text: 'Session and lock' }),
@@ -339,12 +363,20 @@ function sessionCard(vault, rerender) {
       el('button', {
         class: 'btn-secondary',
         text: 'Sign out everywhere',
-        onclick: () =>
-          api
-            .post('/api/auth/logout-all', {})
-            .finally(() => (window.location.href = '/login')),
+        onclick: async () => {
+          everywhereError.hidden = true;
+          try {
+            await api.post('/api/auth/logout-all', {});
+          } catch {
+            show(everywhereError, 'Nothing was signed out. Every session is still open, this one included.');
+            return;
+          }
+          await signOut().catch(() => {});
+          window.location.href = '/login';
+        },
       }),
     ]),
+    everywhereError,
   ]);
 }
 
@@ -352,7 +384,7 @@ function sessionCard(vault, rerender) {
  *  session. The dialog's primary action is Export first: somebody who
  *  came here wanting a backup and left with a wiped vault has been
  *  failed by the dialog. */
-function dangerZone(vault, username, kdf, open) {
+function dangerZone(username, open) {
   const password = el('input', { type: 'password', autocomplete: 'current-password' });
   const typed = el('input', { type: 'text' });
   const error = el('p', { class: 'field-error', hidden: true });
@@ -368,17 +400,17 @@ function dangerZone(vault, username, kdf, open) {
     error.hidden = true;
     remove.disabled = true;
     try {
-      const authKey = await crypto
-        .deriveKeys(password.value, (await api.post('/api/auth/salt', { username })).salt, kdf)
-        .then((keys) => keys.authKey);
+      // Derived at the account's own stored envelope, which is what its
+      // verifier was made at, not at the default the page embeds.
+      const authKey = await authKeyFor(username, password.value);
       await api.del('/api/auth/account', { authKey, confirmUsername: username });
+      signOut().catch(() => {});
       window.location.href = '/login';
     } catch {
       error.textContent = 'Nothing was deleted. Your vault is unchanged and you are still signed in.';
       error.hidden = false;
       remove.disabled = false;
     }
-    void vault;
   });
 
   return el('details', { class: 'card danger-zone' }, [
