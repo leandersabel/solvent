@@ -11,7 +11,7 @@ const SAVE_FAILED = 'That did not save. Nothing changed.';
 
 /** Opaque and immutable, never shown and never derived from a label,
  *  and checked against every id the profile in memory already holds. */
-function newId(vault, minted = []) {
+export function newId(vault, minted = []) {
   const taken = new Set([
     ...minted,
     ...vault.dimensions.flatMap((d) => [d.id, ...d.values.map((v) => v.id)]),

@@ -113,6 +113,7 @@ const ICONS = {
   down: ['M12 5v14', 'M19 12l-7 7-7-7'],
   chevron: ['M9 6l6 6-6 6'],
   alert: ['M12 3l9.5 17h-19z', 'M12 10v4', 'M12 17.5v.01'],
+  note: [{ rect: { x: 5, y: 3, width: 14, height: 18, rx: 2 } }, 'M9 8h6', 'M9 12h6', 'M9 16h4'],
 };
 
 export function icon(name, size = 16) {

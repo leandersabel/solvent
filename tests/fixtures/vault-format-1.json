@@ -1,0 +1,53 @@
+{
+  "format": "solvent-vault",
+  "formatVersion": 1,
+  "exportedAt": "2026-08-01T09:14:00+00:00",
+  "salt": "Bzjyr3XSeC0T1Tu4ySx2jw==",
+  "kdf": {
+    "alg": "argon2id",
+    "v": 19,
+    "m": 1024,
+    "t": 1,
+    "p": 1
+  },
+  "wrappedDek": "ZHi/gCFzUDwqGGRYs3e2/QwpXV55VQAkKZXUFAQYiBqZ+GTur21P7XPNgd9FFsPL",
+  "dekNonce": "rWr39b0fe8OJ5+Mh",
+  "records": [
+    {
+      "recordId": "3be5a773-7398-403f-83f3-23e394d00b59",
+      "recordType": "profile",
+      "accountId": null,
+      "schemaVersion": 1,
+      "version": 2,
+      "nonce": "YderZt0er1rd+NoE",
+      "ciphertext": "PSFeaKPmQOVinUWYmnAZD9A0DLTX/jRR6rthLkhb1K2MxWRZf4UKxtAv6y9Pw2hxMSZSkdd/wtNuXTDAcugbY/t3CxwAUzspzbHEtsdlpIb1QK0hplXOGO8Z1rf8jbJmC3FMbE23xKqRRcjeO9yFOhX+weSSAHPPM/IOKNsdj7kd8rkEUCmoql4r1zyRclLHVHSSZID2zWTO8b+PqMyQKECJHe+OwJSEll7U/O6eFdxgiAxFzZIxC5+qtpJgf7VPxdiIzsv2auIZYBVRLUg="
+    },
+    {
+      "recordId": "0e655574-0c7b-4cff-8123-51c7899c26f2",
+      "recordType": "account",
+      "accountId": null,
+      "schemaVersion": 1,
+      "version": 3,
+      "nonce": "V4llxtagMHFfKQCb",
+      "ciphertext": "/JcvmECP7nU+SEzQWiQJayP1GdE2zdGIDVtaNoc00Y9yurFWpOPfSJjW3NDGHhMQiYK31wuOlnzAzh//rLKb9/ZZFoMAy2hzTtN5SfdfAPO7MLIAZ6oruQHLWafc8GIBXDurp/PCPwpA1k1HThOJ+bAqk4U3UKx2mGASUHfJmpL3vTOy0SXDGnF9fWe328F2hzoBj7cJsrI4LybMIEzFvVpncmtBcwA="
+    },
+    {
+      "recordId": "edef10f2-1861-4bb8-bea0-bd19062d56ae",
+      "recordType": "snapshot",
+      "accountId": "0e655574-0c7b-4cff-8123-51c7899c26f2",
+      "schemaVersion": 1,
+      "version": 1,
+      "nonce": "H+IkRwwjsddwJkSV",
+      "ciphertext": "E+vyo+hK5RYrLqpfHdgESKlZ5v8SRDYYeOzTlD6TDle5TjfcDj/DPRLMqxTYKRzzrARpJwwgqoJ5SkNlAoRUQYg="
+    },
+    {
+      "recordId": "fc22600f-2946-4325-ba7d-a5b0420d5cfa",
+      "recordType": "rate",
+      "accountId": null,
+      "schemaVersion": 1,
+      "version": 1,
+      "nonce": "2qa0Drlx/mNhPMB0",
+      "ciphertext": "dmWdu3HQfgqyxjuXJ/ZEmRx+kqFHyaKCcLLLpP6Sn/P2jHccvNg6rgdcXUgU9sXbhCCEEKtpNtvjyDeVhvgeEemejmCn9fzQgGtr0KoYg7KpTS1XEJxFZJNtp8LnjJ3yIILQWKqeG0E+61chizpT3SpqlnO+maeEdzqyfOZdS7msIlHelxol2nPE8Q/6+61sfrS+bKVnQmI="
+    }
+  ]
+}

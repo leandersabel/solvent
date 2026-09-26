@@ -22,6 +22,8 @@ const DIRECT = BASE.replace('//localhost', '//[::1]');
 
 const checks = [];
 const problems = [];
+// Addresses a check fails on purpose, whose refusal the browser logs.
+const provoked = [];
 
 function check(name, condition, detail = '') {
   checks.push({ name, ok: Boolean(condition), detail: String(detail) });
@@ -43,7 +45,8 @@ page.on((message) => {
     const noise =
       url.endsWith('/favicon.ico') ||
       url.endsWith('/api/export') ||
-      [...expectedFailures].some((path) => url.includes(path));
+      [...expectedFailures].some((path) => url.includes(path)) ||
+      provoked.some((part) => url.includes(part));
     if (entry.level === 'error' && !noise) {
       problems.push(`${entry.url || ''} ${entry.text}`);
     }
@@ -212,34 +215,19 @@ const enterPassword = async (password) => {
 };
 
 // Export the vault, open the file with its own password, and import it
-// back under a freshly generated DEK, exactly as the transfer screen
-// does. Returns what a fresh unlock reads back.
+// back under a freshly generated DEK, through the module the transfer
+// screen runs. Returns what a fresh unlock reads back.
 const importOwnExport = () =>
   page.eval(`(async () => {
     const api = await import('/static/js/api.js');
     const c = await import('/static/js/crypto.js');
     const s = await import('/static/js/session.js');
-    const { SCHEMA_VERSION } = await import('/static/js/model.js');
-    const file = await (await fetch('/api/export', { headers: { 'X-Solvent-Request': '1' } })).json();
+    const t = await import('/static/js/transfer.js');
+    const file = t.checkFile(await (await fetch('/api/export', { headers: { 'X-Solvent-Request': '1' } })).json());
 
-    // Open the file with its own password, exactly as the screen does.
-    const keys = await c.deriveKeys(${JSON.stringify(VAULT_PASSWORD)}, file.salt, file.kdf);
-    const fileDek = await c.unwrapDek(file.wrappedDek, file.dekNonce, keys.masterKey);
-    const plain = [];
-    for (const record of file.records) {
-      plain.push({ record, payload: await c.decryptRecord(fileDek, record) });
-    }
-
+    const { fileDek } = await t.openFile(file, ${JSON.stringify(VAULT_PASSWORD)});
     // Re-key: a freshly generated DEK, never the file's.
-    const newDek = await c.generateDek();
-    const rekeyed = [];
-    for (const { record, payload } of plain) {
-      const slot = {
-        recordId: record.recordId, recordType: record.recordType,
-        accountId: record.accountId ?? null, schemaVersion: SCHEMA_VERSION, version: 1,
-      };
-      rekeyed.push({ ...slot, ...(await c.encryptRecord(newDek, slot, payload)) });
-    }
+    const { dek: newDek, records: rekeyed } = await t.rekey(fileDek, file.records);
     const wrapper = await s.wrapForMaster(newDek);
     await api.post('/api/import', { ...wrapper, records: rekeyed });
 
@@ -447,7 +435,9 @@ try {
         .join(',');
     })()`));
     await setValue('#holding-name', name);
-    await setValue('#holding-unit', unit);
+    const option = `#holding-unit-list [data-symbol="${unit}"]`;
+    await page.waitUntil(`document.querySelector('${option}')`, { label: `the ${unit} option` });
+    await page.eval(`document.querySelector('${option}').click()`);
     await page.eval("document.querySelector('.dialog button[type=submit]').click()");
     await page.waitUntil('!document.querySelector(".dialog")', { label: `${name} to save` });
     await page.settle(250);
@@ -701,7 +691,10 @@ try {
     await page.eval(`(async () => {
       const response = await fetch('/api/export', { headers: { 'X-Solvent-Request': '1' } });
       const body = await response.json();
-      const raw = JSON.stringify(body);
+      // Encoded fields and random ids are blanked: a short needle can
+      // turn up in base64 by chance, and their decoded bytes are scanned
+      // in the export and import section.
+      const raw = JSON.stringify(body).replace(/"(salt|wrappedDek|dekNonce|nonce|ciphertext|recordId|accountId)":"[^"]*"/g, '"$1":""');
       return JSON.stringify({
         kinds: [...new Set(body.records.map(r => r.recordType))].sort(),
         leaks: ['Cantonal', 'UBS', 'Gold bars', 'Mortgage', '12450', 'XAU-ozt', 'leander']
@@ -1105,6 +1098,19 @@ try {
     (await labels('.dimension-card .card-head .strong')).join(','),
   );
   expectedFailures.delete('/api/records/');
+  // The other tab's name goes back, so the sections below find the
+  // dimension under the name they know it by.
+  await page.eval(`(async () => {
+    const v = (await import('/static/js/session.js')).currentVault();
+    const api = await import('/static/js/api.js');
+    const c = await import('/static/js/crypto.js');
+    const { SCHEMA_VERSION } = await import('/static/js/model.js');
+    const record = v.profileRecord;
+    const payload = { ...v.profile, dimensions: v.dimensions.map((d) => (d.id === ${JSON.stringify(liquidity.id)} ? { ...d, label: 'Liquid assets' } : d)) };
+    const slot = { recordId: record.recordId, recordType: 'profile', accountId: null, schemaVersion: SCHEMA_VERSION, version: record.version + 1 };
+    await api.put('/api/records/' + slot.recordId, { recordType: 'profile', accountId: null, schemaVersion: slot.schemaVersion, version: slot.version, ...(await c.encryptRecord(v.dek, slot, payload)) });
+    await v.load();
+  })()`);
 
 
   // ---- Account settings: the settings screen's own states --------------
@@ -1551,22 +1557,112 @@ try {
 
   // ---- Archiving, with the closing value it offers ----------------------
 
+  // manage-accounts.md: archiving onto a date that already holds this
+  // holding's figure prefills the field with it, shows no replace
+  // prompt, and leaves exactly one figure there at version + 1. No
+  // snapshot is deleted, and the chart before the archive date is
+  // unchanged.
+  const archivingId = (await page.eval('location.hash')).split('/')[2];
+  const archiveDay = await page.eval('new Date().toISOString().slice(0, 10)');
+  const snapshotState = () =>
+    page.eval(`(async () => {
+      const api = await import('/static/js/api.js');
+      const v = (await import('/static/js/session.js')).currentVault();
+      const rows = await api.get('/api/records?type=snapshot');
+      const here = v.snapshotsFor('${archivingId}').filter((s) => s.payload.date === '${archiveDay}');
+      return JSON.stringify({
+        stored: rows.length,
+        here: here.map((s) => ({ id: s.recordId, version: s.version, value: s.payload.value })),
+      });
+    })()`).then(JSON.parse);
+  // The chart's own table, every row but the archive date's.
+  const chartOffArchiveDay = async () => {
+    await page.eval("location.hash = '#/'");
+    await page.waitUntil("document.querySelector('.chart-card details table')", { label: 'the chart table' });
+    await page.eval("[...document.querySelectorAll('.range-buttons button')].find(b => b.textContent === 'All').click()");
+    await page.settle(300);
+    return page.eval(`(async () => {
+      const v = (await import('/static/js/session.js')).currentVault();
+      const day = v.format.date('${archiveDay}');
+      return JSON.stringify([...document.querySelectorAll('.chart-card details table tbody tr')]
+        .filter((r) => r.cells[0].textContent !== day).map((r) => r.textContent));
+    })()`);
+  };
+  const chartBeforeArchive = await chartOffArchiveDay();
+  const heroBeforeArchive = await page.eval("document.querySelector('.hero-figure').textContent");
+  await page.eval(`location.hash = '#/holding/${archivingId}'`);
+  await page.waitUntil("document.querySelector('.detail-header')", { label: 'the holding to archive' });
+  await page.settle(400);
+  const beforeArchive = await snapshotState();
+
   await click('Archive');
   await page.waitUntil("document.body.innerText.includes('Archive keeps every value')", {
     label: 'the archive dialog',
   });
   check('archive is offered before deleting', (await text()).includes('You can undo this'));
   check('it offers a closing value', (await text()).includes('What was it worth when you closed it?'));
-  check('it says what skipping costs', (await text()).includes('your chart drops by the last figure'));
+  check(
+    'archive is the preselected choice, and permanent delete waits behind its own',
+    await page.eval(`(() => {
+      const choice = document.querySelector('.dialog input[value=archive]');
+      const button = [...document.querySelectorAll('.dialog button')].find(b => b.textContent === 'Delete permanently');
+      return choice.checked && button.hidden && !document.querySelector('.dialog input[value=delete]').checked;
+    })()`),
+  );
+  const prefilled = await page.eval(`(async () => {
+    const v = (await import('/static/js/session.js')).currentVault();
+    return String(v.format.parseFigure(document.querySelector('#closing-value').value));
+  })()`);
+  const storedFigure = await page.eval(
+    `(async () => String((await import('/static/js/decimal.js')).parse(${JSON.stringify(beforeArchive.here[0]?.value || '')})))()`,
+  );
+  check(
+    'an occupied archive date prefills the stored figure rather than 0',
+    beforeArchive.here.length === 1 && prefilled === storedFigure,
+    `${prefilled} against ${JSON.stringify(beforeArchive.here)}`,
+  );
+  await click('Skip');
+  await page.settle(150);
+  check('skipping says what it costs', (await text()).includes('your chart drops by the last figure recorded here'));
+  await click('Record a closing value after all');
+  await page.settle(150);
+
+  // Every dialog heading that appears from here to the archive landing.
+  await page.eval(`(() => {
+    window.__headings = [];
+    new MutationObserver(() => {
+      for (const node of document.querySelectorAll('.dialog-heading')) window.__headings.push(node.textContent);
+    }).observe(document.body, { childList: true, subtree: true });
+  })()`);
   await page.eval("[...document.querySelectorAll('.dialog button')].find(b => b.textContent === 'Archive').click()");
   await page.waitUntil('!document.querySelector(".dialog")', { timeout: 60000, label: 'the archive to land' });
   await page.settle(1200);
+  const headings = await page.eval('window.__headings');
+  check(
+    'archiving onto an occupied date shows no replace prompt',
+    !headings.some((heading) => heading.startsWith('Replace')),
+    headings.join(' | '),
+  );
+  const afterArchive = await snapshotState();
+  check(
+    'it leaves exactly one figure at that date, the same record at version + 1',
+    afterArchive.here.length === 1 &&
+      afterArchive.here[0].id === beforeArchive.here[0].id &&
+      afterArchive.here[0].version === beforeArchive.here[0].version + 1,
+    `${JSON.stringify(beforeArchive.here)} then ${JSON.stringify(afterArchive.here)}`,
+  );
+  check('archiving deletes no snapshot', afterArchive.stored === beforeArchive.stored, `${beforeArchive.stored} then ${afterArchive.stored}`);
+  const archivedRecord = await page.eval(`(async () => {
+    const v = (await import('/static/js/session.js')).currentVault();
+    return v.holdings.get('${archivingId}').payload.archivedAt;
+  })()`);
+  check('the account record gains archivedAt', archivedRecord === archiveDay, archivedRecord);
   check('an archived holding carries its chip', (await text()).includes('Archived'));
   check('it offers Unarchive rather than Archive', (await labels('.form-actions button')).includes('Unarchive'));
   check('an archived holding takes no new value', !(await labels('.form-actions button')).includes('Record a value'));
 
-  await page.eval("location.hash = '#/'");
-  await page.settle(900);
+  const chartAfterArchive = await chartOffArchiveDay();
+  check('the chart before the archive date is unchanged', chartAfterArchive === chartBeforeArchive, `${chartBeforeArchive} then ${chartAfterArchive}`);
   const listed = await page.eval(
     "[...document.querySelectorAll('.data-table tbody .link-button')].map(b => b.textContent)",
   );
@@ -1590,6 +1686,744 @@ try {
     'the date is gone from the chart',
     (await page.eval("document.querySelectorAll('.entry-mark').length")) === marksBefore - 1,
   );
+
+  // ---- Manage holdings (manage-accounts.md, account-form.md, account-detail.md)
+
+  {
+    const { DatabaseSync } = await import('node:sqlite');
+    const { readFileSync } = await import('node:fs');
+    const query = (sql, ...args) => {
+      const db = new DatabaseSync(process.env.DATABASE_PATH, { readOnly: true });
+      try {
+        return db.prepare(sql).all(...args);
+      } finally {
+        db.close();
+      }
+    };
+    const OWN = "JOIN principals ON principals.id = records.principal_id WHERE principals.username = 'leander'";
+    const accountRows = () =>
+      JSON.stringify(query(`SELECT records.* FROM records ${OWN} AND record_type = 'account' ORDER BY record_id`));
+    const rowOf = (id) => query(`SELECT records.* FROM records ${OWN} AND record_id = ?`, id)[0];
+    // The database file's own bytes, which is where plaintext would sit.
+    const inDatabase = (needles) => {
+      const bytes = readFileSync(process.env.DATABASE_PATH);
+      return needles.filter((needle) => bytes.includes(Buffer.from(needle, 'utf8')));
+    };
+    const vaultValue = (body) =>
+      page.eval(`(async () => {
+        const v = (await import('/static/js/session.js')).currentVault();
+        return JSON.stringify(${body});
+      })()`).then(JSON.parse);
+    const payloadOf = (id) => vaultValue(`v.holdings.get('${id}') ? v.holdings.get('${id}').payload : null`);
+    const idNamed = (name) =>
+      vaultValue(`[...v.holdings.values()].filter(h => h.payload.name === ${JSON.stringify(name)}).map(h => h.recordId)`);
+    // The model read afresh from the store, and the screen redrawn from
+    // it, without a derivation.
+    const reloadModel = async (hash = '#/') => {
+      await page.eval(`(async () => {
+        await (await import('/static/js/session.js')).currentVault().load();
+        location.hash = '#/reloading';
+      })()`);
+      await page.settle(100);
+      await page.eval(`location.hash = ${JSON.stringify(hash)}`);
+      await page.settle(700);
+    };
+    const openHolding = async (id) => {
+      await page.eval(`location.hash = '#/holding/${id}'`);
+      await page.waitUntil("document.querySelector('.detail-header')", { label: 'a holding screen' });
+      await page.settle(400);
+    };
+    const inDialog = (label) =>
+      page.eval(`[...document.querySelectorAll('.dialog button')].find(b => b.textContent === ${JSON.stringify(label)}).click()`);
+    const choose = (selector, value) =>
+      page.eval(`(() => {
+        const node = document.querySelector(${JSON.stringify(selector)});
+        node.value = ${JSON.stringify(value)};
+        node.dispatchEvent(new Event('change', { bubbles: true }));
+      })()`);
+    const writesSeen = () => page.eval('window.__writes.splice(0)');
+    const recordReads = () =>
+      page.eval("performance.getEntriesByType('resource').filter(e => e.name.includes('/api/records?type=')).length");
+    // Every request matching `refuse` answered with Server Error while
+    // `body` runs, the way a failed write looks to the page.
+    const failing = async (refuse, body) => {
+      const handler = async (message) => {
+        if (message.method !== 'Fetch.requestPaused') return;
+        const { requestId, request } = message.params;
+        if (refuse(request)) {
+          provoked.push(new URL(request.url).pathname);
+          await page.send('Fetch.fulfillRequest', { requestId, responseCode: 500, body: '' });
+        } else {
+          await page.send('Fetch.continueRequest', { requestId });
+        }
+      };
+      page.on(handler);
+      await page.send('Fetch.enable', { patterns: [{ urlPattern: '*/api/*', requestStage: 'Request' }] });
+      try {
+        await body();
+      } finally {
+        await page.send('Fetch.disable');
+        page.handlers = page.handlers.filter((h) => h !== handler);
+      }
+    };
+    const writing = (type, method = 'PUT') => (request) =>
+      request.method === method && (!type || (request.postData || '').includes(`"recordType":"${type}"`));
+
+    // Every PUT the page sends, by record type, in order.
+    await page.eval(`(() => {
+      const send = window.fetch;
+      window.__writes = [];
+      window.fetch = (path, init) => {
+        if (init && init.method === 'PUT') window.__writes.push(JSON.parse(init.body).recordType);
+        return send(path, init);
+      };
+      window.__alerted = false;
+      window.alert = () => { window.__alerted = true; };
+    })()`);
+
+    // A second value on the existing dimension and a second dimension,
+    // written to the profile as the dimensions screen would.
+    const profile = await vaultValue('{ recordId: v.profileRecord.recordId, version: v.profileRecord.version, profile: v.profile }');
+    const liquid = profile.profile.dimensions.find((d) => d.label === 'Liquid assets');
+    await plant([{
+      type: 'profile',
+      recordId: profile.recordId,
+      version: profile.version + 1,
+      payload: {
+        ...profile.profile,
+        dimensions: [
+          { ...liquid, values: [...liquid.values, { id: 'retire01', label: 'Retirement', archivedAt: null }] },
+          {
+            id: 'region01',
+            label: 'Region',
+            archivedAt: null,
+            values: [
+              { id: 'home0001', label: 'Home', archivedAt: null },
+              { id: 'abroad01', label: 'Abroad', archivedAt: null },
+            ],
+          },
+        ],
+      },
+    }]);
+    await reloadModel();
+    await writesSeen();
+
+    // -- The form: the unit list ------------------------------------------
+
+    const XSS = '<img src=x onerror=alert(1)>';
+    const NAME = `Name ${XSS}`;
+    const NOTE = `Note ${XSS}`;
+    const AXIS = `Axis ${XSS}`;
+    const BAND = `Band ${XSS}`;
+    const accountsBefore = query(`SELECT record_id FROM records ${OWN} AND record_type = 'account'`).length;
+
+    await click('Add a holding');
+    await page.waitUntil("document.querySelector('#holding-unit-list [data-symbol]')", { label: 'the unit list' });
+    const unitList = JSON.parse(await page.eval(`JSON.stringify({
+      options: [...document.querySelectorAll('#holding-unit-list [role=option]')].map(o => o.dataset.symbol || o.textContent),
+      texts: [...document.querySelectorAll('#holding-unit-list [role=option]')].map(o => o.textContent),
+      groups: [...document.querySelectorAll('#holding-unit-list .unit-group-label')].map(g => g.textContent),
+    })`));
+    check(
+      'the unit list offers the main currency first, then currencies, then metals, then Something else',
+      unitList.options[0] === 'CHF' &&
+        unitList.groups.join(',') === 'Currencies,Metals' &&
+        unitList.options[unitList.options.length - 1] === 'Something else…' &&
+        unitList.options.indexOf('XAU-ozt') > unitList.options.indexOf('USD'),
+      JSON.stringify(unitList.options),
+    );
+    check(
+      'a metal reads as its label, once per unit',
+      unitList.texts.some((t) => t.startsWith('Gold, gram')) && unitList.texts.some((t) => t.startsWith('Gold, troy ounce')),
+      unitList.texts.join(' | '),
+    );
+    check(
+      'a unit with no lookup is listed and marked rate entered by hand',
+      unitList.texts.some((t) => t.includes('XAG-ozt') && t.endsWith('rate entered by hand')),
+    );
+    check('the form says what the unit commits you to', (await text()).includes('After that it is fixed'));
+    check('the form offers no price, rate or symbol field', !(await page.eval("Boolean(document.querySelector('.dialog').textContent.match(/\\bRate\\b|Rate symbol|No price source/))")));
+
+    await setValue('#holding-unit', 'troy');
+    await page.settle(150);
+    const filtered = await page.eval(
+      "[...document.querySelectorAll('#holding-unit-list [data-symbol]')].map(o => o.textContent)",
+    );
+    check(
+      'typing narrows the list and never becomes the unit',
+      filtered.length > 0 && filtered.every((t) => t.toLowerCase().includes('troy')) &&
+        (await page.eval("document.querySelector('.unit-chosen').value")) === 'CHF',
+      filtered.join(' | '),
+    );
+    await setValue('#holding-unit', '');
+
+    // Nothing saves without a name, and a free-text unit that is a
+    // listed symbol in another case is refused in favour of the symbol.
+    await page.eval("document.querySelector('.dialog button[type=submit]').click()");
+    await page.settle(200);
+    check('a missing name is refused inline and writes nothing', (await text()).includes('Give the holding a name.') && (await writesSeen()).length === 0);
+    await setValue('#holding-name', NAME);
+    await page.eval("document.querySelector('#holding-unit-list .unit-other').click()");
+    await setValue('#holding-unit-other', 'usd');
+    await page.settle(150);
+    check('typed text matching a listed symbol offers that symbol', (await text()).includes('USD is on the list'));
+    await page.eval("document.querySelector('.dialog button[type=submit]').click()");
+    await page.settle(200);
+    check('and that free text is not accepted', (await writesSeen()).length === 0 && (await text()).includes('Use it from there'));
+    await page.eval("document.querySelector('#holding-unit-list [data-symbol=\"CHF\"]').click()");
+
+    await page.eval("document.querySelectorAll('.dialog details').forEach(d => (d.open = true))");
+    await setValue('.dialog textarea', NOTE);
+    // A value made inline, then a dimension made inline: each writes the
+    // profile first, and the holding is written once, last.
+    await choose('.dialog select[aria-label="Region"]', '__new__');
+    await setValue('.dialog .inline-create input', 'Offshore');
+    await inDialog('Add');
+    await page.waitUntil("[...document.querySelectorAll('.dialog select[aria-label=\"Region\"] option')].some(o => o.textContent === 'Offshore' && o.selected)", { label: 'the new value, selected' });
+    await page.eval("[...document.querySelectorAll('.dialog button')].find(b => b.textContent === '+ New dimension').click()");
+    await page.eval(`(() => {
+      const inputs = document.querySelectorAll('.dialog .new-dimension input');
+      inputs[0].value = ${JSON.stringify(AXIS)};
+      inputs[1].value = ${JSON.stringify(BAND)};
+    })()`);
+    await inDialog('Add');
+    await page.waitUntil(`[...document.querySelectorAll('.dialog .checkbox')].some(l => l.textContent === ${JSON.stringify(AXIS)} && l.querySelector('input').checked)`, { label: 'the new dimension, set' });
+    await choose('.dialog select[aria-label="Liquid assets"]', 'retire01');
+    const readsBeforeSave = await recordReads();
+    await page.eval("document.querySelector('.dialog button[type=submit]').click()");
+    await page.waitUntil('!document.querySelector(".dialog")', { label: 'the new holding to save' });
+    await page.settle(300);
+    const written = await writesSeen();
+    check('inline creation writes the profile before the holding', written.join(',') === 'profile,profile,account', written.join(','));
+    check('the saved holding shows at once, with no refetch', (await recordReads()) === readsBeforeSave && (await text()).includes(NAME));
+
+    const [probeId] = await idNamed(NAME);
+    const saved = await payloadOf(probeId);
+    const axis = await vaultValue(`v.dimensions.find(d => d.label === ${JSON.stringify(AXIS)})`);
+    const offshore = await vaultValue("v.dimensions.find(d => d.id === 'region01').values.find(x => x.label === 'Offshore').id");
+    check(
+      'creating a holding stores exactly one account record',
+      query(`SELECT record_id FROM records ${OWN} AND record_type = 'account'`).length === accountsBefore + 1 && Boolean(rowOf(probeId)),
+    );
+    check(
+      'the form writes ids for every assignment, never a label',
+      JSON.stringify(saved.dims) === JSON.stringify({ region01: offshore, [axis.id]: axis.values[0].id, [liquid.id]: 'retire01' }) ||
+        (Object.keys(saved.dims).length === 3 && saved.dims.region01 === offshore && saved.dims[liquid.id] === 'retire01' && saved.dims[axis.id] === axis.values[0].id),
+      JSON.stringify(saved.dims),
+    );
+
+    // A free-text unit, twice under one name: names are not unique.
+    const addFreeText = async (name, unit) => {
+      await click('Add a holding');
+      await page.waitUntil("document.querySelector('#holding-unit-list .unit-other')", { label: 'the unit list' });
+      await setValue('#holding-name', name);
+      await page.eval("document.querySelector('#holding-unit-list .unit-other').click()");
+      await setValue('#holding-unit-other', unit);
+      await page.settle(100);
+      await page.eval("document.querySelector('.dialog button[type=submit]').click()");
+      await page.waitUntil('!document.querySelector(".dialog")', { label: `${name} to save` });
+      await page.settle(250);
+    };
+    await addFreeText('Parking space', 'm²');
+    await addFreeText('Parking space', 'm²');
+    const parking = await idNamed('Parking space');
+    check('two holdings may share a name', parking.length === 2, parking.join(','));
+    check('a free-text unit is stored as typed, case kept', (await payloadOf(parking[0])).unit === 'm²');
+
+    const leaks = inDatabase([
+      NAME, NOTE, AXIS, BAND, 'Offshore', 'Parking space', 'm²', 'Liquid assets', 'Retirement', 'Region',
+      offshore, axis.id, axis.values[0].id, 'region01', 'retire01', 'home0001',
+    ]);
+    check('no name, unit, note, label or assignment is in the database in plaintext', leaks.length === 0, leaks.join(' | '));
+    const shapes = await page.eval(`(async () => {
+      const api = await import('/static/js/api.js');
+      const c = await import('/static/js/crypto.js');
+      const v = (await import('/static/js/session.js')).currentVault();
+      const shapes = [];
+      for (const row of await api.get('/api/records?type=account')) {
+        const payload = await c.decryptRecord(v.dek, row);
+        shapes.push(Object.keys(payload).sort().join(',') + (payload.dims && !Array.isArray(payload.dims) && typeof payload.dims === 'object' ? '' : ' dims-not-a-map'));
+      }
+      return JSON.stringify([...new Set(shapes)]);
+    })()`);
+    check(
+      'every account record has exactly the documented fields, no rate symbol beside the unit',
+      shapes === JSON.stringify(['archivedAt,createdAt,dims,name,note,unit']),
+      shapes,
+    );
+
+    // -- Read back after a fresh unlock ---------------------------------------
+
+    await page.goto(`${BASE}/dashboard`);
+    await enterPassword(VAULT_PASSWORD);
+    await page.waitUntil("document.querySelector('svg.trend')", { timeout: 90000, label: 'the dashboard after a fresh unlock' });
+    await page.settle(600);
+    check('a holding reads back whole after a fresh unlock', JSON.stringify(await payloadOf(probeId)) === JSON.stringify(saved));
+    await page.eval(`(() => {
+      const send = window.fetch;
+      window.__writes = [];
+      window.fetch = (path, init) => {
+        if (init && init.method === 'PUT') window.__writes.push(JSON.parse(init.body).recordType);
+        return send(path, init);
+      };
+      window.__alerted = false;
+      window.alert = () => { window.__alerted = true; };
+    })()`);
+
+    // The unit list alone waits on the symbol table, and a table that
+    // cannot be fetched leaves free text, a retry, and the cost named.
+    await failing((request) => request.url.includes('/api/rates/symbols'), async () => {
+      await click('Add a holding');
+      await page.waitUntil("document.body.innerText.includes('The unit list could not be loaded')", { label: 'the degraded unit control' });
+      check(
+        'a symbol table that cannot load degrades to free text with a retry',
+        await page.eval("!document.querySelector('#holding-unit-other').hidden && [...document.querySelectorAll('.dialog button')].some(b => b.textContent === 'Try again')"),
+      );
+    });
+    await inDialog('Try again');
+    await page.waitUntil("document.querySelector('#holding-unit-list [data-symbol]')", { label: 'the list after a retry' });
+    check('trying again brings the list back', true);
+    await inDialog('Cancel');
+    await page.settle(200);
+
+    // -- The holding's own screen ---------------------------------------------
+
+    await openHolding(probeId);
+    check('an unvalued holding says so rather than 0', (await text()).includes('Not yet valued'));
+    check('with no values, one sentence and the primary action', (await text()).includes('No snapshots yet. Record what this holding is worth.'));
+    await click('Record a value');
+    await page.waitUntil("document.querySelector('#snapshot-value')", { label: 'the value form' });
+    const pastDay = await page.eval(`(async () => {
+      const v = (await import('/static/js/session.js')).currentVault();
+      return v.format.date('${BACKDATE}');
+    })()`);
+    await setValue('#snapshot-date', pastDay);
+    await setValue('#snapshot-value', '5000');
+    await page.eval("document.querySelector('.dialog textarea').value = 'kept in the safe'; document.querySelector('.dialog textarea').dispatchEvent(new Event('input', { bubbles: true }))");
+    await inDialog('Save');
+    await page.waitUntil('!document.querySelector(".dialog")', { timeout: 60000, label: 'the value to save' });
+    await page.settle(1200);
+    const noteRow = JSON.parse(await page.eval(`JSON.stringify({
+      toggles: document.querySelectorAll('.note-toggle').length,
+      hiddenBefore: document.querySelector('.note-row').hidden,
+    })`));
+    await page.eval("document.querySelector('.note-toggle').click()");
+    await page.settle(100);
+    check(
+      "an entry's note is behind an icon that expands its row, in full",
+      noteRow.toggles === 1 && noteRow.hiddenBefore &&
+        !(await page.eval("document.querySelector('.note-row').hidden")) &&
+        (await page.eval("document.querySelector('.note-row').textContent")) === 'kept in the safe',
+    );
+    await writesSeen();
+
+    // Editing: Cancel writes nothing. A save re-encrypts under a fresh
+    // nonce at version + 1, the dimension carries one entry, and the
+    // unit of a holding with a value is refused whatever the controls
+    // are made to hold.
+    await click('Edit');
+    await page.waitUntil("document.querySelector('#holding-name')", { label: 'the holding editor' });
+    await page.settle(300);
+    await page.eval("[...document.querySelectorAll('#app .panel-form button')].find(b => b.textContent === 'Cancel').click()");
+    await page.settle(400);
+    check('Cancel closes the editor and writes nothing', !(await page.eval("Boolean(document.querySelector('#holding-name'))")) && (await writesSeen()).length === 0);
+
+    await click('Edit');
+    await page.waitUntil("document.querySelector('#holding-name')", { label: 'the holding editor again' });
+    await page.settle(300);
+    const lock = JSON.parse(await page.eval(`JSON.stringify({
+      disabled: document.querySelector('#holding-unit').disabled,
+      readable: document.querySelector('#holding-unit').value,
+      listShown: !document.querySelector('#holding-unit-list').hidden,
+    })`));
+    check(
+      'the unit of a holding with a value is disabled, readable, and explained',
+      lock.disabled && lock.readable.includes('CHF') && !lock.listShown &&
+        (await text()).includes('The unit cannot change once you have recorded a value here.'),
+      JSON.stringify(lock),
+    );
+    const rowBefore = rowOf(probeId);
+    await page.eval(`(() => {
+      const kept = document.querySelector('.unit-chosen');
+      kept.value = 'USD';
+      kept.dispatchEvent(new Event('change', { bubbles: true }));
+    })()`);
+    await page.eval("document.querySelectorAll('#app details').forEach(d => (d.open = true))");
+    await setValue('#app textarea', `${NOTE} edited`);
+    await choose('#app select[aria-label="Region"]', 'home0001');
+    await page.eval("document.querySelector('#app .panel-form button[type=submit]').click()");
+    await page.waitUntil("!document.querySelector('#holding-name')", { label: 'the edit to save' });
+    await page.settle(400);
+    const rowAfter = rowOf(probeId);
+    const edited = await payloadOf(probeId);
+    check(
+      'an edit increments the version and writes a different nonce',
+      rowAfter.version === rowBefore.version + 1 && rowAfter.nonce !== rowBefore.nonce,
+      `${rowBefore.version}/${rowBefore.nonce} then ${rowAfter.version}/${rowAfter.nonce}`,
+    );
+    check(
+      're-saving a dimension with another value leaves one entry for it',
+      edited.dims.region01 === 'home0001' && Object.keys(edited.dims).length === Object.keys(saved.dims).length &&
+        Object.keys(edited.dims).filter((key) => key === 'region01').length === 1,
+      JSON.stringify(edited.dims),
+    );
+    check('the UI refuses to change the unit of a holding with a value', edited.unit === 'CHF', edited.unit);
+
+    // A Conflict: the record is changed behind this tab, the save is
+    // refused, the editor shows what the other tab wrote, and the edit
+    // is redone against it.
+    await click('Edit');
+    await page.waitUntil("document.querySelector('#holding-name')", { label: 'the editor before the conflict' });
+    const current = await vaultValue(`{ version: v.holdings.get('${probeId}').version, payload: v.holdings.get('${probeId}').payload }`);
+    provoked.push(`/api/records/${probeId}`);
+    await plant([{ type: 'account', recordId: probeId, version: current.version + 1, payload: { ...current.payload, name: 'Changed in another tab' } }]);
+    await page.eval("document.querySelectorAll('#app details').forEach(d => (d.open = true))");
+    await setValue('#app textarea', 'typed in this tab');
+    await page.eval("document.querySelector('#app .panel-form button[type=submit]').click()");
+    await page.waitUntil("document.body.innerText.includes('This holding was changed in another tab.')", { label: 'the conflict message' });
+    await page.settle(300);
+    check(
+      'a Conflict reloads the record into the editor and changes nothing stored',
+      (await page.eval("document.querySelector('#holding-name').value")) === 'Changed in another tab' &&
+        rowOf(probeId).version === current.version + 1,
+      await page.eval("document.querySelector('#holding-name').value"),
+    );
+    await setValue('#holding-name', NAME);
+    await page.eval("document.querySelector('#app .panel-form button[type=submit]').click()");
+    await page.waitUntil("!document.querySelector('#holding-name')", { label: 'the redone edit' });
+    await page.settle(400);
+    check('the redone edit saves at the next version', rowOf(probeId).version === current.version + 2 && (await payloadOf(probeId)).name === NAME);
+
+    // -- Decrypted strings reach the page as text, everywhere -----------------
+
+    check(
+      'a name and a note carrying markup render as literal text on the holding screen',
+      (await page.eval("document.querySelector('.screen-heading').textContent")) === NAME &&
+        (await page.eval("document.querySelector('.detail-header .note').textContent")) === (await payloadOf(probeId)).note &&
+        (await page.eval("[...document.querySelectorAll('.detail-header .chip')].map(c => c.textContent)")).includes(`${AXIS}: ${BAND}`),
+    );
+    await page.eval("location.hash = '#/'");
+    await page.waitUntil("document.querySelector('.chart-controls select')", { label: 'the dashboard' });
+    await choose('.chart-controls select', axis.id);
+    await page.settle(400);
+    await page.eval("[...document.querySelectorAll('.range-buttons button')].find(b => b.textContent === 'All').click()");
+    await page.settle(300);
+    await page.eval(`(() => {
+      const chart = document.querySelector('svg.trend');
+      const box = chart.getBoundingClientRect();
+      chart.dispatchEvent(new PointerEvent('pointermove', { clientX: box.right - 30, clientY: box.top + box.height / 2, bubbles: true }));
+    })()`);
+    await page.settle(100);
+    const places = JSON.parse(await page.eval(`JSON.stringify({
+      row: [...document.querySelectorAll('.holdings-table .row-name')].some(b => b.textContent === ${JSON.stringify(NAME)}),
+      legend: [...document.querySelectorAll('.legend-name')].map(n => n.textContent),
+      grouping: [...document.querySelectorAll('.chart-controls select option')].map(o => o.textContent),
+      heading: document.querySelector('.chart-card .section-heading').textContent,
+      readout: document.querySelector('.chart-readout').textContent,
+      chips: [...document.querySelectorAll('.holdings-table .chip')].map(c => c.textContent),
+    })`));
+    check(
+      'markup in a name, a note and a label is literal in the list, the legend, the heading and the tooltip',
+      places.row && places.legend.includes(BAND) && places.grouping.includes(AXIS) &&
+        places.heading === `Net worth by ${AXIS}` && places.readout.includes(BAND) && places.chips.includes(`${AXIS}: ${BAND}`),
+      JSON.stringify(places),
+    );
+    check(
+      'no markup from the vault became an element, and nothing ran',
+      (await page.eval("document.querySelectorAll('img').length")) === 0 && !(await page.eval('window.__alerted')),
+    );
+    await choose('.chart-controls select', '');
+
+    // -- Renaming and archiving dimensions writes the profile alone ----------
+
+    const accountsAtRename = accountRows();
+    await writesSeen();
+    await page.eval(`document.querySelector('.topbar nav a[href="#/settings"]').click()`);
+    await page.waitUntil("document.querySelector('.link-row[href=\"/settings/dimensions\"]')", { label: 'settings' });
+    await page.eval(`document.querySelector('.link-row[href="/settings/dimensions"]').click()`);
+    await page.waitUntil("document.body.innerText.includes('Region')", { label: 'the dimensions screen' });
+    await page.settle(300);
+    const card = (label) =>
+      `[...document.querySelectorAll('section.card')].find(c => c.querySelector('.card-head .strong')?.textContent === ${JSON.stringify(label)})`;
+    const inCard = (label, button, within = '') =>
+      page.eval(`[...${card(label)}.querySelectorAll('${within} button')].find(b => b.textContent === ${JSON.stringify(button)}).click()`);
+    await page.eval(`${card('Region')}.querySelector('.card-head .btn-inline').click()`);
+    await page.eval(`(() => {
+      const input = ${card('Region')}.querySelector('.card-head input');
+      input.value = 'Area';
+      input.dispatchEvent(new Event('input', { bubbles: true }));
+    })()`);
+    await page.eval(`[...${card('Region')}.querySelectorAll('.card-head button')].find(b => b.textContent === 'Save').click()`);
+    await page.waitUntil(`${card('Area')}`, { label: 'the renamed dimension' });
+    await page.settle(300);
+    check(
+      "renaming a dimension's label writes the profile alone and leaves every account record byte-identical",
+      (await writesSeen()).join(',') === 'profile' && accountRows() === accountsAtRename,
+    );
+
+    // An archived value reads as Unassigned, and restoring it brings the
+    // assignment back, with no account record written either way.
+    await page.eval(`[...[...${card('Area')}.querySelectorAll('li.value-row')].find(r => r.querySelector('.strong').textContent === 'Home').querySelectorAll(':scope > button')].find(b => b.textContent === 'Archive').click()`);
+    await page.settle(500);
+    const bandWhileArchived = await vaultValue(`v.bandOf(v.holdings.get('${probeId}'), v.dimensions.find(d => d.id === 'region01')).label`);
+    await inCard('Area', 'Restore');
+    await page.settle(500);
+    const bandRestored = await vaultValue(`v.bandOf(v.holdings.get('${probeId}'), v.dimensions.find(d => d.id === 'region01')).label`);
+    check(
+      'a holding whose value is archived reads Unassigned, and restoring it restores the assignment with no account write',
+      bandWhileArchived === 'Unassigned' && bandRestored === 'Home' && accountRows() === accountsAtRename &&
+        (await writesSeen()).every((type) => type === 'profile'),
+      `${bandWhileArchived} then ${bandRestored}`,
+    );
+
+    await inCard(AXIS, 'Archive dimension');
+    await page.waitUntil("document.querySelector('.dialog')", { label: 'the archive dimension dialog' });
+    await inDialog('Archive');
+    await page.settle(500);
+    await openHolding(probeId);
+    check(
+      'a holding whose dimension is archived shows no assignment for it, and no account record was written',
+      !(await page.eval("document.querySelector('.detail-header').textContent")).includes('Axis') &&
+        accountRows() === accountsAtRename && (await writesSeen()).every((type) => type === 'profile'),
+    );
+    // Saving the holding meanwhile keeps the entry the form cannot show.
+    await click('Edit');
+    await page.waitUntil("document.querySelector('#holding-name')", { label: 'the editor over an archived dimension' });
+    await page.eval("document.querySelectorAll('#app details').forEach(d => (d.open = true))");
+    await setValue('#app textarea', NOTE);
+    await page.eval("document.querySelector('#app .panel-form button[type=submit]').click()");
+    await page.waitUntil("!document.querySelector('#holding-name')", { label: 'the save over an archived dimension' });
+    await page.settle(300);
+    check(
+      'saving a holding keeps the entry for an archived dimension untouched',
+      (await payloadOf(probeId)).dims[axis.id] === axis.values[0].id,
+      JSON.stringify((await payloadOf(probeId)).dims),
+    );
+    await writesSeen();
+    const accountsBeforeRestore = accountRows();
+    await page.eval(`document.querySelector('.topbar nav a[href="#/settings"]').click()`);
+    await page.waitUntil("document.querySelector('.link-row[href=\"/settings/dimensions\"]')", { label: 'settings again' });
+    await page.eval(`document.querySelector('.link-row[href="/settings/dimensions"]').click()`);
+    await page.waitUntil("document.body.innerText.includes('Area')", { label: 'the dimensions screen again' });
+    await page.eval(`[...document.querySelectorAll('.settings-row')].find(r => r.querySelector('span').textContent === ${JSON.stringify(AXIS)}).querySelector('button').click()`);
+    await page.settle(500);
+    await openHolding(probeId);
+    check(
+      'restoring the dimension restores the assignment without writing an account record',
+      (await page.eval("[...document.querySelectorAll('.detail-header .chip')].map(c => c.textContent)")).includes(`${AXIS}: ${BAND}`) &&
+        accountRows() === accountsBeforeRestore && (await writesSeen()).every((type) => type === 'profile'),
+    );
+
+    // -- Deleting ---------------------------------------------------------------
+
+    await click('Delete');
+    await page.waitUntil("document.querySelector('.dialog')", { label: 'the delete dialog' });
+    await page.settle(200);
+    const offered = JSON.parse(await page.eval(`JSON.stringify({
+      archive: document.querySelector('.dialog input[value=archive]').checked,
+      both: document.querySelectorAll('.dialog input[type=radio]').length,
+    })`));
+    await page.eval("document.querySelector('.dialog input[value=delete]').click()");
+    await page.settle(150);
+    const permanently = "[...document.querySelectorAll('.dialog button')].find(b => b.textContent === 'Delete permanently')";
+    const deleteCopy = (await text()).includes('This also deletes 1 recorded values. Your past net worth figures will change.');
+    await setValue('#delete-name', 'Not the name');
+    const wrongName = await page.eval(`${permanently}.disabled`);
+    await setValue('#delete-name', NAME);
+    const rightName = await page.eval(`${permanently}.disabled`);
+    check(
+      'Delete on a holding with values offers archive, preselected, and permanent delete behind the typed name',
+      offered.archive && offered.both === 2 && deleteCopy && wrongName && !rightName,
+      JSON.stringify({ offered, deleteCopy, wrongName, rightName }),
+    );
+    await inDialog('Cancel');
+    await page.settle(200);
+
+    await openHolding(parking[1]);
+    await click('Delete');
+    await page.waitUntil("location.hash === '#/'", { label: 'the dashboard after deleting outright' });
+    check(
+      'a holding with no values is deleted outright, with no dialog',
+      !(await page.eval("Boolean(document.querySelector('.dialog'))")) && !rowOf(parking[1]) && Boolean(rowOf(parking[0])),
+    );
+
+    // -- Archiving with the closing value taken, and with it skipped -----------
+
+    const today = await page.eval('new Date().toISOString().slice(0, 10)');
+    const [skipId] = await plant([{
+      type: 'account',
+      payload: { name: 'Probe closing', unit: 'CHF', dims: {}, note: null, archivedAt: null, createdAt: new Date().toISOString() },
+    }]);
+    await plant([{ type: 'snapshot', accountId: skipId, payload: { date: BACKDATE, value: '700', note: null } }]);
+    await reloadModel();
+
+    await openHolding(probeId);
+    await click('Archive');
+    await page.waitUntil("document.querySelector('#closing-value')", { label: 'the archive dialog' });
+    const zero = await page.eval(`(async () => {
+      const v = (await import('/static/js/session.js')).currentVault();
+      return v.format.parseFigure(document.querySelector('#closing-value').value) === 0n;
+    })()`);
+    check('the closing value is prefilled 0 on a free date', zero);
+    await setValue('#closing-value', '4000');
+    await inDialog('Archive');
+    await page.waitUntil('!document.querySelector(".dialog")', { timeout: 60000, label: 'the archive with a closing value' });
+    await page.settle(800);
+    const closing = await vaultValue(`v.snapshotsFor('${probeId}').filter(s => s.payload.date === '${today}').map(s => s.payload.value)`);
+    check('the closing value is one figure dated the archive date', closing.join(',') === '4000', closing.join(','));
+
+    await openHolding(skipId);
+    await click('Archive');
+    await page.waitUntil("document.querySelector('#closing-value')", { label: 'the archive dialog to skip' });
+    await click('Skip');
+    await inDialog('Archive');
+    await page.waitUntil('!document.querySelector(".dialog")', { timeout: 60000, label: 'the archive with the value skipped' });
+    await page.settle(800);
+    const skipped = await vaultValue(`{ archivedAt: v.holdings.get('${skipId}').payload.archivedAt, figures: v.snapshotsFor('${skipId}').length }`);
+    check('archiving with the closing value skipped still archives, and records nothing', skipped.archivedAt === today && skipped.figures === 1, JSON.stringify(skipped));
+
+    await page.eval("location.hash = '#/'");
+    await page.waitUntil("document.querySelector('.chart-controls select')", { label: 'the dashboard after archiving' });
+    await choose('.chart-controls select', axis.id);
+    await page.settle(300);
+    await page.eval("[...document.querySelectorAll('.range-buttons button')].find(b => b.textContent === 'All').click()");
+    await page.settle(300);
+    const band = JSON.parse(await page.eval(`(async () => {
+      const v = (await import('/static/js/session.js')).currentVault();
+      const table = document.querySelector('.chart-card details table');
+      const column = [...table.querySelectorAll('thead th')].findIndex(th => th.textContent === ${JSON.stringify(BAND)});
+      const row = [...table.querySelectorAll('tbody tr')].find(r => r.cells[0].textContent === v.format.date('${today}'));
+      return JSON.stringify({ shown: row && column > 0 ? row.cells[column].textContent : null, expected: v.format.money((await import('/static/js/decimal.js')).parse('4000')) });
+    })()`));
+    check("the band runs into the closing value on the archive date", band.shown === band.expected, JSON.stringify(band));
+    const annotations = await page.eval("[...document.querySelectorAll('.archive-annotation title')].map(t => t.textContent)");
+    check(
+      'both archive paths annotate the date, naming the holding as literal text',
+      annotations.includes(`${NAME} archived`) && annotations.includes('Probe closing archived'),
+      annotations.join(' | '),
+    );
+    await choose('.chart-controls select', '');
+
+    // -- When a write in the archive or delete flow fails -----------------------
+
+    const [euroId, poundId] = await plant([
+      { type: 'account', payload: { name: 'Probe euro closing', unit: 'EUR', dims: {}, note: null, archivedAt: null, createdAt: new Date().toISOString() } },
+      { type: 'account', payload: { name: 'Probe pound closing', unit: 'GBP', dims: {}, note: null, archivedAt: null, createdAt: new Date().toISOString() } },
+    ]);
+    await plant([
+      { type: 'snapshot', accountId: euroId, payload: { date: BACKDATE, value: '100', note: null } },
+      { type: 'snapshot', accountId: poundId, payload: { date: BACKDATE, value: '200', note: null } },
+    ]);
+    await reloadModel();
+
+    await openHolding(euroId);
+    await failing(writing(null, 'DELETE'), async () => {
+      await page.eval("[...document.querySelectorAll('.card .data-table button')].find(b => b.textContent === 'Delete').click()");
+      await page.waitUntil("document.querySelector('.dialog')", { label: 'the delete snapshot dialog' });
+      await inDialog('Delete');
+      await page.waitUntil("document.querySelector('.card .data-table .field-error:not([hidden])')", { label: 'the failed delete' });
+    });
+    check(
+      'a failed delete is reported on its row, and the row stays',
+      (await page.eval("document.querySelector('.card .data-table .field-error:not([hidden])').closest('tr').textContent")).includes('Nothing was deleted.') &&
+        (await vaultValue(`v.snapshotsFor('${euroId}').length`)) === 1,
+    );
+
+    await click('Archive');
+    await page.waitUntil("document.querySelector('#closing-value')", { label: 'the euro archive dialog' });
+    await setValue('#closing-value', '90');
+    await failing(writing('snapshot'), async () => {
+      await inDialog('Archive');
+      await page.waitUntil("document.body.innerText.includes('The closing value did not save')", { label: 'the closing value failure' });
+    });
+    check(
+      'a closing value that does not save archives nothing, and the figure stays in the field',
+      (await page.eval("document.querySelector('#closing-value').value")) === '90' &&
+        !(await vaultValue(`v.holdings.get('${euroId}').payload.archivedAt`)) &&
+        (await text()).includes('nothing was archived and the holding is untouched'),
+    );
+    await failing(writing('rate'), async () => {
+      await inDialog('Archive');
+      await page.waitUntil("document.body.innerText.includes('were not written')", { timeout: 60000, label: 'the price failure' });
+    });
+    const priceMessage = await text();
+    check(
+      'a closing value whose prices do not save still archives, naming the units',
+      priceMessage.includes('Archived. The prices for EUR') &&
+        (await vaultValue(`v.holdings.get('${euroId}').payload.archivedAt`)) === today &&
+        (await vaultValue(`v.snapshotsFor('${euroId}').filter(s => s.payload.date === '${today}').length`)) === 1,
+      priceMessage.slice(0, 400),
+    );
+    await inDialog('Close');
+    await page.settle(400);
+
+    await openHolding(poundId);
+    await click('Archive');
+    await page.waitUntil("document.querySelector('#closing-value')", { label: 'the pound archive dialog' });
+    await setValue('#closing-value', '180');
+    await failing(writing('account'), async () => {
+      await inDialog('Archive');
+      await page.waitUntil("document.body.innerText.includes('but the holding was not archived')", { timeout: 60000, label: 'the flag failure' });
+    });
+    const again = await page.eval(`(async () => {
+      const v = (await import('/static/js/session.js')).currentVault();
+      return String(v.format.parseFigure(document.querySelector('#closing-value').value));
+    })()`);
+    check(
+      'a closing value saved without the archive flag says both halves and offers the archive again, prefilled',
+      again === (await page.eval("(async () => String((await import('/static/js/decimal.js')).parse('180')))()")) &&
+        !(await vaultValue(`v.holdings.get('${poundId}').payload.archivedAt`)) &&
+        (await vaultValue(`v.snapshotsFor('${poundId}').filter(s => s.payload.date === '${today}').length`)) === 1,
+      again,
+    );
+    await inDialog('Archive');
+    await page.waitUntil('!document.querySelector(".dialog")', { timeout: 60000, label: 'the archive offered again' });
+    await page.settle(600);
+    check(
+      'the archive offered again finishes it, with one figure at the date',
+      (await vaultValue(`v.holdings.get('${poundId}').payload.archivedAt`)) === today &&
+        (await vaultValue(`v.snapshotsFor('${poundId}').filter(s => s.payload.date === '${today}').length`)) === 1,
+    );
+
+    // -- Unarchiving, from the dashboard's archived rows ------------------------
+
+    await page.eval("location.hash = '#/'");
+    await page.waitUntil("document.querySelector('.holdings-card')", { label: 'the dashboard to unarchive from' });
+    await page.eval("[...document.querySelectorAll('.holdings-card .checkbox input')][0].click()");
+    await page.settle(300);
+    const archivedRow = `[...document.querySelectorAll('.holdings-table tbody tr')].find(r => r.querySelector('.row-name').textContent === ${JSON.stringify(archiving)})`;
+    const rowActions = await page.eval(`[...${archivedRow}.querySelectorAll('.cell-action button')].map(b => b.textContent)`);
+    check('an archived row offers Unarchive and no new value', rowActions.join(',') === 'Unarchive', rowActions.join(','));
+    await page.eval(`${archivedRow}.querySelector('.cell-action button').click()`);
+    await page.settle(800);
+    await page.eval("[...document.querySelectorAll('.holdings-card .checkbox input')][0].checked && [...document.querySelectorAll('.holdings-card .checkbox input')][0].click()");
+    await page.settle(300);
+    const back = await page.eval(`[...document.querySelectorAll('.holdings-table .row-name')].map(b => b.textContent)`);
+    const heroNow = await page.eval("document.querySelector('.hero-figure').textContent");
+    check(
+      'unarchiving restores the holding to the active list and to the current total',
+      back.includes(archiving) && heroNow === heroBeforeArchive,
+      `${back.join(',')}: ${heroNow} against ${heroBeforeArchive}`,
+    );
+
+    // -- What the page asked the server for ---------------------------------------
+
+    const requested = JSON.parse(await page.eval(`JSON.stringify(performance.getEntriesByType('resource')
+      .map(e => new URL(e.name)).filter(u => u.pathname.startsWith('/api/')).map(u => u.pathname + u.search))`));
+    const rateRequests = requested.filter((path) => path.startsWith('/api/rates?'));
+    check(
+      'no rate request names a symbol: each asks for the whole table at a date',
+      rateRequests.length > 0 &&
+        rateRequests.every((path) => [...new URLSearchParams(path.split('?')[1]).keys()].sort().join(',') === 'date,quote'),
+      rateRequests.join(' | '),
+    );
+    check(
+      'no request returns dimensions, labels or values: none names them',
+      requested.every((path) => !/dimension|label|value/i.test(path)),
+      [...new Set(requested.map((path) => path.split('?')[0]))].join(' | '),
+    );
+    check('no markup from the vault ran anywhere along the way', !(await page.eval('window.__alerted')));
+  }
 
   // ---- Export, then import it back ---------------------------------------
 
@@ -1628,6 +2462,514 @@ try {
     return response.status;
   })()`);
   check('the password is untouched by the import', stillOpens === 200);
+
+  // ---- Export and import, through the screen (export-import.md) ----------
+
+  {
+    const { DatabaseSync } = await import('node:sqlite');
+    const { mkdtempSync, readdirSync, readFileSync, writeFileSync, truncateSync } = await import('node:fs');
+    const { tmpdir } = await import('node:os');
+    const { join } = await import('node:path');
+    const query = (sql, ...args) => {
+      const db = new DatabaseSync(process.env.DATABASE_PATH, { readOnly: true });
+      try {
+        return db.prepare(sql).all(...args);
+      } finally {
+        db.close();
+      }
+    };
+    const OWNER = "JOIN principals ON principals.id = records.principal_id WHERE principals.username = 'leander'";
+    const vaultRows = () => JSON.stringify(query(`SELECT records.* FROM records ${OWNER} ORDER BY record_id`));
+    const credentialOf = (username) =>
+      query(
+        'SELECT credentials.params, credentials.verifier, dek_wrappers.wrapped_dek, dek_wrappers.dek_nonce FROM credentials ' +
+          'JOIN principals ON principals.id = credentials.principal_id ' +
+          'JOIN dek_wrappers ON dek_wrappers.credential_id = credentials.id WHERE principals.username = ?',
+        username,
+      )[0];
+    const apiCalls = (part) =>
+      page.eval(`performance.getEntriesByType('resource').filter(e => e.name.includes(${JSON.stringify(part)})).length`);
+    const inPage = (body) =>
+      page.eval(`(async () => {
+        const v = (await import('/static/js/session.js')).currentVault();
+        const c = await import('/static/js/crypto.js');
+        const t = await import('/static/js/transfer.js');
+        return JSON.stringify(await (async () => { ${body} })());
+      })()`).then(JSON.parse);
+    const unlockAt = async (address, ready) => {
+      await page.goto(`${BASE}${address}`);
+      await enterPassword(VAULT_PASSWORD);
+      await page.waitUntil(ready, { timeout: 90000, label: address });
+      await page.settle(500);
+    };
+    // Drawn afresh, so nothing a previous import left on it counts.
+    const toScreen = async () => {
+      await page.eval("location.hash = '#/settings'");
+      await page.settle(300);
+      await page.eval("location.hash = '#/settings/export-import'");
+      await page.waitUntil("document.querySelector('#import-file')", { label: 'the export and import screen' });
+      await page.settle(200);
+    };
+    const dir = mkdtempSync(join(tmpdir(), 'solvent-transfer-'));
+    const fixture = (name, content) => {
+      const path = join(dir, name);
+      writeFileSync(path, content);
+      return path;
+    };
+    // The handle is released straight away: DevTools keeps whatever it
+    // hands out alive, and a live handle to an element of a page since
+    // navigated away would keep that page's decrypted vault reachable.
+    const chooseFile = async (path) => {
+      const { result } = await page.send('Runtime.evaluate', { expression: "document.querySelector('#import-file')" });
+      await page.send('DOM.setFileInputFiles', { files: [path], objectId: result.objectId });
+      await page.send('Runtime.releaseObject', { objectId: result.objectId });
+      await page.settle(400);
+    };
+    const openWith = async (password) => {
+      await page.waitUntil("!document.querySelector('#import-password').closest('[hidden]')", { label: 'the password step' });
+      await setValue('#import-password', password);
+      await page.eval("[...document.querySelectorAll('#import-card button')].find(b => b.textContent === 'Open the file').click()");
+    };
+    const replaceVault = () =>
+      page.eval("[...document.querySelectorAll('#import-card button')].find(b => b.textContent === 'Replace my vault').click()");
+    const importError = () => page.eval("document.querySelector('#import-card .field-error').hidden ? '' : document.querySelector('#import-card .field-error').textContent");
+    // Every request matching `match` answered with `status` while `body` runs.
+    const answering = async (match, status, body) => {
+      const handler = async (message) => {
+        if (message.method !== 'Fetch.requestPaused') return;
+        const { requestId, request } = message.params;
+        if (match(request)) {
+          await page.send('Fetch.fulfillRequest', { requestId, responseCode: status, body: '' });
+        } else {
+          await page.send('Fetch.continueRequest', { requestId });
+        }
+      };
+      page.on(handler);
+      await page.send('Fetch.enable', { patterns: [{ urlPattern: '*/api/*', requestStage: 'Request' }] });
+      try {
+        await body();
+      } finally {
+        await page.send('Fetch.disable');
+        page.handlers = page.handlers.filter((h) => h !== handler);
+      }
+    };
+    // Everything the vault decrypts to, keyed by record id.
+    const decrypted = () =>
+      inPage(`
+        const api = await import('/static/js/api.js');
+        const out = {};
+        for (const type of ['profile', 'account', 'snapshot', 'rate']) {
+          for (const row of await api.get('/api/records?type=' + type)) {
+            out[row.recordId] = { type: row.recordType, accountId: row.accountId, payload: await c.decryptRecord(v.dek, row) };
+          }
+        }
+        return Object.fromEntries(Object.entries(out).sort());
+      `);
+    // The chart and the total in both pricing modes, as drawn.
+    const picture = async () => {
+      await page.eval("location.hash = '#/'");
+      await page.waitUntil("document.querySelector('svg.trend')", { label: 'the dashboard to draw' });
+      await page.settle(400);
+      const mode = async (label) => {
+        await page.eval(`[...document.querySelectorAll('.switch-option')].find(b => b.textContent.includes(${JSON.stringify(label)})).click()`);
+        await page.settle(300);
+        return page.eval("document.querySelector('svg.trend').outerHTML + '|' + document.querySelector('.hero-figure').textContent");
+      };
+      return JSON.stringify([await mode('as of each figure'), await mode('Latest rates')]);
+    };
+
+    await unlockAt('/settings/export-import', "document.querySelector('#export')");
+
+    // -- Export ------------------------------------------------------------
+
+    const downloads = join(dir, 'downloads');
+    await page.send('Page.setDownloadBehavior', { behavior: 'allow', downloadPath: downloads });
+    const order = await page.eval(`(() => {
+      const warning = document.querySelector('#export-card .sensitivity');
+      const button = document.querySelector('#export');
+      return JSON.stringify({
+        warning: warning ? warning.textContent : '',
+        before: Boolean(warning && warning.compareDocumentPosition(button) & Node.DOCUMENT_POSITION_FOLLOWING),
+        tag: button.tagName,
+      });
+    })()`).then(JSON.parse);
+    check(
+      'the sensitivity warning is on screen before the download is triggered',
+      order.warning.includes('exactly as sensitive as your password') && order.warning.includes('permanently unreadable') &&
+        order.before && order.tag === 'BUTTON',
+      JSON.stringify(order),
+    );
+    await page.eval("document.querySelector('#export').click()");
+    let saved = [];
+    for (let i = 0; i < 60 && !saved.some((n) => n.endsWith('.json')); i++) {
+      await page.settle(250);
+      try {
+        saved = readdirSync(downloads);
+      } catch {}
+    }
+    const filename = saved.find((n) => n.endsWith('.json')) || '';
+    check('the export lands as a dated file naming nobody', /^solvent-vault-\d{4}-\d{2}-\d{2}\.json$/.test(filename), saved.join(','));
+    const exportedPath = join(downloads, filename);
+    const exportedText = readFileSync(exportedPath, 'utf8');
+    const exported = JSON.parse(exportedText);
+    await page.waitUntil("!document.querySelector('#export-card [role=status]').hidden", { label: 'what the file holds' });
+    check(
+      'afterwards the screen says what the file holds, both timelines named',
+      /\d+ holdings, \d+ recorded figures and \d+ captured prices, about \d+ KB/.test(
+        await page.eval("document.querySelector('#export-card [role=status]').textContent"),
+      ),
+    );
+
+    // Every plaintext the vault holds, looked for in the file's bytes:
+    // outside the encoded fields, and inside them once decoded.
+    const needles = await inPage(`
+      const out = new Set([v.mainCurrency]);
+      for (const h of v.holdings.values()) [h.payload.name, h.payload.note, h.payload.unit].forEach((x) => x && out.add(x));
+      for (const d of v.dimensions) { out.add(d.label); d.values.forEach((x) => out.add(x.label)); }
+      for (const list of v.snapshots.values()) for (const s of list) { out.add(s.payload.date); if (s.payload.value.length >= 4) out.add(s.payload.value); }
+      for (const list of v.rates.values()) for (const r of list) { out.add(r.payload.symbol); out.add(r.payload.date); if (r.payload.rate.length >= 4) out.add(r.payload.rate); }
+      return [...out];
+    `);
+    // Encoded fields, random ids and the export's own timestamp carry no
+    // vault content, so they are blanked before the plain scan.
+    const opaque = /"(salt|wrappedDek|dekNonce|nonce|ciphertext|recordId|accountId|exportedAt)":\s*"([^"]*)"/g;
+    const outside = exportedText.replace(opaque, '"$1":""');
+    const encoded = [...exportedText.matchAll(opaque)]
+      .filter(([, key]) => !['recordId', 'accountId', 'exportedAt'].includes(key))
+      .map(([, , value]) => Buffer.from(value, 'base64'));
+    const found = needles.filter(
+      (needle) =>
+        outside.includes(needle) ||
+        (needle.length >= 5 && encoded.some((bytes) => bytes.includes(Buffer.from(needle, 'utf8')))),
+    );
+    check(
+      'the exported file holds no name, note, label, value, rate, symbol, date or currency in plaintext',
+      needles.length > 10 && found.length === 0,
+      found.join(' | '),
+    );
+
+    // The export failing, or at its ceiling, as the screen shows it.
+    await answering((r) => r.url.endsWith('/api/export'), 500, async () => {
+      await page.eval("document.querySelector('#export').click()");
+      await page.waitUntil("!document.querySelector('#export-card .field-error').hidden", { label: 'the failed export' });
+    });
+    check(
+      'a failed export says nothing was written and nothing changed, and the button rests',
+      (await page.eval("document.querySelector('#export-card .field-error').textContent")).includes('Nothing was written to disk and nothing in your vault changed') &&
+        !(await page.eval("document.querySelector('#export').disabled")),
+    );
+    await answering((r) => r.url.endsWith('/api/export'), 429, async () => {
+      await page.eval("document.querySelector('#export').click()");
+      await page.waitUntil("document.querySelector('#export-card .field-error').textContent.includes('several times')", { label: 'the export ceiling' });
+    });
+    check('at the export ceiling the button is disabled with the reason beside it', await page.eval("document.querySelector('#export').disabled"));
+
+    // A plain navigation to the endpoint, with a live session cookie.
+    const alive = await page.eval("fetch('/api/sessions', { headers: { 'X-Solvent-Request': '1' } }).then(r => r.status)");
+    const navigated = join(dir, 'navigated');
+    await page.send('Page.setDownloadBehavior', { behavior: 'allow', downloadPath: navigated });
+    // Locked first, because the page navigated away from can stay alive
+    // in the back-forward cache, and it should hold no decrypted vault.
+    await page.eval("[...document.querySelectorAll('.topbar-actions button')].find(b => b.textContent.trim() === 'Lock').click()");
+    await page.goto(`${BASE}/api/export`);
+    await page.settle(1500);
+    const statuses = [await page.eval("performance.getEntriesByType('navigation')[0].responseStatus")];
+    let navigatedFiles = [];
+    try {
+      navigatedFiles = readdirSync(navigated);
+    } catch {}
+    check(
+      'a top-level navigation to the export, with a valid session cookie, is Forbidden and writes no file',
+      alive === 200 && statuses.join(',') === '403' && navigatedFiles.length === 0,
+      `session ${alive}, answered ${statuses.join(',')}, files ${navigatedFiles.join(',')}`,
+    );
+
+    // -- Import: files and passwords that go nowhere ---------------------------
+
+    await unlockAt('/settings/export-import', "document.querySelector('#import-file')");
+    const rowsBefore = vaultRows();
+    const uploads = () => apiCalls('/api/import');
+
+    await chooseFile(fixture('not-json.json', 'this is not a vault'));
+    check('a file that is not JSON is refused at the first step', (await importError()).includes('not a Solvent vault file') &&
+      (await page.eval("Boolean(document.querySelector('#import-password').closest('[hidden]'))")));
+    await chooseFile(fixture('newer.json', JSON.stringify({ ...exported, formatVersion: 2 })));
+    check('a file from a newer version is refused at the first step', (await importError()).includes('newer version'));
+    const badType = JSON.parse(exportedText);
+    badType.records[0].recordType = 'invoice';
+    await chooseFile(fixture('bad-type.json', JSON.stringify(badType)));
+    check('a file the server would refuse is refused before it is opened', (await importError()).includes('not a Solvent vault file'));
+    const large = fixture('large.json', '');
+    truncateSync(large, 49 * 1024 * 1024);
+    await chooseFile(large);
+    check('an oversized file is refused by its size', (await importError()).includes('too large'));
+
+    await chooseFile(exportedPath);
+    const callsBefore = await apiCalls('/api/');
+    await openWith('not the password of this file');
+    await page.waitUntil("document.querySelector('#import-card .field-error').textContent.includes('does not open')", { timeout: 60000, label: 'the wrong password' });
+    check(
+      'a wrong password for the file stops there, sends nothing, and keeps the file chosen',
+      (await apiCalls('/api/')) === callsBefore &&
+        (await page.eval("document.querySelector('#import-file').files.length")) === 1 &&
+        (await page.eval("document.querySelector('.review').hidden")),
+    );
+
+    await openWith(VAULT_PASSWORD);
+    await page.waitUntil("!document.querySelector('.review').hidden", { timeout: 60000, label: 'the review' });
+    const kinds = { account: 0, snapshot: 0, rate: 0 };
+    for (const record of exported.records) if (record.recordType in kinds) kinds[record.recordType] += 1;
+    const review = await page.eval("document.querySelector('.review').innerText");
+    const total = query(`SELECT record_id FROM records ${OWNER}`).length;
+    check(
+      'the review sets what is in the file against what will be deleted, prices on their own line',
+      review.includes(`${kinds.account} holdings`) && review.includes(`${kinds.rate} captured prices`) &&
+        review.includes(`Your vault currently holds ${total} records. All of them will be deleted.`) &&
+        !review.includes('This vault is kept in'),
+      review,
+    );
+    await replaceVault();
+    await page.settle(300);
+    check(
+      'a vault holding records is not replaced without ERASE typed',
+      (await importError()).includes('Type ERASE') && (await uploads()) === 0 && vaultRows() === rowsBefore,
+    );
+
+    const altered = JSON.parse(exportedText);
+    const target = altered.records.find((record) => record.recordType === 'snapshot');
+    const bytes = Buffer.from(target.ciphertext, 'base64');
+    bytes[5] ^= 0x01;
+    target.ciphertext = bytes.toString('base64');
+    await chooseFile(fixture('altered.json', JSON.stringify(altered)));
+    await openWith(VAULT_PASSWORD);
+    await page.waitUntil("!document.querySelector('.review').hidden", { timeout: 60000, label: 'the review of the altered file' });
+    await setValue('#import-erase', 'ERASE');
+    await replaceVault();
+    await page.waitUntil("document.querySelector('#import-card .field-error').textContent.includes('No records were imported')", { timeout: 60000, label: 'the refused record' });
+    check(
+      'one byte altered in one record aborts the import, names the record, uploads nothing and leaves the vault',
+      (await importError()).includes(target.recordId) && (await importError()).includes('Your vault is unchanged') &&
+        (await uploads()) === 0 && vaultRows() === rowsBefore,
+      await importError(),
+    );
+
+    await chooseFile(exportedPath);
+    await openWith(VAULT_PASSWORD);
+    await page.waitUntil("!document.querySelector('.review').hidden", { timeout: 60000, label: 'the review again' });
+    await setValue('#import-erase', 'ERASE');
+    provoked.push('/api/import');
+    await answering((r) => r.url.endsWith('/api/import'), 500, async () => {
+      await replaceVault();
+      await page.waitUntil("document.querySelector('#import-card .field-error').textContent.includes('fully intact')", { timeout: 60000, label: 'the refused upload' });
+    });
+    check('an import the server refuses says the original vault is intact, and it is', vaultRows() === rowsBefore);
+    provoked.splice(provoked.indexOf('/api/import'), 1);
+
+    // -- Import: the real thing -------------------------------------------------
+
+    const recordsBefore = await decrypted();
+    const drawnBefore = await picture();
+    const credentialBefore = credentialOf('leander');
+    await toScreen();
+    await page.eval('window.__samePage = true');
+    await chooseFile(exportedPath);
+    await openWith(VAULT_PASSWORD);
+    await page.waitUntil("!document.querySelector('.review').hidden", { timeout: 60000, label: 'the review to replace' });
+    await setValue('#import-erase', 'ERASE');
+    await replaceVault();
+    await page.waitUntil("document.body.innerText.includes('Your vault was replaced from the file')", { timeout: 90000, label: 'the import to land' });
+    await page.settle(300);
+    check(
+      'an import decrypts and re-encrypts in a Worker, and the view reloads in place confirming what came back',
+      (await apiCalls('transfer-worker.js')) > 0 && (await page.eval('window.__samePage === true')) &&
+        !(await page.eval("Boolean(document.querySelector('#unlock-password'))")) &&
+        (await text()).includes(`${kinds.account} holdings, ${kinds.snapshot} recorded figures and ${kinds.rate} captured prices`),
+    );
+    const versions = query(`SELECT DISTINCT version FROM records ${OWNER}`).map((row) => row.version);
+    check('every record reads version 1 after an import', versions.join(',') === '1', versions.join(','));
+    const credentialAfter = credentialOf('leander');
+    check(
+      'an import replaces the wrapper and leaves the salt, the envelope and the verifier byte-identical',
+      credentialAfter.params === credentialBefore.params && credentialAfter.verifier === credentialBefore.verifier &&
+        credentialAfter.wrapped_dek !== credentialBefore.wrapped_dek && credentialAfter.dek_nonce !== credentialBefore.dek_nonce,
+    );
+    const keys = await inPage(`
+      const raw = async (key) => c.b64encode(new Uint8Array(await crypto.subtle.exportKey('raw', key)));
+      const params = ${credentialAfter.params};
+      const master = (await c.deriveKeys(${JSON.stringify(VAULT_PASSWORD)}, params.salt, params.kdf)).masterKey;
+      const stored = await c.unwrapDek(${JSON.stringify(credentialAfter.wrapped_dek)}, ${JSON.stringify(credentialAfter.dek_nonce)}, master);
+      const file = (await t.openFile(${exportedText}, ${JSON.stringify(VAULT_PASSWORD)})).fileDek;
+      return { stored: await raw(stored), file: await raw(file), memory: await raw(v.dek) };
+    `);
+    check(
+      "after an import the stored wrapper unwraps to a key that is not the file's, and it is the one in use",
+      keys.stored !== keys.file && keys.stored === keys.memory,
+    );
+    check(
+      'the round trip restores the same ids, types, links and payloads, figures and prices alike',
+      JSON.stringify(await decrypted()) === JSON.stringify(recordsBefore),
+    );
+    check('the chart and the total in both pricing modes come back identical', (await picture()) === drawnBefore);
+
+    await unlockAt('/dashboard', "document.querySelector('svg.trend')");
+    const reread = await inPage('return { unreadable: v.unreadable.length, records: v.holdings.size }');
+    check(
+      'after an import the unchanged password signs in and every record reads',
+      reread.unreadable === 0 && reread.records === kinds.account,
+      JSON.stringify(reread),
+    );
+    const stillOpens = await inPage(`
+      const file = ${exportedText};
+      const { fileDek } = await t.openFile(file, ${JSON.stringify(VAULT_PASSWORD)});
+      return (await t.decryptAll(fileDek, file.records)).length === file.records.length;
+    `);
+    check('the exported file still opens with its own password after the vault was re-keyed', stillOpens);
+
+    // -- A vault transfer, from a second owner -----------------------------------
+
+    const SECOND_PASSWORD = 'meadow copper lantern thistle';
+    const other = await launch();
+    try {
+      const second = await Session.connect(other.target);
+      await second.send('Page.enable');
+      await second.send('Runtime.enable');
+      const fill = (fields) =>
+        second.eval(`(() => {
+          for (const [selector, value, index] of ${JSON.stringify(fields)}) {
+            const node = document.querySelectorAll(selector)[index || 0];
+            if (node.type === 'checkbox') node.checked = value;
+            else node.value = value;
+            node.dispatchEvent(new Event(node.tagName === 'SELECT' || node.type === 'checkbox' ? 'change' : 'input', { bubbles: true }));
+          }
+        })()`);
+      await second.goto(`${BASE}/login`);
+      await fill([['#unlock-username', 'ops.leander'], ['#unlock-password', ADMIN_PASSWORD]]);
+      await second.eval("document.querySelector('button[type=submit]').click()");
+      await second.waitUntil("location.pathname === '/admin'", { timeout: 90000, label: 'the administrator on the second browser' });
+      const invite = await second.eval(`fetch('/api/admin/invites', {
+        method: 'POST', headers: { 'X-Solvent-Request': '1', 'Content-Type': 'application/json' },
+        body: JSON.stringify({ kind: 'vault_owner' }),
+      }).then(r => r.json()).then(b => b.token)`);
+      await second.eval(`fetch('/api/auth/logout', { method: 'POST', headers: { 'X-Solvent-Request': '1', 'Content-Type': 'application/json' }, body: '{}' })`);
+      await second.goto(`${BASE}/register?invite=${invite}`);
+      await fill([
+        ['input[type=text]', 'second.owner'],
+        ['input[type=password]', SECOND_PASSWORD, 0],
+        ['input[type=password]', SECOND_PASSWORD, 1],
+        ['select', 'EUR'],
+        ['input[type=checkbox]', true],
+      ]);
+      await second.settle(300);
+      await second.eval("document.querySelector('button[type=submit]').click()");
+      await second.waitUntil("location.pathname === '/dashboard'", { timeout: 90000, label: 'the second vault' });
+      await second.settle(400);
+      await fill([['#unlock-password', SECOND_PASSWORD]]);
+      await second.eval("document.querySelector('button[type=submit]').click()");
+      await second.waitUntil("document.body.innerText.includes('Add your first holding')", { timeout: 90000, label: 'the empty second vault' });
+
+      // An empty vault's review says so, and asks for no typed word.
+      await second.eval("location.hash = '#/settings/export-import'");
+      await second.waitUntil("document.querySelector('#import-file')", { label: 'the second import screen' });
+      const { result } = await second.send('Runtime.evaluate', { expression: "document.querySelector('#import-file')" });
+      await second.send('DOM.setFileInputFiles', { files: [exportedPath], objectId: result.objectId });
+      await second.settle(400);
+      await fill([['#import-password', VAULT_PASSWORD]]);
+      await second.eval("[...document.querySelectorAll('#import-card button')].find(b => b.textContent === 'Open the file').click()");
+      await second.waitUntil("!document.querySelector('.review').hidden", { timeout: 60000, label: 'the review into an empty vault' });
+      check(
+        'into an empty vault the review says nothing will be deleted, and no word is typed',
+        (await second.eval("document.querySelector('.review').innerText")).includes('Your vault is empty. Nothing will be deleted.') &&
+          !(await second.eval("Boolean(document.querySelector('#import-erase'))")),
+      );
+
+      const plantSecond = (records) =>
+        second.eval(`(async () => {
+          const api = await import('/static/js/api.js');
+          const c = await import('/static/js/crypto.js');
+          const dek = (await import('/static/js/session.js')).currentVault().dek;
+          const ids = [];
+          for (const r of ${JSON.stringify(records)}) {
+            const slot = { recordId: c.uuid4(), recordType: r.type, accountId: r.accountId ?? null, schemaVersion: 1, version: 1 };
+            const { recordId, ...body } = slot;
+            await api.put('/api/records/' + recordId, { ...body, ...(await c.encryptRecord(dek, slot, r.payload)) });
+            ids.push(slot.recordId);
+          }
+          return ids;
+        })()`);
+      const [transferred] = await plantSecond([{
+        type: 'account',
+        payload: { name: 'Transfer probe', unit: 'EUR', dims: {}, note: null, archivedAt: null, createdAt: '2026-01-01T00:00:00Z' },
+      }]);
+      await plantSecond([{ type: 'snapshot', accountId: transferred, payload: { date: BACKDATE, value: '321', note: null } }]);
+      const secondText = await second.eval("fetch('/api/export', { headers: { 'X-Solvent-Request': '1' } }).then(r => r.text())");
+      // Written by the source after the export, for the injection check.
+      const [later] = await plantSecond([{
+        type: 'account',
+        payload: { name: 'Written after the export', unit: 'EUR', dims: {}, note: null, archivedAt: null, createdAt: '2026-01-02T00:00:00Z' },
+      }]);
+
+      await toScreen();
+      await chooseFile(fixture('second.json', secondText));
+      await openWith(SECOND_PASSWORD);
+      await page.waitUntil("!document.querySelector('.review').hidden", { timeout: 60000, label: 'the review of the second vault' });
+      check(
+        'the review names a main currency that differs from this vault',
+        (await page.eval("document.querySelector('.review').innerText")).includes('This vault is kept in EUR. Yours is currently in CHF.'),
+      );
+      await setValue('#import-erase', 'ERASE');
+      await replaceVault();
+      await page.waitUntil("document.body.innerText.includes('Your vault was replaced from the file')", { timeout: 90000, label: 'the transfer to land' });
+      const transferredVault = await inPage('return { names: [...v.holdings.values()].map(h => h.payload.name), unreadable: v.unreadable.length, currency: v.mainCurrency }');
+      check(
+        'a vault exported by a different user imports, and every record decrypts',
+        transferredVault.names.join(',') === 'Transfer probe' && transferredVault.unreadable === 0 && transferredVault.currency === 'EUR' &&
+          (await text()).includes('The figures on screen are now in EUR.'),
+        JSON.stringify(transferredVault),
+      );
+
+      // The source's later record, put straight into this vault's rows,
+      // does not decrypt: the two vaults share no key.
+      const db = new DatabaseSync(process.env.DATABASE_PATH);
+      try {
+        const row = db.prepare('SELECT * FROM records WHERE record_id = ?').get(later);
+        const mine = db.prepare("SELECT id FROM principals WHERE username = 'leander'").get().id;
+        db.prepare(
+          'INSERT INTO records (principal_id, record_id, record_type, account_id, schema_version, version, nonce, ciphertext, updated_at) ' +
+            'VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)',
+        ).run(mine, row.record_id, row.record_type, row.account_id, row.schema_version, row.version, row.nonce, row.ciphertext, row.updated_at);
+      } finally {
+        db.close();
+      }
+      const injected = await inPage(`await v.load(); return v.unreadable.includes(${JSON.stringify(later)});`);
+      check("a record the source wrote after the export, inserted into this vault's rows, fails to decrypt", injected);
+      const cleanup = new DatabaseSync(process.env.DATABASE_PATH);
+      try {
+        cleanup.prepare("DELETE FROM records WHERE record_id = ? AND principal_id = (SELECT id FROM principals WHERE username = 'leander')").run(later);
+      } finally {
+        cleanup.close();
+      }
+    } finally {
+      other.child.kill();
+    }
+
+    // Back to this vault's own history, from the file it exported, which
+    // still opens after two imports into the vault it came from.
+    await page.eval('(async () => (await import("/static/js/session.js")).currentVault().load())()');
+    await toScreen();
+    await chooseFile(exportedPath);
+    await openWith(VAULT_PASSWORD);
+    await page.waitUntil("!document.querySelector('.review').hidden", { timeout: 60000, label: 'the review to restore' });
+    await setValue('#import-erase', 'ERASE');
+    await replaceVault();
+    await page.waitUntil("document.body.innerText.includes('Your vault was replaced from the file')", { timeout: 90000, label: 'the restore to land' });
+    const restoredRecords = JSON.stringify(await decrypted());
+    const restoredLine = await page.eval("document.querySelector('[role=status].callout')?.textContent || ''");
+    check(
+      'the vault is its own again after importing its own file back',
+      restoredRecords === JSON.stringify(recordsBefore) && restoredLine.includes('The figures on screen are now in CHF.'),
+      `${restoredLine} ${restoredRecords.length} against ${JSON.stringify(recordsBefore).length}`,
+    );
+  }
 
   // ---- Locking ------------------------------------------------------------
 

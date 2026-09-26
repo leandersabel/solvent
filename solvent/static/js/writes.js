@@ -8,7 +8,7 @@
 // has destroyed nothing.
 import * as api from './api.js';
 import * as crypto from './crypto.js';
-import { SCHEMA_VERSION } from './model.js';
+import { SCHEMA_VERSION, migrate } from './model.js';
 
 export async function putRecord(vault, slot, payload) {
   const blob = await crypto.encryptRecord(vault.dek, slot, payload);
@@ -315,4 +315,22 @@ export async function deleteRecording(vault, date) {
 export async function purgeHolding(vault, holding) {
   await api.del(`/api/accounts/${holding.recordId}?mode=purge`);
   applyDelete(vault, holding);
+}
+
+/** One record read afresh after a Conflict, so the screen shows what
+ *  another tab wrote and the person redoes the edit against it. Gone
+ *  from the store means gone from the model too. */
+export async function reloadRecord(vault, entry) {
+  const rows = await api.get(`/api/records?type=${entry.recordType}`);
+  const row = rows.find((r) => r.recordId === entry.recordId);
+  if (!row) {
+    applyDelete(vault, entry);
+    return null;
+  }
+  const fresh = {
+    ...row,
+    payload: migrate(row.recordType, row.schemaVersion, await crypto.decryptRecord(vault.dek, row)),
+  };
+  applyWrite(vault, fresh);
+  return fresh;
 }

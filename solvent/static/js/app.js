@@ -27,7 +27,7 @@ import { whenUnauthorized } from './api.js';
 import { onLock, currentVault, isUnlocked, lock, signOut } from './session.js';
 import { unlockCard } from './unlock.js';
 import { dashboardView } from './view-dashboard.js';
-import { holdingForm } from './view-forms.js';
+import { holdingForm } from './view-holding-form.js';
 import { holdingView } from './view-holding.js';
 import { recordingView } from './view-recording.js';
 import { resetSweepState, sweepView } from './view-sweep.js';

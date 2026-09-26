@@ -577,6 +577,117 @@ await check('percentage mode normalizes each side against itself', async () => {
   assert.deepEqual(layers[1].lower[0], [-25, -100]);
 });
 
+// ---- Export and import ----------------------------------------------------
+
+// A file written at formatVersion 1, checked in and never regenerated,
+// so it still has to import once the format has moved on. Its KDF
+// envelope is below the server's minimum on purpose: the file's
+// envelope only opens the file.
+const FIXTURE = JSON.parse(
+  await (await import('node:fs/promises')).readFile(
+    new URL('../fixtures/vault-format-1.json', import.meta.url),
+    'utf8',
+  ),
+);
+const FIXTURE_PASSWORD = 'fixture lantern orchard';
+const FIXTURE_PAYLOADS = {
+  profile: {
+    mainCurrency: 'EUR',
+    createdAt: '2026-08-01T09:14:00Z',
+    dimensions: [{ id: 'd7f3a1b2', label: 'Liquidity', archivedAt: null, values: [{ id: '9c4e0f11', label: 'Cash', archivedAt: null }] }],
+  },
+  account: { name: 'Fixture savings', unit: 'USD', dims: { d7f3a1b2: '9c4e0f11' }, note: 'kept from format 1', archivedAt: null, createdAt: '2026-08-01T09:15:00Z' },
+  snapshot: { date: '2026-07-31', value: '12450', note: null },
+  rate: { symbol: 'USD', date: '2026-07-31', rate: '0.8', rateTarget: 'EUR', rateSource: 'proposed', rateAsOf: '2026-07-31', proposedRate: null },
+};
+const transfer = await load('transfer.js');
+const rawKey = async (key) =>
+  cryptoModule.b64encode(new Uint8Array(await globalThis.crypto.subtle.exportKey('raw', key)));
+const copyOf = (value) => JSON.parse(JSON.stringify(value));
+// Every request the code under test makes, so a check can say none went.
+const requests = [];
+globalThis.fetch = async (url) => {
+  requests.push(String(url));
+  throw new Error('no request belongs here');
+};
+
+await check('a formatVersion 1 file still opens, decrypts and re-keys', async () => {
+  const file = transfer.checkFile(copyOf(FIXTURE));
+  assert.equal(file.formatVersion, 1);
+  const { fileDek, profile } = await transfer.openFile(file, FIXTURE_PASSWORD);
+  assert.deepEqual(profile, FIXTURE_PAYLOADS.profile);
+
+  const { dek, records } = await transfer.rekey(fileDek, file.records);
+  assert.notEqual(await rawKey(dek), await rawKey(fileDek));
+  assert.deepEqual(
+    records.map((r) => [r.recordId, r.recordType, r.accountId]),
+    file.records.map((r) => [r.recordId, r.recordType, r.accountId]),
+  );
+  for (const record of records) {
+    assert.equal(record.version, 1, record.recordType);
+    assert.deepEqual(await cryptoModule.decryptRecord(dek, record), FIXTURE_PAYLOADS[record.recordType]);
+    // Nothing the new key encrypted opens under the file's.
+    await assert.rejects(cryptoModule.decryptRecord(fileDek, record));
+  }
+  assert.deepEqual(requests, []);
+});
+
+await check('the file keeps opening under its own key after a re-key', async () => {
+  const { fileDek } = await transfer.openFile(copyOf(FIXTURE), FIXTURE_PASSWORD);
+  await transfer.rekey(fileDek, FIXTURE.records);
+  const again = await transfer.openFile(copyOf(FIXTURE), FIXTURE_PASSWORD);
+  const plain = await transfer.decryptAll(again.fileDek, FIXTURE.records);
+  assert.equal(plain.length, FIXTURE.records.length);
+});
+
+await check('a wrong password for the file stops at the unwrap and sends nothing', async () => {
+  await assert.rejects(
+    transfer.openFile(copyOf(FIXTURE), 'not the fixture password'),
+    transfer.WrongPassword,
+  );
+  assert.deepEqual(requests, []);
+});
+
+await check('one byte altered in one record aborts the import and names that record', async () => {
+  const file = copyOf(FIXTURE);
+  const target = file.records.find((r) => r.recordType === 'snapshot');
+  const bytes = cryptoModule.b64decode(target.ciphertext);
+  bytes[3] ^= 0x01;
+  target.ciphertext = cryptoModule.b64encode(bytes);
+  const { fileDek } = await transfer.openFile(transfer.checkFile(file), FIXTURE_PASSWORD);
+  await assert.rejects(transfer.rekey(fileDek, file.records), (error) => {
+    assert.ok(error instanceof transfer.RecordUnreadable);
+    assert.equal(error.recordId, target.recordId);
+    return true;
+  });
+  assert.deepEqual(requests, []);
+});
+
+await check('the file is checked before it is decrypted, as the server checks the upload', () => {
+  const refused = (change) => {
+    const file = copyOf(FIXTURE);
+    change(file);
+    try {
+      transfer.checkFile(file);
+    } catch (error) {
+      return error instanceof transfer.FileRefused ? error.reason : error.message;
+    }
+    return 'accepted';
+  };
+  assert.equal(refused(() => {}), 'accepted');
+  assert.equal(refused((f) => { f.formatVersion = 2; }), 'newer');
+  assert.equal(refused((f) => { f.formatVersion = 0; }), 'format');
+  assert.equal(refused((f) => { f.format = 'something-else'; }), 'format');
+  assert.equal(refused((f) => { f.records[1].recordType = 'invoice'; }), 'format');
+  assert.equal(refused((f) => { f.records[1].recordId = 'not-a-uuid'; }), 'format');
+  assert.equal(refused((f) => { f.records[1].accountId = ''; }), 'format');
+  assert.equal(refused((f) => { f.records[2].accountId = null; }), 'format');
+  assert.equal(refused((f) => { f.records[2].accountId = cryptoModule.uuid4(); }), 'format');
+  assert.equal(refused((f) => { f.records[3].nonce = 'not base64!'; }), 'format');
+  assert.equal(refused((f) => { f.records.push(copyOf(f.records[0])); }), 'format');
+  assert.equal(refused((f) => { delete f.wrappedDek; }), 'format');
+});
+
 // ---- Report -----------------------------------------------------------
 
 for (const [state, name] of results) console.log(`${state} ${name}`);

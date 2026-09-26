@@ -95,3 +95,12 @@ def guard_rates(principal_id: str) -> None:
     record(bucket)
     if _count(bucket, "request", 60) > current_app.config["RATE_REQUESTS_PER_HOUR"]:
         abort(429)
+
+
+def guard_export(principal_id: str) -> None:
+    """Per-user, because an export is a full vault read
+    (export-import.md, Rules)."""
+    bucket = f"export:{principal_id}"
+    record(bucket)
+    if _count(bucket, "request", 60) > current_app.config["EXPORTS_PER_USER_HOUR"]:
+        abort(429)

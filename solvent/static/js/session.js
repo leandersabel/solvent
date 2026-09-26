@@ -180,6 +180,16 @@ export function wrapForMaster(dek) {
   return crypto.wrapDek(dek, masterKey);
 }
 
+/** After an import: the in-memory DEK becomes the new one and the model
+ *  is read again under it. The Master Key stays, because the password
+ *  did not change (export-import.md, The re-key step). */
+export async function replaceDek(dek) {
+  const next = new Vault(dek);
+  await next.load();
+  vault = next;
+  return vault;
+}
+
 /** The lock, by hand or by the idle timer.
  *
  *  It discards the keys **and every decrypted value derived from
