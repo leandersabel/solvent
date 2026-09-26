@@ -5,8 +5,13 @@
 // looked up from it, at any age. Every figure comes from the model.
 import * as decimal from './decimal.js';
 import * as writes from './writes.js';
-import { ageInWords, dialog, el, trackEdits } from './dom.js';
-import { deleteHoldingDialog, holdingForm, snapshotDialog } from './view-forms.js';
+import { ageInWords, dialog, el, icon, trackEdits } from './dom.js';
+import { snapshotDialog } from './view-forms.js';
+import { deleteHoldingDialog, holdingForm } from './view-holding-form.js';
+
+// A Conflict on saving the editor reloads the record and redraws the
+// screen, and the reopened editor says why it is showing other values.
+let conflictNotice = null;
 
 export function holdingView(vault, accountId, { editing = false, onOpenRecording, onChanged, onGone }) {
   const holding = vault.holdings.get(accountId);
@@ -20,12 +25,22 @@ export function holdingView(vault, accountId, { editing = false, onOpenRecording
   // comes back to it rather than to the bare holding. Written without
   // a hashchange, because nothing needs to redraw.
   const address = `#/holding/${accountId}`;
+  const closeEditor = () => {
+    window.history.replaceState(null, '', address);
+    onChanged();
+  };
   const openEditor = () => {
     window.history.replaceState(null, '', `${address}/edit`);
+    const notice = conflictNotice;
+    conflictNotice = null;
     panel.replaceChildren(
-      holdingForm(vault, holding, () => {
-        window.history.replaceState(null, '', address);
-        onChanged();
+      holdingForm(vault, holding, closeEditor, {
+        onCancel: closeEditor,
+        notice,
+        onConflict: (text) => {
+          conflictNotice = text;
+          onChanged();
+        },
       }),
     );
   };
@@ -85,11 +100,17 @@ export function holdingView(vault, accountId, { editing = false, onOpenRecording
           class: 'btn-secondary',
           text: 'Unarchive',
           onclick: async () => {
-            await writes.saveHolding(vault, holding, {
-              ...holding.payload,
-              archivedAt: null,
-            });
-            onChanged();
+            error.hidden = true;
+            try {
+              await writes.saveHolding(vault, holding, {
+                ...holding.payload,
+                archivedAt: null,
+              });
+              onChanged();
+            } catch {
+              error.textContent = 'The holding is still archived. Nothing changed.';
+              error.hidden = false;
+            }
           },
         })
       : el('button', {
@@ -129,11 +150,10 @@ export function holdingView(vault, accountId, { editing = false, onOpenRecording
             el(
               'tbody',
               {},
-              history.map((snapshot) =>
+              history.flatMap((snapshot) =>
                 historyRow(vault, holding, snapshot, flagged, {
                   onOpenRecording,
                   onChanged,
-                  error,
                 }),
               ),
             ),
@@ -163,18 +183,42 @@ function chipsFor(vault, holding) {
   return chips.filter(Boolean);
 }
 
-function historyRow(vault, holding, snapshot, flagged, { onOpenRecording, onChanged, error }) {
+/** A row, and beneath it the entry's note when it has one: shown in
+ *  full when its icon expands the row, never truncated into the table.
+ *  A failed delete is reported on the row it was asked of. */
+function historyRow(vault, holding, snapshot, flagged, { onOpenRecording, onChanged }) {
   const quantity = decimal.parse(snapshot.payload.value);
   const price = vault.priceOn(holding.payload.unit, snapshot.payload.date);
   const duplicate = flagged.has(snapshot.payload.date);
+  const failed = el('p', { class: 'field-error', hidden: true, role: 'alert' });
+  const noteRow = snapshot.payload.note
+    ? el('tr', { class: 'note-row', hidden: true }, [
+        el('td', { colspan: '4' }, [el('p', { class: 'note', text: snapshot.payload.note })]),
+      ])
+    : null;
+  const noteToggle = noteRow
+    ? el('button', {
+        type: 'button',
+        class: 'btn-icon note-toggle',
+        'aria-expanded': 'false',
+        'aria-label': 'Show the note',
+        title: 'Show the note',
+        onclick: () => {
+          noteRow.hidden = !noteRow.hidden;
+          noteToggle.setAttribute('aria-expanded', String(!noteRow.hidden));
+          noteToggle.setAttribute('aria-label', noteRow.hidden ? 'Show the note' : 'Hide the note');
+        },
+      }, [icon('note', 14)])
+    : null;
 
-  return el('tr', { class: duplicate ? 'flagged' : null }, [
+  const row = el('tr', { class: duplicate ? 'flagged' : null }, [
     el('td', {}, [
       el('button', {
         class: 'link-button',
         text: vault.format.longDate(snapshot.payload.date),
         onclick: () => onOpenRecording(snapshot.payload.date),
       }),
+      noteToggle,
       duplicate
         ? el('span', {
             class: 'flag-note',
@@ -215,10 +259,12 @@ function historyRow(vault, holding, snapshot, flagged, { onOpenRecording, onChan
       el('button', {
         class: 'btn-inline',
         text: 'Delete',
-        onclick: () => confirmDeleteSnapshot(vault, holding, snapshot, error, onChanged),
+        onclick: () => confirmDeleteSnapshot(vault, holding, snapshot, failed, onChanged),
       }),
+      failed,
     ]),
   ]);
+  return noteRow ? [row, noteRow] : [row];
 }
 
 /** Deleting a value deletes no price. A price belongs to a unit, not

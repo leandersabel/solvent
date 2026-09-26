@@ -6,7 +6,7 @@
 import * as writes from './writes.js';
 import { dialog, el, inlineRename, resumable } from './dom.js';
 
-function newId() {
+export function newId() {
   const bytes = crypto.getRandomValues(new Uint8Array(8));
   return [...bytes].map((byte) => (byte % 36).toString(36)).join('');
 }

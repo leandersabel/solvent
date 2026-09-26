@@ -8,7 +8,9 @@ import { chartTable, fillFor, trendChart } from './chart.js';
 import { dialog, el, icon, mount, resumable, today } from './dom.js';
 import { dateField } from './datepicker.js';
 import { dayNumber, isoFromDay } from './model.js';
-import { holdingForm, snapshotDialog } from './view-forms.js';
+import * as writes from './writes.js';
+import { snapshotDialog } from './view-forms.js';
+import { holdingForm } from './view-holding-form.js';
 
 const RANGES = [
   ['1M', 30],
@@ -563,12 +565,27 @@ function holdingsTable(vault, state, render, actions, grouping) {
                   })
                 : null,
             ]),
+            // An archived row takes no new value, and unarchiving it is
+            // one action with no dialog (account-form.md, Rules).
             el('td', { class: 'cell-action' }, [
-              el('button', {
-                class: 'btn-secondary btn-small',
-                text: 'Record a value',
-                onclick: () => snapshotDialog(vault, holding, null, actions.reload),
-              }),
+              holding.payload.archivedAt
+                ? el('button', {
+                    class: 'btn-secondary btn-small',
+                    text: 'Unarchive',
+                    onclick: async (event) => {
+                      try {
+                        await writes.saveHolding(vault, holding, { ...holding.payload, archivedAt: null });
+                        actions.reload();
+                      } catch {
+                        event.target.textContent = 'Still archived. Try again';
+                      }
+                    },
+                  })
+                : el('button', {
+                    class: 'btn-secondary btn-small',
+                    text: 'Record a value',
+                    onclick: () => snapshotDialog(vault, holding, null, actions.reload),
+                  }),
             ]),
           ]),
         ),

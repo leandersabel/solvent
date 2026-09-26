@@ -16,6 +16,8 @@ const BACKDATE = process.env.SOLVENT_BACKDATE;
 
 const checks = [];
 const problems = [];
+// Addresses a check fails on purpose, whose refusal the browser logs.
+const provoked = [];
 
 function check(name, condition, detail = '') {
   checks.push({ name, ok: Boolean(condition), detail: String(detail) });
@@ -34,7 +36,8 @@ page.on((message) => {
     // prove the endpoint is not navigable. Both are the gate
     // answering correctly.
     const url = entry.url || '';
-    const noise = url.endsWith('/favicon.ico') || url.endsWith('/api/export');
+    const noise = url.endsWith('/favicon.ico') || url.endsWith('/api/export') ||
+      provoked.some((part) => url.includes(part));
     if (entry.level === 'error' && !noise) {
       problems.push(`${entry.url || ''} ${entry.text}`);
     }
@@ -66,34 +69,19 @@ const enterPassword = async (password) => {
 };
 
 // Export the vault, open the file with its own password, and import it
-// back under a freshly generated DEK, exactly as the transfer screen
-// does. Returns what a fresh unlock reads back.
+// back under a freshly generated DEK, through the module the transfer
+// screen runs. Returns what a fresh unlock reads back.
 const importOwnExport = () =>
   page.eval(`(async () => {
     const api = await import('/static/js/api.js');
     const c = await import('/static/js/crypto.js');
     const s = await import('/static/js/session.js');
-    const { SCHEMA_VERSION } = await import('/static/js/model.js');
-    const file = await (await fetch('/api/export', { headers: { 'X-Solvent-Request': '1' } })).json();
+    const t = await import('/static/js/transfer.js');
+    const file = t.checkFile(await (await fetch('/api/export', { headers: { 'X-Solvent-Request': '1' } })).json());
 
-    // Open the file with its own password, exactly as the screen does.
-    const keys = await c.deriveKeys(${JSON.stringify(VAULT_PASSWORD)}, file.salt, file.kdf);
-    const fileDek = await c.unwrapDek(file.wrappedDek, file.dekNonce, keys.masterKey);
-    const plain = [];
-    for (const record of file.records) {
-      plain.push({ record, payload: await c.decryptRecord(fileDek, record) });
-    }
-
+    const { fileDek } = await t.openFile(file, ${JSON.stringify(VAULT_PASSWORD)});
     // Re-key: a freshly generated DEK, never the file's.
-    const newDek = await c.generateDek();
-    const rekeyed = [];
-    for (const { record, payload } of plain) {
-      const slot = {
-        recordId: record.recordId, recordType: record.recordType,
-        accountId: record.accountId ?? null, schemaVersion: SCHEMA_VERSION, version: 1,
-      };
-      rekeyed.push({ ...slot, ...(await c.encryptRecord(newDek, slot, payload)) });
-    }
+    const { dek: newDek, records: rekeyed } = await t.rekey(fileDek, file.records);
     const wrapper = await s.wrapForMaster(newDek);
     await api.post('/api/import', { ...wrapper, records: rekeyed });
 
@@ -301,7 +289,9 @@ try {
         .join(',');
     })()`));
     await setValue('#holding-name', name);
-    await setValue('#holding-unit', unit);
+    const option = `#holding-unit-list [data-symbol="${unit}"]`;
+    await page.waitUntil(`document.querySelector('${option}')`, { label: `the ${unit} option` });
+    await page.eval(`document.querySelector('${option}').click()`);
     await page.eval("document.querySelector('.dialog button[type=submit]').click()");
     await page.waitUntil('!document.querySelector(".dialog")', { label: `${name} to save` });
     await page.settle(250);
@@ -722,22 +712,112 @@ try {
 
   // ---- Archiving, with the closing value it offers ----------------------
 
+  // manage-accounts.md: archiving onto a date that already holds this
+  // holding's figure prefills the field with it, shows no replace
+  // prompt, and leaves exactly one figure there at version + 1. No
+  // snapshot is deleted, and the chart before the archive date is
+  // unchanged.
+  const archivingId = (await page.eval('location.hash')).split('/')[2];
+  const archiveDay = await page.eval('new Date().toISOString().slice(0, 10)');
+  const snapshotState = () =>
+    page.eval(`(async () => {
+      const api = await import('/static/js/api.js');
+      const v = (await import('/static/js/session.js')).currentVault();
+      const rows = await api.get('/api/records?type=snapshot');
+      const here = v.snapshotsFor('${archivingId}').filter((s) => s.payload.date === '${archiveDay}');
+      return JSON.stringify({
+        stored: rows.length,
+        here: here.map((s) => ({ id: s.recordId, version: s.version, value: s.payload.value })),
+      });
+    })()`).then(JSON.parse);
+  // The chart's own table, every row but the archive date's.
+  const chartOffArchiveDay = async () => {
+    await page.eval("location.hash = '#/'");
+    await page.waitUntil("document.querySelector('.chart-card details table')", { label: 'the chart table' });
+    await page.eval("[...document.querySelectorAll('.range-buttons button')].find(b => b.textContent === 'All').click()");
+    await page.settle(300);
+    return page.eval(`(async () => {
+      const v = (await import('/static/js/session.js')).currentVault();
+      const day = v.format.date('${archiveDay}');
+      return JSON.stringify([...document.querySelectorAll('.chart-card details table tbody tr')]
+        .filter((r) => r.cells[0].textContent !== day).map((r) => r.textContent));
+    })()`);
+  };
+  const chartBeforeArchive = await chartOffArchiveDay();
+  const heroBeforeArchive = await page.eval("document.querySelector('.hero-figure').textContent");
+  await page.eval(`location.hash = '#/holding/${archivingId}'`);
+  await page.waitUntil("document.querySelector('.detail-header')", { label: 'the holding to archive' });
+  await page.settle(400);
+  const beforeArchive = await snapshotState();
+
   await click('Archive');
   await page.waitUntil("document.body.innerText.includes('Archive keeps every value')", {
     label: 'the archive dialog',
   });
   check('archive is offered before deleting', (await text()).includes('You can undo this'));
   check('it offers a closing value', (await text()).includes('What was it worth when you closed it?'));
-  check('it says what skipping costs', (await text()).includes('your chart drops by the last figure'));
+  check(
+    'archive is the preselected choice, and permanent delete waits behind its own',
+    await page.eval(`(() => {
+      const choice = document.querySelector('.dialog input[value=archive]');
+      const button = [...document.querySelectorAll('.dialog button')].find(b => b.textContent === 'Delete permanently');
+      return choice.checked && button.hidden && !document.querySelector('.dialog input[value=delete]').checked;
+    })()`),
+  );
+  const prefilled = await page.eval(`(async () => {
+    const v = (await import('/static/js/session.js')).currentVault();
+    return String(v.format.parseFigure(document.querySelector('#closing-value').value));
+  })()`);
+  const storedFigure = await page.eval(
+    `(async () => String((await import('/static/js/decimal.js')).parse(${JSON.stringify(beforeArchive.here[0]?.value || '')})))()`,
+  );
+  check(
+    'an occupied archive date prefills the stored figure rather than 0',
+    beforeArchive.here.length === 1 && prefilled === storedFigure,
+    `${prefilled} against ${JSON.stringify(beforeArchive.here)}`,
+  );
+  await click('Skip');
+  await page.settle(150);
+  check('skipping says what it costs', (await text()).includes('your chart drops by the last figure recorded here'));
+  await click('Record a closing value after all');
+  await page.settle(150);
+
+  // Every dialog heading that appears from here to the archive landing.
+  await page.eval(`(() => {
+    window.__headings = [];
+    new MutationObserver(() => {
+      for (const node of document.querySelectorAll('.dialog-heading')) window.__headings.push(node.textContent);
+    }).observe(document.body, { childList: true, subtree: true });
+  })()`);
   await page.eval("[...document.querySelectorAll('.dialog button')].find(b => b.textContent === 'Archive').click()");
   await page.waitUntil('!document.querySelector(".dialog")', { timeout: 60000, label: 'the archive to land' });
   await page.settle(1200);
+  const headings = await page.eval('window.__headings');
+  check(
+    'archiving onto an occupied date shows no replace prompt',
+    !headings.some((heading) => heading.startsWith('Replace')),
+    headings.join(' | '),
+  );
+  const afterArchive = await snapshotState();
+  check(
+    'it leaves exactly one figure at that date, the same record at version + 1',
+    afterArchive.here.length === 1 &&
+      afterArchive.here[0].id === beforeArchive.here[0].id &&
+      afterArchive.here[0].version === beforeArchive.here[0].version + 1,
+    `${JSON.stringify(beforeArchive.here)} then ${JSON.stringify(afterArchive.here)}`,
+  );
+  check('archiving deletes no snapshot', afterArchive.stored === beforeArchive.stored, `${beforeArchive.stored} then ${afterArchive.stored}`);
+  const archivedRecord = await page.eval(`(async () => {
+    const v = (await import('/static/js/session.js')).currentVault();
+    return v.holdings.get('${archivingId}').payload.archivedAt;
+  })()`);
+  check('the account record gains archivedAt', archivedRecord === archiveDay, archivedRecord);
   check('an archived holding carries its chip', (await text()).includes('Archived'));
   check('it offers Unarchive rather than Archive', (await labels('.form-actions button')).includes('Unarchive'));
   check('an archived holding takes no new value', !(await labels('.form-actions button')).includes('Record a value'));
 
-  await page.eval("location.hash = '#/'");
-  await page.settle(900);
+  const chartAfterArchive = await chartOffArchiveDay();
+  check('the chart before the archive date is unchanged', chartAfterArchive === chartBeforeArchive, `${chartBeforeArchive} then ${chartAfterArchive}`);
   const listed = await page.eval(
     "[...document.querySelectorAll('.data-table tbody .link-button')].map(b => b.textContent)",
   );
@@ -761,6 +841,744 @@ try {
     'the date is gone from the chart',
     (await page.eval("document.querySelectorAll('.entry-mark').length")) === marksBefore - 1,
   );
+
+  // ---- Manage holdings (manage-accounts.md, account-form.md, account-detail.md)
+
+  {
+    const { DatabaseSync } = await import('node:sqlite');
+    const { readFileSync } = await import('node:fs');
+    const query = (sql, ...args) => {
+      const db = new DatabaseSync(process.env.DATABASE_PATH, { readOnly: true });
+      try {
+        return db.prepare(sql).all(...args);
+      } finally {
+        db.close();
+      }
+    };
+    const OWN = "JOIN principals ON principals.id = records.principal_id WHERE principals.username = 'leander'";
+    const accountRows = () =>
+      JSON.stringify(query(`SELECT records.* FROM records ${OWN} AND record_type = 'account' ORDER BY record_id`));
+    const rowOf = (id) => query(`SELECT records.* FROM records ${OWN} AND record_id = ?`, id)[0];
+    // The database file's own bytes, which is where plaintext would sit.
+    const inDatabase = (needles) => {
+      const bytes = readFileSync(process.env.DATABASE_PATH);
+      return needles.filter((needle) => bytes.includes(Buffer.from(needle, 'utf8')));
+    };
+    const vaultValue = (body) =>
+      page.eval(`(async () => {
+        const v = (await import('/static/js/session.js')).currentVault();
+        return JSON.stringify(${body});
+      })()`).then(JSON.parse);
+    const payloadOf = (id) => vaultValue(`v.holdings.get('${id}') ? v.holdings.get('${id}').payload : null`);
+    const idNamed = (name) =>
+      vaultValue(`[...v.holdings.values()].filter(h => h.payload.name === ${JSON.stringify(name)}).map(h => h.recordId)`);
+    // The model read afresh from the store, and the screen redrawn from
+    // it, without a derivation.
+    const reloadModel = async (hash = '#/') => {
+      await page.eval(`(async () => {
+        await (await import('/static/js/session.js')).currentVault().load();
+        location.hash = '#/reloading';
+      })()`);
+      await page.settle(100);
+      await page.eval(`location.hash = ${JSON.stringify(hash)}`);
+      await page.settle(700);
+    };
+    const openHolding = async (id) => {
+      await page.eval(`location.hash = '#/holding/${id}'`);
+      await page.waitUntil("document.querySelector('.detail-header')", { label: 'a holding screen' });
+      await page.settle(400);
+    };
+    const inDialog = (label) =>
+      page.eval(`[...document.querySelectorAll('.dialog button')].find(b => b.textContent === ${JSON.stringify(label)}).click()`);
+    const choose = (selector, value) =>
+      page.eval(`(() => {
+        const node = document.querySelector(${JSON.stringify(selector)});
+        node.value = ${JSON.stringify(value)};
+        node.dispatchEvent(new Event('change', { bubbles: true }));
+      })()`);
+    const writesSeen = () => page.eval('window.__writes.splice(0)');
+    const recordReads = () =>
+      page.eval("performance.getEntriesByType('resource').filter(e => e.name.includes('/api/records?type=')).length");
+    // Every request matching `refuse` answered with Server Error while
+    // `body` runs, the way a failed write looks to the page.
+    const failing = async (refuse, body) => {
+      const handler = async (message) => {
+        if (message.method !== 'Fetch.requestPaused') return;
+        const { requestId, request } = message.params;
+        if (refuse(request)) {
+          provoked.push(new URL(request.url).pathname);
+          await page.send('Fetch.fulfillRequest', { requestId, responseCode: 500, body: '' });
+        } else {
+          await page.send('Fetch.continueRequest', { requestId });
+        }
+      };
+      page.on(handler);
+      await page.send('Fetch.enable', { patterns: [{ urlPattern: '*/api/*', requestStage: 'Request' }] });
+      try {
+        await body();
+      } finally {
+        await page.send('Fetch.disable');
+        page.handlers = page.handlers.filter((h) => h !== handler);
+      }
+    };
+    const writing = (type, method = 'PUT') => (request) =>
+      request.method === method && (!type || (request.postData || '').includes(`"recordType":"${type}"`));
+
+    // Every PUT the page sends, by record type, in order.
+    await page.eval(`(() => {
+      const send = window.fetch;
+      window.__writes = [];
+      window.fetch = (path, init) => {
+        if (init && init.method === 'PUT') window.__writes.push(JSON.parse(init.body).recordType);
+        return send(path, init);
+      };
+      window.__alerted = false;
+      window.alert = () => { window.__alerted = true; };
+    })()`);
+
+    // A second value on the existing dimension and a second dimension,
+    // written to the profile as the dimensions screen would.
+    const profile = await vaultValue('{ recordId: v.profileRecord.recordId, version: v.profileRecord.version, profile: v.profile }');
+    const liquid = profile.profile.dimensions.find((d) => d.label === 'Liquid assets');
+    await plant([{
+      type: 'profile',
+      recordId: profile.recordId,
+      version: profile.version + 1,
+      payload: {
+        ...profile.profile,
+        dimensions: [
+          { ...liquid, values: [...liquid.values, { id: 'retire01', label: 'Retirement', archivedAt: null }] },
+          {
+            id: 'region01',
+            label: 'Region',
+            archivedAt: null,
+            values: [
+              { id: 'home0001', label: 'Home', archivedAt: null },
+              { id: 'abroad01', label: 'Abroad', archivedAt: null },
+            ],
+          },
+        ],
+      },
+    }]);
+    await reloadModel();
+    await writesSeen();
+
+    // -- The form: the unit list ------------------------------------------
+
+    const XSS = '<img src=x onerror=alert(1)>';
+    const NAME = `Name ${XSS}`;
+    const NOTE = `Note ${XSS}`;
+    const AXIS = `Axis ${XSS}`;
+    const BAND = `Band ${XSS}`;
+    const accountsBefore = query(`SELECT record_id FROM records ${OWN} AND record_type = 'account'`).length;
+
+    await click('Add a holding');
+    await page.waitUntil("document.querySelector('#holding-unit-list [data-symbol]')", { label: 'the unit list' });
+    const unitList = JSON.parse(await page.eval(`JSON.stringify({
+      options: [...document.querySelectorAll('#holding-unit-list [role=option]')].map(o => o.dataset.symbol || o.textContent),
+      texts: [...document.querySelectorAll('#holding-unit-list [role=option]')].map(o => o.textContent),
+      groups: [...document.querySelectorAll('#holding-unit-list .unit-group-label')].map(g => g.textContent),
+    })`));
+    check(
+      'the unit list offers the main currency first, then currencies, then metals, then Something else',
+      unitList.options[0] === 'CHF' &&
+        unitList.groups.join(',') === 'Currencies,Metals' &&
+        unitList.options[unitList.options.length - 1] === 'Something else…' &&
+        unitList.options.indexOf('XAU-ozt') > unitList.options.indexOf('USD'),
+      JSON.stringify(unitList.options),
+    );
+    check(
+      'a metal reads as its label, once per unit',
+      unitList.texts.some((t) => t.startsWith('Gold, gram')) && unitList.texts.some((t) => t.startsWith('Gold, troy ounce')),
+      unitList.texts.join(' | '),
+    );
+    check(
+      'a unit with no lookup is listed and marked rate entered by hand',
+      unitList.texts.some((t) => t.includes('XAG-ozt') && t.endsWith('rate entered by hand')),
+    );
+    check('the form says what the unit commits you to', (await text()).includes('After that it is fixed'));
+    check('the form offers no price, rate or symbol field', !(await page.eval("Boolean(document.querySelector('.dialog').textContent.match(/\\bRate\\b|Rate symbol|No price source/))")));
+
+    await setValue('#holding-unit', 'troy');
+    await page.settle(150);
+    const filtered = await page.eval(
+      "[...document.querySelectorAll('#holding-unit-list [data-symbol]')].map(o => o.textContent)",
+    );
+    check(
+      'typing narrows the list and never becomes the unit',
+      filtered.length > 0 && filtered.every((t) => t.toLowerCase().includes('troy')) &&
+        (await page.eval("document.querySelector('.unit-chosen').value")) === 'CHF',
+      filtered.join(' | '),
+    );
+    await setValue('#holding-unit', '');
+
+    // Nothing saves without a name, and a free-text unit that is a
+    // listed symbol in another case is refused in favour of the symbol.
+    await page.eval("document.querySelector('.dialog button[type=submit]').click()");
+    await page.settle(200);
+    check('a missing name is refused inline and writes nothing', (await text()).includes('Give the holding a name.') && (await writesSeen()).length === 0);
+    await setValue('#holding-name', NAME);
+    await page.eval("document.querySelector('#holding-unit-list .unit-other').click()");
+    await setValue('#holding-unit-other', 'usd');
+    await page.settle(150);
+    check('typed text matching a listed symbol offers that symbol', (await text()).includes('USD is on the list'));
+    await page.eval("document.querySelector('.dialog button[type=submit]').click()");
+    await page.settle(200);
+    check('and that free text is not accepted', (await writesSeen()).length === 0 && (await text()).includes('Use it from there'));
+    await page.eval("document.querySelector('#holding-unit-list [data-symbol=\"CHF\"]').click()");
+
+    await page.eval("document.querySelectorAll('.dialog details').forEach(d => (d.open = true))");
+    await setValue('.dialog textarea', NOTE);
+    // A value made inline, then a dimension made inline: each writes the
+    // profile first, and the holding is written once, last.
+    await choose('.dialog select[aria-label="Region"]', '__new__');
+    await setValue('.dialog .inline-create input', 'Offshore');
+    await inDialog('Add');
+    await page.waitUntil("[...document.querySelectorAll('.dialog select[aria-label=\"Region\"] option')].some(o => o.textContent === 'Offshore' && o.selected)", { label: 'the new value, selected' });
+    await page.eval("[...document.querySelectorAll('.dialog button')].find(b => b.textContent === '+ New dimension').click()");
+    await page.eval(`(() => {
+      const inputs = document.querySelectorAll('.dialog .new-dimension input');
+      inputs[0].value = ${JSON.stringify(AXIS)};
+      inputs[1].value = ${JSON.stringify(BAND)};
+    })()`);
+    await inDialog('Add');
+    await page.waitUntil(`[...document.querySelectorAll('.dialog .checkbox')].some(l => l.textContent === ${JSON.stringify(AXIS)} && l.querySelector('input').checked)`, { label: 'the new dimension, set' });
+    await choose('.dialog select[aria-label="Liquid assets"]', 'retire01');
+    const readsBeforeSave = await recordReads();
+    await page.eval("document.querySelector('.dialog button[type=submit]').click()");
+    await page.waitUntil('!document.querySelector(".dialog")', { label: 'the new holding to save' });
+    await page.settle(300);
+    const written = await writesSeen();
+    check('inline creation writes the profile before the holding', written.join(',') === 'profile,profile,account', written.join(','));
+    check('the saved holding shows at once, with no refetch', (await recordReads()) === readsBeforeSave && (await text()).includes(NAME));
+
+    const [probeId] = await idNamed(NAME);
+    const saved = await payloadOf(probeId);
+    const axis = await vaultValue(`v.dimensions.find(d => d.label === ${JSON.stringify(AXIS)})`);
+    const offshore = await vaultValue("v.dimensions.find(d => d.id === 'region01').values.find(x => x.label === 'Offshore').id");
+    check(
+      'creating a holding stores exactly one account record',
+      query(`SELECT record_id FROM records ${OWN} AND record_type = 'account'`).length === accountsBefore + 1 && Boolean(rowOf(probeId)),
+    );
+    check(
+      'the form writes ids for every assignment, never a label',
+      JSON.stringify(saved.dims) === JSON.stringify({ region01: offshore, [axis.id]: axis.values[0].id, [liquid.id]: 'retire01' }) ||
+        (Object.keys(saved.dims).length === 3 && saved.dims.region01 === offshore && saved.dims[liquid.id] === 'retire01' && saved.dims[axis.id] === axis.values[0].id),
+      JSON.stringify(saved.dims),
+    );
+
+    // A free-text unit, twice under one name: names are not unique.
+    const addFreeText = async (name, unit) => {
+      await click('Add a holding');
+      await page.waitUntil("document.querySelector('#holding-unit-list .unit-other')", { label: 'the unit list' });
+      await setValue('#holding-name', name);
+      await page.eval("document.querySelector('#holding-unit-list .unit-other').click()");
+      await setValue('#holding-unit-other', unit);
+      await page.settle(100);
+      await page.eval("document.querySelector('.dialog button[type=submit]').click()");
+      await page.waitUntil('!document.querySelector(".dialog")', { label: `${name} to save` });
+      await page.settle(250);
+    };
+    await addFreeText('Parking space', 'm²');
+    await addFreeText('Parking space', 'm²');
+    const parking = await idNamed('Parking space');
+    check('two holdings may share a name', parking.length === 2, parking.join(','));
+    check('a free-text unit is stored as typed, case kept', (await payloadOf(parking[0])).unit === 'm²');
+
+    const leaks = inDatabase([
+      NAME, NOTE, AXIS, BAND, 'Offshore', 'Parking space', 'm²', 'Liquid assets', 'Retirement', 'Region',
+      offshore, axis.id, axis.values[0].id, 'region01', 'retire01', 'home0001',
+    ]);
+    check('no name, unit, note, label or assignment is in the database in plaintext', leaks.length === 0, leaks.join(' | '));
+    const shapes = await page.eval(`(async () => {
+      const api = await import('/static/js/api.js');
+      const c = await import('/static/js/crypto.js');
+      const v = (await import('/static/js/session.js')).currentVault();
+      const shapes = [];
+      for (const row of await api.get('/api/records?type=account')) {
+        const payload = await c.decryptRecord(v.dek, row);
+        shapes.push(Object.keys(payload).sort().join(',') + (payload.dims && !Array.isArray(payload.dims) && typeof payload.dims === 'object' ? '' : ' dims-not-a-map'));
+      }
+      return JSON.stringify([...new Set(shapes)]);
+    })()`);
+    check(
+      'every account record has exactly the documented fields, no rate symbol beside the unit',
+      shapes === JSON.stringify(['archivedAt,createdAt,dims,name,note,unit']),
+      shapes,
+    );
+
+    // -- Read back after a fresh unlock ---------------------------------------
+
+    await page.goto(`${BASE}/dashboard`);
+    await enterPassword(VAULT_PASSWORD);
+    await page.waitUntil("document.querySelector('svg.trend')", { timeout: 90000, label: 'the dashboard after a fresh unlock' });
+    await page.settle(600);
+    check('a holding reads back whole after a fresh unlock', JSON.stringify(await payloadOf(probeId)) === JSON.stringify(saved));
+    await page.eval(`(() => {
+      const send = window.fetch;
+      window.__writes = [];
+      window.fetch = (path, init) => {
+        if (init && init.method === 'PUT') window.__writes.push(JSON.parse(init.body).recordType);
+        return send(path, init);
+      };
+      window.__alerted = false;
+      window.alert = () => { window.__alerted = true; };
+    })()`);
+
+    // The unit list alone waits on the symbol table, and a table that
+    // cannot be fetched leaves free text, a retry, and the cost named.
+    await failing((request) => request.url.includes('/api/rates/symbols'), async () => {
+      await click('Add a holding');
+      await page.waitUntil("document.body.innerText.includes('The unit list could not be loaded')", { label: 'the degraded unit control' });
+      check(
+        'a symbol table that cannot load degrades to free text with a retry',
+        await page.eval("!document.querySelector('#holding-unit-other').hidden && [...document.querySelectorAll('.dialog button')].some(b => b.textContent === 'Try again')"),
+      );
+    });
+    await inDialog('Try again');
+    await page.waitUntil("document.querySelector('#holding-unit-list [data-symbol]')", { label: 'the list after a retry' });
+    check('trying again brings the list back', true);
+    await inDialog('Cancel');
+    await page.settle(200);
+
+    // -- The holding's own screen ---------------------------------------------
+
+    await openHolding(probeId);
+    check('an unvalued holding says so rather than 0', (await text()).includes('Not yet valued'));
+    check('with no values, one sentence and the primary action', (await text()).includes('No snapshots yet. Record what this holding is worth.'));
+    await click('Record a value');
+    await page.waitUntil("document.querySelector('#snapshot-value')", { label: 'the value form' });
+    const pastDay = await page.eval(`(async () => {
+      const v = (await import('/static/js/session.js')).currentVault();
+      return v.format.date('${BACKDATE}');
+    })()`);
+    await setValue('#snapshot-date', pastDay);
+    await setValue('#snapshot-value', '5000');
+    await page.eval("document.querySelector('.dialog textarea').value = 'kept in the safe'; document.querySelector('.dialog textarea').dispatchEvent(new Event('input', { bubbles: true }))");
+    await inDialog('Save');
+    await page.waitUntil('!document.querySelector(".dialog")', { timeout: 60000, label: 'the value to save' });
+    await page.settle(1200);
+    const noteRow = JSON.parse(await page.eval(`JSON.stringify({
+      toggles: document.querySelectorAll('.note-toggle').length,
+      hiddenBefore: document.querySelector('.note-row').hidden,
+    })`));
+    await page.eval("document.querySelector('.note-toggle').click()");
+    await page.settle(100);
+    check(
+      "an entry's note is behind an icon that expands its row, in full",
+      noteRow.toggles === 1 && noteRow.hiddenBefore &&
+        !(await page.eval("document.querySelector('.note-row').hidden")) &&
+        (await page.eval("document.querySelector('.note-row').textContent")) === 'kept in the safe',
+    );
+    await writesSeen();
+
+    // Editing: Cancel writes nothing. A save re-encrypts under a fresh
+    // nonce at version + 1, the dimension carries one entry, and the
+    // unit of a holding with a value is refused whatever the controls
+    // are made to hold.
+    await click('Edit');
+    await page.waitUntil("document.querySelector('#holding-name')", { label: 'the holding editor' });
+    await page.settle(300);
+    await page.eval("[...document.querySelectorAll('#app .panel-form button')].find(b => b.textContent === 'Cancel').click()");
+    await page.settle(400);
+    check('Cancel closes the editor and writes nothing', !(await page.eval("Boolean(document.querySelector('#holding-name'))")) && (await writesSeen()).length === 0);
+
+    await click('Edit');
+    await page.waitUntil("document.querySelector('#holding-name')", { label: 'the holding editor again' });
+    await page.settle(300);
+    const lock = JSON.parse(await page.eval(`JSON.stringify({
+      disabled: document.querySelector('#holding-unit').disabled,
+      readable: document.querySelector('#holding-unit').value,
+      listShown: !document.querySelector('#holding-unit-list').hidden,
+    })`));
+    check(
+      'the unit of a holding with a value is disabled, readable, and explained',
+      lock.disabled && lock.readable.includes('CHF') && !lock.listShown &&
+        (await text()).includes('The unit cannot change once you have recorded a value here.'),
+      JSON.stringify(lock),
+    );
+    const rowBefore = rowOf(probeId);
+    await page.eval(`(() => {
+      const kept = document.querySelector('.unit-chosen');
+      kept.value = 'USD';
+      kept.dispatchEvent(new Event('change', { bubbles: true }));
+    })()`);
+    await page.eval("document.querySelectorAll('#app details').forEach(d => (d.open = true))");
+    await setValue('#app textarea', `${NOTE} edited`);
+    await choose('#app select[aria-label="Region"]', 'home0001');
+    await page.eval("document.querySelector('#app .panel-form button[type=submit]').click()");
+    await page.waitUntil("!document.querySelector('#holding-name')", { label: 'the edit to save' });
+    await page.settle(400);
+    const rowAfter = rowOf(probeId);
+    const edited = await payloadOf(probeId);
+    check(
+      'an edit increments the version and writes a different nonce',
+      rowAfter.version === rowBefore.version + 1 && rowAfter.nonce !== rowBefore.nonce,
+      `${rowBefore.version}/${rowBefore.nonce} then ${rowAfter.version}/${rowAfter.nonce}`,
+    );
+    check(
+      're-saving a dimension with another value leaves one entry for it',
+      edited.dims.region01 === 'home0001' && Object.keys(edited.dims).length === Object.keys(saved.dims).length &&
+        Object.keys(edited.dims).filter((key) => key === 'region01').length === 1,
+      JSON.stringify(edited.dims),
+    );
+    check('the UI refuses to change the unit of a holding with a value', edited.unit === 'CHF', edited.unit);
+
+    // A Conflict: the record is changed behind this tab, the save is
+    // refused, the editor shows what the other tab wrote, and the edit
+    // is redone against it.
+    await click('Edit');
+    await page.waitUntil("document.querySelector('#holding-name')", { label: 'the editor before the conflict' });
+    const current = await vaultValue(`{ version: v.holdings.get('${probeId}').version, payload: v.holdings.get('${probeId}').payload }`);
+    provoked.push(`/api/records/${probeId}`);
+    await plant([{ type: 'account', recordId: probeId, version: current.version + 1, payload: { ...current.payload, name: 'Changed in another tab' } }]);
+    await page.eval("document.querySelectorAll('#app details').forEach(d => (d.open = true))");
+    await setValue('#app textarea', 'typed in this tab');
+    await page.eval("document.querySelector('#app .panel-form button[type=submit]').click()");
+    await page.waitUntil("document.body.innerText.includes('This holding was changed in another tab.')", { label: 'the conflict message' });
+    await page.settle(300);
+    check(
+      'a Conflict reloads the record into the editor and changes nothing stored',
+      (await page.eval("document.querySelector('#holding-name').value")) === 'Changed in another tab' &&
+        rowOf(probeId).version === current.version + 1,
+      await page.eval("document.querySelector('#holding-name').value"),
+    );
+    await setValue('#holding-name', NAME);
+    await page.eval("document.querySelector('#app .panel-form button[type=submit]').click()");
+    await page.waitUntil("!document.querySelector('#holding-name')", { label: 'the redone edit' });
+    await page.settle(400);
+    check('the redone edit saves at the next version', rowOf(probeId).version === current.version + 2 && (await payloadOf(probeId)).name === NAME);
+
+    // -- Decrypted strings reach the page as text, everywhere -----------------
+
+    check(
+      'a name and a note carrying markup render as literal text on the holding screen',
+      (await page.eval("document.querySelector('.screen-heading').textContent")) === NAME &&
+        (await page.eval("document.querySelector('.detail-header .note').textContent")) === (await payloadOf(probeId)).note &&
+        (await page.eval("[...document.querySelectorAll('.detail-header .chip')].map(c => c.textContent)")).includes(`${AXIS}: ${BAND}`),
+    );
+    await page.eval("location.hash = '#/'");
+    await page.waitUntil("document.querySelector('.chart-controls select')", { label: 'the dashboard' });
+    await choose('.chart-controls select', axis.id);
+    await page.settle(400);
+    await page.eval("[...document.querySelectorAll('.range-buttons button')].find(b => b.textContent === 'All').click()");
+    await page.settle(300);
+    await page.eval(`(() => {
+      const chart = document.querySelector('svg.trend');
+      const box = chart.getBoundingClientRect();
+      chart.dispatchEvent(new PointerEvent('pointermove', { clientX: box.right - 30, clientY: box.top + box.height / 2, bubbles: true }));
+    })()`);
+    await page.settle(100);
+    const places = JSON.parse(await page.eval(`JSON.stringify({
+      row: [...document.querySelectorAll('.holdings-table .row-name')].some(b => b.textContent === ${JSON.stringify(NAME)}),
+      legend: [...document.querySelectorAll('.legend-name')].map(n => n.textContent),
+      grouping: [...document.querySelectorAll('.chart-controls select option')].map(o => o.textContent),
+      heading: document.querySelector('.chart-card .section-heading').textContent,
+      readout: document.querySelector('.chart-readout').textContent,
+      chips: [...document.querySelectorAll('.holdings-table .chip')].map(c => c.textContent),
+    })`));
+    check(
+      'markup in a name, a note and a label is literal in the list, the legend, the heading and the tooltip',
+      places.row && places.legend.includes(BAND) && places.grouping.includes(AXIS) &&
+        places.heading === `Net worth by ${AXIS}` && places.readout.includes(BAND) && places.chips.includes(`${AXIS}: ${BAND}`),
+      JSON.stringify(places),
+    );
+    check(
+      'no markup from the vault became an element, and nothing ran',
+      (await page.eval("document.querySelectorAll('img').length")) === 0 && !(await page.eval('window.__alerted')),
+    );
+    await choose('.chart-controls select', '');
+
+    // -- Renaming and archiving dimensions writes the profile alone ----------
+
+    const accountsAtRename = accountRows();
+    await writesSeen();
+    await page.eval(`document.querySelector('.topbar nav a[href="#/settings"]').click()`);
+    await page.waitUntil("document.querySelector('.link-row[href=\"/settings/dimensions\"]')", { label: 'settings' });
+    await page.eval(`document.querySelector('.link-row[href="/settings/dimensions"]').click()`);
+    await page.waitUntil("document.body.innerText.includes('Region')", { label: 'the dimensions screen' });
+    await page.settle(300);
+    const card = (label) =>
+      `[...document.querySelectorAll('section.card')].find(c => c.querySelector('.card-head .strong')?.textContent === ${JSON.stringify(label)})`;
+    const inCard = (label, button, within = '') =>
+      page.eval(`[...${card(label)}.querySelectorAll('${within} button')].find(b => b.textContent === ${JSON.stringify(button)}).click()`);
+    await page.eval(`${card('Region')}.querySelector('.card-head .btn-inline').click()`);
+    await page.eval(`(() => {
+      const input = ${card('Region')}.querySelector('.card-head input');
+      input.value = 'Area';
+      input.dispatchEvent(new Event('input', { bubbles: true }));
+    })()`);
+    await page.eval(`[...${card('Region')}.querySelectorAll('.card-head button')].find(b => b.textContent === 'Save').click()`);
+    await page.waitUntil(`${card('Area')}`, { label: 'the renamed dimension' });
+    await page.settle(300);
+    check(
+      "renaming a dimension's label writes the profile alone and leaves every account record byte-identical",
+      (await writesSeen()).join(',') === 'profile' && accountRows() === accountsAtRename,
+    );
+
+    // An archived value reads as Unassigned, and restoring it brings the
+    // assignment back, with no account record written either way.
+    await page.eval(`[...[...${card('Area')}.querySelectorAll('li.value-row')].find(r => r.querySelector('.strong').textContent === 'Home').querySelectorAll(':scope > button')].find(b => b.textContent === 'Archive').click()`);
+    await page.settle(500);
+    const bandWhileArchived = await vaultValue(`v.bandOf(v.holdings.get('${probeId}'), v.dimensions.find(d => d.id === 'region01')).label`);
+    await inCard('Area', 'Restore');
+    await page.settle(500);
+    const bandRestored = await vaultValue(`v.bandOf(v.holdings.get('${probeId}'), v.dimensions.find(d => d.id === 'region01')).label`);
+    check(
+      'a holding whose value is archived reads Unassigned, and restoring it restores the assignment with no account write',
+      bandWhileArchived === 'Unassigned' && bandRestored === 'Home' && accountRows() === accountsAtRename &&
+        (await writesSeen()).every((type) => type === 'profile'),
+      `${bandWhileArchived} then ${bandRestored}`,
+    );
+
+    await inCard(AXIS, 'Archive dimension');
+    await page.waitUntil("document.querySelector('.dialog')", { label: 'the archive dimension dialog' });
+    await inDialog('Archive');
+    await page.settle(500);
+    await openHolding(probeId);
+    check(
+      'a holding whose dimension is archived shows no assignment for it, and no account record was written',
+      !(await page.eval("document.querySelector('.detail-header').textContent")).includes('Axis') &&
+        accountRows() === accountsAtRename && (await writesSeen()).every((type) => type === 'profile'),
+    );
+    // Saving the holding meanwhile keeps the entry the form cannot show.
+    await click('Edit');
+    await page.waitUntil("document.querySelector('#holding-name')", { label: 'the editor over an archived dimension' });
+    await page.eval("document.querySelectorAll('#app details').forEach(d => (d.open = true))");
+    await setValue('#app textarea', NOTE);
+    await page.eval("document.querySelector('#app .panel-form button[type=submit]').click()");
+    await page.waitUntil("!document.querySelector('#holding-name')", { label: 'the save over an archived dimension' });
+    await page.settle(300);
+    check(
+      'saving a holding keeps the entry for an archived dimension untouched',
+      (await payloadOf(probeId)).dims[axis.id] === axis.values[0].id,
+      JSON.stringify((await payloadOf(probeId)).dims),
+    );
+    await writesSeen();
+    const accountsBeforeRestore = accountRows();
+    await page.eval(`document.querySelector('.topbar nav a[href="#/settings"]').click()`);
+    await page.waitUntil("document.querySelector('.link-row[href=\"/settings/dimensions\"]')", { label: 'settings again' });
+    await page.eval(`document.querySelector('.link-row[href="/settings/dimensions"]').click()`);
+    await page.waitUntil("document.body.innerText.includes('Area')", { label: 'the dimensions screen again' });
+    await page.eval(`[...document.querySelectorAll('.settings-row')].find(r => r.querySelector('span').textContent === ${JSON.stringify(AXIS)}).querySelector('button').click()`);
+    await page.settle(500);
+    await openHolding(probeId);
+    check(
+      'restoring the dimension restores the assignment without writing an account record',
+      (await page.eval("[...document.querySelectorAll('.detail-header .chip')].map(c => c.textContent)")).includes(`${AXIS}: ${BAND}`) &&
+        accountRows() === accountsBeforeRestore && (await writesSeen()).every((type) => type === 'profile'),
+    );
+
+    // -- Deleting ---------------------------------------------------------------
+
+    await click('Delete');
+    await page.waitUntil("document.querySelector('.dialog')", { label: 'the delete dialog' });
+    await page.settle(200);
+    const offered = JSON.parse(await page.eval(`JSON.stringify({
+      archive: document.querySelector('.dialog input[value=archive]').checked,
+      both: document.querySelectorAll('.dialog input[type=radio]').length,
+    })`));
+    await page.eval("document.querySelector('.dialog input[value=delete]').click()");
+    await page.settle(150);
+    const permanently = "[...document.querySelectorAll('.dialog button')].find(b => b.textContent === 'Delete permanently')";
+    const deleteCopy = (await text()).includes('This also deletes 1 recorded values. Your past net worth figures will change.');
+    await setValue('#delete-name', 'Not the name');
+    const wrongName = await page.eval(`${permanently}.disabled`);
+    await setValue('#delete-name', NAME);
+    const rightName = await page.eval(`${permanently}.disabled`);
+    check(
+      'Delete on a holding with values offers archive, preselected, and permanent delete behind the typed name',
+      offered.archive && offered.both === 2 && deleteCopy && wrongName && !rightName,
+      JSON.stringify({ offered, deleteCopy, wrongName, rightName }),
+    );
+    await inDialog('Cancel');
+    await page.settle(200);
+
+    await openHolding(parking[1]);
+    await click('Delete');
+    await page.waitUntil("location.hash === '#/'", { label: 'the dashboard after deleting outright' });
+    check(
+      'a holding with no values is deleted outright, with no dialog',
+      !(await page.eval("Boolean(document.querySelector('.dialog'))")) && !rowOf(parking[1]) && Boolean(rowOf(parking[0])),
+    );
+
+    // -- Archiving with the closing value taken, and with it skipped -----------
+
+    const today = await page.eval('new Date().toISOString().slice(0, 10)');
+    const [skipId] = await plant([{
+      type: 'account',
+      payload: { name: 'Probe closing', unit: 'CHF', dims: {}, note: null, archivedAt: null, createdAt: new Date().toISOString() },
+    }]);
+    await plant([{ type: 'snapshot', accountId: skipId, payload: { date: BACKDATE, value: '700', note: null } }]);
+    await reloadModel();
+
+    await openHolding(probeId);
+    await click('Archive');
+    await page.waitUntil("document.querySelector('#closing-value')", { label: 'the archive dialog' });
+    const zero = await page.eval(`(async () => {
+      const v = (await import('/static/js/session.js')).currentVault();
+      return v.format.parseFigure(document.querySelector('#closing-value').value) === 0n;
+    })()`);
+    check('the closing value is prefilled 0 on a free date', zero);
+    await setValue('#closing-value', '4000');
+    await inDialog('Archive');
+    await page.waitUntil('!document.querySelector(".dialog")', { timeout: 60000, label: 'the archive with a closing value' });
+    await page.settle(800);
+    const closing = await vaultValue(`v.snapshotsFor('${probeId}').filter(s => s.payload.date === '${today}').map(s => s.payload.value)`);
+    check('the closing value is one figure dated the archive date', closing.join(',') === '4000', closing.join(','));
+
+    await openHolding(skipId);
+    await click('Archive');
+    await page.waitUntil("document.querySelector('#closing-value')", { label: 'the archive dialog to skip' });
+    await click('Skip');
+    await inDialog('Archive');
+    await page.waitUntil('!document.querySelector(".dialog")', { timeout: 60000, label: 'the archive with the value skipped' });
+    await page.settle(800);
+    const skipped = await vaultValue(`{ archivedAt: v.holdings.get('${skipId}').payload.archivedAt, figures: v.snapshotsFor('${skipId}').length }`);
+    check('archiving with the closing value skipped still archives, and records nothing', skipped.archivedAt === today && skipped.figures === 1, JSON.stringify(skipped));
+
+    await page.eval("location.hash = '#/'");
+    await page.waitUntil("document.querySelector('.chart-controls select')", { label: 'the dashboard after archiving' });
+    await choose('.chart-controls select', axis.id);
+    await page.settle(300);
+    await page.eval("[...document.querySelectorAll('.range-buttons button')].find(b => b.textContent === 'All').click()");
+    await page.settle(300);
+    const band = JSON.parse(await page.eval(`(async () => {
+      const v = (await import('/static/js/session.js')).currentVault();
+      const table = document.querySelector('.chart-card details table');
+      const column = [...table.querySelectorAll('thead th')].findIndex(th => th.textContent === ${JSON.stringify(BAND)});
+      const row = [...table.querySelectorAll('tbody tr')].find(r => r.cells[0].textContent === v.format.date('${today}'));
+      return JSON.stringify({ shown: row && column > 0 ? row.cells[column].textContent : null, expected: v.format.money((await import('/static/js/decimal.js')).parse('4000')) });
+    })()`));
+    check("the band runs into the closing value on the archive date", band.shown === band.expected, JSON.stringify(band));
+    const annotations = await page.eval("[...document.querySelectorAll('.archive-annotation title')].map(t => t.textContent)");
+    check(
+      'both archive paths annotate the date, naming the holding as literal text',
+      annotations.includes(`${NAME} archived`) && annotations.includes('Probe closing archived'),
+      annotations.join(' | '),
+    );
+    await choose('.chart-controls select', '');
+
+    // -- When a write in the archive or delete flow fails -----------------------
+
+    const [euroId, poundId] = await plant([
+      { type: 'account', payload: { name: 'Probe euro closing', unit: 'EUR', dims: {}, note: null, archivedAt: null, createdAt: new Date().toISOString() } },
+      { type: 'account', payload: { name: 'Probe pound closing', unit: 'GBP', dims: {}, note: null, archivedAt: null, createdAt: new Date().toISOString() } },
+    ]);
+    await plant([
+      { type: 'snapshot', accountId: euroId, payload: { date: BACKDATE, value: '100', note: null } },
+      { type: 'snapshot', accountId: poundId, payload: { date: BACKDATE, value: '200', note: null } },
+    ]);
+    await reloadModel();
+
+    await openHolding(euroId);
+    await failing(writing(null, 'DELETE'), async () => {
+      await page.eval("[...document.querySelectorAll('.card .data-table button')].find(b => b.textContent === 'Delete').click()");
+      await page.waitUntil("document.querySelector('.dialog')", { label: 'the delete snapshot dialog' });
+      await inDialog('Delete');
+      await page.waitUntil("document.querySelector('.card .data-table .field-error:not([hidden])')", { label: 'the failed delete' });
+    });
+    check(
+      'a failed delete is reported on its row, and the row stays',
+      (await page.eval("document.querySelector('.card .data-table .field-error:not([hidden])').closest('tr').textContent")).includes('Nothing was deleted.') &&
+        (await vaultValue(`v.snapshotsFor('${euroId}').length`)) === 1,
+    );
+
+    await click('Archive');
+    await page.waitUntil("document.querySelector('#closing-value')", { label: 'the euro archive dialog' });
+    await setValue('#closing-value', '90');
+    await failing(writing('snapshot'), async () => {
+      await inDialog('Archive');
+      await page.waitUntil("document.body.innerText.includes('The closing value did not save')", { label: 'the closing value failure' });
+    });
+    check(
+      'a closing value that does not save archives nothing, and the figure stays in the field',
+      (await page.eval("document.querySelector('#closing-value').value")) === '90' &&
+        !(await vaultValue(`v.holdings.get('${euroId}').payload.archivedAt`)) &&
+        (await text()).includes('nothing was archived and the holding is untouched'),
+    );
+    await failing(writing('rate'), async () => {
+      await inDialog('Archive');
+      await page.waitUntil("document.body.innerText.includes('were not written')", { timeout: 60000, label: 'the price failure' });
+    });
+    const priceMessage = await text();
+    check(
+      'a closing value whose prices do not save still archives, naming the units',
+      priceMessage.includes('Archived. The prices for EUR') &&
+        (await vaultValue(`v.holdings.get('${euroId}').payload.archivedAt`)) === today &&
+        (await vaultValue(`v.snapshotsFor('${euroId}').filter(s => s.payload.date === '${today}').length`)) === 1,
+      priceMessage.slice(0, 400),
+    );
+    await inDialog('Close');
+    await page.settle(400);
+
+    await openHolding(poundId);
+    await click('Archive');
+    await page.waitUntil("document.querySelector('#closing-value')", { label: 'the pound archive dialog' });
+    await setValue('#closing-value', '180');
+    await failing(writing('account'), async () => {
+      await inDialog('Archive');
+      await page.waitUntil("document.body.innerText.includes('but the holding was not archived')", { timeout: 60000, label: 'the flag failure' });
+    });
+    const again = await page.eval(`(async () => {
+      const v = (await import('/static/js/session.js')).currentVault();
+      return String(v.format.parseFigure(document.querySelector('#closing-value').value));
+    })()`);
+    check(
+      'a closing value saved without the archive flag says both halves and offers the archive again, prefilled',
+      again === (await page.eval("(async () => String((await import('/static/js/decimal.js')).parse('180')))()")) &&
+        !(await vaultValue(`v.holdings.get('${poundId}').payload.archivedAt`)) &&
+        (await vaultValue(`v.snapshotsFor('${poundId}').filter(s => s.payload.date === '${today}').length`)) === 1,
+      again,
+    );
+    await inDialog('Archive');
+    await page.waitUntil('!document.querySelector(".dialog")', { timeout: 60000, label: 'the archive offered again' });
+    await page.settle(600);
+    check(
+      'the archive offered again finishes it, with one figure at the date',
+      (await vaultValue(`v.holdings.get('${poundId}').payload.archivedAt`)) === today &&
+        (await vaultValue(`v.snapshotsFor('${poundId}').filter(s => s.payload.date === '${today}').length`)) === 1,
+    );
+
+    // -- Unarchiving, from the dashboard's archived rows ------------------------
+
+    await page.eval("location.hash = '#/'");
+    await page.waitUntil("document.querySelector('.holdings-card')", { label: 'the dashboard to unarchive from' });
+    await page.eval("[...document.querySelectorAll('.holdings-card .checkbox input')][0].click()");
+    await page.settle(300);
+    const archivedRow = `[...document.querySelectorAll('.holdings-table tbody tr')].find(r => r.querySelector('.row-name').textContent === ${JSON.stringify(archiving)})`;
+    const rowActions = await page.eval(`[...${archivedRow}.querySelectorAll('.cell-action button')].map(b => b.textContent)`);
+    check('an archived row offers Unarchive and no new value', rowActions.join(',') === 'Unarchive', rowActions.join(','));
+    await page.eval(`${archivedRow}.querySelector('.cell-action button').click()`);
+    await page.settle(800);
+    await page.eval("[...document.querySelectorAll('.holdings-card .checkbox input')][0].checked && [...document.querySelectorAll('.holdings-card .checkbox input')][0].click()");
+    await page.settle(300);
+    const back = await page.eval(`[...document.querySelectorAll('.holdings-table .row-name')].map(b => b.textContent)`);
+    const heroNow = await page.eval("document.querySelector('.hero-figure').textContent");
+    check(
+      'unarchiving restores the holding to the active list and to the current total',
+      back.includes(archiving) && heroNow === heroBeforeArchive,
+      `${back.join(',')}: ${heroNow} against ${heroBeforeArchive}`,
+    );
+
+    // -- What the page asked the server for ---------------------------------------
+
+    const requested = JSON.parse(await page.eval(`JSON.stringify(performance.getEntriesByType('resource')
+      .map(e => new URL(e.name)).filter(u => u.pathname.startsWith('/api/')).map(u => u.pathname + u.search))`));
+    const rateRequests = requested.filter((path) => path.startsWith('/api/rates?'));
+    check(
+      'no rate request names a symbol: each asks for the whole table at a date',
+      rateRequests.length > 0 &&
+        rateRequests.every((path) => [...new URLSearchParams(path.split('?')[1]).keys()].sort().join(',') === 'date,quote'),
+      rateRequests.join(' | '),
+    );
+    check(
+      'no request returns dimensions, labels or values: none names them',
+      requested.every((path) => !/dimension|label|value/i.test(path)),
+      [...new Set(requested.map((path) => path.split('?')[0]))].join(' | '),
+    );
+    check('no markup from the vault ran anywhere along the way', !(await page.eval('window.__alerted')));
+  }
 
   // ---- Export, then import it back ---------------------------------------
 
