@@ -1313,6 +1313,30 @@ th.numeric {
 
 .rate-meta .chip { margin: 0; }
 
+/* A proposal still in flight: a block in petrol-100 where the chip
+   will sit, never a spinner (design-system.md, States). */
+.skeleton {
+  display: inline-block;
+  width: 112px;
+  height: 20px;
+  border-radius: 4px;
+  background: var(--petrol-100);
+}
+
+.rate-line > .rate-pair,
+.rate-line > .field-error { grid-column: 1 / -1; margin: 0; }
+.rate-figure { flex: 1; text-align: right; font-variant-numeric: tabular-nums; }
+
+.row-saved {
+  font-size: 12px;
+  color: var(--ink-secondary);
+  text-align: right;
+  margin: 4px 0 0;
+}
+
+.sweep-pair { grid-column: 2 / -1; }
+.sweep-pair .flag-note { display: flex; justify-content: space-between; gap: 8px; }
+
 .value-row {
   display: flex;
   align-items: center;

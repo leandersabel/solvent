@@ -76,10 +76,15 @@ function emptyVault(vault, actions) {
 }
 
 function decryptionBanner(vault) {
+  const count = vault.unreadable.length;
   return el('div', { class: 'banner banner-critical', role: 'alert' }, [
     el('span', {
-      text: `${vault.unreadable.length} records could not be read.`,
+      text: `${count} ${count === 1 ? 'record' : 'records'} could not be read.`,
     }),
+    el('details', { class: 'unreadable-list' }, [
+      el('summary', { text: 'Which records' }),
+      el('ul', { class: 'plain-list' }, vault.unreadable.map((id) => el('li', { class: 'record-id', text: id }))),
+    ]),
   ]);
 }
 
@@ -211,7 +216,7 @@ function switchButton(label, active, onclick) {
  *  to the sweep; a marked one opens that recording's own screen, with
  *  no warning and nothing to confirm, because the picker can see what
  *  is there (ui/dashboard.md). */
-function datePicker(vault, actions) {
+export function datePicker(vault, actions) {
   const marked = new Set(vault.recordingDates());
   const note = el('p', { class: 'hint' });
   const describe = () => {
@@ -567,7 +572,7 @@ function holdingsTable(vault, state, render, actions, grouping) {
               el('button', {
                 class: 'btn-secondary btn-small',
                 text: 'Record a value',
-                onclick: () => snapshotDialog(vault, holding, null, actions.reload),
+                onclick: () => snapshotDialog(vault, holding, null, actions.reload, actions.openRecording),
               }),
             ]),
           ]),
@@ -615,7 +620,10 @@ function group(title, holdings, vault, actions, explanation) {
 /** Where the chart shows how composition moved, this shows what it is
  *  made of right now. Every bar takes chart slot 1: these are nominal
  *  categories and the bar length already carries the value. */
-function breakdown(vault, dimension, state) {
+/** Each band's signed total right now, in the dimension's configured
+ *  order with "Unassigned" last. Summed from the same per-holding
+ *  figures as the hero, so the bars add up to the total exactly. */
+export function breakdownTotals(vault, dimension, mode) {
   const bands = new Map();
   for (const value of dimension.values.filter((v) => !v.archivedAt)) {
     bands.set(value.id, { label: value.label, total: decimal.ZERO });
@@ -623,14 +631,25 @@ function breakdown(vault, dimension, state) {
   bands.set('unassigned', { label: 'Unassigned', total: decimal.ZERO });
 
   for (const holding of vault.activeHoldings()) {
-    const figure = vault.valueOf(holding, state.mode);
+    const figure = vault.valueOf(holding, mode);
     if (figure.state !== 'valued') continue;
     const band = vault.bandOf(holding, dimension);
     const target = bands.get(band.id) || bands.get('unassigned');
     target.total += figure.converted;
   }
+  // Past four, the rest fold into "Other", after "Unassigned", which is
+  // the order the chart stacks them in.
+  const all = [...bands.values()];
+  const unassigned = all.pop();
+  const rest = all.splice(4);
+  const other = rest.length
+    ? [{ label: 'Other', total: rest.reduce((sum, band) => sum + band.total, decimal.ZERO) }]
+    : [];
+  return [...all, unassigned, ...other];
+}
 
-  const rows = [...bands.values()].filter((band) => band.total !== 0n);
+function breakdown(vault, dimension, state) {
+  const rows = breakdownTotals(vault, dimension, state.mode).filter((band) => band.total !== 0n);
   if (!rows.length) return null;
 
   // One scale for every bar: the widest negative band to the left of

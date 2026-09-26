@@ -9,144 +9,295 @@ import * as decimal from './decimal.js';
 import * as writes from './writes.js';
 import { ageInWords, dialog, el } from './dom.js';
 
-export function sweepView(vault, date) {
-  const banner = el('p', { class: 'banner', hidden: true, role: 'status' });
-  const rows = [];
-  const rateLines = [];
+// One sitting per date, kept across redraws of the same screen and
+// dropped whenever a route starts a sweep afresh.
+let sittings = new Map();
+// The sweep on screen, so leaving it can name what it held unsaved.
+let current = null;
+
+export function resetSweepState() {
+  sittings = new Map();
+}
+
+function sittingFor(vault, date) {
+  if (!sittings.has(date)) sittings.set(date, writes.sitting(vault, date));
+  return sittings.get(date);
+}
+
+/** What the sweep on screen holds that was typed and not saved, by
+ *  holding name and by unit. Empty once it has left the page. */
+export function unsavedOnSweep() {
+  if (!current || !current.element.isConnected) return { date: null, names: [] };
+  return { date: current.date, names: current.unsaved() };
+}
+
+export function sweepView(vault, date, actions = {}) {
+  const sit = sittingFor(vault, date);
+  const banner = el('div', { class: 'banner', hidden: true, role: 'status' });
+  const say = (text, { critical = false, children = [] } = {}) => {
+    banner.className = critical ? 'banner banner-critical' : 'banner';
+    banner.replaceChildren(el('span', { text }), ...children);
+    banner.hidden = false;
+  };
+  const refused = () =>
+    say(`${vault.format.longDate(date)} already has a recording. Another window got there first.`, {
+      critical: true,
+      children: [
+        el('button', {
+          class: 'btn-secondary',
+          text: 'Open the recording',
+          onclick: () => actions.openRecording && actions.openRecording(date),
+        }),
+      ],
+    });
 
   const holdings = vault.activeHoldings();
-  const table = el('div', { class: 'sweep-rows' });
-
-  for (const holding of holdings) {
-    const row = sweepRow(vault, holding, date, () => ensurePricesOnce(vault, date, rateLines, banner));
-    rows.push(row);
-    table.append(row.element);
+  if (!holdings.length) {
+    return el('section', { class: 'screen sweep' }, [
+      heading(vault, date),
+      el('div', { class: 'card card-centered' }, [
+        el('p', { class: 'empty-line', text: 'Add a holding first.' }),
+        el('button', {
+          class: 'btn-primary',
+          text: 'Add a holding',
+          onclick: () => actions.addHolding && actions.addHolding(),
+        }),
+      ]),
+    ]);
   }
 
-  // The save for the rate lines appears once one of them has changed,
-  // and one confirmation covers every changed line.
-  const saveAll = el('button', {
-    class: 'btn-primary',
-    text: 'Save the rate lines',
-    hidden: true,
-    onclick: () => saveRates(vault, date, rateLines, banner, showSave),
+  const saveAll = el('button', { class: 'btn-primary', text: 'Save the rate lines', hidden: true });
+  const block = rateBlock(vault, date, {
+    sit,
+    onChange: () => {
+      saveAll.hidden = !block.lines.some((line) => line.changed());
+      for (const row of rows) row.describe();
+    },
   });
-  const showSave = () => {
-    saveAll.hidden = !rateLines.some((line) => line.changed());
-  };
-  const rateBlock = el('div', { class: 'rate-block' });
-  buildRateLines(vault, date, rateLines, rateBlock, showSave);
+  saveAll.addEventListener('click', () => saveRates(vault, sit, block, { say, refused, saveAll }));
 
-  return el('section', { class: 'screen sweep' }, [
-    el('header', { class: 'sweep-head' }, [
-      el('p', { class: 'eyebrow', text: 'Recording' }),
-      el('h1', { class: 'screen-heading', text: vault.format.fullDate(date) }),
-    ]),
+  // A date holding nothing arrives with its rate lines filled in by the
+  // proposals for it. A reopened recording asks the source nothing on
+  // arrival: the figures there may be ones the person chose.
+  if (sit.dateWasEmpty && !sit.proposals && writes.needsLookup(vault, date)) {
+    sit.proposals = writes.fetchProposals(vault, date);
+  }
+  if (sit.proposals) {
+    block.waiting();
+    sit.proposals.then((proposals) => block.showProposals(proposals));
+  }
+
+  const ensurePrices = async () => {
+    if (sit.refreshed) return;
+    sit.refreshed = true;
+    const missing = vault.missingUnits(date);
+    if (!missing.length) return;
+    const unanswered = missing.some((unit) => vault.quotable(unit) && !block.lineFor(unit)?.typed);
+    if (!sit.proposals && unanswered) sit.proposals = writes.fetchProposals(vault, date);
+    if (sit.proposals) block.showProposals(await sit.proposals);
+    const { failed } = await writes.refreshPrices(vault, date, {}, (unit) => block.partFor(unit));
+    block.refresh();
+    if (failed.length) {
+      say(`Recorded. Prices were not updated for ${failed.join(', ')}.`, { critical: true });
+    }
+  };
+
+  const rows = holdings.map((holding) =>
+    sweepRow(vault, holding, date, {
+      sit,
+      block,
+      refused,
+      ensurePrices,
+      onTyped: () => block.ask(holding.payload.unit),
+    }),
+  );
+
+  const element = el('section', { class: 'screen sweep' }, [
+    heading(vault, date),
     banner,
-    holdings.length
-      ? table
-      : el('p', { class: 'empty-line', text: 'Add a holding first.' }),
-    holdings.length
-      ? el('section', { class: 'rate-section' }, [
-          el('h2', { class: 'section-heading', text: 'Rates for this date' }),
-          rateBlock,
-          saveAll,
-        ])
-      : null,
+    el('div', { class: 'sweep-rows' }, rows.map((row) => row.element)),
+    el('section', { class: 'rate-section' }, [
+      el('h2', { class: 'section-heading', text: 'Rates for this date' }),
+      block.element,
+      saveAll,
+    ]),
+  ]);
+  current = {
+    date,
+    element,
+    unsaved: () => [
+      ...rows.filter((row) => row.changed()).map((row) => row.name),
+      ...block.lines.filter((line) => line.changed()).map((line) => `the ${line.unit} rate`),
+    ],
+  };
+  return element;
+}
+
+function heading(vault, date) {
+  return el('header', { class: 'sweep-head' }, [
+    el('p', { class: 'eyebrow', text: 'Recording' }),
+    el('h1', { class: 'screen-heading', text: vault.format.fullDate(date) }),
   ]);
 }
 
-function sweepRow(vault, holding, date, ensurePrices) {
-  const stored = vault
-    .snapshotsFor(holding.recordId)
-    .find((s) => s.payload.date === date);
-  const history = vault.usableSnapshots(holding.recordId);
+function sweepRow(vault, holding, date, { sit, block, refused, ensurePrices, onTyped }) {
+  const { format } = vault;
+  const atDate = () => vault.snapshotsFor(holding.recordId).filter((s) => s.payload.date === date);
   // On a reopened recording, the figure a holding carried into that
   // date is its last figure before then, not the newest in its
   // history.
-  const carried = [...history].reverse().find((s) => s.payload.date < date) || null;
-  const reference = stored || carried;
-  const { format } = vault;
-  // The field shows a figure grouped, the way the reader reads one, and
-  // takes it back typed with or without the marks.
+  const carriedInto = () =>
+    [...vault.usableSnapshots(holding.recordId)].reverse().find((s) => s.payload.date < date) || null;
   const same = (figure) => {
     const typed = format.parseFigure(field.value);
     return typed !== null && typed === decimal.parse(figure);
   };
 
-  const field = el('input', {
-    type: 'text',
-    inputmode: 'decimal',
-    class: stored ? 'quantity recorded' : 'quantity carried',
-    value: reference ? format.editable(decimal.parse(reference.payload.value)) : '',
-  });
+  const field = el('input', { type: 'text', inputmode: 'decimal', class: 'quantity' });
   const unit = vault.unitOf(holding.payload.unit);
   const suffix = el('span', { class: 'unit-suffix', text: unit.currency ? unit.symbol : unit.short });
   const converted = el('p', { class: 'hint' });
   const status = el('span', { class: 'row-state' });
   const age = el('span', { class: 'row-age' });
   const message = el('p', { class: 'field-error', hidden: true });
-
+  const savedNote = el('p', { class: 'row-saved', hidden: true, role: 'status' });
+  const pair = el('div', { class: 'sweep-pair', hidden: true });
   const control = el('button', { class: 'btn-secondary' });
+  const input = el('div', { class: 'sweep-input' }, [
+    el('div', { class: 'quantity-field' }, [field, suffix]),
+    converted,
+    message,
+    savedNote,
+  ]);
 
-  const describe = () => {
-    const current = vault
-      .snapshotsFor(holding.recordId)
-      .find((s) => s.payload.date === date);
-    if (current) {
+  const row = { name: holding.payload.name };
+
+  /** Put the field back to what the vault holds for this row. */
+  const reset = () => {
+    const [stored] = atDate();
+    const reference = stored || carriedInto();
+    field.value = reference ? format.editable(decimal.parse(reference.payload.value)) : '';
+    field.className = stored ? 'quantity recorded' : 'quantity carried';
+    row.describe();
+  };
+
+  row.describe = () => {
+    const entries = atDate();
+    // Two figures on one date: both shown, flagged, and neither picked.
+    const flagged = entries.length > 1;
+    pair.hidden = !flagged;
+    input.hidden = flagged;
+    control.hidden = flagged;
+    if (flagged) {
+      status.textContent = 'Two figures share this date.';
+      age.textContent = 'Keep one.';
+      pair.replaceChildren(
+        ...entries.map((entry) =>
+          el('p', { class: 'flag-note' }, [
+            `${vault.amount(decimal.parse(entry.payload.value), holding.payload.unit)} `,
+            el('button', {
+              class: 'btn-inline',
+              text: 'Keep this one',
+              onclick: async () => {
+                try {
+                  for (const other of entries) if (other !== entry) await writes.deleteRecord(vault, other);
+                } catch {
+                  showError(message, 'That did not save.');
+                }
+                reset();
+              },
+            }),
+          ]),
+        ),
+      );
+      return;
+    }
+    const [stored] = entries;
+    const carried = carriedInto();
+    const reference = stored || carried;
+    if (stored) {
       status.textContent = 'Recorded for this date.';
       control.textContent = 'Save';
-      control.disabled = same(current.payload.value);
+      control.disabled = same(stored.payload.value);
     } else {
       status.textContent = 'Nothing recorded for this date.';
-      const untouched = reference && same(reference.payload.value);
-      control.textContent = untouched && reference ? 'Confirm' : 'Record';
-      control.disabled = !history.length && !field.value.trim();
+      const untouched = carried && same(carried.payload.value);
+      control.textContent = untouched ? 'Confirm' : 'Record';
+      // Nothing to confirm where the holding was never valued: the
+      // field is the only control until something is typed in it.
+      control.disabled = !carried && !field.value.trim();
     }
     // The two row states differ in wording and in ink weight, never in
     // color alone. A changed figure puts the brass on the row's control.
-    status.classList.toggle('is-recorded', Boolean(current));
-    const changed = current ? !control.disabled : control.textContent === 'Record' && !control.disabled;
-    control.className = changed ? 'btn-primary' : 'btn-secondary';
+    status.classList.toggle('is-recorded', Boolean(stored));
+    control.className = row.changed() ? 'btn-primary' : 'btn-secondary';
     age.textContent = !reference
       ? 'Never valued.'
-      : current
+      : stored
         ? `${capitalized(ageInWords(reference.payload.date))}.`
         : `Last figure ${vault.format.longDate(reference.payload.date)}, ${ageInWords(reference.payload.date)}.`;
     // A holding in the main currency converts to itself, so the line
     // under its field stays empty.
     converted.textContent = holding.payload.unit === vault.mainCurrency
       ? ''
-      : describeConverted(vault, holding, date, field.value);
+      : describeConverted(vault, holding, field.value, block.figureFor(holding.payload.unit));
   };
 
-  field.addEventListener('input', describe);
+  /** Typed and not saved: what leaving the screen would lose. */
+  row.changed = () => {
+    if (atDate().length > 1) return false;
+    const [stored] = atDate();
+    if (stored) return !same(stored.payload.value);
+    const carried = carriedInto();
+    return Boolean(field.value.trim()) && !(carried && same(carried.payload.value));
+  };
+
+  field.addEventListener('input', () => {
+    savedNote.hidden = true;
+    if (field.value.trim()) onTyped();
+    row.describe();
+  });
   // Leaving the field groups what was typed, once it reads as a figure.
   field.addEventListener('blur', () => {
     const typed = format.parseFigure(field.value);
     if (typed !== null) field.value = format.editable(typed);
   });
 
+  const saved = () => {
+    savedNote.textContent = 'Saved.';
+    savedNote.hidden = false;
+    reset();
+  };
+
+  const failedWith = async (failure) => {
+    if (failure.status === 409) {
+      // Nothing is retried and nothing merged: the row shows what is
+      // stored now, and the person redoes the edit against it.
+      await writes.reloadType(vault, 'snapshot').catch(() => {});
+      reset();
+      showError(message, 'This figure was changed in another window.');
+      return;
+    }
+    showError(message, 'That did not save. Your figure is still here.');
+  };
+
   control.addEventListener('click', async () => {
     message.hidden = true;
-    const current = vault
-      .snapshotsFor(holding.recordId)
-      .find((s) => s.payload.date === date);
+    savedNote.hidden = true;
+    const [stored] = atDate();
     const text = field.value.trim();
 
-    // Only a field backed by a record at this date can be cleared.
-    // What the screen chose to prefill never decides whether a record
-    // dies; the stored record does.
     if (!text) {
-      if (!current) {
-        describe();
-        return;
-      }
+      // Only a field backed by a record at this date can be cleared.
+      // What the screen chose to prefill never decides whether a
+      // record dies. The stored record does.
+      if (!stored) return row.describe();
+      control.disabled = true;
       try {
-        await writes.deleteRecord(vault, current);
-        describe();
-      } catch {
-        showError(message, 'That did not save.');
+        await writes.deleteRecord(vault, stored);
+        saved();
+      } catch (failure) {
+        await failedWith(failure);
       }
       return;
     }
@@ -158,51 +309,68 @@ function sweepRow(vault, holding, date, ensurePrices) {
     }
     control.disabled = true;
     try {
+      if (stored) {
+        // Changing a figure is not recording a quantity, so it ensures
+        // no price and asks the proxy nothing.
+        await writes.saveSnapshot(vault, holding.recordId, stored, {
+          ...stored.payload,
+          value: decimal.format(quantity),
+        });
+        saved();
+        return;
+      }
+      // A create: the date is claimed for this sitting before the first
+      // one, and the whole save is refused if another window got there
+      // first.
+      const refusal = await writes.claimDate(vault, sit, {
+        snapshots: [holding.recordId],
+        rates: sit.refreshed ? [] : vault.missingUnits(date),
+      });
+      if (refusal) {
+        reset();
+        refused();
+        return;
+      }
+      const carried = carriedInto();
       // The quantity goes first and the prices after, on their own
       // requests, so a price write can never fail a quantity write.
-      await writes.saveSnapshot(vault, holding.recordId, current || null, {
-        date,
-        value: decimal.format(quantity),
-        note: current ? current.payload.note : null,
-      });
+      if (carried && quantity === decimal.parse(carried.payload.value)) {
+        await writes.confirmFigure(vault, holding, date);
+      } else {
+        await writes.saveSnapshot(vault, holding.recordId, null, {
+          date,
+          value: decimal.format(quantity),
+          note: null,
+        });
+      }
+      saved();
       await ensurePrices();
-      describe();
     } catch (failure) {
-      showError(
-        message,
-        failure.status === 409
-          ? 'This figure was changed in another window.'
-          : 'That did not save. Your figure is still here.',
-      );
+      await failedWith(failure);
     } finally {
-      control.disabled = false;
+      row.describe();
     }
   });
 
-  describe();
+  reset();
 
-  return {
-    element: el('div', { class: 'sweep-row' }, [
-      el('div', { class: 'sweep-name' }, [
-        el('span', { class: 'holding-name', text: holding.payload.name }),
-        el('p', { class: 'row-status' }, [status, ' ', age]),
-      ]),
-      el('div', { class: 'sweep-input' }, [
-        el('div', { class: 'quantity-field' }, [field, suffix]),
-        converted,
-        message,
-      ]),
-      control,
+  row.element = el('div', { class: 'sweep-row', 'data-holding': holding.recordId }, [
+    el('div', { class: 'sweep-name' }, [
+      el('span', { class: 'holding-name', text: holding.payload.name }),
+      el('p', { class: 'row-status' }, [status, ' ', age]),
     ]),
-  };
+    input,
+    pair,
+    control,
+  ]);
+  return row;
 }
 
-function describeConverted(vault, holding, date, text) {
+function describeConverted(vault, holding, text, price) {
   const quantity = vault.format.parseFigure(text);
   if (quantity === null) return '';
-  const price = vault.priceOn(holding.payload.unit, date);
-  if (!price) return 'not priced';
-  return vault.mainMoney(decimal.multiply(quantity, price.rate));
+  if (price === null) return 'not priced';
+  return vault.mainMoney(decimal.multiply(quantity, price));
 }
 
 function capitalized(text) {
@@ -214,138 +382,338 @@ function showError(node, text) {
   node.hidden = false;
 }
 
-let refreshedDates = new Set();
-
-/** The rates go in with the first row recorded, once for the whole
- *  sitting rather than once per row, so a fifteen-row sweep writes one
- *  set of prices and asks the proxy once. */
-async function ensurePricesOnce(vault, date, rateLines, banner) {
-  if (refreshedDates.has(date)) return;
-  refreshedDates.add(date);
-  const proposals = await writes.fetchProposals(vault, date);
-  const { failed } = await writes.refreshPrices(vault, date, proposals);
-  if (failed.length) {
-    banner.textContent = `Recorded. Prices were not updated for ${failed.join(', ')}.`;
-    banner.hidden = false;
-  }
-  for (const line of rateLines) line.refresh();
+/** The units a date's rate block shows: every unit an active holding
+ *  is measured in, and any unit already priced at that date. The main
+ *  currency has no line, because there is nothing to convert. */
+function blockUnits(vault, date) {
+  const units = new Set(vault.unitsToRefresh());
+  for (const entry of vault.recording(date).prices) units.add(entry.payload.symbol);
+  units.delete(vault.mainCurrency);
+  return [...units].sort();
 }
 
-export function resetSweepState() {
-  refreshedDates = new Set();
-}
-
-/** One line per unit anything in the vault is measured in. No
- *  holding's row ever carries a rate: one price belongs to a unit and
- *  is shared by every holding measured in it. The main currency has no
- *  line, because there is nothing to convert. */
-function buildRateLines(vault, date, rateLines, container, onChange) {
-  const unitsInVault = new Set(
-    [...vault.holdings.values()].map((h) => h.payload.unit),
-  );
-  unitsInVault.delete(vault.mainCurrency);
-
-  if (!unitsInVault.size) {
-    container.append(
+/** One line per unit, for one date. No holding's row ever carries a
+ *  rate: one price belongs to a unit and is shared by every holding
+ *  measured in it.
+ *
+ *  `readOnly` shows the stored prices and nothing to type into, which
+ *  is what the single-holding form shows for a date already priced. */
+export function rateBlock(vault, date, { sit = null, readOnly = false, onChange = () => {} } = {}) {
+  const element = el('div', { class: 'rate-block' });
+  const units = blockUnits(vault, date);
+  if (!units.length) {
+    element.append(
       el('p', { class: 'hint', text: 'Everything here is counted in your main currency, so there is nothing to convert.' }),
     );
-    return;
   }
+  const lines = units.map((unit) => rateLine(vault, unit, date, { sit, readOnly, onChange }));
+  element.append(...lines.map((line) => line.element));
 
-  for (const unit of [...unitsInVault].sort()) {
-    const line = rateLine(vault, unit, date, onChange);
-    rateLines.push(line);
-    container.append(line.element);
-  }
+  const lineFor = (unit) => lines.find((line) => line.unit === unit) || null;
+  return {
+    element,
+    lines,
+    lineFor,
+    refresh: () => lines.forEach((line) => line.reset()),
+    waiting: () => lines.forEach((line) => line.wait()),
+    showProposals: (proposals) => lines.forEach((line) => line.propose(proposals[line.unit] || null)),
+    /** What the refresh writes for a unit, from what its line shows. */
+    partFor: (unit) => {
+      const line = lineFor(unit);
+      return line ? line.part() : null;
+    },
+    /** The price a row converts at: what the line shows for this date,
+     *  or the unit's stored price at or before it. */
+    figureFor: (unit) => {
+      if (unit === vault.mainCurrency) return decimal.ONE;
+      const line = lineFor(unit);
+      const shown = line ? line.figure() : null;
+      if (shown !== null) return shown;
+      const price = vault.priceOn(unit, date);
+      return price ? price.rate : null;
+    },
+    /** A row in this unit is being recorded. A unit with no price at
+     *  all asks for one, at the head of the block, and never blocks the
+     *  row. */
+    ask: (unit) => {
+      const line = lineFor(unit);
+      if (!line || !line.ask()) return;
+      element.prepend(line.element);
+    },
+  };
 }
 
-function rateLine(vault, unit, date, onChange) {
+function rateLine(vault, unit, date, { sit, readOnly, onChange }) {
   const { format } = vault;
   const described = vault.unitOf(unit);
+  const quotable = vault.quotable(unit);
   const field = el('input', {
     type: 'text',
     inputmode: 'decimal',
     class: 'quantity',
     'aria-label': `${described.name} rate`,
   });
-  field.addEventListener('input', onChange);
+  const shown = el('span', { class: 'rate-figure' });
+  const provenance = el('span', { class: 'chip' });
+  const skeleton = el('span', { class: 'skeleton', hidden: true, 'aria-label': 'Looking up the rate' });
+  const explanation = el('p', { class: 'hint' });
+  const error = el('p', { class: 'field-error', hidden: true });
+  const pair = el('div', { class: 'rate-pair', hidden: true });
+  const lookup = el('button', { class: 'btn-inline', text: 'Look it up', hidden: true });
+  const box = el('div', { class: 'quantity-field' }, [
+    readOnly ? shown : field,
+    el('span', { class: 'unit-suffix', text: vault.mainCurrency }),
+  ]);
+
+  const line = {
+    unit,
+    stored: null,
+    rivals: [],
+    proposal: null,
+    carried: null,
+    prefilled: false,
+    typed: false,
+    lookedUp: false,
+    asked: false,
+    pending: false,
+  };
+  const reopened = () => !sit || !sit.dateWasEmpty;
+  const parsed = (text) => decimal.parse(text);
+
+  line.value = () => field.value.trim();
+  /** The figure the line shows, or null for an empty field or one that
+   *  does not read as a number. */
+  line.figure = () => (readOnly ? (line.stored ? parsed(line.stored.payload.rate) : null) : format.parseFigure(field.value));
+  line.invalid = () => !readOnly && line.value() !== '' && line.figure() === null;
+
+  line.changed = () => {
+    if (readOnly || line.rivals.length) return false;
+    if (line.stored) return !line.value() || line.figure() !== parsed(line.stored.payload.rate);
+    if (!line.value()) return false;
+    if (line.invalid()) return true;
+    if (line.proposal) return line.lookedUp || line.figure() !== parsed(line.proposal.rate);
+    return !line.prefilled || line.figure() !== parsed(line.carried.payload.rate);
+  };
+
+  /** What the refresh writes for this unit, where the date has no
+   *  entry for it. */
+  line.part = () => {
+    if (readOnly || line.stored || line.rivals.length || line.invalid()) return null;
+    return writes.ratePart({
+      figure: line.figure(),
+      proposal: line.proposal,
+      carried: line.prefilled ? line.carried : null,
+    });
+  };
+
+  /** The save of this line on its own, for the rate-lines save:
+   *  `{ existing, payload }` to write, `{ entry }` to delete, or null. */
+  line.change = () => {
+    if (!line.changed() || line.invalid()) return null;
+    if (line.stored && !line.value()) return { remove: line.stored };
+    if (line.stored) {
+      return {
+        existing: line.stored,
+        payload: writes.editedRatePayload(line.stored.payload, decimal.format(line.figure())),
+      };
+    }
+    const part = line.part();
+    return part ? { existing: null, payload: writes.rateEntry(vault, unit, date, part) } : null;
+  };
+
+  const ownCopy = () => {
+    const row = vault.symbols.get(unit);
+    return row
+      ? `No market price for ${described.name.toLowerCase()} yet. This one is yours to set.`
+      : `Nobody publishes a price for ${unit}. This one is yours to set.`;
+  };
+
+  /** Chip and wording for what the field holds now. Never touches the
+   *  field itself, so typing is never overwritten. */
+  line.describe = () => {
+    error.hidden = !line.invalid();
+    if (line.invalid()) error.textContent = 'Enter a number, with at most twelve decimal places.';
+    skeleton.hidden = !line.pending;
+    provenance.hidden = line.pending;
+    lookup.hidden = true;
+    if (line.rivals.length) {
+      provenance.textContent = '';
+      explanation.textContent = 'Two prices for this unit share this date. Keep one.';
+      return;
+    }
+    const figure = line.figure();
+    if (line.stored) {
+      const stored = line.stored.payload;
+      const original = stored.rateSource === 'edited' ? stored.proposedRate : stored.rateSource === 'proposed' ? stored.rate : null;
+      // Editing a filled line flips its provenance the moment it
+      // changes. The proposed badge is never silently kept.
+      provenance.textContent =
+        figure !== null && figure !== parsed(stored.rate) && original !== null
+          ? `Edited from ${original}`
+          : provenanceChip(stored, format);
+      explanation.textContent = !readOnly && !line.value() ? 'Cleared. Saving removes this price.' : '';
+      return;
+    }
+    if (line.pending) {
+      provenance.textContent = '';
+      explanation.textContent = '';
+      return;
+    }
+    if (line.proposal) {
+      provenance.textContent =
+        figure === parsed(line.proposal.rate)
+          ? provenanceChip({ rateSource: 'proposed', rateAsOf: line.proposal.asOf, date }, format)
+          : figure !== null
+            ? `Edited from ${line.proposal.rate}`
+            : '';
+      explanation.textContent = '';
+      return;
+    }
+    provenance.textContent = line.changed() ? 'Typed by you' : '';
+    if (readOnly) {
+      explanation.textContent = `No price for ${unit} at this date.`;
+      return;
+    }
+    if (!quotable) {
+      explanation.textContent = line.carried
+        ? `Estimated ${ageInWords(line.carried.payload.date)}. ${ownCopy()}`
+        : line.asked
+          ? askCopy()
+          : `No price for ${unit} yet. ${ownCopy()}`;
+      return;
+    }
+    if (line.asked && !line.carried) {
+      explanation.textContent = askCopy();
+    } else if (reopened()) {
+      explanation.textContent = `No rate was recorded for ${unit} on this date.`;
+    } else {
+      explanation.textContent = `No market rate came back for ${unit}. Nothing will be recorded for it today.`;
+    }
+    // A line that went in empty carries its own lookup, since the
+    // outage that emptied it is the reason for coming back.
+    lookup.hidden = !reopened() || line.lookedUp;
+  };
+
+  const askCopy = () =>
+    `What is ${described.one} worth in ${vault.mainCurrency}? Nothing prices ${unit} yet. The figure records either way, and until a price exists the holding is listed as not priced.`;
+
+  /** Back to what the vault holds for this date. */
+  line.reset = () => {
+    const entries = vault.entriesFor(unit).filter((e) => e.payload.date === date);
+    line.rivals = entries.length > 1 && vault.duplicateRateDates(unit).has(date) ? entries : [];
+    line.stored = line.rivals.length ? null : entries[0] || null;
+    line.carried = vault.carriedRate(unit, date);
+    line.typed = false;
+    // A unit only its owner can price shows its last figure as the
+    // starting point. One somebody publishes stays empty until a
+    // proposal fills it.
+    line.prefilled = !line.stored && !line.proposal && !quotable && Boolean(line.carried);
+    const figure = line.stored
+      ? line.stored.payload.rate
+      : line.proposal
+        ? line.proposal.rate
+        : line.prefilled
+          ? line.carried.payload.rate
+          : null;
+    field.value = figure === null ? '' : format.editable(parsed(figure), 6);
+    field.className = line.prefilled ? 'quantity carried' : 'quantity';
+    shown.textContent = line.stored ? format.editable(parsed(line.stored.payload.rate), 6) : '';
+    box.hidden = line.rivals.length > 0;
+    pair.hidden = !line.rivals.length;
+    if (line.element) line.element.classList.toggle('flagged', line.rivals.length > 0);
+    pair.replaceChildren(
+      ...line.rivals.map((entry) =>
+        el('p', { class: 'flag-note' }, [
+          `${format.editable(parsed(entry.payload.rate), 6)} ${vault.mainCurrency}, ${provenanceChip(entry.payload, format)} `,
+          readOnly
+            ? null
+            : el('button', {
+                class: 'btn-inline',
+                text: 'Keep this one',
+                onclick: async () => {
+                  try {
+                    for (const other of line.rivals) if (other !== entry) await writes.deleteRecord(vault, other);
+                  } catch {
+                    error.textContent = 'That did not save.';
+                    error.hidden = false;
+                  }
+                  line.reset();
+                  onChange();
+                },
+              }),
+        ]),
+      ),
+    );
+    line.describe();
+  };
+
+  line.wait = () => {
+    if (line.stored || line.rivals.length || !quotable) return;
+    line.pending = true;
+    line.describe();
+  };
+
+  /** A proposal for this line's unit at this date, or null when none
+   *  came back. Never replaces what the person typed. */
+  line.propose = (proposal) => {
+    line.pending = false;
+    if (!line.stored && !line.rivals.length && quotable) {
+      line.proposal = proposal;
+      if (!line.typed) {
+        field.value = proposal ? format.editable(parsed(proposal.rate), 6) : '';
+      }
+    }
+    line.describe();
+    onChange();
+  };
+
+  line.ask = () => {
+    if (line.asked || line.stored || line.rivals.length || line.proposal || line.carried || line.pending) return false;
+    line.asked = true;
+    line.describe();
+    return true;
+  };
+
+  field.addEventListener('input', () => {
+    line.typed = true;
+    line.describe();
+    onChange();
+  });
   field.addEventListener('blur', () => {
     const typed = format.parseFigure(field.value);
     if (typed !== null) field.value = format.editable(typed, 6);
   });
-  const provenance = el('span', { class: 'chip' });
-  const explanation = el('p', { class: 'hint' });
-  const lookup = el('button', {
-    class: 'btn-inline',
-    text: 'Look it up',
-    hidden: true,
-    onclick: async () => {
-      // Opening a recording fetches nothing. Pressing this is what
-      // issues the request (ui/update-values.md, Rate lines on a
-      // reopened recording).
-      const proposals = await writes.fetchProposals(vault, date);
-      const proposal = proposals[unit];
-      if (!proposal) {
-        explanation.textContent = `No market rate came back for ${unit}.`;
-        return;
-      }
-      field.value = format.editable(decimal.parse(proposal.rate), 6);
-      line.proposal = proposal;
-      provenance.textContent =
-        proposal.asOf === date ? 'Market rate' : `Market rate as of ${format.dayMonth(proposal.asOf, 'short')}`;
-      onChange();
-    },
-  });
-
-  const line = { unit, stored: null, proposal: null };
-
-  line.refresh = () => {
-    const stored = vault.entriesFor(unit).find((e) => e.payload.date === date);
-    line.stored = stored || null;
-    if (stored) {
-      field.value = format.editable(decimal.parse(stored.payload.rate), 6);
-      provenance.textContent = provenanceChip(stored.payload, vault.format);
-      lookup.hidden = true;
-      const previous = vault.entriesFor(unit).filter((e) => e.payload.date < date);
-      explanation.textContent = '';
-      void previous;
+  lookup.addEventListener('click', async () => {
+    // Opening a recording fetches nothing. Pressing this is what
+    // issues the request (ui/update-values.md, Rate lines on a
+    // reopened recording).
+    lookup.disabled = true;
+    const proposals = await writes.fetchProposals(vault, date);
+    lookup.disabled = false;
+    const proposal = proposals[unit] || null;
+    if (!proposal) {
+      explanation.textContent = `No market rate came back for ${unit}.`;
       return;
     }
-    field.value = '';
-    provenance.textContent = '';
-    lookup.hidden = false;
-    const previous = [...vault.entriesFor(unit)].reverse().find((e) => e.payload.date < date);
-    if (previous && previous.payload.rateSource === 'manual') {
-      explanation.textContent = `No market price for ${unit} yet. This one is yours to set. Last estimated ${ageInWords(previous.payload.date)}.`;
-    } else if (previous) {
-      explanation.textContent = `No market rate came back for ${unit}. Nothing will be recorded for it today, and the total carries on at the most recent rate it has.`;
-    } else {
-      explanation.textContent = `No price recorded for ${unit} at this date. Holdings measured in it are listed as not priced until one exists.`;
-    }
-  };
-  line.value = () => field.value.trim();
-  /** The line's figure, or null for an empty field or one that does
-   *  not read as a number. */
-  line.figure = () => format.parseFigure(field.value);
-  line.changed = () => {
-    if (!line.value()) return Boolean(line.stored);
-    return !line.stored || line.figure() !== decimal.parse(line.stored.payload.rate);
-  };
-  line.refresh();
+    line.lookedUp = true;
+    line.typed = false;
+    line.propose(proposal);
+  });
+
+  line.reset();
 
   // Headed by the unit's name from the symbol table, with what one of
   // it is worth beneath.
-  line.element = el('div', { class: 'rate-line', 'data-unit': unit }, [
+  line.element = el('div', { class: line.rivals.length ? 'rate-line flagged' : 'rate-line', 'data-unit': unit }, [
     el('div', { class: 'rate-name' }, [
       el('span', { class: 'rate-unit', text: described.name }),
       el('p', { class: 'row-status', text: `${described.one} in ${vault.mainCurrency}` }),
     ]),
-    el('div', { class: 'quantity-field' }, [
-      field,
-      el('span', { class: 'unit-suffix', text: vault.mainCurrency }),
-    ]),
-    el('div', { class: 'rate-meta' }, [provenance, lookup]),
+    box,
+    el('div', { class: 'rate-meta' }, [skeleton, provenance, readOnly ? null : lookup]),
     explanation,
+    pair,
+    error,
   ]);
   return line;
 }
@@ -358,41 +726,62 @@ export function provenanceChip(payload, format) {
     : 'Market rate';
 }
 
-/** A rate line on a reopened recording saves by itself: filling in the
- *  price that was missing is a complete act and needs no holding
- *  touched alongside it. Changing one says what it moves, once per
- *  save rather than a dialog per line. */
-async function saveRates(vault, date, rateLines, banner, onSaved) {
-  const changes = [];
-  for (const line of rateLines) {
-    if (!line.changed()) continue;
-    const stored = line.stored;
-    if (!line.value()) {
-      changes.push({ line, unit: line.unit, clearing: true, stored });
+/** How many holdings a change to one unit's price moves: every holding
+ *  measured in it. The client holds every account record, so it can
+ *  count them (record-rate.md, Editing a captured rate). */
+export function holdingsIn(vault, unit) {
+  return [...vault.holdings.values()].filter((h) => h.payload.unit === unit).length;
+}
+
+/** The confirmation for a save of rate lines: one per save, naming each
+ *  unit and how many holdings move (ui/update-values.md, Changing or
+ *  clearing a rate says what it moves). */
+export function rateChangeCopy(vault, date, changes) {
+  const on = vault.format.longDate(date);
+  const lines = [];
+  for (const { unit, clearing } of changes) {
+    const count = holdingsIn(vault, unit);
+    const holdings = `${count} ${count === 1 ? 'holding' : 'holdings'} measured in ${unit}`;
+    if (!clearing) {
+      lines.push(`Changing the ${unit} rate for ${on} moves ${holdings} on that date. Your net worth on that day changes with them.`);
       continue;
     }
-    const parsed = line.figure();
-    if (parsed === null) continue;
-    changes.push({ line, unit: line.unit, rate: decimal.format(parsed), stored, proposal: line.proposal });
+    lines.push(`Clearing the ${unit} price for ${on} leaves that date with no price for it. ${holdings} move on that date.`);
+    if (vault.entriesFor(unit).length === 1) {
+      lines.push(`This is the only price recorded for ${unit}. Clearing it leaves every holding measured in it with no price at all, and they leave the total until one exists.`);
+    }
   }
-  if (!changes.length) return;
+  return lines;
+}
 
-  const counts = changes.map((change) => {
-    const holdings = [...vault.holdings.values()].filter(
-      (h) => h.payload.unit === change.unit,
-    ).length;
-    return { ...change, holdings };
-  });
+/** Both halves of a save that landed in part, by holding name and by
+ *  unit: a count alone leaves the vault in a state nobody can see. */
+export function partialCopy(result) {
+  const named = (list) => list.map((change) => change.name).join(', ');
+  if (!result.failed.length) return 'Saved.';
+  const landed = result.saved.length ? `Saved: ${named(result.saved)}. ` : '';
+  return `${landed}Not saved: ${named(result.failed)}. Nothing was rolled back, and saving again retries only what did not land.`;
+}
+
+/** A rate line on a reopened recording saves by itself: filling in the
+ *  price that was missing is a complete act and needs no holding
+ *  touched alongside it. One confirmation covers every changed line. */
+function saveRates(vault, sit, block, { say, refused, saveAll }) {
+  const changed = block.lines.filter((line) => line.changed());
+  if (changed.some((line) => line.invalid())) {
+    for (const line of changed) line.describe();
+    return;
+  }
+  const planned = changed.map((line) => ({ line, change: line.change() })).filter(({ change }) => change);
+  if (!planned.length) return;
 
   const close = dialog({
     heading: 'Changing a price moves the holdings measured in it',
-    body: counts.map((change) =>
-      el('p', {
-        text: change.clearing
-          ? `Clearing the ${change.unit} price for ${vault.format.longDate(date)} leaves that date with no price for it. ${change.holdings} holdings measured in ${change.unit} move on that date.`
-          : `Changing the ${change.unit} rate for ${vault.format.longDate(date)} moves ${change.holdings} holdings measured in ${change.unit} on that date. Your net worth on that day changes with them.`,
-      }),
-    ),
+    body: rateChangeCopy(
+      vault,
+      sit.date,
+      planned.map(({ line, change }) => ({ unit: line.unit, clearing: Boolean(change.remove) })),
+    ).map((text) => el('p', { text })),
     actions: [
       el('button', { class: 'btn-secondary', text: 'Cancel', onclick: () => close() }),
       el('button', {
@@ -400,38 +789,30 @@ async function saveRates(vault, date, rateLines, banner, onSaved) {
         text: 'Save the prices',
         onclick: async () => {
           close();
-          const failed = [];
-          for (const change of counts) {
-            try {
-              if (change.clearing) {
-                await writes.deleteRecord(vault, change.stored);
-              } else if (change.stored) {
-                await writes.saveRate(
-                  vault,
-                  change.stored,
-                  writes.editedRatePayload(change.stored.payload, change.rate),
-                );
-              } else {
-                await writes.saveRate(vault, null, {
-                  symbol: change.unit,
-                  date,
-                  rate: change.rate,
-                  rateTarget: vault.mainCurrency,
-                  rateSource: change.proposal ? 'edited' : 'manual',
-                  rateAsOf: change.proposal ? change.proposal.asOf : null,
-                  proposedRate: change.proposal ? change.proposal.rate : null,
-                });
-              }
-            } catch {
-              failed.push(change.unit);
-            }
+          const plan = {
+            rates: planned.filter(({ change }) => !change.remove).map(({ change }) => change),
+            deletes: planned
+              .filter(({ change }) => change.remove)
+              .map(({ line, change }) => ({ entry: change.remove, name: line.unit })),
+          };
+          const result = await writes.saveRecording(vault, sit, plan);
+          if (result.refused) {
+            block.refresh();
+            refused();
+            return;
           }
-          for (const line of rateLines) line.refresh();
-          onSaved();
-          banner.textContent = failed.length
-            ? `Saved, except for ${failed.join(', ')}, which did not land.`
-            : 'Prices saved.';
-          banner.hidden = false;
+          const conflicts = result.failed.filter((f) => f.status === 409).map((f) => f.name);
+          if (conflicts.length) await writes.reloadType(vault, 'rate').catch(() => {});
+          const failed = new Set(result.failed.map((f) => f.name));
+          // What landed shows what is stored. What did not keeps what
+          // was typed, except after a Conflict, where the line shows the
+          // figure another window wrote.
+          for (const { line } of planned) {
+            if (!failed.has(line.unit) || conflicts.includes(line.unit)) line.reset();
+          }
+          saveAll.hidden = !block.lines.some((line) => line.changed());
+          const conflictCopy = conflicts.map((unit) => `The ${unit} rate was changed in another window, and the line shows what is stored now.`).join(' ');
+          say([partialCopy(result), conflictCopy].filter(Boolean).join(' '), { critical: result.failed.length > 0 });
         },
       }),
     ],
