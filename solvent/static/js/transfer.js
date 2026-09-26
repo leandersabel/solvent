@@ -20,7 +20,9 @@ const BASE64 = /^(?:[A-Za-z0-9+/]{4})*(?:[A-Za-z0-9+/]{2}==|[A-Za-z0-9+/]{3}=)?$
 
 export class FileRefused extends Error {
   /** `reason` is 'format' for anything that is not a vault file this
-   *  build reads, and 'newer' for a file from a later version. */
+   *  build reads, 'newer' for a file from a later version, and
+   *  'noProfile' for a file that would restore a vault with no main
+   *  currency. */
   constructor(reason) {
     super(reason);
     this.reason = reason;
@@ -92,6 +94,9 @@ export function checkFile(body) {
     if (!fine) throw new FileRefused('format');
     seen.add(record.recordId);
   }
+  // The profile holds the main currency every price is denominated in,
+  // so a file without one would restore a vault nothing can value.
+  if (!body.records.some((r) => r.recordType === 'profile')) throw new FileRefused('noProfile');
   return body;
 }
 

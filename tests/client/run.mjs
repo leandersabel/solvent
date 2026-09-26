@@ -917,6 +917,8 @@ await check('the file is checked before it is decrypted, as the server checks th
   assert.equal(refused((f) => { f.records[3].nonce = 'not base64!'; }), 'format');
   assert.equal(refused((f) => { f.records.push(copyOf(f.records[0])); }), 'format');
   assert.equal(refused((f) => { delete f.wrappedDek; }), 'format');
+  // A vault restored without its profile would have no main currency.
+  assert.equal(refused((f) => { f.records = f.records.filter((r) => r.recordType !== 'profile'); }), 'noProfile');
 });
 
 await check('net-worth-view: a date with prices and no figures still bends the bands', () => {

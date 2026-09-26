@@ -186,10 +186,13 @@ function importCard(vault, reload) {
       parsed = transfer.checkFile(JSON.parse(await chosen.text()));
     } catch (failure) {
       parsed = null;
+      const reason = failure instanceof transfer.FileRefused ? failure.reason : 'format';
       fail(
-        failure instanceof transfer.FileRefused && failure.reason === 'newer'
+        reason === 'newer'
           ? 'This file was written by a newer version of Solvent. Update Solvent before restoring it.'
-          : 'That is not a Solvent vault file, or it has been damaged.',
+          : reason === 'noProfile'
+            ? 'This file carries no vault settings, so it would restore a vault with no main currency. It cannot be restored.'
+            : 'That is not a Solvent vault file, or it has been damaged.',
       );
       return;
     }

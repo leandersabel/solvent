@@ -2716,6 +2716,16 @@ try {
     badType.records[0].recordType = 'invoice';
     await chooseFile(fixture('bad-type.json', JSON.stringify(badType)));
     check('a file the server would refuse is refused before it is opened', (await importError()).includes('not a Solvent vault file'));
+    const noProfile = JSON.parse(exportedText);
+    noProfile.records = noProfile.records.filter((r) => r.recordType !== 'profile');
+    await chooseFile(fixture('no-profile.json', JSON.stringify(noProfile)));
+    check(
+      'a file with no profile record is refused at the first step, before any password is asked for',
+      (await importError()) === 'This file carries no vault settings, so it would restore a vault with no main currency. It cannot be restored.' &&
+        (await page.eval("Boolean(document.querySelector('#import-password').closest('[hidden]'))")) &&
+        (await uploads()) === 0,
+      await importError(),
+    );
     const large = fixture('large.json', '');
     truncateSync(large, 49 * 1024 * 1024);
     await chooseFile(large);

@@ -312,7 +312,7 @@ def test_an_unknown_record_type_is_rejected_before_any_write(app, owner):
 
 
 @pytest.mark.parametrize("where", ["top-level", "on-a-record"])
-def test_a_principal_id_in_the_payload_writes_nothing_into_another_vault(app, owner, where):
+def test_a_principal_id_in_the_payload_is_refused_whole_and_neither_vault_changes(app, owner, where):
     other, _ = register(app, "other")
     holding_with_snapshots(other)
     victim = principal_id(app, "other")

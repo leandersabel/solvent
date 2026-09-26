@@ -76,9 +76,10 @@ is restore and migration, both of which mean "make this vault be what
 the file says," and a merge would need conflict rules that would be
 mostly untested and quietly wrong.
 
-If the target vault already holds records, the user must type `ERASE` to
-confirm, against a dialog stating exactly how many records will be
-destroyed.
+If the target vault holds records beyond its profile, the user must
+type `ERASE` to confirm, against a dialog stating exactly how many
+records will be destroyed. A vault holding only its profile counts as
+empty (Edge cases).
 
 ### The re-key step
 
@@ -205,8 +206,14 @@ written.
   vault transfer, and it requires that vault's password. After it, the
   two vaults share no key material, so the source's later writes cannot
   be injected into the destination.
-- **Export of an empty vault** → valid; produces a file with an empty
-  `records` array.
+- **Export of an empty vault** → valid. A registered vault always holds
+  its profile record, so the file carries that one record.
+- **Import into a vault holding only its profile** → the vault counts
+  as empty. The review says nothing will be deleted and no `ERASE` is
+  asked for, because the profile is the vault's settings rather than
+  anything the person put in it.
+- **A file with no profile record** → refused before anything is
+  decrypted, because it would restore a vault with no main currency.
 - **Browser tab closed mid-import** → the transaction either committed
   or it did not; there is no partial state to recover from.
 - **KDF envelope in the file is below the server minimum** → the import
@@ -248,9 +255,14 @@ written.
 - A file with one record's ciphertext altered by a single byte aborts
   the import, uploads nothing, and leaves the pre-existing vault intact.
 - Importing with the wrong password aborts before any request is sent.
-- A `POST /api/import` payload with a `principalId` field naming another user
-  writes nothing into that user's vault; the records land under the
-  session user.
+- A `POST /api/import` payload carrying a `principalId` field, at the
+  top level or on a record, is refused whole with Bad Request, and
+  neither the session user's vault nor the named user's changes
+  (`record-api.md`, Rules).
+- A file with no profile record is refused before any record is
+  decrypted and before any request is sent.
+- Importing into a vault holding only its profile says nothing will be
+  deleted and asks for no `ERASE`.
 - Importing into a non-empty vault without the typed `ERASE`
   confirmation is refused.
 - Simulating a DB failure mid-import leaves the original vault fully

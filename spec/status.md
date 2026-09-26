@@ -15,7 +15,7 @@ Maintained by the compiler agent. Rows are in build order.
 | record-rate | x | x | x |
 | record-snapshot | x | x | x |
 | net-worth-view | x | x | |
-| export-import | x | x | |
+| export-import | x | x | x |
 
 Verified means every acceptance criterion in the feature file is
 asserted. A row without it is asserted in the parts a server and a

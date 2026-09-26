@@ -56,7 +56,10 @@ Replace-only. There is no merge, and the UI must not imply one exists.
 A flow in one card, each step revealed as the previous completes:
 
 1. **Choose file.** Drag-drop or picker. Validated client-side for size,
-   `format`, and `formatVersion` before parse.
+   `format`, and `formatVersion` before parse, and refused when it
+   carries no profile record, because it would restore a vault with no
+   main currency (`export-import.md`, Edge cases). Nothing is decrypted
+   first.
 2. **Password for that file.** Labelled "The password this file was
    exported under" — not "your password". They can differ, and this is
    the single most confusing point in the feature.
@@ -83,6 +86,9 @@ A flow in one card, each step revealed as the previous completes:
      Nothing will be deleted." The step is still shown: somebody who
      believes they have data and is told they have none needs to see
      that before restoring, not after.
+   - **A vault holding only its profile is empty here.** The profile is
+     the vault's settings, not anything the person put in it, and a
+     registered vault always holds one.
    - When the file's **main currency differs** from the current vault's,
      say so on its own line: "This vault is kept in EUR. Yours is
      currently in CHF." It is correct and consistent — the imported
@@ -94,10 +100,10 @@ A flow in one card, each step revealed as the previous completes:
      it goes in." Not a warning, and nothing to decide.
 4. **Confirm.** The user types `ERASE`. Primary button destructive,
    labelled "Replace my vault".
-   - Into a vault that holds **nothing**, there is nothing to erase, so
-     the typed word is dropped and the destructive button alone
-     confirms. Every other vault requires it, and no setting anywhere
-     turns it off.
+   - Into an **empty** vault, as the review defines it, there is
+     nothing to erase, so the typed word is dropped and the destructive
+     button alone confirms. Every other vault requires it, and no
+     setting anywhere turns it off.
 
 Below the flow, what does and does not change:
 
@@ -135,8 +141,10 @@ step). On a large vault this is the longest operation in the product.
 
 - **Loading**: export assembles server-side; button shows a progress
   state. Import as above.
-- **Empty**: an empty vault exports fine, producing a file with an empty
-  `records` array. Say so rather than disabling the button.
+- **Empty**: an empty vault exports fine, producing a file that carries
+  its profile record alone. Say so rather than disabling the button:
+  "Your vault is empty, so the file holds its settings and no holdings,
+  figures or prices", followed by the file's size.
 - **Error, export ceiling reached**: the button is disabled with the
   reason in place of a silent failure: "You have downloaded your vault
   several times in the last hour. You can do it again shortly." A full
@@ -155,6 +163,10 @@ step). On a large vault this is the longest operation in the product.
   `formatVersion`**: rejected at step 1 with a clear message. A newer
   file in an older app is not something to guess at.
 - **Error, oversized file**: rejected client-side before parse.
+- **Error, a file with no profile record**: rejected at step 1, before
+  any password is asked for: "This file carries no vault settings, so
+  it would restore a vault with no main currency. It cannot be
+  restored."
 - **Error, import failed server-side**: the transaction rolled back;
   the original vault is fully intact and readable. Say that plainly.
 - **Populated**: on success, the view reloads against the imported data
@@ -187,7 +199,8 @@ step). On a large vault this is the longest operation in the product.
 ## Rules
 
 - The `ERASE` confirmation is required whenever the target vault holds
-  any records. It is never skipped, and no "don't ask again" exists.
+  any record beyond its profile. It is never skipped, and no "don't ask
+  again" exists.
 - An older `formatVersion` migrates client-side after decryption, before
   re-encryption. Each supported version needs its own fixture test.
 - Export is rate-limited per user (`export-import.md`); the button

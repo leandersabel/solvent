@@ -27,27 +27,6 @@ tells the client that such a password is "reported to the operator as
 an anomaly rather than shown to you", so dropping the log changes a
 product statement as well, which is the product owner's to change.
 
-- **engineer**: `features/export-import.md`, Acceptance criteria, says a
-  `POST /api/import` payload with a `principalId` field naming another
-  user "writes nothing into that user's vault" and that "the records
-  land under the session user", which reads as the import succeeding.
-  `features/record-api.md`, Rules, says a body carrying `principalId`
-  is rejected outright and no row is written under either user. The
-  server follows record-api: the whole payload is a Bad Request, and
-  neither vault changes. Which one holds decides whether that import is
-  refused or goes through with the field ignored. Until it is settled
-  the criterion is asserted only in its first half, so export-import
-  is not marked verified.
-- **engineer**: `features/export-import.md`, Edge cases, says an empty
-  vault exports "a file with an empty `records` array", and the review
-  and the `ERASE` rule in `ui/export-import.md` speak of a vault that
-  "holds nothing". A registered vault always holds its profile record,
-  so its export carries that one record and never an empty array. The
-  import screen treats a vault holding only its profile as empty: it
-  says nothing will be deleted and asks for no typed word. Is the
-  profile alone "nothing" for the review and for `ERASE`, and should a
-  file with no profile record at all, which would restore a vault with
-  no main currency, be refused?
 - **engineer**: `features/net-worth-view.md`, Acceptance criteria, reads
   150 on 1 February between 100 on 1 January and 200 on 1 March, and
   150 × 1.50 for the priced case. Values between entries are
