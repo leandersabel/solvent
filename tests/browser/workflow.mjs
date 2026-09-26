@@ -1064,6 +1064,7 @@ try {
     // neighbours', so the two pricing modes and every stretch between
     // entries read differently.
     let rateMode = 'answer';
+    let rateDelay = 0;
     const proposalsFor = (date) => {
       const d = dayOf(date);
       const revised = rateMode === 'revised' ? 0.5 : 0;
@@ -1083,6 +1084,7 @@ try {
       if (!muted) traffic.push(entry);
       try {
         if (request.url.includes('/api/rates?')) {
+          if (rateDelay) await new Promise((resolve) => setTimeout(resolve, rateDelay));
           if (rateMode === 'down') return await rec.send('Fetch.fulfillRequest', { requestId, responseCode: 503, body: '' });
           if (rateMode === 'none') return await rec.send('Fetch.fulfillRequest', { requestId, responseCode: 204, body: '' });
           const query = Object.fromEntries(new URL(request.url).searchParams);
@@ -1320,6 +1322,16 @@ try {
     await rec.settle(500);
     await unlockHere();
 
+    await go(`#/sweep/${T}`);
+    const bare = await text();
+    await press('Add a holding', '.sweep');
+    check(
+      'record-snapshot: a sweep with no holdings says to add one first, offers the form, and shows no rates',
+      bare.includes('Add a holding first.') && !bare.includes('Rates for this date') &&
+        (await ev("document.querySelector('.dialog-heading').textContent")) === 'Add a holding',
+    );
+    await ev("document.querySelectorAll('.scrim').forEach(s => s.remove())");
+
     // ---- Fifteen holdings and two past recordings -------------------------
 
     const script = '<script>alert(1)</script>';
@@ -1428,6 +1440,11 @@ try {
     await typeRow('Art', '');
     await typeRow('Current account', '1234.56');
     await pressRow('Current account');
+    check(
+      'record-snapshot: a saved row stays, says so quietly, and reads as recorded',
+      (await ev(`${row('Current account')}.querySelector('.row-saved').textContent`)) === 'Saved.' &&
+        (await rowState('Current account')).state === 'Recorded for this date.',
+    );
     const today = on(await stored('rate'), T).map((r) => r.payload);
     check(
       'record-rate: recording one franc figure writes an entry for every other active unit at the date, and none for francs',
@@ -1455,10 +1472,46 @@ try {
       JSON.stringify({ before, after }),
     );
 
+    traffic.length = 0;
+    await press('New recording');
+    const picker = await ev(`JSON.stringify({
+      focused: document.activeElement.classList.contains('is-today'),
+      marked: [...document.querySelectorAll('.date-day.has-recording')].map(b => b.getAttribute('aria-label')),
+      todayName: document.querySelector('.date-day.is-today').getAttribute('aria-label'),
+    })`).then(JSON.parse);
+    const tomorrowDisabled = await ev(`(() => {
+      const days = [...document.querySelectorAll('.date-day')];
+      const at = days.findIndex(b => b.classList.contains('is-today'));
+      return at === days.length - 1 || days[at + 1].disabled;
+    })()`);
+    await press('Cancel', '.dialog');
+    check(
+      'net-worth-view: New recording opens a month grid on today, marks a recorded date in its name, and refuses the future',
+      picker.focused && picker.todayName === `${await format('dayMonth', T)}, has a recording` && tomorrowDisabled,
+      JSON.stringify(picker),
+    );
+    check('net-worth-view: dismissing the date picker writes nothing and asks nothing', traffic.length === 0);
+
     // ---- record-rate: fifteen rows at one past date -------------------------
 
     traffic.length = 0;
-    const saidEmpty = await newRecording(D10);
+    rateDelay = 1500;
+    await press('New recording');
+    await set('#recording-date', await format('date', D10));
+    const saidEmpty = await ev("document.querySelector('.dialog .hint').textContent");
+    await ev("[...document.querySelectorAll('.dialog button')].find(b => b.textContent === 'Open').click()");
+    await rec.settle(300);
+    const resolving = await ev(`JSON.stringify({
+      skeleton: Boolean(${line('USD')}.querySelector('.skeleton:not([hidden])')),
+      usable: [...document.querySelectorAll('.sweep-row input')].every(i => !i.disabled),
+    })`).then(JSON.parse);
+    await quiet();
+    rateDelay = 0;
+    check(
+      'record-rate: while the proposals resolve the rate lines show a skeleton and every value field stays usable',
+      resolving.skeleton && resolving.usable,
+      JSON.stringify(resolving),
+    );
     check('record-snapshot: a date holding nothing is started as a recording', saidEmpty.includes('holds nothing yet'), saidEmpty);
     await rec.waitUntil(`${line('USD')}.querySelector('input').value !== ''`, { label: 'the proposals for the backdate' });
     check('record-snapshot: the sweep carries a row for each of the fifteen holdings', (await ev("document.querySelectorAll('.sweep-row').length")) === 15);
@@ -1619,6 +1672,70 @@ try {
       literal.row && literal.legend && literal.tooltip && literal.chip &&
         (await ev("document.querySelectorAll('script').length")) === scripts && !(await ev('window.__alerted')),
       JSON.stringify(literal),
+    );
+
+    // Hover, the keyboard and a drag across the plot.
+    const pointer = (type, across) =>
+      ev(`(() => {
+        const svg = document.querySelector('svg.trend');
+        const box = svg.getBoundingClientRect();
+        svg.dispatchEvent(new PointerEvent(${JSON.stringify(type)}, {
+          clientX: box.left + box.width * ${across}, clientY: box.top + 40, button: 0, bubbles: true,
+        }));
+      })()`);
+    await go('#/');
+    const total = await ev("document.querySelector('.hero-amount').textContent");
+    await pointer('pointermove', 0.5);
+    const hovered = await ev(`JSON.stringify({
+      hero: document.querySelector('.hero-amount').textContent,
+      at: document.querySelector('.hero-at').textContent,
+      rows: [...document.querySelectorAll('.chart-readout p')].map(p => p.className),
+      net: document.querySelector('.readout-net').textContent,
+      crosshair: document.querySelector('.crosshair').getAttribute('visibility'),
+    })`).then(JSON.parse);
+    await pointer('pointerleave', 0.5);
+    check(
+      'net-worth-view: hovering moves a crosshair, pins the date, bands and net above it, and the hero follows',
+      hovered.crosshair === 'visible' && hovered.rows[0] === 'readout-date' && hovered.rows.at(-1).includes('readout-net') &&
+        hovered.at.startsWith('on ') && Math.round(figure(hovered.net)) === figure(hovered.hero) &&
+        (await ev("document.querySelector('.hero-amount').textContent")) === total,
+      JSON.stringify(hovered),
+    );
+    await ev("document.querySelector('svg.trend').focus()");
+    await ev("document.querySelector('svg.trend').dispatchEvent(new KeyboardEvent('keydown', { key: 'ArrowLeft', bubbles: true }))");
+    const stepped = await ev("document.querySelector('.hero-at').textContent");
+    await ev("document.querySelector('svg.trend').dispatchEvent(new KeyboardEvent('keydown', { key: 'Enter', bubbles: true }))");
+    await rec.settle(200);
+    const opened = await ev('location.hash');
+    check(
+      'net-worth-view: the arrow keys step between recorded dates and Enter opens that recording',
+      opened.startsWith('#/recording/') && stepped === `on ${await format('longDate', opened.split('/').pop())}`,
+      `${stepped} then ${opened}`,
+    );
+    await go('#/');
+    await ev(`(() => { const s = document.querySelector('.chart-card select'); s.value = 'liq'; s.dispatchEvent(new Event('change', { bubbles: true })); })()`);
+    await rec.settle(300);
+    await pointer('pointerdown', 0.3);
+    await pointer('pointermove', 0.8);
+    await pointer('pointerup', 0.8);
+    await rec.settle(200);
+    const span = await ev(`JSON.stringify({
+      since: document.querySelector('.hero-since').textContent,
+      rect: document.querySelectorAll('svg.trend rect.selection:not([visibility])').length,
+      deltas: [...document.querySelectorAll('.legend-delta')].map(n => n.textContent),
+      bands: document.querySelectorAll('.legend-entry').length,
+    })`).then(JSON.parse);
+    await pointer('pointerdown', 0.5);
+    await pointer('pointerup', 0.5);
+    await rec.settle(200);
+    check(
+      'net-worth-view: a drag selects a span, the hero reads the change across it and each band its own',
+      span.since.startsWith('from ') && span.rect === 1 && span.deltas.length === span.bands && span.bands > 1,
+      JSON.stringify(span),
+    );
+    check(
+      'net-worth-view: a plain click clears the selected span',
+      (await ev("document.querySelectorAll('.legend-delta').length")) === 0 && (await ev("document.querySelector('.hero-since').textContent")).startsWith('since '),
     );
 
     // One price entry sealed where no key opens it, between two readable
@@ -1844,6 +1961,7 @@ try {
         bytes(on(await stored('rate'), D2).filter((r) => r.payload.symbol === 'USD')) === usdPlanted,
       `${JSON.stringify(conflicted)} ${conflictSaid}`,
     );
+    const ratesNowForFault = await stored('rate');
     const currentEntry = on(await stored('snapshot'), D2).find((s) => s.accountId === id['Current account']);
     await plantHere([{ ...snap('Current account', D2, '1122'), recordId: currentEntry.recordId, version: currentEntry.version + 1 }]);
     const currentPlanted = bytes(on(await stored('snapshot'), D2).filter((s) => s.accountId === id['Current account']));
@@ -1856,6 +1974,27 @@ try {
       writesSent().length === 1 && figure(rowAfterConflict.field) === 1122 && rowAfterConflict.error === 'This figure was changed in another window.' &&
         bytes(on(await stored('snapshot'), D2).filter((s) => s.accountId === id['Current account'])) === currentPlanted,
       JSON.stringify(rowAfterConflict),
+    );
+
+    await typeLine('USD', '0.98');
+    await typeLine('XAU-ozt', '2799');
+    faults.push((r) => (r.method === 'PUT' && r.url.endsWith(on(ratesNowForFault, D2).find((x) => x.payload.symbol === 'XAU-ozt').recordId) ? 500 : null));
+    await press('Save the rate lines');
+    await press('Save the prices', '.dialog');
+    faults.length = 0;
+    const halves = await ev("document.querySelector('.sweep .banner').textContent");
+    const keptTyped = await lineState('XAU-ozt');
+    traffic.length = 0;
+    await press('Save the rate lines');
+    await press('Save the prices', '.dialog');
+    check(
+      'record-rate: a save that lands in part names both halves by unit and keeps what did not land typed',
+      halves.startsWith('Saved: USD. Not saved: XAU-ozt.') && figure(keptTyped.value) === 2799,
+      halves,
+    );
+    check(
+      'record-rate: saving again reissues only what failed',
+      writesSent().length === 1 && on(await stored('rate'), D2).find((r) => r.payload.symbol === 'XAU-ozt').payload.rate === '2799',
     );
 
     const secondSnapshots = on(await stored('snapshot'), D2);
@@ -1891,6 +2030,22 @@ try {
       await model(`v.usableEntries('USD').some(e => e.payload.date === '${D2}')`),
     );
 
+    await press('Update');
+    const emptyStates = await ev("[...document.querySelectorAll('.row-state')].map(n => n.textContent)");
+    const emptyLines = [await lineState('USD'), await lineState('XAU-ozt')];
+    check(
+      'record-snapshot: an emptied recording reopens with every row unrecorded and the prices that keep the date',
+      emptyStates.every((s) => s === 'Nothing recorded for this date.') && emptyLines.every((l) => l.value !== '' && l.chip !== ''),
+      JSON.stringify(emptyLines),
+    );
+    await typeRow('Current account', '4242');
+    await home();
+    check(
+      'record-snapshot: leaving with a figure typed and not saved says so and names it',
+      (await text()).includes(`You left the recording for ${await format('longDate', D2)} with changes that were not saved: Current account.`),
+    );
+    check('record-snapshot: an emptied recording still holds its date in the picker', (await newRecording(D2)).includes('already holds a recording'));
+
     // The first recording had no dollar price. Its line asks for one only
     // when asked to.
     traffic.length = 0;
@@ -1913,6 +2068,43 @@ try {
     const firstUsd = on(await stored('rate'), D1).find((r) => r.payload.symbol === 'USD');
     check('record-rate: a looked-up rate on a reopened recording saves by itself, as proposed', firstUsd && firstUsd.payload.rateSource === 'proposed');
 
+    const DP = ago(150);
+    await plantHere([snap('Savings', DP, '5100'), snap('Savings', DP, '5200'), price('USD', DP, '0.9'), price('USD', DP, '0.91')]);
+    await reread();
+    await go(`#/recording/${DP}`);
+    await press('Update');
+    const pairRow = await ev(`JSON.stringify({ state: ${row('Savings')}.querySelector('.row-state').textContent,
+      keeps: ${row('Savings')}.querySelectorAll('.sweep-pair button').length })`).then(JSON.parse);
+    const pairLine = await ev(`JSON.stringify({ flagged: ${line('USD')}.classList.contains('flagged'),
+      keeps: [...${line('USD')}.querySelectorAll('.rate-pair button')].length, says: ${line('USD')}.querySelector(':scope > .hint').textContent })`).then(JSON.parse);
+    check(
+      'record-snapshot: the sweep shows two figures on one date flagged, each with Keep this one, and picks neither',
+      pairRow.state === 'Two figures share this date.' && pairRow.keeps === 2,
+      JSON.stringify(pairRow),
+    );
+    check(
+      'record-rate: the sweep shows two prices on one date flagged, each with Keep this one',
+      pairLine.flagged && pairLine.keeps === 2 && pairLine.says.startsWith('Two prices for this unit share this date.'),
+      JSON.stringify(pairLine),
+    );
+    await ev(`${row('Savings')}.querySelector('.sweep-pair button').click()`);
+    await quiet();
+    await ev(`${line('USD')}.querySelector('.rate-pair button').click()`);
+    await quiet();
+    check(
+      'record-snapshot: keeping one of a pair on the sweep leaves exactly one of each',
+      on(await stored('snapshot'), DP).length === 1 && on(await stored('rate'), DP).length === 1,
+    );
+
+    await go(`#/recording/${ago(3)}`);
+    const gone = await text();
+    await press('Pick a date');
+    check(
+      'record-snapshot: a recording that is not there says so and offers the date picker',
+      gone.includes(`${await format('longDate', ago(3))} holds no recording.`) && (await ev("document.querySelector('.dialog-heading').textContent")) === 'New recording',
+    );
+    await press('Cancel', '.dialog');
+
     // ---- record-snapshot: another window got there first -------------------
 
     await home();
@@ -1932,6 +2124,11 @@ try {
     );
     await press('Open the recording');
     check('record-snapshot: the refusal opens that recording', (await ev('location.hash')) === `#/recording/${D5}`);
+    const unpriced = await text();
+    check(
+      'record-snapshot: a recording with no prices says so, and names each unit whose line is empty',
+      unpriced.includes('No prices were captured at this date.') && unpriced.includes('No price for USD at this date.'),
+    );
     await press('Update');
     await plantHere([snap('Current account', D5, '5006')]);
     traffic.length = 0;
@@ -2090,14 +2287,17 @@ try {
     await set('#snapshot-date', await format('date', D11));
     await ev("document.querySelectorAll('.dialog details').forEach(d => (d.open = true))");
     const joining = await ev("document.querySelector('.prices-line').textContent");
+    const joiningLink = await ev("[...document.querySelectorAll('.dialog button')].some(b => b.textContent === 'Open the recording, where they are changed')");
+    const joiningFields = await ev("document.querySelectorAll('.dialog .rate-line input').length");
     await set('#snapshot-value', '27182.81');
     await formSave();
     const prompt = await ev("document.querySelector('.dialog:last-of-type') && [...document.querySelectorAll('.dialog')].pop().textContent");
     await press('Replace it', '.dialog');
     const replaced = on(await stored('snapshot'), D11).filter((s) => s.accountId === id['Current account']);
     check(
-      'record-snapshot: a date already priced reads its stored prices and looks nothing up',
-      joining === `${await format('longDate', D11)} already holds prices. This figure joins them.` && rateAsks().length === 0,
+      'record-snapshot: a date already priced reads its stored prices read-only, links to its recording, and looks nothing up',
+      joining === `${await format('longDate', D11)} already holds prices. This figure joins them.` && rateAsks().length === 0 &&
+        joiningLink && joiningFields === 0,
       joining,
     );
     check(
@@ -2106,6 +2306,61 @@ try {
         replaced[0].version === firstEntry.version + 1 && replaced[0].nonce !== firstEntry.nonce && replaced[0].payload.value === '27182.81',
       prompt,
     );
+
+    const DQ = ago(45);
+    await openForm('Savings');
+    await set('#snapshot-date', await format('date', DQ));
+    await quiet();
+    await plantHere([snap('Fund 1', DQ, '1')]);
+    traffic.length = 0;
+    await set('#snapshot-value', '5300');
+    await formSave();
+    const takenForm = await formError();
+    check(
+      'record-snapshot: the form refuses a date another window took while it was open, and offers that recording',
+      takenForm.startsWith(`${await format('longDate', DQ)} already has a recording. Another window got there first.`) &&
+        (await ev("[...document.querySelectorAll('.dialog button')].some(b => b.textContent === 'Open the recording')")) &&
+        writesSent().length === 0,
+      takenForm,
+    );
+    await closeDialogs();
+
+    const DR = ago(50);
+    await openForm('Savings');
+    await set('#snapshot-date', await format('date', DR));
+    await rec.waitUntil(`${line('USD')} && ${line('USD')}.querySelector('input').value !== ''`, { label: 'the form proposals to change' });
+    await typeLine('USD', '0.7777');
+    await set('#snapshot-value', '5400');
+    await formSave();
+    const announced = await ev("[...document.querySelectorAll('.dialog')].pop().textContent");
+    await ev("[...[...document.querySelectorAll('.dialog')].pop().querySelectorAll('button')].find(b => b.textContent === 'Save').click()");
+    await rec.settle(200);
+    await quiet();
+    const formEdited = on(await stored('rate'), DR).find((r) => r.payload.symbol === 'USD');
+    check(
+      'record-snapshot: a price changed on the form says what it moves, and is written as edited behind the figure',
+      announced.includes(`Changing the USD rate for ${await format('longDate', DR)} moves 2 holdings measured in USD`) &&
+        formEdited && formEdited.payload.rate === '0.7777' && formEdited.payload.rateSource === 'edited',
+      announced,
+    );
+
+    const DS = ago(55);
+    faults.push((r) => (r.method === 'PUT' && bodyOf(r).recordType === 'rate' ? 500 : null));
+    await openForm('Savings');
+    await set('#snapshot-date', await format('date', DS));
+    await rec.waitUntil(`${line('USD')} && ${line('USD')}.querySelector('input').value !== ''`, { label: 'the form proposals to fail' });
+    await set('#snapshot-value', '5500');
+    await formSave();
+    faults.length = 0;
+    const pricesFailed = await formError();
+    check(
+      'record-snapshot: the form keeps the figure when its prices do not save, and names the units',
+      pricesFailed === 'Saved. The prices were not updated for USD, XAU-ozt.' &&
+        on(await stored('snapshot'), DS).some((s) => s.accountId === id.Savings) &&
+        (await ev("[...document.querySelectorAll('.dialog button')].some(b => b.textContent === 'Done')")),
+      pricesFailed,
+    );
+    await press('Done', '.dialog');
 
     const ratesBeforeEdit = (await stored('rate')).length;
     traffic.length = 0;

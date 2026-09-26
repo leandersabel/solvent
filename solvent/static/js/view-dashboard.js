@@ -31,6 +31,8 @@ export function dashboardView(vault, actions, { unassignedOf = null } = {}) {
     showArchived: false,
     hidden: new Set(),
     unassignedOnly: Boolean(known),
+    // A span dragged across the chart, as two indices into its days.
+    selection: null,
   };
 
   const root = el('section', { class: 'screen screen-wide dashboard' });
@@ -123,7 +125,7 @@ function hero(vault, state, render, actions, history) {
     ? el('p', { class: 'hero-figure' }, [
         el('span', { class: 'hero-code', text: vault.mainCurrency }),
         ' ',
-        el('span', { class: 'hero-amount', text: vault.format.whole(totals.net) }),
+        el('span', { class: 'hero-amount', text: vault.format.whole(totals.net), dataset: { total: vault.format.whole(totals.net) } }),
       ])
     : el('p', { class: 'hero-figure', text: '—' });
 
@@ -131,7 +133,8 @@ function hero(vault, state, render, actions, history) {
     el('div', { class: 'hero-main' }, [
       el('p', { class: 'eyebrow', text: 'Net worth' }),
       figure,
-      history ? heroChange(vault, history, state.range) : null,
+      history ? heroChange(vault, history, state.range, state.selection) : null,
+      el('p', { class: 'hero-at', hidden: true }),
     ]),
     el('div', { class: 'hero-parts' }, [
       heroPart('Assets', vault.mainWhole(totals.assets)),
@@ -180,11 +183,12 @@ function heroPart(label, figure) {
  *  its last. The arrow carries the sign as well as the color does. A
  *  year or more back is named by its month, a shorter range by its
  *  day. */
-function heroChange(vault, { days, bands }, range) {
+function heroChange(vault, { days, bands }, range, selection = null) {
   if (days.length < 2) return null;
   const netAt = (index) => bands.reduce((sum, band) => sum + band.points[index], 0n);
-  const start = netAt(0);
-  const change = netAt(days.length - 1) - start;
+  const [from, to] = selection || [0, days.length - 1];
+  const start = netAt(from);
+  const change = netAt(to) - start;
   const sign = change > 0n ? '+' : '';
   const ratio = start === 0n
     ? null
@@ -199,7 +203,9 @@ function heroChange(vault, { days, bands }, range) {
     }),
     el('span', {
       class: 'hero-since',
-      text: `since ${(range === '1Y' || range === 'All' ? vault.format.monthYear : vault.format.longDate)(isoFromDay(days[0]))}`,
+      text: selection
+        ? `from ${vault.format.longDate(isoFromDay(days[from]))} to ${vault.format.longDate(isoFromDay(days[to]))}`
+        : `since ${(range === '1Y' || range === 'All' ? vault.format.monthYear : vault.format.longDate)(isoFromDay(days[0]))}`,
     }),
   ]);
 }
@@ -232,6 +238,7 @@ export function datePicker(vault, actions) {
     id: 'recording-date',
     max: today(),
     value: today(),
+    marked,
     onChange: describe,
   });
   describe();
@@ -242,12 +249,6 @@ export function datePicker(vault, actions) {
     body: [
       input.element,
       note,
-      marked.size
-        ? el('p', {
-            class: 'hint',
-            text: `Dates already holding a recording: ${[...marked].map((d) => vault.format.longDate(d)).join(', ')}`,
-          })
-        : null,
     ],
     actions: [
       el('button', { class: 'btn-secondary', text: 'Cancel', onclick: () => close() }),
@@ -263,6 +264,8 @@ export function datePicker(vault, actions) {
       }),
     ],
   });
+  // The marked picker opens on today, with today focused.
+  input.openCalendar();
 }
 
 function reopenDatePicker(context) {
@@ -287,7 +290,9 @@ function chartSection(vault, state, render, dimension, actions, { days, bands })
     .filter((h) => h.payload.archivedAt)
     .map((h) => ({ date: h.payload.archivedAt, label: h.payload.name }));
 
-  const readout = el('p', { class: 'hint chart-readout', role: 'status' });
+  // Pinned to the top of the plot above the crosshair: the date, every
+  // visible band with its value, then the net total on a row of its own.
+  const readout = el('div', { class: 'chart-readout', role: 'status', hidden: true });
 
   return el('section', { class: 'card chart-card' }, [
     el('div', { class: 'card-head' }, [
@@ -302,6 +307,7 @@ function chartSection(vault, state, render, dimension, actions, { days, bands })
           RANGES.map(([label]) =>
             switchButton(label, state.range === label, () => {
               state.range = label;
+              state.selection = null;
               render();
             }),
           ),
@@ -351,34 +357,77 @@ function chartSection(vault, state, render, dimension, actions, { days, bands })
           text: 'Each side is normalized against itself, assets against total assets and liabilities against total liabilities.',
         })
       : null,
-    trendChart({
-      days,
-      bands,
-      hidden: state.hidden,
-      marks: vault.quantityDates(),
-      annotations,
-      percentage: state.percentage,
-      justTheLine: state.justTheLine,
-      locale: vault.format.locale,
-      onPickDate: (date) => actions.openRecording(date),
-      onHover: (index) => {
-        if (index === null || typeof index !== 'number') {
-          readout.textContent = '';
-          return;
-        }
-        const shown = bands.filter((band) => !state.hidden.has(band.id));
-        const parts = shown.map(
-          (band) => `${band.label} ${vault.format.money(band.points[index])}`,
-        );
-        const net = shown.reduce((sum, band) => sum + band.points[index], 0n);
-        readout.textContent = `${vault.format.date(isoFromDay(days[index]))} · ${parts.join(' · ')} · Net ${vault.format.money(net)}`;
-      },
-    }),
-    readout,
+    el('div', { class: 'chart-stage' }, [
+      trendChart({
+        days,
+        bands,
+        hidden: state.hidden,
+        selection: state.selection,
+        marks: vault.quantityDates(),
+        annotations,
+        percentage: state.percentage,
+        justTheLine: state.justTheLine,
+        locale: vault.format.locale,
+        onPickDate: (date) => actions.openRecording(date),
+        onSelect: (span) => {
+          state.selection = span;
+          render();
+        },
+        onHover: (index, across) => {
+          const heroAt = document.querySelector('.dashboard .hero-at');
+          const heroAmount = document.querySelector('.dashboard .hero-amount');
+          if (index === null) {
+            readout.hidden = true;
+            if (heroAt) heroAt.hidden = true;
+            if (heroAmount) heroAmount.textContent = heroAmount.dataset.total;
+            return;
+          }
+          const shown = bands.filter((band) => !state.hidden.has(band.id));
+          const net = shown.reduce((sum, band) => sum + band.points[index], 0n);
+          const date = vault.format.longDate(isoFromDay(days[index]));
+          readout.replaceChildren(
+            el('p', { class: 'readout-date', text: date }),
+            ...shown.map((band) =>
+              el('p', { class: 'readout-row' }, [
+                el('span', { text: band.label }),
+                el('span', { class: 'numeric', text: vault.format.money(band.points[index]) }),
+              ]),
+            ),
+            el('p', { class: 'readout-row readout-net' }, [
+              el('span', { text: 'Net' }),
+              el('span', { class: 'numeric', text: vault.format.money(net) }),
+            ]),
+          );
+          readout.style.setProperty('--at', String(across));
+          readout.hidden = false;
+          // The hero follows the cursor: the value first, its date
+          // beneath it.
+          if (heroAmount) heroAmount.textContent = vault.format.whole(net);
+          if (heroAt) {
+            heroAt.textContent = `on ${date}`;
+            heroAt.hidden = false;
+          }
+        },
+      }),
+      readout,
+    ]),
     state.hidden.size
       ? el('p', { class: 'hint hidden-bands', text: 'The total drawn here covers only the visible bands.' })
       : null,
     legend(vault, bands, state, render),
+    state.selection
+      ? el('p', { class: 'hint' }, [
+          'A span is selected. ',
+          el('button', {
+            class: 'link-button',
+            text: 'Clear it',
+            onclick: () => {
+              state.selection = null;
+              render();
+            },
+          }),
+        ])
+      : null,
     el('details', {}, [el('summary', { text: 'View as table' }), chartTable(days, bands, vault.format)]),
   ]);
 }
@@ -398,6 +447,7 @@ function groupBySelect(vault, state, render) {
   select.addEventListener('change', () => {
     state.dimensionId = select.value;
     state.hidden.clear();
+    state.selection = null;
     if (!select.value) state.unassignedOnly = false;
     render();
   });
@@ -449,6 +499,10 @@ function legend(vault, bands, state, render) {
               el('span', { class: 'swatch', style: { background: fillFor(band, index) } }),
               el('span', { class: 'legend-name', text: band.label }),
               el('span', { class: 'legend-value', text: vault.format.whole(band.points[last]) }),
+              // Each band's own change across a selected span.
+              state.selection
+                ? el('span', { class: 'legend-delta', text: signed(vault, band.points[state.selection[1]] - band.points[state.selection[0]]) })
+                : null,
             ]);
             return entry;
           }),
@@ -461,6 +515,10 @@ function legend(vault, bands, state, render) {
         ])
       : null,
   ]);
+}
+
+function signed(vault, value) {
+  return `${value > 0n ? '+' : ''}${vault.format.whole(value)}`;
 }
 
 function holdingsTable(vault, state, render, actions, grouping) {

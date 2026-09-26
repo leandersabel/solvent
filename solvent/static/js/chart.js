@@ -106,8 +106,8 @@ export function stack(bands, percentage = false) {
  *  keeps its hue on both sides. A band in `hidden` is left out of the
  *  stack and the line, and keeps its color slot. */
 export function drawChart({
-  days, bands, marks, annotations, percentage, justTheLine, onPickDate, onHover, width = 900, locale,
-  hidden = new Set(),
+  days, bands, marks, annotations, percentage, justTheLine, onPickDate, onHover, onSelect, width = 900, locale,
+  hidden = new Set(), selection = null,
 }) {
   // A phone-width card gets a shorter plot, fewer gridlines, and the
   // value labels inside the plot rather than in a gutter beside it.
@@ -248,26 +248,104 @@ export function drawChart({
     root.append(label);
   }
 
-  if (onHover) {
-    root.addEventListener('pointermove', (event) => {
-      const box = root.getBoundingClientRect();
-      const scale = box.width / width;
-      const ratio = (event.clientX - box.left - pad.left * scale) / (plotWidth * scale);
-      const day = Math.round(firstDay + ratio * spanDays);
-      let nearest = 0;
-      days.forEach((candidate, index) => {
-        if (Math.abs(candidate - day) < Math.abs(days[nearest] - day)) nearest = index;
-      });
-      onHover(nearest);
-    });
-    root.addEventListener('pointerleave', () => onHover(null));
-    root.addEventListener('keydown', (event) => {
-      if (event.key === 'ArrowLeft' || event.key === 'ArrowRight') {
-        event.preventDefault();
-        onHover(event.key === 'ArrowRight' ? 1 : -1, true);
-      }
-    });
+  // A selected span stays drawn after release, under the crosshair.
+  if (selection) {
+    const [from, to] = selection;
+    root.append(svg('rect', {
+      x: x(days[from]),
+      y: pad.top,
+      width: Math.max(1, x(days[to]) - x(days[from])),
+      height: plotHeight,
+      class: 'selection',
+    }));
   }
+  const crosshair = svg('line', { y1: pad.top, y2: plotBottom, class: 'crosshair', visibility: 'hidden' });
+  const dragging = svg('rect', { y: pad.top, height: plotHeight, class: 'selection', visibility: 'hidden' });
+  root.append(dragging, crosshair);
+
+  // Hover, drag and the keyboard all move one crosshair. `onHover`
+  // hears the index under it and where it sits across the plot, and
+  // null when it leaves.
+  let current = null;
+  const point = (index) => {
+    current = index;
+    if (index === null) {
+      crosshair.setAttribute('visibility', 'hidden');
+      if (onHover) onHover(null);
+      return;
+    }
+    const at = x(days[index]);
+    crosshair.setAttribute('x1', at);
+    crosshair.setAttribute('x2', at);
+    crosshair.setAttribute('visibility', 'visible');
+    if (onHover) onHover(index, at / width);
+  };
+  const nearest = (event) => {
+    const box = root.getBoundingClientRect();
+    const scale = box.width / width;
+    const ratio = (event.clientX - box.left - pad.left * scale) / (plotWidth * scale);
+    const day = Math.round(firstDay + ratio * spanDays);
+    let found = 0;
+    days.forEach((candidate, index) => {
+      if (Math.abs(candidate - day) < Math.abs(days[found] - day)) found = index;
+    });
+    return found;
+  };
+
+  // A drag selects the span between two dates, and a plain click
+  // clears it.
+  let anchor = null;
+  root.addEventListener('pointerdown', (event) => {
+    if (event.button !== 0 || event.target.classList.contains('entry-mark')) return;
+    anchor = nearest(event);
+  });
+  root.addEventListener('pointermove', (event) => {
+    const index = nearest(event);
+    point(index);
+    if (anchor === null || index === anchor) return;
+    const [from, to] = [Math.min(anchor, index), Math.max(anchor, index)];
+    dragging.setAttribute('x', x(days[from]));
+    dragging.setAttribute('width', Math.max(1, x(days[to]) - x(days[from])));
+    dragging.setAttribute('visibility', 'visible');
+  });
+  root.addEventListener('pointerup', (event) => {
+    if (anchor === null) return;
+    const index = nearest(event);
+    const span = index === anchor ? null : [Math.min(anchor, index), Math.max(anchor, index)];
+    anchor = null;
+    dragging.setAttribute('visibility', 'hidden');
+    if (onSelect && (span || selection)) onSelect(span);
+  });
+  root.addEventListener('pointerleave', () => {
+    anchor = null;
+    dragging.setAttribute('visibility', 'hidden');
+    point(null);
+  });
+
+  // The keyboard steps between recorded dates, and Enter opens the one
+  // under the crosshair.
+  const recorded = days
+    .map((day, index) => (marks.includes(isoFromDay(day)) ? index : null))
+    .filter((index) => index !== null);
+  root.addEventListener('keydown', (event) => {
+    if (event.key === 'ArrowLeft' || event.key === 'ArrowRight') {
+      event.preventDefault();
+      if (!recorded.length) return;
+      const forward = event.key === 'ArrowRight';
+      const next = current === null
+        ? recorded[recorded.length - 1]
+        : forward
+          ? recorded.find((index) => index > current)
+          : [...recorded].reverse().find((index) => index < current);
+      if (next !== undefined) point(next);
+      return;
+    }
+    if (event.key === 'Enter' && current !== null && recorded.includes(current) && onPickDate) {
+      onPickDate(isoFromDay(days[current]));
+    }
+    if (event.key === 'Escape') point(null);
+  });
+  root.addEventListener('blur', () => point(null));
 
   return root;
 }

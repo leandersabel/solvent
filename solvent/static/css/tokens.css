@@ -1044,7 +1044,29 @@ th.numeric {
   font-variant-numeric: tabular-nums;
 }
 
-.chart-readout { min-height: 20px; margin: 8px 0 0; }
+/* The tooltip sits on the plot's top edge above the crosshair, kept
+   inside the card at either end. */
+.chart-stage { position: relative; }
+.chart-readout {
+  position: absolute;
+  top: 0;
+  left: clamp(0px, calc(var(--at, 0) * 100% - 90px), calc(100% - 180px));
+  width: 180px;
+  padding: 8px 12px;
+  background: var(--surface);
+  border: 1px solid var(--hairline);
+  border-radius: var(--radius-input);
+  font-size: 12px;
+  pointer-events: none;
+}
+.chart-readout p { margin: 0; }
+.readout-date { color: var(--ink-secondary); margin-bottom: 4px !important; }
+.readout-row { display: flex; justify-content: space-between; gap: 12px; }
+.readout-net { border-top: 1px solid var(--hairline); margin-top: 4px !important; padding-top: 4px; font-weight: 600; }
+.crosshair { stroke: var(--ink-secondary); stroke-width: 1; stroke-dasharray: 2 3; pointer-events: none; }
+.trend .selection { fill: var(--petrol-100); fill-opacity: 0.6; pointer-events: none; }
+.legend-delta { font-variant-numeric: tabular-nums; color: var(--ink-secondary); }
+.hero-at { margin: 4px 0 0; color: var(--ink-secondary); font-size: 13px; }
 
 .legend-row {
   display: flex;
@@ -1653,6 +1675,14 @@ select {
 .date-day:disabled {
   color: var(--ink-muted);
   cursor: default;
+}
+
+/* A date holding a recording: a petrol-600 dot under the numeral. */
+.date-day.has-recording {
+  background-image: radial-gradient(circle, var(--petrol-600) 2px, transparent 2.5px);
+  background-repeat: no-repeat;
+  background-position: center calc(100% - 2px);
+  background-size: 6px 6px;
 }
 
 .date-day.is-today {

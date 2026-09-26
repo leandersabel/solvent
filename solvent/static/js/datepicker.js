@@ -14,7 +14,9 @@ const WEEK_START_MONDAY = 1;
 
 /** Returns `{ element, value, set, onChange }` where `value` is an ISO
  *  date or the empty string. `max` and `min` are ISO dates. */
-export function dateField(format, { id, value = '', min = null, max = null, onChange = null } = {}) {
+/** `marked` is a set of ISO dates the calendar marks as holding a
+ *  recording (design-system.md, Components, Date picker, marked). */
+export function dateField(format, { id, value = '', min = null, max = null, onChange = null, marked = null } = {}) {
   let current = value;
 
   const text = el('input', {
@@ -101,6 +103,7 @@ export function dateField(format, { id, value = '', min = null, max = null, onCh
     drawCalendar(popover, format, current || today(), {
       min,
       max,
+      marked,
       selected: current,
       onPick: (iso) => {
         settle(iso);
@@ -115,6 +118,12 @@ export function dateField(format, { id, value = '', min = null, max = null, onCh
   return {
     element: wrap,
     input: text,
+    /** Open the month grid with today's date focused. */
+    openCalendar() {
+      if (popover.hidden) open.click();
+      const day = popover.querySelector('.date-day.is-today') || popover.querySelector('.date-day');
+      if (day) day.focus();
+    },
     get value() {
       return current;
     },
@@ -134,7 +143,7 @@ function inRange(iso, min, max) {
   return true;
 }
 
-function drawCalendar(host, format, anchor, { min, max, selected, onPick, onClose }) {
+function drawCalendar(host, format, anchor, { min, max, marked, selected, onPick, onClose }) {
   let [year, month] = anchor.split('-').map(Number);
 
   const render = () => {
@@ -154,11 +163,14 @@ function drawCalendar(host, format, anchor, { min, max, selected, onPick, onClos
     for (let day = 1; day <= days; day += 1) {
       const iso = `${String(year).padStart(4, '0')}-${String(month).padStart(2, '0')}-${String(day).padStart(2, '0')}`;
       const usable = inRange(iso, min, max);
+      // A dot is a color, so a marked date says so in its name as well.
+      const recorded = Boolean(marked && marked.has(iso));
       grid.append(
         el('button', {
           type: 'button',
-          class: `date-day${iso === selected ? ' is-selected' : ''}${iso === today() ? ' is-today' : ''}`,
+          class: `date-day${iso === selected ? ' is-selected' : ''}${iso === today() ? ' is-today' : ''}${recorded ? ' has-recording' : ''}`,
           text: String(day),
+          'aria-label': recorded ? `${format.dayMonth(iso)}, has a recording` : null,
           disabled: !usable,
           'aria-current': iso === today() ? 'date' : null,
           onclick: () => onPick(iso),
