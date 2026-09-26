@@ -15,9 +15,11 @@ function newId() {
 // which are reached from a dozen controls and would otherwise all
 // have to carry it. One screen is on at a time, so there is one.
 let reload = () => {};
+let openUnassigned = () => {};
 
-export function dimensionsView(vault, { reload: onChanged }) {
+export function dimensionsView(vault, { reload: onChanged, openUnassigned: onOpen }) {
   reload = onChanged;
+  openUnassigned = onOpen;
   const live = vault.dimensions.filter((d) => !d.archivedAt);
   const archived = vault.dimensions.filter((d) => d.archivedAt);
 
@@ -78,10 +80,17 @@ function dimensionCard(vault, dimension) {
         onclick: () => archiveDimension(vault, dimension),
       }),
     ]),
-    el('p', {
-      class: 'hint',
-      text: `${coverage.assigned} of ${coverage.total} holdings assigned`,
-    }),
+    // A count with a link out to the holdings it leaves unassigned,
+    // never their names listed here.
+    el('p', { class: 'hint' }, [
+      coverage.assigned < coverage.total
+        ? el('button', {
+            class: 'link-button',
+            text: `${coverage.assigned} of ${coverage.total} holdings assigned`,
+            onclick: () => openUnassigned(dimension.id),
+          })
+        : `${coverage.assigned} of ${coverage.total} holdings assigned`,
+    ]),
     el(
       'ul',
       { class: 'plain-list' },

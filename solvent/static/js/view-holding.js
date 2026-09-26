@@ -40,12 +40,14 @@ export function holdingView(vault, accountId, { editing = false, onOpenRecording
         text:
           value.state === 'unvalued'
             ? 'Not yet valued'
-            : `${vault.format.quantity(value.quantity)} ${holding.payload.unit}`,
+            : vault.amount(value.quantity, holding.payload.unit),
       }),
-      value.state === 'valued'
+      // A holding in the main currency converts to itself, so the
+      // figure is not repeated.
+      value.state === 'valued' && holding.payload.unit !== vault.mainCurrency
         ? el('span', {
             class: 'hero-converted',
-            text: `${vault.format.money(value.converted)} ${vault.mainCurrency}`,
+            text: vault.mainMoney(value.converted),
           })
         : value.state === 'unpriced'
           ? el('span', { class: 'hero-converted', text: 'Not priced' })
@@ -228,7 +230,7 @@ function confirmDeleteSnapshot(vault, holding, snapshot, error, onChanged) {
     heading: 'Delete this snapshot?',
     body: [
       el('p', {
-        text: `Delete the snapshot of ${vault.format.quantity(decimal.parse(snapshot.payload.value))} ${holding.payload.unit} for ${vault.format.longDate(snapshot.payload.date)}?`,
+        text: `Delete the snapshot of ${vault.amount(decimal.parse(snapshot.payload.value), holding.payload.unit)} for ${vault.format.longDate(snapshot.payload.date)}?`,
       }),
       el('p', {
         text: only

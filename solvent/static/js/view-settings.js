@@ -5,37 +5,40 @@
 import * as api from './api.js';
 import * as crypto from './crypto.js';
 import * as writes from './writes.js';
-import { el, mount } from './dom.js';
+import { el, icon, mount, today } from './dom.js';
 import * as format from './format.js';
 import { changePassword, restartIdleTimer, signOut } from './session.js';
 import { IDLE_LOCK_PERIODS } from './model.js';
 import { passwordWithToggle } from './unlock.js';
 import { strengthGauge } from './strength.js';
-import { exportCard, importCard } from './page-transfer.js';
 
-export function settingsView(vault, { username, kdf, reload, openDimensions }) {
+/** `open` goes to one of the screens reached from here, by the last
+ *  part of its address. */
+export function settingsView(vault, { username, kdf, reload, open }) {
   return [
     el('h1', { class: 'screen-heading', text: 'Settings' }),
     profileCard(vault, username),
     formatCard(vault, reload),
-    organizingCard(vault, openDimensions),
-    changePasswordCard(vault, kdf),
+    organizingCard(vault, open),
+    changePasswordCard(vault, kdf, username),
     sessionCard(vault, reload),
-    exportCard(vault),
-    importCard(vault, reload),
-    dangerZone(vault, username),
+    dangerZone(vault, username, kdf, open),
   ];
 }
 
 function profileCard(vault, username) {
   return el('section', { class: 'card' }, [
     el('h2', { class: 'section-heading', text: 'Profile' }),
-    row('Username', username),
-    row('Main currency', vault.mainCurrency),
-    el('p', {
-      class: 'hint',
-      text: 'Fixed when you created your vault. Every rate you have recorded converts into it, so changing it would mix two currencies in your history.',
-    }),
+    el('dl', { class: 'pairs' }, [
+      pair('Username', [el('span', { text: username })]),
+      pair('Main currency', [
+        el('span', { class: 'strong', text: vault.mainCurrency }),
+        el('p', {
+          class: 'hint',
+          text: 'Fixed when you created your vault. Every rate you have recorded converts into it, so changing it would mix two currencies in your history.',
+        }),
+      ]),
+    ]),
   ]);
 }
 
@@ -51,7 +54,8 @@ function profileCard(vault, username) {
 function formatCard(vault, reload) {
   const settings = vault.profile || {};
   const error = el('p', { class: 'field-error', hidden: true });
-  const sample = el('p', { class: 'hint' });
+  const sampleFigure = el('span', { class: 'sample-figure' });
+  const sampleDate = el('span', { class: 'sample-date' });
 
   const language = el('select', { id: 'format-locale' });
   for (const tag of LANGUAGES) {
@@ -88,7 +92,8 @@ function formatCard(vault, reload) {
       moneyPlaces: places.value,
       dateStyle: dates.value,
     });
-    sample.textContent = `${shape.money(1234567890000000000n)} ${vault.mainCurrency} on ${shape.date('2026-09-20')}`;
+    sampleFigure.textContent = `${vault.mainCurrency} ${shape.money(1234567890000000000n)}`;
+    sampleDate.textContent = shape.date(today());
   };
   for (const control of [language, group, places, dates]) {
     control.addEventListener('change', preview);
@@ -121,20 +126,28 @@ function formatCard(vault, reload) {
       class: 'hint',
       text: 'Display only. Every figure is stored exactly as you entered it, and every date is stored the same way for everyone, so changing any of this rewrites nothing.',
     }),
-    field('Language', language),
-    field('Dates', dates),
-    field('Thousands', group),
-    field('Decimals on money', places),
-    sample,
+    el('div', { class: 'format-grid' }, [
+      field('Language', language),
+      field('Dates', dates),
+      field('Thousands', group),
+      field('Decimals on money', places),
+    ]),
+    el('div', { class: 'sample-strip' }, [
+      el('p', { class: 'sample' }, [
+        el('span', { class: 'eyebrow', text: 'Sample' }),
+        sampleFigure,
+        sampleDate,
+      ]),
+      save,
+    ]),
     error,
-    el('div', { class: 'form-actions' }, [save]),
   ]);
 }
 
 /** Offered rather than free text, because a tag nobody can spell is
  *  worse than a short list. An empty value means the browser's. */
 const LANGUAGES = [
-  { value: '', label: "Whatever this browser is set to" },
+  { value: '', label: 'Browser setting' },
   { value: 'de-CH', label: 'Deutsch (Schweiz)' },
   { value: 'de-DE', label: 'Deutsch (Deutschland)' },
   { value: 'fr-CH', label: 'Fran\u00e7ais (Suisse)' },
@@ -143,37 +156,39 @@ const LANGUAGES = [
   { value: 'en-US', label: 'English (US)' },
 ];
 
-function row(label, value) {
-  return el('p', { class: 'settings-row' }, [
-    el('span', { class: 'settings-label', text: label }),
-    el('span', { text: value }),
-  ]);
+function pair(label, value) {
+  return el('div', { class: 'pair' }, [el('dt', { text: label }), el('dd', {}, value)]);
 }
 
-function organizingCard(vault, openDimensions) {
+function organizingCard(vault, open) {
   const count = vault.activeDimensions().length;
-  return el('section', { class: 'card' }, [
-    el('h2', { class: 'section-heading', text: 'Organizing' }),
+  // Link rows rather than a section, so the card carries no heading.
+  // Each href is the real address, which a new tab or a bookmark
+  // follows, and a click stays on this page.
+  const row = (address, title, explanation, aside = null) =>
     el('a', {
       class: 'link-row',
-      href: '/settings/dimensions',
+      href: `/settings/${address}`,
       onclick: (event) => {
         event.preventDefault();
-        openDimensions();
+        open(address);
       },
     }, [
-      el('span', { text: 'Dimensions' }),
-      el('span', {
-        class: 'hint',
-        text: count
-          ? `How your holdings split up in the chart. ${count} configured.`
-          : 'How your holdings split up in the chart. None yet.',
-      }),
-    ]),
+      el('span', { class: 'link-row-text' }, [
+        el('span', { class: 'link-row-title', text: title }),
+        el('span', { class: 'hint', text: explanation }),
+      ]),
+      aside ? el('span', { class: 'link-row-aside', text: aside }) : null,
+      icon('chevron'),
+    ]);
+  return el('section', { class: 'card link-list' }, [
+    row('dimensions', 'Dimensions', 'How your holdings split up in the chart.',
+      count ? `${count} ${count === 1 ? 'dimension' : 'dimensions'}` : 'None yet'),
+    row('export-import', 'Export and import', 'Download your vault, or restore one from a file.'),
   ]);
 }
 
-function changePasswordCard(vault, kdf) {
+function changePasswordCard(vault, kdf, username) {
   const current = el('input', { type: 'password', autocomplete: 'current-password' });
   const next = el('input', { type: 'password', autocomplete: 'new-password' });
   const confirm = el('input', { type: 'password', autocomplete: 'new-password' });
@@ -224,22 +239,25 @@ function changePasswordCard(vault, kdf) {
       class: 'callout',
       text: 'Your data is not re-encrypted. Only the lock around your key is rebuilt, which is why this is fast even on a large vault.',
     }),
-    field('Current password', passwordWithToggle(current)),
-    field('New password', passwordWithToggle(next)),
-    gauge.element,
-    field('Confirm new password', passwordWithToggle(confirm)),
-    error,
-    done,
-    button,
-    el('p', {
-      class: 'callout callout-critical',
-      text: 'Export files you have already saved still open with your old password. They carry their own copy of the lock, and changing it here does not reach back and protect them.',
-    }),
+    el('div', { class: 'form-narrow' }, [
+      field('Current password', passwordWithToggle(current)),
+      field('New password', passwordWithToggle(next), gauge.element),
+      field('Confirm new password', passwordWithToggle(confirm)),
+      error,
+      done,
+      button,
+    ]),
+    el('p', { class: 'warning-line' }, [
+      icon('alert', 18),
+      el('span', {
+        text: 'Export files you have already saved still open with your old password. They carry their own copy of the lock, and changing it here does not reach back and protect them.',
+      }),
+    ]),
   ]);
 }
 
-function field(label, control) {
-  return el('div', { class: 'field' }, [el('label', { text: label }), control]);
+function field(label, control, ...after) {
+  return el('div', { class: 'field' }, [el('label', { text: label }), control, ...after]);
 }
 
 function sessionCard(vault, rerender) {
@@ -266,18 +284,28 @@ function sessionCard(vault, rerender) {
 
   api
     .get('/api/sessions')
-    .then((sessions) => {
-      mount(
-        list,
-        sessions.map((session) =>
-          el('p', { class: 'settings-row' }, [
-            el('span', {
-              text: `Started ${vault.format.longDate(session.issuedAt.slice(0, 10))}, last used ${vault.format.longDate(session.lastActiveAt.slice(0, 10))}`,
-            }),
-            session.current ? el('span', { class: 'chip', text: 'This one' }) : null,
-          ]),
-        ),
+    .then((listed) => {
+      // The session reading this first, then the rest by when each
+      // was last used.
+      const sessions = [...listed].sort((a, b) =>
+        Number(b.current) - Number(a.current) || String(b.lastActiveAt).localeCompare(String(a.lastActiveAt)),
       );
+      mount(list, el('table', { class: 'data-table sessions-table' }, [
+        el('thead', {}, [
+          el('tr', {}, [
+            el('th', { text: '' }),
+            el('th', { text: 'Started' }),
+            el('th', { text: 'Last used' }),
+          ]),
+        ]),
+        el('tbody', {}, sessions.map((session) =>
+          el('tr', {}, [
+            el('td', {}, [session.current ? el('span', { class: 'chip', text: 'This session' }) : null]),
+            el('td', { text: vault.format.dateTime(session.issuedAt) }),
+            el('td', { text: session.current ? 'Just now' : vault.format.dateTime(session.lastActiveAt) }),
+          ]),
+        )),
+      ]));
     })
     .catch(() => {
       mount(list, [
@@ -288,18 +316,20 @@ function sessionCard(vault, rerender) {
 
   return el('section', { class: 'card' }, [
     el('h2', { class: 'section-heading', text: 'Session and lock' }),
-    field('Idle lock', idle),
-    el('p', {
-      class: 'hint',
-      text: 'Shorter is safer. Every unlock costs the deliberate wait while your password becomes a key.',
-    }),
-    el('p', {
-      class: 'hint',
-      text: 'You are signed out 12 hours after signing in, however busy you have been.',
-    }),
+    el('div', { class: 'idle-grid' }, [
+      field('Idle lock', idle),
+      el('p', {
+        class: 'hint',
+        text: 'Shorter is safer. Every unlock costs the deliberate wait while your password becomes a key.',
+      }),
+    ]),
     error,
-    list,
-    el('p', { class: 'hint', text: 'Solvent records no IP addresses and no devices.' }),
+    el('p', { text: 'You are signed out 12 hours after signing in, however busy you have been.' }),
+    el('div', { class: 'sessions' }, [
+      el('p', { class: 'eyebrow', text: 'Open sessions' }),
+      list,
+      el('p', { class: 'hint', text: 'Solvent records no IP addresses and no devices.' }),
+    ]),
     el('div', { class: 'form-actions' }, [
       el('button', {
         class: 'btn-secondary',
@@ -322,7 +352,7 @@ function sessionCard(vault, rerender) {
  *  session. The dialog's primary action is Export first: somebody who
  *  came here wanting a backup and left with a wiped vault has been
  *  failed by the dialog. */
-function dangerZone(vault, username) {
+function dangerZone(vault, username, kdf, open) {
   const password = el('input', { type: 'password', autocomplete: 'current-password' });
   const typed = el('input', { type: 'text' });
   const error = el('p', { class: 'field-error', hidden: true });
@@ -360,7 +390,15 @@ function dangerZone(vault, username) {
     field('Type your username to confirm', typed),
     error,
     el('div', { class: 'form-actions' }, [
-      el('a', { class: 'btn-primary', href: '#export', text: 'Export first' }),
+      el('a', {
+        class: 'btn-primary',
+        href: '/settings/export-import',
+        text: 'Export first',
+        onclick: (event) => {
+          event.preventDefault();
+          open('export-import');
+        },
+      }),
       remove,
     ]),
   ]);

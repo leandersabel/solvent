@@ -338,7 +338,7 @@ try {
     'every row states whether this date holds a figure',
     (await labels('.row-state')).every((state) => state === 'Nothing recorded for this date.'),
   );
-  const rateUnits = await labels('.rate-unit');
+  const rateUnits = await page.eval("[...document.querySelectorAll('.rate-line')].map(n => n.dataset.unit)");
   check('one rate line per unit that needs one', rateUnits.join(',') === 'USD,XAU-ozt', rateUnits.join(','));
   check('the main currency has no rate line', !rateUnits.includes('CHF'));
   check(
@@ -370,15 +370,22 @@ try {
   const requests = await page.eval(`(() => performance.getEntriesByType('resource')
     .filter(e => e.name.includes('/api/rates?')).length)()`);
   check('a four-row sweep asks the proxy once', requests === 1, `issued ${requests}`);
+  const rateNames = await labels('.rate-unit');
+  check('a rate line is headed by the unit\'s name', rateNames.join(',') === 'United States Dollar,Gold', rateNames.join(','));
 
-  await click('Done');
+  await page.eval(`document.querySelector('.topbar nav a[href="#/"]').click()`);
   await page.settle(900);
 
   // ---- The dashboard -------------------------------------------------
 
   const hero = await page.eval("document.querySelector('.hero-figure').textContent");
   check('the hero carries a total in the main currency', hero.includes('CHF'), hero);
-  check('gross assets and liabilities are both shown', (await text()).includes('Liabilities'));
+  // Read from the markup: the labels are set in capitals by the
+  // stylesheet, which innerText reports.
+  check(
+    'gross assets and liabilities are both shown',
+    (await page.eval("document.querySelector('.hero').textContent")).includes('Liabilities'),
+  );
   check('the chart is drawn', await page.eval("Boolean(document.querySelector('svg.trend'))"));
   check('the entry marks are on with nothing turned on', (await page.eval("document.querySelectorAll('.entry-mark').length")) > 0);
   check('the table fallback is there', (await text()).includes('View as table'));
@@ -483,7 +490,7 @@ try {
   check('the change-password card explains the speed', (await text()).includes('Your data is not re-encrypted'));
   check('it warns that old export files still open', (await text()).includes('still open with your old password'));
   check('the absence of IP records is volunteered', (await text()).includes('Solvent records no IP addresses'));
-  check('the session list marks this one', (await text()).includes('This one'));
+  check('the session list marks this one', (await text()).includes('This session'));
 
   // ---- Dates and numbers -------------------------------------------------
 
@@ -515,7 +522,7 @@ try {
   })()`);
   check(
     'the saved format is what every figure and date now uses',
-    written === JSON.stringify({ money: "1'234'568", date: '20.09.2026' }),
+    written === JSON.stringify({ money: '1\u2019234\u2019568', date: '20.09.2026' }),
     written,
   );
 
@@ -524,7 +531,7 @@ try {
   await page.settle(600);
   check(
     'the dashboard total carries the apostrophe and no decimals',
-    /\d'\d{3}(?!\.)/.test(await page.eval("document.querySelector('.hero-figure, .hero').textContent")),
+    /\d\u2019\d{3}(?!\.)/.test(await page.eval("document.querySelector('.hero-figure, .hero').textContent")),
     await page.eval("document.querySelector('.hero-figure, .hero').textContent"),
   );
   check(
@@ -681,7 +688,7 @@ try {
   const sweepDate = (await page.eval('location.hash')).split('/').pop();
   check('the sweep heading is the date, not a control', (await page.eval("document.querySelectorAll('.screen-heading input').length")) === 0);
 
-  await click('Done');
+  await page.eval(`document.querySelector('.topbar nav a[href="#/"]').click()`);
   await page.settle(700);
 
   // ---- The replace prompt, on the form where the date is blind ---------
@@ -1109,6 +1116,12 @@ try {
   await page.settle(700);
   const again = await lockPeriod(5);
   check('the chosen period survives signing out and back in', !again.early && again.late, JSON.stringify(again));
+  // Signed in on a page served without a session, so the name comes
+  // from the sign-in rather than from the page.
+  check(
+    'after signing in on a fresh page, unlocking again asks only for the password',
+    !(await page.eval("Boolean(document.querySelector('#unlock-username'))")),
+  );
 
   // Another device: a second browser with a profile of its own.
   const other = await launch();
@@ -1133,6 +1146,8 @@ try {
       "[...document.querySelectorAll('.card')].find(c => c.textContent.includes('Session and lock')).querySelector('select').value",
     );
     check('the chosen period follows you to another device', shown === '5', shown);
+    const named = await second.eval("document.querySelector('.pair dd').textContent");
+    check('settings shows the username after signing in on a page without a session', named === 'leander', named);
   } finally {
     other.child.kill();
   }

@@ -34,6 +34,9 @@ export class Vault {
     this.holdings = new Map();
     this.snapshots = new Map();
     this.rates = new Map();
+    // The operator's symbol table, which says of each unit whether it
+    // is a currency and what it is called (rate-lookup.md).
+    this.symbols = new Map();
     // Skipped and counted rather than guessed at: an unreadable record
     // is the AAD-binding tripwire firing, and it is surfaced rather
     // than swallowed (net-worth-view.md).
@@ -45,6 +48,10 @@ export class Vault {
     for (const type of RECORD_TYPES) {
       byType[type] = await api.get(`/api/records?type=${type}`);
     }
+    // A table that would not load leaves every unit read as typed,
+    // which costs its name and nothing else.
+    const symbols = await api.get('/api/rates/symbols').catch(() => []);
+    this.symbols = new Map(symbols.map((row) => [row.symbol, row]));
     this.profile = null;
     this.profileRecord = null;
     this.holdings.clear();
@@ -59,6 +66,13 @@ export class Vault {
       }
     }
     this._sortSeries();
+    // Oldest first, so every list of holdings reads in the order they
+    // were added.
+    this.holdings = new Map(
+      [...this.holdings].sort(([idA, a], [idB, b]) =>
+        (a.payload.createdAt || '').localeCompare(b.payload.createdAt || '') || idA.localeCompare(idB),
+      ),
+    );
     return this;
   }
 
@@ -118,6 +132,38 @@ export class Vault {
       this._formatFrom = this.profile;
     }
     return this._format;
+  }
+
+  /** A figure in the main currency, the code ahead of the amount. */
+  mainMoney(value) {
+    return `${this.mainCurrency} ${this.format.money(value)}`;
+  }
+
+  /** The same, rounded to whole units for a summary figure. */
+  mainWhole(value) {
+    return `${this.mainCurrency} ${this.format.whole(value)}`;
+  }
+
+  /** How a unit reads, from the symbol table. A currency is written
+   *  by its code ahead of a figure, anything else by its short unit
+   *  after it: the part of the canonical symbol after the hyphen
+   *  ("XAU-ozt" reads "ozt"). The table's label names it, the part
+   *  before a comma being the thing and the part after the unit it is
+   *  counted in ("Gold, troy ounce"). A unit the table does not list
+   *  is free text and reads exactly as typed. */
+  unitOf(symbol) {
+    const row = this.symbols.get(symbol);
+    const currency = row ? row.kind === 'currency' : symbol === this.mainCurrency;
+    const [name, counted] = row ? row.label.split(', ') : [symbol];
+    const short = row && !currency && symbol.includes('-') ? symbol.split('-').pop() : symbol;
+    return { symbol, currency, name, short, one: currency ? `1 ${symbol}` : `1 ${counted || short}` };
+  }
+
+  /** A quantity with its unit: "CHF 48’210.35", "12.50 ozt". */
+  amount(value, symbol) {
+    const unit = this.unitOf(symbol);
+    const figure = this.format.quantity(value);
+    return unit.currency ? `${unit.symbol} ${figure}` : `${figure} ${unit.short}`;
   }
 
   /** The offered period nearest the stored one, the shorter on a tie
@@ -399,7 +445,13 @@ export class Vault {
   /** Per-holding interpolation summed into bands, never interpolation
    *  of an already-summed series: holdings start at different dates
    *  and summing first would smear one holding's first snapshot across
-   *  the rest. */
+   *  the rest.
+   *
+   *  Each band carries its two sides apart as well as its net:
+   *  `assets` sums the holdings standing above zero on a day and
+   *  `liabilities` those below it, so a mortgage and the flat it is
+   *  secured on are both drawn rather than cancelling into one
+   *  figure (net-worth-view.md, Assets and liabilities). */
   series(dimension, fromDay, toDay) {
     const holdings = [...this.holdings.values()];
     const sampleDays = new Set([fromDay, toDay]);
@@ -422,9 +474,14 @@ export class Vault {
     for (const holding of holdings) {
       const band = this.bandOf(holding, dimension);
       if (!bands.has(band.id)) {
-        bands.set(band.id, { ...band, points: days.map(() => decimal.ZERO) });
+        bands.set(band.id, {
+          ...band,
+          points: days.map(() => decimal.ZERO),
+          assets: days.map(() => decimal.ZERO),
+          liabilities: days.map(() => decimal.ZERO),
+        });
       }
-      const points = bands.get(band.id).points;
+      const { points, assets, liabilities } = bands.get(band.id);
       const archived = holding.payload.archivedAt
         ? dayNumber(holding.payload.archivedAt)
         : null;
@@ -434,7 +491,10 @@ export class Vault {
         if (quantity === null) return;
         const price = this.priceAt(holding.payload.unit, day);
         if (price === null) return;
-        points[index] += decimal.multiply(quantity, price);
+        const value = decimal.multiply(quantity, price);
+        points[index] += value;
+        if (value < 0n) liabilities[index] += value;
+        else assets[index] += value;
       });
     }
 
@@ -470,12 +530,14 @@ function orderBands(bands, dimension) {
   const rest = ordered.splice(4);
   if (bands.has('unassigned')) ordered.push(bands.get('unassigned'));
   if (rest.length) {
+    const sum = (side) =>
+      rest[0][side].map((_, index) => rest.reduce((total, band) => total + band[side][index], 0n));
     const other = {
       id: 'other',
       label: 'Other',
-      points: rest[0].points.map((_, index) =>
-        rest.reduce((sum, band) => sum + band.points[index], 0n),
-      ),
+      points: sum('points'),
+      assets: sum('assets'),
+      liabilities: sum('liabilities'),
     };
     ordered.push(other);
   }

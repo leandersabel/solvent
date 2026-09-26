@@ -138,6 +138,7 @@ def test_an_administrator_gets_not_found_from_records_not_an_empty_list(sessions
 
 def test_an_administrator_reaches_change_password_and_not_settings(sessions):
     assert sessions["admin"].get("/settings").status_code == 404
+    assert sessions["admin"].get("/settings/export-import").status_code == 404
     assert sessions["admin"].get("/api/sessions", headers=CSRF).status_code == 404
     assert sessions["admin"].post("/api/auth/logout-all", json={}, headers=CSRF).status_code == 404
     # Reached, and refused on its body rather than on the surface.
@@ -173,12 +174,13 @@ def test_a_vault_page_carries_its_own_sign_in_card(client):
 
 
 def test_the_vault_surface_is_one_page(client):
-    """Settings and dimensions are views of the dashboard, not pages of
-    their own: the keys live in one page's memory, and a second page
+    """Settings and the screens reached from it are views of the
+    dashboard, not pages of their own: the keys live in one page's memory, and a second page
     would charge the derivation again."""
     for path, target in (
         ("/settings", "/dashboard#/settings"),
         ("/settings/dimensions", "/dashboard#/settings/dimensions"),
+        ("/settings/export-import", "/dashboard#/settings/export-import"),
     ):
         response = client.get(path)
         assert response.status_code == 302, path

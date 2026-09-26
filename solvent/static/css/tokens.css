@@ -46,10 +46,14 @@
   --status-warning: #c2603d;
   --status-critical: #ac312c;
 
+  /* Chart slot 1, which every nominal bar takes */
+  --chart-1: #0098b7;
+
   /* Shape */
   --radius-input: 6px;
   --radius-card: 10px;
   --content-max-width: 1200px;
+  --gutter: 40px;
 }
 
 * {
@@ -62,77 +66,27 @@ body {
   color: var(--ink-primary);
   font-family: system-ui, -apple-system, "Segoe UI", sans-serif;
   font-size: 15px;
+  line-height: 1.4;
+  -webkit-font-smoothing: antialiased;
 }
 
-.topbar {
-  display: flex;
-  align-items: center;
-  gap: 24px;
-  background: var(--petrol-800);
-  color: #ffffff;
-  padding: 12px 24px;
+p {
+  margin: 0 0 8px;
 }
 
-.topbar .wordmark {
-  font-weight: 600;
-}
-
-.topbar nav ul {
-  display: flex;
-  gap: 16px;
-  list-style: none;
-  margin: 0;
-  padding: 0;
-}
-
-.topbar nav a {
-  color: #ffffff;
+a {
+  color: var(--petrol-600);
   text-decoration: none;
 }
 
-.topbar nav a:focus-visible,
-.btn-chrome:focus-visible {
-  outline: 2px solid #ffffff;
-  outline-offset: 2px;
-}
-
-.btn-secondary:focus-visible {
-  outline: 2px solid var(--petrol-600);
-  outline-offset: 2px;
-}
-
-.topbar-actions {
-  margin-left: auto;
-  display: flex;
-  gap: 8px;
-}
-
-.btn-secondary {
-  background: transparent;
-  border: 1px solid var(--hairline);
+a:hover {
   color: var(--petrol-700);
-  border-radius: var(--radius-input);
-  padding: 6px 12px;
-  font: inherit;
-  cursor: pointer;
+  text-decoration: underline;
 }
 
-/* The secondary button on the petrol-800 bar, where petrol-700 text
-   and a petrol-600 ring fall under their contrast floors. */
-.btn-chrome {
-  background: transparent;
-  border: 1px solid var(--petrol-400);
-  color: #ffffff;
-  border-radius: var(--radius-input);
-  padding: 6px 12px;
-  font: inherit;
-  cursor: pointer;
-}
-
-.content {
-  max-width: var(--content-max-width);
-  margin: 0 auto;
-  padding: 24px;
+.icon {
+  flex: none;
+  display: block;
 }
 
 @media (prefers-reduced-motion: reduce) {
@@ -141,6 +95,115 @@ body {
   }
 }
 
+/* ---- Top bar ---- */
+
+.topbar {
+  display: flex;
+  align-items: center;
+  gap: 40px;
+  min-height: 64px;
+  background: var(--petrol-800);
+  color: #ffffff;
+  padding: 0 var(--gutter);
+}
+
+.topbar .wordmark {
+  font-size: 19px;
+  font-weight: 600;
+  letter-spacing: 0.02em;
+}
+
+.topbar nav {
+  align-self: stretch;
+  display: flex;
+}
+
+.topbar nav ul {
+  display: flex;
+  gap: 28px;
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+
+.topbar nav li {
+  display: flex;
+}
+
+/* The active entry is marked by the brass rule as well as by the
+   brighter ink, never by hue alone. */
+.topbar nav a {
+  display: flex;
+  align-items: center;
+  padding-top: 2px;
+  border-bottom: 2px solid transparent;
+  color: var(--petrol-200);
+  font-size: 14px;
+  font-weight: 500;
+  text-decoration: none;
+}
+
+.topbar nav a:hover {
+  color: #ffffff;
+  text-decoration: none;
+}
+
+.topbar nav a[aria-current="page"] {
+  color: #ffffff;
+  border-bottom-color: var(--brass-500);
+}
+
+.topbar-actions {
+  margin-left: auto;
+  display: flex;
+  gap: 12px;
+  align-items: center;
+}
+
+/* The secondary button on the petrol-800 bar, where petrol-700 text
+   and a petrol-600 ring fall under their contrast floors. */
+.btn-chrome {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  background: transparent;
+  border: 1px solid var(--petrol-400);
+  color: #ffffff;
+  border-radius: var(--radius-input);
+  padding: 8px 16px;
+  font: inherit;
+  font-size: 14px;
+  font-weight: 500;
+  line-height: 20px;
+  cursor: pointer;
+}
+
+.btn-chrome:hover {
+  background: rgba(255, 255, 255, 0.08);
+}
+
+.btn-lock {
+  padding: 8px 14px;
+}
+
+/* ---- The content region ---- */
+
+.content {
+  max-width: calc(var(--content-max-width) + 2 * var(--gutter));
+  margin: 0 auto;
+  padding: 48px var(--gutter) 64px;
+}
+
+.content-medium { max-width: calc(900px + 2 * var(--gutter)); }
+.content-narrow { max-width: calc(720px + 2 * var(--gutter)); }
+
+/* Each vault screen's own width, set on the region it mounts into. */
+.app-medium { max-width: 900px; margin: 0 auto; }
+.app-narrow { max-width: 720px; margin: 0 auto; }
+
+.screen-wide { max-width: var(--content-max-width); }
+
 /* ---- Typography scale (design-system.md, Typography) ---- */
 
 h1, h2, h3 {
@@ -148,55 +211,113 @@ h1, h2, h3 {
   font-weight: 600;
 }
 
-.screen-heading { font-size: 20px; }
-.section-heading { font-size: 20px; }
-.group-heading { font-size: 15px; color: var(--ink-secondary); }
-.card-heading { font-size: 20px; margin-bottom: 16px; }
+.screen-heading {
+  font-size: 32px;
+  letter-spacing: -0.01em;
+  line-height: 1.2;
+  margin-bottom: 24px;
+}
 
-.hint,
-.axis-tick {
+.section-heading,
+.card-heading {
+  font-size: 20px;
+  line-height: 1.3;
+  margin: 0 0 20px;
+}
+
+.group-heading { font-size: 15px; color: var(--ink-secondary); }
+
+/* The small capitals over a figure or a group: a label, not a
+   heading. */
+.eyebrow {
+  font-size: 12px;
+  font-weight: 600;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--ink-secondary);
+  margin: 0;
+}
+
+.hint {
   font-size: 13px;
+  line-height: 1.5;
   color: var(--ink-secondary);
   margin: 4px 0;
 }
 
 .muted { color: var(--ink-muted); }
 .strong { font-weight: 600; }
+.note { color: var(--ink-secondary); }
 
 /* Anything that must align vertically is tabular. The hero figure
    keeps proportional figures. */
 .numeric,
 .quantity,
 .data-table td,
-.data-table th {
+.data-table th,
+.hero-part-value,
+.hero-delta,
+.legend-value,
+.bar-amount,
+.sample-figure,
+.sample-date {
   font-variant-numeric: tabular-nums;
 }
-
-.content-narrow { max-width: 720px; }
-.content-medium { max-width: 900px; }
-.screen-wide { max-width: var(--content-max-width); }
 
 /* ---- Outside the shell ---- */
 
 .outside-body {
   display: flex;
+  flex-direction: column;
   min-height: 100vh;
   align-items: center;
   justify-content: center;
+  gap: 28px;
+  padding: 24px 16px;
+}
+
+.outside-wordmark {
+  margin: 0;
+  font-size: 28px;
+  font-weight: 600;
+  letter-spacing: 0.01em;
+  color: var(--petrol-800);
 }
 
 .outside {
   width: 100%;
   max-width: 480px;
-  padding: 24px;
+  margin: 0 auto;
+}
+
+/* The unlock card inside the shell sits where a screen would. */
+.app-outside {
+  padding-top: 24px;
+}
+
+.signin-card {
+  max-width: 420px;
+  margin: 0 auto;
+  padding: 32px;
 }
 
 .outside-footnote {
-  margin-top: 16px;
+  margin-top: 28px;
   font-size: 13px;
   color: var(--ink-muted);
   text-align: center;
 }
+
+.known-username {
+  display: flex;
+  align-items: baseline;
+  flex-wrap: wrap;
+  gap: 8px;
+  color: var(--ink-secondary);
+  margin-bottom: 20px;
+}
+
+.known-username .link-quiet { margin-left: auto; }
 
 /* ---- Cards, hairlines, no shadows ---- */
 
@@ -208,25 +329,55 @@ h1, h2, h3 {
   margin-bottom: 24px;
 }
 
-.card-narrow { max-width: 480px; }
+.card > :last-child { margin-bottom: 0; }
+
+.card-narrow { max-width: 480px; margin-left: auto; margin-right: auto; }
 .card-centered { text-align: center; }
 
 .card-head {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  gap: 16px;
+  flex-wrap: wrap;
+  gap: 12px 24px;
+  margin-bottom: 20px;
+}
+
+.card-head .section-heading,
+.card-head .card-heading {
+  margin: 0;
 }
 
 .callout {
   background: var(--surface-tinted);
+  color: var(--petrol-700);
   border-radius: var(--radius-input);
   padding: 12px 16px;
-  margin: 0 0 16px;
+  margin: 0 0 20px;
+  font-size: 14px;
+  line-height: 1.5;
 }
 
 .callout-critical {
   border-left: 3px solid var(--status-critical);
+  color: var(--ink-primary);
+}
+
+/* A consequence stated under a hairline, its icon in critical. */
+.warning-line {
+  display: flex;
+  gap: 10px;
+  align-items: flex-start;
+  font-size: 14px;
+  line-height: 1.5;
+  padding-top: 16px;
+  margin: 20px 0 0;
+  border-top: 1px solid var(--hairline);
+}
+
+.warning-line .icon {
+  color: var(--status-critical);
+  margin-top: 2px;
 }
 
 .banner {
@@ -255,58 +406,134 @@ h1, h2, h3 {
   font-size: 13px;
   font-weight: 500;
   color: var(--ink-secondary);
-  margin-bottom: 4px;
+  margin-bottom: 6px;
 }
 
 .field-inline {
   display: inline-flex;
   align-items: center;
   gap: 8px;
+  font-size: 13px;
+  font-weight: 500;
+  color: var(--ink-secondary);
 }
 
 input[type="text"],
 input[type="password"],
 input[type="date"],
-input[type="file"],
+input[type="number"],
+input:not([type]),
 select,
 textarea {
   width: 100%;
-  background: var(--surface);
+  min-height: 44px;
+  background-color: var(--surface);
   border: 1px solid var(--hairline);
   border-radius: var(--radius-input);
   padding: 8px 12px;
   font: inherit;
+  font-size: 15px;
   color: var(--ink-primary);
 }
 
-/* Never remove the focus ring (design-system.md, Components). */
+input[type="file"] {
+  width: 100%;
+  font: inherit;
+  font-size: 14px;
+}
+
+textarea { min-height: 88px; }
+
+/* The Input's box with a petrol-400 chevron, drawn with two gradients
+   because a data URI image falls outside the policy's `img-src`. */
+select {
+  appearance: none;
+  padding-right: 36px;
+  background-image:
+    linear-gradient(45deg, transparent 50%, var(--petrol-400) 50%),
+    linear-gradient(135deg, var(--petrol-400) 50%, transparent 50%);
+  background-position: calc(100% - 18px) 50%, calc(100% - 13px) 50%;
+  background-size: 5px 5px, 5px 5px;
+  background-repeat: no-repeat;
+}
+
+/* Never remove the focus ring (design-system.md, Components): on a
+   box it is the border and a matching shadow, 2px of petrol-600. */
 input:focus-visible,
 select:focus-visible,
-textarea:focus-visible,
+textarea:focus-visible {
+  outline: none;
+  border-color: var(--petrol-600);
+  box-shadow: 0 0 0 1px var(--petrol-600);
+}
+
+input[type="checkbox"]:focus-visible,
+input[type="file"]:focus-visible,
 button:focus-visible,
 a:focus-visible,
+summary:focus-visible,
 svg:focus-visible {
   outline: 2px solid var(--petrol-600);
   outline-offset: 2px;
 }
 
-.password-field {
-  display: flex;
-  gap: 8px;
-  align-items: center;
+.topbar nav a:focus-visible,
+.topbar .btn-chrome:focus-visible {
+  outline: 2px solid #ffffff;
+  outline-offset: 2px;
 }
 
+/* A box holding a field and what belongs inside it: the password's
+   Show toggle, or a quantity's unit. The box takes the focus ring. */
+.password-field,
 .quantity-field {
-  position: relative;
   display: flex;
   align-items: center;
+  background: var(--surface);
+  border: 1px solid var(--hairline);
+  border-radius: var(--radius-input);
+  min-height: 44px;
+}
+
+.password-field { padding: 0 4px 0 0; }
+.quantity-field { padding: 0 12px; min-height: 40px; }
+
+.password-field:focus-within,
+.quantity-field:focus-within {
+  border-color: var(--petrol-600);
+  box-shadow: 0 0 0 1px var(--petrol-600);
+}
+
+.password-field input,
+.quantity-field input,
+.password-field input:focus-visible,
+.quantity-field input:focus-visible {
+  flex: 1;
+  min-width: 0;
+  min-height: 0;
+  border: 0;
+  background: transparent;
+  box-shadow: none;
+}
+
+.password-field .btn-inline {
+  font-size: 13px;
+  font-weight: 500;
+  padding: 8px 10px;
+  text-decoration: none;
+}
+
+.quantity-field input {
+  padding: 8px 0;
+  text-align: right;
 }
 
 .quantity-field .unit-suffix {
-  position: absolute;
-  right: 12px;
+  margin-left: 10px;
   font-size: 13px;
+  font-weight: 500;
   color: var(--ink-secondary);
+  white-space: nowrap;
 }
 
 .quantity.carried { color: var(--ink-secondary); }
@@ -322,10 +549,23 @@ svg:focus-visible {
 .checkbox input {
   width: 16px;
   height: 16px;
-  margin-top: 2px;
+  margin: 2px 0 0;
   accent-color: var(--petrol-600);
   flex: none;
 }
+
+.checkbox-inline {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  margin: 0;
+  font-size: 13px;
+  font-weight: 500;
+  color: var(--ink-secondary);
+  cursor: pointer;
+}
+
+.checkbox-inline input { margin: 0; }
 
 .field-error {
   color: var(--status-critical);
@@ -342,22 +582,44 @@ fieldset {
   padding: 12px 16px;
 }
 
+.form-narrow { max-width: 420px; }
+
 /* ---- Buttons ---- */
 
 .btn-primary,
 .btn-secondary,
 .btn-destructive {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
   border-radius: var(--radius-input);
-  padding: 8px 16px;
+  padding: 9px 16px;
   font: inherit;
+  font-size: 14px;
+  font-weight: 500;
+  line-height: 20px;
   cursor: pointer;
   text-decoration: none;
-  display: inline-block;
+  white-space: nowrap;
+}
+
+.btn-primary:hover,
+.btn-secondary:hover,
+.btn-destructive:hover {
+  text-decoration: none;
 }
 
 .btn-primary {
   background: var(--brass-600);
   border: 1px solid var(--brass-600);
+  color: #ffffff;
+  font-weight: 600;
+}
+
+.btn-primary:hover:not(:disabled) {
+  background: var(--brass-700);
+  border-color: var(--brass-700);
   color: #ffffff;
 }
 
@@ -366,6 +628,20 @@ fieldset {
   border-color: var(--petrol-200);
   color: var(--ink-secondary);
   cursor: not-allowed;
+}
+
+.btn-secondary {
+  background: transparent;
+  border: 1px solid var(--rule);
+  color: var(--petrol-700);
+}
+
+.btn-secondary:hover:not(:disabled) { background: var(--petrol-50); }
+
+.btn-secondary:disabled {
+  border-color: var(--hairline);
+  color: var(--ink-muted);
+  cursor: default;
 }
 
 .btn-destructive {
@@ -379,6 +655,28 @@ fieldset {
   color: #ffffff;
 }
 
+.btn-large {
+  font-size: 15px;
+  padding: 12px 22px;
+}
+
+.btn-block {
+  display: flex;
+  width: 100%;
+  font-size: 15px;
+  min-height: 46px;
+  margin-top: 4px;
+}
+
+/* The bordered button a table row carries, on a hairline so a column
+   of them stays quiet. */
+.btn-small {
+  font-size: 13px;
+  padding: 5px 10px;
+  border-color: var(--hairline);
+  color: var(--petrol-600);
+}
+
 .btn-inline,
 .link-button {
   background: none;
@@ -387,17 +685,19 @@ fieldset {
   font: inherit;
   color: var(--petrol-600);
   cursor: pointer;
+  text-decoration: none;
+  text-align: left;
+}
+
+.btn-inline:hover,
+.link-button:hover {
+  color: var(--petrol-700);
   text-decoration: underline;
 }
 
-.link-button.back { margin-bottom: 16px; }
-
-.link-row {
-  display: block;
-  padding: 12px 0;
-  border-bottom: 1px solid var(--hairline);
-  color: var(--ink-primary);
-  text-decoration: none;
+.link-button.back {
+  font-size: 14px;
+  margin-bottom: 20px;
 }
 
 .link-quiet {
@@ -409,29 +709,33 @@ fieldset {
 .form-actions,
 .table-actions {
   display: flex;
-  gap: 8px;
+  gap: 12px;
   align-items: center;
   flex-wrap: wrap;
-  margin-top: 16px;
+  margin: 20px 0 24px;
 }
 
 /* A row of links moving between the sections of one screen. It is
    not navigation and never appears in the top bar. */
 .section-switcher {
   display: flex;
-  gap: 24px;
+  gap: 28px;
   margin-bottom: 24px;
   border-bottom: 1px solid var(--hairline);
+  overflow-x: auto;
 }
 
 .switcher-link {
   background: none;
   border: none;
   border-bottom: 2px solid transparent;
-  padding: 8px 0;
+  padding: 10px 0;
   font: inherit;
+  font-size: 14px;
+  font-weight: 500;
   color: var(--petrol-600);
   cursor: pointer;
+  white-space: nowrap;
 }
 
 .switcher-link.active {
@@ -439,46 +743,67 @@ fieldset {
   border-bottom-color: var(--brass-500);
 }
 
+/* The segmented control: every position named, the chosen one filled
+   in petrol-800. */
 .switch {
   display: inline-flex;
   border: 1px solid var(--hairline);
   border-radius: var(--radius-input);
   overflow: hidden;
+  background: var(--surface);
 }
 
 .switch-option {
   background: transparent;
   border: none;
+  border-left: 1px solid var(--hairline);
   padding: 6px 12px;
   font: inherit;
+  font-size: 13px;
+  font-weight: 500;
+  line-height: 18px;
+  color: var(--ink-secondary);
   cursor: pointer;
-  color: var(--petrol-600);
+  white-space: nowrap;
 }
 
+.switch-option:first-child { border-left: 0; }
+.switch-option:hover:not(.active) { background: var(--petrol-50); }
+
 .switch-option.active {
-  background: var(--surface-tinted);
-  color: var(--petrol-800);
-  font-weight: 600;
+  background: var(--petrol-800);
+  color: #ffffff;
 }
+
+.switch-option:focus-visible { outline-offset: -2px; }
 
 /* ---- Chips ---- */
 
 .chip {
-  display: inline-block;
+  display: inline-flex;
+  align-items: center;
   background: var(--petrol-50);
   color: var(--petrol-700);
+  border: 1px solid var(--petrol-200);
   border-radius: 4px;
-  padding: 2px 8px;
+  padding: 1px 8px;
   font-size: 13px;
-  margin-right: 4px;
+  font-weight: 500;
+  line-height: 18px;
+  white-space: nowrap;
+  margin: 2px 4px 2px 0;
 }
+
+.chip:empty { display: none; }
 
 .chip-archived {
   background: var(--hairline);
+  border-color: var(--hairline);
   color: var(--ink-secondary);
+  margin-left: 8px;
 }
 
-.chips { margin-bottom: 8px; }
+.chips { margin-bottom: 12px; }
 
 /* ---- Tables: no vertical rules, money right-aligned ---- */
 
@@ -490,24 +815,51 @@ fieldset {
 .data-table th,
 .data-table td {
   text-align: left;
-  padding: 8px 12px 8px 0;
-  border-bottom: 1px solid var(--rule);
-  vertical-align: top;
+  padding: 14px 16px;
+  border-bottom: 1px solid var(--hairline);
+  vertical-align: middle;
 }
 
 .data-table th {
-  font-size: 13px;
-  font-weight: 500;
+  padding-top: 0;
+  padding-bottom: 12px;
+  border-bottom-color: var(--rule);
+  font-size: 12px;
+  font-weight: 600;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
   color: var(--ink-secondary);
+  white-space: nowrap;
 }
+
+.data-table th:first-child,
+.data-table td:first-child { padding-left: 0; }
+
+.data-table th:last-child,
+.data-table td:last-child { padding-right: 0; }
+
+.data-table tbody tr:last-child td { border-bottom: 0; }
 
 .data-table .numeric,
 th.numeric {
   text-align: right;
 }
 
+/* A control inside a table row keeps the row's rhythm. */
+.data-table select,
+.data-table input[type="text"] {
+  min-height: 36px;
+  padding-top: 6px;
+  padding-bottom: 6px;
+  font-size: 14px;
+}
+
 .data-table tr.dimmed td { color: var(--ink-secondary); }
-.data-table tr.flagged td { border-left: 3px solid var(--status-critical); }
+
+.data-table tr.flagged td:first-child {
+  border-left: 3px solid var(--status-critical);
+  padding-left: 12px;
+}
 
 .flag-note {
   display: block;
@@ -521,13 +873,16 @@ th.numeric {
   padding: 0;
 }
 
+.plain-list li { padding: 6px 0; }
+
 .table-group { margin-top: 24px; }
 
 .settings-row {
   display: flex;
   justify-content: space-between;
+  align-items: center;
   gap: 16px;
-  padding: 8px 0;
+  padding: 12px 0;
   border-bottom: 1px solid var(--hairline);
   margin: 0;
 }
@@ -537,32 +892,88 @@ th.numeric {
   margin: 8px 0;
 }
 
-/* ---- Hero ---- */
+/* ---- The dashboard ---- */
 
-.hero {
-  display: flex;
-  flex-wrap: wrap;
-  align-items: baseline;
-  gap: 24px;
-  margin-bottom: 24px;
-}
-
-.hero-figure {
-  font-size: 44px;
-  font-weight: 600;
-  margin: 0;
-}
-
-.hero-side {
+.dashboard {
   display: flex;
   flex-direction: column;
+  gap: 32px;
 }
 
-.hero-part,
-.hero-age,
-.hero-converted {
-  font-size: 13px;
+.dashboard > .card,
+.dashboard > .banner { margin: 0; }
+
+/* The figure, then the two sides of it and the one primary action,
+   then which rates the figure is read at. */
+.hero {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto auto;
+  grid-template-areas:
+    "main parts action"
+    "rates rates rates";
+  align-items: end;
+  gap: 20px 32px;
+}
+
+.hero-main { grid-area: main; display: flex; flex-direction: column; gap: 10px; }
+.hero-parts { grid-area: parts; display: flex; border-left: 1px solid var(--hairline); }
+.hero-action { grid-area: action; }
+.hero-rates { grid-area: rates; }
+
+.hero-figure {
+  display: flex;
+  align-items: baseline;
+  gap: 10px;
+  margin: 0;
+  font-size: 52px;
+  font-weight: 600;
+  letter-spacing: -0.02em;
+  line-height: 1;
+}
+
+.hero-code {
+  font-size: 22px;
+  font-weight: 500;
+  letter-spacing: 0;
   color: var(--ink-secondary);
+}
+
+.hero-change {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin: 0;
+  font-size: 15px;
+}
+
+.hero-change .hero-delta { font-weight: 600; }
+.hero-change.good { color: var(--status-good); }
+.hero-change.critical { color: var(--status-critical); }
+.hero-change.flat { color: var(--ink-secondary); }
+.hero-since { color: var(--ink-secondary); }
+
+.hero-part {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  padding: 0 24px;
+}
+
+.hero-part + .hero-part { border-left: 1px solid var(--hairline); }
+
+.hero-part-value {
+  margin: 0;
+  font-size: 20px;
+  font-weight: 500;
+  white-space: nowrap;
+}
+
+/* The holding screen's header figure, a size down from the hero. */
+.detail-header .hero-figure {
+  display: inline;
+  font-size: 24px;
+  letter-spacing: 0;
 }
 
 .hero-line {
@@ -570,108 +981,337 @@ th.numeric {
   gap: 16px;
   align-items: baseline;
   flex-wrap: wrap;
+  margin-bottom: 20px;
 }
 
-.detail-header .hero-figure { font-size: 24px; }
+.hero-converted { font-size: 15px; }
+
+.hero-age {
+  font-size: 13px;
+  color: var(--ink-secondary);
+}
 
 /* ---- Chart ---- */
 
 .chart-controls {
   display: flex;
   flex-wrap: wrap;
-  gap: 16px;
+  gap: 12px 16px;
   align-items: center;
-  margin-bottom: 16px;
 }
 
-.range-buttons { display: inline-flex; gap: 4px; }
+.chart-controls select {
+  width: auto;
+  min-height: 32px;
+  padding: 5px 32px 5px 10px;
+  font-size: 13px;
+}
+
+.chart-controls .coverage { font-size: 13px; padding: 0; }
+
+/* Words a narrow screen drops, and the shorter ones it uses instead. */
+.narrow-only { display: none; }
+
+.chart-frame {
+  width: 100%;
+  min-height: 1px;
+}
 
 .trend {
-  width: 100%;
-  height: 320px;
   display: block;
+  width: 100%;
+  height: auto;
 }
 
 .gridline { stroke: var(--hairline); stroke-width: 1; }
-.zero-line { stroke: var(--rule); stroke-width: 1; }
-.net-line { fill: none; stroke: var(--ink-primary); stroke-width: 1.5; }
-.entry-mark { stroke: var(--ink-muted); stroke-width: 2; }
+.zero-line { stroke: var(--ink-muted); stroke-width: 1; }
+.net-line { fill: none; stroke: var(--ink-primary); stroke-width: 1.75; stroke-linejoin: round; }
+
+/* A legend entry under the pointer or the focus lifts its band and
+   quiets the rest. */
+.trend.highlighting .band:not(.is-highlighted) { opacity: 0.2; }
+.net-end { fill: var(--ink-primary); stroke: #ffffff; stroke-width: 2; }
+.entry-mark { stroke: var(--ink-muted); stroke-width: 1.5; cursor: pointer; }
 .archive-annotation {
   stroke: var(--ink-muted);
   stroke-width: 1;
   stroke-dasharray: 2 3;
 }
-.axis-tick { fill: var(--ink-muted); font-size: 12px; }
+
+.axis-tick {
+  fill: var(--ink-muted);
+  font-size: 12px;
+  font-variant-numeric: tabular-nums;
+}
+
+.chart-readout { min-height: 20px; margin: 8px 0 0; }
+
+.legend-row {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 12px 28px;
+  margin-top: 8px;
+  padding-top: 16px;
+  border-top: 1px solid var(--hairline);
+  font-size: 13px;
+}
 
 .legend {
   display: flex;
   flex-wrap: wrap;
-  gap: 16px;
-  list-style: none;
-  padding: 0;
-  margin: 8px 0 0;
-  font-size: 13px;
+  gap: 10px 28px;
 }
 
-.legend li { display: flex; align-items: center; gap: 8px; }
-
-.swatch {
-  width: 12px;
-  height: 12px;
-  border-radius: 2px;
-  display: inline-block;
-}
-
-/* Nominal bars: every bar takes chart slot 1, and bar length carries
-   the value. A negative band grows leftward from the shared zero
-   baseline, at the liability opacity. */
-.bars { list-style: none; padding: 0; margin: 0; }
-
-.bar {
+.legend-entry {
   display: flex;
   align-items: center;
-  gap: 12px;
-  padding: 4px 0;
+  gap: 8px;
+  padding: 0;
+  border: 0;
+  background: transparent;
+  font: inherit;
+  font-size: 13px;
+  color: var(--ink-primary);
+  cursor: pointer;
+}
+
+/* A hidden band keeps its entry, drawn hollow and muted. */
+.legend-entry.is-hidden { color: var(--ink-muted); }
+.legend-entry.is-hidden .swatch {
+  background: transparent !important;
+  box-shadow: inset 0 0 0 1.5px var(--ink-muted);
+}
+.legend-entry.is-hidden .legend-name { text-decoration: line-through; }
+
+.hidden-bands { margin: 8px 0 0; }
+.legend-name { font-weight: 500; }
+.legend-value { color: var(--ink-secondary); }
+
+.legend-key {
+  margin-left: auto;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  color: var(--ink-secondary);
+}
+
+.legend-tick {
+  width: 1.5px;
+  height: 9px;
+  background: var(--ink-muted);
+  margin: 0 4px;
+}
+
+.swatch {
+  width: 10px;
+  height: 10px;
+  border-radius: 2px;
+  display: inline-block;
+  flex: none;
+}
+
+.chart-card details { margin: 12px 0 0; }
+.chart-card details .data-table { margin-top: 12px; }
+
+/* ---- The holdings table ---- */
+
+.holdings-card .card-head { margin-bottom: 16px; }
+
+.holdings-table .row-name {
+  color: var(--ink-primary);
+  font-weight: 500;
+  padding: 0;
+}
+
+.holdings-table tr.dimmed .row-name { color: var(--ink-secondary); }
+.holdings-table .cell-asof .hint { display: block; margin: 2px 0 0; }
+
+.holdings-table .cell-asof,
+.holdings-table .cell-native,
+.holdings-table .cell-converted { white-space: nowrap; }
+
+.holdings-table .cell-action { text-align: right; }
+
+.filter-line {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: 4px 12px;
+  margin: 0 0 16px;
+  padding: 10px 14px;
+  border-radius: var(--radius-input);
+  background: var(--petrol-50);
+  font-size: 14px;
+}
+
+.filter-line .link-button { padding: 0; }
+
+/* ---- Breakdown: nominal bars on a shared zero baseline ---- */
+
+/* Room is kept at each end for the direct label on a bar's outboard
+   end, on the left only when a band runs negative. The baseline sits
+   at the share of the scale the widest negative band takes. */
+.bars {
+  --room-left: 0px;
+  --room-right: 240px;
+  position: relative;
+  list-style: none;
+  margin: 0;
+  padding: 0 var(--room-right) 0 var(--room-left);
+  display: flex;
+  flex-direction: column;
+  gap: 22px;
+}
+
+.bars.has-negative { --room-left: 240px; }
+
+.bars::before {
+  content: "";
+  position: absolute;
+  top: -11px;
+  bottom: -11px;
+  width: 1px;
+  background: var(--ink-muted);
+  left: calc(var(--room-left) + (100% - var(--room-left) - var(--room-right)) * var(--zero));
+}
+
+.bar {
+  position: relative;
+  height: 22px;
+}
+
+.bar-track {
+  position: absolute;
+  inset: 0;
 }
 
 .bar-fill {
-  height: 16px;
-  border-radius: 2px;
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  left: calc(var(--start) * 100%);
+  width: calc(var(--len) * 100%);
   min-width: 2px;
+  border-radius: 2px;
+  background: var(--chart-1);
 }
 
-.bar.negative { flex-direction: row-reverse; justify-content: flex-end; }
-.bar-label { font-size: 13px; }
+.bar.negative .bar-fill { opacity: 0.45; }
+
+.bar-label {
+  position: absolute;
+  top: 50%;
+  transform: translateY(-50%);
+  left: calc((var(--start) + var(--len)) * 100% + 12px);
+  white-space: nowrap;
+  font-size: 14px;
+}
+
+.bar.negative .bar-label {
+  left: auto;
+  right: calc((1 - var(--start)) * 100% + 12px);
+}
+
+.bar-name { font-weight: 600; }
+.bar-amount { color: var(--ink-secondary); margin-left: 6px; }
 
 /* ---- Sweep ---- */
 
-.sweep-rows { margin-bottom: 24px; }
+.sweep-head { margin-bottom: 28px; }
+.sweep-head .eyebrow { margin-bottom: 8px; }
+.sweep-head .screen-heading { margin: 0; }
+
+/* One card, one row per holding: who and where it stands, the figure,
+   and the one control. */
+.sweep-rows,
+.rate-block {
+  background: var(--surface);
+  border: 1px solid var(--hairline);
+  border-radius: var(--radius-card);
+  margin-bottom: 28px;
+}
 
 .sweep-row {
   display: grid;
-  grid-template-columns: 1fr 1fr auto;
-  gap: 16px;
-  align-items: start;
-  padding: 16px 0;
-  border-bottom: 1px solid var(--hairline);
+  grid-template-columns: minmax(0, 1fr) 260px 112px;
+  gap: 24px;
+  align-items: center;
+  padding: 18px 24px;
+  border-top: 1px solid var(--hairline);
 }
 
-.holding-name { font-weight: 600; }
-.row-state { font-size: 13px; color: var(--ink-secondary); margin: 4px 0 0; }
+.sweep-row:first-child { border-top: 0; }
+.sweep-row > button { width: 100%; }
 
-.rate-block { margin-bottom: 16px; }
+.holding-name,
+.rate-unit {
+  display: block;
+  font-size: 15px;
+  font-weight: 600;
+}
+
+.row-status {
+  font-size: 13px;
+  color: var(--ink-secondary);
+  margin: 4px 0 0;
+}
+
+.row-state.is-recorded {
+  color: var(--ink-primary);
+  font-weight: 600;
+}
+
+.sweep-input .hint {
+  font-size: 12px;
+  text-align: right;
+  margin: 4px 0 0;
+}
+
+.sweep-input .hint:empty { display: none; }
+
+.rate-section .section-heading { margin-bottom: 12px; }
+
+/* The rate lines share their columns, so a longer provenance chip on
+   one line does not pull its field out of line with the others.
+   The card holds the side padding, so each line's divider is drawn
+   out to the card's edges. */
+.rate-block {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 260px minmax(112px, max-content);
+  column-gap: 24px;
+  padding: 0 24px;
+}
 
 .rate-line {
+  position: relative;
+  grid-column: 1 / -1;
   display: grid;
-  grid-template-columns: 6rem 1fr auto auto;
-  gap: 12px;
+  grid-template-columns: subgrid;
+  row-gap: 8px;
   align-items: center;
-  padding: 8px 0;
-  border-bottom: 1px solid var(--hairline);
+  padding: 18px 0;
 }
 
-.rate-line .hint { grid-column: 1 / -1; margin: 0; }
-.rate-unit { font-weight: 500; }
+.rate-line + .rate-line::before {
+  content: "";
+  position: absolute;
+  top: 0;
+  left: -24px;
+  right: -24px;
+  border-top: 1px solid var(--hairline);
+}
+.rate-line > .hint { grid-column: 1 / -1; margin: 0; }
+.rate-line > .hint:empty { display: none; }
+
+.rate-meta {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  align-items: center;
+}
+
+.rate-meta .chip { margin: 0; }
 
 .value-row {
   display: flex;
@@ -679,6 +1319,120 @@ th.numeric {
   gap: 8px;
   padding: 4px 0;
 }
+
+/* ---- Settings ---- */
+
+.pairs { margin: 0; }
+
+.pair {
+  display: grid;
+  grid-template-columns: 160px minmax(0, 1fr);
+  gap: 16px;
+  align-items: baseline;
+  padding: 12px 0;
+  border-top: 1px solid var(--hairline);
+}
+
+.pair:first-child { border-top: 0; padding-top: 0; }
+.pair:last-child { padding-bottom: 0; }
+.pair dt { font-size: 13px; font-weight: 500; color: var(--ink-secondary); }
+.pair dd { margin: 0; }
+.pair dd .hint { margin: 6px 0 0; }
+
+.format-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 16px 20px;
+  margin: 20px 0;
+}
+
+.format-grid .field { margin: 0; }
+
+.sample-strip {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: 12px 16px;
+  background: var(--petrol-50);
+  border-radius: var(--radius-input);
+  padding: 14px 16px;
+}
+
+.sample {
+  display: flex;
+  align-items: baseline;
+  flex-wrap: wrap;
+  gap: 8px 20px;
+  margin: 0;
+}
+
+.sample .eyebrow { font-size: 11px; }
+.sample-figure { font-size: 17px; font-weight: 600; }
+.sample-date { color: var(--ink-secondary); }
+
+/* Link rows inside one card, each running edge to edge. */
+.link-list {
+  padding: 0;
+  overflow: hidden;
+}
+
+.link-row {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  padding: 18px 24px;
+  border-top: 1px solid var(--hairline);
+  color: var(--ink-primary);
+  text-decoration: none;
+}
+
+.link-row:first-child { border-top: 0; }
+
+.link-row:hover {
+  background: var(--petrol-50);
+  color: var(--ink-primary);
+  text-decoration: none;
+}
+
+.link-row:focus-visible { outline-offset: -2px; }
+.link-row-text { flex: 1; display: flex; flex-direction: column; }
+.link-row-title { font-weight: 600; }
+.link-row .hint { margin: 2px 0 0; }
+.link-row .icon { color: var(--ink-secondary); flex: none; }
+.link-row-aside { font-size: 13px; color: var(--ink-secondary); }
+
+/* The select in its own column and the tradeoff beside it, level with
+   the control rather than its label. */
+.idle-grid {
+  display: grid;
+  grid-template-columns: 200px minmax(0, 1fr);
+  gap: 20px;
+  align-items: start;
+  margin-bottom: 20px;
+}
+
+.idle-grid .field { margin: 0; }
+.idle-grid .hint { margin: 0; padding-top: 28px; }
+
+.sessions { margin: 20px 0; }
+.sessions .eyebrow { margin-bottom: 8px; }
+
+.sessions-table th,
+.sessions-table td {
+  padding-top: 10px;
+  padding-bottom: 10px;
+  font-size: 14px;
+}
+
+.sessions-table th { padding-top: 0; font-size: 12px; }
+.sessions-table .chip { margin: 0; }
+.sessions .hint { margin-top: 12px; }
+
+.danger-zone { padding: 18px 24px; }
+.danger-zone[open] { padding-bottom: 24px; }
+.danger-zone summary { font-weight: 600; }
+.danger-zone[open] summary { margin-bottom: 16px; }
 
 /* ---- Dialog: the one place a soft shadow is permitted ---- */
 
@@ -704,44 +1458,49 @@ th.numeric {
   box-shadow: 0 8px 32px rgba(17, 29, 32, 0.18);
 }
 
-.dialog-heading { font-size: 20px; margin-bottom: 16px; }
+.dialog-heading { font-size: 20px; margin-bottom: 20px; }
+
 .dialog-actions {
   display: flex;
-  gap: 8px;
+  gap: 12px;
   justify-content: flex-end;
   margin-top: 24px;
   flex-wrap: wrap;
 }
 
-/* At phone width a dialog is a full-screen sheet: a centered box
-   inside a narrow viewport leaves nothing for the scrim to show. */
-@media (max-width: 600px) {
-  .scrim { padding: 0; align-items: stretch; }
-  .dialog { max-width: none; max-height: none; border-radius: 0; }
-  .sweep-row { grid-template-columns: 1fr; }
-  .rate-line { grid-template-columns: 1fr; }
-  .topbar { flex-wrap: wrap; gap: 12px; }
-}
-
 /* ---- The strength gauge: a magnitude, not a verdict ---- */
 
-.gauge { margin-bottom: 16px; }
+.gauge {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 4px 12px;
+  margin: 8px 0 0;
+}
 
 .gauge-track {
-  display: flex;
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
   gap: 4px;
-  margin-bottom: 4px;
+  flex: 1;
 }
 
 .gauge-segment {
   height: 4px;
-  flex: 1;
   background: var(--petrol-100);
   border-radius: 2px;
 }
 
 .gauge-segment.filled { background: var(--petrol-600); }
-.gauge-label { font-size: 13px; color: var(--ink-secondary); }
+
+.gauge-label {
+  font-size: 13px;
+  font-weight: 500;
+  color: var(--ink-primary);
+  white-space: nowrap;
+}
+
+.gauge > p { flex-basis: 100%; }
 
 /* ---- Disclosure ---- */
 
@@ -794,7 +1553,8 @@ select {
   background: transparent;
   border: 1px solid var(--hairline);
   border-radius: var(--radius-input);
-  padding: 6px 10px;
+  min-height: 44px;
+  padding: 6px 12px;
   font: inherit;
   cursor: pointer;
   line-height: 1;
@@ -893,4 +1653,230 @@ select {
   clip-path: inset(50%);
   white-space: nowrap;
   border: 0;
+}
+
+/* ---- Below the width the full table and hero row need ---- */
+
+@media (max-width: 900px) {
+  /* The figure on its own row, its two sides and the action beneath. */
+  .hero {
+    grid-template-columns: auto minmax(0, 1fr);
+    grid-template-areas:
+      "main main"
+      "parts action"
+      "rates rates";
+  }
+
+  .hero-parts { border-left: 0; }
+  .hero-part:first-child { padding-left: 0; }
+  .hero-action { justify-self: end; }
+
+  /* Holdings as a list: name and chips at the left, the converted
+     figure and its date at the right. */
+  .holdings-table thead { display: none; }
+
+  .holdings-table,
+  .holdings-table tbody { display: block; }
+
+  .holdings-table tr {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) auto auto;
+    column-gap: 0;
+    row-gap: 4px;
+    padding: 14px 0;
+    border-top: 1px solid var(--hairline);
+  }
+
+  .holdings-table tr:first-child { border-top: 0; padding-top: 0; }
+
+  .holdings-table td {
+    display: block;
+    padding: 0;
+    border: 0;
+  }
+
+  /* The native figure and its date share one line under the converted
+     figure. */
+  .holdings-table .cell-name { grid-column: 1; grid-row: 1; padding-right: 12px; }
+  .holdings-table .cell-dims { grid-column: 1; grid-row: 2 / span 2; padding-right: 12px; }
+  .holdings-table .cell-converted { grid-column: 2 / span 2; grid-row: 1; text-align: right; font-weight: 500; }
+
+  .holdings-table .cell-native,
+  .holdings-table .cell-asof {
+    grid-row: 2;
+    text-align: right;
+    font-size: 12px;
+    color: var(--ink-secondary);
+  }
+
+  .holdings-table .cell-native { grid-column: 2; }
+  .holdings-table .cell-asof { grid-column: 3; }
+  .holdings-table .cell-native:not(.same-unit) ~ .cell-asof::before { content: "\00a0\00b7\00a0"; }
+  .holdings-table .cell-native.same-unit { display: none; }
+
+  .holdings-table .cell-action {
+    grid-column: 2 / span 2;
+    text-align: right;
+    margin-top: 4px;
+  }
+}
+
+/* ---- At phone width ---- */
+
+/* The same content, stacked: 16px gutters and a 44px floor under
+   every control a finger has to hit. */
+@media (max-width: 600px) {
+  :root { --gutter: 16px; }
+
+  .content { padding: 24px var(--gutter) 40px; }
+
+  /* The nav drops to a second row of the bar, and Lock to its icon. */
+  .topbar {
+    flex-wrap: wrap;
+    gap: 0 12px;
+  }
+
+  .topbar .wordmark { font-size: 18px; line-height: 56px; }
+  .topbar-actions { gap: 8px; }
+  .topbar nav { order: 3; flex-basis: 100%; height: 44px; }
+  .topbar nav ul { gap: 24px; }
+  .btn-chrome { min-height: 44px; padding: 0 12px; }
+  .btn-lock { width: 44px; padding: 0; }
+
+  .btn-lock .btn-label {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    overflow: hidden;
+    clip-path: inset(50%);
+    white-space: nowrap;
+  }
+
+  .btn-primary,
+  .btn-secondary,
+  .btn-destructive { min-height: 44px; }
+
+  .screen-heading { font-size: 26px; }
+
+  .section-heading,
+  .card-heading { font-size: 17px; margin-bottom: 12px; }
+
+  .eyebrow { font-size: 11px; }
+
+  .card { padding: 16px; margin-bottom: 20px; }
+  .card-head { margin-bottom: 12px; }
+  .signin-card { padding: 24px; }
+
+  .dashboard { gap: 20px; }
+
+  .hero {
+    grid-template-columns: minmax(0, 1fr);
+    grid-template-areas: "main" "parts" "rates" "action";
+    gap: 12px;
+  }
+
+  .hero-main { gap: 8px; }
+  .hero-figure { font-size: 40px; line-height: 1.05; gap: 8px; flex-wrap: wrap; }
+  .hero-code { font-size: 18px; }
+  .hero-change { font-size: 14px; gap: 6px; }
+
+  .hero-parts {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 12px;
+    border-left: 0;
+    border-top: 1px solid var(--hairline);
+    padding-top: 12px;
+    margin-top: 4px;
+  }
+
+  .hero-part { padding: 0; gap: 4px; }
+  .hero-part + .hero-part { border-left: 0; }
+  .hero-part-value { font-size: 16px; white-space: normal; }
+  .hero-action { justify-self: stretch; }
+  .hero-action .btn-primary { width: 100%; min-height: 48px; }
+
+  .switch { display: flex; width: 100%; }
+  .switch-option { flex: 1; min-height: 36px; padding: 0 8px; white-space: normal; }
+
+  /* The range across the top, then the grouping, its coverage and
+     Just the line on one row, then the scale. */
+  .chart-controls { gap: 10px 12px; justify-content: space-between; }
+  .chart-controls > .switch:not(.range-buttons) { order: 1; }
+  .chart-controls select { min-height: 36px; }
+
+  .legend-row { display: block; margin-top: 12px; padding-top: 12px; }
+  .legend { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 8px 12px; }
+  .legend-entry { gap: 6px; min-height: 24px; }
+
+  .wide-only { display: none; }
+  .narrow-only { display: inline; }
+
+  /* The select names itself to a screen reader, and on screen the
+     heading above says what it groups. */
+  .group-by-label {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    overflow: hidden;
+    clip-path: inset(50%);
+    white-space: nowrap;
+  }
+
+  /* Each band's figure is in the breakdown below at this width. */
+  .legend-value { display: none; }
+  .legend-key { margin: 12px 0 0; }
+
+  .holdings-table .cell-action { display: none; }
+  .holdings-table .chip { font-size: 11px; padding: 0 6px; }
+
+  /* Bars with the label above each one, name left and figure right. */
+  .bars { padding: 0; gap: 14px; }
+  .bars::before { display: none; }
+  .bar { height: auto; display: flex; flex-direction: column-reverse; gap: 4px; }
+  .bar-track { position: relative; height: 14px; }
+
+  .bar-track::before {
+    content: "";
+    position: absolute;
+    top: 0;
+    bottom: 0;
+    width: 1px;
+    background: var(--ink-muted);
+    left: calc(var(--zero) * 100%);
+  }
+
+  .bar-fill { top: 1px; bottom: 1px; }
+
+  .bar-label,
+  .bar.negative .bar-label {
+    position: static;
+    transform: none;
+    display: flex;
+    justify-content: space-between;
+    gap: 12px;
+    font-size: 13px;
+  }
+
+  .sweep-head { margin-bottom: 20px; }
+
+  .sweep-row { grid-template-columns: minmax(0, 1fr); gap: 10px; padding: 16px; }
+  .rate-block { grid-template-columns: minmax(0, 1fr); padding: 0 16px; }
+  .rate-line { row-gap: 10px; padding: 16px 0; }
+  .rate-line + .rate-line::before { left: -16px; right: -16px; }
+  .quantity-field { min-height: 44px; }
+  .sweep-input .hint { text-align: left; }
+
+  .pair { grid-template-columns: minmax(0, 1fr); gap: 4px; }
+  .idle-grid { grid-template-columns: minmax(0, 1fr); gap: 6px; }
+  .idle-grid .hint { padding-top: 0; }
+  .format-grid { grid-template-columns: minmax(0, 1fr); }
+  .link-list { padding: 0; }
+  .link-row { padding: 16px; }
+  .danger-zone { padding: 16px; }
+
+  /* A dialog is a full-screen sheet: a centered box inside a narrow
+     viewport leaves nothing for the scrim to show. */
+  .scrim { padding: 0; align-items: stretch; }
+  .dialog { max-width: none; max-height: none; border-radius: 0; padding: 24px 16px; }
 }

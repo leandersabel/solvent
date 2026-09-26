@@ -4,8 +4,8 @@
 // No control here issues a network request. Range, dimension, mode,
 // band visibility and selection all read a model already in memory.
 import * as decimal from './decimal.js';
-import { chartTable, drawChart, fillFor } from './chart.js';
-import { ageInWords, dialog, el, mount, resumable, today } from './dom.js';
+import { chartTable, fillFor, trendChart } from './chart.js';
+import { dialog, el, icon, mount, resumable, today } from './dom.js';
 import { dateField } from './datepicker.js';
 import { dayNumber, isoFromDay } from './model.js';
 import { holdingForm, snapshotDialog } from './view-forms.js';
@@ -17,17 +17,23 @@ const RANGES = [
   ['All', null],
 ];
 
-export function dashboardView(vault, actions) {
+/** `unassignedOf` opens the screen grouped by that dimension with the
+ *  table filtered to the holdings it leaves unassigned, which is where
+ *  a coverage link elsewhere lands (ui/dimensions.md). */
+export function dashboardView(vault, actions, { unassignedOf = null } = {}) {
+  const known = unassignedOf && vault.activeDimensions().some((d) => d.id === unassignedOf);
   const state = {
     range: '1Y',
-    dimensionId: '',
+    dimensionId: known ? unassignedOf : '',
     percentage: false,
     justTheLine: false,
     mode: 'latest',
     showArchived: false,
+    hidden: new Set(),
+    unassignedOnly: Boolean(known),
   };
 
-  const root = el('section', { class: 'screen screen-wide' });
+  const root = el('section', { class: 'screen screen-wide dashboard' });
 
   const render = () => {
     const holdings = [...vault.holdings.values()];
@@ -38,14 +44,15 @@ export function dashboardView(vault, actions) {
     const dimension = vault
       .activeDimensions()
       .find((d) => d.id === state.dimensionId) || null;
+    const history = chartSeries(vault, state, dimension);
 
     mount(root, [
       vault.unreadable.length ? decryptionBanner(vault) : null,
       duplicateBanner(vault, actions),
-      hero(vault, state, render, actions),
-      chartSection(vault, state, render, dimension, actions),
-      holdingsTable(vault, state, render, actions),
+      hero(vault, state, render, actions, history),
+      history ? chartSection(vault, state, render, dimension, actions, history) : null,
       dimension ? breakdown(vault, dimension, state) : null,
+      holdingsTable(vault, state, render, actions, dimension),
     ]);
   };
 
@@ -103,45 +110,91 @@ function duplicateBanner(vault, actions) {
   );
 }
 
-function hero(vault, state, render, actions) {
+function hero(vault, state, render, actions, history) {
   const totals = vault.totals(state.mode);
   const rateDate = vault.newestRateDate();
 
+  const figure = totals.valued
+    ? el('p', { class: 'hero-figure' }, [
+        el('span', { class: 'hero-code', text: vault.mainCurrency }),
+        ' ',
+        el('span', { class: 'hero-amount', text: vault.format.whole(totals.net) }),
+      ])
+    : el('p', { class: 'hero-figure', text: '—' });
+
   return el('section', { class: 'hero' }, [
-    el('p', {
-      class: 'hero-figure',
-      text: totals.valued
-        ? `${vault.format.money(totals.net)} ${vault.mainCurrency}`
-        : '—',
-    }),
-    el('div', { class: 'hero-side' }, [
-      el('span', {
-        class: 'hero-part',
-        text: `Assets ${vault.format.money(totals.assets)}`,
-      }),
-      el('span', {
-        class: 'hero-part',
-        text: `Liabilities ${vault.format.money(totals.liabilities)}`,
+    el('div', { class: 'hero-main' }, [
+      el('p', { class: 'eyebrow', text: 'Net worth' }),
+      figure,
+      history ? heroChange(vault, history, state.range) : null,
+    ]),
+    el('div', { class: 'hero-parts' }, [
+      heroPart('Assets', vault.mainWhole(totals.assets)),
+      heroPart('Liabilities', vault.mainWhole(totals.liabilities)),
+    ]),
+    el('div', { class: 'hero-action' }, [
+      el('button', {
+        class: 'btn-primary btn-large',
+        text: 'New recording',
+        onclick: () => datePicker(vault, actions),
       }),
     ]),
-    el('div', { class: 'switch', role: 'group', 'aria-label': 'Which rates' }, [
-      switchButton(
-        rateDate ? `Latest rates, ${vault.format.longDate(rateDate)}` : 'Latest rates',
-        state.mode === 'latest',
-        () => {
-          state.mode = 'latest';
+    el('div', { class: 'hero-rates' }, [
+      el('div', { class: 'switch', role: 'group', 'aria-label': 'Which rates' }, [
+        switchButton(
+          rateDate
+            ? [
+                'Latest rates, ',
+                el('span', { class: 'wide-only', text: vault.format.dayMonth(rateDate) }),
+                el('span', { class: 'narrow-only', text: vault.format.dayMonth(rateDate, 'short') }),
+              ]
+            : 'Latest rates',
+          state.mode === 'latest',
+          () => {
+            state.mode = 'latest';
+            render();
+          },
+        ),
+        switchButton('Rates as of each figure', state.mode === 'asRecorded', () => {
+          state.mode = 'asRecorded';
           render();
-        },
-      ),
-      switchButton('Rates as of each figure', state.mode === 'asRecorded', () => {
-        state.mode = 'asRecorded';
-        render();
-      }),
+        }),
+      ]),
     ]),
-    el('button', {
-      class: 'btn-primary',
-      text: 'New recording',
-      onclick: () => datePicker(vault, actions),
+  ]);
+}
+
+function heroPart(label, figure) {
+  return el('div', { class: 'hero-part' }, [
+    el('p', { class: 'eyebrow', text: label }),
+    el('p', { class: 'hero-part-value', text: figure }),
+  ]);
+}
+
+/** The change over the chart's selected range, from its first point to
+ *  its last. The arrow carries the sign as well as the color does. A
+ *  year or more back is named by its month, a shorter range by its
+ *  day. */
+function heroChange(vault, { days, bands }, range) {
+  if (days.length < 2) return null;
+  const netAt = (index) => bands.reduce((sum, band) => sum + band.points[index], 0n);
+  const start = netAt(0);
+  const change = netAt(days.length - 1) - start;
+  const sign = change > 0n ? '+' : '';
+  const ratio = start === 0n
+    ? null
+    : (Number(decimal.format(change)) / Math.abs(Number(decimal.format(start)))) * 100;
+  const tone = change > 0n ? 'good' : change < 0n ? 'critical' : 'flat';
+  return el('p', { class: `hero-change ${tone}` }, [
+    change === 0n ? null : icon(change > 0n ? 'up' : 'down'),
+    el('span', {
+      class: 'hero-delta',
+      text: `${vault.mainCurrency} ${sign}${vault.format.whole(change)}` +
+        (ratio === null ? '' : ` · ${ratio > 0 ? '+' : ratio < 0 ? '\u2212' : ''}${Math.abs(ratio).toFixed(1)}%`),
+    }),
+    el('span', {
+      class: 'hero-since',
+      text: `since ${(range === '1Y' || range === 'All' ? vault.format.monthYear : vault.format.longDate)(isoFromDay(days[0]))}`,
     }),
   ]);
 }
@@ -150,9 +203,8 @@ function switchButton(label, active, onclick) {
   return el('button', {
     class: active ? 'switch-option active' : 'switch-option',
     'aria-pressed': String(active),
-    text: label,
     onclick,
-  });
+  }, label);
 }
 
 /** The marked date picker. A date holding no recording goes straight
@@ -212,58 +264,80 @@ function reopenDatePicker(context) {
   datePicker(context.vault, context);
 }
 
-function chartSection(vault, state, render, dimension, actions) {
+/** The series the chart draws over the selected range, or null before
+ *  anything has been recorded. */
+function chartSeries(vault, state, dimension) {
   const dates = vault.recordingDates();
   if (!dates.length) return null;
-
   const lastDay = dayNumber(dates[dates.length - 1]);
   const firstRecorded = dayNumber(dates[0]);
   const span = RANGES.find(([label]) => label === state.range)[1];
   const fromDay = span === null ? firstRecorded : Math.max(firstRecorded, lastDay - span);
-  const { days, bands } = vault.series(dimension, fromDay, lastDay);
+  return vault.series(dimension, fromDay, lastDay);
+}
 
+function chartSection(vault, state, render, dimension, actions, { days, bands }) {
   const coverage = dimension ? vault.coverage(dimension) : null;
   const annotations = [...vault.holdings.values()]
     .filter((h) => h.payload.archivedAt)
     .map((h) => ({ date: h.payload.archivedAt, label: h.payload.name }));
 
-  const readout = el('p', { class: 'hint', role: 'status' });
+  const readout = el('p', { class: 'hint chart-readout', role: 'status' });
 
-  return el('section', { class: 'card' }, [
-    el('div', { class: 'chart-controls' }, [
-      el(
-        'div',
-        { class: 'range-buttons', role: 'group', 'aria-label': 'Range' },
-        RANGES.map(([label]) =>
-          switchButton(label, state.range === label, () => {
-            state.range = label;
+  return el('section', { class: 'card chart-card' }, [
+    el('div', { class: 'card-head' }, [
+      el('h2', {
+        class: 'section-heading',
+        text: dimension ? `Net worth by ${dimension.label}` : 'Net worth',
+      }),
+      el('div', { class: 'chart-controls' }, [
+        el(
+          'div',
+          { class: 'switch range-buttons', role: 'group', 'aria-label': 'Range' },
+          RANGES.map(([label]) =>
+            switchButton(label, state.range === label, () => {
+              state.range = label;
+              render();
+            }),
+          ),
+        ),
+        el('label', { class: 'field-inline' }, [
+          el('span', { class: 'group-by-label', text: 'Group by' }),
+          groupBySelect(vault, state, render),
+        ]),
+        coverage
+          ? el('button', {
+              class: 'link-button coverage',
+              'aria-label': `${coverage.assigned} of ${coverage.total} holdings assigned. Show the unassigned ones.`,
+              onclick: () => {
+                state.unassignedOnly = true;
+                render();
+                const table = document.querySelector('.holdings-card');
+                if (table) table.scrollIntoView({ block: 'start' });
+              },
+            }, [
+              `${coverage.assigned} of ${coverage.total} `,
+              el('span', { class: 'wide-only', text: 'holdings ' }),
+              'assigned',
+            ])
+          : null,
+        el('div', { class: 'switch', role: 'group', 'aria-label': 'Scale' }, [
+          switchButton('Absolute', !state.percentage, () => {
+            state.percentage = false;
             render();
           }),
-        ),
-      ),
-      el('label', { class: 'field-inline' }, [
-        el('span', { text: 'Group by' }),
-        groupBySelect(vault, state, render),
-      ]),
-      coverage
-        ? el('span', {
-            class: 'hint',
-            text: `${coverage.assigned} of ${coverage.total} holdings assigned`,
-          })
-        : null,
-      el('label', { class: 'checkbox' }, [
-        checkbox(state.percentage, (on) => {
-          state.percentage = on;
-          render();
-        }),
-        el('span', { text: 'Percentage' }),
-      ]),
-      el('label', { class: 'checkbox' }, [
-        checkbox(state.justTheLine, (on) => {
-          state.justTheLine = on;
-          render();
-        }),
-        el('span', { text: 'Just the line' }),
+          switchButton('Percentage', state.percentage, () => {
+            state.percentage = true;
+            render();
+          }),
+        ]),
+        el('label', { class: 'checkbox checkbox-inline' }, [
+          checkbox(state.justTheLine, (on) => {
+            state.justTheLine = on;
+            render();
+          }),
+          el('span', { text: 'Just the line' }),
+        ]),
       ]),
     ]),
     state.percentage
@@ -272,28 +346,34 @@ function chartSection(vault, state, render, dimension, actions) {
           text: 'Each side is normalized against itself, assets against total assets and liabilities against total liabilities.',
         })
       : null,
-    drawChart({
+    trendChart({
       days,
       bands,
+      hidden: state.hidden,
       marks: vault.quantityDates(),
       annotations,
       percentage: state.percentage,
       justTheLine: state.justTheLine,
+      locale: vault.format.locale,
       onPickDate: (date) => actions.openRecording(date),
       onHover: (index) => {
         if (index === null || typeof index !== 'number') {
           readout.textContent = '';
           return;
         }
-        const parts = bands.map(
+        const shown = bands.filter((band) => !state.hidden.has(band.id));
+        const parts = shown.map(
           (band) => `${band.label} ${vault.format.money(band.points[index])}`,
         );
-        const net = bands.reduce((sum, band) => sum + band.points[index], 0n);
+        const net = shown.reduce((sum, band) => sum + band.points[index], 0n);
         readout.textContent = `${vault.format.date(isoFromDay(days[index]))} · ${parts.join(' · ')} · Net ${vault.format.money(net)}`;
       },
     }),
     readout,
-    bands.length > 1 ? legend(bands) : null,
+    state.hidden.size
+      ? el('p', { class: 'hint hidden-bands', text: 'The total drawn here covers only the visible bands.' })
+      : null,
+    legend(vault, bands, state, render),
     el('details', {}, [el('summary', { text: 'View as table' }), chartTable(days, bands, vault.format)]),
   ]);
 }
@@ -312,33 +392,83 @@ function groupBySelect(vault, state, render) {
   select.value = state.dimensionId;
   select.addEventListener('change', () => {
     state.dimensionId = select.value;
+    state.hidden.clear();
+    if (!select.value) state.unassignedOnly = false;
     render();
   });
   return select;
 }
 
-function legend(bands) {
-  return el(
-    'ul',
-    { class: 'legend' },
-    bands.map((band, index) =>
-      el('li', {}, [
-        el('span', { class: 'swatch', style: `background:${fillFor(band, index)}` }),
-        el('span', { text: band.label }),
-      ]),
-    ),
-  );
+/** Under the plot, beneath a hairline: each band with its swatch and
+ *  its figure at the right-hand edge, and the key to the entry marks
+ *  while they are drawn. One band needs no legend, since the heading
+ *  names it.
+ *
+ *  Each entry is a button that hides or shows its band. Hovering or
+ *  focusing one highlights its band and dims the rest, by class alone,
+ *  so nothing is redrawn. */
+function legend(vault, bands, state, render) {
+  const marksShown = !state.justTheLine;
+  if (bands.length < 2 && !marksShown) return null;
+  const last = bands.length ? bands[0].points.length - 1 : 0;
+  const highlight = (entry, id) => {
+    const chart = entry.closest('.chart-card').querySelector('svg.trend');
+    if (!chart) return;
+    chart.classList.toggle('highlighting', id !== null);
+    for (const path of chart.querySelectorAll('.band')) {
+      path.classList.toggle('is-highlighted', path.dataset.band === id);
+    }
+  };
+  return el('div', { class: 'legend-row' }, [
+    bands.length > 1
+      ? el(
+          'div',
+          { class: 'legend' },
+          bands.map((band, index) => {
+            const hidden = state.hidden.has(band.id);
+            const entry = el('button', {
+              type: 'button',
+              class: hidden ? 'legend-entry is-hidden' : 'legend-entry',
+              'aria-pressed': String(!hidden),
+              title: hidden ? `Show ${band.label}` : `Hide ${band.label}`,
+              onclick: () => {
+                if (hidden) state.hidden.delete(band.id);
+                else state.hidden.add(band.id);
+                render();
+              },
+              onmouseenter: () => highlight(entry, band.id),
+              onmouseleave: () => highlight(entry, null),
+              onfocus: () => highlight(entry, band.id),
+              onblur: () => highlight(entry, null),
+            }, [
+              el('span', { class: 'swatch', style: { background: fillFor(band, index) } }),
+              el('span', { class: 'legend-name', text: band.label }),
+              el('span', { class: 'legend-value', text: vault.format.whole(band.points[last]) }),
+            ]);
+            return entry;
+          }),
+        )
+      : null,
+    marksShown
+      ? el('span', { class: 'legend-key' }, [
+          el('span', { class: 'legend-tick', 'aria-hidden': 'true' }),
+          el('span', { text: 'A date you recorded' }),
+        ])
+      : null,
+  ]);
 }
 
-function holdingsTable(vault, state, render, actions) {
+function holdingsTable(vault, state, render, actions, grouping) {
   const dimensions = vault.activeDimensions();
   const rows = [];
   const unvalued = [];
   const unpriced = [];
   const newestRate = vault.newestRateDate();
+  const filtering = state.unassignedOnly && grouping;
 
   for (const holding of vault.holdings.values()) {
     if (holding.payload.archivedAt && !state.showArchived) continue;
+    if (filtering && vault.bandOf(holding, grouping).id !== 'unassigned') continue;
     const value = vault.valueOf(holding, state.mode);
     if (value.state === 'unvalued') unvalued.push(holding);
     else if (value.state === 'unpriced') unpriced.push({ holding, value });
@@ -354,18 +484,43 @@ function holdingsTable(vault, state, render, actions) {
     el('th', { text: '' }),
   ]);
 
-  return el('section', { class: 'card' }, [
-    el('h2', { class: 'section-heading', text: 'Holdings' }),
-    el('table', { class: 'data-table' }, [
+  return el('section', { class: 'card holdings-card' }, [
+    el('div', { class: 'card-head' }, [
+      el('h2', { class: 'section-heading', text: 'Holdings' }),
+      el('label', { class: 'checkbox checkbox-inline' }, [
+        checkbox(state.showArchived, (on) => {
+          state.showArchived = on;
+          render();
+        }),
+        el('span', { text: 'Show archived' }),
+      ]),
+    ]),
+    filtering
+      ? el('p', { class: 'filter-line', role: 'status' }, [
+          el('span', { text: `Showing the holdings with no ${grouping.label} value.` }),
+          el('button', {
+            class: 'link-button',
+            text: 'Show all holdings',
+            onclick: () => {
+              state.unassignedOnly = false;
+              if (window.location.hash.startsWith('#/unassigned')) {
+                window.history.replaceState(null, '', '#/');
+              }
+              render();
+            },
+          }),
+        ])
+      : null,
+    el('table', { class: 'data-table holdings-table' }, [
       el('thead', {}, [header]),
       el(
         'tbody',
         {},
         rows.map(({ holding, value }) =>
           el('tr', { class: holding.payload.archivedAt ? 'dimmed' : null }, [
-            el('td', {}, [
+            el('td', { class: 'cell-name' }, [
               el('button', {
-                class: 'link-button',
+                class: 'link-button row-name',
                 text: holding.payload.name,
                 onclick: () => actions.openHolding(holding.recordId),
               }),
@@ -376,7 +531,7 @@ function holdingsTable(vault, state, render, actions) {
             dimensions.length
               ? el(
                   'td',
-                  {},
+                  { class: 'cell-dims' },
                   dimensions
                     .map((dimension) => {
                       const band = vault.bandOf(holding, dimension);
@@ -389,13 +544,15 @@ function holdingsTable(vault, state, render, actions) {
                     .filter(Boolean),
                 )
               : null,
+            // At phone width the native figure is dropped where it
+            // would only repeat the converted one.
             el('td', {
-              class: 'numeric',
-              text: `${vault.format.quantity(value.quantity)} ${holding.payload.unit}`,
+              class: holding.payload.unit === vault.mainCurrency ? 'numeric cell-native same-unit' : 'numeric cell-native',
+              text: vault.amount(value.quantity, holding.payload.unit),
             }),
-            el('td', { class: 'numeric', text: vault.format.money(value.converted) }),
-            el('td', {}, [
-              el('span', { text: `${vault.format.longDate(value.asOf)} · ${ageInWords(value.asOf)}` }),
+            el('td', { class: 'numeric cell-converted', text: vault.format.money(value.converted) }),
+            el('td', { class: 'cell-asof' }, [
+              el('span', { text: vault.format.longDate(value.asOf) }),
               // A row priced older than the vault's newest rate
               // carries that price's date too, because "latest rates"
               // is not true of that row.
@@ -406,9 +563,9 @@ function holdingsTable(vault, state, render, actions) {
                   })
                 : null,
             ]),
-            el('td', {}, [
+            el('td', { class: 'cell-action' }, [
               el('button', {
-                class: 'btn-inline',
+                class: 'btn-secondary btn-small',
                 text: 'Record a value',
                 onclick: () => snapshotDialog(vault, holding, null, actions.reload),
               }),
@@ -426,13 +583,6 @@ function holdingsTable(vault, state, render, actions) {
           'Nothing has been recorded for these yet.')
       : null,
     el('div', { class: 'table-actions' }, [
-      el('label', { class: 'checkbox' }, [
-        checkbox(state.showArchived, (on) => {
-          state.showArchived = on;
-          render();
-        }),
-        el('span', { text: 'Show archived' }),
-      ]),
       el('button', {
         class: 'btn-secondary',
         text: 'Add a holding',
@@ -482,29 +632,37 @@ function breakdown(vault, dimension, state) {
 
   const rows = [...bands.values()].filter((band) => band.total !== 0n);
   if (!rows.length) return null;
-  const widest = rows.reduce(
-    (max, band) => (band.total > max ? band.total : band.total < 0n && -band.total > max ? -band.total : max),
-    1n,
-  );
+
+  // One scale for every bar: the widest negative band to the left of
+  // the shared zero baseline, the widest positive one to its right.
+  const most = (pick) => rows.reduce((max, band) => (pick(band.total) > max ? pick(band.total) : max), 0n);
+  const left = most((total) => -total);
+  const right = most((total) => total);
+  const span = Number(decimal.format(left + right)) || 1;
+  const share = (value) => Number(decimal.format(value)) / span;
+  const zero = share(left);
 
   return el('section', { class: 'card' }, [
-    el('h2', { class: 'section-heading', text: `By ${dimension.label}` }),
+    el('h2', { class: 'section-heading', text: `${dimension.label} today` }),
     el(
       'ul',
-      { class: 'bars' },
+      {
+        class: left > 0n ? 'bars has-negative' : 'bars',
+        style: { '--zero': String(zero) },
+      },
       rows.map((band) => {
         const negative = band.total < 0n;
-        const magnitude = negative ? -band.total : band.total;
-        const width = Number((magnitude * 100n) / widest);
-        return el('li', { class: negative ? 'bar negative' : 'bar' }, [
-          el('span', {
-            class: 'bar-fill',
-            style: `width:${width}%;background:${fillFor({ id: 'slot' }, 0)};opacity:${negative ? 0.45 : 0.85}`,
-          }),
-          el('span', {
-            class: 'bar-label',
-            text: `${band.label} · ${vault.format.money(band.total)}`,
-          }),
+        const length = share(negative ? -band.total : band.total);
+        return el('li', {
+          class: negative ? 'bar negative' : 'bar',
+          style: { '--start': String(negative ? zero - length : zero), '--len': String(length) },
+        }, [
+          el('span', { class: 'bar-track' }, [el('span', { class: 'bar-fill' })]),
+          el('span', { class: 'bar-label' }, [
+            el('span', { class: 'bar-name', text: band.label }),
+            ' ',
+            el('span', { class: 'bar-amount', text: vault.mainWhole(band.total) }),
+          ]),
         ]);
       }),
     ),

@@ -10,22 +10,22 @@
 import * as decimal from './decimal.js';
 
 export const GROUPS = [
-  { value: 'locale', label: "Whatever the language does" },
+  { value: 'locale', label: 'The language\u2019s own mark' },
   { value: 'thin', label: "1 234 567", separator: ' ' },
-  { value: 'apostrophe', label: "1'234'567", separator: "'" },
+  { value: 'apostrophe', label: '1\u2019234\u2019567', separator: '\u2019' },
   { value: 'comma', label: '1,234,567', separator: ',' },
   { value: 'period', label: '1.234.567', separator: '.' },
   { value: 'none', label: '1234567', separator: '' },
 ];
 
 export const PLACES = [
-  { value: 'locale', label: 'Whatever the currency does' },
-  { value: '0', label: 'None, rounded to whole units' },
+  { value: 'locale', label: 'The currency\u2019s own' },
+  { value: '0', label: 'None' },
   { value: '2', label: 'Two' },
 ];
 
 export const DATE_STYLES = [
-  { value: 'locale', label: "Whatever the language does" },
+  { value: 'locale', label: 'The language\u2019s own order' },
   { value: 'dmy', label: '20.09.2026', order: ['day', 'month', 'year'], sep: '.' },
   { value: 'ymd', label: '2026-09-20', order: ['year', 'month', 'day'], sep: '-' },
   { value: 'mdy', label: '09/20/2026', order: ['month', 'day', 'year'], sep: '/' },
@@ -110,6 +110,21 @@ export function formatter(profile) {
     /** A figure denominated in a currency, at the reader's precision. */
     money: (value) => decimal.toDisplay(value, places, group, point),
 
+    /** A summary figure, rounded to whole units: the hero, the gross
+     *  sides, the legend and the breakdown, where the tables beneath
+     *  carry the exact amounts. */
+    whole: (value) => decimal.toDisplay(value, 0, group, point),
+
+    /** A figure as a field shows it for editing: grouped, every stored
+     *  digit kept, and read back exactly by `parseFigure`. */
+    editable: (value, minPlaces = 2) => decimal.toEditable(value, minPlaces, group, point),
+
+    /** What the reader typed into a figure field, with or without
+     *  group marks, as an exact scale-12 value, or null. A group mark
+     *  counts only between groups of three digits, so a mark typed as
+     *  a decimal point is refused rather than read as a thousand. */
+    parseFigure: (typed) => readFigure(typed, group, point),
+
     /** A quantity of something that is not money: ounces of gold,
      *  square metres. Its precision is the unit's, never the money
      *  setting, because rounding 12.5 ounces to 13 loses the holding.
@@ -135,6 +150,25 @@ export function formatter(profile) {
           })
         : '',
 
+    /** The month spelled out and the year alone: how far back a
+     *  long chart range reaches. */
+    monthYear: (iso) => spelled(iso, locale, { month: 'long', year: 'numeric' }),
+
+    /** A date with its month spelled out in full, for a heading. */
+    fullDate: (iso) => spelled(iso, locale, { day: 'numeric', month: 'long', year: 'numeric' }),
+
+    /** A day and its month, for a label that already implies the year. */
+    dayMonth: (iso, month = 'long') => spelled(iso, locale, { day: 'numeric', month }),
+
+    /** A moment, such as when a session started, in this browser's
+     *  time zone. */
+    dateTime: (timestamp) => {
+      const at = new Date(timestamp);
+      const day = at.toLocaleDateString(locale, { day: 'numeric', month: 'short', year: 'numeric' });
+      const time = at.toLocaleTimeString(locale, { hour: '2-digit', minute: '2-digit' });
+      return `${day}, ${time}`;
+    },
+
     /** What an empty date field should show it expects. */
     datePlaceholder: () =>
       date.order.map((part) => (part === 'year' ? 'yyyy' : part === 'month' ? 'mm' : 'dd')).join(date.sep),
@@ -144,6 +178,33 @@ export function formatter(profile) {
      *  impossible day are both refused. */
     parseDate: (typed) => readDate(typed, date.order),
   };
+}
+
+function spelled(iso, locale, parts) {
+  if (!iso) return '';
+  return new Date(iso + 'T00:00:00Z').toLocaleDateString(locale, { ...parts, timeZone: 'UTC' });
+}
+
+// Marks a reader types for the one they see: a plain apostrophe for
+// the typographic one, and any space for a narrow one.
+const SPACES = [' ', '\u2009', '\u202f', '\u00a0'];
+const APOSTROPHES = ["'", '\u2019'];
+
+function readFigure(typed, group, point) {
+  let text = String(typed).trim();
+  const negative = /^[-\u2212]/.test(text);
+  if (negative) text = text.slice(1);
+  const [whole, fraction, extra] = text.split(point);
+  if (extra !== undefined) return null;
+  const marks = SPACES.includes(group) ? SPACES : APOSTROPHES.includes(group) ? APOSTROPHES : group ? [group] : [];
+  let digits = whole;
+  if (marks.some((mark) => whole.includes(mark))) {
+    const grouped = marks.reduce((acc, mark) => acc.split(mark).join('_'), whole);
+    if (!/^\d{1,3}(_\d{3})+$/.test(grouped)) return null;
+    digits = grouped.replaceAll('_', '');
+  }
+  if (!/^\d*$/.test(digits) || (fraction !== undefined && !/^\d*$/.test(fraction))) return null;
+  return decimal.parse((negative ? '-' : '') + digits + (fraction === undefined ? '' : '.' + fraction));
 }
 
 function otherPoint(point) {

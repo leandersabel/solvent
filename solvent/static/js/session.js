@@ -96,7 +96,9 @@ export async function signIn(username, password) {
   }
 
   startIdleTimer();
-  return { kind: 'vault_owner', vault };
+  // The name that just verified, for every screen that shows or sends
+  // it, since a page served without a session was never told it.
+  return { kind: 'vault_owner', vault, username };
 }
 
 async function upgradeKdf(password, targetKdf, dek) {

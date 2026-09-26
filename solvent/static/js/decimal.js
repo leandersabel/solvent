@@ -70,8 +70,8 @@ export function interpolate(x, x0, y0, x1, y1) {
 
 // Display rounding is a separate, later step applied to a figure
 // already exact at scale 12. The separators are the reader's, from
-// static/js/format.js. Nothing parses a figure back out of this
-// form, so they reach no arithmetic.
+// static/js/format.js, and a negative figure takes the true minus
+// sign.
 export function toDisplay(value, places, group = '\u2009', point = '.') {
   const factor = 10n ** BigInt(SCALE - places);
   const rounded = rescale(value, factor);
@@ -82,5 +82,16 @@ export function toDisplay(value, places, group = '\u2009', point = '.') {
   const whole = places ? digits.slice(0, -places) : digits;
   const fraction = places ? digits.slice(-places) : '';
   const grouped = group ? whole.replace(/\B(?=(\d{3})+(?!\d))/g, group) : whole;
-  return (negative ? '-' : '') + grouped + (fraction ? point + fraction : '');
+  return (negative ? '\u2212' : '') + grouped + (fraction ? point + fraction : '');
+}
+
+// The form a figure takes in a field the reader edits, which
+// static/js/format.js parses back. Every stored digit is kept rather
+// than rounded, and the fraction is padded to at least `minPlaces`.
+export function toEditable(value, minPlaces, group, point) {
+  const [whole, fraction = ''] = format(value < 0n ? -value : value).split('.');
+  const places = Math.max(minPlaces, fraction.length);
+  const grouped = group ? whole.replace(/\B(?=(\d{3})+(?!\d))/g, group) : whole;
+  const digits = fraction.padEnd(places, '0');
+  return (value < 0n ? '\u2212' : '') + grouped + (digits ? point + digits : '');
 }

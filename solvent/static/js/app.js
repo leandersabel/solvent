@@ -15,6 +15,7 @@ import {
   dialog,
   editedFields,
   el,
+  markCurrentNav,
   mount,
   reopenDialogs,
   restoreFields,
@@ -31,9 +32,13 @@ import { recordingView } from './view-recording.js';
 import { resetSweepState, sweepView } from './view-sweep.js';
 import { settingsView } from './view-settings.js';
 import { dimensionsView } from './view-dimensions.js';
+import { transferView } from './page-transfer.js';
 
 const container = document.getElementById('app');
-const username = container ? container.dataset.username : null;
+// Who is signed in. The server writes it into a page it served with a
+// session, and a sign-in on a page served without one supplies it,
+// because the person just typed it (ui/settings.md, Profile).
+let username = container ? container.dataset.username || null : null;
 const kdfNode = document.getElementById('kdf-envelope');
 const kdf = kdfNode ? JSON.parse(kdfNode.textContent) : null;
 
@@ -46,12 +51,20 @@ let vaultShown = false;
 
 function render() {
   draw();
+  markCurrentNav();
   vaultShown = isUnlocked();
   if (vaultShown) trackEdits(container);
 }
 
+// Each screen's own content width (spec/ui/*.md, Layout), set on the
+// region every view mounts into.
+function width(name) {
+  container.className = `app-${name}`;
+}
+
 function draw() {
   if (!isUnlocked()) {
+    width('outside');
     mount(
       container,
       unlockCard({
@@ -61,6 +74,7 @@ function draw() {
             window.location.href = '/admin';
             return;
           }
+          username = result.username;
           revealChrome('vault_owner', {
             onUpdate: () => {
               resetSweepState();
@@ -80,27 +94,34 @@ function draw() {
   const [, view, argument, mode] = (window.location.hash || '#/').split('/');
 
   if (view === 'settings' && argument === 'dimensions') {
-    mount(container, [backLink(), ...dimensionsView(vault, { reload: render })]);
+    width('narrow');
+    mount(container, dimensionsView(vault, {
+      reload: render,
+      openUnassigned: (dimensionId) => go(`#/unassigned/${dimensionId}`),
+    }));
+    return;
+  }
+  if (view === 'settings' && argument === 'export-import') {
+    width('narrow');
+    mount(container, transferView(vault, { reload: render }));
     return;
   }
   if (view === 'settings') {
-    mount(container, [
-      backLink(),
-      ...settingsView(vault, {
-        username,
-        kdf,
-        reload: render,
-        openDimensions: () => go('#/settings/dimensions'),
-      }),
-    ]);
+    width('narrow');
+    mount(container, settingsView(vault, {
+      username,
+      kdf,
+      reload: render,
+      open: (address) => go(`#/settings/${address}`),
+    }));
     return;
   }
 
   const actions = actionsFor(vault);
+  width(['holding', 'recording', 'sweep'].includes(view) ? 'medium' : 'wide');
 
   if (view === 'holding') {
     mount(container, [
-      backLink(),
       holdingView(vault, argument, {
         editing: mode === 'edit',
         onOpenRecording: actions.openRecording,
@@ -112,7 +133,6 @@ function draw() {
   }
   if (view === 'recording') {
     mount(container, [
-      backLink(),
       recordingView(vault, argument, {
         onUpdate: actions.openSweep,
         onOpenHolding: actions.openHolding,
@@ -123,13 +143,12 @@ function draw() {
     return;
   }
   if (view === 'sweep') {
-    mount(container, [
-      backLink(),
-      sweepView(vault, argument, { onDone: () => go('#/') }),
-    ]);
+    mount(container, sweepView(vault, argument));
     return;
   }
-  mount(container, dashboardView(vault, actions));
+  mount(container, dashboardView(vault, actions, {
+    unassignedOf: view === 'unassigned' ? argument : null,
+  }));
 }
 
 function actionsFor(vault) {
@@ -161,14 +180,6 @@ function resumeHeld() {
     if (hash === window.location.hash) restoreFields(container, fields);
     reopenDialogs(dialogs, { vault, ...actionsFor(vault) });
   }, 0);
-}
-
-function backLink() {
-  return el('button', {
-    class: 'link-button back',
-    text: '← Dashboard',
-    onclick: () => go('#/'),
-  });
 }
 
 function go(hash) {

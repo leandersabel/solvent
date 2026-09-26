@@ -213,7 +213,7 @@ export function snapshotDialog(vault, holding, existing, onSaved) {
     converted.textContent =
       quantity === null || !price
         ? ''
-        : `${vault.format.money(decimal.multiply(quantity, price.rate))} ${vault.mainCurrency}`;
+        : vault.mainMoney(decimal.multiply(quantity, price.rate));
   };
   value.addEventListener('input', describeConverted);
   describePrices();
@@ -276,11 +276,11 @@ export function snapshotDialog(vault, holding, existing, onSaved) {
       if (atDate && !existing) {
         // The date here is chosen blind, so the stored figure is put
         // in front of the person before anything is written.
-        confirmReplace(atDate, holding, vault.format, () => write(atDate));
+        confirmReplace(atDate, holding, vault, () => write(atDate));
         return;
       }
       if (atDate && existing) {
-        confirmMove(atDate, holding, vault.format, () => write(atDate));
+        confirmMove(atDate, holding, vault, () => write(atDate));
         return;
       }
       await write(null);
@@ -317,12 +317,12 @@ function reopenSnapshot({ vault, reload }, holdingId, snapshotId) {
   snapshotDialog(vault, holding, existing, reload);
 }
 
-function confirmReplace(stored, holding, format, onConfirm) {
+function confirmReplace(stored, holding, vault, onConfirm) {
   const close = dialog({
     heading: 'Replace the figure already recorded?',
     body: [
       el('p', {
-        text: `You already recorded ${format.quantity(decimal.parse(stored.payload.value))} ${holding.payload.unit} for ${format.longDate(stored.payload.date)}. Replace it?`,
+        text: `You already recorded ${vault.amount(decimal.parse(stored.payload.value), holding.payload.unit)} for ${vault.format.longDate(stored.payload.date)}. Replace it?`,
       }),
     ],
     actions: [
@@ -339,12 +339,12 @@ function confirmReplace(stored, holding, format, onConfirm) {
   });
 }
 
-function confirmMove(stored, holding, format, onConfirm) {
+function confirmMove(stored, holding, vault, onConfirm) {
   const close = dialog({
     heading: 'Move this entry onto an occupied date?',
     body: [
       el('p', {
-        text: `${format.longDate(stored.payload.date)} already holds a snapshot of ${format.quantity(decimal.parse(stored.payload.value))} ${holding.payload.unit}. Moving this entry there will delete it.`,
+        text: `${vault.format.longDate(stored.payload.date)} already holds a snapshot of ${vault.amount(decimal.parse(stored.payload.value), holding.payload.unit)}. Moving this entry there will delete it.`,
       }),
     ],
     actions: [

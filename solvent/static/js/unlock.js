@@ -29,7 +29,7 @@ export function unlockCard({ knownUsername = null, onUnlocked }) {
     autocapitalize: 'none',
     spellcheck: 'false',
   });
-  const button = el('button', { type: 'submit', class: 'btn-primary', text: 'Unlock' });
+  const button = el('button', { type: 'submit', class: 'btn-primary btn-block', text: 'Unlock' });
   const note = el('p', { class: 'hint', hidden: true, text: WAIT_NOTE });
   const retry = el('button', {
     type: 'button',
@@ -52,8 +52,9 @@ export function unlockCard({ knownUsername = null, onUnlocked }) {
         username,
       ]);
 
-  const form = el('form', { class: 'card card-narrow', novalidate: true }, [
-    el('h1', { class: 'card-heading', text: 'Solvent' }),
+  // The wordmark sits above the card: in the page's own markup outside
+  // the shell, and in the top bar inside it.
+  const form = el('form', { class: 'card signin-card', novalidate: true, 'aria-label': 'Unlock' }, [
     identity,
     error,
     el('div', { class: 'field' }, [

@@ -9,7 +9,17 @@ import { el } from './dom.js';
 import { wrapForMaster } from './session.js';
 import { SCHEMA_VERSION, migrate } from './model.js';
 
-export function exportCard(vault) {
+/** The screen, reached from Settings at an in-page address like
+ *  dimensions, because the keys live in this page's memory. */
+export function transferView(vault, { reload }) {
+  return [
+    el('h1', { class: 'screen-heading', text: 'Export and import' }),
+    exportCard(vault),
+    importCard(vault, reload),
+  ];
+}
+
+function exportCard(vault) {
   const status = el('p', { class: 'hint', hidden: true });
   const error = el('p', { class: 'field-error', hidden: true });
 
@@ -71,7 +81,7 @@ function countOf(map) {
 
 /** Replace-only. There is no merge, and the UI must not imply one
  *  exists. */
-export function importCard(vault, onDone) {
+function importCard(vault, onDone) {
   const file = el('input', { type: 'file', accept: 'application/json' });
   const password = el('input', { type: 'password', autocomplete: 'off' });
   const erase = el('input', { type: 'text', placeholder: 'ERASE' });

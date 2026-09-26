@@ -32,6 +32,9 @@ export function el(tag, props = {}, children = []) {
     if (key === 'text') node.textContent = value;
     else if (key === 'class') node.className = value;
     else if (key === 'dataset') Object.assign(node.dataset, value);
+    // Through the CSSOM, one property at a time: the policy's
+    // `style-src 'self'` refuses a style attribute however it is set.
+    else if (key === 'style') for (const [name, v] of Object.entries(value)) node.style.setProperty(name, v);
     else if (key.startsWith('on')) node.addEventListener(key.slice(2), value);
     else node.setAttribute(key, value === true ? '' : value);
   }
@@ -99,6 +102,59 @@ export function inlineRename(text, save, failed) {
     if (event.key === 'Escape') open(false);
   });
   return el('div', {}, [view, editor, error]);
+}
+
+// Line icons, drawn as SVG so no image request and no font is needed.
+// Each is decorative: the text beside it or the button's own label
+// carries the meaning.
+const ICONS = {
+  lock: ['M8 11V7a4 4 0 0 1 8 0v4', { rect: { x: 4, y: 11, width: 16, height: 10, rx: 2 } }],
+  up: ['M12 19V5', 'M5 12l7-7 7 7'],
+  down: ['M12 5v14', 'M19 12l-7 7-7-7'],
+  chevron: ['M9 6l6 6-6 6'],
+  alert: ['M12 3l9.5 17h-19z', 'M12 10v4', 'M12 17.5v.01'],
+};
+
+export function icon(name, size = 16) {
+  const NS = 'http://www.w3.org/2000/svg';
+  const svg = document.createElementNS(NS, 'svg');
+  const attrs = {
+    class: `icon icon-${name}`, width: size, height: size, viewBox: '0 0 24 24', fill: 'none',
+    stroke: 'currentColor', 'stroke-width': 2, 'stroke-linecap': 'round',
+    'stroke-linejoin': 'round', 'aria-hidden': 'true', focusable: 'false',
+  };
+  for (const [key, value] of Object.entries(attrs)) svg.setAttribute(key, value);
+  for (const part of ICONS[name]) {
+    const [tag, props] = typeof part === 'string' ? ['path', { d: part }] : Object.entries(part)[0];
+    const node = document.createElementNS(NS, tag);
+    for (const [key, value] of Object.entries(props)) node.setAttribute(key, value);
+    svg.append(node);
+  }
+  return svg;
+}
+
+/** The top bar's Lock button: the padlock and its word, the word
+ *  dropped from sight at phone width and still read aloud. */
+export function lockButton(onclick) {
+  return el('button', { type: 'button', class: 'btn-chrome btn-lock', onclick }, [
+    icon('lock', 14),
+    el('span', { class: 'btn-label', text: 'Lock' }),
+  ]);
+}
+
+/** Mark the nav entry for the view on screen, so the bar can underline
+ *  it. Settings covers the screens reached from it, and Dashboard its
+ *  filtered table. */
+export function markCurrentNav() {
+  const hash = window.location.hash || '#/';
+  for (const link of document.querySelectorAll('.topbar nav a')) {
+    const href = link.getAttribute('href');
+    const current = href === '#/'
+      ? hash === '#/' || hash === '#' || hash.startsWith('#/unassigned/')
+      : hash.startsWith(href);
+    if (current) link.setAttribute('aria-current', 'page');
+    else link.removeAttribute('aria-current');
+  }
 }
 
 export function clear(node) {
@@ -334,7 +390,7 @@ export function revealChrome(kind, { onUpdate, onLock, onSignOut }) {
       ]),
       el('div', { class: 'topbar-actions' }, [
         el('button', { type: 'button', class: 'btn-chrome', text: 'Update values', onclick: onUpdate }),
-        el('button', { type: 'button', class: 'btn-chrome', text: 'Lock', onclick: onLock }),
+        lockButton(onLock),
       ]),
     );
     return;

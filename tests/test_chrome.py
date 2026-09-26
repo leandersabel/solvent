@@ -150,8 +150,8 @@ def test_no_shell_response_contains_vault_plaintext(app):
     asserts is that no route wired to it receives decrypted content:
     every page's content region is an empty mount point."""
     owner, _ = register(app, "owner")
-    for path in ("/dashboard", "/settings", "/settings/dimensions"):
-        # Followed, because the last two are views of the first and
+    for path in ("/dashboard", "/settings", "/settings/dimensions", "/settings/export-import"):
+        # Followed, because the rest are views of the first and
         # answer with a redirect to it.
         body = owner.get(path, follow_redirects=True).get_data(as_text=True)
         region = body[body.index("<main") : body.index("</main>")]

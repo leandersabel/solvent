@@ -338,7 +338,7 @@ await check('the locale supplies the defaults and each control overrules it', as
   assert.equal(formatter({ locale: 'en-US' }).money(million), '1,234,567.89');
   assert.equal(
     formatter({ locale: 'de-CH', groupSeparator: 'apostrophe', moneyPlaces: '0' }).money(million),
-    "1'234'568",
+    '1\u2019234\u2019568',
   );
   assert.equal(formatter({ locale: 'en-US', groupSeparator: 'none' }).money(million), '1234567.89');
 });
@@ -392,6 +392,98 @@ await check('an unknown language falls back rather than throwing', async () => {
   const shape = formatter({ locale: 'not-a-language-tag' });
   assert.equal(typeof shape.money(1000000000000n), 'string');
   assert.equal(shape.date('2026-09-20').length, 10);
+});
+
+await check('a negative figure takes the true minus sign', async () => {
+  const { formatter } = await load('format.js');
+  assert.equal(formatter({ locale: 'en-GB' }).money(-18400000000000000n), '\u221218,400.00');
+});
+
+// ---- Figures typed into a field ------------------------------------------
+
+await check('a field shows a figure grouped and reads it back exactly', async () => {
+  const { formatter } = await load('format.js');
+  for (const settings of [
+    { locale: 'en-GB', groupSeparator: 'apostrophe' },
+    { locale: 'de-DE' },
+    { locale: 'fr-CH' },
+    { locale: 'en-US', groupSeparator: 'none' },
+  ]) {
+    const shape = formatter(settings);
+    for (const stored of ['48210.35', '-780000', '1150000.5', '0.000000000001', '12.5', '0']) {
+      const value = decimal.parse(stored);
+      const shown = shape.editable(value);
+      assert.equal(shape.parseFigure(shown), value, `${JSON.stringify(settings)} showed ${shown}`);
+    }
+  }
+  const swiss = formatter({ locale: 'en-GB', groupSeparator: 'apostrophe' });
+  assert.equal(swiss.editable(decimal.parse('48210.35')), '48\u2019210.35');
+  assert.equal(swiss.editable(decimal.parse('12.5')), '12.50');
+  assert.equal(swiss.editable(decimal.parse('0.797'), 6), '0.797000');
+  assert.equal(swiss.editable(decimal.parse('-18400')), '\u221218\u2019400.00');
+});
+
+await check('a typed figure is read with or without group marks', async () => {
+  const { formatter } = await load('format.js');
+  const swiss = formatter({ locale: 'en-GB', groupSeparator: 'apostrophe' });
+  const expected = decimal.parse('221304.5');
+  for (const typed of ['221304.50', '221\u2019304.50', "221'304.50", ' 221304.5 ']) {
+    assert.equal(swiss.parseFigure(typed), expected, typed);
+  }
+  assert.equal(swiss.parseFigure('-780\u2019000'), decimal.parse('-780000'));
+  assert.equal(swiss.parseFigure('\u2212780000'), decimal.parse('-780000'));
+  assert.equal(swiss.parseFigure('1\u2019234\u2019567.891234567891'), decimal.parse('1234567.891234567891'));
+  const german = formatter({ locale: 'de-DE' });
+  assert.equal(german.parseFigure('1.234,5'), decimal.parse('1234.5'));
+  assert.equal(german.parseFigure('1234,5'), decimal.parse('1234.5'));
+  const spaced = formatter({ locale: 'en-GB', groupSeparator: 'thin' });
+  assert.equal(spaced.parseFigure('1 234 567'), decimal.parse('1234567'));
+});
+
+await check('a typed figure that could mean two things is refused', async () => {
+  const { formatter } = await load('format.js');
+  const swiss = formatter({ locale: 'en-GB', groupSeparator: 'apostrophe' });
+  // A group mark that does not sit between groups of three.
+  assert.equal(swiss.parseFigure("12'34.50"), null);
+  assert.equal(swiss.parseFigure('1.2.3'), null);
+  assert.equal(swiss.parseFigure('12,50'), null);
+  assert.equal(swiss.parseFigure(''), null);
+  assert.equal(swiss.parseFigure('abc'), null);
+  assert.equal(swiss.parseFigure('1.0000000000001'), null);
+  // German reads a period as a thousands mark, so a period typed as a
+  // decimal point is refused rather than taken for 123'450.
+  assert.equal(formatter({ locale: 'de-DE' }).parseFigure('1234.50'), null);
+});
+
+// ---- The trend chart ------------------------------------------------------
+
+await check('a band holding a liability draws both sides instead of their net', async () => {
+  const { stack } = await load('chart.js');
+  const money = (n) => decimal.parse(String(n));
+  const property = {
+    id: 'property',
+    points: [money(370000)],
+    assets: [money(1150000)],
+    liabilities: [money(-780000)],
+  };
+  const cash = { id: 'cash', points: [money(100000)], assets: [money(100000)], liabilities: [money(0)] };
+  const { layers, net } = stack([cash, property]);
+  assert.deepEqual(layers[0].upper[0], [0, 100000]);
+  assert.deepEqual(layers[1].upper[0], [100000, 1250000]);
+  assert.deepEqual(layers[1].lower[0], [0, -780000]);
+  assert.deepEqual(layers[0].lower[0], [0, 0]);
+  assert.equal(net[0], 470000);
+});
+
+await check('percentage mode normalizes each side against itself', async () => {
+  const { stack } = await load('chart.js');
+  const money = (n) => decimal.parse(String(n));
+  const band = (a, l) => ({ id: String(a), points: [money(a + l)], assets: [money(a)], liabilities: [money(l)] });
+  const { layers } = stack([band(300, -100), band(100, -300)], true);
+  assert.deepEqual(layers[0].upper[0], [0, 75]);
+  assert.deepEqual(layers[1].upper[0], [75, 100]);
+  assert.deepEqual(layers[0].lower[0], [0, -25]);
+  assert.deepEqual(layers[1].lower[0], [-25, -100]);
 });
 
 // ---- Report -----------------------------------------------------------

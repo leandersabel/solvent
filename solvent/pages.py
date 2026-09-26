@@ -69,6 +69,12 @@ def dimensions():
     return redirect("/dashboard#/settings/dimensions")
 
 
+@bp.get("/settings/export-import")
+@navigation
+def export_import():
+    return redirect("/dashboard#/settings/export-import")
+
+
 @bp.get("/admin")
 @navigation
 def admin():

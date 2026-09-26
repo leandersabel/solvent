@@ -61,12 +61,12 @@ function figureRow(vault, { holding, snapshot }, onOpenHolding, onChanged) {
     ]),
     el('td', {
       class: 'numeric',
-      text: `${vault.format.quantity(quantity)} ${holding.payload.unit}`,
+      text: vault.amount(quantity, holding.payload.unit),
     }),
     el('td', {
       class: 'numeric',
       text: price
-        ? `${vault.format.money(decimal.multiply(quantity, price.rate))} ${vault.mainCurrency}`
+        ? vault.mainMoney(decimal.multiply(quantity, price.rate))
         : 'not priced',
     }),
     keepCell(vault, rivals, 'Two figures for this holding share this date. Keep one.', onChanged),
