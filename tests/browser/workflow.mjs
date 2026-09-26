@@ -1372,7 +1372,7 @@ try {
     await plantHere([
       ...Object.entries(FIRST).map(([name, value]) => snap(name, D1, value)),
       // The first recording priced gold, silver and the flat, and not
-      // the dollar; the second priced the dollar alone.
+      // the dollar, and the second priced the dollar alone.
       price('XAU-ozt', D1, '2500', 'proposed'),
       price('XAG-ozt', D1, '25'),
       price('m2', D1, '10000'),
@@ -2123,12 +2123,14 @@ try {
     await typeRow('Current account', '10');
     await pressRow('Current account');
     const refusal = await ev("document.querySelector('.sweep .banner').textContent");
+    const nowShown = await rowState('Savings');
     const longD5 = await format('longDate', D5);
     check(
       'record-snapshot: a fresh recording at a date another window recorded is refused whole, naming the date',
       refusal.startsWith(`${longD5} already has a recording. Another window got there first.`) && writesSent().length === 0 &&
-        on(await stored('snapshot'), D5).length === 1 && on(await stored('rate'), D5).length === 0,
-      refusal,
+        on(await stored('snapshot'), D5).length === 1 && on(await stored('rate'), D5).length === 0 &&
+        nowShown.state === 'Recorded for this date.' && figure(nowShown.field) === 5005,
+      `${refusal} ${JSON.stringify(nowShown)}`,
     );
     await press('Open the recording');
     check('record-snapshot: the refusal opens that recording', (await ev('location.hash')) === `#/recording/${D5}`);

@@ -39,7 +39,11 @@ export function sweepView(vault, date, actions = {}) {
     banner.replaceChildren(el('span', { text }), ...children);
     banner.hidden = false;
   };
-  const refused = () =>
+  // Refused whole: the screen shows the recording as it now stands, and
+  // what was typed into the refused attempt is gone.
+  const refused = () => {
+    for (const row of rows) row.reset();
+    block.refresh();
     say(`${vault.format.longDate(date)} already has a recording. Another window got there first.`, {
       critical: true,
       children: [
@@ -50,6 +54,7 @@ export function sweepView(vault, date, actions = {}) {
         }),
       ],
     });
+  };
 
   const holdings = vault.activeHoldings();
   if (!holdings.length) {
@@ -173,13 +178,13 @@ function sweepRow(vault, holding, date, { sit, block, refused, ensurePrices, onT
   const row = { name: holding.payload.name };
 
   /** Put the field back to what the vault holds for this row. */
-  const reset = () => {
+  const reset = (row.reset = () => {
     const [stored] = atDate();
     const reference = stored || carriedInto();
     field.value = reference ? format.editable(decimal.parse(reference.payload.value)) : '';
     field.className = stored ? 'quantity recorded' : 'quantity carried';
     row.describe();
-  };
+  });
 
   row.describe = () => {
     const entries = atDate();
@@ -327,7 +332,6 @@ function sweepRow(vault, holding, date, { sit, block, refused, ensurePrices, onT
         rates: sit.refreshed ? [] : vault.missingUnits(date),
       });
       if (refusal) {
-        reset();
         refused();
         return;
       }
@@ -797,7 +801,6 @@ function saveRates(vault, sit, block, { say, refused, saveAll }) {
           };
           const result = await writes.saveRecording(vault, sit, plan);
           if (result.refused) {
-            block.refresh();
             refused();
             return;
           }

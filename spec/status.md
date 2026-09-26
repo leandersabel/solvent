@@ -12,8 +12,8 @@ Maintained by the compiler agent. Rows are in build order.
 | login | x | x | |
 | account-settings | x | x | |
 | manage-accounts | x | x | |
-| record-rate | x | x | |
-| record-snapshot | x | x | |
+| record-rate | x | x | x |
+| record-snapshot | x | x | x |
 | net-worth-view | x | x | |
 | export-import | x | x | |
 
