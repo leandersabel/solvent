@@ -8,6 +8,7 @@
 // has destroyed nothing.
 import * as api from './api.js';
 import * as crypto from './crypto.js';
+import * as decimal from './decimal.js';
 import { SCHEMA_VERSION, migrate } from './model.js';
 
 export async function putRecord(vault, slot, payload) {
@@ -144,74 +145,124 @@ export async function fetchProposals(vault, date) {
   }
 }
 
-/** The pre-create reload (record-snapshot.md, Creating and reopening
- *  are distinct acts).
- *
- *  Once per sitting, before the first record it creates at a date, and
- *  never against the model in memory: a session open since this
- *  morning is exactly the session whose model says the date is free.
- *  It returns the freshly loaded types, so the caller can refuse the
- *  whole save rather than claiming a slot somebody else took. */
-export async function reloadCreateTypes(vault) {
-  const fresh = { snapshot: await api.get('/api/records?type=snapshot'), rate: await api.get('/api/records?type=rate') };
-  const decoded = { snapshot: [], rate: [] };
-  for (const type of ['snapshot', 'rate']) {
-    for (const record of fresh[type]) {
-      try {
-        decoded[type].push({
-          ...record,
-          payload: await crypto.decryptRecord(vault.dek, record),
-        });
-      } catch {
-        // An unreadable record carries no readable date, so it shapes
-        // no slot check. It is already counted in the load's warning.
-      }
+/** Whether a recording at `date` would have anything to ask the proxy:
+ *  a unit with no entry there that somebody publishes a price for. */
+export function needsLookup(vault, date) {
+  return vault.missingUnits(date).some((unit) => vault.quotable(unit));
+}
+
+/** Decrypt a freshly read list of records, skipping any that will not
+ *  open. An unreadable record carries no readable date, so it shapes no
+ *  slot check, and it is already counted in the load's warning. */
+async function decryptAll(vault, rows) {
+  const decoded = [];
+  for (const record of rows) {
+    try {
+      decoded.push({ ...record, payload: await crypto.decryptRecord(vault.dek, record) });
+    } catch {
+      /* counted by the load that first met it */
     }
   }
   return decoded;
 }
 
-export function occupiedSlots(reloaded) {
-  const snapshots = new Set(
-    reloaded.snapshot.map((r) => `${r.accountId}\u001f${r.payload.date}`),
-  );
-  const rates = new Set(
-    reloaded.rate.map((r) => `${r.payload.symbol}\u001f${r.payload.date}`),
-  );
-  return { snapshots, rates };
+/** The pre-create reload (record-snapshot.md, Creating and reopening
+ *  are distinct acts).
+ *
+ *  Never against the model in memory: a session open since this
+ *  morning is exactly the session whose model says the date is free. */
+export async function reloadCreateTypes(vault) {
+  return {
+    snapshot: await decryptAll(vault, await api.get('/api/records?type=snapshot')),
+    rate: await decryptAll(vault, await api.get('/api/records?type=rate')),
+  };
+}
+
+/** After a Conflict, the whole type again, since there is no by-id read
+ *  (record-api.md, Endpoints). The model then holds what the vault
+ *  holds, and nothing is retried. */
+export async function reloadType(vault, type) {
+  vault.replaceType(type, await decryptAll(vault, await api.get(`/api/records?type=${type}`)));
+}
+
+/** A sitting at one date: the reload runs before the first record it
+ *  creates and never again, because after it the date belongs to this
+ *  session. `dateWasEmpty` is what the model said when the sitting
+ *  began, which is what a create there is judged against. */
+export function sitting(vault, date) {
+  return { date, dateWasEmpty: !vault.holdsRecording(date), claimed: false, refreshed: false, proposals: null };
+}
+
+/** Claim the date for a sitting about to create records at it, or say
+ *  why it cannot. `snapshots` names the holdings and `rates` the units
+ *  the write would create an entry for.
+ *
+ *  A date another session recorded since the sitting began, or any slot
+ *  already taken, refuses the whole save before a single write. The
+ *  model then takes the reloaded records, so the screen can show the
+ *  recording as it now stands. */
+export async function claimDate(vault, sit, { snapshots = [], rates = [] }) {
+  if (sit.claimed) return null;
+  const fresh = await reloadCreateTypes(vault);
+  const at = (list) => list.filter((record) => record.payload.date === sit.date);
+  const taken =
+    (sit.dateWasEmpty && (at(fresh.snapshot).length > 0 || at(fresh.rate).length > 0)) ||
+    at(fresh.snapshot).some((r) => snapshots.includes(r.accountId)) ||
+    at(fresh.rate).some((r) => rates.includes(r.payload.symbol));
+  if (taken) {
+    vault.replaceType('snapshot', fresh.snapshot);
+    vault.replaceType('rate', fresh.rate);
+    return { refused: true, date: sit.date };
+  }
+  sit.claimed = true;
+  return null;
+}
+
+/** What a rate line would write at a date with no entry for its unit,
+ *  or null for nothing. A proposal left alone is written as proposed,
+ *  a changed one as edited with the offer kept, and a figure typed
+ *  where no proposal came as manual. A line still showing the figure
+ *  carried from an earlier entry writes nothing, because an estimate
+ *  does not get newer by being looked at (record-rate.md, The
+ *  refresh). */
+export function ratePart({ figure, proposal = null, carried = null }) {
+  if (figure === null || figure === undefined) return null;
+  if (proposal) {
+    return decimal.parse(proposal.rate) === figure
+      ? { rate: proposal.rate, rateSource: 'proposed', rateAsOf: proposal.asOf, proposedRate: null }
+      : { rate: decimal.format(figure), rateSource: 'edited', rateAsOf: proposal.asOf, proposedRate: proposal.rate };
+  }
+  if (carried && decimal.parse(carried.payload.rate) === figure) return null;
+  return { rate: decimal.format(figure), rateSource: 'manual', rateAsOf: null, proposedRate: null };
+}
+
+/** A new entry for one unit at one date, in the main currency as it
+ *  stands now. */
+export function rateEntry(vault, unit, date, part) {
+  return { symbol: unit, date, ...part, rateTarget: vault.mainCurrency };
 }
 
 /** Ensure the recording date's prices: write where the date has no
  *  entry for a symbol and leave every entry that is there alone, so
  *  running it twice at one date is a no-op the second time.
  *
+ *  `choose(unit)` says what to write for a unit, from what its rate
+ *  line shows. Without it, the proposals are written as they came.
+ *
  *  Issued after the quantity, on its own requests, so a price write
  *  can never fail a quantity write. What did not land is returned and
  *  named rather than swallowed. */
-export async function refreshPrices(vault, date, proposals) {
+export async function refreshPrices(vault, date, proposals, choose = null) {
+  const pick = choose || ((unit) => (proposals[unit] ? ratePart({ figure: decimal.parse(proposals[unit].rate), proposal: proposals[unit] }) : null));
   const written = [];
   const failed = [];
-  for (const unit of vault.unitsToRefresh()) {
-    const already = vault
-      .entriesFor(unit)
-      .some((entry) => entry.payload.date === date);
-    if (already) continue;
-    const proposal = proposals[unit];
-    // No proposal and a previous entry: nothing is written, the
-    // previous entry stays the symbol's latest. Degraded, not wrong.
-    if (!proposal) continue;
+  for (const unit of vault.missingUnits(date)) {
+    const part = pick(unit);
+    // No proposal and nothing typed: nothing is written, and a previous
+    // entry stays the symbol's latest. Degraded, not wrong.
+    if (!part) continue;
     try {
-      written.push(
-        await saveRate(vault, null, {
-          symbol: unit,
-          date,
-          rate: proposal.rate,
-          rateTarget: vault.mainCurrency,
-          rateSource: 'proposed',
-          rateAsOf: proposal.asOf,
-          proposedRate: null,
-        }),
-      );
+      written.push(await saveRate(vault, null, rateEntry(vault, unit, date, part)));
     } catch {
       failed.push(unit);
     }
@@ -231,37 +282,46 @@ export function editedRatePayload(stored, rate) {
   return { ...stored, rate };
 }
 
-/** One save of a reopened recording, in the fixed order: the
- *  pre-create reload if anything is being created, then quantities,
- *  then rates, then deletions.
+/** Confirming: the quantity the holding carried into `date`, recorded
+ *  again at it. Refused for a holding with nothing to confirm, which is
+ *  the request a screen that offers no Confirm would never send. */
+export function confirmFigure(vault, holding, date) {
+  const carried = [...vault.usableSnapshots(holding.recordId)]
+    .reverse()
+    .find((s) => s.payload.date < date);
+  if (!carried) throw new Error('A holding with no figure before this date has nothing to confirm.');
+  return saveSnapshot(vault, holding.recordId, null, { date, value: carried.payload.value, note: null });
+}
+
+/** One save of a recording, in the fixed order: the pre-create reload
+ *  if anything is being created, then quantities, then rates, then
+ *  deletions.
  *
  *  No step is skipped because an earlier one failed. Each record is
  *  independent, and abandoning the rest would turn one failed write
  *  into several unattempted ones. */
-export async function saveRecording(vault, date, plan) {
-  const creating =
-    plan.quantities.some((q) => !q.existing) || plan.rates.some((r) => !r.existing);
-
-  if (creating) {
-    const taken = occupiedSlots(await reloadCreateTypes(vault));
-    const clash =
-      plan.quantities.some(
-        (q) => !q.existing && taken.snapshots.has(`${q.accountId}\u001f${date}`),
-      ) ||
-      plan.rates.some(
-        (r) => !r.existing && taken.rates.has(`${r.payload.symbol}\u001f${date}`),
-      );
-    if (clash) {
-      // Refused whole, before a single write. The person is looking at
-      // a screen that no longer describes the vault.
-      return { refused: true, date, saved: [], failed: [] };
-    }
+export async function saveRecording(vault, sit, plan) {
+  const quantities = plan.quantities || [];
+  const rates = plan.rates || [];
+  const deletes = plan.deletes || [];
+  const creates = {
+    snapshots: quantities.filter((q) => !q.existing).map((q) => q.accountId),
+    rates: rates.filter((r) => !r.existing).map((r) => r.payload.symbol),
+  };
+  // A save that only changes and clears what is there claims nothing:
+  // the version rule on each record is the check that catches another
+  // session on exactly those records.
+  const creating = creates.snapshots.length > 0 || creates.rates.length > 0;
+  if (creating && (await claimDate(vault, sit, creates))) {
+    // Refused whole, before a single write. The person is looking at
+    // a screen that no longer describes the vault.
+    return { refused: true, date: sit.date, saved: [], failed: [] };
   }
 
   const saved = [];
   const failed = [];
 
-  for (const change of plan.quantities) {
+  for (const change of quantities) {
     try {
       await saveSnapshot(vault, change.accountId, change.existing, change.payload);
       saved.push({ kind: 'quantity', name: change.name });
@@ -269,7 +329,7 @@ export async function saveRecording(vault, date, plan) {
       failed.push({ kind: 'quantity', name: change.name, status: error.status });
     }
   }
-  for (const change of plan.rates) {
+  for (const change of rates) {
     try {
       await saveRate(vault, change.existing, change.payload);
       saved.push({ kind: 'rate', name: change.payload.symbol });
@@ -282,15 +342,15 @@ export async function saveRecording(vault, date, plan) {
   // to remove. Quantities before rates, so a run that stops partway
   // leaves the date priced rather than leaving quantities nothing can
   // value.
-  const ordered = [...plan.deletes].sort(
-    (a, b) => (a.recordType === 'snapshot' ? 0 : 1) - (b.recordType === 'snapshot' ? 0 : 1),
+  const ordered = [...deletes].sort(
+    (a, b) => (a.entry.recordType === 'snapshot' ? 0 : 1) - (b.entry.recordType === 'snapshot' ? 0 : 1),
   );
-  for (const entry of ordered) {
+  for (const { entry, name } of ordered) {
     try {
       await deleteRecord(vault, entry);
-      saved.push({ kind: 'deleted', name: entry.recordType });
-    } catch {
-      failed.push({ kind: 'deleted', name: entry.recordType });
+      saved.push({ kind: 'deleted', name });
+    } catch (error) {
+      failed.push({ kind: 'deleted', name, status: error.status });
     }
   }
   return { refused: false, saved, failed };

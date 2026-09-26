@@ -6,43 +6,67 @@
 import * as decimal from './decimal.js';
 import * as writes from './writes.js';
 import { dialog, el } from './dom.js';
-import { provenanceChip } from './view-sweep.js';
+import { holdingsIn, provenanceChip } from './view-sweep.js';
 
-export function recordingView(vault, date, { onUpdate, onOpenHolding, onDeleted, onChanged }) {
-  const { figures, prices } = vault.recording(date);
-  const error = el('p', { class: 'field-error', hidden: true });
+export function recordingView(vault, date, { onUpdate, onOpenHolding, onDeleted, onChanged, onPickDate }) {
+  const root = el('section', { class: 'screen recording' });
+  const draw = (notice = null) => {
+    // Another window deleted this date: the screen says so rather than
+    // rendering a shell of a recording it no longer has.
+    if (!vault.holdsRecording(date)) {
+      root.replaceChildren(
+        el('h1', { class: 'screen-heading', text: vault.format.longDate(date) }),
+        el('div', { class: 'card card-centered' }, [
+          el('p', { class: 'empty-line', text: `${vault.format.longDate(date)} holds no recording.` }),
+          el('button', { class: 'btn-primary', text: 'Pick a date', onclick: () => onPickDate && onPickDate() }),
+        ]),
+      );
+      return;
+    }
+    const { figures, prices } = vault.recording(date);
+    const priced = new Set(prices.map((entry) => entry.payload.symbol));
+    // A unit the vault holds with nothing at this date: the source did
+    // not answer that day, and filling it in is done after Update.
+    const empty = vault.unitsToRefresh().filter((unit) => !priced.has(unit));
+    const error = el('p', { class: 'field-error', role: 'alert', hidden: !notice, text: notice || '' });
 
-  return el('section', { class: 'screen' }, [
-    el('h1', { class: 'screen-heading', text: vault.format.longDate(date) }),
-    error,
-    el('section', { class: 'card' }, [
-      el('h2', { class: 'section-heading', text: 'Figures' }),
-      figures.length
-        ? el('table', { class: 'data-table' }, [
-            el('tbody', {}, figures.map((figure) => figureRow(vault, figure, onOpenHolding, onChanged))),
-          ])
-        : el('p', { class: 'empty-line', text: 'No figures recorded on this date' }),
-    ]),
-    el('section', { class: 'card' }, [
-      el('h2', { class: 'section-heading', text: 'Prices' }),
-      prices.length
-        ? el('table', { class: 'data-table' }, [
-            el('tbody', {}, prices.map((entry) => priceRow(vault, entry, onChanged))),
-          ])
-        : el('p', {
-            class: 'empty-line',
-            text: 'No prices were captured at this date.',
+    root.replaceChildren(
+      el('h1', { class: 'screen-heading', text: vault.format.longDate(date) }),
+      error,
+      el('section', { class: 'card' }, [
+        el('h2', { class: 'section-heading', text: 'Figures' }),
+        figures.length
+          ? el('table', { class: 'data-table' }, [
+              el('tbody', {}, figures.map((figure) => figureRow(vault, figure, onOpenHolding, onChanged))),
+            ])
+          : el('p', { class: 'empty-line', text: 'No figures recorded on this date' }),
+      ]),
+      el('section', { class: 'card' }, [
+        el('h2', { class: 'section-heading', text: 'Prices' }),
+        prices.length
+          ? el('table', { class: 'data-table' }, [
+              el('tbody', {}, prices.map((entry) => priceRow(vault, entry, onChanged))),
+            ])
+          : el('p', { class: 'empty-line', text: 'No prices were captured at this date.' }),
+        ...empty.map((unit) =>
+          el('p', {
+            class: 'hint missing-price',
+            text: `No price for ${unit} at this date. The line is empty, and it is filled in after Update.`,
           }),
-    ]),
-    el('div', { class: 'form-actions' }, [
-      el('button', { class: 'btn-primary', text: 'Update', onclick: () => onUpdate(date) }),
-      el('button', {
-        class: 'btn-destructive',
-        text: 'Delete',
-        onclick: () => confirmDelete(vault, date, error, onDeleted),
-      }),
-    ]),
-  ]);
+        ),
+      ]),
+      el('div', { class: 'form-actions' }, [
+        el('button', { class: 'btn-primary', text: 'Update', onclick: () => onUpdate(date) }),
+        el('button', {
+          class: 'btn-destructive',
+          text: 'Delete',
+          onclick: () => confirmDelete(vault, date, onDeleted, draw),
+        }),
+      ]),
+    );
+  };
+  draw();
+  return root;
 }
 
 function figureRow(vault, { holding, snapshot }, onOpenHolding, onChanged) {
@@ -77,9 +101,13 @@ function priceRow(vault, entry, onChanged) {
   const rivals = vault
     .entriesFor(entry.payload.symbol)
     .filter((e) => e.payload.date === entry.payload.date && e.recordId !== entry.recordId);
-  return el('tr', { class: rivals.length ? 'flagged' : null }, [
-    el('td', { text: entry.payload.symbol }),
-    el('td', { class: 'numeric', text: entry.payload.rate }),
+  const unit = vault.unitOf(entry.payload.symbol);
+  return el('tr', { class: rivals.length ? 'flagged' : null, 'data-unit': entry.payload.symbol }, [
+    el('td', { text: entry.payload.symbol, title: unit.name }),
+    el('td', {
+      class: 'numeric',
+      text: `${vault.format.editable(decimal.parse(entry.payload.rate), 6)} ${vault.mainCurrency}`,
+    }),
     el('td', {}, [el('span', { class: 'chip', text: provenanceChip(entry.payload, vault.format) })]),
     keepCell(vault, rivals, 'Two prices for this unit share this date. Keep one.', onChanged),
   ]);
@@ -103,16 +131,25 @@ function keepCell(vault, rivals, note, onChanged) {
   ]);
 }
 
+/** What a recording still holds, by holding name and by unit. */
+function named(vault, entries) {
+  return entries
+    .map((entry) =>
+      entry.recordType === 'snapshot'
+        ? (vault.holdings.get(entry.accountId) || { payload: { name: 'a holding' } }).payload.name
+        : `the ${entry.payload.symbol} price`,
+    )
+    .join(', ');
+}
+
 /** One confirmation, naming the two things that make this
  *  destructive: the prices go too, so every holding measured in those
  *  units moves on that date and not only the ones that had a figure,
  *  and there is no way back. */
-function confirmDelete(vault, date, error, onDeleted) {
+function confirmDelete(vault, date, onDeleted, redraw) {
   const { figures, prices } = vault.recording(date);
   const units = [...new Set(prices.map((entry) => entry.payload.symbol))];
-  const affected = [...vault.holdings.values()].filter((h) =>
-    units.includes(h.payload.unit),
-  ).length;
+  const affected = units.reduce((sum, unit) => sum + holdingsIn(vault, unit), 0);
 
   const body = [
     el('p', {
@@ -124,7 +161,7 @@ function confirmDelete(vault, date, error, onDeleted) {
   if (units.length) {
     body.push(
       el('p', {
-        text: `${affected} holdings measured in ${units.join(' and ')} move on that date, including ones you recorded nothing for.`,
+        text: `${affected} ${affected === 1 ? 'holding' : 'holdings'} measured in ${units.join(' and ')} move on that date, including ones you recorded nothing for.`,
       }),
     );
   }
@@ -140,13 +177,18 @@ function confirmDelete(vault, date, error, onDeleted) {
         text: 'Delete the recording',
         onclick: async () => {
           close();
+          const before = figures.length + prices.length;
           const remaining = await writes.deleteRecording(vault, date);
-          if (remaining.length) {
-            error.textContent = `Part of the recording is still there. Nothing was rolled back; ${remaining.length} records remain and read normally.`;
-            error.hidden = false;
-            return;
-          }
-          onDeleted();
+          if (!remaining.length) return onDeleted();
+          // Nothing is rolled back and nothing marks the date as half
+          // deleted. The screen shows what is actually left, names it,
+          // and offers Delete again.
+          redraw(
+            remaining.length === before
+              ? 'Nothing was deleted. The recording is unchanged.'
+              : `Part of the recording is still there: ${named(vault, remaining)}. Nothing was rolled back, and what is left reads normally. Delete again to remove it.`,
+          );
+          return null;
         },
       }),
     ],

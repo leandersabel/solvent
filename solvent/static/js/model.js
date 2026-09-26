@@ -206,6 +206,39 @@ export class Vault {
     return [...units].sort();
   }
 
+  /** The units a recording at `date` would still price: those the
+   *  refresh covers with no entry at that date. A date whose prices are
+   *  complete asks the proxy nothing (record-rate.md, The refresh). */
+  missingUnits(date) {
+    return this.unitsToRefresh().filter(
+      (unit) => !this.entriesFor(unit).some((entry) => entry.payload.date === date),
+    );
+  }
+
+  /** Whether the proxy can propose a price for this unit at all. A
+   *  free-text unit, or a symbol with lookup off, has no rate source,
+   *  so nothing is ever requested for it. */
+  quotable(unit) {
+    const row = this.symbols.get(unit);
+    return Boolean(row && row.lookup);
+  }
+
+  /** The unit's last usable entry before `date`: the figure a line with
+   *  nothing at its own date carries. */
+  carriedRate(unit, date) {
+    return [...this.usableEntries(unit)].reverse().find((e) => e.payload.date < date) || null;
+  }
+
+  /** Replace every record of one type with a fresh read of it: the
+   *  reload a Conflict costs (record-api.md, Endpoints), and the one a
+   *  refused create shows the person. */
+  replaceType(type, entries) {
+    const map = type === 'snapshot' ? this.snapshots : this.rates;
+    map.clear();
+    for (const entry of entries) this._index(entry);
+    this._sortSeries();
+  }
+
   snapshotsFor(accountId) {
     return this.snapshots.get(accountId) || [];
   }
@@ -352,6 +385,13 @@ export class Vault {
       for (const entry of list) dates.add(entry.payload.date);
     }
     return [...dates].sort();
+  }
+
+  /** Whether any record carries this date. A recording exists exactly
+   *  as long as one does (record-snapshot.md, A recording is a date). */
+  holdsRecording(date) {
+    const { figures, prices } = this.recording(date);
+    return figures.length > 0 || prices.length > 0;
   }
 
   /** Everything bearing one date: a client-side index over the model,

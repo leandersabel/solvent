@@ -85,7 +85,7 @@ export function holdingView(vault, accountId, { editing = false, onOpenRecording
       : el('button', {
           class: 'btn-primary',
           text: 'Record a value',
-          onclick: () => snapshotDialog(vault, holding, null, onChanged),
+          onclick: () => snapshotDialog(vault, holding, null, onChanged, onOpenRecording),
         }),
     el('button', {
       class: 'btn-secondary',
@@ -254,7 +254,7 @@ function historyRow(vault, holding, snapshot, flagged, { onOpenRecording, onChan
       el('button', {
         class: 'btn-inline',
         text: 'Edit',
-        onclick: () => snapshotDialog(vault, holding, snapshot, onChanged),
+        onclick: () => snapshotDialog(vault, holding, snapshot, onChanged, onOpenRecording),
       }),
       el('button', {
         class: 'btn-inline',

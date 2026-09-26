@@ -26,11 +26,11 @@ import {
 import { whenUnauthorized } from './api.js';
 import { onLock, currentVault, isUnlocked, lock, signOut } from './session.js';
 import { unlockCard } from './unlock.js';
-import { dashboardView } from './view-dashboard.js';
+import { dashboardView, datePicker as pickDate } from './view-dashboard.js';
 import { holdingForm } from './view-holding-form.js';
 import { holdingView } from './view-holding.js';
 import { recordingView } from './view-recording.js';
-import { resetSweepState, sweepView } from './view-sweep.js';
+import { resetSweepState, sweepView, unsavedOnSweep } from './view-sweep.js';
 import { settingsView } from './view-settings.js';
 import { dimensionsView } from './view-dimensions.js';
 import { transferView } from './page-transfer.js';
@@ -51,10 +51,26 @@ let held = null;
 let vaultShown = false;
 
 function render() {
+  const left = unsavedOnSweep();
   draw();
+  leftUnsaved(left);
   markCurrentNav();
   vaultShown = isUnlocked();
   if (vaultShown) trackEdits(container);
+}
+
+/** Leaving a sweep with typed figures says so and names them, on the
+ *  screen that replaced it. Nothing in the vault records them, because
+ *  the unsaved half existed only in the screen that is gone
+ *  (record-rate.md, Saving an edited recording). */
+function leftUnsaved({ date, names }) {
+  if (!names.length || !isUnlocked()) return;
+  const vault = currentVault();
+  container.prepend(
+    el('p', { class: 'banner banner-critical', role: 'status' }, [
+      `You left the recording for ${vault.format.longDate(date)} with changes that were not saved: ${names.join(', ')}.`,
+    ]),
+  );
 }
 
 // Each screen's own content width (spec/ui/*.md, Layout), set on the
@@ -139,12 +155,13 @@ function draw() {
         onOpenHolding: actions.openHolding,
         onDeleted: () => go('#/'),
         onChanged: render,
+        onPickDate: () => pickDate(vault, actions),
       }),
     ]);
     return;
   }
   if (view === 'sweep') {
-    mount(container, sweepView(vault, argument));
+    mount(container, sweepView(vault, argument, actions));
     return;
   }
   mount(container, dashboardView(vault, actions, {
