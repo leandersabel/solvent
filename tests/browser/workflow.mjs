@@ -1605,6 +1605,10 @@ try {
     // ---- net-worth-view: the dashboard over the recorder vault --------------
 
     check('net-worth-view: the chart loads with its entry marks showing', (await ev("document.querySelectorAll('.entry-mark').length")) > 0);
+    check(
+      'net-worth-view: a history shorter than a year opens on All',
+      (await ev("document.querySelector('.range-buttons .active').textContent")) === 'All',
+    );
     traffic.length = 0;
     await ev(`(() => { const s = [...document.querySelectorAll('.chart-card select')][0]; s.value = 'liq'; s.dispatchEvent(new Event('change', { bubbles: true })); })()`);
     await rec.settle(300);
@@ -1827,10 +1831,14 @@ try {
       JSON.stringify(shapeBefore.filter((r) => !r.startsWith(todayLabel))) === JSON.stringify(shapeAfter.filter((r) => !r.startsWith(todayLabel))) &&
         (await hero()) !== totalBefore && !(await tableRow('Fund 4')),
     );
+    await pointer('pointermove', 0.999);
     check(
-      'net-worth-view: the archive is annotated on the chart, naming the holding',
-      await ev("[...document.querySelectorAll('.archive-annotation title')].some(t => t.textContent === 'Fund 4 archived')"),
+      'net-worth-view: the archive is annotated on the chart, and the tooltip at its date names the holding',
+      (await ev("[...document.querySelectorAll('.archive-annotation title')].some(t => t.textContent === 'Fund 4 archived')")) &&
+        (await ev("document.querySelector('.chart-readout').textContent")).includes('Fund 4 archived'),
+      await ev("document.querySelector('.chart-readout').textContent"),
     );
+    await pointer('pointerleave', 0.999);
     await archive('Fund 3', '0');
     const closing = on(await stored('snapshot'), T).find((s) => s.accountId === id['Fund 3']);
     await go(`#/holding/${id['Fund 3']}`);

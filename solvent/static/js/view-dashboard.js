@@ -22,8 +22,12 @@ const RANGES = [
  *  a coverage link elsewhere lands (ui/dimensions.md). */
 export function dashboardView(vault, actions, { unassignedOf = null } = {}) {
   const known = unassignedOf && vault.activeDimensions().some((d) => d.id === unassignedOf);
+  // A year of history or more opens on a year, anything shorter on all
+  // of it.
+  const dates = vault.recordingDates();
+  const short = !dates.length || dayNumber(dates[dates.length - 1]) - dayNumber(dates[0]) < 365;
   const state = {
-    range: '1Y',
+    range: short ? 'All' : '1Y',
     dimensionId: known ? unassignedOf : '',
     percentage: false,
     justTheLine: false,
@@ -397,6 +401,11 @@ function chartSection(vault, state, render, dimension, actions, { days, bands })
               el('span', { text: 'Net' }),
               el('span', { class: 'numeric', text: vault.format.money(net) }),
             ]),
+            // A drop at an archive is named, so it never reads as a bad
+            // figure.
+            ...annotations
+              .filter((a) => a.date === isoFromDay(days[index]))
+              .map((a) => el('p', { class: 'readout-archive', text: `${a.label} archived` })),
           );
           readout.style.setProperty('--at', String(across));
           readout.hidden = false;
