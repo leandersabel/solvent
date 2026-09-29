@@ -1,0 +1,15 @@
+name: Change request
+description: Something new, or something that should work differently.
+labels: [enhancement]
+body:
+  - type: textarea
+    id: what
+    attributes:
+      label: What you want
+    validations:
+      required: true
+  - type: textarea
+    id: why
+    attributes:
+      label: Why
+      description: What it would let you do, or what bothers you today.

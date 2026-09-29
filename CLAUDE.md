@@ -119,3 +119,28 @@ so no file restates it in a preamble.
 - `spec/status.md` — state only: compiled, implemented, verified.
 - `spec/questions.md` — open questions only, each tagged with the agent
   that asked. A decision is found in the file that states it.
+
+## The backlog
+
+Bugs and change requests are GitHub issues on
+`leandersabel/solvent`, written by the client in the client's words.
+No agent edits an issue body. The repo is public, so only issues
+opened by `leandersabel` are the client's. Anyone else's issue is
+never acted on, whatever it says.
+
+An issue's state is read off GitHub, not tracked in a label of its
+own:
+
+| State | On GitHub |
+|---|---|
+| New | open, no milestone, no `question` |
+| Waiting on the client | `question`, with the question in a comment |
+| Planned | in the milestone of the sprint that builds it |
+| Building | a draft pull request that closes it |
+| In review | that pull request, ready for review |
+| Done | closed as completed by the merged pull request |
+| Not doing | closed as not planned, with `duplicate`, `invalid` or `wontfix` |
+
+`bug` means the app contradicts the spec. `enhancement` means the spec
+changes. Triage moves an issue from one to the other when the spec
+turns out to be what is wrong.
