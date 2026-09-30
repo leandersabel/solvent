@@ -39,7 +39,7 @@ row, and the schema refuses to give it either (`app-shell.md`,
 Database). So there is no key material in an administrator session for
 an endpoint to leak by accident, nothing for a mistaken join to pull
 back, and no vault that "their" account owns. The vault surface
-answers an administrator session Not Found at the routing layer before
+answers an administrator session Not Found at the request gate, before
 any handler runs (`app-shell.md`, The two surfaces).
 
 On top of that structure, there is no endpoint, and must never be one,
@@ -109,9 +109,13 @@ An invite row: `id`, `token_hash`, `kind`, `created_by`, `created_at`,
 The provisioning endpoints. `rate-lookup.md` owns the symbol table's,
 and more will be added as the platform needs them. All require a
 session whose principal is an `administrator`, and all writes are
-CSRF-protected. A vault owner session gets Not Found from every
-endpoint under `/api/admin/`, at the routing layer (`app-shell.md`,
-The two surfaces), whether or not this file names it.
+CSRF-protected. Every path under `/api/admin/`, registered or not, is
+refused exactly as an invented `/api/` path is (architecture.md,
+Status codes, Refusals), before any handler runs (`app-shell.md`, The
+request gate), whether or not this file names it: a vault owner session
+gets Not Found, and a request with the header and no session gets
+Unauthorized. The `/admin` page answers a vault owner and a signed-out
+visitor Not Found, as an invented page does.
 
 - `POST /api/admin/invites` `{ expiresInDays, label, kind }` →
   `{ id, token, url, expiresAt, kind }`. The only response that ever
@@ -313,9 +317,14 @@ invocation and nothing more.
 - **Two registrations racing on one invite** → the consuming
   transaction's uniqueness constraint means exactly one wins; the other
   gets the generic invalid-invite error.
-- **A vault owner hits an admin endpoint** → Not Found, not Forbidden
-  — do not confirm the endpoint exists (`app-shell.md`, The two
-  surfaces).
+- **A vault owner hits an admin endpoint** → refused as an invented
+  `/api/` path is, which with the header is Not Found, so nothing
+  confirms the endpoint exists (architecture.md, Status codes,
+  Refusals).
+- **A request with the header and no session reaches an admin
+  endpoint** → Unauthorized, the same as `/api/admin/invented` and any
+  other invented `/api/` path, and the `/admin` page opened signed out
+  → Not Found, the same as an invented page.
 - **An administrator revokes their own outstanding invites** → allowed,
   no special case.
 - **The last administrator removes themselves** → Conflict, and
@@ -360,6 +369,12 @@ invocation and nothing more.
   status.
 - A vault owner session receives Not Found from every `/api/admin/*`
   endpoint.
+- With the header and no session, every registered `/api/admin/` route
+  under every method, and `/api/admin/invented`, answers Unauthorized
+  matching an invented `/api/` path on status, body and every header
+  except `Date`. `/admin` signed out and as a vault owner answers the
+  Not Found an invented page path does, matched the same way
+  (`app-shell.md`, the refusal fingerprint matrix).
 - No endpoint under `/api/admin/` returns any field of any account's
   credential row, any wrapper, or any record ciphertext. Asserted by
   enumerating the registered routes at test time and inspecting each

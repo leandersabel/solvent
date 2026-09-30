@@ -1,9 +1,9 @@
 {
   "feature": "app-shell",
-  "summary": "The one Flask application every other feature runs inside: response headers on every response, the CSRF header check ahead of authentication and routing, the session cookie, the SQLite schema including the two administrator triggers, the vault and administration surface split, and the authenticated chrome.",
+  "summary": "The one Flask application every other feature runs inside: response headers on every response, the request gate that serves or refuses every request before any handler runs with a refusal picked from namespace, header and session alone, the CSRF header check, the session cookie, the SQLite schema including the two administrator triggers, the vault and administration surface split, and the authenticated chrome.",
   "read": [
     {"file": "spec/features/app-shell.md", "sections": ["all"]},
-    {"file": "spec/architecture.md", "sections": ["Components", "Status codes", "Application hardening", "Network & transport", "Supply chain", "Tech stack", "Accounts on this instance", "Credentials and vault key wrappers", "Key management"]},
+    {"file": "spec/architecture.md", "sections": ["Components", "Status codes", "Refusals", "Application hardening", "Network & transport", "Supply chain", "Tech stack", "Accounts on this instance", "Credentials and vault key wrappers", "Key management"]},
     {"file": "spec/ui/design-system.md", "sections": ["App shell", "Components", "States"], "role": "the chrome this feature renders, top bar, nav, Update values, Lock and the administrator's stripped bar. No screen of its own"},
     {"file": "spec/features/admin-invites.md", "sections": ["The admin boundary"], "role": "the boundary the surface split is the routing half of"}
   ],
@@ -14,28 +14,70 @@
     "noXFrameOptions": {"value": "no separate X-Frame-Options header is served. frame-ancestors 'none' in the CSP is the only framing control", "cite": "spec/features/app-shell.md#response-headers"},
     "hsts": {"value": "includeSubDomains always, plus preload only once the deployment is internet-reachable on a fixed domain that has served the header stably for the required probation period. Not applicable to a LAN or VPN-only deployment", "cite": "spec/architecture.md#network-transport"},
     "csrfHeader": {"value": "X-Solvent-Request: 1", "cite": "spec/architecture.md#application-hardening"},
-    "csrfOrdering": {"value": "the check is middleware and runs before authentication and before routing, so a missing header is Forbidden whether or not the session is valid and whether or not the path resolves", "cite": "spec/features/app-shell.md#csrf"},
+    "csrfOrdering": {"value": "the check is middleware and runs before authentication and before any handler, on every route not named exempt, wherever it sits. In the API namespace a missing header is Forbidden whether or not the session is valid and whether or not the path exists. No API route is exempt, so the check needs no routing", "cite": "spec/features/app-shell.md#csrf"},
     "csrfExemptRule": {"value": "exempt are the server-rendered shell pages reached by navigation and the static endpoint, each a named route and never a path pattern, so an endpoint added under an existing prefix inherits nothing. Every JSON endpoint requires the header, GET /api/export included", "cite": "spec/features/app-shell.md#csrf"},
-    "staticExemption": {"value": "the static endpoint is exempt because no subresource request carries a custom header and the unauthenticated screens have no session to offer. What it serves is public by construction: the design tokens, the client-side code and the vendored Alpine build", "cite": "spec/features/app-shell.md#csrf"},
+    "staticExemption": {"value": "the static endpoint is exempt because no subresource request carries a custom header and the unauthenticated screens have no session to offer. It is also a Public route, which is why it needs no session. What it serves is public by construction: the design tokens, the client-side code and the vendored Alpine build", "cite": "spec/features/app-shell.md#csrf"},
+    "namespaces": {"value": "a path starting with /api/ is in the API namespace and every other path is in the page namespace", "cite": "spec/architecture.md#refusals"},
+    "namespaceInvariants": {"value": "every route that requires the header is in the API namespace, under /api/, because outside it a missing header is refused with Not Found, which the app's own client reads as done on a DELETE. Every route in the page namespace is a named navigation route or the static endpoint, exempt from the header, and answers only GET and HEAD. A route that would break either is a design change", "cite": "spec/features/app-shell.md#csrf"},
+    "refusalPicking": {"value": "a refusal's status is picked from the namespace, whether the X-Solvent-Request header is present, and whether the session is valid, and from nothing else. Whether the path exists, which surface it belongs to and which method the request used never pick it. No valid session is one condition: no cookie, an expired or revoked session and a bad signature read the same", "cite": "spec/architecture.md#refusals"},
+    "refusalTable": {
+      "value": {
+        "pageNamespace": {"noHeader": "Not Found", "headerNoValidSession": "Not Found", "headerValidSession": "Not Found"},
+        "apiNamespace": {"noHeader": "Forbidden", "headerNoValidSession": "Unauthorized", "headerValidSession": "Not Found"}
+      },
+      "cite": "spec/architecture.md#refusals"
+    },
+    "unresolvedCountsAsInvented": {"value": "unresolved means any routing outcome other than a match: an unknown path, a method the route does not answer, or an address the router would redirect to its canonical form (//admin). Each is refused as the table says, exactly as an invented path is. No response is Method Not Allowed and the gate never redirects. The URL map sets merge_slashes = False, so //admin has no canonical form. The gate is the backstop for every other redirect or Method Not Allowed the router would raise", "cite": "spec/features/app-shell.md#the-request-gate"},
+    "requestGateOrder": {
+      "value": [
+        "1 Header: an API-namespace request without X-Solvent-Request: 1 is Forbidden, resolved or not",
+        "2 Authentication: absent, expired, revoked and badly signed are one outcome, no valid session",
+        "3 Unauthenticated API request: an API-namespace request with no valid session is Unauthorized unless it resolved to a Public route, whether or not its path exists",
+        "4 Unresolved: a request that did not resolve is Not Found. Only a page-namespace request or an API request with a valid session reaches this step",
+        "5 No session, page namespace: a Public page is served. A vault navigation page is served and renders its own sign-in card. Any other page is Not Found, which makes /admin answer a signed-out visitor as an invented address does",
+        "6 Surface: with a valid session, a route whose surface the session's kind does not reach is Not Found"
+      ],
+      "cite": "spec/features/app-shell.md#the-request-gate"
+    },
+    "servedOnlyWhen": {"value": "a request is served only when it resolves, it is exempt or carries the header, and one of these holds: the route is Public; it is a vault navigation page requested without a session; or the session is valid and its kind reaches the route's group. Every other request is refused", "cite": "spec/features/app-shell.md#the-request-gate"},
+    "refusalHeaders": {"value": "a refusal carries the headers every response carries (CSP and HSTS) and no others, and its body depends on its status and namespace alone. No Set-Cookie, no Allow, no Location, and no header a route sets on its own response, such as Cache-Control: no-store on the vault shell or Referrer-Policy on admin pages. The page-namespace Not Found renders nothing that depends on the session or the kind", "cite": "spec/features/app-shell.md#the-request-gate"},
+    "noOptions": {"value": "no route answers OPTIONS: automatic OPTIONS responses are turned off. No CORS headers are served", "cite": "spec/features/app-shell.md#csrf"},
     "sessionRow": {"value": "(id, token_hash, principal_id, issued_at, last_active_at). The row shape does not vary by kind and carries no kind column, which is read through principal_id. last_active_at is written on every authenticated request", "cite": "spec/architecture.md#application-hardening"},
     "sessionCookie": {"value": "HttpOnly, Secure, SameSite=Lax, carrying only a random session token signed with the Flask SECRET_KEY. No key material and no principal id. A valid signature alone is not a session: the token must hash to a stored row", "cite": "spec/architecture.md#application-hardening"},
     "secretKeyStartupRule": {"value": "the app refuses to start when SECRET_KEY is absent or empty rather than generating one, and the failure names the variable without printing any value", "cite": "spec/features/app-shell.md#configuration"},
     "schemaOwnership": {"value": "one place creates the schema and opens the SQLite file on its writable volume. Each table's columns are stated by the feature that owns them: records by record-api.md, principals and credentials and dek_wrappers by register.md, invites by admin-invites.md, sessions by architecture.md Application hardening", "cite": "spec/features/app-shell.md#database"},
     "administratorTriggers": {"value": "a BEFORE INSERT on records and a BEFORE INSERT on dek_wrappers, each resolving the row's principal and aborting when its kind is administrator. A SQLite CHECK cannot reach another table, which is why these are triggers", "cite": "spec/features/app-shell.md#database"},
-    "surfaceShared": {"value": ["/login", "/api/auth/salt", "/api/auth/login", "/api/auth/logout", "/api/auth/upgrade-kdf", "/api/auth/change-password"], "cite": "spec/features/app-shell.md#the-two-surfaces"},
-    "surfaceVault": {"value": "the record store, the rate lookup including GET /api/rates/symbols, export, import, /api/sessions, /api/auth/logout-all, DELETE /api/auth/account, /settings, /settings/dimensions and /settings/export-import, the dashboard, and every screen that renders vault data. An administrator gets Not Found, /settings included. The surface is decided before routing, so an address that answers a vault owner with a redirect still answers an administrator with Not Found", "cite": "spec/features/app-shell.md#the-two-surfaces"},
+    "publicRoutes": {
+      "value": [
+        "GET /login",
+        "GET /register",
+        "POST /api/register",
+        "POST /api/auth/salt",
+        "POST /api/auth/login",
+        "POST /api/auth/logout",
+        "GET /",
+        "the static endpoint, the framework's own static route"
+      ],
+      "cite": "spec/features/app-shell.md#the-two-surfaces"
+    },
+    "publicRule": {"value": "Public routes answer a caller with no session and a session of either kind. Public lifts the session requirement and nothing else: a Public JSON endpoint still requires X-Solvent-Request, and each keeps the checks and rate limits its own feature states. Public is a list of named routes, never a path pattern, so an endpoint added beside /api/auth/login or /api/register inherits no sessionless access. No Public route is /admin or under /api/admin/", "cite": "spec/features/app-shell.md#the-two-surfaces"},
+    "surfaceShared": {"value": ["/api/auth/upgrade-kdf", "/api/auth/change-password"], "cite": "spec/features/app-shell.md#the-two-surfaces"},
+    "surfaceSharedRule": {"value": "reached by both kinds with a valid session. Shared holds no page and no route that answers without a session", "cite": "spec/features/app-shell.md#the-two-surfaces"},
+    "surfaceVault": {"value": "the record store, the rate lookup including GET /api/rates/symbols, export, import, /api/sessions, /api/auth/logout-all, DELETE /api/auth/account, /settings, /settings/dimensions and /settings/export-import, the dashboard, and every screen that renders vault data. An administrator gets Not Found, /settings included. The surface is decided before any handler runs, so an address that answers a vault owner with a redirect still answers an administrator with Not Found", "cite": "spec/features/app-shell.md#the-two-surfaces"},
     "oneVaultShellPage": {"value": "the vault surface is one shell page, /dashboard, carrying every screen behind the gate as in-page addresses, settings, dimensions and export and import included. /settings, /settings/dimensions and /settings/export-import each redirect to the view they name, because a second shell page would discard the in-memory keys and charge the derivation again", "cite": "spec/features/app-shell.md#rules"},
     "surfaceAdministration": {"value": "the /admin shell page and every /api/admin/* endpoint, including ones no feature file has been written for yet. A vault owner gets Not Found", "cite": "spec/features/app-shell.md#the-two-surfaces"},
-    "surfaceCheckPlacement": {"value": "the check sits beside the CSRF middleware and runs immediately after authentication, once, so no individual endpoint repeats it. Membership is a prefix rule, not a list, and a route matching no group is unreachable", "cite": "spec/features/app-shell.md#the-two-surfaces"},
+    "surfaceCheckPlacement": {"value": "the surface check is step 6 of the request gate, which runs once per request before any handler, so no individual endpoint repeats it. A session of the wrong kind is refused as the Refusals table says for a valid session. Public is a list of named routes and the other groups are placed by prefix: outside Public, everything under /api/admin/ is administration and everything else that touches a vault is vault. A route matching no group is unreachable", "cite": "spec/features/app-shell.md#the-two-surfaces"},
     "rootPath": {"value": "resolves by kind, the Dashboard for a vault owner and the Admin area for an administrator. It is the only route that resolves to different content per kind", "cite": "spec/features/app-shell.md#the-two-surfaces"},
     "chromeByKind": {"value": "vault owner: nav of Dashboard and Settings, Update values shown, right-hand control Lock, record and decryption layer loaded. Administrator: no nav entries at all, Update values absent rather than disabled, right-hand control Sign out, record and decryption layer not loaded. Both: the embedded KDF envelope and the Argon2id worker", "cite": "spec/features/app-shell.md#the-chrome"},
     "navHasNoAdminOrHoldingsEntry": {"value": "there is no Holdings entry and no Admin entry in either bar, in any state", "cite": "spec/ui/design-system.md#app-shell"},
     "contentMaxWidth": {"value": "1200px on the ground. Forms are 480px, and 900px covers the sweep, a recording's own screen and account detail", "cite": "spec/ui/design-system.md#app-shell"},
     "alpineBuild": {"value": "the CSP-safe build. The standard build needs unsafe-eval for x- expressions, which would gut the CSP", "cite": "spec/architecture.md#application-hardening"},
     "statusCodes": {
-      "csrfHeaderMissing": {"value": 403, "cite": "spec/architecture.md#status-codes", "condition": "the required X-Solvent-Request header is absent, checked before authentication and before routing (spec/features/app-shell.md#csrf)"},
-      "csrfPresentSessionInvalid": {"value": 401, "cite": "spec/architecture.md#status-codes", "condition": "the header is present and the session is missing, expired or invalid (spec/features/app-shell.md#edge-cases)"},
-      "wrongSurfaceOrUnknownRoute": {"value": 404, "cite": "spec/architecture.md#status-codes", "condition": "Not Found in both directions and for an unknown path, never Forbidden, because Forbidden confirms the route exists (spec/features/app-shell.md#the-two-surfaces)"},
+      "apiNoHeader": {"value": 403, "cite": "spec/architecture.md#status-codes", "condition": "a request in the API namespace lacks the X-Solvent-Request header, whether or not its path exists and whatever the session (spec/architecture.md#refusals, spec/features/app-shell.md#the-request-gate)"},
+      "apiHeaderNoValidSession": {"value": 401, "cite": "spec/architecture.md#status-codes", "condition": "a request in the API namespace carries the header and no valid session, and is not a resolved public route, whether or not its path exists. An expired session reads as an absent one (spec/features/app-shell.md#edge-cases)"},
+      "apiHeaderValidSessionRefused": {"value": 404, "cite": "spec/architecture.md#status-codes", "condition": "a request in the API namespace carries the header and a valid session and is refused: an unknown path, an unresolved method or address, or a route of the other kind's surface. Never Forbidden, because Forbidden confirms the route exists (spec/features/app-shell.md#the-two-surfaces)"},
+      "pageNamespaceRefusal": {"value": 404, "cite": "spec/architecture.md#status-codes", "condition": "every refusal in the page namespace, with or without the header and with or without a valid session, including /admin signed out or as a vault owner, /settings as an administrator, an invented page path and //admin (spec/features/app-shell.md#edge-cases)"},
+      "unresolvedRequest": {"value": "no Method Not Allowed and no redirect", "cite": "spec/architecture.md#refusals", "condition": "a method a route does not answer and an address the router would redirect are refused as an invented path is in the same namespace (spec/features/app-shell.md#edge-cases)"},
       "unhandledFailure": {"value": 500, "cite": "spec/architecture.md#status-codes", "condition": "never a designed answer, and it must still carry CSP and HSTS (spec/features/app-shell.md#acceptance-criteria)"}
     }
   },
@@ -44,22 +86,28 @@
     "productCriteria": [{"file": "spec/product/app-shell.md", "section": "What must be true"}],
     "fixtures": [
       "one route of each response shape, a shell page, a JSON endpoint, an unknown path, and a handler stubbed to raise, for the header-parity assertion",
-      "one valid session, one expired session and no session at all, for the CSRF-before-authentication indistinguishability assertion",
-      "a seeded vault owner and a seeded administrator, each with a session, for the surface enumeration in both directions",
-      "a route enumerator that reads the registered route table at test time rather than a fixed list, so a route added later is covered by the surface test instead of exempt from it",
+      "one valid session, one expired session and no session at all, plus a vault owner session and an administrator session, for the four session states of the refusal fingerprint matrix",
+      "a route enumerator that reads the registered route table at test time rather than a fixed list, calling each route under every method it answers, so a route added later joins the refusal matrix, the namespace invariant and the surface test instead of being exempt",
+      "the matrix's fixed probes in each namespace: an invented page path, //admin, a method a registered route does not answer, /api/invented and /api/admin/invented",
+      "a real browser session for the top-level navigation assertions: /admin signed out and as a vault owner, /settings as an administrator, and an invented page path",
       "a process-launch harness that can start the app with SECRET_KEY unset or empty and capture the failure output",
       "a direct SQL insert path into records and into dek_wrappers, bypassing every endpoint, for the two triggers"
     ],
     "focus": [
       "the header criterion is easy to fake by asserting CSP and HSTS on one happy-path route. The spec requires them on a shell page, a JSON endpoint, a Not Found and a Server Error, and a green test over one proves nothing about the others",
-      "the CSRF-before-authentication ordering is only observable by comparing the missing-header response across a valid, an expired and an absent session and confirming all three are byte-identical in status, body and headers. A test against one session state cannot show the check precedes authentication",
-      "the same comparison is needed across an existing and a non-existent path, which is what shows the check also precedes routing",
-      "the surface split must be asserted by enumerating the registered routes at test time and calling each with a session of both kinds. A fixed list of routes passes forever and misses exactly the route somebody adds next, which is the failure the prefix rule exists to prevent. A route that appears in neither group has to fail the test",
+      "the refusal fingerprint matrix is the test that cannot be faked by spot checks: one cell per session state (absent, expired, vault owner, administrator) and header state (absent, present), and within a cell every refused request must match every other in its namespace on status, body and every header except Date, at the status the Refusals table gives. A test over one route or one session state shows nothing about the rest",
+      "without the header a refusal in either namespace must be identical across all four session states, and with the header a refusal to an expired session must be identical to one to an absent session. Comparing an expired session with only a valid one, or checking status without body and headers, leaves the leak in place",
+      "a refusal must carry no Set-Cookie, no Allow, no Location and no route-set header such as Cache-Control: no-store or Referrer-Policy. Comparing status and body alone misses exactly these, and a Method Not Allowed or a trailing-slash redirect leaks through them",
+      "the method and address probes matter: a method a route does not answer and //admin must be refused as an invented path, never Method Not Allowed and never a redirect. A test that only requests unknown paths passes while the router still answers these differently",
+      "the namespace invariant must be asserted over the route map enumerated at test time: every route requiring the header starts with /api/, every route outside /api/ is exempt and answers only GET and HEAD, and no route answers OPTIONS. A fixed route list passes forever and misses the next route added",
+      "the exempt-route criterion must be tested against an actual exempt route and against a nearby non-exempt route under the same prefix, because the exemption is per named route and a pattern-based implementation passes the first half",
+      "the surface split must be asserted by enumerating the registered routes at test time and calling each with a session of both kinds. A route that answers something other than Not Found to the wrong kind, or that appears in neither group, has to fail the test",
+      "the Public group must be asserted over the route map enumerated at test time, against the list in publicRoutes: with the header and no session every Public route is passed by the gate and every other registered API route is Unauthorized under every method it answers, and without a session the only pages served are the Public pages and the vault navigation pages. A test over the listed routes alone passes while a route added later answers without a session",
       "an administrator's GET /api/records must return Not Found and not an empty list, asserted specifically. An empty list passes any test that only checks no other vault's rows came back",
+      "the page-namespace Not Found must be identical in a real browser for /admin signed out, /admin as a vault owner, /settings as an administrator and an invented path. A server-side comparison alone does not show that the rendered page depends on neither session nor kind",
       "the two triggers must be asserted with a direct SQL insert, not through an endpoint. An endpoint that happens to refuse the insert for its own reasons hides whether the schema refuses it at all",
       "the SECRET_KEY criterion needs a real process start attempt and inspection of the failure output for the variable name and the absence of any value. A unit test of a config loader in isolation is not the same thing",
-      "'no response body originating in the shell contains vault plaintext' cannot be checked by grepping the shell's templates, since the shell never holds plaintext to begin with. The assertion that matters is that no route wired to the shell ever receives decrypted content to render",
-      "the exempt-route criterion must be tested against an actual exempt route and against a nearby non-exempt route under the same prefix, because the exemption is per named route and a pattern-based implementation passes the first half"
+      "'no response body originating in the shell contains vault plaintext' cannot be checked by grepping the shell's templates, since the shell never holds plaintext to begin with. The assertion that matters is that no route wired to the shell ever receives decrypted content to render"
     ]
   },
   "openQuestions": []
