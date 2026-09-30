@@ -30,11 +30,14 @@ names for it, handed what the stage before produced.
    body starts with `Closes #<number>`, says what the client will see
    differently in the client's terms, and puts everything technical in
    a `<details>` block. It is a draft when reviewer findings remain,
-   and those findings are listed in it.
-8. Subscribe to the pull request's activity, so a failing check or a
-   review comment brings the work back.
+   and those findings are listed in it. Otherwise turn on auto-merge
+   with squash.
+8. Subscribe to the pull request's activity, so a failing check brings
+   the work back.
 
-The pull request is where the client reviews, and merging it is the
-approval. Nothing here merges.
+The client does not review the pull request. The client's say is the
+plan on the issue, and the required checks decide the merge. Nothing
+here merges directly, and a branch from here never changes `.github/`,
+`.claude/` or `CLAUDE.md`, because the checks refuse it.
 
 Comments follow triage's Writing section.

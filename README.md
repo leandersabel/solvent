@@ -1,12 +1,8 @@
 # Solvent
 
 A self-hosted net worth tracker with an end-to-end encrypted vault. The
-server only ever stores ciphertext; balances are decrypted in the browser
+server stores only ciphertext. Balances are decrypted in the browser
 with a key derived from your password.
-
-**Status: every feature in `spec/status.md` is built and runs. The
-ones not yet marked verified carry the criteria still without a
-harness in `spec/questions.md`.**
 
 ## Stack
 
@@ -39,8 +35,8 @@ invites everybody else.
 Tests: `.venv/bin/python -m pytest`. The suite covers the server, the
 client-side rules that two implementations would drift on, and the
 workflows end to end in a real browser. The last two need Node, and
-the browser tests also need Chrome installed; both are skipped where
-they are absent.
+the browser tests also need Chrome. Each is skipped where what it needs
+is absent.
 
 ## Build it
 
@@ -58,29 +54,10 @@ docker run --rm -p 8000:8000 \
   solvent
 ```
 
-## Layout
+## Layout and workflow
 
-- `spec/product/` — what the client asked for, in their words.
-- `spec/design/` — the design canvas, one artboard per screen. It is
-  how the product looks.
-- `spec/` — the technical design: architecture, features, screens.
-- `spec/.compiled/` — per-feature implementation contracts.
-- `security/` — design-review reports.
-- `.claude/agents/` — the pipeline that specifies, builds, reviews,
-  deploys and tests.
-
-## Workflow
-
-A chain of agents turns what the client asks for into a deployed URL.
-The high-level spec comes first: the product spec and the
-architecture. Then the design, drawn as a canvas. Then the low-level
-spec derived from both, the code, review, image, and a test pass
-against the client's own acceptance list. The client approves the
-product spec, the architecture and the design, and the rest runs on
-its own.
-
-See `CLAUDE.md` for who owns each step and how questions reach the
-client.
+`CLAUDE.md` holds the spec layers, the agent pipeline in
+`.claude/agents/`, and the loop that turns an issue into a release.
 
 ---
 

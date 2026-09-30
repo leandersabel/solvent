@@ -18,16 +18,8 @@ given.
   and in what order, `parameters` pins the exact values a test asserts
   with the file that states each, and `verify.criteria` is the
   technical acceptance list.
-- The artboards in `spec/design/` that the contract's `read` names —
-  how each screen looks. Build the look from the artboard, not from
-  prose, and where a screen file disagrees with its artboard about
-  appearance, the artboard wins. A disagreement about behavior goes to
-  `spec/questions.md` tagged `engineer`.
-- `spec/architecture.md` — tech stack and, especially, the Security
-  section: concrete, non-negotiable requirements that apply to any code
-  you touch.
-- The existing codebase. Match its patterns before introducing a new
-  one. This app has no client-side build step and a small dependency
+- `spec/architecture.md`: the tech stack and the Security section.
+- The existing codebase. This app has no client-side build step and a small dependency
   surface by design.
 
 `verify.productCriteria` points at the client's own acceptance list.
@@ -66,5 +58,5 @@ could not cover. The compiler ticks `spec/status.md`, not you.
   All of those are upstream of you. If the contract itself is wrong,
   log it to `spec/questions.md` rather than quietly implementing
   something else.
-- Never put a question to the client. Questions go to
-  `spec/questions.md`, and the product owner decides what reaches them.
+- Never put a question to the client (`CLAUDE.md`, Who asks the
+  client).
