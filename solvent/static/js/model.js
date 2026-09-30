@@ -597,7 +597,7 @@ function orderBands(bands, dimension) {
  *  read and never written back (record-api.md, Schema migration).
  *  Version 1 is the current shape and there is nothing below it, so
  *  the chain is empty and the same chain is reused by import. */
-export const MIGRATIONS = {};
+const MIGRATIONS = {};
 
 export function migrate(recordType, fromVersion, payload) {
   let current = payload;

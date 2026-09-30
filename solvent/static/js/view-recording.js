@@ -149,7 +149,7 @@ function named(vault, entries) {
 function confirmDelete(vault, date, onDeleted, redraw) {
   const { figures, prices } = vault.recording(date);
   const units = [...new Set(prices.map((entry) => entry.payload.symbol))];
-  const affected = units.reduce((sum, unit) => sum + holdingsIn(vault, unit), 0);
+  const affected = units.reduce((sum, unit) => sum + holdingsIn(vault, unit, date), 0);
 
   const body = [
     el('p', {

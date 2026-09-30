@@ -286,7 +286,7 @@ for.
 
 The architecture holds the same line from the other side.
 `spec/architecture.md` (Supply chain) requires every asset be
-self-hosted with SRI and forbids third-party CDNs, and the frontend has
+self-hosted and hash-pinned and forbids third-party CDNs, and the frontend has
 no build step, so a webfont would add bytes, a pinning obligation, and
 a flash of unstyled text on the slowest screen in the product. Elegance
 here comes from spacing and restraint.
@@ -326,9 +326,8 @@ only its own content region.
 - **Nav is Dashboard and Settings**, the same for everybody who has a
   vault.
   - There is deliberately **no "Holdings" entry**: the dashboard's own
-    table *is* the list of holdings (`dashboard.md`), so a third entry
-    would either lead back to the screen the user is on or open a
-    second, thinner copy of it.
+    table *is* the list of holdings (`dashboard.md`,
+    `product/app-shell.md`).
   - There is deliberately **no "Admin" entry, in any state.**
     Administering the instance is done from a separate account with no
     vault (`app-shell.md`), so a vault owner has nowhere
@@ -336,10 +335,8 @@ only its own content region.
 - **Update values** is a global action rather than a nav destination. It
   opens the sweep (`update-values.md`) at today, going straight into
   editing today's recording with no screen in between, which is what
-  makes the sweep reachable while the user is deep in one holding. It
-  is the fast path for the one act somebody performs every month, and a
-  page in front of it would add a step to exactly the thing the product
-  exists to make cheap.
+  makes the sweep reachable while the user is deep in one holding
+  (`product/record-snapshot.md`, Decisions taken on your behalf).
 - **The dashboard does not repeat it.** The dashboard hero carries
   **New recording**, which asks which date and routes on the answer
   (`dashboard.md`). One control goes to today and one asks the
@@ -354,9 +351,7 @@ only its own content region.
   discards the keys and all decrypted state and shows the re-unlock
   screen (`unlock.md`, with the rule in `login.md`, Rules). The server
   session stays alive, so unlocking needs only the password. No
-  confirmation dialog: this is the control someone reaches for when
-  another person walks into the room, and a confirm step spends the
-  seconds it exists to save.
+  confirmation dialog (`product/app-shell.md`, Lock).
 - Content max-width 1200px on the ground, and each screen states its
   own narrower width.
 - The shell is server-rendered Jinja (`architecture.md`, Components)
@@ -403,8 +398,7 @@ only its own content region.
   never auto-submitted, never logged, and cleared from the DOM on
   success. Each one carries autocomplete tokens, named by its own
   screen, so a password manager can generate, store and update the
-  password. A manager-generated passphrase is the most realistic
-  protection a vault with no recovery can have.
+  password (`product/login.md`).
 - **Chip**: petrol-50 fill, petrol-200 border, petrol-700 text, 4px
   radius, 12px. Used for
   a dimension assignment (`Liquidity: Cash`), for status chips such as

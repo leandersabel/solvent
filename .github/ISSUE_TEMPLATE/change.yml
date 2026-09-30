@@ -1,6 +1,6 @@
 name: Change request
 description: Something new, or something that should work differently.
-labels: [enhancement]
+labels: [change]
 body:
   - type: textarea
     id: what

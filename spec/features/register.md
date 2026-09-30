@@ -91,8 +91,8 @@ no endpoint anywhere writes it again (admin-invites.md).
 
 `method` is not a client input. The server writes `'password'`, and
 **no endpoint in v1 accepts any other value**, so a payload carrying
-one is a Bad Request. No passkey endpoint, storage, or screen is
-specified here or anywhere else.
+one is a Bad Request (architecture.md, Credentials and vault key
+wrappers).
 
 The profile blob is encrypted at step 4, **before** the server has
 assigned this user an identity, and that is only possible because
@@ -156,9 +156,6 @@ two callers rather than two record writers.
   never as a plaintext column. An administrator has neither, and the
   rate lookup that would need one is on the vault surface
   (app-shell.md, The two surfaces).
-- The invite is marked used in the **same transaction** as the user
-  insert — a failed registration must not burn the invite, and a
-  successful one must not leave it reusable.
 
 ## Edge cases
 

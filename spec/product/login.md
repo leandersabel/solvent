@@ -102,7 +102,7 @@ Locking is not cosmetic. Everything readable goes: not just the key,
 but every figure, chart, name, and note that had been decrypted. The
 threat this defends against is another household member at an unlocked
 machine, and that person can open the browser's own developer tools. So
-unlocking genuinely reloads and re-reads the vault, and that pause is
+unlocking reloads and re-reads the vault, and that pause is
 by design.
 
 **One thing survives a lock: whatever you were typing.** An unsaved
@@ -128,7 +128,7 @@ you are returned to where you were.
   unlocking needs. The copy blames the moment, not the password and not
   the device: this device does not have enough memory available right
   now, close other tabs and try again. Retry is offered, because
-  closing tabs genuinely can fix it. It must never tell you that your
+  closing tabs can fix it. It must never tell you that your
   phone or your computer is incapable of opening a vault.
 - **The session ran out mid-action.** You are asked to unlock again.
   Nothing you typed is thrown away.

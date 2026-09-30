@@ -66,8 +66,7 @@ and stated the way it is experienced:
 - The only destructive power an administrator holds is removing an
   entire account, and that destroys the vault rather than opening it.
 
-This is the hard line of the product. Every future administrator
-feature is checked against it before it is built.
+This is the hard line of the product.
 
 The line bounds an administrator, it does not enumerate them. The tasks
 of running the platform will grow: handing out accounts, removing them,
@@ -162,7 +161,7 @@ decision with a cost: an administrator session left open on an unlocked
 machine can destroy somebody's whole history in two clicks, and nothing
 locks it short of the twelve-hour session limit (`login.md`), so what
 protects it is keeping the machine to yourself rather than anything the
-app does. Typing the username stays the whole of the friction.
+app does.
 
 Which kind an account is, is shown here and is not changed here,
 because it is not changed anywhere.
@@ -273,9 +272,6 @@ created the first administrator.
   its financial features switched off. There is no dashboard, no list
   of holdings, no figures, and nothing to lock, because there is
   nothing in it to hide.
-- **No account changes kind.** An administrator account and a user
-  account are different things, not two settings of one thing. A person
-  who needs both holds both.
 - **No password reset by an administrator.** Not withheld, impossible.
   There is nothing to reset toward: a vault owner's password is what
   makes their vault readable, so a new one would open an empty room.

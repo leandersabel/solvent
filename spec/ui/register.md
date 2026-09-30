@@ -8,9 +8,7 @@ that needs a session: the page embeds the server's current default KDF
 envelope, and, for a user invite, the currency list the main-currency
 picker offers (`register.md`).
 
-**The invite decides which of two forms renders.** Nothing on either
-form lets the person choose which kind of account they are making, and
-neither form mentions the other.
+**The invite decides which of two forms renders.**
 
 Exercises: `spec/features/register.md`.
 
@@ -124,7 +122,7 @@ in `ui/unlock.md`, The derivation wait.
   after the key.
 - The tab stays responsive throughout, and on a phone it stays
   responsive to touch. It must never look like it has hung.
-- No spinner before the work actually starts.
+- No spinner before the work starts.
 
 ## States
 
@@ -157,7 +155,7 @@ Both forms unless a state says otherwise.
   - On the administrator form: "This device does not have enough memory
     available right now. No account was created and your invite link is
     still good. Close some other tabs and try again."
-  - A **Try again** button, because closing tabs genuinely can fix it.
+  - A **Try again** button, because closing tabs can fix it.
   - A moment, not a device class, and the copy never names a device
     (`ui/unlock.md`).
   - No weaker setup is offered. Falling back would create an account

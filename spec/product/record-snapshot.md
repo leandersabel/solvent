@@ -260,7 +260,7 @@ A small form for everything the sweep is not for: an odd date, a March
 figure you are adding now that the statement is in front of you,
 history you are backfilling from old statements. Holding, date, value,
 an optional note. The converted figure updates as you type, because
-that is the number you are actually reasoning about.
+that is the number you are reasoning about.
 
 This records something, so it writes rates like the sweep does, for the
 date on the form. They sit on one folded line stating what will be

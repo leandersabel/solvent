@@ -6,6 +6,7 @@ import assert from 'node:assert/strict';
 
 const JS = new URL('../../solvent/static/js/', import.meta.url);
 const load = (name) => import(new URL(name, JS).href);
+const argon2id = async () => (await import(new URL('../vendor/argon2id/1.0.1/argon2id.js', JS).href)).default();
 
 const results = [];
 async function check(name, body) {
@@ -36,10 +37,7 @@ globalThis.Worker = class {
   }
   async postMessage(message) {
     trace?.push(['worker', Object.keys(message).sort().join(','), JSON.stringify(message.kdf), message.salt.length]);
-    const { default: loadArgon2id } = await import(
-      new URL('../vendor/argon2id/1.0.1/argon2id.js', JS).href
-    );
-    const hash = await loadArgon2id();
+    const hash = await argon2id();
     const raw = hash({
       password: new TextEncoder().encode(message.password),
       salt: message.salt,
@@ -56,7 +54,9 @@ globalThis.Worker = class {
 
 const decimal = await load('decimal.js');
 const cryptoModule = await load('crypto.js');
-const { migrate, SCHEMA_VERSION } = await load('model.js');
+const { migrate, SCHEMA_VERSION, Vault, dayNumber, isoFromDay } = await load('model.js');
+const rawKey = async (key) =>
+  cryptoModule.b64encode(new Uint8Array(await globalThis.crypto.subtle.exportKey('raw', key)));
 
 // ---- Decimal ----------------------------------------------------------
 
@@ -228,9 +228,7 @@ await check('the derivation is deterministic and splits into two keys', async ()
   const second = await cryptoModule.deriveKeys('correct horse battery', SALT, KDF);
   assert.equal(first.authKey, second.authKey);
 
-  const masterRaw = cryptoModule.b64encode(
-    new Uint8Array(await globalThis.crypto.subtle.exportKey('raw', first.masterKey)),
-  );
+  const masterRaw = await rawKey(first.masterKey);
   // The Auth Key cannot derive the Master Key: they are two HKDF
   // outputs under different info strings.
   assert.notEqual(masterRaw, first.authKey);
@@ -278,10 +276,7 @@ await check('unwrapping with the wrong Master Key fails', async () => {
 });
 
 await check('the vendored library answers the RFC 9106 test vector', async () => {
-  const { default: loadArgon2id } = await import(
-    new URL('../vendor/argon2id/1.0.1/argon2id.js', JS).href
-  );
-  const hash = await loadArgon2id();
+  const hash = await argon2id();
   const out = hash({
     password: new Uint8Array(32).fill(1),
     salt: new Uint8Array(16).fill(2),
@@ -402,7 +397,6 @@ await check('a record written through the write path carries its payload', async
     return { ok: true, status: 200, json: async () => ({}) };
   };
   const writes = await load('writes.js');
-  const { Vault } = await load('model.js');
 
   const vault = new Vault(await cryptoModule.generateDek());
   vault.profileRecord = null;
@@ -601,8 +595,6 @@ const FIXTURE_PAYLOADS = {
   rate: { symbol: 'USD', date: '2026-07-31', rate: '0.8', rateTarget: 'EUR', rateSource: 'proposed', rateAsOf: '2026-07-31', proposedRate: null },
 };
 const transfer = await load('transfer.js');
-const rawKey = async (key) =>
-  cryptoModule.b64encode(new Uint8Array(await globalThis.crypto.subtle.exportKey('raw', key)));
 const copyOf = (value) => JSON.parse(JSON.stringify(value));
 // Every request the code under test makes, so a check can say none went.
 const requests = [];
@@ -637,8 +629,6 @@ await check('a formatVersion 1 file still opens, decrypts and re-keys', async ()
 // spec/features/net-worth-view.md and record-snapshot.md, Acceptance
 // criteria. The model is built in memory, record by record, exactly as
 // a load indexes what it decrypts.
-
-const { Vault, dayNumber, isoFromDay } = await load('model.js');
 
 let nextId = 0;
 function model({ main = 'CHF', holdings = [], figures = [], prices = [], dimensions = [] }) {

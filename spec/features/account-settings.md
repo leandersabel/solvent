@@ -142,11 +142,9 @@ on the session's principal kind and not on which fields arrived, so a
 vault owner's request without a wrapper is a Bad Request and an
 administrator's with one is too.
 
-**There is no "remove password" action, and there will not be one.**
-For a vault owner, the password credential's wrapper is the only one
-an export file can carry (`export-import.md`), so a vault without it
-has no openable backup and no migration path. For an administrator it
-is the only way in at all. Changing the password replaces the row.
+**There is no "remove password" action, and there will not be one**
+(architecture.md, Credentials and vault key wrappers, which gives the
+reason for both kinds). Changing the password replaces the row.
 Nothing deletes it short of deleting the account.
 
 The screen must warn that **existing export files still open with the
@@ -204,11 +202,8 @@ their wealth.
   against the profile already in memory. It is never shown, never typed,
   and never derived from the label.
 - **`label` is free display text** in any script, renamable at any time.
-  A rename writes one record — the profile — and touches no holding.
-  This is the whole reason ids are not slugs: a label-derived key would
-  make renaming either impossible or a multi-record rewrite that can
-  fail partway, and would risk colliding with strings already in user
-  data.
+  A rename writes one record, the profile, and touches no holding.
+  Why ids are not slugs is `manage-accounts.md`, Dimensions.
 - **Order in `values` is the band order** in the stacked chart. It
   cannot be derived from the holdings, which yield which value ids are
   in use but never the intended sequence — and a stack whose bands
@@ -249,8 +244,7 @@ renders it as a checkbox rather than a select.
 ## Delete my account
 
 A vault owner's own account. Self-service, irreversible, and distinct
-from an administrator removing an account (admin-invites.md). Not
-Found for an administrator session.
+from an administrator removing an account (admin-invites.md).
 
 `DELETE /api/auth/account` `{ authKey, confirmUsername }`.
 

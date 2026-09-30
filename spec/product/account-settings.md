@@ -276,10 +276,6 @@ single total.
   on a household instance it answers no question worth the record.
 - **No soft delete, no grace period, no recycle bin** on deleting an
   account. There is no readable vault to hold in reserve.
-- **No permanent delete of a dimension**, and no way to strip one from
-  every holding at once.
-- **No cap on how many values a dimension has**, even though the chart
-  only draws four separately.
 - **No freeform tags.** Every way of labeling a holding is a
   dimension, because a tag is a dimension with one value. Two
   vocabularies over the same holdings would mean two ways to spell one

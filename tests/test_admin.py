@@ -7,18 +7,10 @@ import subprocess
 import sys
 from pathlib import Path
 
-import pytest
-
 from solvent.guard import ADMINISTRATION, surface_of
-from tests.helpers import CSRF, b64, connect, register, rows
+from tests.helpers import CSRF, b64, connect, mint_invite, register, rows
 
 REPO_ROOT = Path(__file__).resolve().parent.parent
-
-
-@pytest.fixture
-def admin(app):
-    client, _ = register(app, "root", kind="administrator")
-    return client
 
 
 def test_creating_an_invite_returns_the_token_exactly_once(app, admin):
@@ -91,8 +83,6 @@ def test_revoking_is_idempotent_and_refused_on_a_used_invite(app, admin):
 
 
 def test_expired_is_derived_and_not_stored(app, admin):
-    from tests.helpers import mint_invite
-
     token = mint_invite(app, expires_at="2000-01-01T00:00:00+00:00")
     from solvent.crypto import hash_invite_token
 
@@ -306,8 +296,6 @@ def test_the_cli_creates_an_invite_and_never_an_account(app):
 def test_the_cli_records_the_bootstrap_sentinel_and_refuses_it_as_a_username(app):
     run_cli(app, "--kind", "administrator")
     assert rows(app, "SELECT created_by FROM invites")[0]["created_by"] == "system:bootstrap"
-
-    from tests.helpers import mint_invite
 
     body = {
         "inviteToken": mint_invite(app, "administrator"),

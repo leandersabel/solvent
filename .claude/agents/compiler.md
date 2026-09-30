@@ -11,15 +11,15 @@ reviewer and qa agents work against without re-interpreting prose.
 
 ## Inputs
 
-- `spec/product/*.md` — the client's intent, product-owner-owned
-- `spec/architecture.md` — system-level design, architect-owned
-- `spec/features/*.md` — the technical spec, architect-owned
+- `spec/product/*.md`: the client's intent
+- `spec/architecture.md`: system-level design
+- `spec/features/*.md`: the technical spec
 - `spec/ui/*.md` — one file per screen
 
 ## Output
 
 A contract is an **index into the spec plus what prose cannot encode**.
-It is not a restatement. Readers load the spec; the contract tells them
+Readers load the spec; the contract tells them
 which parts, in what order, and pins the values a test asserts exactly.
 
 Never copy a passage you could point at. A second copy is a second
@@ -35,7 +35,6 @@ For each feature, write `spec/.compiled/<feature-name>.json`:
   "read": [
     {"file": "spec/features/x.md", "sections": ["all"]},
     {"file": "spec/architecture.md", "sections": ["Key management"]},
-    {"file": "spec/design/Y.dc.html", "role": "how the screen looks"},
     {"file": "spec/ui/y.md", "sections": ["all"], "role": "screen this feature drives"}
   ],
   "dependsOn": ["feature-whose-rows-or-routes-this-one-needs"],
@@ -52,12 +51,11 @@ For each feature, write `spec/.compiled/<feature-name>.json`:
 
 - **`read`** — every file the engineer must load, with the headings
   that bear on this feature, first entry first. For any feature with a
-  screen, `spec/ui/design-system.md` comes before that screen, and the
-  screen's artboard in `spec/design/` comes before its `spec/ui/` file.
-  `spec/design/canvas.json` names which artboard is which screen.
+  screen, `spec/ui/design-system.md` comes before that screen's
+  `spec/ui/` file.
 - **`dependsOn`** — what must already exist for this feature to run or
-  be tested. Coupling is many-to-many and may be circular; the
-  invite/registration bootstrap genuinely is. Record it as it is. Build
+  be tested. Coupling is many-to-many and may be circular. Record it
+  as it is. Build
   order is not derived from this, `spec/status.md` states it.
 - **`parameters`** — every value the spec pins as exact: numeric
   limits, byte encodings, field orders, header names, status codes tied
@@ -86,8 +84,6 @@ not a compilation.
 
 ## `spec/status.md`
 
-State only.
-
 - Tick **Compiled** when compilation succeeds.
 - Tick **Implemented** when the engineer reports the contract built.
 - Tick **Verified** when the reviewer reports no outstanding findings
@@ -97,7 +93,7 @@ State only.
 ## Rules
 
 - Follow `CLAUDE.md`, Writing the spec, for anything you write into
-  `spec/`. Target state only.
+  `spec/`.
 - Never invent requirements, tech choices, or acceptance criteria that
   are not stated or clearly implied. If something is ambiguous,
   missing, or contradictory, do not guess: append a question to

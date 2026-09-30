@@ -46,11 +46,9 @@ payload:
     free text gets none, and its rates are entered by hand. That is the
     whole of the rule — no flag, no checkbox, no `null` case to
     special-case.
-  - Formatting precision comes from the symbol table's `kind`
-    (`currency` or `metal`), and from a sensible default for free text.
-    An explicit `kind` on the `account` record would be a third copy of
-    the same
-    fact.
+  - Formatting follows the reader's settings, not the unit
+    (account-settings.md, Dates and numbers), so the `account` record
+    carries no `kind`.
 - `dims` maps **dimension id → value id**, both opaque ids from the
   profile's dimension config (`account-settings.md`). It carries no
   display text: renaming "Cash" to "Bargeld" rewrites the profile and
@@ -76,8 +74,8 @@ dimension.
   export. A JSON object cannot carry the same key twice. Making the
   fault unrepresentable beats detecting it.
 - **Ids, never labels.** Both halves of an entry are short opaque ids
-  (8 characters of `[a-z0-9]`, generated client-side at creation). Two
-  consequences carry the point:
+  (`account-settings.md`, Dimensions). Two consequences carry the
+  point:
   - Labels are free text in any script, and renaming one is a
     single-record write to the profile. There is no multi-record
     rewrite anywhere in this feature.
@@ -179,14 +177,14 @@ whole reach of the cascade: no other record type carries an
 
 - **A holding with no public price source** (unlisted real estate,
   collectibles) → a free-text unit. Valid and expected; rate proposals
-  are simply unavailable and snapshots take a manual rate. Note that a
+  are unavailable and snapshots take a manual rate. Note that a
   private loan denominated in EUR is *not* this case: its unit is `EUR`
   and it prices through ordinary FX like any other foreign-currency
   holding.
 - **Brokerage depot** → an ordinary currency holding whose unit is the
   depot's reporting currency, and whose snapshot value is the broker's
   reported total. A depot reporting in the user's main currency needs no
-  rate at all, per the next case.
+  rate at all, per the main-currency case below.
 - **A free-text unit that later becomes a listed symbol** → the holding
   starts receiving proposals with no migration, because the unit string
   was already the symbol. This is the seeded-symbol argument

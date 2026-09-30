@@ -1,0 +1,45 @@
+name: Triage
+
+# The client opening an issue, or commenting on one the client opened,
+# runs the triage skill as claude[bot]. Anyone can open an issue on a
+# public repository, so who is asking is checked here, before anything
+# runs, and the bot's own comments start nothing because it is not the
+# client.
+on:
+  issues:
+    types: [opened]
+  issue_comment:
+    types: [created]
+
+permissions: {}
+
+jobs:
+  triage:
+    if: >-
+      github.event.sender.login == github.repository_owner
+      && github.event.issue.user.login == github.repository_owner
+      && !github.event.issue.pull_request
+      && github.event.issue.state == 'open'
+    runs-on: ubuntu-latest
+    timeout-minutes: 120
+    # One run per issue at a time. A comment made while one runs waits,
+    # and the run it starts reads the issue as it then stands.
+    concurrency:
+      group: issue-${{ github.event.issue.number }}
+    permissions:
+      contents: write
+      issues: write
+      pull-requests: write
+      id-token: write
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          fetch-depth: 0
+      - uses: ./.github/actions/setup
+      - uses: anthropics/claude-code-action@fd1c128679612beff4ca259c78021c506e8aa7a7 # v1.0.237
+        with:
+          claude_code_oauth_token: ${{ secrets.CLAUDE_CODE_OAUTH_TOKEN }}
+          prompt: Run the `triage` skill with the argument `${{ github.event.issue.number }}`.
+          claude_args: |
+            --model claude-opus-5-5
+            --allowedTools Bash,Read,Write,Edit,Glob,Grep,Agent,Skill

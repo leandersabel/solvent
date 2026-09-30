@@ -88,46 +88,26 @@ export function saveProfile(vault, payload) {
   );
 }
 
+function slotFor(recordType, accountId, existing) {
+  return {
+    recordId: existing ? existing.recordId : crypto.uuid4(),
+    recordType,
+    accountId,
+    schemaVersion: SCHEMA_VERSION,
+    version: existing ? existing.version + 1 : 1,
+  };
+}
+
 export function saveHolding(vault, existing, payload) {
-  return putRecord(
-    vault,
-    {
-      recordId: existing ? existing.recordId : crypto.uuid4(),
-      recordType: 'account',
-      accountId: null,
-      schemaVersion: SCHEMA_VERSION,
-      version: existing ? existing.version + 1 : 1,
-    },
-    payload,
-  );
+  return putRecord(vault, slotFor('account', null, existing), payload);
 }
 
 export function saveSnapshot(vault, accountId, existing, payload) {
-  return putRecord(
-    vault,
-    {
-      recordId: existing ? existing.recordId : crypto.uuid4(),
-      recordType: 'snapshot',
-      accountId,
-      schemaVersion: SCHEMA_VERSION,
-      version: existing ? existing.version + 1 : 1,
-    },
-    payload,
-  );
+  return putRecord(vault, slotFor('snapshot', accountId, existing), payload);
 }
 
 export function saveRate(vault, existing, payload) {
-  return putRecord(
-    vault,
-    {
-      recordId: existing ? existing.recordId : crypto.uuid4(),
-      recordType: 'rate',
-      accountId: null,
-      schemaVersion: SCHEMA_VERSION,
-      version: existing ? existing.version + 1 : 1,
-    },
-    payload,
-  );
+  return putRecord(vault, slotFor('rate', null, existing), payload);
 }
 
 /** The whole quotable table for one date, in one request.
@@ -151,14 +131,17 @@ export function needsLookup(vault, date) {
   return vault.missingUnits(date).some((unit) => vault.quotable(unit));
 }
 
-/** Decrypt a freshly read list of records, skipping any that will not
- *  open. An unreadable record carries no readable date, so it shapes no
- *  slot check, and it is already counted in the load's warning. */
+/** Decrypt a freshly read list of records the way the load does,
+ *  skipping any that will not open or that a newer client wrote. An
+ *  unreadable record carries no readable date, so it shapes no slot
+ *  check, and it is already counted in the load's warning. */
 async function decryptAll(vault, rows) {
   const decoded = [];
   for (const record of rows) {
+    if (record.schemaVersion > SCHEMA_VERSION) continue;
     try {
-      decoded.push({ ...record, payload: await crypto.decryptRecord(vault.dek, record) });
+      const payload = migrate(record.recordType, record.schemaVersion, await crypto.decryptRecord(vault.dek, record));
+      decoded.push({ ...record, payload });
     } catch {
       /* counted by the load that first met it */
     }
@@ -171,7 +154,7 @@ async function decryptAll(vault, rows) {
  *
  *  Never against the model in memory: a session open since this
  *  morning is exactly the session whose model says the date is free. */
-export async function reloadCreateTypes(vault) {
+async function reloadCreateTypes(vault) {
   return {
     snapshot: await decryptAll(vault, await api.get('/api/records?type=snapshot')),
     rate: await decryptAll(vault, await api.get('/api/records?type=rate')),

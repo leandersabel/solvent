@@ -13,6 +13,7 @@ import uuid
 import pytest
 
 from solvent.config import DEFAULT_KDF_ENVELOPE
+from solvent.session import COOKIE_NAME
 from tests.helpers import (
     CSRF,
     b64,
@@ -20,32 +21,13 @@ from tests.helpers import (
     credential,
     mint_invite,
     params_of,
+    principal_id,
     put_record,
     register,
+    register_body as payload,
     rows,
     sign_in,
 )
-
-
-def payload(app, kind="vault_owner", **overrides):
-    body = {
-        "inviteToken": mint_invite(app, kind),
-        "username": "someone",
-        "authKey": b64(),
-        "salt": b64(16),
-        "kdf": dict(DEFAULT_KDF_ENVELOPE),
-    }
-    if kind == "vault_owner":
-        body.update(
-            wrappedDek=b64(48),
-            dekNonce=b64(12),
-            profileRecordId=str(uuid.uuid4()),
-            profileSchemaVersion=1,
-            profileCiphertext=b64(64),
-            profileNonce=b64(12),
-        )
-    body.update(overrides)
-    return body
 
 
 # ---- Registration -----------------------------------------------------
@@ -427,17 +409,10 @@ def test_a_login_cookie_carries_its_flags_and_no_key_material(app):
 
 
 def stale(app, username):
+    stored = params_of(credential(app, username))
+    stored["kdf"]["m"] = 32768
     conn = connect(app)
     try:
-        stored = json.loads(
-            conn.execute(
-                "SELECT credentials.params FROM credentials JOIN principals "
-                "ON principals.id = credentials.principal_id "
-                "WHERE principals.username = ?",
-                (username,),
-            ).fetchone()[0]
-        )
-        stored["kdf"]["m"] = 32768
         conn.execute(
             "UPDATE credentials SET params = ? WHERE principal_id = "
             "(SELECT id FROM principals WHERE username = ?)",
@@ -519,7 +494,7 @@ def test_the_upgrade_replaces_the_credential_and_its_one_wrapper(app):
         ("dek_wrappers", (own["id"],)),
     }
     old_row, new_row = before["credentials"][(own["id"],)], after["credentials"][(own["id"],)]
-    old_params, new_params = json.loads(old_row["params"]), json.loads(new_row["params"])
+    old_params, new_params = params_of(old_row), params_of(new_row)
     assert new_params["salt"] != old_params["salt"]
     assert new_params["kdf"] == DEFAULT_KDF_ENVELOPE != old_params["kdf"]
     assert new_row["verifier"] != old_row["verifier"]
@@ -552,8 +527,8 @@ def test_an_administrator_upgrade_creates_no_wrapper(app):
 
     assert changed_rows(before, after) == {("credentials", (own["id"],))}
     old_row, new_row = before["credentials"][(own["id"],)], after["credentials"][(own["id"],)]
-    assert json.loads(new_row["params"])["salt"] != json.loads(old_row["params"])["salt"]
-    assert json.loads(new_row["params"])["kdf"] == DEFAULT_KDF_ENVELOPE
+    assert params_of(new_row)["salt"] != params_of(old_row)["salt"]
+    assert params_of(new_row)["kdf"] == DEFAULT_KDF_ENVELOPE
     assert new_row["verifier"] != old_row["verifier"]
     assert not any(key == (own["id"],) for key in after["dek_wrappers"])
 
@@ -604,15 +579,12 @@ def test_the_server_discriminates_on_kind_not_on_which_fields_arrived(app):
     before = snapshot(app, EVERY_TABLE)
     with_wrapper = admin_client.post(
         "/api/auth/upgrade-kdf",
-        json={
-            "salt": b64(16), "kdf": dict(DEFAULT_KDF_ENVELOPE), "authKey": b64(),
-            "wrappedDek": b64(48), "dekNonce": b64(12),
-        },
+        json=rotation(wrappedDek=b64(48), dekNonce=b64(12)),
         headers=CSRF,
     )
     without_wrapper = owner_client.post(
         "/api/auth/upgrade-kdf",
-        json={"salt": b64(16), "kdf": dict(DEFAULT_KDF_ENVELOPE), "authKey": b64()},
+        json=rotation(),
         headers=CSRF,
     )
     assert with_wrapper.status_code == 400
@@ -651,7 +623,7 @@ def test_changing_a_password_rewrites_the_credential_and_the_wrapper_only(app):
         ("dek_wrappers", (own["id"],)),
     }
     old_row, new_row = before["credentials"][(own["id"],)], after["credentials"][(own["id"],)]
-    assert json.loads(new_row["params"])["salt"] != json.loads(old_row["params"])["salt"]
+    assert params_of(new_row)["salt"] != params_of(old_row)["salt"]
     assert new_row["verifier"] != old_row["verifier"]
     assert (
         after["dek_wrappers"][(own["id"],)]["wrapped_dek"]
@@ -729,14 +701,7 @@ def test_a_wrong_current_auth_key_is_refused_server_side(app):
     before = snapshot(app, EVERY_TABLE)
     assert owner.post(
         "/api/auth/change-password",
-        json={
-            "currentAuthKey": b64(),
-            "salt": b64(16),
-            "kdf": dict(DEFAULT_KDF_ENVELOPE),
-            "authKey": b64(),
-            "wrappedDek": b64(48),
-            "dekNonce": b64(12),
-        },
+        json=rotation(currentAuthKey=b64(), wrappedDek=b64(48), dekNonce=b64(12)),
         headers=CSRF,
     ).status_code == 400
     assert snapshot(app, EVERY_TABLE) == before
@@ -749,14 +714,7 @@ def test_a_password_change_ends_every_other_session_and_keeps_this_one(app):
 
     owner.post(
         "/api/auth/change-password",
-        json={
-            "currentAuthKey": auth_key,
-            "salt": b64(16),
-            "kdf": dict(DEFAULT_KDF_ENVELOPE),
-            "authKey": b64(),
-            "wrappedDek": b64(48),
-            "dekNonce": b64(12),
-        },
+        json=rotation(currentAuthKey=auth_key, wrappedDek=b64(48), dekNonce=b64(12)),
         headers=CSRF,
     )
     assert len(rows(app, "SELECT * FROM sessions")) == 1
@@ -765,8 +723,6 @@ def test_a_password_change_ends_every_other_session_and_keeps_this_one(app):
 
 
 def test_sessions_report_no_ip_and_no_user_agent(app):
-    from solvent.session import COOKIE_NAME
-
     owner, auth_key = register(app, "owner")
     second, _ = sign_in(app, "owner", auth_key)
     body = owner.get("/api/sessions", headers=CSRF).get_json()
@@ -807,8 +763,6 @@ def test_log_out_everywhere_ends_the_current_session_too(app):
 
 
 def test_logout_ends_only_the_calling_session(app):
-    from solvent.session import COOKIE_NAME
-
     owner, auth_key = register(app, "owner")
     second, _ = sign_in(app, "owner", auth_key)
     calling = next(c.value for c in owner._cookies.values() if c.key == COOKIE_NAME)
@@ -835,7 +789,7 @@ def test_deleting_an_account_needs_the_auth_key_and_the_typed_username(app):
         assert owner.delete("/api/auth/account", json=body, headers=CSRF).status_code == 400
         assert snapshot(app, EVERY_TABLE) == before, body
 
-    own_id = rows(app, "SELECT id FROM principals WHERE username = 'owner'")[0]["id"]
+    own_id = principal_id(app, "owner")
     assert owner.delete(
         "/api/auth/account",
         json={"authKey": auth_key, "confirmUsername": "owner"},

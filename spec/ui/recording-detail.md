@@ -123,8 +123,8 @@ prices at all. For an empty recording the first sentence reads "It
 holds no figures, and the prices captured that day go with it."
 
 Filled critical on the confirm button, inside the dialog
-(`design-system.md`, Components). One confirmation, not a ladder, and
-no typed word to repeat.
+(`design-system.md`, Components). No ladder and no typed word to
+repeat.
 
 Afterwards the date is gone from every holding's list and from every
 unit's prices, the chart runs across it as though the sitting had never

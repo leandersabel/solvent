@@ -77,7 +77,6 @@ function createInvite(reload) {
   const days = el('select', {}, [1, 3, 7, 14, 30].map((n) =>
     el('option', { value: String(n), text: `${n} days`, selected: n === 7 }),
   ));
-  days.value = '7';
   const error = el('p', { class: 'field-error', hidden: true });
   const card = el('section', { class: 'card' });
 

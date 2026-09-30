@@ -132,10 +132,7 @@ export function snapshotDialog(vault, holding, existing, onSaved, onOpenRecordin
     fail(text);
     submit.hidden = true;
     cancel.textContent = 'Done';
-    cancel.onclick = () => {
-      close();
-      onSaved();
-    };
+    cancel.onclick = done;
   };
 
   const create = async (on, quantity) => {

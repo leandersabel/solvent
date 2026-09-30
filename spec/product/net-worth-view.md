@@ -95,7 +95,7 @@ It answers two questions at once: how the total moved, and what it was
 made of while it moved. Grouped by nothing, it is a single band, which
 is just your net worth over time.
 
-What it is actually for, in order:
+What it is for, in order:
 
 - **The shape of the last few years.** Range buttons for one month, six
   months, one year and everything, defaulting to a year.
@@ -113,7 +113,7 @@ What it is actually for, in order:
   when the net figure is near zero.
 
 Beside the grouping control, the app states how much of your money the
-dimension actually covers: "7 of 10 holdings assigned", clickable to see
+dimension covers: "7 of 10 holdings assigned", clickable to see
 which ones are not. A dimension you only ever filled in for three
 holdings draws a chart that is perfectly correct and completely
 misleading, and this line is what stops that being read as a bug.
@@ -154,7 +154,7 @@ so a long run between two entries is the normal shape of a correct
 chart rather than a hole in it.
 
 The dates you recorded something are marked on the chart from the
-moment it loads. They are the points the line is actually built from,
+moment it loads. They are the points the line is built from,
 and they are the dates that open a recording when you click them, so
 the marking says which part of the line you gave it and where there is
 something to go back to.
@@ -313,7 +313,7 @@ the section needs no small print.
 ## Decisions taken on your behalf
 
 - **The chart defaults to one year**, or everything when your history is
-  shorter, and defaults to grouping by nothing until you have set up an
+  shorter, and defaults to grouping by nothing until you have set up a
   dimension.
 - **The control that hides the marks is called Just the line.** It has
   to say what it does without claiming the marked chart is the untidy

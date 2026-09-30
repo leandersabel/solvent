@@ -96,11 +96,10 @@ key — and never influenced by client input (see SSRF hardening below).
 **Frankfurter's public instance, `api.frankfurter.dev`.** HTTPS, no API
 key, no daily or monthly quota; requests are rate-limited only against
 abuse, and the operators ask heavy users to cache, which this design
-already does (see Caching). History goes back to 1948, and an FX
-symbol is simply an ISO 4217 code.
+already does (see Caching). History goes back to 1948.
 
-- An FX symbol is the **base currency code** (`USD`, `EUR`) — which is
-  simply the holding's unit — and `quote` is the user's main currency.
+- An FX symbol is the **base currency's ISO 4217 code** (`USD`, `EUR`),
+  which is the holding's unit, and `quote` is the user's main currency.
   A unit names the base asset only (`manage-accounts.md`).
 - The currency half of the operator's symbol table can be seeded
   directly from the provider's own currency list rather than typed by
@@ -117,8 +116,8 @@ symbol is simply an ISO 4217 code.
 
 ### Gold
 
-**Narodowy Bank Polski's public API, `api.nbp.pl`.** HTTPS (HTTP was
-retired 2025-08-01), no API key, no quota, no account. Publishes the
+**Narodowy Bank Polski's public API, `api.nbp.pl`.** HTTPS, no API key,
+no quota, no account. Publishes the
 price of 1 g of fine gold (millesimal fineness 1000) in PLN, daily, from
 2013-01-02, queryable by date and by date range — the same shape as the
 FX provider, and chosen for the same reasons: a central bank rather than
@@ -201,13 +200,10 @@ Rejected, the licensing being largely closed:
   out on fit rather than terms — 25 requests/day shared across the whole
   instance, and thin coverage of European listings.
 
-The objection that generalizes: **a price entry stores its rate
-permanently, inside user ciphertext the server cannot read, enumerate,
-or delete** (`record-rate.md`). "Delete all data on termination" is
-unsatisfiable by construction, not a cache-policy problem a shorter TTL
-could fix. Any future provider for any asset class must be checked
-against that, not merely against request volume, the same test that
-eliminates LBMA for gold.
+The objection that generalizes is the constraint binding every future
+provider (architecture.md, Conversion-rate lookup). Any future provider
+for any asset class must be checked against it, not merely against
+request volume, the same test that eliminates LBMA for gold.
 
 ## The symbol table
 

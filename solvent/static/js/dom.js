@@ -136,7 +136,7 @@ export function icon(name, size = 16) {
 
 /** The top bar's Lock button: the padlock and its word, the word
  *  dropped from sight at phone width and still read aloud. */
-export function lockButton(onclick) {
+function lockButton(onclick) {
   return el('button', { type: 'button', class: 'btn-chrome btn-lock', onclick }, [
     icon('lock', 14),
     el('span', { class: 'btn-label', text: 'Lock' }),
@@ -166,10 +166,6 @@ export function clear(node) {
 export function mount(node, children) {
   node.replaceChildren(...[].concat(children).filter(Boolean));
   return node;
-}
-
-export function byId(id) {
-  return document.getElementById(id);
 }
 
 // Every dialog open right now, so a lock can close them all.

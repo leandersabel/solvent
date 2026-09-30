@@ -22,6 +22,7 @@ from . import session as sessions
 from .config import DEFAULT_KDF_ENVELOPE
 from .db import get_db, utcnow, write_transaction
 from .guard import public
+from .records import NONCE_BYTES
 from .validation import (
     Payload,
     decode_b64,
@@ -34,7 +35,6 @@ from .validation import (
 bp = Blueprint("auth", __name__)
 
 SALT_BYTES = 16
-NONCE_BYTES = 12
 
 
 class SaltRequest(Payload):

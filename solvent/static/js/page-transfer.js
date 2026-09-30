@@ -21,7 +21,7 @@ export function transferView(vault, { reload }) {
   return [
     el('h1', { class: 'screen-heading', text: 'Export and import' }),
     done ? confirmation(done) : null,
-    exportCard(vault),
+    exportCard(),
     importCard(vault, reload),
   ];
 }

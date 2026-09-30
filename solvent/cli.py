@@ -13,8 +13,9 @@ import sys
 import click
 import flask
 
-from .admin import BOOTSTRAP_CREATOR, mint_invite
+from .admin import mint_invite
 from .db import write_transaction
+from .validation import BOOTSTRAP_PRINCIPAL
 
 
 def init_app(app: flask.Flask) -> None:
@@ -69,6 +70,6 @@ def create_invite(kind: str, expires_days: int, label: str, force: bool) -> None
             )
             sys.exit(1)
 
-        invite = mint_invite(conn, stored_kind, expires_days, label, BOOTSTRAP_CREATOR)
+        invite = mint_invite(conn, stored_kind, expires_days, label, BOOTSTRAP_PRINCIPAL)
 
     click.echo(f"/register?invite={invite['token']}")

@@ -22,10 +22,9 @@ from flask import abort, current_app
 
 from .config import SERVER_VERIFY_PARAMS
 
-# The vendored browser bundle, hashed here and rendered into every
-# <script integrity>. tools/vendor-argon2id.py prints this value; see
-# static/vendor/argon2id/1.0.1/SOURCE.txt.
-ARGON2ID_VERSION = "1.0.1"
+# The vendored browser bundle's pinned hash, which the test suite
+# recomputes from the file. tools/vendor-argon2id.py prints this value;
+# see static/vendor/argon2id/1.0.1/SOURCE.txt.
 ARGON2ID_SRI = "sha384-STUmJDURIwAiKH+yqPUtZ/E6HZmrEvZoQG7X51r+FjJl1vinyhEyrqHLVkofdrh1"
 
 ZXCVBN_VERSION = "4.4.2"

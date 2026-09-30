@@ -241,8 +241,7 @@ specified and owned by `manage-accounts.md`, not here.
   the stored row's immutable columns is rejected with Bad Request, and
   the row is byte-identical afterwards.
 - The AAD string for a known tuple matches a fixture byte-for-byte,
-  including separators and the empty `account_id` — the regression test
-  that keeps two implementations from drifting into an unreadable vault.
+  including separators and the empty `account_id`.
 - The AAD contains no user identifier in any form, asserted against the
   fixture. A record encrypted by one user and inserted directly into
   another user's rows still fails to decrypt under that user's DEK —
@@ -257,8 +256,7 @@ specified and owned by `manage-accounts.md`, not here.
   and in an exported file — asserted against both, since the two are
   written by different code paths.
 - A request body carrying an `aad` field is rejected rather than
-  ignored. Sending one would invite a server that trusts the client's
-  copy of values it already holds.
+  ignored.
 - A ciphertext over the per-record cap, a vault over the record-count
   cap, and a user over the byte quota each return Content Too Large with
   nothing written.

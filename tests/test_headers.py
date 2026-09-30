@@ -11,7 +11,7 @@ import pytest
 
 from solvent.headers import CSP
 from solvent.guard import navigation
-from tests.helpers import CSRF, register
+from tests.helpers import CSRF, mint_invite, register
 
 
 @pytest.fixture
@@ -73,8 +73,6 @@ def test_hsts_preload_is_off_unless_the_deployment_opts_in(app, client):
 def test_the_register_page_carries_no_referrer(app, client):
     """The token rides in this page's URL, so it is this page's
     outbound navigations that could carry it in a Referer header."""
-    from tests.helpers import mint_invite
-
     body = client.get(f"/register?invite={mint_invite(app)}").get_data(as_text=True)
     assert 'name="referrer" content="no-referrer"' in body
 

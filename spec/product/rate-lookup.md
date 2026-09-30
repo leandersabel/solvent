@@ -56,7 +56,7 @@ meet one.
   field is yours to fill. A unit whose source did not answer simply
   gets no entry that day, and that day can be filled in later by
   opening its recording (`record-snapshot.md`).
-- **A lookup no longer says which holding you touched.** Every unit in
+- **A lookup does not say which holding you touched.** Every unit in
   your vault is asked about whenever you record anything, so the
   pattern of lookups is the same whether you updated one holding or
   fifteen, and the same whichever one it was.

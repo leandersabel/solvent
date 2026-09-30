@@ -6,14 +6,14 @@
 import * as crypto from './crypto.js';
 import { RECORD_TYPES, SCHEMA_VERSION, migrate } from './model.js';
 
-export const FORMAT = 'solvent-vault';
+const FORMAT = 'solvent-vault';
 export const FORMAT_VERSION = 1;
 
 // Refused by size before the file is read at all. The server's own cap
 // is on the ciphertext it stores, and a file carries that ciphertext
 // base64 encoded inside JSON, so this sits above it rather than on it.
 export const MAX_FILE_BYTES = 48 * 1024 * 1024;
-export const MAX_RECORDS = 50_000;
+const MAX_RECORDS = 50_000;
 
 const UUID4 = /^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/;
 const BASE64 = /^(?:[A-Za-z0-9+/]{4})*(?:[A-Za-z0-9+/]{2}==|[A-Za-z0-9+/]{3}=)?$/;
@@ -150,7 +150,7 @@ export async function decryptAll(fileDek, records, onProgress = () => {}) {
 
 /** Each record encrypted under `dek` with a fresh nonce, at version 1,
  *  its AAD rebuilt for that version. */
-export async function reencryptAll(plain, dek, onProgress = () => {}) {
+async function reencryptAll(plain, dek, onProgress = () => {}) {
   const records = [];
   for (const [index, { record, payload }] of plain.entries()) {
     const slot = {

@@ -15,7 +15,7 @@ matches what was contracted and specified.
 
 - The diff or code under review
 - `spec/.compiled/<feature>.json` — the contract it should satisfy
-- `spec/architecture.md`'s Security section — the concrete
+- `spec/architecture.md`'s Security section, and these concrete
   requirements: CSP headers present, `textContent` or `x-text` only for
   decrypted content, parameterized SQL, CSRF header on mutating
   endpoints, base-amount-only rate requests, nonce and AAD handling,
@@ -31,7 +31,7 @@ matches what was contracted and specified.
    can fake: write your own for every one. `verify.fixtures` names the
    artifacts they assume.
 2. Run both your tests and the engineer's. Read what the engineer's
-   tests actually assert rather than trusting a green run.
+   tests assert rather than trusting a green run.
 3. Check every claim you intend to report. A finding you have not
    reproduced is a guess, and a wrong finding costs more than a missed
    one.
@@ -57,12 +57,11 @@ spec/architecture.md, Application hardening requires one".
 - Never tick `Verified` in `spec/status.md`. That is the compiler's
   call, once your findings and qa's are both resolved.
 - Do not re-raise a finding already accepted as a tradeoff in
-  `spec/architecture.md`, such as metadata leakage or no password
-  recovery.
+  `spec/architecture.md`.
 - Do not review whether the app matches the client's intent. That is
   qa's, against `spec/product/`, and it is tested in a browser rather
   than read out of a template.
 - If there is nothing wrong, say so plainly. An empty findings list is
   a valid result.
-- Never put a question to the client. It goes to `spec/questions.md`
-  tagged `reviewer`, and the product owner decides what reaches them.
+- Never put a question to the client (`CLAUDE.md`, Who asks the
+  client).

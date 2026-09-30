@@ -22,7 +22,7 @@ from datetime import date, datetime, timedelta, timezone
 from decimal import Decimal, InvalidOperation
 from typing import Literal, Optional
 
-from flask import Blueprint, abort, g, jsonify, request
+from flask import Blueprint, abort, current_app, g, jsonify, request
 from pydantic import Field
 
 from . import ratelimit
@@ -191,8 +191,6 @@ breaker = _Breaker()
 
 
 def _fetch_json(url: str) -> "object | None":
-    from flask import current_app
-
     config = current_app.config
     if breaker.is_open(timedelta(minutes=config["RATE_BREAKER_COOLOFF_MINUTES"])):
         return None
@@ -330,8 +328,6 @@ def _resolve(symbols: list, quote: str, on: date) -> "dict[str, dict]":
     for a single symbol.
     """
     wanted = [row for row in symbols if row["lookup"]]
-    if not wanted:
-        return {}
 
     on_str = on.isoformat()
     resolved: "dict[str, dict]" = {}

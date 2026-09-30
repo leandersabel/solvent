@@ -80,7 +80,7 @@ changed later**. People choose this in five seconds and live with it
 for years, so the warning belongs here and not in settings afterwards
 (`account-settings.md`).
 
-The list holds only currencies Solvent can actually look up a rate
+The list holds only currencies Solvent can look up a rate
 into. Offering more would let somebody pick a currency that quietly
 breaks every future conversion, and they would find out years later
 with a full vault and no way to fix it.
@@ -214,8 +214,7 @@ You land in the admin area, signed in.
 
 - **The password bar is twelve characters plus a strength rating.**
   You asked for zero-knowledge, which makes the password the only
-  defense if the stored data is ever stolen outright. Somebody had
-  to pick a number. Twelve with a strength check, rather than a longer
+  defense if the stored data is ever stolen outright. Twelve with a strength check, rather than a longer
   minimum, keeps a memorable four-word phrase comfortably inside the
   bar while ruling out anything on a common-password list.
 - **Username shape and length.** Lowercase, three to thirty-two

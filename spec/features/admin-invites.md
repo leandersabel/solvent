@@ -12,9 +12,7 @@ one.
 
 **An administrator account is a kind of account, not a capability on a
 vault-owning one** (architecture.md, Accounts on this instance). Several
-exist at once. One person doing both jobs holds two accounts with two
-usernames and two passwords, and nothing in the system records that
-they are the same person.
+exist at once.
 
 **The job is not a fixed list of tasks.** Running a platform means
 whatever running this platform turns out to need, and the set grows.
@@ -44,9 +42,8 @@ back, and no vault that "their" account owns. The vault surface
 answers an administrator session Not Found at the routing layer before
 any handler runs (`app-shell.md`, The two surfaces).
 
-On top of that structure, the endpoint rule still holds and is still
-worth stating: there is no endpoint, and must never be one, that
-returns any record ciphertext, or any field of any account's
+On top of that structure, there is no endpoint, and must never be one,
+that returns any record ciphertext, or any field of any account's
 credential row (salt, KDF envelope, Auth Key hash) or wrapper. An
 administrator cannot reset a password, because a password reset would
 orphan the vault anyway — there is nothing to reset toward. The only
@@ -302,8 +299,6 @@ invocation and nothing more.
   logging, and the deployment's reverse proxy / tunnel logging is
   documented as a place it may still appear — the invite's short expiry
   and single-use nature are what bound that exposure.
-- Revoking is refused on a used invite, where deleting the resulting
-  account is the remedy, and is a no-op on an already revoked one.
 
 ## Edge cases
 

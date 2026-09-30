@@ -79,15 +79,6 @@ def revoke_current() -> None:
         get_db().execute("DELETE FROM sessions WHERE id = ?", (g.session["id"],))
 
 
-def revoke_others(principal_id: str, keep_session_id: str) -> None:
-    """Every other session of this principal, which is what a password
-    change and an import each end with (account-settings.md)."""
-    get_db().execute(
-        "DELETE FROM sessions WHERE principal_id = ? AND id != ?",
-        (principal_id, keep_session_id),
-    )
-
-
 def load_into_g() -> bool:
     """Resolve the request's cookie to a session and its principal.
 

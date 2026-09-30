@@ -150,7 +150,7 @@ others:
 - The **last** entry of a series affects everything from the previous
   entry onward, because what follows it is carried forward.
 - The **first** entry of a price series affects everything up to the
-  next entry, because what precedes it is carried backward. An
+  next entry, because what precedes it is carried backward. A
   holding's first snapshot instead moves where that holding's band
   starts, since nothing precedes it.
 
@@ -297,8 +297,8 @@ an otherwise smooth chart is indistinguishable from a bad snapshot.
   and a table fallback is estimated at 350–450.
   - SVG, not canvas: the direct labels, `tabular-nums` figures, and the
     accessible fallback below all need real DOM.
-  - Any library added later inherits the constraints: self-hosted with
-    SRI, CSP-safe with no `eval` or `new Function`, no CDN
+  - Any library added later inherits the constraints: self-hosted and
+    hash-pinned, CSP-safe with no `eval` or `new Function`, no CDN
     (architecture.md, Supply chain), and text-only labels and tooltips.
     Measured against the shipped bundles:
 
@@ -318,8 +318,8 @@ an otherwise smooth chart is indistinguishable from a bad snapshot.
 - The chart is **keyboard reachable and has a data-table fallback**. A
   static `aria-label` on the SVG is not sufficient for the primary
   screen of the app.
-- Formatting follows the main currency's conventions; asset units
-  (troy oz, m²) keep their own precision in per-holding views.
+- Formatting follows the reader's settings (account-settings.md, Dates
+  and numbers).
 
 ## Edge cases
 

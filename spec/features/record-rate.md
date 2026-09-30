@@ -124,13 +124,9 @@ per-blob cap.
 ## The refresh
 
 **Recording anything at all refreshes the price of every holding that
-needs one.** Record a single franc holding and the dollar rate and the
-gold price still get entries.
-
-**Prices are written by default and quantities are not**: a quantity
-must be looked up on a statement, so the app never writes one nobody
-gathered, while nobody gathers a price, so the person sees a proposal
-and doing nothing accepts and writes it.
+needs one**, and prices are written by default while quantities are
+not (architecture.md, Data model). The person sees a proposal, and
+doing nothing accepts and writes it.
 
 - **The recording date is the date of the entry being written**, the
   sweep's date or the single-holding form's date, and not today. A

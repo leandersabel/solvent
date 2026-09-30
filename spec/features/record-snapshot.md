@@ -7,10 +7,7 @@ the holding's native unit. That is the whole of a snapshot.
 
 **A snapshot carries no rate.** Quantities and prices are two separate
 timelines (architecture.md, Data model), one price series per symbol
-(`record-rate.md`). A holding priced from its own last entry would join
-today's total at the price of the day it was last touched, and with
-partial updates as the normal case that is most holdings most of the
-time.
+(`record-rate.md`).
 
 **Recording a quantity refreshes every price**, which is the other half
 of the same design and is specified in `record-rate.md`, The refresh.

@@ -21,12 +21,6 @@ from tests.helpers import (
 )
 
 
-@pytest.fixture
-def owner(app):
-    client, _ = register(app, "owner")
-    return client
-
-
 def holding_with_snapshots(client, count=2):
     account_id, response = put_record(client)
     assert response.status_code == 200
@@ -124,7 +118,7 @@ def test_purge_requires_the_mode_parameter(owner):
 
 
 def test_the_export_carries_both_timelines_and_one_wrapper(owner):
-    account_id = holding_with_snapshots(owner)
+    holding_with_snapshots(owner)
     put_record(owner, record_type="rate")
 
     body = owner.get("/api/export", headers=CSRF).get_json()
@@ -179,8 +173,7 @@ def test_the_export_filename_is_dated_and_names_nobody(owner):
 def test_the_exported_file_carries_no_user_identifier(app, owner):
     holding_with_snapshots(owner)
     body = owner.get("/api/export", headers=CSRF).get_data(as_text=True)
-    principal = rows(app, "SELECT id FROM principals")[0]["id"]
-    assert principal not in body
+    assert principal_id(app, "owner") not in body
     assert "owner" not in body
 
 
@@ -379,8 +372,6 @@ def test_a_payload_over_the_record_count_cap_is_refused(app, owner, monkeypatch)
     monkeypatch.setattr(vault_module, "MAX_RECORDS_PER_VAULT", 1)
     before = rows(app, "SELECT * FROM records")
     records = [record_body("account", recordId=str(uuid.uuid4())) for _ in range(2)]
-    for record in records:
-        record["recordId"] = str(uuid.uuid4())
 
     assert owner.post(
         "/api/import", json=import_payload(records), headers=CSRF

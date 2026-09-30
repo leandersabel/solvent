@@ -7,7 +7,7 @@ A net worth tracker, self-hosted on the owner's own NAS.
 - **Vault owners**: a small number of accounts (e.g. household
   members), not open to the public. Each has a separate vault: own
   password → own encryption key, nothing shared or visible between
-  them. No shared/household view.
+  them.
 - **Administrators**: accounts that provision and remove other
   accounts and own no vault at all. A separate kind of account rather
   than a capability on a vault owner, so one person doing both jobs
@@ -398,15 +398,14 @@ exists.
   injected via the TrueNAS app's environment config — never baked into
   the image or committed to the repo.
 - **CI/CD & updates**: Dependabot tracks the Dockerfile's `FROM` digest and
-  Python (`pip`) dependencies. Each PR triggers a GitHub Actions build+test;
-  on merge, Actions builds the image and pushes it to GHCR. A weekly
+  Python (`pip`) dependencies. Each PR triggers a GitHub Actions build+test.
+  The image reaches GHCR only as a nightly or stable version (`CLAUDE.md`,
+  The loop, Nightly and stable). A weekly
   scheduled workflow rebuilds the image to catch upstream base-image
   security patches even without a dependency bump, opening a PR if the
-  digest changed. Patch-level PRs may auto-merge after CI passes;
-  minor/major bumps need manual review. Dependencies touching crypto or
-  auth (`argon2id`, Alpine, anything in the auth/session path) are
-  excluded from auto-merge regardless of bump level and always need
-  manual review. Actions workflows run with least-privilege
+  digest changed. Dependency PRs merge when CI passes, after a cooldown
+  (`CLAUDE.md`, The loop, Merge gate). The vendored browser files are
+  outside Dependabot and are re-pinned by hand. Actions workflows run with least-privilege
   `permissions:` blocks, pin third-party actions by commit SHA, and use
   `pull_request` (never `pull_request_target`) so fork-triggered runs
   can't reach GHCR push secrets. Images are signed at push (cosign/
@@ -484,9 +483,9 @@ Actors this design defends against vs. accepts:
 - **Offline attacker with a DB dump or an export file**: only as
   defended as password strength × Argon2id cost, by construction (see
   Key management) — there is no rate limit on an offline attack.
-- **Compromised dependency or CDN**: defended — all crypto/framework JS
-  is self-hosted with Subresource Integrity, no third-party CDN sits
-  inside the trust boundary (see Supply chain).
+- **Compromised dependency or CDN**: defended. All crypto and framework
+  JS is self-hosted and hash-pinned, and no third-party CDN sits inside
+  the trust boundary (see Supply chain).
 - **Accepted, not defended**: metadata leakage (login timestamps,
   per-user record counts, including roughly how many distinct priced
   symbols a vault holds from the size of a recording's burst of writes,
@@ -539,7 +538,7 @@ Actors this design defends against vs. accepts:
     shipping a SIMD build changes nothing. The residual is the engine
     itself.
   - The `argon2id` library is one algorithm and nothing else, about 7 KB
-    minified with the WASM inlined, so the self-hosted, SRI-pinned
+    minified with the WASM inlined, so the self-hosted, hash-pinned
     artifact is a single small file to audit and re-pin on a bump. It
     ships separate SIMD and non-SIMD binaries and chooses between them,
     and it manages the hash's memory JS-side, so a failed allocation
@@ -758,8 +757,8 @@ Actors this design defends against vs. accepts:
   what make sessions enumerable and revocable, which the product
   requires for listing active sessions, "log out everywhere",
   invalidating every other session on a password change or an import,
-  and the absolute 12-hour expiry (login.md, Rules, which owns the
-  value, and export-import.md). `id` is a separate opaque handle — it
+  and the absolute expiry (login.md, Rules, which owns the value, and
+  export-import.md). `id` is a separate opaque handle — it
   is what `GET /api/sessions` returns, so no response ever hands JavaScript the
   cookie's own value.
   - **The row shape does not vary by kind and carries no `kind`
@@ -892,16 +891,22 @@ Actors this design defends against vs. accepts:
 - **Import authorization**: strict schema/size validation on the
   imported file (client and server), and the server ties every imported
   record to the authenticated user's own vault only — one user's import
-  can never write into another user's vault. Overwrite-vs-merge
-  semantics must be explicit in the Export/Import feature spec.
+  can never write into another user's vault. Import replaces the vault
+  and never merges (export-import.md, Import: replace-only).
 
 ### Supply chain
 
 - All crypto and framework JS/WASM is self-hosted from the app origin
-  with pinned versions and Subresource Integrity hashes, never loaded
-  from a third-party CDN, which would otherwise sit inside the trust
-  boundary and could silently exfiltrate passwords via a malicious
-  script. CI/CD supply-chain controls (image signing, dependency-merge
+  with pinned versions, never loaded from a third-party CDN, which
+  would otherwise sit inside the trust boundary and could silently
+  exfiltrate passwords via a malicious script.
+- Every vendored file has a pinned SHA-384 hash, and the test suite
+  checks each file against it. A page that loads one by script tag also
+  carries the hash as Subresource Integrity for the browser to enforce.
+  The `argon2id` import inside the KDF worker cannot carry one, and
+  enforcing it by hand would need `blob:` in `script-src`, which costs
+  more than it buys: the hash is served by the same origin as the file,
+  so whoever can change the file can change the hash. CI/CD supply-chain controls (image signing, dependency-merge
   policy) live under Tech stack.
 - **The list is named here in full, and it is meant to stay short**:
   `argon2id` (Key management), Alpine in its CSP-safe build, and

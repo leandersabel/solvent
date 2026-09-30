@@ -9,12 +9,6 @@ from solvent.records import MAX_CIPHERTEXT_BYTES, aad
 from tests.helpers import CSRF, b64, put_record, record_body, register, rows
 
 
-@pytest.fixture
-def owner(app):
-    client, _ = register(app, "owner")
-    return client
-
-
 def account_of(client):
     record_id, response = put_record(client)
     assert response.status_code == 200

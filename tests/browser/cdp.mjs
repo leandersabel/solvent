@@ -11,7 +11,7 @@ import { mkdtempSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 
-const CHROME = '/Applications/Google Chrome.app/Contents/MacOS/Google Chrome';
+const CHROME = process.env.CHROME ?? '/Applications/Google Chrome.app/Contents/MacOS/Google Chrome';
 
 export async function launch(port = 10000 + Math.floor(Math.random() * 40000)) {
   const profile = mkdtempSync(join(tmpdir(), 'solvent-chrome-'));

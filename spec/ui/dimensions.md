@@ -71,9 +71,9 @@ validated chart palette (`design-system.md`), not a limit on the data
   empty select on the account form.
 - **A flag** is offered as a second option in the same dialog: a
   dimension with exactly one value, which the account form renders as a
-  checkbox rather than a select. This is the shape that replaces a
-  yes/no tag ("Emergency fund"), and it must be as fast to make as
-  typing a tag once was — one field, one button.
+  checkbox rather than a select. This is the shape a yes/no tag
+  ("Emergency fund") takes, and it must be as fast to make as typing a
+  tag: one field, one button.
 - Ids are generated, never asked for. The user never sees one.
 
 ## Editing a label
@@ -110,7 +110,7 @@ save button and no reorder mode.
 
 - Archiving a **dimension** hides it from the account form, the "Group
   by" select, and the breakdown. Its holdings render as "Unassigned"
-  for it — which is to say, it simply stops appearing.
+  for it.
 - Archiving a **value** moves its holdings to "Unassigned" in that
   dimension.
 - **Archiving the last active value of a dimension is allowed.** The
@@ -178,8 +178,6 @@ beside it, and its unassigned link stays a tap target of its own.
 - **No value totals and no chart preview.** What a band is worth
   belongs to the dashboard, which is one click away, and a figure here
   would be a second place for the same number to be right or wrong.
-- **No permanent delete and no "remove from all holdings".**
-- **No cap on values**, only the note above.
 
 ## Rules
 
