@@ -36,7 +36,7 @@ jobs:
           --read-only --tmpfs /dev/shm:size=64m
           --cap-drop ALL --security-opt no-new-privileges:true
           solvent
-      - run: curl -fsS --retry 10 --retry-connrefused --retry-delay 1 -o /dev/null http://localhost:8000/login
+      - run: curl -fsS --retry 10 --retry-all-errors --retry-delay 1 -o /dev/null http://localhost:8000/login
       - if: failure()
         run: docker logs solvent
 
