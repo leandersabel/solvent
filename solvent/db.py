@@ -16,6 +16,10 @@ SCHEMA_PATH = Path(__file__).parent / "schema.sql"
 #: The version schema.sql stamps into `PRAGMA user_version`.
 SCHEMA_VERSION = 1
 
+#: Seconds a starting process waits for another's initialization to
+#: commit, which covers the slowest start on the smallest host.
+_INIT_TIMEOUT = 30
+
 
 class SchemaMismatch(RuntimeError):
     """A database file this build cannot serve."""
@@ -39,6 +43,13 @@ def init_db(app: flask.Flask) -> None:
     schema.sql is `IF NOT EXISTS`, and the seed inserts only rows that
     are absent.
 
+    The one transaction is what makes it safe when several processes
+    start at once, as gunicorn's workers do on a fresh volume. Without
+    it, schema.sql commits statement by statement and stamps the version
+    last, so a second process sees tables at version 0 and refuses to
+    start. `BEGIN IMMEDIATE` makes it wait instead, for the first one's
+    commit, and then find a finished schema at the current version.
+
     That idempotence is also why an existing file is checked first.
     `IF NOT EXISTS` leaves a table written by another version of this
     schema exactly as it found it, so the process would start against a
@@ -46,12 +57,19 @@ def init_db(app: flask.Flask) -> None:
     """
     db_path = Path(app.config["DATABASE_PATH"])
     db_path.parent.mkdir(parents=True, exist_ok=True)
-    conn = sqlite3.connect(db_path)
+    # `autocommit=True` leaves transaction control here, and keeps
+    # `executescript` from committing the transaction it runs in.
+    conn = sqlite3.connect(db_path, timeout=_INIT_TIMEOUT, autocommit=True)
     try:
-        _check_version(conn, db_path)
-        conn.executescript(SCHEMA_PATH.read_text())
-        _seed_symbols(conn)
-        conn.commit()
+        conn.execute("BEGIN IMMEDIATE")
+        try:
+            _check_version(conn, db_path)
+            conn.executescript(SCHEMA_PATH.read_text())
+            _seed_symbols(conn)
+        except BaseException:
+            conn.execute("ROLLBACK")
+            raise
+        conn.execute("COMMIT")
     finally:
         conn.close()
 
