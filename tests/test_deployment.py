@@ -20,7 +20,7 @@ def test_base_image_is_pinned_by_digest():
     from_line = next(
         line for line in DOCKERFILE.splitlines() if line.startswith("FROM ")
     )
-    assert "python:3.13-slim@sha256:" in from_line
+    assert re.fullmatch(r"FROM python:\d+\.\d+-slim@sha256:[0-9a-f]{64}", from_line)
 
 
 def test_the_image_does_not_run_as_root():

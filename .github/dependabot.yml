@@ -23,8 +23,3 @@ updates:
       interval: weekly
     cooldown:
       default-days: 3
-    # The Python version is the architecture's (spec/architecture.md,
-    # Base image), so only the image's digest moves here.
-    ignore:
-      - dependency-name: python
-        update-types: [version-update:semver-major, version-update:semver-minor]

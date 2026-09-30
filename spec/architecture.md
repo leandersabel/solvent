@@ -388,8 +388,11 @@ exists.
   (Docker-based, managed through TrueNAS's Apps UI — not the experimental
   Instances/LXC feature). TrueNAS pulls the image from a private GHCR
   (GitHub Container Registry) repo.
-- **Base image**: `python:3.13-slim` (Debian-based Docker Official Image),
-  pinned by digest. Chosen over alpine/distroless/Chainguard for broadest
+- **Base image**: the current Python release's `-slim` image
+  (Debian-based Docker Official Image), pinned by digest. The
+  Dockerfile's `FROM` line is the one place the Python version is
+  written, and CI tests on that same version, so Dependabot moves the
+  image and the tests together. Chosen over alpine/distroless/Chainguard for broadest
   pip wheel compatibility and the largest maintained-image audience;
   revisit for a smaller attack surface once dependencies stabilize.
 - **Container hardening**: runs as non-root, read-only root filesystem
