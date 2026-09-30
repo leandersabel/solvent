@@ -139,8 +139,8 @@ closing `<details>` block.
    `spec/ui/`, each to the target state `CLAUDE.md`, Writing the spec,
    asks for. `compiler` recompiles the contracts the change touches.
    Nothing outside `spec/` changes, except in a pipeline change, which
-   touches only `.claude/`, `CLAUDE.md` and `.github/` outside
-   `.github/workflows/`. A change to a workflow file is the client's
+   touches only `.claude/`, `CLAUDE.md`, `SECURITY.md` and `.github/`
+   outside `.github/workflows/`. A change to a workflow file is the client's
    to make: say so, with the proposed change in the `<details>` block,
    and stop.
 3. Commit, push, and open a pull request against `master`. The title
@@ -175,9 +175,9 @@ closing `<details>` block.
 8. Comment on the issue with the link.
 
 An implementation never changes `spec/product/`,
-`spec/architecture.md`, `spec/design/`, `.github/`, `.claude/` or
-`CLAUDE.md`. When the spec has to change, stop and return to Clarify
-with a question or a `change`.
+`spec/architecture.md`, `spec/design/`, `.github/`, `.claude/`,
+`CLAUDE.md` or `SECURITY.md`. When the spec has to change, stop and
+return to Clarify with a question or a `change`.
 
 ## Stuck
 

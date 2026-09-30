@@ -144,7 +144,9 @@ The client is `leandersabel`. No agent edits an issue body.
   other change, and a Claude session on the client's machine does not
   push. Workflow files are the exception: the Claude GitHub App cannot
   write them, so the client changes them in a pull request of their
-  own, which merges on green.
+  own, which merges on green. A security fix is made by the client in
+  its advisory's private fork, because a loop pull request is public
+  before it merges (`SECURITY.md`).
 - Model calls draw on the client's subscription through
   `CLAUDE_CODE_OAUTH_TOKEN`, made with `claude setup-token`. The token
   can only make model requests, so it reaches no claude.ai chats or
@@ -228,9 +230,10 @@ the client does.
   are required. No approval is required except the code owner's, and a
   push dismisses an earlier approval. Nobody bypasses it.
 - `CODEOWNERS` makes `@leandersabel` the reviewer of `spec/product/`,
-  `spec/architecture.md`, `spec/design/`, `.claude/`, `CLAUDE.md` and
-  `.github/` outside `.github/workflows/`. So the client approves every
-  spec change, and no agent changes the pipeline that gates it.
+  `spec/architecture.md`, `spec/design/`, `.claude/`, `CLAUDE.md`,
+  `SECURITY.md` and `.github/` outside `.github/workflows/`. So the
+  client approves every spec change, and no agent changes the pipeline
+  that gates it.
 - A pull request need not be up to date with `master`, because one
   implementation runs at a time and a spec pull request touches no
   code. The nightly run tests `master` as a whole before any version.
