@@ -61,10 +61,20 @@ Standard app shell (`design-system.md`, App shell), content max-width
 Top to bottom: the date as the heading, one row per active holding,
 then the rate block. Archived holdings do not appear.
 
+The date is the screen heading, with a section label above it. The
+rows share one Card, divided by hairline rules. The rate block follows
+under its own section heading, in a Card of its own.
+
 ### A row
 
 Name, unit, what the holding holds now, its age, the value field, and
 one control.
+
+Three columns. The name holds the fluid left column with the row's
+sentence and age beneath it. The quantity field takes a 260px column,
+its unit as the suffix and the converted figure right-aligned beneath
+it. The control fills a 112px column at the right, so every row's
+control lines up whatever it reads.
 
 **Every row states in words whether this date already holds a figure
 for it.** That sentence, not the contents of the field, is what tells a
@@ -147,6 +157,11 @@ would have to win silently (`record-rate.md`).
 Each line carries the unit, the figure, and where it came from. The
 provenance wording is one vocabulary across the product and is owned by
 `recording-detail.md`.
+
+The lines keep the rows' columns: the unit at the left, the figure in
+the field column, and the provenance chip in the control column. That
+column widens for a long chip on every line at once, so no field falls
+out of line with the others.
 
 Line states:
 
@@ -240,6 +255,12 @@ counting it would overstate what the change moves.
 Editing a filled line flips its provenance the moment it changes, to
 "Edited from 0.9312", naming the figure that was replaced
 (`recording-detail.md`). The proposed badge is never silently kept.
+
+## At phone width
+
+A row stacks into one column: the name with its sentence and age, then
+the quantity field with the converted figure beneath it at the left,
+then the control at full width. A rate line stacks the same way.
 
 ## Writes
 

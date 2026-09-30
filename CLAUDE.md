@@ -139,6 +139,14 @@ The client is `leandersabel`. No agent edits an issue body.
   `.github/workflows/agent.yml` runs the `advance` skill with the
   issue number, and the skill reads the issue's state and takes the one
   next step. Repeating or restarting a run does no harm.
+- Changes reach `master` only as pull requests from `claude[bot]` or
+  Dependabot. The client changes the pipeline through an issue like any
+  other change, and a Claude session on the client's machine does not
+  push. Workflow files are the exception: the Claude GitHub App cannot
+  write them, so the client changes them in a pull request of their
+  own, which merges on green. A security fix is made by the client in
+  its advisory's private fork, because a loop pull request is public
+  before it merges (`SECURITY.md`).
 - Model calls draw on the client's subscription through
   `CLAUDE_CODE_OAUTH_TOKEN`, made with `claude setup-token`. The token
   can only make model requests, so it reaches no claude.ai chats or
@@ -155,7 +163,10 @@ The client is `leandersabel`. No agent edits an issue body.
   issue is in the issue's language, following the `advance` skill's
   Writing section.
 - An issue by `leandersabel` starts the loop when it is opened. Anyone
-  else's issue starts it when `accepted` is added. Adding a label takes
+  else's issue starts it when `accepted` is added. An issue by
+  `github-actions[bot]` starts at once: only this repository's
+  workflows can write one, for a red `master`, and its text is
+  theirs. Adding a label takes
   triage access to the repository, no form sets `accepted`, and no
   agent adds it.
 - The loop reads an issue's body, the comments by `leandersabel` and
@@ -174,6 +185,8 @@ Each run on a new issue, or on a reply from the client, ends in one of:
   says and what the app does, and implementation starts.
 - `change`, the spec changes: the comment says what changes for the
   client, screen by screen, and the spec pull request opens.
+- `maintenance`, only the code changes and nothing the client sees:
+  the comment says what changes and why, and implementation starts.
 - Already met, a duplicate, or doubtful: the reasoning, and a question
   to the client.
 
@@ -198,8 +211,10 @@ the client does.
 ### Implementation
 
 - Starts when a spec pull request merges, or when clarifying finds a
-  `bug` with nothing to ask. One implementation runs at a time, in the
-  order the triggers arrive.
+  `bug` with nothing to ask. One implementation runs at a time: its
+  issue carries `implementing`, an issue ready meanwhile waits with
+  `queued`, and the lowest-numbered queued issue starts when the running
+  one merges.
 - On `claude/issue-<issue>`, `engineer` implements the contract, for a
   `bug` starting with a test that fails on the reported behavior. The
   suite passes, browser tests included. `reviewer` reviews the change
@@ -218,16 +233,17 @@ the client does.
 - One ruleset on `master`: pull requests only, squash merges only, no
   force push or deletion. The `test`, `image` and `dependencies` checks
   are required. No approval is required except the code owner's, and a
-  push dismisses an earlier approval. The client bypasses as
-  administrator, to change the pipeline.
+  push dismisses an earlier approval. Nobody bypasses it.
 - `CODEOWNERS` makes `@leandersabel` the reviewer of `spec/product/`,
-  `spec/architecture.md`, `spec/design/`, `.github/`, `.claude/` and
-  `CLAUDE.md`. So the client approves every spec change, and no agent
-  changes the pipeline that gates it.
+  `spec/architecture.md`, `spec/design/`, `.claude/`, `CLAUDE.md`,
+  `SECURITY.md` and `.github/` outside `.github/workflows/`. So the
+  client approves every spec change, and no agent changes the pipeline
+  that gates it.
 - A pull request need not be up to date with `master`, because one
   implementation runs at a time and a spec pull request touches no
-  code. `check.yml` runs again on `master` after every merge.
-- Dependabot's updates pass the same gate and merge when green. A
+  code. The nightly run tests `master` as a whole before any version.
+- Dependabot's updates pass the same gate and merge when green, except
+  one touching a file the client owns, which waits for their approval. A
   release is proposed only once it has aged: a week for a major or
   minor release and for an action, a few days for a patch or a base
   image. A compromised release is usually caught and pulled within
@@ -277,8 +293,8 @@ the client does.
   becomes a draft without auto-merge and the issue is `stuck`.
 - Every merge to `master` rebases the loop's open pull requests.
 - A failing check on `master` opens a `bug` issue as
-  `github-actions[bot]`, and that night has no QA. It waits for
-  `accepted`.
+  `github-actions[bot]`, which starts at once and skips the
+  implementation queue, and that night has no QA.
 - Disabling `agent.yml`, or removing the token from the `agent`
   environment, stops the loop.
 
@@ -290,6 +306,7 @@ the client does.
 | New | started, no comment from `claude[bot]` yet |
 | Waiting on the client | `needs-answer` or `stuck` |
 | Spec in review | an open spec pull request links it |
-| Being implemented | an open pull request closes it |
+| Queued | `queued` |
+| Being implemented | `implementing`, and an open pull request closes it |
 | Done | closed by the merged pull request, shipped in the next nightly |
 | Not doing | closed as not planned by the client |

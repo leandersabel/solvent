@@ -1,0 +1,110 @@
+name: Nightly
+
+# Tonight's master, tested end to end against the client's acceptance
+# lists, becomes a dated pre-release when it passes (CLAUDE.md, The
+# loop, Nightly and stable).
+on:
+  schedule:
+    - cron: "0 1 * * *"
+  workflow_dispatch:
+
+permissions: {}
+
+# A run by hand and the scheduled one never race for the same day.
+concurrency: nightly
+
+jobs:
+  nightly:
+    runs-on: ubuntu-latest
+    timeout-minutes: 180
+    environment: agent
+    permissions:
+      contents: write
+      packages: write
+      issues: write
+      pull-requests: read
+      id-token: write
+    env:
+      GH_TOKEN: ${{ github.token }}
+      IMAGE: ghcr.io/${{ github.repository }}
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: master
+          fetch-depth: 0
+
+      # At most one version a day, and none for a night whose only
+      # changes are to the spec, the docs or the pipeline.
+      - id: decide
+        run: |
+          today=$(date -u +%F)
+          last=$(git tag --list '20[0-9][0-9]-[0-9][0-9]-[0-9][0-9]' --sort=-refname | head -n 1)
+          echo "today=$today" >> "$GITHUB_OUTPUT"
+          echo "last=$last" >> "$GITHUB_OUTPUT"
+          if [ "$last" = "$today" ]; then
+            echo "Version $today already exists."
+            [ "${{ github.event_name }}" = workflow_dispatch ] && exit 1
+            echo "go=false" >> "$GITHUB_OUTPUT"; exit 0
+          fi
+          if [ -n "$last" ] && [ -z "$(git diff --name-only "$last" HEAD | grep -vE '^(spec/|\.github/|\.claude/|CLAUDE\.md|README\.md)')" ]; then
+            echo "No code changed since $last."
+            echo "go=false" >> "$GITHUB_OUTPUT"; exit 0
+          fi
+          echo "go=true" >> "$GITHUB_OUTPUT"
+
+      - if: steps.decide.outputs.go == 'true'
+        uses: ./.github/actions/setup
+      - if: steps.decide.outputs.go == 'true'
+        run: python -m pytest -q
+
+      - if: steps.decide.outputs.go == 'true'
+        id: app
+        run: |
+          docker build -t "$IMAGE:${{ steps.decide.outputs.today }}" .
+          docker run -d --name solvent -p 8000:8000 \
+            -e SECRET_KEY="$(openssl rand -hex 32)" \
+            -v solvent-data:/data \
+            --read-only --tmpfs /dev/shm:size=64m \
+            --cap-drop ALL --security-opt no-new-privileges:true \
+            "$IMAGE:${{ steps.decide.outputs.today }}"
+          curl -fsS --retry 10 --retry-all-errors --retry-delay 1 -o /dev/null http://localhost:8000/login
+          echo "invite=$(docker exec solvent flask --app app create-invite --kind administrator | tail -n 1)" >> "$GITHUB_OUTPUT"
+
+      - if: steps.decide.outputs.go == 'true'
+        uses: anthropics/claude-code-action@fd1c128679612beff4ca259c78021c506e8aa7a7 # v1.0.237
+        with:
+          claude_code_oauth_token: ${{ secrets.CLAUDE_CODE_OAUTH_TOKEN }}
+          prompt: >-
+            Run the `nightly-qa` skill with the arguments
+            `http://localhost:8000 ${{ steps.app.outputs.invite }} ${{ steps.decide.outputs.last }}`.
+          # A scheduled run's actor is whoever last changed this file,
+          # which can be a bot.
+          allowed_bots: claude,github-actions,dependabot
+          bot_id: "209825114"
+          claude_args: |
+            --model claude-opus-5-5
+            --allowedTools Bash,Read,Write,Glob,Grep,Agent,Task,Skill,TodoWrite,mcp__playwright
+            --mcp-config '{"mcpServers":{"playwright":{"command":"npx","args":["-y","@playwright/mcp@0.0.83","--headless","--browser","chrome","--isolated"]}}}'
+
+      - if: steps.decide.outputs.go == 'true'
+        run: |
+          verdict=$(cat qa-verdict.txt 2>/dev/null || echo missing)
+          echo "QA verdict: $verdict"
+          [ "$verdict" = PASS ]
+
+      - if: steps.decide.outputs.go == 'true'
+        env:
+          TODAY: ${{ steps.decide.outputs.today }}
+          LAST: ${{ steps.decide.outputs.last }}
+        run: |
+          echo "${{ github.token }}" | docker login ghcr.io -u "${{ github.actor }}" --password-stdin
+          docker tag "$IMAGE:$TODAY" "$IMAGE:nightly"
+          docker push "$IMAGE:$TODAY"
+          docker push "$IMAGE:nightly"
+          # The release creates the tag through the API: the agent step
+          # left git authenticated with a token it has since revoked.
+          python3 tools/release-notes.py "$LAST" HEAD > notes.md
+          gh release create "$TODAY" --target "$(git rev-parse HEAD)" --prerelease --title "$TODAY" --notes-file notes.md
+
+      - if: failure()
+        run: docker logs solvent || true

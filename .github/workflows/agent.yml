@@ -1,0 +1,158 @@
+name: Agent
+
+# Every event that can move an issue along the loop runs the `advance`
+# skill for that issue (CLAUDE.md, The loop). The route job decides which
+# issue, if any, from who acted and on what, before any agent runs.
+on:
+  issues:
+    types: [opened, labeled, closed]
+  issue_comment:
+    types: [created]
+  pull_request_review:
+    types: [submitted]
+  workflow_run:
+    workflows: [Check]
+    types: [completed]
+  push:
+    branches: [master]
+  workflow_dispatch:
+    inputs:
+      issue:
+        description: Issue number
+        required: true
+
+permissions: {}
+
+jobs:
+  route:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    permissions:
+      contents: read
+      issues: write
+      pull-requests: read
+      actions: write
+    outputs:
+      issue: ${{ steps.route.outputs.issue }}
+    steps:
+      - id: route
+        env:
+          GH_TOKEN: ${{ github.token }}
+          GH_REPO: ${{ github.repository }}
+          EVENT: ${{ github.event_name }}
+          OWNER: ${{ github.repository_owner }}
+        run: |
+          jqe() { jq -r "$1" "$GITHUB_EVENT_PATH"; }
+          from_branch() { sed -nE "s#^claude/(spec|issue)-([0-9]+)\$#\2#p" <<<"$1"; }
+          dispatch() { gh workflow run agent.yml --ref master -f issue="$1"; }
+          # The lowest-numbered queued issue starts once nothing is
+          # being implemented.
+          next_queued() {
+            [ -z "$(gh issue list --state open --label implementing --json number --jq '.[].number')" ] &&
+              gh issue list --state open --label queued --json number --jq 'map(.number) | min // empty'
+          }
+          sender=$(jqe .sender.login)
+          issue=
+          case "$EVENT" in
+            issues)
+              if [ "$(jqe .action)" = opened ]; then
+                [ "$sender" = "$OWNER" ] && [ "$(jqe .issue.user.login)" = "$OWNER" ] && issue=$(jqe .issue.number)
+              elif [ "$(jqe .action)" = closed ]; then
+                # A closed issue gives up its place in the queue.
+                gh issue edit "$(jqe .issue.number)" --remove-label implementing --remove-label queued || true
+                for n in $(next_queued || true); do dispatch "$n"; done
+              elif [ "$(jqe .label.name)" = accepted ] && [ "$(jqe .issue.state)" = open ]; then
+                issue=$(jqe .issue.number)
+              fi ;;
+            issue_comment)
+              if [ "$sender" = "$OWNER" ] && [ "$(jqe .issue.state)" = open ]; then
+                if [ "$(jqe .issue.pull_request)" = null ]; then
+                  issue=$(jqe .issue.number)
+                else
+                  issue=$(from_branch "$(gh pr view "$(jqe .issue.number)" --json headRefName --jq .headRefName)")
+                fi
+              fi ;;
+            pull_request_review)
+              # A review event runs on the pull request's ref, which the
+              # `agent` environment refuses, so the run starts on master.
+              if [ "$sender" = "$OWNER" ]; then
+                n=$(from_branch "$(jqe .pull_request.head.ref)")
+                [ -n "$n" ] && dispatch "$n"
+              fi ;;
+            workflow_run)
+              # A failed check on an implementation needs a fix. A
+              # finished check on a spec may let an approval merge.
+              if [ "$(jqe .workflow_run.head_repository.full_name)" = "$GH_REPO" ]; then
+                branch=$(jqe .workflow_run.head_branch)
+                conclusion=$(jqe .workflow_run.conclusion)
+                if [[ "$branch" == claude/issue-* && "$conclusion" == failure ]] || [[ "$branch" == claude/spec-* ]]; then
+                  issue=$(from_branch "$branch")
+                fi
+              fi ;;
+            workflow_dispatch)
+              issue=$(jqe .inputs.issue)
+              [[ "$issue" =~ ^[0-9]+$ ]] || { echo "Not an issue number: $issue"; exit 1; } ;;
+            push)
+              # A merge frees the implementation slot, can leave the
+              # loop's other pull requests conflicting, and lets the
+              # next queued issue start. Each gets a run of its own.
+              for n in $(gh issue list --state closed --label implementing --json number --jq '.[].number'); do
+                gh issue edit "$n" --remove-label implementing
+              done
+              # GitHub computes mergeability lazily after a push.
+              for _ in 1 2 3 4 5 6; do
+                sleep 10
+                prs=$(gh pr list --state open --json headRefName,mergeable \
+                  --jq '[.[] | select(.headRefName | startswith("claude/"))]')
+                [ "$(jq '[.[] | select(.mergeable == "UNKNOWN")] | length' <<<"$prs")" = 0 ] && break
+              done
+              runs=$(jq -r '.[] | select(.mergeable == "CONFLICTING") | .headRefName' <<<"$prs" \
+                | while read -r b; do from_branch "$b"; done)
+              runs="$runs $(next_queued || true)"
+              for n in $runs; do dispatch "$n"; done ;;
+          esac
+          echo "issue=$issue" >> "$GITHUB_OUTPUT"
+
+  advance:
+    needs: route
+    if: needs.route.outputs.issue != ''
+    runs-on: ubuntu-latest
+    timeout-minutes: 180
+    environment: agent
+    # One run per issue at a time. A later event waits, and the run it
+    # starts reads the issue as it then stands.
+    concurrency:
+      group: issue-${{ needs.route.outputs.issue }}
+    permissions:
+      contents: write
+      issues: write
+      pull-requests: write
+      actions: read
+      checks: read
+      id-token: write
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: master
+          fetch-depth: 0
+      - uses: ./.github/actions/setup
+      - uses: anthropics/claude-code-action@fd1c128679612beff4ca259c78021c506e8aa7a7 # v1.0.237
+        with:
+          claude_code_oauth_token: ${{ secrets.CLAUDE_CODE_OAUTH_TOKEN }}
+          prompt: Run the `advance` skill with the argument `${{ needs.route.outputs.issue }}`.
+          # Its own failing checks arrive as claude[bot], and a run the
+          # route job starts arrives as github-actions[bot].
+          allowed_bots: claude,github-actions
+          bot_id: "209825114"
+          claude_args: |
+            --model claude-opus-5-5
+            --allowedTools Bash,Read,Write,Edit,MultiEdit,Glob,Grep,Agent,Task,Skill,TodoWrite
+      - if: failure() || cancelled()
+        env:
+          GH_TOKEN: ${{ github.token }}
+          GH_REPO: ${{ github.repository }}
+          ISSUE: ${{ needs.route.outputs.issue }}
+          RUN: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
+        run: |
+          gh issue edit "$ISSUE" --add-label stuck
+          gh issue comment "$ISSUE" --body "@${{ github.repository_owner }} The agent's run did not finish: $RUN. Any comment here starts the next one."

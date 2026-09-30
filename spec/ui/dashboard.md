@@ -16,7 +16,9 @@ Standard app shell (`design-system.md`, App shell). The holdings table
 below is the list of holdings the shell deliberately has no nav entry
 for.
 
-Regions, top to bottom:
+Regions, top to bottom, each at the full content width and 32px apart.
+The hero sits on the ground, and every region after it is a Card
+opening on its section heading (`design-system.md`, Components).
 
 ### 1. Hero figure
 
@@ -24,6 +26,13 @@ Summary figures read in whole units of the main currency: the total,
 the change, gross assets and liabilities here, the legend and the
 breakdown below. The holdings table carries the money places, because
 it is where a figure is checked against a statement.
+
+The total holds the left, its section label above it and the change
+beneath it. At the right, level with the foot of the total, sit gross
+assets and gross liabilities, each set off by a hairline rule at its
+left, and after them New recording. Which rates takes its own row
+beneath, at the left, as a segmented control (`design-system.md`,
+Components).
 
 - The net worth total, ink-primary, proportional figures, in the main
   currency, under the section label "Net worth" (`design-system.md`,
@@ -106,6 +115,14 @@ bands mirror down, the net-worth line runs over the top.
 - **Pricing** is not a chart control. The two-position rates control in
   the hero leaves the chart alone (Hero figure).
 
+The section heading holds the left of that row and the controls the
+right, in the order listed, wrapping beneath the heading when the row
+runs out. Range and Absolute / percentage are segmented controls. The
+plot spans the card with its value ticks at the left. Beneath it,
+under a hairline rule, the legend runs as one row, each entry its
+swatch, band name and figure, with the key to the entry marks at the
+row's right end. The "View as table" disclosure closes the card.
+
 **Interaction:**
 
 - **Hover** moves a dotted crosshair and a tooltip pinned to the top of
@@ -155,7 +172,8 @@ section exists.
   Same order as the stack above, so the two read as one thing.
 - **Every bar is chart slot 1** — these are nominal categories and the
   bar length already carries the value (`design-system.md`).
-- Direct label on each bar: value label and amount.
+- Direct label on each bar: value label and amount. The bars run the
+  card's width less the room these labels take at the outboard ends.
 - "Unassigned" is a bar like any other, and "Other" folds the fifth and
   beyond, matching the chart.
 - **A band can be net negative** — a mortgage under "Fixed" — so the
@@ -175,6 +193,10 @@ section exists.
   equal to the hero figure says nothing.
 
 ### 4. Holdings table
+
+The section heading holds the left of the card's head row and the
+"Show archived" toggle the right, with the table filling the card
+beneath them.
 
 Columns: Name · Dimensions · Latest value (native unit) · In main
 currency · As of · (row action).
@@ -213,6 +235,29 @@ currency · As of · (row action).
   (`snapshot-entry.md`). It is not a second New recording: that button
   asks which date and sweeps every holding, this one takes one holding
   to one date, which is what an odd date or a backfill needs.
+
+## At phone width
+
+The regions keep their order and stack, 20px apart.
+
+- **Hero**: the total, then the change, then gross assets and gross
+  liabilities side by side in two equal columns under a hairline rule.
+  Which rates spans the width beneath them, and New recording spans
+  the width beneath that, 48px tall.
+- **Trend chart**: Range spans the width across the top of the
+  controls, and the rest wrap in rows beneath it. Group by drops its
+  visible label and keeps it as the select's accessible name, because
+  the section heading above already says what it groups. The legend
+  runs in two columns and drops each band's figure, which the breakdown
+  below carries, and the key to the entry marks sits beneath it.
+- **Breakdown**: each bar's label moves above the bar, the band's name
+  at the left and its amount at the right, and the bar keeps the shared
+  zero baseline beneath it.
+- **Holdings table**: a list rather than a table, with no column
+  headings. Each row holds the name with its dimension chips beneath
+  it at the left, and at the right the main-currency figure with the
+  as-of date beneath it, preceded by the native figure where the unit
+  is not the main currency.
 
 ## States
 
