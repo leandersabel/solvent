@@ -20,7 +20,9 @@ owns live on their own screens and are linked from here: dimensions
 ## Layout
 
 Standard app shell, reached from **Settings** in the nav. Content
-max-width 720px, one card per section, stacked in the order below.
+max-width 720px, one card per section, stacked in the order below
+under the screen heading, 24px apart. Each section's card opens on its
+section heading.
 
 The nav entry is an in-page address, not a second page. The keys live
 in one page's memory, so a page load here would charge the derivation
@@ -37,6 +39,10 @@ typed address still works.
   it, so changing it would mix two currencies in your history."
 
   This is not a control disabled for now: there is no field.
+
+Each is a label and value pair: the label in ink-secondary in a 160px
+column at the left, the value beside it, and a hairline rule between
+the pairs. The currency's note sits beneath the currency.
 
 ### Dates and numbers
 
@@ -65,6 +71,11 @@ The sample line underneath shows the current choice applied to a
 figure and a date in the main currency, and updates as each select
 changes, before anything is saved.
 
+The note comes first, then the four selects in two columns in the
+order listed, Language and Dates on the first row. The sample line sits
+beneath them in a tinted petrol-50 strip, under its own section label,
+with **Save** at the strip's right end.
+
 A thousands mark that is also the language's decimal point is not
 applied, because 1.234 would then mean two things. The language's own
 pairing stands.
@@ -79,6 +90,11 @@ belongs inside a settings card, so neither is a section.
   "None yet".
 - **Export and import** (`ui/export-import.md`). "Download your vault,
   or restore one from a file."
+
+The two rows share one Card with no heading, each running edge to edge
+with a hairline rule between them. A row's title sits at the left with
+its explanation beneath it, and the count and the chevron sit at the
+right. The whole row is the link.
 
 ### Change password
 
@@ -101,6 +117,10 @@ Said here, in the order somebody would be surprised to learn them:
   password is changed. Every other session was signed out, and this one
   is still open."
 
+Top to bottom in the card: the callout, then the fields stacked in one
+column at form width with **Change password** beneath them, then the
+export files line under a hairline rule at the foot of the card.
+
 ### Session and lock
 
 - **Idle lock**, a select: 5, 10, 15, 30, 45, or 60 minutes, with 15
@@ -120,10 +140,18 @@ Said here, in the order somebody would be surprised to learn them:
 - **Sign out**, and **Sign out everywhere**, which ends this session
   too.
 
+The card runs in the order listed. The idle lock select holds a 200px
+column and the tradeoff sits beside it, level with the control rather
+than its label. Open sessions is a Table under its own section label:
+a first column carrying the chip that marks the current session, then
+started, then last used. The no-IP line sits beneath the table. The two
+sign-out buttons close the card side by side, both secondary.
+
 ### Delete my account
 
 Behind a collapsed **Danger zone** disclosure, destructive styling.
-Opened, the disclosure holds one destructive button, **Delete my
+The disclosure is its own Card at the foot of the screen, its label in
+critical. Opened, it holds one destructive button, **Delete my
 account**, and that button opens the dialog. Nothing is typed into the
 disclosure itself.
 
@@ -144,6 +172,13 @@ a wiped vault has been failed by the dialog.
 No vault is exempt. Any vault owner can delete their own account,
 whoever else is on the instance, because handing out accounts on this
 instance is not something a vault owner does.
+
+## At phone width
+
+Everything set side by side stacks. A profile pair puts its label
+above its value, the four selects run in one column, and the idle lock
+tradeoff moves beneath its select. The sample strip wraps, with
+**Save** beneath the sample when the width runs out.
 
 ## States
 

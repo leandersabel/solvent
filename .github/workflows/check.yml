@@ -46,3 +46,25 @@ jobs:
     timeout-minutes: 5
     steps:
       - uses: actions/dependency-review-action@a1d282b36b6f3519aa1f3fc636f609c47dddb294 # v5.0.0
+
+  # A red master blocks the nightly, so it becomes a bug the client can
+  # accept (CLAUDE.md, The loop, When something fails).
+  report:
+    needs: [test, image]
+    if: failure() && github.event_name == 'push'
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    permissions:
+      issues: write
+    env:
+      GH_TOKEN: ${{ github.token }}
+      GH_REPO: ${{ github.repository }}
+      RUN: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
+    steps:
+      - run: |
+          open=$(gh issue list --state open --label bug --search "in:title \"The checks fail on master\"" --json number --jq '.[0].number // empty')
+          if [ -n "$open" ]; then
+            gh issue comment "$open" --body "Still failing at ${{ github.sha }}: $RUN"
+          else
+            gh issue create --label bug --title "The checks fail on master" --body "The checks fail on master at ${{ github.sha }}: $RUN"
+          fi

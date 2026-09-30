@@ -10,7 +10,7 @@ nothing here reaches a vault.
 Exercises: `spec/features/admin-invites.md`, and the symbol table half
 of `spec/features/rate-lookup.md`.
 
-## The frame
+## Layout
 
 An administrator's top bar carries the wordmark and **Sign out**, and
 nothing else (`design-system.md`, App shell). It has no nav, because
@@ -18,8 +18,6 @@ an administrator has one destination, and moving around inside that
 destination is this screen's own job.
 
 Content max-width 900px on the ground.
-
-## Arrangement
 
 Stacked, in this order, on every part of the area:
 
@@ -36,6 +34,21 @@ The boundary callout sits above the links rather than inside the first
 section, because the boundary is a property of the whole area. An
 administrator who has been working in Units for ten minutes is exactly
 the person about to be asked for help they cannot give.
+
+Each section's cards, top to bottom, every one at the full content
+width and opening on its section heading (`design-system.md`,
+Components):
+
+- **Invites**: the create card, then the outstanding invites table in
+  a card of its own beneath it.
+- **Accounts**: one card holding the table.
+- **Units**: one card holding the table, with the collapsed Retired
+  section beneath the table and Add a unit beneath that.
+- **Your password**: one card, the fields stacked in one column at
+  form width with the button beneath them.
+
+At phone width the order holds, and the section switcher stays one row
+that scrolls sideways rather than wrapping.
 
 ## The boundary this area states
 

@@ -4,14 +4,13 @@ Shared visual foundations and shared behavior. Every screen spec in
 this directory assumes this file and states only what it adds. It is
 not a screen, and nothing compiles against it alone.
 
-**The design canvas is how every screen looks.** It is drawn in Claude
-Design at https://claude.ai/artifact/NFxzA1ngFuYB53FHnMizn3 and
-mirrored artboard for artboard in `spec/design/`, which is what the
-engineer builds against. Sizes, spacing, arrangement and component
-styling are read off the canvas. This file holds what a drawing cannot
-carry: the tokens and why they are what they are, the contrast floors,
-and the rules for what each component means. A screen with no artboard
-yet takes its components from the ones drawn.
+**The screen files and this file state how every screen looks.**
+Sizes, spacing and component styling are this file's tokens and
+components. It also holds why each token is what it is, the contrast
+floors, and the rules for what each component means. A screen's Layout
+section states its arrangement: the order of its regions, what sits
+beside what, and the widths that matter. What changes shape at phone
+width is stated beside it, under At phone width.
 
 ## The look
 
@@ -301,6 +300,11 @@ here comes from spacing and restraint.
 | Section label | 12px, 600, uppercase, 0.08em tracking | ink-secondary, over a figure or a group |
 | Axis tick | 12px, 400 | ink-muted |
 
+At phone width four roles step down: the hero figure to 40px with its
+currency code at 18px, the screen heading to 26px, the section heading
+to 17px, and the section label to 11px. Every other role keeps its
+size.
+
 **`font-variant-numeric: tabular-nums` on every money column, table row,
 and axis tick** — anything that must align vertically. The hero figure
 keeps proportional figures.
@@ -309,6 +313,8 @@ keeps proportional figures.
 
 - 8px base scale: 4, 8, 12, 16, 24, 32, 48, 64.
 - Content max-width 1200px, centered; forms max-width 480px.
+- Page gutter 40px. At phone width the gutter is 16px, a card pads
+  16px, and every button is at least 44px tall.
 - Radius: 6px on inputs and buttons, 10px on cards. Nothing fully round
   except avatars and status dots.
 - **Hairline rules, not shadows.** One 1px `hairline` border. A single
@@ -322,7 +328,13 @@ only its own content region.
 - **Top bar**, petrol-800: wordmark at the left, nav beside it, the
   global **Update values** action and the lock button at the right.
   Both buttons take the chrome variant (Components), not the secondary
-  one, which is specified for the light ground.
+  one, which is specified for the light ground. The current nav entry
+  is white with a 2px brass-500 rule beneath it and the others are
+  petrol-200, so the current one is marked by the rule as well as by
+  hue.
+- **At phone width** the nav drops to a second row of the bar, beneath
+  the wordmark and the two buttons, and the lock button shows its icon
+  alone, keeping "Lock" as its accessible name.
 - **Nav is Dashboard and Settings**, the same for everybody who has a
   vault.
   - There is deliberately **no "Holdings" entry**: the dashboard's own
@@ -469,6 +481,13 @@ only its own content region.
   bar. It exists because an administrator's bar carries no nav at all,
   so movement inside the admin area belongs to the screen
   (`app-shell.md`, `admin.md`).
+- **Segmented control**: named positions side by side in one box with
+  the Input's hairline border and radius, hairline rules between them,
+  13px/500 ink-secondary. The chosen position is filled petrol-800
+  with white text. Every position is named, so no position reads as an
+  unlabeled off state. Used for the dashboard's Which rates, Range and
+  Absolute / percentage (`dashboard.md`). At phone width it spans its
+  row and the positions share the width.
 - **Progress, determinate**: a 4px track in petrol-100 with a
   petrol-600 fill, under a label naming the phase in words and the
   position within it. For work with known phases that runs long enough

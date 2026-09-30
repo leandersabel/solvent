@@ -35,6 +35,12 @@ The card outside the shell (`design-system.md`, App shell), max-width
 - Beneath the card, 13px ink-muted: "Solvent cannot recover a lost
   password."
 
+The wordmark, the card and that line stack in the middle of the
+ground, centered horizontally and vertically. Inside the card, which
+pads 32px, each field carries its label above it, the show-and-hide
+toggle sits inside the password field at its right end, and **Unlock**
+spans the card's width at the foot.
+
 ## One card, both kinds
 
 **The card looks and behaves identically for both kinds of account

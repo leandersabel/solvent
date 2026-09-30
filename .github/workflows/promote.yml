@@ -1,0 +1,48 @@
+name: Promote
+
+# The client marking a nightly as the latest release makes it stable:
+# the same image gets `:stable`, the notes cover everything since the
+# last stable, and the nightlies before it go (CLAUDE.md, The loop,
+# Nightly and stable).
+on:
+  release:
+    types: [released]
+
+permissions: {}
+
+jobs:
+  promote:
+    if: github.event.sender.login == github.repository_owner
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    permissions:
+      contents: write
+      packages: write
+      pull-requests: read
+      issues: read
+    env:
+      GH_TOKEN: ${{ github.token }}
+      GH_REPO: ${{ github.repository }}
+      IMAGE: ghcr.io/${{ github.repository }}
+      TAG: ${{ github.event.release.tag_name }}
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          fetch-depth: 0
+      - run: |
+          echo "${{ github.token }}" | docker login ghcr.io -u "${{ github.actor }}" --password-stdin
+          docker buildx imagetools create -t "$IMAGE:stable" "$IMAGE:$TAG"
+      - run: |
+          previous=$(gh release list --exclude-pre-releases --limit 100 --json tagName \
+            --jq "map(.tagName) | map(select(. < \"$TAG\")) | max // empty")
+          python3 tools/release-notes.py "$previous" "$TAG" > notes.md
+          gh release edit "$TAG" --notes-file notes.md
+      - run: |
+          for old in $(gh release list --limit 100 --json tagName,isPrerelease \
+            --jq ".[] | select(.isPrerelease) | select(.tagName < \"$TAG\") | .tagName"); do
+            gh release delete "$old" --cleanup-tag --yes
+            for id in $(gh api --paginate "users/${{ github.repository_owner }}/packages/container/${{ github.event.repository.name }}/versions" \
+              --jq ".[] | select(.metadata.container.tags | index(\"$old\")) | .id"); do
+              gh api -X DELETE "users/${{ github.repository_owner }}/packages/container/${{ github.event.repository.name }}/versions/$id"
+            done
+          done
