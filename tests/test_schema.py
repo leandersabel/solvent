@@ -135,3 +135,97 @@ def test_a_database_from_another_schema_version_refuses_to_start(tmp_path, monke
 
     columns = sqlite3.connect(stale).execute("PRAGMA table_info(sessions)").fetchall()
     assert [row[1] for row in columns] == ["id", "user_id"]
+
+
+def test_two_processes_starting_on_an_empty_file_both_start(tmp_path, monkeypatch):
+    """Two gunicorn workers run `init_db` at the same moment on a fresh
+    volume. The first is held after its first table exists; the second
+    starts meanwhile. The second must wait for the first's transaction
+    and then find a finished schema, not a half-built one at version 0.
+
+    The hold is deterministic, a trace callback that blocks the first
+    initialization at its second CREATE TABLE, so the test does not
+    depend on which worker wins a race.
+    """
+    import re
+    import threading
+
+    import flask
+
+    path = tmp_path / "race.db"
+    hold = threading.Event()
+    release = threading.Event()
+    second_started = threading.Event()
+    creates = []
+    results: dict[str, BaseException | None] = {}
+    real_connect = sqlite3.connect
+
+    def connect_for(role):
+        def connect(*args, **kwargs):
+            conn = real_connect(*args, **kwargs)
+
+            def trace(statement):
+                if role == "first":
+                    # sqlite hands over a statement with its leading
+                    # comments attached, so a prefix match would miss.
+                    if re.search(r"^CREATE TABLE", statement, re.M | re.I):
+                        creates.append(statement)
+                        if len(creates) == 2:
+                            hold.set()
+                            assert release.wait(30)
+                else:
+                    second_started.set()
+
+            conn.set_trace_callback(trace)
+            return conn
+
+        return connect
+
+    def run(role):
+        app = flask.Flask(role)
+        app.config["DATABASE_PATH"] = str(path)
+        try:
+            db.init_db(app)
+            results[role] = None
+        except BaseException as exc:  # noqa: BLE001 - reported by the assert
+            results[role] = exc
+
+    # `db.sqlite3` is the module both threads share, so the patch is
+    # switched per thread rather than per call.
+    local = threading.local()
+
+    def dispatch(*args, **kwargs):
+        return connect_for(local.role)(*args, **kwargs)
+
+    monkeypatch.setattr(db.sqlite3, "connect", dispatch)
+
+    def thread_main(role):
+        local.role = role
+        run(role)
+
+    first = threading.Thread(target=thread_main, args=("first",))
+    second = threading.Thread(target=thread_main, args=("second",))
+    first.start()
+    try:
+        assert hold.wait(30), "the first initialization never reached a second table"
+        second.start()
+        assert second_started.wait(30)
+        # Unfixed, the second finishes here, against the half-built file.
+        # Fixed, it is blocked on the first's transaction until release.
+        second.join(timeout=1)
+    finally:
+        release.set()
+        first.join(30)
+        second.join(30)
+
+    assert results == {"first": None, "second": None}
+
+    conn = real_connect(path)
+    try:
+        assert conn.execute("PRAGMA user_version").fetchone()[0] == db.SCHEMA_VERSION
+        from solvent.rates import SEEDED_SYMBOLS
+
+        symbols = [row[0] for row in conn.execute("SELECT symbol FROM symbols")]
+    finally:
+        conn.close()
+    assert sorted(symbols) == sorted(s["symbol"] for s in SEEDED_SYMBOLS)
