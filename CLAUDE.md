@@ -163,7 +163,10 @@ The client is `leandersabel`. No agent edits an issue body.
   issue is in the issue's language, following the `advance` skill's
   Writing section.
 - An issue by `leandersabel` starts the loop when it is opened. Anyone
-  else's issue starts it when `accepted` is added. Adding a label takes
+  else's issue starts it when `accepted` is added. An issue by
+  `github-actions[bot]` starts at once: only this repository's
+  workflows can write one, for a red `master`, and its text is
+  theirs. Adding a label takes
   triage access to the repository, no form sets `accepted`, and no
   agent adds it.
 - The loop reads an issue's body, the comments by `leandersabel` and
@@ -182,6 +185,8 @@ Each run on a new issue, or on a reply from the client, ends in one of:
   says and what the app does, and implementation starts.
 - `change`, the spec changes: the comment says what changes for the
   client, screen by screen, and the spec pull request opens.
+- `maintenance`, only the code changes and nothing the client sees:
+  the comment says what changes and why, and implementation starts.
 - Already met, a duplicate, or doubtful: the reasoning, and a question
   to the client.
 
@@ -288,8 +293,8 @@ the client does.
   becomes a draft without auto-merge and the issue is `stuck`.
 - Every merge to `master` rebases the loop's open pull requests.
 - A failing check on `master` opens a `bug` issue as
-  `github-actions[bot]`, and that night has no QA. It waits for
-  `accepted`.
+  `github-actions[bot]`, which starts at once and skips the
+  implementation queue, and that night has no QA.
 - Disabling `agent.yml`, or removing the token from the `agent`
   environment, stops the loop.
 

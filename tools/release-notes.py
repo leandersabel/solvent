@@ -34,6 +34,8 @@ def issue_line(issue_number):
     author = login(issue["author"])
     if author == CLIENT:
         origin = f"Requested by @{author} in #{issue_number}"
+    elif author == "github-actions[bot]":
+        origin = f"Opened by @{author} in #{issue_number}"
     else:
         origin = f"Reported by @{author} in #{issue_number}, accepted by @{CLIENT}"
     # The spec may have merged in an earlier version than its code.
@@ -41,7 +43,8 @@ def issue_line(issue_number):
     if spec:
         origin += f", spec approved by @{CLIENT} in #{spec[0]['number']}"
     labels = {label["name"] for label in issue["labels"]}
-    return origin, "qa" in labels
+    group = "Found by QA" if "qa" in labels else "Maintenance" if "maintenance" in labels else "Changes and fixes"
+    return origin, group
 
 
 def main():
@@ -59,9 +62,8 @@ def main():
         author = login(pr["author"])
         found = re.fullmatch(r"claude/issue-(\d+)", pr["headRefName"])
         if found:
-            origin, by_qa = issue_line(int(found.group(1)))
-            line = f"- {pr['title']}. {origin}, implemented by @{author} in #{pr['number']}."
-            groups["Found by QA" if by_qa else "Changes and fixes"].append(line)
+            origin, group = issue_line(int(found.group(1)))
+            groups[group].append(f"- {pr['title']}. {origin}, implemented by @{author} in #{pr['number']}.")
         elif not pr["headRefName"].startswith("claude/spec-"):
             groups["Maintenance"].append(f"- {pr['title']}, by @{author} in #{pr['number']}.")
 

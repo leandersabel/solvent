@@ -43,8 +43,11 @@ than your latest marked comment on the issue and its pull requests.
 
 ## Take the first step that applies
 
-1. **Not started.** The issue is closed, or someone else's issue
-   without `accepted`: stop without a word.
+1. **Not started.** The issue is closed, or an issue by neither the
+   client nor `github-actions[bot]` (`app/github-actions` in `gh`'s
+   output) without `accepted`: stop without a word. An issue by
+   `github-actions[bot]` was opened by this repository's own workflows
+   for a red `master`, and needs no `accepted`.
 2. **Edited after acceptance.** Someone else's issue whose title or
    body someone other than the client edited after `accepted` was
    added: remove `accepted`, add `needs-answer`, and comment to
@@ -100,7 +103,8 @@ written.
    and your earlier marked comments, including their `<details>`
    readings. It answers which features in `spec/product/` this touches,
    whether the app contradicts the spec (`bug`), the spec changes
-   (`change`), or the pipeline changes, what changes for the client,
+   (`change`), the pipeline changes, or only the code changes and
+   nothing the client sees (`maintenance`), what changes for the client,
    and what only the client can decide, as questions in its own format.
 2. `architect` gets that reading. It answers what changes in
    `spec/architecture.md` and `spec/features/`, which code and tests
@@ -119,6 +123,8 @@ Then one comment, and exactly one outcome:
   mentioned.
 - **Bug:** what the spec says and what the app does, `needs-answer`
   removed, then Implementation.
+- **Maintenance:** what changes in the code and why, `maintenance`
+  added, `needs-answer` removed, then Implementation.
 - **Change**, including a pipeline change: what changes for the client,
   `needs-answer` removed, then Spec.
 - **Already met, a duplicate, or doubtful:** the reasoning and a
@@ -154,14 +160,17 @@ closing `<details>` block.
 ## Implementation
 
 1. Another open issue carries `implementing`: add `queued`, comment
-   which issue it waits for, and stop. Otherwise add `implementing`
+   which issue it waits for, and stop. A `bug` opened by
+   `github-actions[bot]` for a red `master` skips this, since every
+   other implementation's checks fail until it is fixed. Otherwise add `implementing`
    and remove `queued`.
 2. `git fetch origin`, and branch `claude/issue-<issue>` from
    `origin/master`. A leftover branch of that name without a pull
    request is reset to `origin/master`.
 3. `engineer` implements the compiled contract. For a `bug`, it first
-   writes a test that fails on the reported behavior, then the fix. A
-   fix never skips, loosens or deletes an existing test.
+   writes a test that fails on the reported behavior, then the fix. For
+   `maintenance`, it changes the code without changing behavior. A fix
+   never skips, loosens or deletes an existing test.
 4. `python -m pytest -q` passes, browser tests included.
 5. `reviewer` reviews the change against the contract. Its findings go
    back to `engineer`, for at most three rounds.

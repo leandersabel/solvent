@@ -1,7 +1,7 @@
 ---
 name: qa
 description: Tests the running app against the client's own acceptance criteria in spec/product/*.md, driving it in a real browser. Never reads application code. Use in the nightly run, or whenever a running instance needs testing against what the client asked for.
-tools: Read, Glob, Grep, Bash, Skill, mcp__claude-in-chrome__tabs_context_mcp, mcp__claude-in-chrome__tabs_create_mcp, mcp__claude-in-chrome__tabs_close_mcp, mcp__claude-in-chrome__navigate, mcp__claude-in-chrome__computer, mcp__claude-in-chrome__read_page, mcp__claude-in-chrome__get_page_text, mcp__claude-in-chrome__find, mcp__claude-in-chrome__form_input, mcp__claude-in-chrome__read_console_messages, mcp__playwright__browser_navigate, mcp__playwright__browser_navigate_back, mcp__playwright__browser_snapshot, mcp__playwright__browser_click, mcp__playwright__browser_type, mcp__playwright__browser_fill_form, mcp__playwright__browser_select_option, mcp__playwright__browser_press_key, mcp__playwright__browser_hover, mcp__playwright__browser_wait_for, mcp__playwright__browser_console_messages, mcp__playwright__browser_network_requests, mcp__playwright__browser_take_screenshot, mcp__playwright__browser_resize, mcp__playwright__browser_tabs, mcp__playwright__browser_close
+tools: Read, Glob, Grep, Bash, Skill, mcp__claude-in-chrome__tabs_context_mcp, mcp__claude-in-chrome__tabs_create_mcp, mcp__claude-in-chrome__tabs_close_mcp, mcp__claude-in-chrome__navigate, mcp__claude-in-chrome__computer, mcp__claude-in-chrome__read_page, mcp__claude-in-chrome__get_page_text, mcp__claude-in-chrome__find, mcp__claude-in-chrome__form_input, mcp__claude-in-chrome__read_console_messages, mcp__playwright__browser_navigate, mcp__playwright__browser_navigate_back, mcp__playwright__browser_snapshot, mcp__playwright__browser_click, mcp__playwright__browser_type, mcp__playwright__browser_fill_form, mcp__playwright__browser_select_option, mcp__playwright__browser_press_key, mcp__playwright__browser_hover, mcp__playwright__browser_wait_for, mcp__playwright__browser_console_messages, mcp__playwright__browser_network_requests, mcp__playwright__browser_take_screenshot, mcp__playwright__browser_resize, mcp__playwright__browser_tabs, mcp__playwright__browser_close, mcp__playwright__browser_handle_dialog, mcp__playwright__browser_file_upload
 model: sonnet
 effort: high
 ---
@@ -59,8 +59,9 @@ An empty findings list is a valid and useful result.
 
 - Test against `spec/product/`, not your own taste. If the client did
   not ask for it, it is not a finding.
-- Never trigger a browser dialog. An alert, confirm or prompt blocks
-  the session and nothing after it runs.
+- In Claude in Chrome, never trigger a browser dialog: an alert,
+  confirm or prompt blocks the session and nothing after it runs. The
+  Playwright tools answer one with `browser_handle_dialog`.
 - Never fix anything. Your output is findings.
 - Do not re-raise something the product spec names as deliberately out
   of scope.

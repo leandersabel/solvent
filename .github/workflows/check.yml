@@ -47,8 +47,8 @@ jobs:
     steps:
       - uses: actions/dependency-review-action@a1d282b36b6f3519aa1f3fc636f609c47dddb294 # v5.0.0
 
-  # A red master blocks the nightly, so it becomes a bug the client can
-  # accept (CLAUDE.md, The loop, When something fails).
+  # A red master blocks the nightly, so it becomes a bug the agent takes
+  # up at once (CLAUDE.md, The loop, When something fails).
   report:
     needs: [test, image]
     if: failure() && github.event_name == 'push'
@@ -56,6 +56,7 @@ jobs:
     timeout-minutes: 5
     permissions:
       issues: write
+      actions: write
     env:
       GH_TOKEN: ${{ github.token }}
       GH_REPO: ${{ github.repository }}
@@ -66,5 +67,6 @@ jobs:
           if [ -n "$open" ]; then
             gh issue comment "$open" --body "Still failing at ${{ github.sha }}: $RUN"
           else
-            gh issue create --label bug --title "The checks fail on master" --body "The checks fail on master at ${{ github.sha }}: $RUN"
+            url=$(gh issue create --label bug --title "The checks fail on master" --body "The checks fail on master at ${{ github.sha }}: $RUN")
+            gh workflow run agent.yml --ref master -f issue="${url##*/}"
           fi
