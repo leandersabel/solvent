@@ -14,7 +14,7 @@ import {
   signOut,
 } from './session.js';
 import { IDLE_LOCK_PERIODS } from './model.js';
-import { passwordWithToggle } from './unlock.js';
+import { passwordWithToggle, show } from './unlock.js';
 import { strengthGauge } from './strength.js';
 
 /** `open` goes to one of the screens reached from here, by the last
@@ -47,14 +47,10 @@ function profileCard(vault, username) {
   ]);
 }
 
-/** Dates and numbers (spec/ui/settings.md, Dates and numbers).
- *
- *  The language supplies the defaults and each control can overrule
- *  it, because a locale tag is a coarse guess about taste: a Swiss
- *  reader may want an apostrophe between thousands and no centimes,
- *  and no tag says that. Saved into the profile record, so the
- *  settings follow the vault to any browser rather than staying on
- *  one machine.
+/** Dates and numbers (spec/ui/settings.md, Dates and numbers), whose
+ *  defaults and overrides static/js/format.js explains. Saved into the
+ *  profile record, so the settings follow the vault to any browser
+ *  rather than staying on one machine.
  */
 function formatCard(vault, reload) {
   const settings = vault.profile || {};
@@ -118,7 +114,7 @@ function formatCard(vault, reload) {
         dateStyle: dates.value,
       });
       reload();
-    } catch (failure) {
+    } catch {
       error.textContent = 'That did not save. Nothing changed.';
       error.hidden = false;
       save.disabled = false;
@@ -264,11 +260,6 @@ function changePasswordCard(kdf, username) {
       }),
     ]),
   ]);
-}
-
-function show(node, text) {
-  node.textContent = text;
-  node.hidden = false;
 }
 
 function field(label, control, ...after) {

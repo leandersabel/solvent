@@ -36,8 +36,7 @@ typed address still works.
   you created your vault. Every rate you have recorded converts into
   it, so changing it would mix two currencies in your history."
 
-  This is not a control disabled for now. An editable field here would
-  quietly corrupt years of history, so there is no field.
+  This is not a control disabled for now: there is no field.
 
 ### Dates and numbers
 

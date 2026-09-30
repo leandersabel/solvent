@@ -8,7 +8,7 @@ import * as api from './api.js';
 import * as crypto from './crypto.js';
 import { el, mount } from './dom.js';
 import { SCHEMA_VERSION } from './model.js';
-import { passwordWithToggle } from './unlock.js';
+import { WAIT_NOTE, passwordWithToggle } from './unlock.js';
 import { MIN_LENGTH, strengthGauge } from './strength.js';
 
 const container = document.getElementById('app');
@@ -46,11 +46,7 @@ const currency = el('select', {}, currencies.map((row) =>
 ));
 const acknowledge = el('input', { type: 'checkbox' });
 const error = el('p', { class: 'field-error', hidden: true });
-const note = el('p', {
-  class: 'hint',
-  hidden: true,
-  text: 'This takes a moment by design. It is what makes your password hard to attack.',
-});
+const note = el('p', { class: 'hint', hidden: true, text: WAIT_NOTE });
 const submit = el('button', {
   type: 'submit',
   class: 'btn-primary',

@@ -13,13 +13,7 @@ from datetime import date, timedelta
 import pytest
 
 import solvent.rates as rates
-from tests.helpers import CSRF, register
-
-
-@pytest.fixture
-def owner(app):
-    client, _ = register(app, "owner")
-    return client
+from tests.helpers import CSRF, mint_invite, register
 
 
 @pytest.fixture
@@ -312,12 +306,6 @@ def test_the_symbol_table_answers_an_administrator_not_found(app):
 # ---- Maintaining the table --------------------------------------------
 
 
-@pytest.fixture
-def admin(app):
-    client, _ = register(app, "root", kind="administrator")
-    return client
-
-
 def test_has_adapter_is_derived_from_the_registry(admin):
     table = admin.get("/api/admin/symbols", headers=CSRF).get_json()
     for row in table:
@@ -410,8 +398,6 @@ def test_no_admin_symbol_response_counts_which_holdings_use_one(admin):
 
 
 def test_an_administrator_adding_a_currency_reaches_the_next_registration(app, admin):
-    from tests.helpers import mint_invite
-
     admin.post(
         "/api/admin/symbols",
         json={"symbol": "ZZZ", "label": "Testland Dollar", "kind": "currency", "lookup": False},

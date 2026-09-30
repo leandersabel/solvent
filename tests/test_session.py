@@ -9,7 +9,7 @@ from __future__ import annotations
 from datetime import datetime, timedelta, timezone
 
 from solvent.session import COOKIE_NAME, sign_token
-from tests.helpers import CSRF, connect, register, rows
+from tests.helpers import CSRF, b64, connect, mint_invite, register, rows
 
 
 def cookie_of(client):
@@ -111,7 +111,6 @@ def test_the_session_row_carries_no_kind_column(app):
 
 
 def test_the_cookie_carries_its_pinned_flags(app):
-    from tests.helpers import mint_invite, b64
     import uuid
 
     client = app.test_client()

@@ -27,7 +27,7 @@ from pathlib import Path
 
 import pytest
 from argon2 import PasswordHasher, Type
-from argon2.exceptions import VerificationError, VerifyMismatchError
+from argon2.exceptions import VerificationError
 from argon2.low_level import hash_secret_raw
 
 REPO_ROOT = Path(__file__).resolve().parent.parent
@@ -172,5 +172,5 @@ def derive(password: str, params: dict) -> "tuple[str, str]":
 def verifies(verifier: str, candidate: str) -> bool:
     try:
         return PasswordHasher().verify(verifier, candidate)
-    except (VerifyMismatchError, VerificationError):
+    except VerificationError:
         return False

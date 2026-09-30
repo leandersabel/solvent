@@ -245,7 +245,7 @@ function sweepRow(vault, holding, date, { sit, block, refused, ensurePrices, onT
     // under its field stays empty.
     converted.textContent = holding.payload.unit === vault.mainCurrency
       ? ''
-      : describeConverted(vault, holding, field.value, block.figureFor(holding.payload.unit));
+      : describeConverted(vault, field.value, block.figureFor(holding.payload.unit));
   };
 
   /** Typed and not saved: what leaving the screen would lose. */
@@ -370,7 +370,7 @@ function sweepRow(vault, holding, date, { sit, block, refused, ensurePrices, onT
   return row;
 }
 
-function describeConverted(vault, holding, text, price) {
+function describeConverted(vault, text, price) {
   const quantity = vault.format.parseFigure(text);
   if (quantity === null) return '';
   if (price === null) return 'not priced';
@@ -519,7 +519,7 @@ function rateLine(vault, unit, date, { sit, readOnly: blockReadOnly, fillMissing
   };
 
   /** The save of this line on its own, for the rate-lines save:
-   *  `{ existing, payload }` to write, `{ entry }` to delete, or null. */
+   *  `{ existing, payload }` to write, `{ remove }` to delete, or null. */
   line.change = () => {
     if (!line.changed() || line.invalid()) return null;
     if (line.stored && !line.value()) return { remove: line.stored };
@@ -646,8 +646,7 @@ function rateLine(vault, unit, date, { sit, readOnly: blockReadOnly, fillMissing
                   try {
                     for (const other of line.rivals) if (other !== entry) await writes.deleteRecord(vault, other);
                   } catch {
-                    error.textContent = 'That did not save.';
-                    error.hidden = false;
+                    showError(error, 'That did not save.');
                   }
                   line.reset();
                   onChange();

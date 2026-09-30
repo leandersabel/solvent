@@ -10,7 +10,6 @@ import { dateField } from './datepicker.js';
 import { dayNumber, isoFromDay } from './model.js';
 import * as writes from './writes.js';
 import { snapshotDialog } from './view-forms.js';
-import { holdingForm } from './view-holding-form.js';
 
 const RANGES = [
   ['1M', 30],
@@ -701,9 +700,6 @@ function group(title, holdings, vault, actions, explanation) {
   ]);
 }
 
-/** Where the chart shows how composition moved, this shows what it is
- *  made of right now. Every bar takes chart slot 1: these are nominal
- *  categories and the bar length already carries the value. */
 /** Each band's signed total right now, in the dimension's configured
  *  order with "Unassigned" last. Summed from the same per-holding
  *  figures as the hero, so the bars add up to the total exactly. */
@@ -732,6 +728,9 @@ export function breakdownTotals(vault, dimension, mode) {
   return [...all, unassigned, ...other];
 }
 
+/** Where the chart shows how composition moved, this shows what it is
+ *  made of right now. Every bar takes chart slot 1: these are nominal
+ *  categories and the bar length already carries the value. */
 function breakdown(vault, dimension, state) {
   const rows = breakdownTotals(vault, dimension, state.mode).filter((band) => band.total !== 0n);
   if (!rows.length) return null;
@@ -771,5 +770,3 @@ function breakdown(vault, dimension, state) {
     ),
   ]);
 }
-
-export { holdingForm };

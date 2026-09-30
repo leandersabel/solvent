@@ -21,8 +21,8 @@ authenticator does not travel: a file restored on another machine, or
 after the authenticator is lost, could not use it, and its credential
 id in a file the user may hand to someone else is a device correlator
 sitting in a backup for no benefit. This is the reason the password
-method is mandatory and permanent (`account-settings.md`): it is what
-makes a vault exportable at all.
+method is mandatory and permanent: it is what makes a vault exportable
+at all.
 
 It serves two jobs: a **user-held backup** independent of the NAS's ZFS
 snapshots, and the **migration path across data-model upgrades**. It is
@@ -119,10 +119,7 @@ bound by the rewrite-every-wrapper rule** (architecture.md, One key, N
 wrappers). Every credential the vault holds must end this
 transaction wrapping `DEK_new`, and any method the importing session
 cannot re-wrap is **deleted in that same transaction**, never left
-behind. A stale wrapper is worse than a missing one: it unwraps
-cleanly to the old DEK, so the method authenticates and then every
-record fails to decrypt, which reads as a corrupt vault rather than a
-missing unlock option. In v1 this costs nothing, because the password
+behind. In v1 this costs nothing, because the password
 method is the only one and the importing session is holding its Master
 Key by definition.
 
@@ -146,8 +143,8 @@ written.
 ## Rules
 
 - The server assigns `principal_id` from the session on every imported
-  record. It never reads an `accountId` from the uploaded payload — one
-  account's import can never write into another's vault
+  record. It never reads a `principalId` from the uploaded payload, so
+  one account's import can never write into another's vault
   (architecture.md, Import authorization). Export and import are both
   on the vault surface, so an administrator session receives Not Found
   from either (`app-shell.md`, The two surfaces).
@@ -191,8 +188,7 @@ written.
 - **Malformed JSON, wrong `format`, or unknown `formatVersion`
   (newer)** → reject with a clear message. A newer file in an older app
   is not something to guess at.
-- **There is no `formatVersion` below 1.** There is no older format to
-  migrate from.
+- **There is no `formatVersion` below 1.**
 - **Older `formatVersion`** → migrate the plaintext shape client-side
   after decryption, before re-encrypting, reusing the same per-type
   migration chain the client already applies lazily on read
@@ -237,7 +233,7 @@ written.
   record decrypts afterwards.
 - After an import, the vault's wrapped DEK unwraps to a key that is not
   the file's `DEK_file` — asserted directly, since a verbatim restore
-  would now pass every other test in this list.
+  would pass every other test in this list.
 - A record taken from the *source* vault after the export, and inserted
   directly into the destination's rows, fails to decrypt. This is the
   regression test for the re-key: it passes only because the two vaults

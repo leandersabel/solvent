@@ -61,15 +61,13 @@ def mint_invite(app, kind: str = "vault_owner", **columns) -> str:
     return token
 
 
-def register(app, username: str, *, kind: str = "vault_owner", auth_key=None, **overrides):
-    """Register through POST /api/register and return a client bound to
-    the resulting session, plus the Auth Key it used."""
-    token = overrides.pop("invite_token", None) or mint_invite(app, kind)
-    auth_key = auth_key or b64()
+def register_body(app, kind: str = "vault_owner", **overrides) -> dict:
+    """A POST /api/register body for a fresh invite of that kind, unless
+    `inviteToken` names one."""
     body = {
-        "inviteToken": token,
-        "username": username,
-        "authKey": auth_key,
+        "inviteToken": overrides.pop("inviteToken", None) or mint_invite(app, kind),
+        "username": "someone",
+        "authKey": b64(),
         "salt": b64(16),
         "kdf": dict(DEFAULT_KDF_ENVELOPE),
     }
@@ -83,11 +81,24 @@ def register(app, username: str, *, kind: str = "vault_owner", auth_key=None, **
             profileNonce=b64(12),
         )
     body.update(overrides)
+    return body
 
+
+def register(app, username: str, *, kind: str = "vault_owner", auth_key=None, **overrides):
+    """Register through POST /api/register and return a client bound to
+    the resulting session, plus the Auth Key it used."""
+    body = register_body(
+        app,
+        kind,
+        inviteToken=overrides.pop("invite_token", None),
+        username=username,
+        authKey=auth_key or b64(),
+        **overrides,
+    )
     client = app.test_client()
     response = client.post("/api/register", json=body, headers=CSRF)
     assert response.status_code == 200, response.get_data(as_text=True)
-    return client, auth_key
+    return client, body["authKey"]
 
 
 def sign_in(app, username: str, auth_key: str):

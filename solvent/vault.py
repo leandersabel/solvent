@@ -21,7 +21,9 @@ from .db import get_db, utcnow, write_transaction
 from .records import (
     MAX_BYTES_PER_USER,
     MAX_RECORDS_PER_VAULT,
+    NONCE_BYTES,
     RecordWrite,
+    _row_json,
     fetch_all,
     store,
 )
@@ -31,8 +33,6 @@ bp = Blueprint("vault", __name__)
 
 EXPORT_FORMAT = "solvent-vault"
 EXPORT_FORMAT_VERSION = 1
-
-NONCE_BYTES = 12
 
 
 @bp.delete("/api/accounts/<account_id>")
@@ -95,18 +95,7 @@ def export_vault():
         "kdf": params["kdf"],
         "wrappedDek": wrapper["wrapped_dek"],
         "dekNonce": wrapper["dek_nonce"],
-        "records": [
-            {
-                "recordId": row["record_id"],
-                "recordType": row["record_type"],
-                "accountId": row["account_id"] or None,
-                "schemaVersion": row["schema_version"],
-                "version": row["version"],
-                "nonce": row["nonce"],
-                "ciphertext": row["ciphertext"],
-            }
-            for row in fetch_all(g.principal["id"])
-        ],
+        "records": [_row_json(row) for row in fetch_all(g.principal["id"])],
     }
     response = jsonify(payload)
     response.headers["Content-Disposition"] = (

@@ -119,6 +119,7 @@ const credentialOf = (username) =>
   )[0];
 const recordsOf = (principal) =>
   JSON.stringify(sql('SELECT * FROM records WHERE principal_id = ? ORDER BY record_id', principal));
+const OWN = "JOIN principals ON principals.id = records.principal_id WHERE principals.username = 'leander'";
 
 // Answers each request matching `pattern` with what `respond` returns
 // for it, { status, body } to fulfil or null to let it through, until
@@ -147,6 +148,27 @@ async function intercept(session, pattern, respond) {
     await session.send('Fetch.disable');
   };
 }
+
+// Every request matching `match` answered with `status` while `body` runs.
+const answering = async (match, status, body) => {
+  const handler = async (message) => {
+    if (message.method !== 'Fetch.requestPaused') return;
+    const { requestId, request } = message.params;
+    if (match(request)) {
+      await page.send('Fetch.fulfillRequest', { requestId, responseCode: status, body: '' });
+    } else {
+      await page.send('Fetch.continueRequest', { requestId });
+    }
+  };
+  page.on(handler);
+  await page.send('Fetch.enable', { patterns: [{ urlPattern: '*/api/*', requestStage: 'Request' }] });
+  try {
+    await body();
+  } finally {
+    await page.send('Fetch.disable');
+    page.handlers = page.handlers.filter((h) => h !== handler);
+  }
+};
 
 // An account at a KDF envelope below the server default, the state of
 // one registered before the default was raised. No endpoint stores a
@@ -503,8 +525,9 @@ try {
   );
   const rateValues = await page.eval("[...document.querySelectorAll('.rate-line input')].map(n => n.value)");
   check('the prices went in with the first row', rateValues.every(Boolean), rateValues.join(','));
-  const requests = await page.eval(`(() => performance.getEntriesByType('resource')
-    .filter(e => e.name.includes('/api/rates?')).length)()`);
+  const rateCalls = () =>
+    page.eval("performance.getEntriesByType('resource').filter(e => e.name.includes('/api/rates?')).length");
+  const requests = await rateCalls();
   check('a four-row sweep asks the proxy once', requests === 1, `issued ${requests}`);
   const rateNames = await labels('.rate-unit');
   check('a rate line is headed by the unit\'s name', rateNames.join(',') === 'United States Dollar,Gold', rateNames.join(','));
@@ -555,8 +578,6 @@ try {
   const chips = await labels('.chip');
   check('each price says where it came from', chips.some((chip) => chip.startsWith('Market rate')), chips.join(','));
   check('the recording offers Update and Delete', (await labels('.form-actions button')).join(',') === 'Update,Delete');
-  const rateCalls = () =>
-    page.eval("performance.getEntriesByType('resource').filter(e => e.name.includes('/api/rates?')).length");
   const beforeOpen = await rateCalls();
   await page.eval("location.hash = '#/'");
   await page.settle(400);
@@ -1079,18 +1100,20 @@ try {
   await releaseWrites();
   expectedFailures.delete('/api/records/');
 
-  // Another tab writes the profile first.
+  // Another tab writes the profile first, with the dimension renamed.
+  const relabelElsewhere = (label) =>
+    page.eval(`(async () => {
+      const v = (await import('/static/js/session.js')).currentVault();
+      const api = await import('/static/js/api.js');
+      const c = await import('/static/js/crypto.js');
+      const { SCHEMA_VERSION } = await import('/static/js/model.js');
+      const record = v.profileRecord;
+      const payload = { ...v.profile, dimensions: v.dimensions.map((d) => (d.id === ${JSON.stringify(liquidity.id)} ? { ...d, label: ${JSON.stringify(label)} } : d)) };
+      const slot = { recordId: record.recordId, recordType: 'profile', accountId: null, schemaVersion: SCHEMA_VERSION, version: record.version + 1 };
+      await api.put('/api/records/' + slot.recordId, { recordType: 'profile', accountId: null, schemaVersion: slot.schemaVersion, version: slot.version, ...(await c.encryptRecord(v.dek, slot, payload)) });
+    })()`);
   const otherTab = 'Liquidity, from another tab';
-  await page.eval(`(async () => {
-    const v = (await import('/static/js/session.js')).currentVault();
-    const api = await import('/static/js/api.js');
-    const c = await import('/static/js/crypto.js');
-    const { SCHEMA_VERSION } = await import('/static/js/model.js');
-    const record = v.profileRecord;
-    const payload = { ...v.profile, dimensions: v.dimensions.map((d) => (d.id === ${JSON.stringify(liquidity.id)} ? { ...d, label: ${JSON.stringify(otherTab)} } : d)) };
-    const slot = { recordId: record.recordId, recordType: 'profile', accountId: null, schemaVersion: SCHEMA_VERSION, version: record.version + 1 };
-    await api.put('/api/records/' + slot.recordId, { recordType: 'profile', accountId: null, schemaVersion: slot.schemaVersion, version: slot.version, ...(await c.encryptRecord(v.dek, slot, payload)) });
-  })()`);
+  await relabelElsewhere(otherTab);
   expectedFailures.add('/api/records/');
   await inRow('Pension', 'Edit');
   await page.eval(`(() => {
@@ -1109,17 +1132,8 @@ try {
   expectedFailures.delete('/api/records/');
   // The other tab's name goes back, so the sections below find the
   // dimension under the name they know it by.
-  await page.eval(`(async () => {
-    const v = (await import('/static/js/session.js')).currentVault();
-    const api = await import('/static/js/api.js');
-    const c = await import('/static/js/crypto.js');
-    const { SCHEMA_VERSION } = await import('/static/js/model.js');
-    const record = v.profileRecord;
-    const payload = { ...v.profile, dimensions: v.dimensions.map((d) => (d.id === ${JSON.stringify(liquidity.id)} ? { ...d, label: 'Liquid assets' } : d)) };
-    const slot = { recordId: record.recordId, recordType: 'profile', accountId: null, schemaVersion: SCHEMA_VERSION, version: record.version + 1 };
-    await api.put('/api/records/' + slot.recordId, { recordType: 'profile', accountId: null, schemaVersion: slot.schemaVersion, version: slot.version, ...(await c.encryptRecord(v.dek, slot, payload)) });
-    await v.load();
-  })()`);
+  await relabelElsewhere('Liquid assets');
+  await page.eval("(async () => { await (await import('/static/js/session.js')).currentVault().load(); })()");
 
 
   // ---- Account settings: the settings screen's own states --------------
@@ -1535,9 +1549,6 @@ try {
     (await labels('.row-state')).filter((s) => s === 'Recorded for this date.').length === 4,
   );
 
-  // A holding recorded at the backdate but not today carries its
-  // earlier figure forward, and the control offers to confirm it.
-  const sweepDate = (await page.eval('location.hash')).split('/').pop();
   check('the sweep heading is the date, not a control', (await page.eval("document.querySelectorAll('.screen-heading input').length")) === 0);
 
   await page.eval(`document.querySelector('.topbar nav a[href="#/"]').click()`);
@@ -1707,20 +1718,10 @@ try {
   // ---- Manage holdings (manage-accounts.md, account-form.md, account-detail.md)
 
   {
-    const { DatabaseSync } = await import('node:sqlite');
     const { readFileSync } = await import('node:fs');
-    const query = (sql, ...args) => {
-      const db = new DatabaseSync(process.env.DATABASE_PATH, { readOnly: true });
-      try {
-        return db.prepare(sql).all(...args);
-      } finally {
-        db.close();
-      }
-    };
-    const OWN = "JOIN principals ON principals.id = records.principal_id WHERE principals.username = 'leander'";
     const accountRows = () =>
-      JSON.stringify(query(`SELECT records.* FROM records ${OWN} AND record_type = 'account' ORDER BY record_id`));
-    const rowOf = (id) => query(`SELECT records.* FROM records ${OWN} AND record_id = ?`, id)[0];
+      JSON.stringify(sql(`SELECT records.* FROM records ${OWN} AND record_type = 'account' ORDER BY record_id`));
+    const rowOf = (id) => sql(`SELECT records.* FROM records ${OWN} AND record_id = ?`, id)[0];
     // The database file's own bytes, which is where plaintext would sit.
     const inDatabase = (needles) => {
       const bytes = readFileSync(process.env.DATABASE_PATH);
@@ -1763,40 +1764,28 @@ try {
       page.eval("performance.getEntriesByType('resource').filter(e => e.name.includes('/api/records?type=')).length");
     // Every request matching `refuse` answered with Server Error while
     // `body` runs, the way a failed write looks to the page.
-    const failing = async (refuse, body) => {
-      const handler = async (message) => {
-        if (message.method !== 'Fetch.requestPaused') return;
-        const { requestId, request } = message.params;
-        if (refuse(request)) {
-          provoked.push(new URL(request.url).pathname);
-          await page.send('Fetch.fulfillRequest', { requestId, responseCode: 500, body: '' });
-        } else {
-          await page.send('Fetch.continueRequest', { requestId });
-        }
-      };
-      page.on(handler);
-      await page.send('Fetch.enable', { patterns: [{ urlPattern: '*/api/*', requestStage: 'Request' }] });
-      try {
-        await body();
-      } finally {
-        await page.send('Fetch.disable');
-        page.handlers = page.handlers.filter((h) => h !== handler);
-      }
-    };
+    const failing = (refuse, body) =>
+      answering((request) => {
+        if (!refuse(request)) return false;
+        provoked.push(new URL(request.url).pathname);
+        return true;
+      }, 500, body);
     const writing = (type, method = 'PUT') => (request) =>
       request.method === method && (!type || (request.postData || '').includes(`"recordType":"${type}"`));
 
     // Every PUT the page sends, by record type, in order.
-    await page.eval(`(() => {
-      const send = window.fetch;
-      window.__writes = [];
-      window.fetch = (path, init) => {
-        if (init && init.method === 'PUT') window.__writes.push(JSON.parse(init.body).recordType);
-        return send(path, init);
-      };
-      window.__alerted = false;
-      window.alert = () => { window.__alerted = true; };
-    })()`);
+    const recordWrites = () =>
+      page.eval(`(() => {
+        const send = window.fetch;
+        window.__writes = [];
+        window.fetch = (path, init) => {
+          if (init && init.method === 'PUT') window.__writes.push(JSON.parse(init.body).recordType);
+          return send(path, init);
+        };
+        window.__alerted = false;
+        window.alert = () => { window.__alerted = true; };
+      })()`);
+    await recordWrites();
 
     // A second value on the existing dimension and a second dimension,
     // written to the profile as the dimensions screen would.
@@ -1832,7 +1821,7 @@ try {
     const NOTE = `Note ${XSS}`;
     const AXIS = `Axis ${XSS}`;
     const BAND = `Band ${XSS}`;
-    const accountsBefore = query(`SELECT record_id FROM records ${OWN} AND record_type = 'account'`).length;
+    const accountsBefore = sql(`SELECT record_id FROM records ${OWN} AND record_type = 'account'`).length;
 
     await click('Add a holding');
     await page.waitUntil("document.querySelector('#holding-unit-list [data-symbol]')", { label: 'the unit list' });
@@ -1920,7 +1909,7 @@ try {
     const offshore = await vaultValue("v.dimensions.find(d => d.id === 'region01').values.find(x => x.label === 'Offshore').id");
     check(
       'creating a holding stores exactly one account record',
-      query(`SELECT record_id FROM records ${OWN} AND record_type = 'account'`).length === accountsBefore + 1 && Boolean(rowOf(probeId)),
+      sql(`SELECT record_id FROM records ${OWN} AND record_type = 'account'`).length === accountsBefore + 1 && Boolean(rowOf(probeId)),
     );
     check(
       'the form writes ids for every assignment, never a label',
@@ -1976,16 +1965,7 @@ try {
     await page.waitUntil("document.querySelector('svg.trend')", { timeout: 90000, label: 'the dashboard after a fresh unlock' });
     await page.settle(600);
     check('a holding reads back whole after a fresh unlock', JSON.stringify(await payloadOf(probeId)) === JSON.stringify(saved));
-    await page.eval(`(() => {
-      const send = window.fetch;
-      window.__writes = [];
-      window.fetch = (path, init) => {
-        if (init && init.method === 'PUT') window.__writes.push(JSON.parse(init.body).recordType);
-        return send(path, init);
-      };
-      window.__alerted = false;
-      window.alert = () => { window.__alerted = true; };
-    })()`);
+    await recordWrites();
 
     // The unit list alone waits on the symbol table, and a table that
     // cannot be fetched leaves free text, a retry, and the cost named.
@@ -2444,8 +2424,8 @@ try {
 
   // ---- Export, then import it back ---------------------------------------
 
-  // A bookmark of the old address, which is still a real address and
-  // still lands on the screen it names.
+  // A bookmark of the server address, which lands on the screen it
+  // names.
   await page.goto(`${BASE}/settings`);
   await enterPassword(VAULT_PASSWORD);
   await page.waitUntil("document.body.innerText.includes('Main currency')", { timeout: 90000, label: 'settings again' });
@@ -2483,27 +2463,10 @@ try {
   // ---- Export and import, through the screen (export-import.md) ----------
 
   {
-    const { DatabaseSync } = await import('node:sqlite');
     const { mkdtempSync, readdirSync, readFileSync, writeFileSync, truncateSync } = await import('node:fs');
     const { tmpdir } = await import('node:os');
     const { join } = await import('node:path');
-    const query = (sql, ...args) => {
-      const db = new DatabaseSync(process.env.DATABASE_PATH, { readOnly: true });
-      try {
-        return db.prepare(sql).all(...args);
-      } finally {
-        db.close();
-      }
-    };
-    const OWNER = "JOIN principals ON principals.id = records.principal_id WHERE principals.username = 'leander'";
-    const vaultRows = () => JSON.stringify(query(`SELECT records.* FROM records ${OWNER} ORDER BY record_id`));
-    const credentialOf = (username) =>
-      query(
-        'SELECT credentials.params, credentials.verifier, dek_wrappers.wrapped_dek, dek_wrappers.dek_nonce FROM credentials ' +
-          'JOIN principals ON principals.id = credentials.principal_id ' +
-          'JOIN dek_wrappers ON dek_wrappers.credential_id = credentials.id WHERE principals.username = ?',
-        username,
-      )[0];
+    const vaultRows = () => JSON.stringify(sql(`SELECT records.* FROM records ${OWN} ORDER BY record_id`));
     const apiCalls = (part) =>
       page.eval(`performance.getEntriesByType('resource').filter(e => e.name.includes(${JSON.stringify(part)})).length`);
     const inPage = (body) =>
@@ -2550,26 +2513,6 @@ try {
     const replaceVault = () =>
       page.eval("[...document.querySelectorAll('#import-card button')].find(b => b.textContent === 'Replace my vault').click()");
     const importError = () => page.eval("document.querySelector('#import-card .field-error').hidden ? '' : document.querySelector('#import-card .field-error').textContent");
-    // Every request matching `match` answered with `status` while `body` runs.
-    const answering = async (match, status, body) => {
-      const handler = async (message) => {
-        if (message.method !== 'Fetch.requestPaused') return;
-        const { requestId, request } = message.params;
-        if (match(request)) {
-          await page.send('Fetch.fulfillRequest', { requestId, responseCode: status, body: '' });
-        } else {
-          await page.send('Fetch.continueRequest', { requestId });
-        }
-      };
-      page.on(handler);
-      await page.send('Fetch.enable', { patterns: [{ urlPattern: '*/api/*', requestStage: 'Request' }] });
-      try {
-        await body();
-      } finally {
-        await page.send('Fetch.disable');
-        page.handlers = page.handlers.filter((h) => h !== handler);
-      }
-    };
     // Everything the vault decrypts to, keyed by record id.
     const decrypted = () =>
       inPage(`
@@ -2793,7 +2736,7 @@ try {
     const kinds = { account: 0, snapshot: 0, rate: 0 };
     for (const record of exported.records) if (record.recordType in kinds) kinds[record.recordType] += 1;
     const review = await page.eval("document.querySelector('.review').innerText");
-    const total = query(`SELECT record_id FROM records ${OWNER}`).length;
+    const total = sql(`SELECT record_id FROM records ${OWN}`).length;
     check(
       'the review sets what is in the file against what will be deleted, prices on their own line',
       review.includes(`${kinds.account} holdings`) && review.includes(`${kinds.rate} captured prices`) &&
@@ -2858,7 +2801,7 @@ try {
         !(await page.eval("Boolean(document.querySelector('#unlock-password'))")) &&
         (await text()).includes(`${kinds.account} holdings, ${kinds.snapshot} recorded figures and ${kinds.rate} captured prices`),
     );
-    const versions = query(`SELECT DISTINCT version FROM records ${OWNER}`).map((row) => row.version);
+    const versions = sql(`SELECT DISTINCT version FROM records ${OWN}`).map((row) => row.version);
     check('every record reads version 1 after an import', versions.join(',') === '1', versions.join(','));
     const credentialAfter = credentialOf('leander');
     check(
@@ -2916,8 +2859,7 @@ try {
           }
         })()`);
       await second.goto(`${BASE}/login`);
-      await fill([['#unlock-username', 'ops.leander'], ['#unlock-password', ADMIN_PASSWORD]]);
-      await second.eval("document.querySelector('button[type=submit]').click()");
+      await signInOn(second, ADMIN_PASSWORD, 'ops.leander');
       await second.waitUntil("location.pathname === '/admin'", { timeout: 90000, label: 'the administrator on the second browser' });
       const invite = await second.eval(`fetch('/api/admin/invites', {
         method: 'POST', headers: { 'X-Solvent-Request': '1', 'Content-Type': 'application/json' },
@@ -2936,8 +2878,7 @@ try {
       await second.eval("document.querySelector('button[type=submit]').click()");
       await second.waitUntil("location.pathname === '/dashboard'", { timeout: 90000, label: 'the second vault' });
       await second.settle(400);
-      await fill([['#unlock-password', SECOND_PASSWORD]]);
-      await second.eval("document.querySelector('button[type=submit]').click()");
+      await signInOn(second, SECOND_PASSWORD);
       await second.waitUntil("document.body.innerText.includes('Add your first holding')", { timeout: 90000, label: 'the empty second vault' });
 
       // An empty vault's review says so, and asks for no typed word.
@@ -3002,25 +2943,16 @@ try {
 
       // The source's later record, put straight into this vault's rows,
       // does not decrypt: the two vaults share no key.
-      const db = new DatabaseSync(process.env.DATABASE_PATH);
-      try {
-        const row = db.prepare('SELECT * FROM records WHERE record_id = ?').get(later);
-        const mine = db.prepare("SELECT id FROM principals WHERE username = 'leander'").get().id;
-        db.prepare(
-          'INSERT INTO records (principal_id, record_id, record_type, account_id, schema_version, version, nonce, ciphertext, updated_at) ' +
-            'VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)',
-        ).run(mine, row.record_id, row.record_type, row.account_id, row.schema_version, row.version, row.nonce, row.ciphertext, row.updated_at);
-      } finally {
-        db.close();
-      }
+      const [row] = sql('SELECT * FROM records WHERE record_id = ?', later);
+      const [{ id: mine }] = sql("SELECT id FROM principals WHERE username = 'leander'");
+      sql(
+        'INSERT INTO records (principal_id, record_id, record_type, account_id, schema_version, version, nonce, ciphertext, updated_at) ' +
+          'VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)',
+        mine, row.record_id, row.record_type, row.account_id, row.schema_version, row.version, row.nonce, row.ciphertext, row.updated_at,
+      );
       const injected = await inPage(`await v.load(); return v.unreadable.includes(${JSON.stringify(later)});`);
       check("a record the source wrote after the export, inserted into this vault's rows, fails to decrypt", injected);
-      const cleanup = new DatabaseSync(process.env.DATABASE_PATH);
-      try {
-        cleanup.prepare("DELETE FROM records WHERE record_id = ? AND principal_id = (SELECT id FROM principals WHERE username = 'leander')").run(later);
-      } finally {
-        cleanup.close();
-      }
+      sql("DELETE FROM records WHERE record_id = ? AND principal_id = (SELECT id FROM principals WHERE username = 'leander')", later);
     } finally {
       other.child.kill();
     }
@@ -4890,16 +4822,7 @@ try {
     await second.send('Page.enable');
     await second.send('Runtime.enable');
     await second.goto(`${BASE}/settings`);
-    await second.eval(`(() => {
-      const set = (selector, value) => {
-        const node = document.querySelector(selector);
-        node.value = value;
-        node.dispatchEvent(new Event('input', { bubbles: true }));
-      };
-      set('#unlock-username', 'leander');
-      set('#unlock-password', ${JSON.stringify(VAULT_PASSWORD)});
-      document.querySelector('button[type=submit]').click();
-    })()`);
+    await signInOn(second, VAULT_PASSWORD, 'leander');
     await second.waitUntil("document.body.innerText.includes('Session and lock')", { timeout: 90000, label: 'settings on the second device' });
     await second.settle(400);
     const shown = await second.eval(

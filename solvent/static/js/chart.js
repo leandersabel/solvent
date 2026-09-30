@@ -9,15 +9,15 @@
 // real DOM.
 import * as decimal from './decimal.js';
 import { el } from './dom.js';
-import { isoFromDay } from './model.js';
+import { dayNumber, isoFromDay } from './model.js';
 
 const NS = 'http://www.w3.org/2000/svg';
 
 // Categorical slots, assigned in fixed order and never cycled
 // (spec/ui/design-system.md, Chart palette).
-export const SLOTS = ['#0098b7', '#ad7d00', '#964265', '#7f79d1'];
-export const UNASSIGNED_FILL = '#c4cccf';
-export const OTHER_FILL = '#798285';
+const SLOTS = ['#0098b7', '#ad7d00', '#964265', '#7f79d1'];
+const UNASSIGNED_FILL = '#c4cccf';
+const OTHER_FILL = '#798285';
 
 export function fillFor(band, index) {
   if (band.id === 'unassigned') return UNASSIGNED_FILL;
@@ -105,7 +105,7 @@ export function stack(bands, percentage = false) {
  *  runs over the top. The side of the axis carries the sign, so a band
  *  keeps its hue on both sides. A band in `hidden` is left out of the
  *  stack and the line, and keeps its color slot. */
-export function drawChart({
+function drawChart({
   days, bands, marks, annotations, percentage, justTheLine, onPickDate, onHover, onSelect, width = 900, locale,
   hidden = new Set(), selection = null,
 }) {
@@ -202,7 +202,7 @@ export function drawChart({
   // also the way into that date's recording.
   if (!justTheLine) {
     for (const date of marks) {
-      const day = Math.round(Date.parse(date + 'T00:00:00Z') / 86400000);
+      const day = dayNumber(date);
       if (day < firstDay || day > lastDay) continue;
       // Kept whole at the plot's two edges rather than cut in half.
       const at = Math.min(Math.max(x(day), pad.left + 0.75), width - pad.right - 0.75);
@@ -222,7 +222,7 @@ export function drawChart({
   }
 
   for (const annotation of annotations) {
-    const day = Math.round(Date.parse(annotation.date + 'T00:00:00Z') / 86400000);
+    const day = dayNumber(annotation.date);
     if (day < firstDay || day > lastDay) continue;
     const marker = svg('line', {
       x1: x(day),

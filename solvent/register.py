@@ -24,16 +24,14 @@ from flask import Blueprint, abort, jsonify, render_template, request
 
 from . import crypto
 from . import session as sessions
+from .auth import SALT_BYTES
 from .db import get_db, utcnow, write_transaction
 from .guard import navigation, public
 from .rates import table_rows
-from .records import RecordWrite, store
+from .records import NONCE_BYTES, RecordWrite, store
 from .validation import Payload, decode_b64, kdf_envelope_ok, normalize_username, parse
 
 bp = Blueprint("register", __name__)
-
-SALT_BYTES = 16
-NONCE_BYTES = 12
 
 # All four invalid invite states render the same message, so a probe
 # learns nothing about which one applies.

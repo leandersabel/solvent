@@ -23,7 +23,7 @@ function failed(status, path) {
   return new ApiError(status);
 }
 
-export class ApiError extends Error {
+class ApiError extends Error {
   constructor(status) {
     super(`request failed with status ${status}`);
     this.status = status;

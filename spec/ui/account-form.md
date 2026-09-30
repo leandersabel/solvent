@@ -66,7 +66,7 @@ the holding's detail screen (`account-detail.md`). Form max-width
     choice on a holding already measured in it, with its stored text.
     A retired symbol keeps pricing (`rate-lookup.md`, Maintaining the
     table), so nothing is wrong and nothing needs deciding. The option
-    is simply absent for anyone choosing afresh.
+    is absent for anyone choosing afresh.
   - When the wanted unit is absent, the same free-text option is the
     answer, with: "Not listed? This list is set up for the whole
     instance by an administrator, not per vault." Adding a unit is an
@@ -77,8 +77,7 @@ the holding's detail screen (`account-detail.md`). Form max-width
     it is still open and not only once it is locked: "You can change
     this until you record a value for this holding. After that it is
     fixed, and the only way to a different unit is to archive this
-    holding and start a new one." The freeze is announced where the
-    choice is made.
+    holding and start a new one."
   - Option labels are server-supplied text and render through
     `textContent`, never as markup (`rate-lookup.md`, Maintaining the
     table).
@@ -89,7 +88,7 @@ the holding's detail screen (`account-detail.md`). Form max-width
   can leave in place, not an empty one to nag about.
   - A dimension with exactly one value — a **flag** — renders as a
     checkbox instead of a select. Unchecked means unassigned. This is
-    the shape that replaces a yes/no tag, and it must be one click.
+    the shape a yes/no tag takes, and it must be one click.
   - The user never sees an id. Ids are what `dims` stores; the form
     reads and writes them and displays only labels.
   - One value per dimension needs no enforcement here: `dims` is a map

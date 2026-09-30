@@ -40,11 +40,6 @@ export function multiply(a, b) {
   return rescale(a * b, UNIT);
 }
 
-export function divide(a, b) {
-  if (b === 0n) return null;
-  return rescale(a * UNIT, b);
-}
-
 function rescale(numerator, denominator) {
   const negative = numerator < 0n !== denominator < 0n;
   const n = numerator < 0n ? -numerator : numerator;

@@ -25,7 +25,6 @@ from pydantic import Field
 bp = Blueprint("admin", __name__)
 
 DEFAULT_EXPIRY_DAYS = 7
-BOOTSTRAP_CREATOR = "system:bootstrap"
 
 
 class InviteCreate(Payload):
@@ -44,10 +43,8 @@ class AccountDelete(Payload):
 def mint_invite(conn, kind: str, expires_in_days: int, label: str, created_by: str):
     """Write an invite row and return it with its one-time token.
 
-    256 bits from `secrets.token_urlsafe`, stored as a SHA-256 hash:
-    the token is unguessable, so a slow KDF buys nothing and lookup is
-    by hash in constant time. The plaintext is returned here and
-    nowhere else, ever.
+    256 bits from `secrets.token_urlsafe`. The plaintext is returned
+    here and nowhere else, ever.
     """
     token = secrets.token_urlsafe(32)
     invite_id = uuid.uuid4().hex

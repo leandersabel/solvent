@@ -1,7 +1,7 @@
 """The container hardening the image itself has to carry
 (spec/architecture.md, Tech stack).
 
-Running the image is what proves it serves; these lock the three
+Running the image is what proves it serves; these lock the
 properties that would otherwise regress silently in the Dockerfile,
 since nothing about a working build tells you the base drifted or the
 process went back to root.

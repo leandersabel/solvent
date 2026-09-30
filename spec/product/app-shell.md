@@ -28,7 +28,7 @@ shell frames sits behind the password.
 ## What "looks like a private bank" commits us to
 
 You asked for something that looks like a private bank. In terms of
-what you actually see, that is:
+what you see, that is:
 
 - **One structural color.** A deep petrol blue carries the chrome.
   Beyond it there are two accents, a warm brass for the primary action
@@ -250,19 +250,12 @@ panning sideways.
 
 ## What it deliberately does not do
 
-- **No Holdings entry in the navigation.** The dashboard table is the
-  list of holdings, so the entry would lead back to the current screen
-  or duplicate it.
-- **No Admin entry in the navigation, for anybody.** The navigation
-  frames a vault, and administering the instance is not something a
-  vault owner does. It is done from a separate account that has no
-  vault and no dashboard to hang the entry beside.
+- **No Holdings entry and no Admin entry in the navigation** (see
+  Navigation).
 - **No sign-out button in the top bar.** Locking is the frequent act
   and signing out is rare and deliberate. Two similar-looking buttons
   side by side in the bar would invite the wrong one. Signing out lives
   in Settings.
-- **No confirmation step on Lock.** The control exists to be fast under
-  pressure.
 - **No dark theme.** You asked for a light ground. A dark theme
   is a second complete set of colors that has to be checked for
   readability from scratch rather than inverted, and the chart colors

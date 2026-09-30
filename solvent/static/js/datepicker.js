@@ -8,14 +8,13 @@
 // field keeps the platform's behaviour where it can: a typed date is
 // accepted without opening anything, and the calendar is reachable
 // from the keyboard.
-import { el } from './dom.js';
+import { el, today } from './dom.js';
 
 const WEEK_START_MONDAY = 1;
 
-/** Returns `{ element, value, set, onChange }` where `value` is an ISO
- *  date or the empty string. `max` and `min` are ISO dates. */
-/** `marked` is a set of ISO dates the calendar marks as holding a
- *  recording (design-system.md, Components, Date picker, marked). */
+/** `value` is an ISO date or the empty string. `max` and `min` are ISO
+ *  dates. `marked` is a set of ISO dates the calendar marks as holding
+ *  a recording (design-system.md, Components, Date picker, marked). */
 export function dateField(format, { id, value = '', min = null, max = null, onChange = null, marked = null } = {}) {
   let current = value;
 
@@ -131,10 +130,6 @@ export function dateField(format, { id, value = '', min = null, max = null, onCh
       settle(iso);
     },
   };
-}
-
-function today() {
-  return new Date().toISOString().slice(0, 10);
 }
 
 function inRange(iso, min, max) {

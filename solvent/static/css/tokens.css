@@ -1,6 +1,5 @@
-/* Design tokens and app-shell chrome (spec/ui/design-system.md).
-   Every screen that extends templates/shell/base.html shares this file;
-   a screen's own stylesheet adds only what its content region needs. */
+/* Design tokens, app-shell chrome and every screen's styles
+   (spec/ui/design-system.md). The one stylesheet every page links. */
 
 /* Before everything else. The UA rule behind the `hidden` attribute is
    a bare `display: none`, which any later rule setting a display wins
@@ -196,7 +195,6 @@ a:hover {
 }
 
 .content-medium { max-width: calc(900px + 2 * var(--gutter)); }
-.content-narrow { max-width: calc(720px + 2 * var(--gutter)); }
 
 /* Each vault screen's own width, set on the region it mounts into. */
 .app-medium { max-width: 900px; margin: 0 auto; }
@@ -400,8 +398,7 @@ h1, h2, h3 {
 
 .field { margin-bottom: 16px; }
 
-.field label,
-.settings-label {
+.field label {
   display: block;
   font-size: 13px;
   font-weight: 500;
@@ -420,8 +417,6 @@ h1, h2, h3 {
 
 input[type="text"],
 input[type="password"],
-input[type="date"],
-input[type="number"],
 input:not([type]),
 select,
 textarea {
@@ -1394,7 +1389,7 @@ th.numeric {
   border-radius: 6px;
 }
 
-.overflow-items .btn-inline { display: block; width: 100%; text-align: left; }
+.overflow-items .btn-inline { display: block; width: 100%; }
 
 /* ---- Settings ---- */
 
@@ -1475,7 +1470,7 @@ th.numeric {
 .link-row-text { flex: 1; display: flex; flex-direction: column; }
 .link-row-title { font-weight: 600; }
 .link-row .hint { margin: 2px 0 0; }
-.link-row .icon { color: var(--ink-secondary); flex: none; }
+.link-row .icon { color: var(--ink-secondary); }
 .link-row-aside { font-size: 13px; color: var(--ink-secondary); }
 
 /* The select in its own column and the tradeoff beside it, level with
@@ -1616,10 +1611,7 @@ select {
 
 /* ---- Date field ---- */
 
-/* Hand-built because `input type=date` is written in the browser's
-   locale and no page can change that, which would leave a reader
-   whose browser is in English unable to get the dates they chose
-   (spec/ui/settings.md, Dates and numbers). */
+/* Hand-built, for the reason static/js/datepicker.js gives. */
 .date-field {
   position: relative;
   display: flex;
@@ -1642,13 +1634,6 @@ select {
   font: inherit;
   cursor: pointer;
   line-height: 1;
-}
-
-.date-open:focus-visible,
-.date-day:focus-visible,
-.date-step:focus-visible {
-  outline: 2px solid var(--petrol-600);
-  outline-offset: 2px;
 }
 
 .date-popover {
@@ -2016,7 +2001,7 @@ select {
 .unit-field #holding-unit-other { margin-top: 8px; }
 
 /* A skeleton while the symbol table is on its way, and only there. */
-.skeleton {
+.unit-list .skeleton {
   height: 14px;
   margin: 10px 12px;
   border-radius: 4px;

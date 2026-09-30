@@ -74,7 +74,7 @@ moment and it must never look like a hang.
 - The tab stays responsive throughout, and on a phone it stays
   responsive to touch, so the extra second or two reads as the screen
   working rather than the screen having frozen.
-- No spinner before the derivation actually starts.
+- No spinner before the derivation starts.
 
 **An administrator pays the same wait, and there is no fast path for
 them.** It is not an oversight to be optimized away later. The
@@ -111,8 +111,8 @@ moment it is shown the screen does not know which it is.
   above. The browser can run the encryption, and the allocation was
   refused anyway. The copy names the moment: "This device does not have
   enough memory available right now. Close some other tabs and try
-  again." A **Try again** button, because closing tabs genuinely can
-  fix it.
+  again." A **Try again** button, because closing tabs can fix
+  it.
   - A moment, not a device class. Any device, of any kind, can be too
     busy right now with enough other tabs and other apps open. The copy
     never says a phone, a tablet, or any other device cannot open a

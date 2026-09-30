@@ -6,11 +6,11 @@
 // same failures. Nothing on it announces, before then, that a username
 // belongs to an administrator, and nothing hints that an admin area
 // exists.
-import { el, mount } from './dom.js';
+import { el } from './dom.js';
 import { DerivationError } from './crypto.js';
-import { SignInError, signIn } from './session.js';
+import { SignInError, signIn, signOut } from './session.js';
 
-const WAIT_NOTE =
+export const WAIT_NOTE =
   'This takes a moment by design. It is what makes your password hard to attack.';
 
 export function unlockCard({ knownUsername = null, onUnlocked }) {
@@ -118,11 +118,9 @@ export function unlockCard({ knownUsername = null, onUnlocked }) {
 
 function signOutLink(event) {
   event.preventDefault();
-  import('./session.js').then((session) =>
-    session.signOut().finally(() => {
-      window.location.href = '/login';
-    }),
-  );
+  signOut().finally(() => {
+    window.location.href = '/login';
+  });
 }
 
 function messageFor(failure) {
@@ -159,12 +157,4 @@ export function passwordWithToggle(input) {
     },
   });
   return el('div', { class: 'password-field' }, [input, toggle]);
-}
-
-/** Replace a screen's content region with the unlock card, keeping the
- *  shell around it. Unsaved form input elsewhere is the one named
- *  exception to the lock discarding everything (login.md, Rules), and
- *  it is the caller that holds it. */
-export function mountUnlock(container, options) {
-  mount(container, unlockCard(options));
 }

@@ -203,12 +203,9 @@ never lock anyone out.
     decrypted is exempt. The same rule covers the manual lock button
     (`ui/design-system.md`, App shell) and a session expiring
     mid-request.
-- **No idle rule for an administrator**: nothing is decrypted, so
-  there is nothing for a lock to take away, and the idle lock never
-  bounded the server session for a vault owner either
-  (account-settings.md, Session and lock, which owns the reason). An
-  administrator session is bounded by the absolute expiry and by
-  signing out.
+- **No idle rule for an administrator** (account-settings.md, Session
+  and lock, which owns the reason). An administrator session is bounded
+  by the absolute expiry and by signing out.
 - **Session lifetime**: server-side session expires 12 hours after
   issue, absolute, not sliding. Both kinds, and for an administrator it
   is the only bound.
@@ -229,10 +226,9 @@ never lock anyone out.
   Nothing is logged: the unwrap happens in the browser after the login
   already answered OK, so the server never sees it fail.
 - **Rate limiting**: per-account and per-IP on both `/api/auth/salt` and
-  `/api/auth/login`, then a lockout with operator alerting. The lockout
-  is the escalation, and there is no backoff (architecture.md, Rate
-  limiting). Lockout responses must not reveal whether the account
-  exists.
+  `/api/auth/login`, then a lockout with operator alerting
+  (architecture.md, Rate limiting). Lockout responses must not reveal
+  whether the account exists.
 - **Already-authenticated caller hits `/login`** → redirect to the
   root path, which resolves by kind (app-shell.md, The two surfaces).
   For a vault owner, keys are still only in memory, so if they were

@@ -2,6 +2,8 @@ from __future__ import annotations
 
 import pytest
 
+from tests.helpers import register
+
 
 @pytest.fixture
 def app(tmp_path, monkeypatch):
@@ -22,6 +24,18 @@ def app(tmp_path, monkeypatch):
 @pytest.fixture
 def client(app):
     return app.test_client()
+
+
+@pytest.fixture
+def owner(app):
+    client, _ = register(app, "owner")
+    return client
+
+
+@pytest.fixture
+def admin(app):
+    client, _ = register(app, "root", kind="administrator")
+    return client
 
 
 @pytest.fixture(autouse=True)

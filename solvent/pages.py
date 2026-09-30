@@ -25,9 +25,7 @@ def root():
     visitor to the dashboard, which carries the sign-in card and sends
     an administrator on once it knows which they are.
     """
-    if not g.get("principal"):
-        return redirect("/dashboard")
-    if g.principal["kind"] == "administrator":
+    if g.get("principal") and g.principal["kind"] == "administrator":
         return redirect("/admin")
     return redirect("/dashboard")
 

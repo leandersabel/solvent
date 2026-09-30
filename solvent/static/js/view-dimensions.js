@@ -425,7 +425,7 @@ function createDimension(vault) {
     actions: [
       el('button', { class: 'btn-secondary', text: 'Cancel', onclick: () => close() }),
       // A flag is a dimension whose one value carries its own name:
-      // one field and one button, as fast as typing a tag once was.
+      // one field and one button.
       el('button', {
         class: 'btn-secondary',
         text: 'Create a flag',

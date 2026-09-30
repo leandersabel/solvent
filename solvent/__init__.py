@@ -7,6 +7,8 @@ bootstrap, and the authenticated chrome every screen sits inside.
 """
 from __future__ import annotations
 
+import dataclasses
+
 import flask
 
 from . import (
@@ -44,22 +46,7 @@ def create_app(config_overrides: dict | None = None) -> flask.Flask:
     # deployment never serves a request (app-shell.md, Configuration).
     config = load_config()
     app.config.update(
-        SECRET_KEY=config.secret_key,
-        DATABASE_PATH=config.database_path,
-        HSTS_PRELOAD=config.hsts_preload,
-        HSTS_MAX_AGE=config.hsts_max_age,
-        LOGIN_ATTEMPTS_PER_ACCOUNT=config.login_attempts_per_account,
-        LOGIN_ACCOUNT_WINDOW_MINUTES=config.login_account_window_minutes,
-        LOGIN_LOCKOUT_THRESHOLD=config.login_lockout_threshold,
-        LOGIN_LOCKOUT_WINDOW_MINUTES=config.login_lockout_window_minutes,
-        LOGIN_LOCKOUT_MINUTES=config.login_lockout_minutes,
-        LOGIN_REQUESTS_PER_IP_HOUR=config.login_requests_per_ip_hour,
-        VERIFY_CONCURRENCY=config.verify_concurrency,
-        VERIFY_WAIT_SECONDS=config.verify_wait_seconds,
-        RATE_REQUESTS_PER_HOUR=config.rate_requests_per_hour,
-        RATE_BREAKER_FAILURES=config.rate_breaker_failures,
-        RATE_BREAKER_COOLOFF_MINUTES=config.rate_breaker_cooloff_minutes,
-        EXPORTS_PER_USER_HOUR=config.exports_per_user_hour,
+        {name.upper(): value for name, value in dataclasses.asdict(config).items()},
         # The vault ships as one JSON payload per record type, and an
         # import as one payload for the whole vault, so the framework
         # cap sits above the storage quota rather than below it.

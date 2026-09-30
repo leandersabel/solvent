@@ -21,6 +21,7 @@ import {
   restoreFields,
   resumable,
   revealChrome,
+  today,
   trackEdits,
 } from './dom.js';
 import { whenUnauthorized } from './api.js';
@@ -93,10 +94,7 @@ function draw() {
           }
           username = result.username;
           revealChrome('vault_owner', {
-            onUpdate: () => {
-              resetSweepState();
-              go(`#/sweep/${new Date().toISOString().slice(0, 10)}`);
-            },
+            onUpdate: () => openSweep(today()),
             onLock: lock,
             onSignOut: signOut,
           });
@@ -175,10 +173,7 @@ function actionsFor(vault) {
     home: () => go('#/'),
     openHolding: (id) => go(`#/holding/${id}`),
     openRecording: (date) => go(`#/recording/${date}`),
-    openSweep: (date) => {
-      resetSweepState();
-      go(`#/sweep/${date}`);
-    },
+    openSweep,
     addHolding: () => addHoldingDialog(vault),
   };
 }
@@ -198,6 +193,11 @@ function resumeHeld() {
     if (hash === window.location.hash) restoreFields(container, fields);
     reopenDialogs(dialogs, { vault, ...actionsFor(vault) });
   }, 0);
+}
+
+function openSweep(date) {
+  resetSweepState();
+  go(`#/sweep/${date}`);
 }
 
 function go(hash) {
@@ -237,8 +237,7 @@ function registerVaultStore() {
   window.Alpine.store('vault', {
     clear: lock,
     updateValues() {
-      resetSweepState();
-      go(`#/sweep/${new Date().toISOString().slice(0, 10)}`);
+      openSweep(today());
     },
     signOut() {
       const leaving = signOut();

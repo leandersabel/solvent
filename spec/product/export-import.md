@@ -135,7 +135,7 @@ successfully**.
 
   Telling you how long it has been, or putting a copy somewhere by
   itself, is wanted and is not in the first version. What the first
-  version owes them is that a backup stays a plain file you hold,
+  version owes those features is that a backup stays a plain file you hold,
   with nothing else depending on the app knowing when one was
   last made.
 - **There is a ceiling on how often the whole vault can be downloaded**,

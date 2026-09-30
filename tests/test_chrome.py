@@ -15,9 +15,10 @@ from pathlib import Path
 from solvent.config import DEFAULT_KDF_ENVELOPE
 from solvent.crypto import ARGON2ID_SRI, ZXCVBN_SRI
 from solvent.shell import ALPINE_SRI, nav_entries
-from tests.helpers import register
+from tests.helpers import mint_invite, register
 
-VENDOR = Path(__file__).resolve().parent.parent / "solvent" / "static" / "vendor"
+STATIC = Path(__file__).resolve().parent.parent / "solvent" / "static"
+VENDOR = STATIC / "vendor"
 
 
 def nav_labels(body):
@@ -113,11 +114,7 @@ def test_an_administrator_loads_the_worker_and_not_the_record_layer(app):
     assert "js/app.js" not in admin_page
     assert "js/app.js" in owner_page
 
-    from pathlib import Path
-
-    admin_js = (
-        Path(__file__).resolve().parent.parent / "solvent" / "static" / "js" / "page-admin.js"
-    ).read_text()
+    admin_js = (STATIC / "js" / "page-admin.js").read_text()
     # It reaches the worker through session.js, which owns the
     # derivation, and never through the model or the write paths.
     assert "./session.js" in admin_js
@@ -221,10 +218,7 @@ def contrast(first, second):
 
 
 def token(name):
-    css = (
-        Path(__file__).resolve().parent.parent
-        / "solvent" / "static" / "css" / "tokens.css"
-    ).read_text()
+    css = (STATIC / "css" / "tokens.css").read_text()
     return re.search(rf"--{name}:\s*(#[0-9a-f]{{6}})", css).group(1)
 
 
@@ -248,8 +242,6 @@ def test_the_register_page_hands_the_currency_list_to_the_browser_intact(app, cl
     """`tojson` marks its output safe, so autoescaping does not run on
     it: a double-quoted attribute would be closed by the first quote
     the list carries and the page would parse nothing."""
-    from tests.helpers import mint_invite
-
     body = client.get(f"/register?invite={mint_invite(app)}").get_data(as_text=True)
     attribute = re.search(r"data-currencies='([^']*)'", body)
     assert attribute, body[body.index("data-currencies") - 80 : body.index("data-currencies") + 200]

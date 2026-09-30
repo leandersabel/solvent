@@ -8,7 +8,7 @@
 import { el } from './dom.js';
 
 export const MIN_LENGTH = 12;
-export const MIN_SCORE = 3;
+const MIN_SCORE = 3;
 
 const RATINGS = ['very weak', 'weak', 'fair', 'strong', 'very strong'];
 

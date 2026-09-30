@@ -34,7 +34,7 @@ export const DATE_STYLES = [
 /** What the browser says the reader reads, which is the default for
  *  every setting below and the only one available before a vault is
  *  open. */
-export function browserLocale() {
+function browserLocale() {
   const tag = (navigator.languages && navigator.languages[0]) || navigator.language;
   return supported(tag) ? tag : 'en-US';
 }
@@ -140,15 +140,7 @@ export function formatter(profile) {
 
     /** The same date with the month spelled, for prose where a run of
      *  digits would read as a figure. */
-    longDate: (iso) =>
-      iso
-        ? new Date(iso + 'T00:00:00Z').toLocaleDateString(locale, {
-            day: 'numeric',
-            month: 'short',
-            year: 'numeric',
-            timeZone: 'UTC',
-          })
-        : '',
+    longDate: (iso) => spelled(iso, locale, { day: 'numeric', month: 'short', year: 'numeric' }),
 
     /** The month spelled out and the year alone: how far back a
      *  long chart range reaches. */

@@ -147,8 +147,7 @@ step). On a large vault this is the longest operation in the product.
   figures or prices", followed by the file's size.
 - **Error, export ceiling reached**: the button is disabled with the
   reason in place of a silent failure: "You have downloaded your vault
-  several times in the last hour. You can do it again shortly." A full
-  vault read is rate-limited per user (`export-import.md`).
+  several times in the last hour. You can do it again shortly."
 - **Error, export failed**: nothing was written to disk and nothing in
   the vault changed. The button returns to its resting state and the
   message says both.
