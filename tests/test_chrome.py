@@ -247,3 +247,81 @@ def test_the_register_page_hands_the_currency_list_to_the_browser_intact(app, cl
     assert attribute, body[body.index("data-currencies") - 80 : body.index("data-currencies") + 200]
     parsed = json.loads(attribute.group(1))
     assert {"symbol": "CHF", "label": "Swiss Franc"} in parsed
+
+
+# ---- One document from the derivation to the vault ---------------------
+#
+# The keys live in the memory of the document that derived them, so a
+# vault owner's sign-in and registration are served the vault shell
+# page, and what follows is drawn in that same document
+# (spec/features/app-shell.md, Rules; login.md; register.md, Flow).
+
+
+def scripts(body):
+    return re.findall(r'<script[^>]*type="module"[^>]*src="[^"]*/js/([^"]+)"', body)
+
+
+def test_the_sign_in_address_serves_the_vault_page_in_the_outside_frame(client):
+    response = client.get("/login")
+    body = response.get_data(as_text=True)
+    assert response.status_code == 200
+    assert scripts(body) == ["app.js"]
+    assert 'class="outside-body"' in body
+    assert 'class="outside-wordmark"' in body
+    # No kind to draw a bar for, and none shown until a password has
+    # been proved: the wordmark alone, hidden.
+    assert "<nav" not in body
+    assert re.search(r'<header class="topbar"[^>]* hidden', body)
+    # Nothing in it names who is signed in, because nobody is.
+    assert "data-username" not in body
+
+
+def test_a_vault_owner_invite_serves_the_vault_page_carrying_the_form_data(app, client):
+    token = mint_invite(app)
+    response = client.get(f"/register?invite={token}")
+    body = response.get_data(as_text=True)
+    assert response.status_code == 200
+    assert scripts(body) == ["app.js"]
+    assert 'class="outside-body"' in body
+    assert "<nav" not in body
+    assert re.search(r'<header class="topbar"[^>]* hidden', body)
+    assert 'data-kind="vault_owner"' in body
+    assert f'data-token="{token}"' in body
+    assert 'name="referrer" content="no-referrer"' in body
+    # zxcvbn is handed over for the strength gauge, never loaded here.
+    assert 'id="zxcvbn-source"' in body
+
+
+def test_an_administrator_invite_keeps_its_own_page(app, client):
+    body = client.get(f"/register?invite={mint_invite(app, 'administrator')}").get_data(as_text=True)
+    assert scripts(body) == ["page-register.js"]
+    assert 'data-kind="administrator"' in body
+    assert "topbar" not in body
+
+
+def test_an_invalid_invite_keeps_its_error_page(client):
+    response = client.get("/register?invite=nonsense")
+    body = response.get_data(as_text=True)
+    assert response.status_code == 400
+    assert "This invite link is not valid" in body
+    assert scripts(body) == []
+
+
+def test_a_signed_in_caller_at_the_sign_in_address_is_still_sent_on(app):
+    owner, _ = register(app, "owner")
+    admin, _ = register(app, "root", kind="administrator")
+    for client in (owner, admin):
+        response = client.get("/login")
+        assert response.status_code == 302
+        assert response.headers["Location"] == "/"
+    assert owner.get("/").headers["Location"] == "/dashboard"
+    assert admin.get("/").headers["Location"] == "/admin"
+
+
+def test_a_vault_owner_invite_opened_while_signed_in_draws_no_chrome(app):
+    """The form sits in the outside frame whoever opens the link, so a
+    session that happens to exist does not put a bar around it."""
+    owner, _ = register(app, "owner")
+    body = owner.get(f"/register?invite={mint_invite(app)}").get_data(as_text=True)
+    assert "<nav" not in body
+    assert "data-username" not in body

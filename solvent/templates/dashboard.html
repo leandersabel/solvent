@@ -1,12 +1,25 @@
 {% extends "shell/base.html" %}
-{% block title %}Solvent{% endblock %}
+{% block title %}{{ title or 'Solvent' }}{% endblock %}
+{# The invite token rides in the URL of the registration address, so
+   it is this page's outbound navigations that could carry it in a
+   Referer header (admin-invites.md, Rules). #}
+{% block meta %}{% if no_referrer %}<meta name="referrer" content="no-referrer">{% endif %}{% endblock %}
 {% block content %}
-  <div id="app"{% if g.get('principal') %} data-username="{{ g.principal.username }}"{% endif %}></div>
+  {% if registration %}
+  {# What the registration form needs and the page has no session to
+     fetch: the invite's kind, its token and the currency list. #}
+  <div id="app"
+       data-kind="{{ registration.kind }}"
+       data-token="{{ registration.token }}"
+       data-currencies='{{ registration.currencies | tojson }}'></div>
+  {% else %}
+  <div id="app"{% if g.get('principal') and not outside %} data-username="{{ g.principal.username }}"{% endif %}></div>
+  {% endif %}
 {% endblock %}
 {% block scripts %}
   {# zxcvbn is the largest file the browser can load here and only the
-     change-password card scores anything, so the vault surface is
-     handed where to get it rather than getting it
+     change-password card and the registration form score anything, so
+     the vault surface is handed where to get it rather than getting it
      (architecture.md, Supply chain). static/js/strength.js fetches it
      on the first gauge it builds. #}
   <script id="zxcvbn-source" type="application/json">

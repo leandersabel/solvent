@@ -30,31 +30,43 @@ def root():
     return redirect("/dashboard")
 
 
+def vault_page(**context):
+    """The vault shell page, served `no-store`.
+
+    A browser must not keep it for Back once the person has left it
+    (architecture.md, Application hardening). The client also locks on
+    `pagehide`, which holds whatever the browser decides to keep.
+    """
+    response = make_response(render_template("dashboard.html", **context))
+    response.headers["Cache-Control"] = "no-store"
+    return response
+
+
 @bp.get("/login")
 @navigation
 @public
 def login_page():
     """One sign-in screen at one address, for both kinds. There is no
     administrator login page and no kind selector: the screen looks and
-    behaves identically until a correct password has been supplied."""
+    behaves identically until a correct password has been supplied.
+
+    It is the vault shell page in the outside frame. The Master Key and
+    the DEK live in the memory of the document that derived them, so a
+    sign-in that then loaded `/dashboard` would arrive with no keys and
+    ask for the password a second time. The same document draws the
+    vault instead, and an administrator, who has no keys to keep, is
+    sent on to `/admin` once the kind is known.
+    """
     if g.get("principal"):
         return redirect("/")
-    return render_template("login.html")
+    return vault_page(outside=True, title="Sign in to Solvent")
 
 
 @bp.get("/dashboard")
 @navigation
 def dashboard():
-    """The vault shell page, where the keys live once it is unlocked.
-
-    Served with `no-store`, so a browser does not keep it for Back once
-    the person has left it (architecture.md, Application hardening).
-    The client also locks on `pagehide`, which holds whatever the
-    browser decides to keep.
-    """
-    response = make_response(render_template("dashboard.html"))
-    response.headers["Cache-Control"] = "no-store"
-    return response
+    """The vault shell page, where the keys live once it is unlocked."""
+    return vault_page()
 
 
 @bp.get("/settings")

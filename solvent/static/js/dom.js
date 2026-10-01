@@ -364,6 +364,19 @@ export function today() {
   return new Date().toISOString().slice(0, 10);
 }
 
+/** The sign-in and registration addresses serve this page in the
+ *  outside frame: the wordmark above one card, the bar hidden. Once
+ *  the keys exist the same document becomes the vault, so the frame is
+ *  taken down and the bar shown. A page served inside the shell has no
+ *  frame to leave. */
+function leaveOutsideFrame(bar) {
+  if (!document.body.classList.contains('outside-body')) return;
+  document.body.classList.remove('outside-body');
+  document.querySelector('.outside-wordmark')?.remove();
+  if (bar) bar.hidden = false;
+  document.title = 'Solvent';
+}
+
 /** Draw the chrome the server had no kind to draw.
  *
  *  A page reached without a session carries the wordmark alone, so
@@ -375,6 +388,7 @@ export function today() {
  */
 export function revealChrome(kind, { onUpdate, onLock, onSignOut }) {
   const bar = document.querySelector('.topbar');
+  leaveOutsideFrame(bar);
   if (!bar || bar.querySelector('nav')) return;
 
   if (kind === 'vault_owner') {

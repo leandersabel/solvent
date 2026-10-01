@@ -25,7 +25,8 @@ import {
   trackEdits,
 } from './dom.js';
 import { whenUnauthorized } from './api.js';
-import { onLock, currentVault, isUnlocked, lock, signOut } from './session.js';
+import { onLock, currentVault, isUnlocked, holdsKeys, lock, signOut, startRegistered, LockedWhileOpeningError } from './session.js';
+import { registerForm } from './register-form.js';
 import { unlockCard } from './unlock.js';
 import { dashboardView, datePicker as pickDate } from './view-dashboard.js';
 import { holdingForm } from './view-holding-form.js';
@@ -43,6 +44,24 @@ const container = document.getElementById('app');
 let username = container ? container.dataset.username || null : null;
 const kdfNode = document.getElementById('kdf-envelope');
 const kdf = kdfNode ? JSON.parse(kdfNode.textContent) : null;
+
+// A vault owner's invite is served this page, in the outside frame,
+// with what the form needs. The keys the form makes are in this
+// document's memory, so this document draws the vault once they exist
+// (ui/register.md). Null everywhere else, and again once it is used.
+let registration = null;
+let registrationForm = null;
+if (container && container.dataset.kind === 'vault_owner') {
+  registration = {
+    token: container.dataset.token,
+    currencies: JSON.parse(container.dataset.currencies || '[]'),
+  };
+  // The form holds the token, so the address bar drops it: a bookmark,
+  // a shared screen or a synced history afterwards carries nothing
+  // (admin-invites.md, Rules).
+  history.replaceState(null, '', window.location.pathname);
+  delete container.dataset.token;
+}
 
 // What the person was typing when the vault locked: plain field values,
 // the address they were typed at, and the way back into each open
@@ -80,9 +99,85 @@ function width(name) {
   container.className = `app-${name}`;
 }
 
+/** The keys exist and this document holds them: show the chrome and
+ *  draw the vault, in place. A page served at the sign-in or
+ *  registration address moves to the dashboard's address without
+ *  loading it, which would find no keys and ask for the password
+ *  again. Where the page was already the dashboard, its address
+ *  stands, whatever view it named. */
+function enterVault(name) {
+  username = name;
+  if (window.location.pathname !== '/dashboard') {
+    history.replaceState(null, '', '/dashboard#/');
+  }
+  revealChrome('vault_owner', {
+    onUpdate: () => openSweep(today()),
+    onLock: lock,
+    onSignOut: signOut,
+  });
+  render();
+  resumeHeld();
+}
+
+async function registered(created) {
+  registration = null;
+  registrationForm = null;
+  // Who the card asks for if an idle lock comes before the vault is read.
+  username = created.username;
+  await readRegistered(created);
+}
+
+/** Reads the new vault, in this document. The account exists, its
+ *  session is live and the keys are held, so a read that fails is
+ *  offered again here: loading a page, or locking, would ask for the
+ *  password the person has just chosen (ui/register.md, States). */
+async function readRegistered(created) {
+  let result;
+  try {
+    result = await startRegistered(created);
+  } catch (failure) {
+    // A lock came while the vault was being read. It has drawn the
+    // card that asks for the password, and that stands.
+    if (failure instanceof LockedWhileOpeningError) return;
+    width('outside');
+    const retry = el('button', { type: 'button', class: 'btn-primary', text: 'Try again' });
+    retry.addEventListener('click', () => {
+      retry.disabled = true;
+      readRegistered(created);
+    });
+    mount(
+      container,
+      el('div', { class: 'outside' }, [
+        el('div', { class: 'card card-narrow', role: 'alert' }, [
+          el('h1', { class: 'card-heading', text: 'Your vault is created' }),
+          el('p', {
+            class: 'hint',
+            text: 'It could not be read just now. Nothing was lost, and you do not need to type your password again.',
+          }),
+          retry,
+        ]),
+      ]),
+    );
+    return;
+  }
+  enterVault(result.username);
+}
+
 function draw() {
   if (!isUnlocked()) {
     width('outside');
+    if (registration) {
+      // Built once, so a redraw does not take away what was typed.
+      registrationForm ??= registerForm({
+        kind: 'vault_owner',
+        token: registration.token,
+        currencies: registration.currencies,
+        kdf,
+        onCreated: registered,
+      });
+      mount(container, registrationForm);
+      return;
+    }
     mount(
       container,
       unlockCard({
@@ -92,14 +187,7 @@ function draw() {
             window.location.href = '/admin';
             return;
           }
-          username = result.username;
-          revealChrome('vault_owner', {
-            onUpdate: () => openSweep(today()),
-            onLock: lock,
-            onSignOut: signOut,
-          });
-          render();
-          resumeHeld();
+          enterVault(result.username);
         },
       }),
     );
@@ -264,7 +352,7 @@ whenUnauthorized(() => {
 // timer does, and Back finds the unlock card (architecture.md,
 // Application hardening).
 window.addEventListener('pagehide', () => {
-  if (isUnlocked()) lock();
+  if (holdsKeys()) lock();
 });
 
 onLock(() => {
