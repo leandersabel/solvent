@@ -13,7 +13,10 @@ harm, so when in doubt, read again rather than assume.
 GitHub is reached with `gh`. The client is `leandersabel`, and you
 write as `claude[bot]`. Every subagent runs in the foreground and you
 wait for its result: the run ends with your turn, and work still in
-flight is lost. Every comment you write ends with the line
+flight is lost. Your GitHub token lasts an hour: push and open the pull
+request as soon as the work is ready, and when a GitHub command fails
+with "Bad credentials", stop. The workflow then starts a fresh run,
+which finds the branch and opens the pull request. Every comment you write ends with the line
 `<!-- advance -->`, which is how a later run tells your comments from
 anything else `claude[bot]` wrote.
 
@@ -141,7 +144,8 @@ closing `<details>` block.
 
 1. `git fetch origin`, and branch `claude/spec-<issue>` from
    `origin/master`. A leftover branch of that name without a pull
-   request is reset to `origin/master`.
+   request, holding commits beyond `origin/master`, is the last run's
+   finished work: rebase it onto `origin/master` and go to step 3.
 2. `product-owner` rewrites `spec/product/`, `architect` rewrites
    `spec/architecture.md` and `spec/features/`, and `designer` rewrites
    `spec/ui/`, each to the target state `CLAUDE.md`, Writing the spec,
@@ -168,7 +172,9 @@ closing `<details>` block.
    and remove `queued`.
 2. `git fetch origin`, and branch `claude/issue-<issue>` from
    `origin/master`. A leftover branch of that name without a pull
-   request is reset to `origin/master`.
+   request, holding commits beyond `origin/master`, is the last run's
+   finished work: rebase it onto `origin/master`, check that the suite
+   passes, and go to step 6.
 3. `engineer` implements the compiled contract. For a `bug`, it first
    writes a test that fails on the reported behavior, then the fix. For
    `maintenance`, it changes the code without changing behavior. A fix

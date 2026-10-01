@@ -20,6 +20,10 @@ on:
       issue:
         description: Issue number
         required: true
+      resume:
+        description: Set by a run whose work is pushed but has no pull request yet
+        type: boolean
+        default: false
 
 permissions: {}
 
@@ -127,7 +131,7 @@ jobs:
       contents: write
       issues: write
       pull-requests: write
-      actions: read
+      actions: write
       checks: read
       id-token: write
     steps:
@@ -158,6 +162,23 @@ jobs:
           name: session
           path: ${{ steps.claude.outputs.execution_file }}
           retention-days: 14
+      # The agent's GitHub token lasts an hour, so a long run can push
+      # its branch and lose the token before it opens the pull request.
+      # One fresh run, with a fresh token, opens it.
+      - if: success() && github.event.inputs.resume != 'true'
+        env:
+          GH_TOKEN: ${{ github.token }}
+          GH_REPO: ${{ github.repository }}
+          ISSUE: ${{ needs.route.outputs.issue }}
+        run: |
+          [ "$(gh issue view "$ISSUE" --json state --jq .state)" = OPEN ] || exit 0
+          for kind in spec issue; do
+            branch="claude/$kind-$ISSUE"
+            gh api "repos/$GH_REPO/branches/$branch" >/dev/null 2>&1 || continue
+            [ -z "$(gh pr list --head "$branch" --state open --json number --jq '.[].number')" ] || continue
+            gh workflow run agent.yml --ref master -f issue="$ISSUE" -f resume=true
+            exit 0
+          done
       - if: failure() || cancelled()
         env:
           GH_TOKEN: ${{ github.token }}
