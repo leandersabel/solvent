@@ -449,7 +449,7 @@ export function rateBlock(vault, date, { sit = null, readOnly = false, fillMissi
     ask: (unit) => {
       const line = lineFor(unit);
       if (!line || !line.ask()) return;
-      element.prepend(line.element);
+      grid.prepend(line.element);
     },
   };
 }

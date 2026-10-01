@@ -4177,6 +4177,28 @@ try {
       head === 'PAINT' && asked.says.startsWith('What is 1 PAINT worth in CHF?'),
       `${head}: ${asked.says}`,
     );
+    // The asked line joins the grid: inside the card's border, with its
+    // field in line with the others'.
+    await rec.send('Emulation.setDeviceMetricsOverride', { width: 1280, height: 900, deviceScaleFactor: 1, mobile: false });
+    await rec.settle(200);
+    const askedBox = JSON.parse(await ev(`JSON.stringify((() => {
+      const l = ${line('PAINT')};
+      const card = l.parentElement.getBoundingClientRect();
+      const r = l.getBoundingClientRect();
+      const lefts = [...document.querySelectorAll('.rate-line input')].map((i) => Math.round(i.getBoundingClientRect().left));
+      return {
+        inGrid: l.parentElement.classList.contains('rate-block'),
+        inside: r.left >= card.left && r.right <= card.right,
+        lefts,
+        width: Math.round(l.querySelector('input').getBoundingClientRect().width),
+      };
+    })())`));
+    await rec.send('Emulation.clearDeviceMetricsOverride');
+    check(
+      'record-rate: the line asking for a price sits inside the block, its field in line with the others and in the field column',
+      askedBox.inGrid && askedBox.inside && new Set(askedBox.lefts).size === 1 && askedBox.width <= 260,
+      JSON.stringify(askedBox),
+    );
     check('record-snapshot: the row stays live while its unit has no price', (await rowState('Art')).disabled === false);
     await typeRow('Art', '');
     await typeRow('Current account', '1234.56');
@@ -5321,37 +5343,40 @@ try {
       await set('#snapshot-date', await format('date', DW));
       await rec.waitUntil(`${line('USD')} && ${line('USD')}.querySelector('input').value !== ''`, { label: 'the form proposals for the layout' });
       await ev("document.querySelectorAll('.dialog details').forEach(d => (d.open = true))");
-      await typeLine('USD', '0.812345678901');
-      await typeLine('XAU-ozt', '2111.123456789012');
-      await quiet();
     };
     const widths = {};
     for (const width of [1280, 390]) {
       await viewport(width);
       await prices();
+      // Before any edit: the proposals, gold's naming the earlier day it is for.
+      const proposed = await layout('.dialog .rate-block');
+      await typeLine('USD', '0.812345678901');
+      await typeLine('XAU-ozt', '2111.123456789012');
+      await quiet();
       const shown = await layout('.dialog .rate-block');
       // The longest provenance the vocabulary allows, in place of the short one.
       await ev(`document.querySelectorAll('.dialog .rate-meta .chip').forEach(c => { if (c.textContent) c.textContent = 'Edited from 0.931234567890123456'; })`);
       const longest = await layout('.dialog .rate-block');
-      widths[width] = { shown, longest, dialog: await ev("document.querySelector('.dialog').getBoundingClientRect().width") };
+      widths[width] = { proposed, shown, longest, dialog: await ev("document.querySelector('.dialog').getBoundingClientRect().width") };
       await closeDialogs();
     }
     const formLayout = widths[1280];
     check(
       'record-snapshot: the opened prices line shows each unit in full, without overlap or clipping, at a desktop width',
-      formLayout.shown.problems.length === 0 && formLayout.longest.problems.length === 0 &&
+      formLayout.shown.problems.length === 0 && formLayout.longest.problems.length === 0 && formLayout.proposed.problems.length === 0 &&
+        formLayout.proposed.seen.some((l) => l.unit === 'Gold' && l.chip.startsWith('Market rate as of ')) &&
         ['United States Dollar', 'Gold'].every((name) => formLayout.shown.seen.some((l) => l.unit === name && l.chip.startsWith('Edited from '))),
       JSON.stringify(formLayout),
     );
     check(
       'record-rate: the rate lines of the single-holding form stack at a desktop width and at a phone width, since its block is under 720px',
       formLayout.shown.width < 720 && widths[390].shown.width < 720 &&
-        [1280, 390].every((w) => widths[w].shown.seen.every((l) => l.stacked && l.chipBelow !== false) && widths[w].longest.seen.every((l) => l.stacked && l.chipBelow !== false)),
+        [1280, 390].every((w) => widths[w].proposed.seen.every((l) => l.stacked && l.chipBelow !== false) && widths[w].shown.seen.every((l) => l.stacked && l.chipBelow !== false) && widths[w].longest.seen.every((l) => l.stacked && l.chipBelow !== false)),
       JSON.stringify(widths),
     );
     check(
       'record-snapshot: the opened prices line has no overlap or clipping at a phone width',
-      widths[390].shown.problems.length === 0 && widths[390].longest.problems.length === 0,
+      widths[390].shown.problems.length === 0 && widths[390].longest.problems.length === 0 && widths[390].proposed.problems.length === 0,
       JSON.stringify(widths[390]),
     );
 
