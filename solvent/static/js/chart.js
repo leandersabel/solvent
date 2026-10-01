@@ -66,16 +66,19 @@ export function trendChart(options) {
  *  its own total, assets against total assets and liabilities against
  *  total liabilities (net-worth-view.md, Ranges and modes).
  *
+ *  `phase` stacks a band's `before` or `after` sides instead, the two
+ *  steps a day can carry (see `Vault.series`).
+ *
  *  Pure, so the arithmetic is tested without a page. */
-export function stack(bands, percentage = false) {
+export function stack(bands, percentage = false, phase = null) {
   const count = bands.length ? bands[0].points.length : 0;
   const layers = bands.map((band) => ({ band, upper: [], lower: [] }));
   const net = [];
   for (let index = 0; index < count; index += 1) {
-    const sides = layers.map((layer) => [
-      toNumber(layer.band.assets[index]),
-      toNumber(layer.band.liabilities[index]),
-    ]);
+    const sides = layers.map(({ band }) => {
+      const { assets, liabilities } = phase ? band[phase] : band;
+      return [toNumber(assets[index]), toNumber(liabilities[index])];
+    });
     const assetTotal = sides.reduce((sum, [asset]) => sum + asset, 0);
     const liabilityTotal = sides.reduce((sum, [, liability]) => sum - liability, 0);
     let up = 0;
@@ -128,18 +131,24 @@ function drawChart({
   const x = (day) => pad.left + ((day - firstDay) / spanDays) * plotWidth;
 
   const fills = new Map(bands.map((band, index) => [band, fillFor(band, index)]));
-  const { layers, net: netLine } = stack(bands.filter((band) => !hidden.has(band.id)), percentage);
+  // A day's samples are its value just before it, at it and just after
+  // it, so a holding's first recording or archive draws as a step.
+  const shown = bands.filter((band) => !hidden.has(band.id));
+  const stacks = [stack(shown, percentage, 'before'), stack(shown, percentage), stack(shown, percentage, 'after')];
+  const { layers, net: netLine } = stacks[1];
 
   let top = 0;
   let bottom = 0;
   days.forEach((_, index) => {
-    for (const layer of layers) {
-      top = Math.max(top, layer.upper[index][1]);
-      bottom = Math.min(bottom, layer.lower[index][1]);
-    }
-    if (!percentage) {
-      top = Math.max(top, netLine[index]);
-      bottom = Math.min(bottom, netLine[index]);
+    for (const { layers: stacked, net } of stacks) {
+      for (const layer of stacked) {
+        top = Math.max(top, layer.upper[index][1]);
+        bottom = Math.min(bottom, layer.lower[index][1]);
+      }
+      if (!percentage) {
+        top = Math.max(top, net[index]);
+        bottom = Math.min(bottom, net[index]);
+      }
     }
   });
   if (top === bottom) top = bottom + 1;
@@ -171,23 +180,22 @@ function drawChart({
     valueLabels.push(tick);
   }
 
-  for (const layer of layers) {
+  layers.forEach((layer, at) => {
     const fill = fills.get(layer.band);
-    for (const [spans, opacity] of [[layer.upper, '0.85'], [layer.lower, '0.45']]) {
-      const d = areaPath(days, spans, x, y);
+    for (const [side, opacity] of [['upper', '0.85'], ['lower', '0.45']]) {
+      const d = areaPath(days, stacks.map((s) => s.layers[at][side]), x, y);
       if (d) {
         root.append(svg('path', { d, fill, 'fill-opacity': opacity, class: 'band', 'data-band': layer.band.id }));
       }
     }
-  }
+  });
 
   // The zero line over the fills, a step darker than a gridline.
   root.append(svg('line', { x1: pad.left, x2: width - pad.right, y1: y(0), y2: y(0), class: 'zero-line' }));
   root.append(...valueLabels);
 
   if (!percentage) {
-    const linePoints = days.map((day, index) => `${x(day)},${y(netLine[index])}`).join(' ');
-    root.append(svg('polyline', { points: linePoints, class: 'net-line' }));
+    root.append(svg('polyline', { points: outline(days, stacks.map((s) => s.net), x, y).join(' '), class: 'net-line' }));
     root.append(svg('circle', {
       cx: x(lastDay),
       cy: y(netLine[netLine.length - 1]),
@@ -396,10 +404,29 @@ function timeLabels(firstDay, lastDay, plotWidth, locale, formatDay) {
   });
 }
 
+/** The points of one edge, left to right. `runs` holds the value just
+ *  before each day, at it and just after it. A day with a step emits up
+ *  to three points at its x, a vertical edge, and a day with none emits
+ *  one. The first day has nothing before it and the last nothing after,
+ *  so the chart's ends carry no edge. */
+export function outline(days, runs, x, y) {
+  const points = [];
+  days.forEach((day, index) => {
+    runs.forEach((run, phase) => {
+      if ((phase === 0 && index === 0) || (phase === 2 && index === days.length - 1)) return;
+      const point = `${x(day)},${y(run[index])}`;
+      if (point !== points[points.length - 1]) points.push(point);
+    });
+  });
+  return points;
+}
+
+/** `spans` is one band side's [low, high] per day, before, at and
+ *  after it. */
 function areaPath(days, spans, x, y) {
-  if (!spans.some(([from, to]) => from !== to)) return null;
-  const tops = days.map((day, index) => `${x(day)},${y(spans[index][1])}`);
-  const bottoms = days.map((day, index) => `${x(day)},${y(spans[index][0])}`);
+  if (!spans.some((run) => run.some(([from, to]) => from !== to))) return null;
+  const tops = outline(days, spans.map((run) => run.map(([, to]) => to)), x, y);
+  const bottoms = outline(days, spans.map((run) => run.map(([from]) => from)), x, y);
   return `M${tops.join('L')}L${bottoms.reverse().join('L')}Z`;
 }
 
