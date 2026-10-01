@@ -22,9 +22,7 @@ The card outside the shell (`design-system.md`, App shell), max-width
 The form a user invite renders.
 
 1. Heading: "Create your vault".
-2. **Username**. 3 to 32 characters, `[a-z0-9._-]`, lowercased in the
-   field as it is typed rather than quietly changed on submit, so what
-   they see is what they will sign in with.
+2. **Username**, with its message line (The username field).
 3. **Password**, and **Confirm password**, with the strength gauge.
 4. **Main currency**.
 5. The no-recovery acknowledgement.
@@ -43,7 +41,7 @@ The form an administrator invite renders, and a shorter one.
    > finances in Solvent, that is a separate account and you need a
    > separate invite for it.
 
-3. **Username**, the same rule and the same live lowercasing.
+3. **Username**, the same field and message line.
 4. **Password**, and **Confirm password**, with the same strength gauge
    held to the same bar. This password protects the power to remove
    every account on the instance, so it is not the place to relax it.
@@ -59,6 +57,45 @@ Absent here, each because there is no vault:
   direction.
 - **No vault being built.** The account is made and that is the whole
   of it (Setting up, below).
+
+## The username field
+
+Both forms use it, unchanged. An Input with its message line
+(`design-system.md`, Components).
+
+- The rule is the one in `spec/features/register.md`, Rules: after
+  trimming, 3 to 32 characters of `[a-z0-9._-]`. The field lowercases
+  as it is typed rather than quietly changing the value on submit, so
+  what the person sees is what they will sign in with.
+- `autocapitalize="none"`, `autocorrect="off"`, `spellcheck="false"`,
+  so a phone keyboard neither capitalizes nor "corrects" the name.
+- **No `maxlength`.** A value past 32 characters stays in the field and
+  is reported, because a name cut short silently is a name the person
+  never chose.
+
+The message line, as a hint, before anything is typed and whenever the
+value fits:
+
+> Use 3 to 32 characters: letters a to z, digits, dot, underscore or
+> hyphen.
+
+It turns into an error on the trimmed value:
+
+| When | Copy |
+|---|---|
+| A character outside the set, the moment it is typed | "Only letters a to z, digits, dot, underscore and hyphen are allowed." |
+| More than 32 characters, the moment the 33rd is typed | "That is more than 32 characters." |
+| 1 or 2 characters, when the field loses focus | "Use at least 3 characters." |
+
+- A character outside the set is named before the length, because
+  removing it may fix the length too.
+- An empty field keeps the hint on blur. Passing through a field is not
+  a mistake, and the disabled button already holds the form.
+- The error clears the moment the value fits, while typing, without
+  waiting for blur.
+- **The primary button stays disabled until the username fits**, as it
+  does for the password (The strength gauge). Enter in any field sends
+  nothing and derives nothing while it is disabled.
 
 ## The strength gauge
 
@@ -134,15 +171,27 @@ Both forms unless a state says otherwise.
   identical whichever kind of account it would have made. The UI must
   not distinguish them, by wording, by layout, or by which form it
   would have shown.
+- **The invite is refused at submit**: the link went bad while the form
+  was open. The form gives way, with no page load, to the same bare
+  card and the same words: "This invite link is not valid." Nothing on
+  the form could make it usable, so no field is kept.
 - **Loading**: none. The page is server-rendered and fetches nothing.
 - **Working**: as above, Setting up.
-- **Error, that username is taken**: inline beneath the field, plain:
-  "That username is taken." A username is taken once across the whole
-  instance, whichever kind of account holds it, so somebody who holds
-  both picks a second name for the second one. Enumeration is accepted
-  here (`register.md`, Edge cases), so do not contort the message.
-- **Error, the passwords do not match**: inline beneath the
-  confirmation field, before anything is derived.
+- **Error, the username field's rule**: on its message line (The
+  username field), before anything is derived.
+- **Error, that username is taken**: on the username's message line,
+  plain: "That username is taken." A username is taken once across the
+  whole instance, whichever kind of account holds it, so somebody who
+  holds both picks a second name for the second one. Enumeration is
+  accepted here (`register.md`, Edge cases), so do not contort the
+  message. Editing the username returns the line to the hint.
+- **Error, the server refuses the username**: the browser's check
+  passed and the server's did not. On the username's message line:
+  "This username was not accepted. Use 3 to 32 characters: letters a to
+  z, digits, dot, underscore or hyphen." Editing the username returns
+  the line to the hint.
+- **Error, the passwords do not match**: on the confirmation field's
+  message line, before anything is derived.
 - **Error, this browser cannot run the encryption**: a hard stop with a
   plain explanation and no form. No fallback is offered, because none
   exists.
@@ -161,10 +210,28 @@ Both forms unless a state says otherwise.
   - No weaker setup is offered. Falling back would create an account
     permanently easier to break into, and record that weakness as
     though it had been chosen, because of one busy moment.
-- **Error, the submit failed after the slow part**: every field is still
-  filled, including the password. Nobody re-types a password and waits
-  again because of a network blip. The invite is untouched and the copy
-  says so.
+- **Error, the registration is refused**: any refusal not named above
+  (`spec/features/register.md`, In the browser). Above the primary
+  button, every field still filled:
+  - On the vault form: "Solvent did not accept this registration. No
+    vault was created and your invite link is still unused. If this
+    happens again, ask whoever sent you the invite."
+  - On the administrator form: "Solvent did not accept this
+    registration. No account was created and your invite link is still
+    unused. If this happens again, ask whoever sent you the invite."
+- **Error, the submit did not go through**: no response, or a server
+  error from Solvent or a proxy in front of it. The only state worded
+  as a failure to get through. Above the primary button, every field
+  still filled, including the password. Nobody re-types a password and
+  waits again because of a network blip.
+
+  > That did not go through. Everything you typed is still here, so you
+  > can try again.
+
+  The copy makes no claim about the invite, because with no response
+  the browser cannot know whether the registration landed.
+- A form-level error clears when the button is pressed again, and only
+  one shows at a time.
 - **Error, the new vault could not be read**, on the vault form only:
   the account exists and the keys are held, and only the first read of
   the vault failed (`spec/features/register.md`, Edge cases, "The first

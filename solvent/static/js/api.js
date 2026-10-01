@@ -23,10 +23,21 @@ function failed(status, path) {
   return new ApiError(status);
 }
 
+// `body` is the answer's JSON, or null when it was not JSON. Only a
+// caller that reads a reason from it looks (register-form.js).
 class ApiError extends Error {
   constructor(status) {
     super(`request failed with status ${status}`);
     this.status = status;
+    this.body = null;
+  }
+}
+
+async function jsonOrNull(response) {
+  try {
+    return await response.json();
+  } catch {
+    return null;
   }
 }
 
@@ -37,7 +48,11 @@ async function call(method, path, body) {
     init.body = JSON.stringify(body);
   }
   const response = await fetch(path, init);
-  if (!response.ok) throw failed(response.status, path);
+  if (!response.ok) {
+    const error = failed(response.status, path);
+    error.body = await jsonOrNull(response);
+    throw error;
+  }
   if (response.status === 204) return null;
   return response.json();
 }

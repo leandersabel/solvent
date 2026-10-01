@@ -397,6 +397,18 @@ only its own content region.
   holding name writes a stored login into an encrypted record nobody
   but its owner can ever review. A Password field opts back in by
   naming its autocomplete tokens.
+  - **The message line** sits directly under a field that has a rule
+    to state or an error to show, in label/meta type. As a **hint** it
+    is ink-secondary and states the rule before anything is typed. As
+    an **error** the same line turns critical, takes the critical icon,
+    and says what is wrong, so the form never grows or shifts. It
+    returns to the hint the moment the value fits again.
+  - **A field's error sits on its own message line**, whether the
+    browser or the server found it, never above the form or in a
+    summary elsewhere.
+  - The input names the line in `aria-describedby` and carries
+    `aria-invalid="true"` while it is an error. The line is a polite
+    live region, so the turn to an error is announced.
 - **Quantity field**: the money input. The holding's own unit sits as a
   suffix inside the box, `inputmode="decimal"`, and the converted
   main-currency figure appears beneath it in ink-secondary as you type,
@@ -544,8 +556,10 @@ differently.
   skeletons.
 - **Empty**: one sentence naming what is missing, one primary action.
   Never an empty table with headers.
-- **Error**: inline, above the relevant control, critical text with an
-  icon. Never a toast for anything the user must act on.
+- **Error**: inline, critical text with an icon. A field's error is on
+  that field's message line (Components, Input), and any other error
+  sits above the control it concerns. Never a toast for anything the
+  user must act on.
 - **Populated**: the real thing.
 
 These failures recur across screens, and a screen writes only its own

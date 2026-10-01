@@ -1759,6 +1759,37 @@ await check('a figure dated today is "today" at any hour, not "yesterday"', asyn
   }
 });
 
+// ---- The username rule -------------------------------------------------
+
+// The same file the server's normalization is run over
+// (tests/test_register_refusals.py), through the real check.
+const usernames = JSON.parse(
+  await (await import('node:fs/promises')).readFile(new URL('../fixtures/usernames.json', import.meta.url), 'utf8'),
+);
+const username = await load('username.js');
+
+await check('the browser accepts what the shared fixture accepts, normalized the same', () => {
+  for (const { raw, normalized } of usernames.accept) {
+    assert.equal(username.normalizeUsername(raw), normalized, JSON.stringify(raw));
+  }
+});
+
+await check('the browser refuses what the shared fixture refuses', () => {
+  for (const raw of usernames.refuse) {
+    assert.equal(username.normalizeUsername(raw), null, JSON.stringify(raw));
+  }
+});
+
+await check('a username error names the character before the length, and short only once left', () => {
+  assert.match(username.usernameProblem('Bo b!', false), /^Only letters/);
+  assert.match(username.usernameProblem('a'.repeat(32) + '!', false), /^Only letters/);
+  assert.equal(username.usernameProblem('a'.repeat(33), false), 'That is more than 32 characters.');
+  assert.equal(username.usernameProblem('ab', false), null);
+  assert.equal(username.usernameProblem('ab', true), 'Use at least 3 characters.');
+  assert.equal(username.usernameProblem('', true), null);
+  assert.equal(username.usernameProblem('  Bob  ', true), null);
+});
+
 // ---- Report -----------------------------------------------------------
 
 for (const [state, name] of results) console.log(`${state} ${name}`);
