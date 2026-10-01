@@ -15,6 +15,7 @@ import {
   dialog,
   editedFields,
   el,
+  enterOutsideFrame,
   markCurrentNav,
   mount,
   reopenDialogs,
@@ -165,6 +166,7 @@ async function readRegistered(created) {
 
 function draw() {
   if (!isUnlocked()) {
+    enterOutsideFrame();
     width('outside');
     if (registration) {
       // Built once, so a redraw does not take away what was typed.
@@ -323,11 +325,16 @@ window.addEventListener('hashchange', render);
 // controls doing nothing.
 function registerVaultStore() {
   window.Alpine.store('vault', {
-    clear: lock,
+    // Nothing here acts on a vault that is locked: the bar is not on
+    // screen then, and a stray call must not reach one.
+    clear() {
+      if (isUnlocked()) lock();
+    },
     updateValues() {
-      openSweep(today());
+      if (isUnlocked()) openSweep(today());
     },
     signOut() {
+      if (!isUnlocked()) return;
       const leaving = signOut();
       held = null;
       leaving.finally(() => {

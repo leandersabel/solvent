@@ -325,3 +325,40 @@ def test_a_vault_owner_invite_opened_while_signed_in_draws_no_chrome(app):
     body = owner.get(f"/register?invite={mint_invite(app)}").get_data(as_text=True)
     assert "<nav" not in body
     assert "data-username" not in body
+
+
+# The password screen is the vault page while it is locked, and it has
+# no top bar and no navigation (product/app-shell.md, What must be
+# true). The bar is in the markup for the moment the keys exist, and
+# hidden until then.
+
+
+def test_the_vault_page_is_served_in_the_outside_frame_with_the_bar_hidden(app):
+    owner, _ = register(app, "owner")
+    body = owner.get("/dashboard").get_data(as_text=True)
+    assert 'class="outside-body"' in body
+    assert 'class="outside-wordmark"' in body
+    assert re.search(r'<header class="topbar"[^>]* hidden', body)
+    # Ready for the unlock, which reveals what is already there.
+    assert nav_labels(body) == ["Dashboard", "Settings"]
+    assert "Update values" in topbar(body)
+
+
+def test_a_visitor_with_no_session_gets_the_vault_page_in_the_outside_frame(client):
+    body = client.get("/dashboard").get_data(as_text=True)
+    assert 'class="outside-body"' in body
+    assert 'class="outside-wordmark"' in body
+    assert re.search(r'<header class="topbar"[^>]* hidden', body)
+    assert "<nav" not in body
+    assert "Update values" not in body
+    assert client.get("/").headers["Location"] == "/dashboard"
+
+
+def test_the_client_returns_to_the_outside_frame_on_every_lock():
+    app_js = (STATIC / "js" / "app.js").read_text()
+    start = app_js.index("function draw()")
+    draw = app_js[start : app_js.index("const vault = currentVault();", start)]
+    assert "enterOutsideFrame()" in draw
+    # Nothing in the store acts on a vault that is locked.
+    store = app_js[app_js.index("function registerVaultStore()") :]
+    assert store.count("isUnlocked()") >= 3

@@ -16,17 +16,23 @@
      password derives like any other account's. #}
   <script id="kdf-envelope" type="application/json">{{ kdf_envelope | tojson }}</script>
 </head>
-<body{% if outside %} class="outside-body"{% endif %}>
+{# `outside`: a page for someone who is not signed in. `locked`: the
+   vault page, which is locked whenever it loads, so it too starts in
+   the outside frame, with the bar it will show once unlocked already
+   drawn into the markup but hidden. #}
+{% set framed = outside or locked %}
+<body{% if framed %} class="outside-body"{% endif %}>
   {# The outside frame (ui/design-system.md, App shell): the wordmark
      above one centered card, with the bar hidden. It is this page's
      frame until a vault owner's keys exist, and the client then
-     removes it and shows the bar, in the same document. #}
-  {% if outside %}<p class="outside-wordmark">Solvent</p>{% endif %}
+     removes it and shows the bar, in the same document. It comes back
+     whenever the vault locks. #}
+  {% if framed %}<p class="outside-wordmark">Solvent</p>{% endif %}
   <div x-data="shell">
     {# A visitor with no session has no kind, so there is no bar to
        draw for them: the page carries the sign-in card alone until
        one derivation has bought both the session and the keys. #}
-    <header class="topbar"{% if outside %} hidden{% endif %}>
+    <header class="topbar"{% if framed %} hidden{% endif %}>
       <span class="wordmark">Solvent</span>
       {% if g.get('principal') and not outside %}
       <nav aria-label="Primary">
