@@ -101,6 +101,31 @@ def instance(tmp_path_factory):
         server.wait(timeout=10)
 
 
+@pytest.mark.skipif(shutil.which("node") is None, reason="needs Node")
+def test_a_chrome_that_dies_at_launch_fails_fast_with_its_stderr(tmp_path):
+    """launch() reports a browser that exits before it is ready at once,
+    with what it wrote to stderr, instead of polling to a timeout. The
+    stand-in below is not Chrome, so this runs anywhere Node does."""
+    stub = tmp_path / "chrome"
+    stub.write_text("#!/bin/sh\necho 'stub chrome: no display available' >&2\nexit 1\n")
+    stub.chmod(0o755)
+    started = time.monotonic()
+    result = subprocess.run(
+        ["node", "--input-type=module", "-e",
+         f"const {{ launch }} = await import({json.dumps((REPO_ROOT / 'tests' / 'browser' / 'cdp.mjs').as_uri())});"
+         "try { await launch(); } catch (error) { console.error(error.message); process.exit(3); }"],
+        cwd=REPO_ROOT,
+        env=dict(os.environ, CHROME=str(stub)),
+        capture_output=True,
+        text=True,
+        timeout=30,
+    )
+    assert time.monotonic() - started < 10
+    assert result.returncode == 3, result.stdout + result.stderr
+    assert "stub chrome: no display available" in result.stderr
+    assert "code 1" in result.stderr
+
+
 @needs_browser
 def test_the_workflows_hold_in_a_browser(instance):
     base, invite, env = instance

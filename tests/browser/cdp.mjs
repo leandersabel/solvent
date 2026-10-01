@@ -7,34 +7,79 @@
 // engine is the only place their acceptance criteria can be checked
 // at all.
 import { spawn } from 'node:child_process';
-import { mkdtempSync } from 'node:fs';
+import { mkdtempSync, readFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 
 const CHROME = process.env.CHROME ?? '/Applications/Google Chrome.app/Contents/MacOS/Google Chrome';
 
-export async function launch(port = 10000 + Math.floor(Math.random() * 40000)) {
+const LAUNCH_TIMEOUT_MS = 60000;
+const STDERR_KEEP = 32 * 1024;
+
+// Chrome picks its own debugging port (port 0) and writes it to the
+// profile's DevToolsActivePort, so no other process can hold it first.
+// Its stderr is drained for its whole life into a bounded buffer: a
+// full pipe would block Chrome, and the tail is what explains a launch
+// that fails.
+export async function launch() {
   const profile = mkdtempSync(join(tmpdir(), 'solvent-chrome-'));
   const child = spawn(CHROME, [
     '--headless=new',
-    `--remote-debugging-port=${port}`,
+    '--remote-debugging-port=0',
     `--user-data-dir=${profile}`,
     '--no-first-run',
     '--no-default-browser-check',
     '--disable-gpu',
     'about:blank',
-  ], { stdio: 'ignore' });
+  ], { stdio: ['ignore', 'ignore', 'pipe'] });
 
-  for (let attempt = 0; attempt < 60; attempt++) {
-    try {
-      const list = await fetch(`http://127.0.0.1:${port}/json/list`).then((r) => r.json());
-      const page = list.find((t) => t.type === 'page');
-      if (page) return { child, port, target: page };
-    } catch {}
-    await new Promise((r) => setTimeout(r, 250));
+  let stderr = '';
+  child.stderr.setEncoding('utf8');
+  child.stderr.on('data', (chunk) => {
+    stderr = (stderr + chunk).slice(-STDERR_KEEP);
+  });
+
+  let failure = null;
+  child.once('error', (error) => {
+    failure ??= `Chrome could not start: ${error.message}`;
+  });
+  child.once('exit', (code, signal) => {
+    failure ??= `Chrome exited before it was ready (code ${code}, signal ${signal})`;
+  });
+
+  const nap = () => new Promise((r) => setTimeout(r, 150));
+  const fail = async (message) => {
+    child.kill('SIGKILL');
+    // Let the pipe deliver what was written before the process went.
+    await new Promise((r) => setTimeout(r, 50));
+    throw new Error(`${message}\nChrome stderr (tail):\n${stderr}`);
+  };
+
+  const deadline = Date.now() + LAUNCH_TIMEOUT_MS;
+  let port = null;
+  let target = null;
+  while (Date.now() < deadline) {
+    if (failure) return fail(failure);
+    if (port === null) {
+      try {
+        const first = readFileSync(join(profile, 'DevToolsActivePort'), 'utf8').split('\n')[0].trim();
+        const value = Number(first);
+        if (/^\d+$/.test(first) && value >= 1 && value <= 65535) port = value;
+      } catch {}
+    }
+    if (port !== null) {
+      try {
+        const list = await fetch(`http://127.0.0.1:${port}/json/list`, {
+          signal: AbortSignal.timeout(Math.max(1, deadline - Date.now())),
+        }).then((r) => r.json());
+        target = list.find((t) => t.type === 'page');
+        if (target) return { child, port, target };
+      } catch {}
+    }
+    await nap();
   }
-  child.kill();
-  throw new Error('Chrome did not come up');
+  if (failure) return fail(failure);
+  return fail(`Chrome did not come up within ${LAUNCH_TIMEOUT_MS / 1000} s`);
 }
 
 export class Session {
