@@ -462,6 +462,52 @@ await check('a date round-trips through the format the reader types', async () =
   }
 });
 
+await check('an explicit date style reaches every writer that shows a day, in literal strings', async () => {
+  const { formatter } = await load('format.js');
+  const iso = '2026-09-20';
+  // Noon local time, so the browser's own zone cannot move the day.
+  const moment = new Date(2026, 8, 20, 14, 5).getTime();
+  const written = { dmy: '20.09.2026', ymd: '2026-09-20', mdy: '09/20/2026' };
+  for (const [dateStyle, expected] of Object.entries(written)) {
+    const shape = formatter({ locale: 'en-US', dateStyle });
+    assert.equal(shape.date(iso), expected, `${dateStyle} date`);
+    assert.equal(shape.longDate(iso), expected, `${dateStyle} longDate`);
+    assert.equal(shape.fullDate(iso), expected, `${dateStyle} fullDate`);
+    // A slot with no year still shows the full date: a rate delay can
+    // cross New Year, and the setting offers no yearless shape.
+    assert.equal(shape.dayMonth(iso), expected, `${dateStyle} dayMonth`);
+    assert.equal(shape.dayMonth(iso, 'short'), expected, `${dateStyle} short dayMonth`);
+    assert.ok(shape.dateTime(moment).startsWith(`${expected}, `), `${dateStyle} dateTime: ${shape.dateTime(moment)}`);
+    assert.ok(!/[A-Za-z]/.test(shape.longDate(iso)), `${dateStyle} longDate has no month name`);
+  }
+  // The style outranks the language, whichever language it is.
+  assert.equal(formatter({ locale: 'de-DE', dateStyle: 'ymd' }).longDate(iso), '2026-09-20');
+  assert.equal(formatter({ locale: 'en-GB', dateStyle: 'mdy' }).fullDate(iso), '09/20/2026');
+  assert.equal(formatter({ locale: 'en-GB', dateStyle: 'dmy' }).dayMonth('2026-01-05', 'short'), '05.01.2026');
+  assert.equal(formatter({ dateStyle: 'ymd' }).longDate(''), '');
+});
+
+await check('under the language’s own order the spelled dates stay as they were', async () => {
+  const { formatter } = await load('format.js');
+  const iso = '2026-09-20';
+  for (const settings of [{ locale: 'en-US' }, { locale: 'en-US', dateStyle: 'locale' }]) {
+    const shape = formatter(settings);
+    assert.equal(shape.longDate(iso), 'Sep 20, 2026');
+    assert.equal(shape.fullDate(iso), 'September 20, 2026');
+    assert.equal(shape.dayMonth(iso), 'September 20');
+    assert.equal(shape.dayMonth(iso, 'short'), 'Sep 20');
+    assert.equal(shape.monthYear(iso), 'September 2026');
+    assert.ok(/^Sep 20, 2026, \d{1,2}:\d{2}/.test(shape.dateTime(new Date(2026, 8, 20, 14, 5).getTime())));
+  }
+  const german = formatter({ locale: 'de-DE', dateStyle: 'locale' });
+  assert.equal(german.fullDate(iso), '20. September 2026');
+});
+
+await check('a month alone or a year alone keeps its spelling whatever the style', async () => {
+  const { formatter } = await load('format.js');
+  assert.equal(formatter({ locale: 'en-US', dateStyle: 'ymd' }).monthYear('2026-07-01'), 'July 2026');
+});
+
 await check('a date that does not exist is refused rather than rolled forward', async () => {
   const { formatter } = await load('format.js');
   const shape = formatter({ locale: 'de-CH' });

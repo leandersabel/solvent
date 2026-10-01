@@ -3087,6 +3087,23 @@ try {
           !(await second.eval("Boolean(document.querySelector('#import-erase'))")),
       );
 
+      // This owner writes their dates month first, so the file carries a
+      // profile whose date style differs from the vault it lands in.
+      await second.eval("location.hash = '#/settings'");
+      await second.waitUntil("document.getElementById('format-dates')", { label: "the second owner's dates setting" });
+      await second.settle(300);
+      await second.eval(`(() => {
+        const node = document.getElementById('format-dates');
+        node.value = 'mdy';
+        node.dispatchEvent(new Event('change', { bubbles: true }));
+      })()`);
+      await second.eval("[...document.querySelectorAll('.card')].find(c => c.textContent.includes('Dates and numbers')).querySelector('.btn-primary').click()");
+      await second.settle(1200);
+      check(
+        "the second owner's profile holds the month-first style before it is exported",
+        (await second.eval("(async () => (await import('/static/js/session.js')).currentVault().profile.dateStyle)()")) === 'mdy',
+      );
+
       const plantSecond = (records) =>
         second.eval(`(async () => {
           const api = await import('/static/js/api.js');
@@ -3144,6 +3161,23 @@ try {
       const injected = await inPage(`await v.load(); return v.unreadable.includes(${JSON.stringify(later)});`);
       check("a record the source wrote after the export, inserted into this vault's rows, fails to decrypt", injected);
       sql("DELETE FROM records WHERE record_id = ? AND principal_id = (SELECT id FROM principals WHERE username = 'leander')", later);
+
+      // The restored profile is the one every date follows from here on.
+      // The expected strings are spelled out from the stored ISO date, not
+      // asked of the formatter under test.
+      await page.eval('(async () => (await import("/static/js/session.js")).currentVault().load())()');
+      await page.eval("location.hash = '#/unassigned/none'");
+      await page.settle(200);
+      await page.eval("location.hash = '#/'");
+      await page.waitUntil("document.querySelector('.holdings-table')", { label: 'the transferred dashboard' });
+      await page.settle(400);
+      const monthFirst = `${BACKDATE.slice(5, 7)}/${BACKDATE.slice(8, 10)}/${BACKDATE.slice(0, 4)}`;
+      const transferredAsOf = await labels('.holdings-table .cell-asof span:first-child');
+      check(
+        "after a restore the dashboard's As of dates follow the restored profile's style",
+        transferredAsOf.length > 0 && transferredAsOf.every((shown) => shown === monthFirst),
+        `${transferredAsOf.join(' | ')} against ${monthFirst}`,
+      );
     } finally {
       other.child.kill();
     }
@@ -3164,6 +3198,123 @@ try {
       'the vault is its own again after importing its own file back',
       restoredRecords === JSON.stringify(recordsBefore) && restoredLine.includes('The figures on screen are now in CHF.'),
       `${restoredLine} ${restoredRecords.length} against ${JSON.stringify(recordsBefore).length}`,
+    );
+
+    // -- A chosen date style reaches every date that shows a day -------------
+    //
+    // Every expected string below is read off the stored ISO dates and
+    // written out by hand, never asked of the formatter under test: a
+    // helper that derives the expectation from the code it checks agrees
+    // with that code whatever the code does.
+
+    const recordsNow = await decrypted();
+    const snapshots = Object.values(recordsNow).filter((r) => r.type === 'snapshot');
+    const snapshotDates = new Set(snapshots.map((r) => r.payload.date));
+    const probeHolding = snapshots[0].accountId;
+    const isoShape = /^\d{4}-\d{2}-\d{2}$/;
+    const monthName = /\b(Jan|Feb|Mar|Apr|May|Jun|Jul|Aug|Sep|Oct|Nov|Dec)[a-z]*\b/;
+    const dmyOf = (iso) => `${iso.slice(8, 10)}.${iso.slice(5, 7)}.${iso.slice(0, 4)}`;
+
+    const saveDateStyle = async (value) => {
+      await page.eval("location.hash = '#/settings'");
+      await page.waitUntil("document.getElementById('format-dates')", { label: 'the dates setting' });
+      await page.settle(300);
+      await page.eval(`(() => {
+        const node = document.getElementById('format-dates');
+        node.value = ${JSON.stringify(value)};
+        node.dispatchEvent(new Event('change', { bubbles: true }));
+      })()`);
+      await page.eval("[...document.querySelectorAll('.card')].find(c => c.textContent.includes('Dates and numbers')).querySelector('.btn-primary').click()");
+      await page.settle(1200);
+    };
+    const dashboardAsOf = async () => {
+      await page.eval("location.hash = '#/unassigned/none'");
+      await page.settle(200);
+      await page.eval("location.hash = '#/'");
+      await page.waitUntil("document.querySelector('.holdings-table')", { label: 'the dashboard table' });
+      await page.settle(400);
+      return labels('.holdings-table .cell-asof span:first-child');
+    };
+
+    await saveDateStyle('ymd');
+    check(
+      'the dates setting saved is the year-first style',
+      (await page.eval("(async () => (await import('/static/js/session.js')).currentVault().profile.dateStyle)()")) === 'ymd',
+    );
+
+    const asOfYmd = await dashboardAsOf();
+    check(
+      'with year-first saved, every As of date on the dashboard is YYYY-MM-DD with no month name',
+      asOfYmd.length > 0 && asOfYmd.every((shown) => isoShape.test(shown) && !monthName.test(shown)) &&
+        asOfYmd.some((shown) => snapshotDates.has(shown)),
+      asOfYmd.join(' | '),
+    );
+
+    await page.eval(`location.hash = '#/holding/${probeHolding}'`);
+    await page.waitUntil("document.querySelector('.hero-age')", { label: 'the holding page' });
+    await page.settle(400);
+    const heroAges = await labels('.hero-age');
+    const snapshotButtons = await labels('.data-table tbody .link-button');
+    check(
+      'with year-first saved, the holding page writes its as-of line and every snapshot date as YYYY-MM-DD',
+      heroAges.some((age) => /^as of \d{4}-\d{2}-\d{2}, /.test(age) && snapshotDates.has(age.slice(6, 16))) &&
+        heroAges.every((age) => !monthName.test(age.replace(/, .*/, ''))) &&
+        snapshotButtons.length > 0 && snapshotButtons.every((shown) => isoShape.test(shown) && snapshotDates.has(shown)),
+      `${heroAges.join(' | ')} / ${snapshotButtons.join(' | ')}`,
+    );
+
+    await page.eval("location.hash = '#/unassigned/none'");
+    await page.settle(200);
+    await page.eval("location.hash = '#/'");
+    await page.waitUntil("document.querySelector('.holdings-table')", { label: 'the dashboard before the picker' });
+    await page.settle(400);
+    const recordedDay = [...snapshotDates].sort()[0];
+    await page.eval("[...document.querySelectorAll('button')].find(b => b.textContent.trim() === 'New recording').click()");
+    await page.waitUntil("document.querySelector('.dialog #recording-date')", { label: 'the date picker' });
+    await setValue('#recording-date', recordedDay);
+    await page.settle(200);
+    const pickerNote = await page.eval("document.querySelector('.dialog .hint').textContent");
+    check(
+      "with year-first saved, the date picker's note writes the day as YYYY-MM-DD",
+      pickerNote === `${recordedDay} already holds a recording. Opening it.`,
+      pickerNote,
+    );
+    await page.eval("[...document.querySelectorAll('.dialog button')].find(b => b.textContent === 'Cancel').click()");
+    await page.settle(200);
+
+    const chartDays = await labels('svg.trend .axis-tick');
+    check(
+      'with year-first saved, no day tick on the chart axis spells a month',
+      chartDays.every((tick) => !(monthName.test(tick) && /(^|\D)\d{1,2}(\D|$)/.test(tick))),
+      chartDays.join(' | '),
+    );
+
+    // The review is of the file, but it is read in the vault now open, so
+    // it is written in that vault's style: the file's own profile applies
+    // only once the restore is done.
+    await toScreen();
+    await chooseFile(exportedPath);
+    await openWith(VAULT_PASSWORD);
+    await page.waitUntil("!document.querySelector('.review').hidden", { timeout: 60000, label: 'the review in year-first dates' });
+    const exportedOn = exported.exportedAt.slice(0, 10);
+    const exportedLine = await page.eval("[...document.querySelectorAll('.review .hint')].map(n => n.textContent).find(t => t.startsWith('Exported')) || ''");
+    check(
+      "the import review's Exported date is in the style of the vault that is open, not the file's",
+      exportedLine === `Exported ${exportedOn}`,
+      exportedLine,
+    );
+
+    // Restoring brings back the profile that file was exported with, which
+    // writes day first, and every date follows it.
+    await setValue('#import-erase', 'ERASE');
+    await replaceVault();
+    await page.waitUntil("document.body.innerText.includes('Your vault was replaced from the file')", { timeout: 90000, label: 'the restore into dates that differ' });
+    const afterRestore = await dashboardAsOf();
+    check(
+      "after the restore the dashboard's As of dates follow the restored profile's day-first style",
+      afterRestore.length > 0 && afterRestore.every((shown) => /^\d{2}\.\d{2}\.\d{4}$/.test(shown)) &&
+        afterRestore.some((shown) => [...snapshotDates].some((iso) => dmyOf(iso) === shown)),
+      afterRestore.join(' | '),
     );
   }
 

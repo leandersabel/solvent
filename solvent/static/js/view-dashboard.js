@@ -373,6 +373,8 @@ function chartSection(vault, state, render, dimension, actions, { days, bands })
         percentage: state.percentage,
         justTheLine: state.justTheLine,
         locale: vault.format.locale,
+        formatDay: (iso) => vault.format.dayMonth(iso, 'short'),
+        formatDate: vault.format.longDate,
         onPickDate: (date) => actions.openRecording(date),
         onSelect: (span) => {
           state.selection = span;
