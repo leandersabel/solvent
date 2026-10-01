@@ -8,7 +8,7 @@
 // field keeps the platform's behaviour where it can: a typed date is
 // accepted without opening anything, and the calendar is reachable
 // from the keyboard.
-import { el, today } from './dom.js';
+import { el, mount, today } from './dom.js';
 
 const WEEK_START_MONDAY = 1;
 
@@ -250,11 +250,11 @@ export function dateGrid(host, format, anchor, { min = null, max = null, marked 
     }
   };
 
-  host.replaceChildren(
+  mount(host, [
     el('div', { class: 'date-head' }, [previous, title, next]),
     grid,
-    onClose ? el('button', { type: 'button', class: 'link-button', text: 'Close', onclick: onClose }) : null,
-  );
+    onClose && el('button', { type: 'button', class: 'link-button', text: 'Close', onclick: onClose }),
+  ]);
   render();
   return {
     /** Focus today, or the first day that can be chosen. */
