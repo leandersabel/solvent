@@ -11,6 +11,7 @@
   <title>{% block title %}Solvent{% endblock %}</title>
   {% block meta %}{% endblock %}
   <link rel="stylesheet" href="{{ url_for('static', filename='css/tokens.css') }}">
+  <link rel="icon" href="{{ url_for('static', filename='icon.png') }}" type="image/png">
   <script id="kdf-envelope" type="application/json">{{ kdf_envelope | tojson }}</script>
 </head>
 <body class="outside-body">

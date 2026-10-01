@@ -1,0 +1,16 @@
+{# An error body depends on the status code alone (app-shell.md, CSRF):
+   one body per code, whichever path was asked for and whatever session
+   asked, so a refusal tells a probe nothing. It declares the app's icon
+   like every page, or the browser asks for /favicon.ico, which the gate
+   refuses, and logs that refusal as an error. #}
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <title>{{ code }} {{ name }}</title>
+  <link rel="icon" href="{{ url_for('static', filename='icon.png') }}" type="image/png">
+</head>
+<body>
+  <h1>{{ name }}</h1>
+</body>
+</html>

@@ -9,6 +9,7 @@
   {% block meta %}{% endblock %}
   <title>{% block title %}Solvent{% endblock %}</title>
   <link rel="stylesheet" href="{{ url_for('static', filename='css/tokens.css') }}">
+  <link rel="icon" href="{{ url_for('static', filename='icon.png') }}" type="image/png">
   {# The server's current default KDF envelope, embedded so a
      client-side flow on this page can derive at current parameters
      with no extra round-trip (architecture.md, Key management). It

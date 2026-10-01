@@ -17,7 +17,9 @@
     "csrfScope": {"value": "required on every endpoint that is not meant to be reached by navigation: every state-changing one and GET /api/export. Every endpoint that requires the header is under /api/, and every other route is exempt from it and answers only GET and HEAD", "cite": "spec/architecture.md#application-hardening"},
     "csrfOrdering": {"value": "the header check is step 1 of the request gate, before authentication and routing. No API route is exempt, so the check needs no routing. A request without the header changes nothing", "cite": "spec/features/app-shell.md#csrf"},
     "csrfExemptRule": {"value": "exempt are the routes meant to be reached by navigation: the server-rendered shell pages and the static endpoint. An exemption is a named route, never a path pattern, so an endpoint added under an existing prefix cannot inherit one", "cite": "spec/features/app-shell.md#csrf"},
-    "staticExemption": {"value": "the static endpoint is exempt because no subresource request carries a custom header", "cite": "spec/features/app-shell.md#csrf"},
+    "staticExemption": {"value": "the static endpoint is exempt because no subresource request carries a custom header. What it serves is public by construction: the design tokens, the client-side code, the vendored Alpine build and the app's icon", "cite": "spec/features/app-shell.md#csrf"},
+    "appIcon": {"value": "every shell page and every error page declares <link rel=\"icon\" href=\"<static>/icon.png\" type=\"image/png\">, a transparent 1x1 PNG served by the static endpoint. It is not a data: URL, because img-src 'self' blocks it", "cite": "spec/features/app-shell.md#csrf"},
+    "noFaviconRoute": {"value": "there is no /favicon.ico route and no exemption for it, so the request gate refuses it like any invented path", "cite": "spec/features/app-shell.md#csrf"},
     "apiAndPageRequests": {"value": "a path under /api/ is an API request and any other path is a page request", "cite": "spec/architecture.md#refusals"},
     "refusalPicking": {"value": "a refusal's status depends only on the namespace, the X-Solvent-Request header and the session, never on whether the path exists, its surface or its method, so a probe learns nothing it did not send. No valid session means no cookie, a badly signed one, or an expired or revoked session", "cite": "spec/architecture.md#refusals"},
     "refusalTable": {
@@ -80,6 +82,7 @@
       "apiHeaderValidSessionRefused": {"value": 404, "cite": "spec/architecture.md#status-codes", "condition": "an API request carries the header and a valid session and is refused: an unknown path, an unresolved method or address, or a route of the other kind's surface (spec/architecture.md#refusals)"},
       "pageRefusal": {"value": 404, "cite": "spec/architecture.md#status-codes", "condition": "every refusal of a page request, with or without the header and with or without a valid session, including /admin signed out or as a vault owner, /settings as an administrator, an invented page path and //admin (spec/architecture.md#refusals, spec/features/app-shell.md#acceptance-criteria)"},
       "unresolvedRequest": {"value": "no Method Not Allowed and no redirect", "cite": "spec/architecture.md#refusals", "condition": "a method a route does not answer and an address the router would redirect are refused as an invented address is"},
+      "faviconIco": {"value": "refused as an invented page path", "cite": "spec/architecture.md#refusals", "condition": "GET /favicon.ico, which no route answers (spec/features/app-shell.md#csrf)"},
       "unhandledFailure": {"value": 500, "cite": "spec/architecture.md#status-codes", "condition": "never a designed answer, and it must still carry CSP and HSTS (spec/features/app-shell.md#acceptance-criteria)"}
     }
   },
@@ -93,7 +96,8 @@
       "the matrix's fixed probes: an invented page path, //admin, a method a registered route does not answer on a page and on an API route, /api/invented and /api/admin/invented",
       "a real browser session for the top-level navigation assertions: /admin signed out and as a vault owner, /settings as an administrator, and an invented page path",
       "a process-launch harness that can start the app with SECRET_KEY unset or empty and capture the failure output",
-      "a direct SQL insert path into records and into dek_wrappers, bypassing every endpoint, for the two triggers"
+      "a direct SQL insert path into records and into dek_wrappers, bypassing every endpoint, for the two triggers",
+      "a headless browser with console capture, loading a shell page and a Not Found page, for the no-console-error and icon-declaration assertions"
     ],
     "focus": [
       "the header criterion is easy to fake by asserting CSP and HSTS on one happy-path route. The spec requires them on a shell page, a JSON endpoint, a Not Found and a Server Error, and a green test over one proves nothing about the others",
@@ -102,6 +106,8 @@
       "a refusal must carry no Set-Cookie, no Allow, no Location and no route-set header such as Cache-Control: no-store or Referrer-Policy. Comparing status and body alone misses exactly these, and a Method Not Allowed or a trailing-slash redirect leaks through them",
       "the method and address probes matter: a method a route does not answer and //admin must be refused as an invented address, never Method Not Allowed and never a redirect. A test that only requests unknown paths passes while the router still answers these differently",
       "the namespace invariant must be asserted over the route map enumerated at test time: every route requiring the header is under /api/, every other route is exempt and answers only GET and HEAD, and no route answers OPTIONS. A fixed route list passes forever and misses the next route added",
+      "'no error in the browser console' covers every screen including the error pages reached by navigation, not only the happy-path shell pages. It needs a real browser load of a Not Found page with console messages captured, and a missing icon declaration on an error template passes every server-side test",
+      "the icon criterion has three halves that each fake easily: every shell page and every error page carries the declaration, the icon is fetchable with no header and no session, and /favicon.ico is refused with the status, body and headers of an invented page path. Asserting the declaration on one template proves nothing about the error pages, and adding a /favicon.ico route or exemption to quiet the console passes the fetch half while breaking the third",
       "the exempt-route criterion must be tested against an actual exempt route and against a nearby non-exempt route under the same prefix, because the exemption is per named route and a pattern-based implementation passes the first half",
       "the surface split must be asserted by enumerating the registered routes at test time and calling each with a session of both kinds. A route that answers something other than Not Found to the wrong kind, or that appears in neither group, has to fail the test",
       "the Public group must be asserted over the route map enumerated at test time, against the list in publicRoutes: with no session the gate passes exactly the Public routes (with the header, for API routes) and the vault navigation pages, and refuses every other route under every method it answers. A test over the listed routes alone passes while a route added later answers without a session",
