@@ -75,8 +75,9 @@ feature owns all three (architecture.md, Accounts on this instance,
 and Credentials and vault key wrappers).
 
 - **`principals`**: identity and kind only, meaning the normalized
-  username, the kind copied from the invite, and the two timestamps.
-  Registration adds **no key column** to this table. The app shell
+  username, the kind copied from the invite, `created_at`, and
+  `last_login_at` as set by the session registration issues (login.md,
+  The session a sign-in issues). Registration adds **no key column** to this table. The app shell
   already creates it (`app-shell.md`, Database).
 - **`credentials`**: exactly one row, `method: 'password'`, for **both
   kinds**. Its `params` take the request's salt and KDF envelope
@@ -233,6 +234,9 @@ two callers rather than two record writers.
   plaintext nowhere in the DB.
 - The invite's status is `used`, and a second registration with the same
   token fails.
+- Registration of either kind, the first administrator's through the
+  bootstrap CLI's invite included, leaves `last_login_at` equal to the
+  `issued_at` of the session it starts.
 - A registration carrying another account's live session deletes that
   row, and the old cookie answers Unauthorized. A failed registration
   leaves the carried session working.

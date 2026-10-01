@@ -30,6 +30,7 @@
     "methodIsNotClientInput": {"value": "the server writes 'password' and no endpoint in v1 accepts any other value, so a payload carrying a method field is a Bad Request", "cite": "spec/features/register.md#what-registration-writes"},
     "kindIsNotClientInput": {"value": "the server copies kind from the invite row and no endpoint anywhere writes it again. A payload carrying a kind field of any value is rejected", "cite": "spec/features/register.md#what-registration-writes"},
     "registrationSession": {"value": "the session starts by the same rule as a sign-in. The account is new, so the carried session is at most another account's, and a live one is deleted and replaced. A failed registration leaves the carried session working", "cite": "spec/features/register.md#flow"},
+    "lastLoginAtOnRegistration": {"value": "principals.last_login_at is the time the registration's session is issued, so after a registration of either kind, the bootstrap CLI's invite included, it equals that session row's issued_at and is never null", "cite": "spec/features/register.md#what-registration-writes"},
     "oneTransaction": {"value": "the principal row, its password credential row, its wrapper and profile record where they apply, and the invite's consumption commit together or not at all", "cite": "spec/features/register.md#what-registration-writes"},
     "passwordPolicy": {"value": "at least 12 characters and a zxcvbn score of at least 3, no composition rules. Client-enforced by construction, because the server never sees the password", "cite": "spec/features/admin-invites.md#invite-lifecycle"},
     "noRecoveryAcknowledgement": {"value": "the screen states plainly that there is no password recovery and requires an explicit acknowledgement before submitting. The administrator form carries none and claims nothing about recovery in its place", "cite": "spec/features/admin-invites.md#invite-lifecycle"},
@@ -52,9 +53,11 @@
       "a fault injected into the profile insert, for the all-or-nothing assertion including the unconsumed invite",
       "a seeded account of each kind holding the same username, for the cross-kind collision refusal",
       "an account registered through PUT /api/records with an equivalent profile record, for the indistinguishability assertion",
-      "another account's live session cookie, carried into a successful and into a failed registration"
+      "another account's live session cookie, carried into a successful and into a failed registration",
+      "a CLI-minted administrator invite, for the last_login_at assertion on the first administrator"
     ],
     "focus": [
+      "last_login_at must be asserted against the principals row and compared with the issued_at of the sessions row the registration started, for both kinds and for the CLI-invited first administrator. Asserting only that it is non-null passes an implementation that stamps created_at by another clock reading",
       "the administrator path must leave zero dek_wrappers rows and zero records rows, asserted against both tables rather than against the response. Zero is the whole guarantee and an implementation that writes an empty wrapper row passes every behaviour test",
       "the principals row must hold no salt, no KDF envelope, no Auth Key hash and no wrapped DEK, asserted against the table's full column set so the test fails if one is added back. Asserting the values are absent is not the same as asserting the columns are",
       "the profile AAD must be shown to be built entirely before the request is sent, by encrypting the blob in a test with no server interaction at all. A test that checks the AAD after a successful registration cannot tell whether the client waited for an identity",

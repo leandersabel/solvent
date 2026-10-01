@@ -8,8 +8,8 @@ Maintained by the compiler agent. Rows are in build order.
 | record-api | x | x | x |
 | rate-lookup | x | x | x |
 | admin-invites | x | | |
-| register | x | x | x |
-| login | x | x | x |
+| register | x | | |
+| login | x | | |
 | account-settings | x | x | x |
 | manage-accounts | x | x | x |
 | record-rate | x | x | x |

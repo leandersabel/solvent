@@ -262,6 +262,9 @@ created the first administrator.
   administrator and no vault. Doing it on an instance that already has
   accounts refuses, says how many there are, and changes nothing, until
   it is explicitly told to proceed.
+- Creating an account signs you in to it. A new account of either kind,
+  the first administrator included, is listed as last signed in to when
+  it was created, so no account reads as never signed in.
 - The link does not turn up in Solvent's own logs.
 
 ## What it deliberately does not do

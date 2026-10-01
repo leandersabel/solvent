@@ -50,6 +50,7 @@
     "sessionCookie": {"value": "HttpOnly, Secure, SameSite=Lax, carrying only a random session token signed with the Flask SECRET_KEY. No key material of any kind rides in the cookie. A valid signature alone is not a session: the token must hash to a stored row", "cite": "spec/architecture.md#application-hardening"},
     "secretKeyStartupRule": {"value": "the app refuses to start when SECRET_KEY is absent or empty rather than generating one, and the failure names the variable without printing any value", "cite": "spec/features/app-shell.md#configuration"},
     "schemaOwnership": {"value": "one place creates the schema and opens the SQLite file on its writable volume. Each table's columns are stated by the feature that owns them: records by record-api.md, principals and credentials and dek_wrappers by register.md, invites by admin-invites.md, sessions by architecture.md Application hardening", "cite": "spec/features/app-shell.md#database"},
+    "lastLoginAtNeverNull": {"value": "principals.last_login_at is never null though the DDL declares it nullable, because NOT NULL in SQLite means rebuilding principals. Its one writer is issuing a session. On every start, in the transaction that creates the schema, any null last_login_at is set to that row's created_at. A no-op once nothing is null, so it needs no schema version", "cite": "spec/features/app-shell.md#database"},
     "administratorTriggers": {"value": "a BEFORE INSERT on records and a BEFORE INSERT on dek_wrappers, each resolving the row's principal and aborting when its kind is administrator. A SQLite CHECK cannot reach another table, which is why these are triggers", "cite": "spec/features/app-shell.md#database"},
     "publicRoutes": {
       "value": [
@@ -97,6 +98,7 @@
       "a real browser session for the top-level navigation assertions: /admin signed out and as a vault owner, /settings as an administrator, and an invented page path",
       "a process-launch harness that can start the app with SECRET_KEY unset or empty and capture the failure output",
       "a direct SQL insert path into records and into dek_wrappers, bypassing every endpoint, for the two triggers",
+      "a database file holding a principal whose last_login_at is null, started twice, for the startup fill",
       "a headless browser with console capture, loading a shell page and a Not Found page, for the no-console-error and icon-declaration assertions"
     ],
     "focus": [
@@ -114,6 +116,7 @@
       "an administrator's GET /api/records must return Not Found and not an empty list, asserted specifically. An empty list passes any test that only checks no other vault's rows came back",
       "the page Not Found must be identical in a real browser for /admin signed out, /admin as a vault owner, /settings as an administrator and an invented path. A server-side comparison alone does not show that the rendered page depends on neither session nor kind",
       "the two triggers must be asserted with a direct SQL insert, not through an endpoint. An endpoint that happens to refuse the insert for its own reasons hides whether the schema refuses it at all",
+      "the last_login_at fill must be run against a real file with a null row at app start, and a second start must change nothing, asserted against the row's value after each. A fill in a one-off migration script or one that rewrites already-set values passes a single-start test",
       "the SECRET_KEY criterion needs a real process start attempt and inspection of the failure output for the variable name and the absence of any value. A unit test of a config loader in isolation is not the same thing",
       "'no response body originating in the shell contains vault plaintext' cannot be checked by grepping the shell's templates, since the shell never holds plaintext to begin with. The assertion that matters is that no route wired to the shell ever receives decrypted content to render"
     ]

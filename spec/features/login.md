@@ -48,8 +48,8 @@ time in all three cases (Rules, The sign-in wait).
    halves, always**, because the client does not yet know whether it
    will need the Master Key (architecture.md, Administrator
    credentials).
-3. `POST /api/auth/login` `{ username, authKey }` → on success, sets the
-   session cookie, writes `last_login_at`, and returns
+3. `POST /api/auth/login` `{ username, authKey }` → on success, issues
+   the session (The session a sign-in issues) and returns
    `{ kind, kdfStale }` plus, for a vault owner only, `wrappedDek` and
    `dekNonce`. That wrapper is the one belonging to the credential the
    caller just authenticated with, never a list (architecture.md, One
@@ -137,6 +137,11 @@ In every case the signing-in account's expired rows are deleted in the
 same transaction. Live means not past the absolute expiry (Rules,
 Session lifetime). A failed login, a rate-limited or locked-out one
 included, writes no session row and leaves the carried session working.
+
+Issuing the session sets the account's `last_login_at` to the time it
+was issued, in the same transaction and in every case above, an
+unlock's in-place update included. Registration issues its session by
+this rule (register.md, Flow).
 
 The unlock prompt after an idle lock, the lock button or a refresh
 calls this endpoint on a server session that is still live. Updating
@@ -365,6 +370,10 @@ anyone who unlocks more often than every twelve hours.
   other live rows untouched.
 - A sign-in deletes the signing-in account's expired rows, and only
   those.
+- A successful login moves the account's `last_login_at` to the time
+  of that request, an unlock on a live session included. A failed
+  login, a rate-limited or locked-out one included, leaves it
+  unchanged.
 - Signing in, then unlocking 11 hours later, leaves a session that
   answers Unauthorized 12 hours after the first sign-in.
 - Exceeding the per-account attempt limit locks the account and returns

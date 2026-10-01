@@ -133,7 +133,8 @@ Refusals).
   `{ username, kind, createdAt, lastLoginAt }`, plus `recordCount`
   **for a vault owner only**. Both kinds are listed, because an
   administrator needs to see the other administrators to know whether
-  they are the last one and to remove one.
+  they are the last one and to remove one. `lastLoginAt` is never null
+  (architecture.md, Accounts on this instance).
 
   `recordCount` is **absent** for an administrator rather than zero.
   Zero and "has no vault" are different statements, and a zero invites
@@ -420,4 +421,7 @@ invocation and nothing more.
 - `GET /api/admin/accounts` lists both kinds, and an administrator's
   row carries no `recordCount` field at all, asserted against the row's
   full key set rather than against its value.
+- Right after a vault owner and an administrator register, before
+  either signs in, `GET /api/admin/accounts` lists both with a non-null
+  `lastLoginAt`.
 - The invite token does not appear in the application's own log output.

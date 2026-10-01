@@ -147,8 +147,8 @@ One table, every account on the instance, both kinds. Columns:
 - **Kind** carries the same chip as the invites table, "Administrator"
   or "User". It is shown here and changed nowhere, because it is not
   something an account has, it is what an account is.
-- **Last signed in** shows the date, or an ink-muted "Never" for an
-  account whose invite was followed but which has not signed in since.
+- **Last signed in** shows the date. Every account has one, because
+  creating an account signs it in.
 - **Items** is how many things the vault holds. For an administrator the
   cell reads an ink-muted **No vault**, never a zero. Zero and "there is
   nothing to count" are different statements, and a zero invites the
