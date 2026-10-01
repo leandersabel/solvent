@@ -38,13 +38,11 @@ await page.send('Log.enable');
 page.on((message) => {
   if (message.method === 'Log.entryAdded') {
     const entry = message.params.entry;
-    // The browser asks every page for /favicon.ico, and one check
-    // here deliberately fetches the export without its header to
-    // prove the endpoint is not navigable. Both are the gate
+    // One check here deliberately fetches the export without its
+    // header to prove the endpoint is not navigable, which is the gate
     // answering correctly.
     const url = entry.url || '';
     const noise =
-      url.endsWith('/favicon.ico') ||
       url.endsWith('/api/export') ||
       [...expectedFailures].some((path) => url.includes(path)) ||
       provoked.some((part) => url.includes(part));
@@ -6321,6 +6319,56 @@ try {
     }
   } finally {
     timing.child.kill();
+  }
+
+  // ---- App shell: no console error on a page reached by navigation -----
+  //
+  // app-shell.md: every page declares its icon, so the browser never asks
+  // for /favicon.ico, which the gate refuses. A fresh browser with no
+  // session reaches a shell page, a Not Found (the administration area
+  // answers a caller with no session as an unknown path) and a Forbidden
+  // (the export, navigated to without its header). Nothing here is
+  // filtered but the browser's own note that the page it was asked for
+  // answered 4xx; any other error it logs is a problem.
+  {
+    const bare = await openBrowser();
+    const logged = [];
+    const asked = new Set();
+    bare.session.on((message) => {
+      if (
+        message.method === 'Log.entryAdded' &&
+        message.params.entry.level === 'error' &&
+        !asked.has(message.params.entry.url)
+      ) {
+        logged.push(`${message.params.entry.url || ''} ${message.params.entry.text}`);
+      }
+      if (message.method === 'Runtime.consoleAPICalled' && message.params.type === 'error') {
+        logged.push(`console.error ${JSON.stringify(message.params.args.map((a) => a.value))}`);
+      }
+      if (message.method === 'Runtime.exceptionThrown') logged.push('exception');
+    });
+    await bare.session.send('Log.enable');
+    try {
+      for (const [name, path, status] of [
+        ['a shell page', '/login', 200],
+        ['a Not Found page', '/admin', 404],
+        ['a Forbidden page', '/api/export', 403],
+      ]) {
+        asked.add(`${BASE}${path}`);
+        await bare.session.goto(`${BASE}${path}`);
+        await bare.session.settle(1500);
+        const answered = await bare.session.eval("performance.getEntriesByType('navigation')[0].responseStatus");
+        const icon = await bare.session.eval(
+          "document.querySelector('link[rel=icon]')?.getAttribute('href') + ' ' + document.querySelector('link[rel=icon]')?.getAttribute('type')",
+        );
+        check(`${name} answers ${status}`, answered === status, answered);
+        check(`${name} declares the app icon from the static endpoint`, icon === '/static/icon.png image/png', icon);
+      }
+      check('no page reached by navigation logs an error in the console', logged.length === 0, logged.join(' | '));
+      for (const entry of logged) problems.push(entry);
+    } finally {
+      bare.close();
+    }
   }
 } catch (error) {
   check('the workflow ran to the end', false, error.message);

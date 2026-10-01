@@ -47,6 +47,14 @@ named route, never a path pattern, so an endpoint added under an
 existing prefix cannot inherit one. The static endpoint is exempt
 because no subresource request carries a custom header.
 
+**Every page declares the app's icon from the static endpoint**, error
+pages included: `<link rel="icon" href="<static>/icon.png"
+type="image/png">`, a transparent 1x1 PNG. A page that declares none
+makes the browser request `/favicon.ico`, which the request gate refuses
+like any invented path, and the refusal is a console error. There is no
+`/favicon.ico` route, because it would answer a path nothing links to.
+The icon is not a `data:` URL, because `img-src 'self'` blocks it.
+
 ## Database
 
 One place creates the schema and opens the SQLite file on its writable
@@ -231,8 +239,13 @@ rearrangement:
 - Every response — a shell page, a JSON endpoint, a Not Found, and a
   Server Error — carries the CSP byte-identical to architecture.md's,
   and carries HSTS.
-- No screen produces a CSP violation in the browser console, and the
-  Alpine build served is the CSP-safe one.
+- No screen, the error pages reached by navigation included, produces
+  any error in the browser console, and the Alpine build served is the
+  CSP-safe one.
+- Every shell page and every error page declares the app's icon from
+  the static endpoint, the icon is fetchable with no header and no
+  session, and `/favicon.ico` is refused exactly as an invented page
+  path is.
 - A state-changing JSON request without `X-Solvent-Request` returns
   Forbidden and changes nothing; a shell navigation route loads without
   it.
