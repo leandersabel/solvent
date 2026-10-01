@@ -9,7 +9,7 @@
     {"file": "spec/features/record-api.md", "sections": ["Endpoints", "Schema migration", "Row shape"], "role": "the four fetches the model is built from and the unreadable-record cases the warning counts"},
     {"file": "spec/features/manage-accounts.md", "sections": ["Record shape", "Dimensions", "Delete: the user chooses"], "role": "the accounts, their units and the partition the bands come from"},
     {"file": "spec/features/account-settings.md", "sections": ["The profile record", "Dimensions"], "role": "the main currency and the configured band order"},
-    {"file": "spec/ui/design-system.md", "sections": ["Chart palette (validated)", "Colors by chart job", "Stacked areas", "The two neutral bands", "The estimated marker", "Components", "States", "Typography", "Accessibility", "App shell"], "role": "the chart palette, the entry mark, and the table and disclosure conventions"},
+    {"file": "spec/ui/design-system.md", "sections": ["Chart palette (validated)", "Colors by chart job", "Stacked areas", "The two neutral bands", "The estimated marker", "Components", "States", "Typography", "Accessibility", "App shell"], "role": "the chart palette, the entry mark, and the chip (its text is never cut off), table and disclosure conventions"},
     {"file": "spec/ui/dashboard.md", "sections": ["all"], "role": "the screen this feature drives"},
     {"file": "spec/ui/account-detail.md", "sections": ["Header", "The holding's own list of values", "States"], "role": "one holding's figures and as-of dates, drawn from the same model"}
   ],

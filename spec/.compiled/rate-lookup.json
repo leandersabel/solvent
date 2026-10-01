@@ -9,9 +9,9 @@
     {"file": "spec/features/manage-accounts.md", "sections": ["Record shape", "Rules", "Edge cases"], "role": "an account's unit is its rate symbol, which is what the table is a picker for"},
     {"file": "spec/features/register.md", "sections": ["Rules"], "role": "the kind: currency rows are the whole of the main-currency list"},
     {"file": "spec/features/admin-invites.md", "sections": ["The admin boundary", "Endpoints"], "role": "the boundary the symbol table clears without an exception"},
-    {"file": "spec/ui/design-system.md", "sections": ["Components", "States", "App shell"], "role": "the combobox, chip, table and section-switcher conventions the unit picker and the admin Units screen use"},
+    {"file": "spec/ui/design-system.md", "sections": ["Components", "States", "App shell"], "role": "the combobox, chip (its text is never cut off), table and section-switcher conventions the unit picker and the admin Units screen use"},
     {"file": "spec/ui/admin.md", "sections": ["Units", "Retiring, not deleting", "States", "Rules", "What it deliberately does not show"], "role": "the symbol table's maintenance screen"},
-    {"file": "spec/ui/update-values.md", "sections": ["The rates, at the foot of the sweep", "Rate lines on a reopened recording", "States"], "role": "where a proposal is shown, accepted, overridden or reported missing"},
+    {"file": "spec/ui/update-values.md", "sections": ["The rates, at the foot of the sweep", "Rate lines on a reopened recording", "At phone width", "States"], "role": "where a proposal is shown, accepted, overridden or reported missing. The column rule is the sweep's alone, and the stacked rate-line order is under At phone width"},
     {"file": "spec/ui/account-form.md", "sections": ["Layout", "Unit, once there are snapshots", "States", "Rules"], "role": "the unit picker built from this table"}
   ],
   "dependsOn": ["app-shell", "register", "login", "admin-invites"],

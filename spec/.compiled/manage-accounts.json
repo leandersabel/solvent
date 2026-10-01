@@ -10,7 +10,7 @@
     {"file": "spec/features/record-snapshot.md", "sections": ["Same holding, same date: upsert", "Edge cases"], "role": "the closing snapshot the archive flow writes, and the upsert rule it follows"},
     {"file": "spec/features/record-rate.md", "sections": ["The refresh", "Reading"], "role": "the archive flow is a recording action and refreshes prices at archivedAt, and a purge deletes no price entry"},
     {"file": "spec/features/net-worth-view.md", "sections": ["Current net worth", "Archived holdings", "Grouping by dimension"], "role": "what archiving does to the total and the chart"},
-    {"file": "spec/ui/design-system.md", "sections": ["Components", "States", "App shell"], "role": "the combobox, chip, dialog and table conventions the form and the delete decision use"},
+    {"file": "spec/ui/design-system.md", "sections": ["Components", "States", "App shell"], "role": "the combobox, chip (its text is never cut off), dialog and table conventions the form and the delete decision use"},
     {"file": "spec/ui/account-form.md", "sections": ["all"], "role": "the create and edit form and the archive or delete decision"},
     {"file": "spec/ui/account-detail.md", "sections": ["all"], "role": "one holding's own page, where edit, archive and delete are reached"}
   ],

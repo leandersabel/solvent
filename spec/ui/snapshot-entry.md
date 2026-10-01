@@ -47,7 +47,12 @@ Recording something writes that date's prices, exactly as the sweep
 does (`record-rate.md`, The refresh), so the form says what it is about
 to write rather than doing it silently. One folded line, ink-secondary,
 which opens into the same rate lines the sweep carries at its foot
-(`update-values.md`):
+(`update-values.md`). At every width they stack as the sweep's lines do
+at phone width (`update-values.md`, At phone width). The sweep's columns
+need more width than a Dialog has, and here there are no rows for the
+lines to align with.
+
+The folded line reads:
 
 - **A date holding no recording yet**: "Prices for 31 July will be
   recorded with this", opening to the proposals. A figure dated 2019

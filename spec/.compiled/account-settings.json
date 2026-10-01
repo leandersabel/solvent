@@ -10,7 +10,7 @@
     {"file": "spec/features/manage-accounts.md", "sections": ["Dimensions"], "role": "the account records that read the dimension ids configured here"},
     {"file": "spec/features/export-import.md", "sections": ["Import: replace-only", "The re-key step"], "role": "the one sanctioned way the main currency changes, and the export the delete dialog offers first"},
     {"file": "spec/features/app-shell.md", "sections": ["The two surfaces", "CSRF"], "role": "/settings, GET /api/sessions, POST /api/auth/logout-all and DELETE /api/auth/account are vault routes, POST /api/auth/change-password is Shared, and POST /api/auth/logout is Public"},
-    {"file": "spec/ui/design-system.md", "sections": ["Components", "States", "App shell"], "role": "the input, dialog, disclosure, reorder and table conventions both screens below use"},
+    {"file": "spec/ui/design-system.md", "sections": ["Components", "States", "App shell"], "role": "the input, chip (its text is never cut off), dialog, disclosure, reorder and table conventions both screens below use"},
     {"file": "spec/ui/settings.md", "sections": ["all"], "role": "profile, change password, session and lock, and delete my account"},
     {"file": "spec/ui/dimensions.md", "sections": ["all"], "role": "the only screen dimensions and their values are created, renamed, reordered, archived and restored on"},
     {"file": "spec/ui/unlock.md", "sections": ["The derivation wait", "States", "Rules"], "role": "the re-unlock the idle period leads to"}

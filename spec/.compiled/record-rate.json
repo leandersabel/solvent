@@ -8,10 +8,10 @@
     {"file": "spec/features/record-snapshot.md", "sections": ["A recording is a date", "Reopening and editing a recording", "Creating and reopening are distinct acts", "Clearing a figure", "Deleting a recording", "Edge cases"], "role": "the act that triggers the refresh, and the pre-create reload that enforces one entry per symbol per date"},
     {"file": "spec/features/rate-lookup.md", "sections": ["Endpoint", "The client never names a symbol", "The symbol table", "Edge cases"], "role": "where a proposal comes from and what No Content means"},
     {"file": "spec/features/net-worth-view.md", "sections": ["Data flow", "Current net worth", "Values between entries"], "role": "the in-memory model this series lives in and the reader of every entry"},
-    {"file": "spec/ui/design-system.md", "sections": ["Components", "States", "App shell"], "role": "the chip, disclosure and dialog conventions the rate lines and their confirmations use"},
+    {"file": "spec/ui/design-system.md", "sections": ["Components", "States", "App shell"], "role": "the chip (its text is never cut off, and it wraps inside its border), disclosure and dialog conventions the rate lines and their confirmations use"},
     {"file": "spec/ui/recording-detail.md", "sections": ["The prices", "Delete", "States", "Rules"], "role": "owns the provenance vocabulary and the one screen a stored price is read on"},
-    {"file": "spec/ui/update-values.md", "sections": ["The rates, at the foot of the sweep", "Rate lines on a reopened recording", "Changing or clearing a rate says what it moves", "Writes", "States"], "role": "the screen a rate is proposed, edited and cleared on"},
-    {"file": "spec/ui/snapshot-entry.md", "sections": ["The prices line", "Editing an existing entry", "States"], "role": "the single-holding form's account of what the refresh is about to write"}
+    {"file": "spec/ui/update-values.md", "sections": ["The rates, at the foot of the sweep", "Rate lines on a reopened recording", "Changing or clearing a rate says what it moves", "At phone width", "Writes", "States"], "role": "the screen a rate is proposed, edited and cleared on. The column rule is the sweep's alone, and the stacked rate-line order is under At phone width"},
+    {"file": "spec/ui/snapshot-entry.md", "sections": ["The prices line", "Editing an existing entry", "States"], "role": "the single-holding form's account of what the refresh is about to write. Its rate lines stack at every width, in the order At phone width states"}
   ],
   "dependsOn": ["app-shell", "record-api", "rate-lookup", "register", "login", "account-settings", "manage-accounts", "record-snapshot", "net-worth-view"],
   "parameters": {
