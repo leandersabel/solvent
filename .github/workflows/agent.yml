@@ -136,7 +136,12 @@ jobs:
           ref: master
           fetch-depth: 0
       - uses: ./.github/actions/setup
-      - uses: anthropics/claude-code-action@fd1c128679612beff4ca259c78021c506e8aa7a7 # v1.0.237
+      - id: claude
+        uses: anthropics/claude-code-action@fd1c128679612beff4ca259c78021c506e8aa7a7 # v1.0.237
+        # A headless run ends when its own turn does, so a subagent left
+        # running in the background would be cut off unfinished.
+        env:
+          CLAUDE_CODE_DISABLE_BACKGROUND_TASKS: "1"
         with:
           claude_code_oauth_token: ${{ secrets.CLAUDE_CODE_OAUTH_TOKEN }}
           prompt: Run the `advance` skill with the argument `${{ needs.route.outputs.issue }}`.
@@ -147,6 +152,12 @@ jobs:
           claude_args: |
             --model claude-opus-5-5
             --allowedTools Bash,Read,Write,Edit,MultiEdit,Glob,Grep,Agent,Task,Skill,TodoWrite
+      - if: always() && steps.claude.outputs.execution_file
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+        with:
+          name: session
+          path: ${{ steps.claude.outputs.execution_file }}
+          retention-days: 14
       - if: failure() || cancelled()
         env:
           GH_TOKEN: ${{ github.token }}

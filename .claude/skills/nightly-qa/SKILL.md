@@ -14,7 +14,7 @@ with `gh`, and you write as `claude[bot]`.
    tag, or when an issue closed since then names it. Read the closed
    issues' titles and bodies for that, and nothing else about them.
    With no last tag, walk every feature in full.
-2. **Run `qa`.** Hand it the address, the invite path (opening it
+2. **Run `qa`** in the foreground, and wait for its report. Hand it the address, the invite path (opening it
    creates the first administrator, from whom it invites whatever
    accounts it needs), and the features to walk in full. It walks every
    other feature's main path once.
