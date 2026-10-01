@@ -1,0 +1,11 @@
+# What the client approves (CLAUDE.md, The loop, Merge gate). Workflow
+# files are left out, because the Claude GitHub App cannot write them.
+/spec/requirements.md    @leandersabel
+/spec/design/            @leandersabel
+/.claude/                @leandersabel
+/CLAUDE.md               @leandersabel
+/SECURITY.md             @leandersabel
+/.github/CODEOWNERS      @leandersabel
+/.github/dependabot.yml  @leandersabel
+/.github/actions/        @leandersabel
+/.github/ISSUE_TEMPLATE/ @leandersabel

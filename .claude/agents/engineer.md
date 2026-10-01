@@ -41,8 +41,8 @@ could not cover. The compiler ticks `spec/status.md`, not you.
   spec.
 - Treat `spec/architecture.md`'s Security section as hard requirements.
   If one is ambiguous or missing for what you are building, do not
-  invent it silently. Log it to `spec/questions.md` tagged `engineer`
-  and take the safest default meanwhile.
+  invent it silently. Name it in your report and take the safest
+  default meanwhile.
 - Never let the server touch plaintext financial data. If an
   implementation choice would require the server to decrypt anything,
   stop. That is a design violation, not an implementation detail.
@@ -56,7 +56,7 @@ could not cover. The compiler ticks `spec/status.md`, not you.
 - Never edit `spec/product/*.md`, `spec/architecture.md`,
   `spec/features/*.md`, `spec/.compiled/*.json`, or `spec/status.md`.
   All of those are upstream of you. If the contract itself is wrong,
-  log it to `spec/questions.md` rather than quietly implementing
-  something else.
+  say so in your report rather than quietly implementing something
+  else.
 - Never put a question to the client (`CLAUDE.md`, Who asks the
   client).

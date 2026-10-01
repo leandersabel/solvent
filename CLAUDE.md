@@ -1,7 +1,7 @@
 # Solvent
 
-Spec-first. A high-level spec says what the product is, and the
-low-level spec and the code are derived from it.
+Spec-first. `spec/requirements.md` says what the client requires, and
+the rest of the spec and the code are derived from it.
 
 ## The pipeline
 
@@ -10,9 +10,9 @@ talks to the client.
 
 | Stage | Agent | Owns |
 |---|---|---|
-| High-level spec | `product-owner` | `spec/product/*.md` |
-| | `architect` | `spec/architecture.md`, `security/` |
-| Low-level spec | `architect` | `spec/features/*.md` |
+| Requirements | `product-owner`, for the client | `spec/requirements.md` |
+| Spec | `product-owner` | `spec/product/*.md` |
+| | `architect` | `spec/architecture.md`, `spec/features/*.md`, `security/` |
 | | `designer` | `spec/ui/*.md`, the design system |
 | | `compiler` | `spec/.compiled/*.json`, `spec/status.md` |
 | Code | `engineer` | application code and its tests |
@@ -23,28 +23,37 @@ talks to the client.
 The architecture comes before the screens because it sets what a
 screen may use at all, such as which assets a page can load.
 
-The client approves the high-level spec, in each change's spec pull
-request (The loop, Spec). From the low-level spec onward the pipeline
-runs to a nightly version on its own.
+The client approves changes to `spec/requirements.md` and nothing else
+(The loop, Requirements). From there the pipeline runs to a nightly
+version on its own.
 
 ## Who asks the client
 
 Only `product-owner`, only in the client's terms, and only in a comment
-on the issue. Every other agent
-writes its question to `spec/questions.md` tagged with its own name.
-The product owner translates the ones that turn on the client's risk
-tolerance, money or taste, and decides the rest are not the client's to
-answer.
+on the issue. Another agent hands its question to whoever invoked it.
+The product owner asks the client the ones that turn on the client's
+risk tolerance, money or taste, and the agents decide the rest.
 
 A question that cannot be put without technical vocabulary belongs to
-the architect, who decides it and writes the reason into the spec.
+the architect, who decides it and states the result in the spec.
+
+The client's answer becomes a statement in `spec/requirements.md`. No
+file keeps questions or a list of decisions: a decision is the
+statement it produced, in the file that owns the subject, with its
+reason where the statement would otherwise get undone. Who decided, and
+when, is in the issues and the history.
 
 ## The spec layers
 
-- `spec/product/*.md` holds what the client asked for, in their words.
-  Screens as a person sees them, and a "What must be true" list
-  observable from outside by someone who cannot read code. No status
-  codes, no columns, no libraries.
+- `spec/requirements.md` holds what the client requires: one plain
+  statement each, from what the client wrote and the answers they
+  gave, with a reason only where the requirement would otherwise look
+  arbitrary. No mechanics, screens or numbers the client never gave. It
+  changes only with the client's approval.
+- `spec/product/*.md` holds the product owner's statement of the
+  product that meets the requirements: screens as a person sees them,
+  and a "What must be true" list observable from outside by someone who
+  cannot read code. No status codes, no columns, no libraries.
 - `spec/features/*.md` holds the technical derivation. Row shapes,
   endpoints, byte encodings, and a technical acceptance list a test can
   assert.
@@ -59,8 +68,8 @@ https://claude.ai/artifact/NFxzA1ngFuYB53FHnMizn3. It is outside the
 pipeline. No agent reads or edits it, so a drawing the app has moved
 past never overrules a screen file.
 
-`spec/architecture.md` sits above all three and holds what is true
-system-wide. The same subject at two altitudes is the design, not
+`spec/architecture.md` sits above the product, feature and screen
+files and holds what is true system-wide. The same subject at two altitudes is the design, not
 duplication.
 
 Some features have no product file, because the client never asked for
@@ -86,12 +95,9 @@ paths stay as they are. Where prose names the record type, "the
 `account` record" is right. A screen keeps the name it has, even where
 that name and its subject differ.
 
-`spec/product/*.md` addresses the client as **you**. `spec/features/`
-and `spec/ui/` are written for a builder and stay third person.
-
-A product file's **"Decisions taken on your behalf"** section holds what
-the client never said and may overrule. That is what the heading means,
-so no file restates it in a preamble.
+`spec/requirements.md` and `spec/product/*.md` address the client as
+**you**. `spec/features/` and `spec/ui/` are written for a builder and
+stay third person.
 
 ## Economy
 
@@ -120,9 +126,7 @@ comments on GitHub, commit messages, pull requests) and the
 
 ## Tracking files
 
-- `spec/status.md` — state only: compiled, implemented, verified.
-- `spec/questions.md` — open questions only, each tagged with the agent
-  that asked. A decision is found in the file that states it.
+- `spec/status.md`: state only, compiled, implemented, verified.
 
 ## The loop
 
@@ -133,7 +137,7 @@ The client is `leandersabel`. No agent edits an issue body.
 
 - Every decision of the client's is a GitHub action by
   `leandersabel`: opening an issue, commenting, adding `accepted`,
-  reviewing a spec pull request, promoting a release. That is how an
+  reviewing a requirements pull request, promoting a release. That is how an
   outside reader tells the client's work from the agents'.
 - Agents write as `claude[bot]`, through the Claude GitHub App, and
   never under the client's account. Workflow steps without a model
@@ -186,42 +190,47 @@ Each run on a new issue, or on a reply from the client, ends in one of:
 
 - Unclear: questions to the client, the `needs-answer` label and an
   @mention. The client's reply starts the next run.
-- `bug`, the app contradicts the spec: the comment says what the spec
-  says and what the app does, and implementation starts.
-- `change`, the spec changes: the comment says what changes for the
-  client, screen by screen, and the spec pull request opens.
-- `maintenance`, only the code changes and nothing the client sees:
+- `bug`, Solvent falls short of the requirements, or of
+  `spec/product/` where no requirement covers it, in the code, the
+  spec or both: the comment says what the requirement is and what
+  Solvent does, and implementation starts.
+- `change`, the requirements change: the comment says what changes for
+  the client, and the requirements pull request opens.
+- `maintenance`, nothing the client sees changes, in the code or the
+  agent-owned spec:
   the comment says what changes and why, and implementation starts.
 - Already met, a duplicate, or doubtful: the reasoning, and a question
   to the client.
 
-A `bug` where the spec is what is wrong is relabeled `change`, and a
-`change` the spec already asks for is relabeled `bug`, each with a
-comment saying so. No agent closes an issue. A merged pull request or
+A `bug` where a requirement is what is wrong is relabeled `change`,
+and a `change` the requirements already ask for is relabeled `bug`,
+each with a comment saying so. Every decision a request leaves open for
+the client is asked as a question, never settled in the spec on their
+behalf. No agent closes an issue. A merged pull request or
 the client does.
 
-### Spec
+### Requirements
 
 - A `change` becomes a pull request from `claude/spec-<issue>` that
-  touches only `spec/` and links the issue without closing it. Its
-  description says what changes for the client in the issue's
-  language, with the technical part collapsed.
-- The client reviews `spec/product/` and `spec/architecture.md` in it.
-  Approving merges it and starts implementation. Requesting changes
+  touches only `spec/requirements.md`, or for a pipeline change only
+  the pipeline, and links the issue without closing it. Its description
+  is the requirements it adds, changes or removes, in the issue's
+  language.
+- Approving merges it and starts implementation. Requesting changes
   gets a revision on the same pull request. Closing it stops the loop
   and leaves the issue to the client.
-- Until the implementation merges, `master` holds a spec ahead of the
-  code. No version ships in between, because QA holds the release.
 
 ### Implementation
 
-- Starts when a spec pull request merges, or when clarifying finds a
-  `bug` with nothing to ask. One implementation runs at a time, holding
+- Starts when a requirements pull request merges, or when clarifying
+  finds a `bug` or `maintenance` with nothing to ask. One implementation runs at a time, holding
   the `claude/slot` branch, which GitHub creates only once: its issue
   carries `implementing`, an issue ready meanwhile waits with
   `queued`, and the lowest-numbered queued issue starts when the running
   one merges.
-- On `claude/issue-<issue>`, `engineer` implements the contract, for a
+- On `claude/issue-<issue>`, the spec is brought to the requirements
+  first, where it falls short, and the contracts recompiled. Then
+  `engineer` implements the contract, for a
   `bug` starting with a test that fails on the reported behavior. The
   suite passes, browser tests included. `reviewer` reviews the change
   against the contract, and its findings go back to `engineer` for a
@@ -230,9 +239,9 @@ the client does.
   Its body starts with `Closes #<issue>` and says the same in the
   issue's language, with the technical part collapsed. Auto-merge is on
   from the start.
-- An implementation never changes `spec/product/`,
-  `spec/architecture.md` or the pipeline. When the spec has to change,
-  the issue goes back to clarifying.
+- An implementation never changes `spec/requirements.md` or the
+  pipeline. When a requirement has to change, the issue goes back to
+  clarifying.
 
 ### Merge gate
 
@@ -240,14 +249,14 @@ the client does.
   force push or deletion. The `test`, `image` and `dependencies` checks
   are required. No approval is required except the code owner's, and a
   push dismisses an earlier approval. Nobody bypasses it.
-- `CODEOWNERS` makes `@leandersabel` the reviewer of `spec/product/`,
-  `spec/architecture.md`, `spec/design/`, `.claude/`, `CLAUDE.md`,
+- `CODEOWNERS` makes `@leandersabel` the reviewer of
+  `spec/requirements.md`, `spec/design/`, `.claude/`, `CLAUDE.md`,
   `SECURITY.md` and `.github/` outside `.github/workflows/`. So the
-  client approves every spec change, and no agent changes the pipeline
+  client approves every requirement, and no agent changes the pipeline
   that gates it.
 - A pull request need not be up to date with `master`, because one
-  implementation runs at a time and a spec pull request touches no
-  code. The nightly run tests `master` as a whole before any version.
+  implementation runs at a time and a requirements pull request touches
+  no code. The nightly run tests `master` as a whole before any version.
 - Dependabot's updates pass the same gate and merge when green, except
   one touching a file the client owns, which waits for their approval. A
   release is proposed only once it has aged: a week for a major or
@@ -310,7 +319,7 @@ the client does.
 | Not started | someone else's issue without `accepted` |
 | New | started, no comment from `claude[bot]` yet |
 | Waiting on the client | `needs-answer` or `stuck` |
-| Spec in review | an open spec pull request links it |
+| Requirements in review | an open requirements pull request links it |
 | Queued | `queued` |
 | Being implemented | `implementing`, and an open pull request closes it |
 | Done | closed by the merged pull request, shipped in the next nightly |

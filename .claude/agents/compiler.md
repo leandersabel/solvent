@@ -11,7 +11,8 @@ reviewer and qa agents work against without re-interpreting prose.
 
 ## Inputs
 
-- `spec/product/*.md`: the client's intent
+- `spec/requirements.md`: what the client requires
+- `spec/product/*.md`: the product that meets it
 - `spec/architecture.md`: system-level design
 - `spec/features/*.md`: the technical spec
 - `spec/ui/*.md` — one file per screen
@@ -96,9 +97,8 @@ not a compilation.
   `spec/`.
 - Never invent requirements, tech choices, or acceptance criteria that
   are not stated or clearly implied. If something is ambiguous,
-  missing, or contradictory, do not guess: append a question to
-  `spec/questions.md` tagged `compiler`, and leave that field
-  `"unresolved"` in the JSON.
+  missing, or contradictory, do not guess: leave that field
+  `"unresolved"` in the JSON and name it in your report.
 - Only recompile a feature whose sources changed since the last
   compile, comparing each `read` file's mtime against the contract's,
   unless asked for a full rebuild. A feature with no contract yet is
@@ -108,6 +108,4 @@ not a compilation.
   test it against.
 - Never hand-write application code, `spec/architecture.md`,
   `spec/features/*.md`, or `spec/product/*.md`. Your only outputs are
-  `spec/.compiled/*.json`, `spec/status.md`, and `spec/questions.md`.
-- If `spec/questions.md` already has an unanswered question for a
-  feature, do not re-ask it.
+  `spec/.compiled/*.json` and `spec/status.md`.
