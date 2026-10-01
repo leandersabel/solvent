@@ -500,7 +500,13 @@ export class Vault {
    *  `assets` sums the holdings standing above zero on a day and
    *  `liabilities` those below it, so a mortgage and the flat it is
    *  secured on are both drawn rather than cancelling into one
-   *  figure (net-worth-view.md, Assets and liabilities). */
+   *  figure (net-worth-view.md, Assets and liabilities).
+   *
+   *  A holding's first recording and its archive are steps, not slopes,
+   *  so each band also carries the two sides `before` a day, without the
+   *  holdings first recorded on it, and `after` it, without the holdings
+   *  archived on it. The chart draws the step between them at that
+   *  day's x. */
   series(dimension, fromDay, toDay) {
     const holdings = [...this.holdings.values()];
     const sampleDays = new Set([fromDay, toDay]);
@@ -520,20 +526,18 @@ export class Vault {
       .sort((a, b) => a - b);
 
     const bands = new Map();
+    const sides = () => ({ assets: days.map(() => decimal.ZERO), liabilities: days.map(() => decimal.ZERO) });
     for (const holding of holdings) {
       const band = this.bandOf(holding, dimension);
       if (!bands.has(band.id)) {
-        bands.set(band.id, {
-          ...band,
-          points: days.map(() => decimal.ZERO),
-          assets: days.map(() => decimal.ZERO),
-          liabilities: days.map(() => decimal.ZERO),
-        });
+        bands.set(band.id, { ...band, points: days.map(() => decimal.ZERO), ...sides(), before: sides(), after: sides() });
       }
-      const { points, assets, liabilities } = bands.get(band.id);
+      const { points, assets, liabilities, before, after } = bands.get(band.id);
       const archived = holding.payload.archivedAt
         ? dayNumber(holding.payload.archivedAt)
         : null;
+      const first = this.usableSnapshots(holding.recordId)[0];
+      const firstDay = first ? dayNumber(first.payload.date) : null;
       days.forEach((day, index) => {
         if (archived !== null && day > archived) return;
         const quantity = this.quantityAt(holding.recordId, day);
@@ -541,9 +545,11 @@ export class Vault {
         const price = this.priceAt(holding.payload.unit, day);
         if (price === null) return;
         const value = decimal.multiply(quantity, price);
+        const side = value < 0n ? 'liabilities' : 'assets';
         points[index] += value;
-        if (value < 0n) liabilities[index] += value;
-        else assets[index] += value;
+        ({ assets, liabilities })[side][index] += value;
+        if (day !== firstDay) before[side][index] += value;
+        if (day !== archived) after[side][index] += value;
       });
     }
 
@@ -579,14 +585,16 @@ function orderBands(bands, dimension) {
   const rest = ordered.splice(4);
   if (bands.has('unassigned')) ordered.push(bands.get('unassigned'));
   if (rest.length) {
-    const sum = (side) =>
-      rest[0][side].map((_, index) => rest.reduce((total, band) => total + band[side][index], 0n));
+    const sum = (pick) =>
+      rest[0].points.map((_, index) => rest.reduce((total, band) => total + pick(band)[index], 0n));
     const other = {
       id: 'other',
       label: 'Other',
-      points: sum('points'),
-      assets: sum('assets'),
-      liabilities: sum('liabilities'),
+      points: sum((band) => band.points),
+      assets: sum((band) => band.assets),
+      liabilities: sum((band) => band.liabilities),
+      before: { assets: sum((band) => band.before.assets), liabilities: sum((band) => band.before.liabilities) },
+      after: { assets: sum((band) => band.after.assets), liabilities: sum((band) => band.after.liabilities) },
     };
     ordered.push(other);
   }

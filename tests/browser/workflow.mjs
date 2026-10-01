@@ -3587,6 +3587,53 @@ try {
   const afterImport = await picture();
   check('the planted pairs read the same after an export and import', afterImport === inOrder, `${inOrder} vs ${afterImport}`);
 
+  // ---- A holding first recorded later steps in, it does not ramp ---------
+  //
+  // Everything sits in 2019, before any other figure in the vault, so
+  // the left of the net line is the probes' alone. The line is read off
+  // the drawn polyline, with each date's x taken from its entry mark.
+  const [checking, flat] = await plant([holding('Ramp checking', 'CHF'), holding('Ramp flat', 'RAMP-SQM')]);
+  const ramp = await plant([
+    figure(checking, '2019-09-15', '1000'),
+    figure(checking, '2019-10-01', '1000'),
+    figure(flat, '2019-10-01', '100'),
+    price('RAMP-SQM', '2019-10-01', '8000'),
+  ]);
+  await unlockDashboard('the dashboard over the ramp probes');
+  const line = JSON.parse(await page.eval(`(async () => {
+    const v = (await import('/static/js/session.js')).currentVault();
+    [...document.querySelectorAll('.range-buttons button')].find(b => b.textContent === 'All').click();
+    await new Promise(r => setTimeout(r, 300));
+    const mark = (iso) => [...document.querySelectorAll('.entry-mark')]
+      .find(m => m.querySelector('title').textContent.startsWith(v.format.longDate(iso)));
+    const points = document.querySelector('svg.trend .net-line').getAttribute('points').split(' ')
+      .map(p => p.split(',').map(Number));
+    return JSON.stringify({
+      points,
+      step: Number(mark('2019-10-01').getAttribute('x1')),
+      end: Number(document.querySelector('svg.trend .net-end').getAttribute('cy')),
+    });
+  })()`));
+  const [first, ...others] = line.points;
+  const stepAt = line.points.filter(([x]) => Math.abs(x - line.step) < 0.01);
+  const toStep = line.points.filter(([x]) => x < line.step - 0.01);
+  check(
+    'net-worth-view: a holding first recorded on a later date lifts the net line there in one vertical step, not along the way from the date before',
+    stepAt.length >= 2 && stepAt[0][1] > stepAt.at(-1)[1] && toStep.every(([, y]) => Math.abs(y - first[1]) < 0.01) &&
+      Math.abs(stepAt[0][1] - first[1]) < 0.01,
+    JSON.stringify(line.points.slice(0, 6)),
+  );
+  check(
+    'net-worth-view: the net line has no step at the chart\'s first date and none at its last',
+    line.points.filter(([x]) => x === first[0]).length === 1 && others.at(-1)[1] === line.end,
+    JSON.stringify([first, others.at(-1), line.end]),
+  );
+  await page.eval(`(async () => {
+    const api = await import('/static/js/api.js');
+    for (const id of ${JSON.stringify([...ramp, checking, flat])}) await api.del('/api/records/' + id);
+  })()`);
+  await unlockDashboard('the dashboard after the ramp probes');
+
   // ---- Recording, in a vault of its own ---------------------------------
   //
   // record-rate.md, record-snapshot.md and net-worth-view.md, Acceptance
