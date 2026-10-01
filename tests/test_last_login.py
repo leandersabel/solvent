@@ -8,7 +8,7 @@ from datetime import datetime, timedelta, timezone
 
 import pytest
 
-from solvent.db import init_db
+from solvent import create_app
 from tests.helpers import CSRF, b64, connect, mint_invite, register, rows, sign_in
 from tests.test_admin import run_cli
 
@@ -58,11 +58,42 @@ def test_an_administrator_invite_from_the_cli_registers_with_last_login_at_set(a
     assert principal["last_login_at"] == principal["created_at"] == used_at
 
 
-def test_the_admin_account_list_reports_a_last_sign_in_for_every_new_account(app, admin):
+def listed_accounts(client):
+    rows_ = client.get("/api/admin/accounts", headers=CSRF).get_json()
+    return {row["username"]: row for row in rows_}
+
+
+def test_the_admin_account_list_never_shows_a_null_last_sign_in(app, clock):
+    token = run_cli(app, "--kind", "administrator").stdout.strip().split("=")[-1]
+    root, root_key = register(app, "root", kind="administrator", invite_token=token)
+    for kind, username in (("vault_owner", "sarah"), ("administrator", "second")):
+        invite = root.post("/api/admin/invites", json={"kind": kind}, headers=CSRF).get_json()
+        _, key = register(app, username, kind=kind, invite_token=invite["token"])
+        if username == "sarah":
+            sarah_key = key
+
+    listed = listed_accounts(root)
+    assert set(listed) == {"root", "sarah", "second"}
+    assert all(row["lastLoginAt"] == row["createdAt"] for row in listed.values())
+
+    # A later sign-in moves that account's row and no other.
+    clock(hours=1)
+    sign_in(app, "sarah", sarah_key)
+    after = listed_accounts(root)
+    assert after["sarah"]["lastLoginAt"] > after["sarah"]["createdAt"]
+    for username in ("root", "second"):
+        assert after[username] == listed[username]
+
+
+def test_a_backfilled_null_comes_back_as_created_at_through_the_admin_list(app):
+    _, root_key = register(app, "root", kind="administrator")
     register(app, "sarah")
-    listed = admin.get("/api/admin/accounts", headers=CSRF).get_json()
-    assert [row["lastLoginAt"] for row in listed] == [row["createdAt"] for row in listed]
-    assert all(row["lastLoginAt"] for row in listed)
+    set_last_login(app, "sarah", None)
+
+    restarted = create_app({"DATABASE_PATH": app.config["DATABASE_PATH"], "TESTING": True})
+    root, _ = sign_in(restarted, "root", root_key)
+    sarah = listed_accounts(root)["sarah"]
+    assert sarah["lastLoginAt"] == sarah["createdAt"]
 
 
 # ---- Sign-in and unlock move it ----------------------------------------
@@ -129,27 +160,31 @@ def test_a_rate_limited_or_locked_out_attempt_leaves_last_login_at(app, clock, l
 # ---- Start-up backfill -------------------------------------------------
 
 
-def test_start_up_fills_null_last_login_at_with_created_at_and_only_those(app):
-    register(app, "nulled")
-    register(app, "kept")
+def set_last_login(app, username, value):
     conn = connect(app)
-    conn.execute("UPDATE principals SET last_login_at = NULL WHERE username = 'nulled'")
-    conn.execute(
-        "UPDATE principals SET last_login_at = '2030-01-01T00:00:00+00:00' "
-        "WHERE username = 'kept'"
-    )
-    version = conn.execute("PRAGMA user_version").fetchone()[0]
+    conn.execute("UPDATE principals SET last_login_at = ? WHERE username = ?", (value, username))
     conn.commit()
     conn.close()
 
-    def state():
-        return rows(app, "SELECT username, created_at, last_login_at FROM principals ORDER BY username")
 
-    init_db(app)
+def test_starting_the_app_fills_null_last_login_at_with_created_at_and_only_those(app):
+    register(app, "nulled")
+    register(app, "kept")
+    set_last_login(app, "nulled", None)
+    set_last_login(app, "kept", "2030-01-01T00:00:00+00:00")
+    version = rows(app, "PRAGMA user_version")[0]["user_version"]
+
+    def state():
+        return rows(
+            app, "SELECT username, created_at, last_login_at FROM principals ORDER BY username"
+        )
+
+    config = {"DATABASE_PATH": app.config["DATABASE_PATH"], "TESTING": True}
+    create_app(config)
     after = {row["username"]: row for row in state()}
     assert after["nulled"]["last_login_at"] == after["nulled"]["created_at"]
     assert after["kept"]["last_login_at"] == "2030-01-01T00:00:00+00:00"
     assert rows(app, "PRAGMA user_version")[0]["user_version"] == version
 
-    init_db(app)
+    create_app(config)
     assert {row["username"]: row for row in state()} == after
