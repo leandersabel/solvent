@@ -387,6 +387,14 @@ export class Vault {
     return [...dates].sort();
   }
 
+  /** The chart's last day: the newest date carrying a snapshot, a price
+   *  entry or an archive, so an archive made on a day with no recording
+   *  still falls inside the chart (net-worth-view.md, Ranges and modes). */
+  chartLastDate() {
+    const archives = [...this.holdings.values()].map((h) => h.payload.archivedAt).filter(Boolean);
+    return [...this.recordingDates(), ...archives].sort().at(-1);
+  }
+
   /** Whether any record carries this date. A recording exists exactly
    *  as long as one does (record-snapshot.md, A recording is a date). */
   holdsRecording(date) {
@@ -502,11 +510,13 @@ export class Vault {
    *  secured on are both drawn rather than cancelling into one
    *  figure (net-worth-view.md, Assets and liabilities).
    *
-   *  A holding's first recording and its archive are steps, not slopes,
-   *  so each band also carries the two sides `before` a day, without the
-   *  holdings first recorded on it, and `after` it, without the holdings
-   *  archived on it. The chart draws the step between them at that
-   *  day's x. */
+   *  A holding's first recording and its archive are steps, not slopes.
+   *  A holding archived on D counts on every day before D and on none
+   *  from D on, so `points` at D leave it out. Each band also carries
+   *  the side `before` a day: without the holdings first recorded on
+   *  it, and with the holdings archived on it, at its quantity and
+   *  price. The chart draws the step from `before` to the day's value at
+   *  that day's x. */
   series(dimension, fromDay, toDay) {
     const holdings = [...this.holdings.values()];
     const sampleDays = new Set([fromDay, toDay]);
@@ -530,9 +540,9 @@ export class Vault {
     for (const holding of holdings) {
       const band = this.bandOf(holding, dimension);
       if (!bands.has(band.id)) {
-        bands.set(band.id, { ...band, points: days.map(() => decimal.ZERO), ...sides(), before: sides(), after: sides() });
+        bands.set(band.id, { ...band, points: days.map(() => decimal.ZERO), ...sides(), before: sides() });
       }
-      const { points, assets, liabilities, before, after } = bands.get(band.id);
+      const { points, assets, liabilities, before } = bands.get(band.id);
       const archived = holding.payload.archivedAt
         ? dayNumber(holding.payload.archivedAt)
         : null;
@@ -546,10 +556,10 @@ export class Vault {
         if (price === null) return;
         const value = decimal.multiply(quantity, price);
         const side = value < 0n ? 'liabilities' : 'assets';
+        if (day !== firstDay) before[side][index] += value;
+        if (day === archived) return;
         points[index] += value;
         ({ assets, liabilities })[side][index] += value;
-        if (day !== firstDay) before[side][index] += value;
-        if (day !== archived) after[side][index] += value;
       });
     }
 
@@ -594,7 +604,6 @@ function orderBands(bands, dimension) {
       assets: sum((band) => band.assets),
       liabilities: sum((band) => band.liabilities),
       before: { assets: sum((band) => band.before.assets), liabilities: sum((band) => band.before.liabilities) },
-      after: { assets: sum((band) => band.after.assets), liabilities: sum((band) => band.after.liabilities) },
     };
     ordered.push(other);
   }

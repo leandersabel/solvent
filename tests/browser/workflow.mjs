@@ -1933,6 +1933,56 @@ try {
   );
   check('an archived holding leaves the current total', !listed.includes(archiving), `${archiving} in ${listed.join(',')}`);
 
+  // net-worth-view.md, Archived holdings: a holding archived on the newest
+  // recorded date, closing value skipped, is in no total from that date
+  // on, so the headline, the chart's last point, the table's last row and
+  // the change over the range all agree.
+  await page.eval("document.querySelector('.data-table tbody .link-button').click()");
+  await page.waitUntil("location.hash.startsWith('#/holding/')", { label: 'a second holding to archive' });
+  await page.settle(400);
+  const skippedId = (await page.eval('location.hash')).split('/')[2];
+  await click('Archive');
+  await page.waitUntil("document.body.innerText.includes('Archive keeps every value')", { label: 'the second archive dialog' });
+  await click('Skip');
+  await page.settle(150);
+  await page.eval("[...document.querySelectorAll('.dialog button')].find(b => b.textContent === 'Archive').click()");
+  await page.waitUntil('!document.querySelector(".dialog")', { timeout: 60000, label: 'the second archive to land' });
+  await page.settle(1200);
+  await page.eval("location.hash = '#/'");
+  await page.waitUntil("document.querySelector('.chart-card details table')", { label: 'the chart after a skipped archive' });
+  await page.eval("[...document.querySelectorAll('.range-buttons button')].find(b => b.textContent === 'All').click()");
+  await page.settle(300);
+  const skippedArchive = await page.eval(`(async () => {
+    const v = (await import('/static/js/session.js')).currentVault();
+    const { dayNumber } = await import('/static/js/model.js');
+    const total = v.totals('latest').net;
+    const rows = [...document.querySelectorAll('.chart-card details table tbody tr')];
+    const first = v.series(null, dayNumber(v.recordingDates()[0]), dayNumber(v.chartLastDate())).bands[0].points[0];
+    const edge = document.querySelector('.net-line').getAttribute('points').split(' ').map((p) => p.split(',').map(Number));
+    const [x, y] = edge.at(-1);
+    return JSON.stringify({
+      headline: document.querySelector('.hero-amount').textContent === v.format.whole(total),
+      lastRow: rows.at(-1).cells[1].textContent === v.format.money(total),
+      lastDate: rows.at(-1).cells[0].textContent === v.format.date(v.chartLastDate()),
+      change: document.querySelector('.hero-delta').textContent.startsWith('CHF ' + (total - first > 0n ? '+' : '') + v.format.whole(total - first)),
+      edgeDot: Number(document.querySelector('.net-end').getAttribute('cy')) === y,
+      // The drop is a vertical edge at the last day: two points at its x.
+      dropDrawn: edge.filter(([px]) => px === x).length === 2 && edge.at(-2)[1] !== y,
+    });
+  })()`).then(JSON.parse);
+  for (const [name, held] of Object.entries(skippedArchive)) {
+    check(`archived on the newest date with no closing value: ${name}`, held, JSON.stringify(skippedArchive));
+  }
+  // Back to active, so what follows reads the vault as it was.
+  await page.eval(`location.hash = '#/holding/${skippedId}'`);
+  await page.waitUntil("document.querySelector('.detail-header')", { label: 'the holding to unarchive' });
+  await page.settle(400);
+  await click('Unarchive');
+  await page.waitUntil("[...document.querySelectorAll('.form-actions button')].some(b => b.textContent === 'Archive')", { label: 'the holding active again' });
+  await page.eval("location.hash = '#/'");
+  await page.waitUntil("document.querySelector('.entry-mark')", { label: 'the dashboard after unarchiving' });
+  await page.settle(400);
+
   // ---- Deleting a recording ---------------------------------------------
 
   const marksBefore = await page.eval("document.querySelectorAll('.entry-mark').length");
@@ -2527,9 +2577,22 @@ try {
       const table = document.querySelector('.chart-card details table');
       const column = [...table.querySelectorAll('thead th')].findIndex(th => th.textContent === ${JSON.stringify(BAND)});
       const row = [...table.querySelectorAll('tbody tr')].find(r => r.cells[0].textContent === v.format.date('${today}'));
-      return JSON.stringify({ shown: row && column > 0 ? row.cells[column].textContent : null, expected: v.format.money((await import('/static/js/decimal.js')).parse('4000')) });
+      const decimal = await import('/static/js/decimal.js');
+      const { dayNumber } = await import('/static/js/model.js');
+      // The side just before the archive date carries the closing value.
+      const { days, bands } = v.series(v.dimensions.find((d) => d.id === ${JSON.stringify(axis.id)}), dayNumber(v.recordingDates()[0]), dayNumber('${today}'));
+      const before = bands.find((b) => b.label === ${JSON.stringify(BAND)}).before;
+      const index = days.indexOf(dayNumber('${today}'));
+      return JSON.stringify({
+        shown: row && column > 0 ? row.cells[column].textContent : null,
+        expected: v.format.money(decimal.ZERO),
+        before: String(before.assets[index] + before.liabilities[index]),
+        closing: String(decimal.parse('4000')),
+      });
     })()`));
-    check("the band runs into the closing value on the archive date", band.shown === band.expected, JSON.stringify(band));
+    // The value at the archive date leaves the holding out, closing value or not.
+    check("the band's value on the archive date leaves the archived holding out", band.shown === band.expected, JSON.stringify(band));
+    check("the band's side just before the archive date carries the closing value", band.before === band.closing, JSON.stringify(band));
     const annotations = await page.eval("[...document.querySelectorAll('.archive-annotation title')].map(t => t.textContent)");
     check(
       'both archive paths annotate the date, naming the holding as literal text',

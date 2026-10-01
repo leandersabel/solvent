@@ -66,8 +66,8 @@ export function trendChart(options) {
  *  its own total, assets against total assets and liabilities against
  *  total liabilities (net-worth-view.md, Ranges and modes).
  *
- *  `phase` stacks a band's `before` or `after` sides instead, the two
- *  steps a day can carry (see `Vault.series`).
+ *  `phase` stacks a band's `before` side instead, the one just before
+ *  a day (see `Vault.series`).
  *
  *  Pure, so the arithmetic is tested without a page. */
 export function stack(bands, percentage = false, phase = null) {
@@ -131,10 +131,10 @@ function drawChart({
   const x = (day) => pad.left + ((day - firstDay) / spanDays) * plotWidth;
 
   const fills = new Map(bands.map((band, index) => [band, fillFor(band, index)]));
-  // A day's samples are its value just before it, at it and just after
-  // it, so a holding's first recording or archive draws as a step.
+  // A day's samples are its value just before it and at it, so a
+  // holding's first recording or archive draws as a step.
   const shown = bands.filter((band) => !hidden.has(band.id));
-  const stacks = [stack(shown, percentage, 'before'), stack(shown, percentage), stack(shown, percentage, 'after')];
+  const stacks = [stack(shown, percentage, 'before'), stack(shown, percentage)];
   const { layers, net: netLine } = stacks[1];
 
   let top = 0;
@@ -405,15 +405,14 @@ function timeLabels(firstDay, lastDay, plotWidth, locale, formatDay) {
 }
 
 /** The points of one edge, left to right. `runs` holds the value just
- *  before each day, at it and just after it. A day with a step emits up
- *  to three points at its x, a vertical edge, and a day with none emits
- *  one. The first day has nothing before it and the last nothing after,
- *  so the chart's ends carry no edge. */
+ *  before each day and at it. A day with a step emits two points at its
+ *  x, a vertical edge, and a day with none emits one. The first day has
+ *  nothing before it, so the chart's left end carries no edge. */
 export function outline(days, runs, x, y) {
   const points = [];
   days.forEach((day, index) => {
     runs.forEach((run, phase) => {
-      if ((phase === 0 && index === 0) || (phase === 2 && index === days.length - 1)) return;
+      if (phase === 0 && index === 0) return;
       const point = `${x(day)},${y(run[index])}`;
       if (point !== points[points.length - 1]) points.push(point);
     });
@@ -421,8 +420,7 @@ export function outline(days, runs, x, y) {
   return points;
 }
 
-/** `spans` is one band side's [low, high] per day, before, at and
- *  after it. */
+/** `spans` is one band side's [low, high] per day, before and at it. */
 function areaPath(days, spans, x, y) {
   if (!spans.some((run) => run.some(([from, to]) => from !== to))) return null;
   const tops = outline(days, spans.map((run) => run.map(([, to]) => to)), x, y);
