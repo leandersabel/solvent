@@ -802,7 +802,8 @@ fieldset {
   font-size: 13px;
   font-weight: 500;
   line-height: 18px;
-  white-space: nowrap;
+  overflow-wrap: anywhere;
+  max-width: 100%;
   margin: 2px 4px 2px 0;
 }
 
@@ -1306,6 +1307,9 @@ th.numeric {
 
 .rate-section .section-heading { margin-bottom: 12px; }
 
+/* The container the lines' breakpoint measures. */
+.rate-lines { container-type: inline-size; }
+
 /* The rate lines share their columns, so a longer provenance chip on
    one line does not pull its field out of line with the others.
    The card holds the side padding, so each line's divider is drawn
@@ -1335,6 +1339,17 @@ th.numeric {
   right: -24px;
   border-top: 1px solid var(--hairline);
 }
+
+/* Below 720px of block width the field column and a widened chip column
+   leave the unit too narrow to read, so the lines stack. The block's
+   width is measured, not the window's, because the single-holding
+   form's dialog is narrower than the window. */
+@container (max-width: 719.98px) {
+  .rate-block { grid-template-columns: minmax(0, 1fr); padding: 0 16px; }
+  .rate-line { row-gap: 10px; padding: 16px 0; }
+  .rate-line + .rate-line::before { left: -16px; right: -16px; }
+}
+
 .rate-line > .hint { grid-column: 1 / -1; margin: 0; }
 .rate-line > .hint:empty { display: none; }
 
@@ -1980,9 +1995,6 @@ select {
   .sweep-head { margin-bottom: 20px; }
 
   .sweep-row { grid-template-columns: minmax(0, 1fr); gap: 10px; padding: 16px; }
-  .rate-block { grid-template-columns: minmax(0, 1fr); padding: 0 16px; }
-  .rate-line { row-gap: 10px; padding: 16px 0; }
-  .rate-line + .rate-line::before { left: -16px; right: -16px; }
   .quantity-field { min-height: 44px; }
   .sweep-input .hint { text-align: left; }
 

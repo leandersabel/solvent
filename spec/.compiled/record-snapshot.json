@@ -42,6 +42,7 @@
     "dateBounds": {"value": "a future date is blocked. A date preceding the account's createdAt is allowed, because backfilling history is normal", "cite": "spec/features/record-snapshot.md#edge-cases"},
     "valueRange": {"value": "zero is valid and means a closed-out position, which is not the same as having no snapshot. Negative is valid, because net worth is a signed sum", "cite": "spec/features/record-snapshot.md#edge-cases"},
     "archivedAccounts": {"value": "an archived account takes no new snapshots, the one exception being the closing snapshot written as part of archiving, dated archivedAt and written in the same flow that sets it", "cite": "spec/features/record-snapshot.md#edge-cases"},
+    "openedPricesLineLayout": {"value": "on the single-holding form the opened prices line shows each unit's full name, its price and its source in full, without overlap or clipping, at any width. The rate lines always stack there, because the Dialog's content box is 416px, below the 720px the sweep's columns need. The sweep's own rate lines keep their columns only while their block is at least 720px wide and stack below it. A chip never exceeds its container and its text wraps rather than clipping", "cite": "spec/ui/snapshot-entry.md#the-prices-line, spec/ui/update-values.md#the-rates-at-the-foot-of-the-sweep, spec/ui/design-system.md#components"},
     "rollbackIsNotDetected": {"value": "the AAD's version binds a ciphertext to the version it was written at but does not prevent a rollback of an intact (ciphertext, version) pair. Do not write a test asserting rollback is detected today", "cite": "spec/features/record-snapshot.md#edge-cases"}
   },
   "verify": {
@@ -56,7 +57,8 @@
       "a stubbed DELETE that fails, for the write-then-delete order on a date move and for the partial delete of a recording",
       "a stubbed DELETE answering Not Found during a save, which must report as saved",
       "two snapshots planted for one (account, date), for the flagged pair and the interpolation exclusion",
-      "an archived account and an account whose archive date already holds a snapshot"
+      "an archived account and an account whose archive date already holds a snapshot",
+      "a unit with a long full name and a stored price whose provenance is the longest rendering, shown on the opened prices line of the single-holding form at a phone width and at a desktop width"
     ],
     "focus": [
       "a figure the screen pre-filled into a row and nobody confirmed must appear nowhere afterwards. This is the single easiest rule in the product to satisfy on paper and to fake in a test: leave eleven of fifteen rows alone, save, and assert against the holdings' own record sets that no snapshot was created at that date for any of them, rather than against the sweep's own report of what it did",
@@ -68,6 +70,7 @@
       "round-half-even has to be asserted on a value sitting exactly on the midpoint in both directions. Any other case passes under round-half-up as well, and the rounding mode is what two implementations drift on",
       "a Conflict inside a recording save must reload that row and retry nothing, with the stored record byte-identical afterwards. A retry that happens to succeed looks like correct behaviour",
       "editing inside a reopened recording must never show the replace prompt while the single-holding form at an occupied date still does. Testing only one of the two directions leaves the rule half-asserted",
+      "the opened prices line on the single-holding form has to be asserted on rendered geometry at a narrow and a wide window: every unit's full name, price and source text present and visible, no chip wider than its container, no two boxes intersecting. A screenshot or a check that the text is in the DOM passes while the text is clipped or overlapped",
       "do not write a test asserting that a rolled-back (ciphertext, version) pair is detected. The spec states outright that it is not, and a green test here would be asserting something untrue"
     ]
   },

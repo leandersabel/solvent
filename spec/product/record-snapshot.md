@@ -515,6 +515,10 @@ worth around that date will change.
 - Adding a figure to a date that already carries rates uses those
   rates. Nothing is looked up and no holding measured in those units
   moves.
+- On the form for one holding and one date, the opened line of prices
+  shows every unit's full name, its price and the whole of where that
+  price came from, at any window width. Nothing on it overlaps or is
+  cut off.
 - Clearing every figure out of a recording leaves the recording and
   its prices. The date still bends every band measured in those
   units, and only the cleared holdings straighten across it.

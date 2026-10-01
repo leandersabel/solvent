@@ -72,6 +72,10 @@ which opens into the same rate lines the sweep carries at its foot
   prices for every other unit in the vault. That is the case the whole
   split exists for, and the line says so rather than being absent.
 
+Opened, the rate lines always stack, because the Dialog's content box
+is 416px, below the 720px they need to keep the sweep's columns
+(`update-values.md`, The rates, at the foot of the sweep).
+
 ## Editing an existing entry
 
 The same modal, pre-filled with the stored value, date and note.
