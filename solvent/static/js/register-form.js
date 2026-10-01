@@ -17,6 +17,9 @@ import { el } from './dom.js';
 import { SCHEMA_VERSION } from './model.js';
 import { WAIT_NOTE, passwordWithToggle } from './unlock.js';
 import { MIN_LENGTH, strengthGauge } from './strength.js';
+import { HINT, NOT_ACCEPTED, normalizeUsername, usernameProblem } from './username.js';
+
+const NETWORK = 'That did not go through. Everything you typed is still here, so you can try again.';
 
 /** Builds the card.
  *
@@ -31,25 +34,63 @@ export function registerForm({ kind, token: inviteToken, currencies, kdf, onCrea
 
   const username = el('input', {
     type: 'text',
+    id: 'register-username',
     autocomplete: 'username',
     autocapitalize: 'none',
+    autocorrect: 'off',
     spellcheck: 'false',
+    'aria-describedby': 'register-username-line',
     required: true,
   });
+  // The hint until the value is wrong, then the error, on the one line
+  // so the form never shifts.
+  const usernameLine = el('p', { id: 'register-username-line', class: 'hint', 'aria-live': 'polite', text: HINT });
+  // Set while the line shows the server's answer about the value, until
+  // the username is edited.
+  let answered = null;
+  let blurred = false;
+  function showUsername() {
+    const problem = answered ?? usernameProblem(username.value, blurred);
+    usernameLine.textContent = problem ?? HINT;
+    usernameLine.className = problem ? 'field-error' : 'hint';
+    if (problem) username.setAttribute('aria-invalid', 'true');
+    else username.removeAttribute('aria-invalid');
+  }
   username.addEventListener('input', () => {
     // Lowercased in the field as it is typed rather than quietly
     // changed on submit, so what they see is what they sign in with.
     const at = username.selectionStart;
     username.value = username.value.toLowerCase();
     username.setSelectionRange(at, at);
+    answered = null;
+    // A too-short error stays up until the value fits.
+    if (!usernameProblem(username.value, true)) blurred = false;
+    showUsername();
+    refresh();
+  });
+  username.addEventListener('blur', () => {
+    blurred = usernameProblem(username.value, true) !== null;
+    showUsername();
   });
 
   const password = el('input', { type: 'password', autocomplete: 'new-password', required: true });
-  const confirm = el('input', { type: 'password', autocomplete: 'new-password', required: true });
+  const confirm = el('input', {
+    type: 'password',
+    autocomplete: 'new-password',
+    'aria-describedby': 'register-confirm-line',
+    required: true,
+  });
+  for (const field of [password, confirm]) {
+    field.addEventListener('input', () => {
+      mismatch.hidden = true;
+      confirm.removeAttribute('aria-invalid');
+    });
+  }
   const currency = el('select', {}, currencies.map((row) =>
     el('option', { value: row.symbol, text: `${row.label} (${row.symbol})` }),
   ));
   const acknowledge = el('input', { type: 'checkbox' });
+  const mismatch = el('p', { id: 'register-confirm-line', class: 'field-error', 'aria-live': 'polite', hidden: true });
   const error = el('p', { class: 'field-error', hidden: true });
   const note = el('p', { class: 'hint', hidden: true, text: WAIT_NOTE });
   const submit = el('button', {
@@ -65,7 +106,8 @@ export function registerForm({ kind, token: inviteToken, currencies, kdf, onCrea
     refresh();
   });
   function refresh() {
-    submit.disabled = !strongEnough || (isVault && !acknowledge.checked);
+    submit.disabled =
+      !strongEnough || normalizeUsername(username.value) === null || (isVault && !acknowledge.checked);
   }
   acknowledge.addEventListener('change', refresh);
 
@@ -78,13 +120,17 @@ export function registerForm({ kind, token: inviteToken, currencies, kdf, onCrea
           text: 'This link creates an administrator account. It invites and removes people on this instance. It holds no financial data of its own and cannot read anybody else’s. If you also want to keep your own finances in Solvent, that is a separate account and you need a separate invite for it.',
         }),
     el('div', { class: 'field' }, [
-      el('label', { text: 'Username' }),
+      el('label', { for: 'register-username', text: 'Username' }),
       username,
-      el('p', { class: 'hint', text: '3 to 32 characters: letters, digits, dots, dashes and underscores.' }),
+      usernameLine,
     ]),
     el('div', { class: 'field' }, [el('label', { text: 'Password' }), passwordWithToggle(password)]),
     gauge.element,
-    el('div', { class: 'field' }, [el('label', { text: 'Confirm password' }), passwordWithToggle(confirm)]),
+    el('div', { class: 'field' }, [
+      el('label', { text: 'Confirm password' }),
+      passwordWithToggle(confirm),
+      mismatch,
+    ]),
     isVault
       ? el('div', { class: 'field' }, [
           el('label', { text: 'Main currency' }),
@@ -107,9 +153,14 @@ export function registerForm({ kind, token: inviteToken, currencies, kdf, onCrea
 
   form.addEventListener('submit', async (event) => {
     event.preventDefault();
+    // Enter sends nothing while the button is disabled.
+    if (submit.disabled) return;
     error.hidden = true;
+    mismatch.hidden = true;
     if (password.value !== confirm.value) {
-      fail('The two passwords do not match.');
+      mismatch.textContent = 'The two passwords do not match.';
+      mismatch.hidden = false;
+      confirm.setAttribute('aria-invalid', 'true');
       return;
     }
     if (password.value.length < MIN_LENGTH) {
@@ -127,7 +178,7 @@ export function registerForm({ kind, token: inviteToken, currencies, kdf, onCrea
       const keys = await crypto.deriveKeys(password.value, salt, kdf);
       const body = {
         inviteToken: token,
-        username: username.value.trim(),
+        username: normalizeUsername(username.value),
         authKey: keys.authKey,
         salt,
         kdf,
@@ -165,18 +216,10 @@ export function registerForm({ kind, token: inviteToken, currencies, kdf, onCrea
         ? { kind: answer.kind, username: body.username, masterKey: keys.masterKey, dek, wrapper }
         : { kind: answer.kind, username: body.username };
     } catch (failure) {
-      fail(
-        failure.status === 409
-          ? 'That username is taken.'
-          : failure.outOfMemory
-            ? isVault
-              ? 'This device does not have enough memory available right now. No vault was created and your invite link is still good. Close some other tabs and try again.'
-              : 'This device does not have enough memory available right now. No account was created and your invite link is still good. Close some other tabs and try again.'
-            : 'That did not go through. Your invite link is untouched and everything you typed is still here.',
-      );
-      submit.disabled = false;
       submit.textContent = isVault ? 'Create vault' : 'Create account';
       note.hidden = true;
+      refresh();
+      refused(failure);
       return;
     }
 
@@ -194,5 +237,33 @@ export function registerForm({ kind, token: inviteToken, currencies, kdf, onCrea
     error.hidden = false;
   }
 
-  return el('div', { class: 'outside' }, [form]);
+  /** Each answer in its own words (spec/features/register.md, In the
+   *  browser). Every one but the invite's leaves every field filled. */
+  function refused(failure) {
+    const { status, body } = failure;
+    const reason = body && typeof body === 'object' ? body.refused : undefined;
+    if (failure.outOfMemory) {
+      fail(
+        `This device does not have enough memory available right now. No ${isVault ? 'vault' : 'account'} was created and your invite link is still good. Close some other tabs and try again.`,
+      );
+    } else if (status === undefined || status >= 500) {
+      fail(NETWORK);
+    } else if (reason === 'invite') {
+      root.replaceChildren(
+        el('div', { class: 'card card-narrow' }, [
+          el('h1', { class: 'card-heading', text: 'This invite link is not valid.' }),
+        ]),
+      );
+    } else if (reason === 'username' || status === 409) {
+      answered = status === 409 ? 'That username is taken.' : NOT_ACCEPTED;
+      showUsername();
+    } else {
+      fail(
+        `Solvent did not accept this registration. No ${isVault ? 'vault' : 'account'} was created and your invite link is still unused. If this happens again, ask whoever sent you the invite.`,
+      );
+    }
+  }
+
+  const root = el('div', { class: 'outside' }, [form]);
+  return root;
 }

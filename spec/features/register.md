@@ -39,7 +39,9 @@ enumeration oracle login.md closes.
    states on the page that this link creates an administrator account
    with no vault.
 2. User enters username, password, password confirmation, and, for a
-   vault owner only, main currency chosen from that embedded list.
+   vault owner only, main currency chosen from that embedded list. The
+   browser checks the username before anything is derived (Checks and
+   their answers).
 3. Client generates a random 128-bit salt (`crypto.getRandomValues`).
 4. Client derives Master Key + Auth Key from password + salt with the
    embedded parameters. **A vault owner** then generates a random
@@ -136,12 +138,25 @@ two callers rather than two record writers.
   Password/passphrase policy).
 - The registration screen must state plainly that **there is no password
   recovery** and require an explicit acknowledgement before submitting.
-- Username is normalized (trimmed, lowercased) before storage and
-  comparison. Allowed: 3–32 chars, `[a-z0-9._-]`. **One namespace
+- **The username rule.** Normalized (trimmed, lowercased) before
+  storage and comparison. Allowed: 3–32 chars, `[a-z0-9._-]`. The
+  rule refuses the `system:bootstrap` sentinel (admin-invites.md,
+  Invite lifecycle), since a colon is outside the set. **One namespace
   across both kinds** (architecture.md, Accounts on this instance), so
   a person holding an administrator account and a vault account needs
   two distinct usernames. The product suggests no convention and
   enforces none beyond uniqueness.
+- **The browser and the server apply the same rule, held in one
+  fixture.** `tests/fixtures/usernames.json` is
+  `{"accept": [{"raw", "normalized"}], "refuse": [raw]}`. pytest runs
+  every case through the server's normalization and the client tests
+  run every case through the browser's check, and both must agree with
+  the file. It covers at least: 3 and 32 characters, 2 and 33, each of
+  `.` `_` `-`, uppercase accepted as its lowercase, leading and
+  trailing whitespace accepted trimmed, an inner space, a character
+  outside the set, a non-ASCII letter, the empty string, and
+  `system:bootstrap`. Its whitespace is ASCII space and tab only,
+  where Python's `str.strip` and JavaScript's `trim` agree.
 - Server validates: salt is exactly 16 bytes; KDF envelope parameters
   are at or above the server's configured minimum (a client must not be
   able to register itself a weak KDF); wrapped DEK and profile blobs are
@@ -160,11 +175,87 @@ two callers rather than two record writers.
   rate lookup that would need one is on the vault surface
   (app-shell.md, The two surfaces).
 
+## Checks and their answers
+
+`POST /api/register` runs its checks in this order and answers the
+first that fails:
+
+1. **The body's shape**: a JSON object holding only the known fields,
+   each of its type. `kind`, `method` and any other unknown field fail
+   here. → Bad Request, no `refused` member.
+2. **The username** against the username rule (Rules). → Bad Request
+   `{"refused":"username"}`.
+3. **The rest of the input**: the salt and the KDF envelope (Rules,
+   Server validates), and, where present, `dekNonce` as 96 bits of
+   base64 and `wrappedDek` as base64. → Bad Request, no `refused`
+   member.
+4. **The invite**: the token names a pending, unexpired invite
+   (admin-invites.md, Invite lifecycle). → Bad Request
+   `{"refused":"invite"}`, byte-identical in status, headers and body
+   whether the token is unknown, empty, used, expired or revoked.
+5. **The payload against the invite's kind** (Flow). → Bad Request, no
+   `refused` member.
+6. **The username is free**, across both kinds. → Conflict, the same
+   whichever kind holds it.
+7. **The profile record**, through the record validator
+   (record-api.md). → that validator's own answer, with no `refused`
+   member.
+
+The order is the design:
+
+- Steps 1 to 3 read only the request, so malformed input costs no
+  database read and a username refusal reaches the caller whatever the
+  invite's state. Neither named reason teaches anything
+  (architecture.md, Status codes). The caller sent the username, and
+  the rule ships in the page's script. Anyone holding the link already
+  learns the invite's state from `GET /register`.
+- The invite comes before the taken check, so only an invite holder
+  learns whether a username exists (Edge cases).
+- The kind check comes before the taken check, so the enumeration
+  answer goes only to a request the invite would accept.
+
+**Every refusal writes nothing and leaves the invite pending.** The
+checks and the writes share the one transaction, and a refusal rolls
+it back. So does a Server Error raised inside it. Only with no
+response at all is the outcome unknown to the browser, because the
+transaction may have committed before the connection dropped.
+
+### In the browser
+
+- **Before deriving**, the browser normalizes the field's value as the
+  server does and tests it against the username rule. The submit
+  button stays disabled until it passes, so a username outside the
+  rule never starts the derivation. The request carries the value the
+  browser checked.
+- The browser reads `refused` from a JSON body. A body that is not
+  JSON, or has no `refused` member, is a general refusal, because a
+  reverse proxy in front of Solvent can answer Bad Request too.
+
+| Answer | Shown as (ui/register.md, States) |
+|---|---|
+| `{"refused":"username"}` | the username field's rule error |
+| `{"refused":"invite"}` | the invalid-invite wording |
+| Conflict | that username is taken |
+| any other refusal status | nothing was created, and the invite is unused |
+| no response, a Server Error, or any status of that class from a proxy | the submit did not go through |
+
+Every answer but the invite's leaves every field filled, so nobody
+re-types anything to retry.
+
+A `{"refused":"username"}` reaching the browser means the two copies
+of the rule have drifted, which the shared fixture (Rules) prevents.
+
 ## Edge cases
 
 - **Invalid, expired, already-used, or revoked invite** → error page, no
   form rendered. All four render an identical message ("This invite link
   is not valid") so a probe learns nothing about which state applies.
+  An invite that turns bad while the form is open is refused at submit
+  with `{"refused":"invite"}` (Checks and their answers), and the
+  browser shows the same wording.
+- **Username outside the rule** → the button stays disabled and the
+  derivation never starts. A hand-built request gets
+  `{"refused":"username"}`.
 - **Username already taken** → plain error, reported clearly. This
   endpoint is invite-gated and the audience is a small trusted household,
   so username enumeration *here* is **accepted** rather than defended;
@@ -190,8 +281,6 @@ two callers rather than two record writers.
 - **KDF derivation is slow** → show a busy state; the tab must not
   appear frozen. Run derivation in a Web Worker so the UI thread stays
   responsive.
-- **Registration POST fails after key derivation** → the client keeps
-  form state so the user need not re-enter and re-derive.
 - **The first read of the new vault fails** (its `GET /api/records`
   after a successful `POST /api/register`) → the registration stands:
   the account exists and its session is live. The client keeps the
@@ -265,7 +354,35 @@ two callers rather than two record writers.
 - A POST with a salt that is not 16 bytes is rejected with Bad
   Request.
 - Invalid, expired, used, and revoked invites produce byte-identical
-  error responses.
+  error pages from `GET /register`.
+- `POST /api/register` with an otherwise valid body and a token that
+  is unknown, empty, used, expired or revoked answers Bad Request with
+  the body `{"refused":"invite"}`, byte-identical across all five in
+  status, headers and body.
+- `POST /api/register` with a username outside the rule answers Bad
+  Request with the body `{"refused":"username"}`, with a usable invite
+  and with an unusable one alike.
+- `POST /api/register` with a taken username and an unusable invite
+  answers `{"refused":"invite"}`, not Conflict.
+- Every other Bad Request from `POST /api/register` (an unknown field,
+  `kind`, `method`, a short salt, a below-minimum KDF envelope, a
+  payload that does not fit the invite's kind) carries no `refused`
+  member.
+- Every refusal above, Conflict included, leaves no principal row and
+  the invite `pending`, asserted against both tables.
+- Every case in `tests/fixtures/usernames.json` gets the same verdict,
+  and an accepted case the same normalized value, from the server's
+  normalization and from the browser's check.
+- On both forms, a username outside the rule keeps the submit button
+  disabled, and pressing Enter in a field derives nothing and sends
+  nothing, asserted against the derivation and the captured requests.
+- With `POST /api/register` stubbed, each answer in the table under In
+  the browser shows its own message and no other: `{"refused":"invite"}`,
+  `{"refused":"username"}`, Conflict, a Bad Request with no `refused`
+  member, a Bad Request with a non-JSON body, Content Too Large, Server
+  Error, Service Unavailable, and a dropped connection. Only the last
+  three show the network wording, and every field keeps its value in
+  all but the invite's.
 - A password of 11 characters, or one scoring below zxcvbn 3, is blocked
   client-side and never derives keys.
 - Submitting without the "no password recovery" acknowledgement is

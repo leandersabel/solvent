@@ -377,6 +377,12 @@ contract pins one value and prose stays readable.
 | Too Many Requests | 429 | a rate limit engaged (Application hardening) |
 | Server Error | 500 | an unhandled failure. Never a designed answer; it appears in this spec only where a test stubs one |
 
+A Bad Request names its reason, as the body `{"refused":"<reason>"}`,
+only where a feature file pins that reason, and only when the reason
+tells the caller nothing it did not send or could not already learn.
+Every other Bad Request carries no `refused` member, so the caller
+learns that the request was wrong and not which part.
+
 ### Refusals
 
 A refusal's status depends only on the namespace, the

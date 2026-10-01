@@ -1,0 +1,25 @@
+{
+  "accept": [
+    {"raw": "abc", "normalized": "abc"},
+    {"raw": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa", "normalized": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"},
+    {"raw": "ab.", "normalized": "ab."},
+    {"raw": "a_b", "normalized": "a_b"},
+    {"raw": "a-b", "normalized": "a-b"},
+    {"raw": "a.b_c-d9", "normalized": "a.b_c-d9"},
+    {"raw": "Bob", "normalized": "bob"},
+    {"raw": "  bob  ", "normalized": "bob"},
+    {"raw": "\tbob\t", "normalized": "bob"}
+  ],
+  "refuse": [
+    "ab",
+    "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+    "bo b",
+    "Bo b!",
+    "bo/b",
+    "bób",
+    "",
+    "   ",
+    "system:bootstrap",
+    " ab "
+  ]
+}

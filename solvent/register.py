@@ -35,7 +35,7 @@ bp = Blueprint("register", __name__)
 
 # All four invalid invite states render the same message, so a probe
 # learns nothing about which one applies.
-INVALID_INVITE = "This invite link is not valid"
+INVALID_INVITE = "This invite link is not valid."
 
 
 class RegisterRequest(Payload):
@@ -50,6 +50,13 @@ class RegisterRequest(Payload):
     profileSchemaVersion: Optional[int] = None
     profileCiphertext: Optional[str] = None
     profileNonce: Optional[str] = None
+
+
+def refuse(reason: str):
+    """A Bad Request naming its reason, for the two the contract pins
+    (architecture.md, Status codes). Raised, so the transaction around
+    it rolls back."""
+    abort(make_response(jsonify(refused=reason), 400))
 
 
 def usable_invite(conn, token: str):
@@ -131,10 +138,14 @@ def register():
 
     username = normalize_username(body.username)
     if username is None:
-        abort(400)
+        refuse("username")
     if decode_b64(body.salt, exact_bytes=SALT_BYTES) is None:
         abort(400)
     if not kdf_envelope_ok(body.kdf):
+        abort(400)
+    if body.dekNonce is not None and decode_b64(body.dekNonce, exact_bytes=NONCE_BYTES) is None:
+        abort(400)
+    if body.wrappedDek is not None and decode_b64(body.wrappedDek) is None:
         abort(400)
 
     vault_fields = (
@@ -149,7 +160,7 @@ def register():
     with write_transaction() as conn:
         invite = usable_invite(conn, body.inviteToken)
         if invite is None:
-            abort(400)
+            refuse("invite")
 
         wants_vault = invite["kind"] == "vault_owner"
         if wants_vault != all(field is not None for field in vault_fields):
@@ -189,10 +200,6 @@ def register():
         )
 
         if wants_vault:
-            if decode_b64(body.dekNonce, exact_bytes=NONCE_BYTES) is None:
-                abort(400)
-            if decode_b64(body.wrappedDek) is None:
-                abort(400)
             conn.execute(
                 "INSERT INTO dek_wrappers "
                 "(credential_id, wrapped_dek, dek_nonce, created_at) "

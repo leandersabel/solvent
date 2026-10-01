@@ -38,7 +38,12 @@ you arrived from a link to do one thing.
   digits, dot, underscore, hyphen. Lowercase only, so no two people
   claim names that differ by capitalization alone. It is lowercased as
   you type rather than quietly changed afterwards, so what you see is
-  what you will sign in with.
+  what you will sign in with. A line under the field always states the
+  rule. It says what is wrong the moment you type a character the rule
+  does not allow or go past thirty-two, and points out a name that is
+  too short when you leave the field. The button stays unusable until
+  the username fits, so nobody waits through the slow setup only to be
+  refused for the name.
 - **Password, and again to confirm.** With a strength gauge that fills
   as you type and says, in words, roughly how long the password would
   hold up.
@@ -101,9 +106,9 @@ responsive. It must never look like it has hung.
 ### Create an administrator account
 
 This is the screen an invite for an administrator account opens, and it
-is a shorter one. A single card, same as the other, with a username and
-a password held to the same bar and measured by the same strength
-gauge. The bar is not relaxed here, because this password guards the
+is a shorter one. A single card, same as the other, with a username
+under the same rule and the same line beneath it, and a password held
+to the same bar and measured by the same strength gauge. The bar is not relaxed here, because this password guards the
 power to delete every account on the instance.
 
 What is absent is absent because there is no vault:
@@ -130,7 +135,8 @@ You land in the admin area, signed in.
 
 - **The link is no good.** No form at all, just: this invite link is
   not valid. Wrong, used, expired, and called back all say exactly
-  that, word for word.
+  that, word for word. A link that stops working while the page is open
+  says the same when you submit.
 - **The username is taken.** Said plainly. Somebody holding a valid
   invite to a small household instance learning that a username exists
   is accepted rather than defended against here. A username is taken
@@ -144,9 +150,13 @@ You land in the admin area, signed in.
   and the invite is still good, and offers a retry after closing other
   tabs. It does not quietly set up a weaker vault instead, and it never
   tells you that your phone cannot do this.
-- **The submit fails after the slow part.** Everything typed is still
-  there. Nobody re-types a password and waits again because of a
-  network blip.
+- **Solvent cannot be reached, or fails, after the slow part.**
+  Everything typed is still there. Nobody re-types a password and waits
+  again because of a network blip. This is the only case that says the
+  submit did not go through.
+- **Solvent refuses the registration for any other reason.** The screen
+  says nothing was created, and to ask whoever sent the invite if it
+  happens again.
 
 ## What must be true
 
@@ -174,6 +184,15 @@ You land in the admin area, signed in.
   up the link. You try again with the same link.
 - A password under twelve characters, or one that fails the strength
   rating, cannot be submitted, and the slow setup never starts.
+- A username outside the rule cannot be submitted either, on either
+  screen. The rule is on screen before you type, and a character it
+  does not allow, or a thirty-third character, is named as wrong the
+  moment it is typed.
+- A link that stops working while the page is open is answered with the
+  same words as opening a bad link. Any other refusal says that nothing
+  was created and to ask whoever sent the invite if it happens again.
+- Only a failure to reach Solvent, or Solvent failing, says the submit
+  did not go through. No refusal is worded as one.
 - The vault form cannot be submitted without ticking the no-recovery
   acknowledgement. The administrator form does not carry one, and does
   not claim anything about recovery in its place.
