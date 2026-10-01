@@ -125,7 +125,9 @@ time, not a fixed policy, because both options are legitimate:
   was liquidated at a figure, `0` if it simply ended. This is the
   expected path, not a nicety: with it, the holding's band reaches its
   closing value as recorded data, and the trend chart interpolates into
-  that value like any other snapshot (`net-worth-view.md`). It is a
+  that value like any other snapshot. On either path the holding counts
+  on chart dates before `archivedAt` and on none from it on
+  (`net-worth-view.md`, Archived holdings). It is a
   recording action like any other, so it refreshes prices at
   `archivedAt`, the unit of the holding being archived included, since
   that holding is still active at that moment. The user may skip it,
@@ -242,7 +244,8 @@ whole reach of the cascade: no other record type carries an
   and ends there, instead of dropping by the last known value.
 - Archiving with the closing snapshot skipped still archives; the drop
   at `archivedAt` is unexplained, and that is the user's choice. Both
-  paths annotate the date as an archive.
+  paths annotate the date as an archive, and on both the chart's value
+  at `archivedAt` leaves the holding out.
 - A holding saved with a dimension set to one value and then re-saved
   with another carries exactly one entry for that dimension id
   afterwards — true by construction of the map, so the test guards the

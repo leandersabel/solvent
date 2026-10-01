@@ -1092,15 +1092,16 @@ await check('net-worth-view: archiving leaves every earlier point and drops the 
   assert.deepEqual(changed, []);
   const skipped = model({ ...spec('2026-02-01'), figures: spec().figures.slice(0, 2) });
   const skippedCurve = curve(skipped, '2026-01-01', '2026-04-01');
-  assert.equal(decimal.format(skippedCurve.get('2026-02-01')), '140');
+  // It counts on every date before the archive date and on none from it on.
+  assert.equal(decimal.format(skippedCurve.get('2026-01-31')), '140');
+  assert.equal(decimal.format(skippedCurve.get('2026-02-01')), '100');
   assert.equal(decimal.format(skippedCurve.get('2026-02-02')), '100');
   assert.equal(decimal.format(archived.totals().net), '100');
 });
 
 // A holding's first recording, or its archive, is a step at its own date,
-// so each sample also carries the stack just before and just after it.
+// so each sample also carries the stack just before it.
 const justBefore = async (bands, index) => (await load('chart.js')).stack(bands, false, 'before').net[index];
-const justAfter = async (bands, index) => (await load('chart.js')).stack(bands, false, 'after').net[index];
 
 const flatLater = () =>
   model({
@@ -1137,7 +1138,6 @@ await check('net-worth-view: a holding first recorded on a later date steps in a
   assert.equal(decimal.format(total.points[1] - total.points[0]), '800000');
   // Just before 1 October the flat is not there, so the line stays level.
   assert.equal(await justBefore(bands, 1), Number(decimal.format(total.points[0])));
-  assert.equal(await justAfter(bands, 1), Number(decimal.format(total.points[1])));
 });
 
 await check('net-worth-view: grouped by a dimension, the later holding\'s band starts at its first date and the others do not move', async () => {
@@ -1158,7 +1158,7 @@ await check('net-worth-view: grouped by a dimension, the later holding\'s band s
   assert.deepEqual(at(before.layers, 'p').lower[1], at(main.layers, 'p').lower[1]);
 });
 
-await check('net-worth-view: a band archived with no closing snapshot drops at archivedAt and does not slope to the next sample', async () => {
+await check('net-worth-view: a band archived with no closing snapshot is on the side just before archivedAt and off the value at it', async () => {
   const vault = model({
     holdings: [
       { name: 'Kept', unit: 'CHF' },
@@ -1172,19 +1172,110 @@ await check('net-worth-view: a band archived with no closing snapshot drops at a
   });
   const { days, bands } = vault.series(null, day('2026-01-01'), day('2026-04-01'));
   const index = days.indexOf(day('2026-02-01'));
-  assert.equal(decimal.format(bands[0].points[index]), '140');
-  assert.equal(await justAfter(bands, index), 100);
+  assert.equal(decimal.format(bands[0].points[index - 1]), '140');
+  assert.equal(decimal.format(bands[0].points[index]), '100');
   assert.equal(await justBefore(bands, index), 140);
   assert.equal(decimal.format(bands[0].points[index + 1]), '100');
 });
 
-await check('net-worth-view: the first sample has no step before it and the last none after it', async () => {
+await check('net-worth-view: with a closing snapshot the side just before archivedAt carries the closing value, not the day before\'s quantity', () => {
+  const vault = model({
+    holdings: [{ name: 'Closed', unit: 'CHF', archivedAt: '2026-02-01' }],
+    figures: [
+      ['Closed', '2026-01-01', '100'],
+      ['Closed', '2026-02-01', '10'],
+    ],
+  });
+  const { days, bands } = vault.series(null, day('2026-01-01'), day('2026-02-01'));
+  const index = days.indexOf(day('2026-02-01'));
+  assert.equal(bands[0].points[index], 0n);
+  assert.equal(decimal.format(bands[0].before.assets[index]), '10');
+});
+
+await check('net-worth-view: archived on the newest recorded date with the closing value skipped, the chart edge and every reading equal the total', async () => {
+  const vault = model({
+    holdings: [
+      { name: 'Kept', unit: 'CHF' },
+      { name: 'Gold', unit: 'XAU-ozt', archivedAt: '2026-10-01' },
+    ],
+    figures: [
+      ['Kept', '2026-09-15', '1000'],
+      ['Kept', '2026-10-01', '1000'],
+      ['Gold', '2026-09-15', '2'],
+    ],
+    prices: [['XAU-ozt', '2026-09-15', '2000']],
+  });
+  assert.equal(vault.chartLastDate(), '2026-10-01');
+  const { days, bands } = vault.series(null, day('2026-09-15'), day(vault.chartLastDate()));
+  const edge = bands.reduce((sum, band) => sum + band.points.at(-1), 0n);
+  assert.equal(edge, vault.totals('latest').net);
+  assert.equal(decimal.format(edge), '1000');
+  // The change over the range reads the same last point.
+  assert.equal(decimal.format(edge - bands[0].points[0]), '-4000');
+  // The drop is drawn at that date: 5000 just before it, 1000 at it.
+  assert.equal(await justBefore(bands, days.length - 1), 5000);
+});
+
+await check('net-worth-view: archived after the newest recording, the chart extends to the archive date and its edge is the total', () => {
+  const vault = model({
+    holdings: [
+      { name: 'Kept', unit: 'CHF' },
+      { name: 'Gold', unit: 'XAU-ozt', archivedAt: '2026-10-05' },
+    ],
+    figures: [
+      ['Kept', '2026-09-15', '1000'],
+      ['Gold', '2026-09-15', '2'],
+    ],
+    prices: [['XAU-ozt', '2026-09-15', '2000']],
+  });
+  assert.equal(vault.chartLastDate(), '2026-10-05');
+  const { days, bands } = vault.series(null, day('2026-09-15'), day(vault.chartLastDate()));
+  assert.deepEqual(days, [day('2026-09-15'), day('2026-10-05')]);
+  assert.equal(bands.reduce((sum, band) => sum + band.points.at(-1), 0n), vault.totals('latest').net);
+  assert.equal(decimal.format(vault.totals('latest').net), '1000');
+});
+
+await check('net-worth-view: a price entry at the archive date moves the side just before it and leaves the value at it unchanged', async () => {
+  const at = (rate) => {
+    const vault = model({
+      holdings: [{ name: 'Gold', unit: 'XAU-ozt', archivedAt: '2026-10-01' }],
+      figures: [['Gold', '2026-09-15', '2']],
+      prices: [['XAU-ozt', '2026-09-15', '2000'], ['XAU-ozt', '2026-10-01', rate]],
+    });
+    const { days, bands } = vault.series(null, day('2026-09-15'), day('2026-10-01'));
+    return { value: bands[0].points.at(-1), before: justBefore(bands, days.length - 1) };
+  };
+  const [low, high] = [at('2100'), at('2400')];
+  assert.equal(low.value, 0n);
+  assert.equal(high.value, 0n);
+  // The quantity is carried forward and D's own price values it.
+  assert.equal(await low.before, 4200);
+  assert.equal(await high.before, 4800);
+});
+
+await check('net-worth-view: a holding first valued and archived on the same date is on neither side of its step', async () => {
+  const vault = model({
+    holdings: [
+      { name: 'Kept', unit: 'CHF' },
+      { name: 'Blip', unit: 'CHF', archivedAt: '2026-02-01' },
+    ],
+    figures: [
+      ['Kept', '2026-01-01', '100'],
+      ['Kept', '2026-03-01', '100'],
+      ['Blip', '2026-02-01', '7'],
+    ],
+  });
+  const { days, bands } = vault.series(null, day('2026-01-01'), day('2026-03-01'));
+  const index = days.indexOf(day('2026-02-01'));
+  assert.equal(decimal.format(bands[0].points[index]), '100');
+  assert.equal(await justBefore(bands, index), 100);
+});
+
+await check('net-worth-view: the first sample has no side before it and every later one steps from its before side to its own value', async () => {
   const { outline } = await load('chart.js');
   const at = (value) => value;
-  // Both ends still step on their own side: the first sample after, the
-  // last before.
-  const points = outline([0, 10, 20], [[99, 1, 7], [0, 3, 5], [2, 4, 99]], at, at);
-  assert.deepEqual(points, ['0,0', '0,2', '10,1', '10,3', '10,4', '20,7', '20,5']);
+  const points = outline([0, 10, 20], [[99, 1, 7], [0, 3, 5]], at, at);
+  assert.deepEqual(points, ['0,0', '10,1', '10,3', '20,7', '20,5']);
 });
 
 await check('net-worth-view: on latest rates the chart\'s right edge is the total, and the other mode is not', () => {

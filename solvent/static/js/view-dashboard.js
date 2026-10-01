@@ -260,7 +260,7 @@ function reopenDatePicker(context) {
 function chartSeries(vault, state, dimension) {
   const dates = vault.recordingDates();
   if (!dates.length) return null;
-  const lastDay = dayNumber(dates[dates.length - 1]);
+  const lastDay = dayNumber(vault.chartLastDate());
   const firstRecorded = dayNumber(dates[0]);
   const span = RANGES.find(([label]) => label === state.range)[1];
   const fromDay = span === null ? firstRecorded : Math.max(firstRecorded, lastDay - span);
