@@ -2,7 +2,7 @@
 // (spec/ui/snapshot-entry.md).
 import * as decimal from './decimal.js';
 import * as writes from './writes.js';
-import { dialog, el, resumable, today } from './dom.js';
+import { dialog, el, mount, resumable, today } from './dom.js';
 import { dateField } from './datepicker.js';
 import { rateBlock, rateChangeCopy } from './view-sweep.js';
 
@@ -65,7 +65,7 @@ export function snapshotDialog(vault, holding, existing, onSaved, onOpenRecordin
         ? `Prices for ${vault.format.longDate(on)} will be recorded with this, for every other unit in your vault, although this figure is in ${vault.mainCurrency}.`
         : `Prices for ${vault.format.longDate(on)} will be recorded with this.`;
     }
-    pricesBody.replaceChildren(
+    mount(pricesBody, [
       block.element,
       joining && onOpenRecording && occupied
         ? el('button', {
@@ -77,7 +77,7 @@ export function snapshotDialog(vault, holding, existing, onSaved, onOpenRecordin
             },
           })
         : null,
-    );
+    ]);
     if (sit && writes.needsLookup(vault, on)) {
       sit.proposals = writes.fetchProposals(vault, on);
       block.waiting();
@@ -110,7 +110,7 @@ export function snapshotDialog(vault, holding, existing, onSaved, onOpenRecordin
   value.addEventListener('input', describeConverted);
 
   const fail = (text, children = []) => {
-    error.replaceChildren(text, ...children);
+    mount(error, [text, ...children]);
     error.hidden = false;
   };
   const refusedAt = (on) =>

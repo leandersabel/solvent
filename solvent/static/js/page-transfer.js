@@ -4,7 +4,7 @@
 // to a new machine, to a fresh install, or into another person's
 // account on the instance. Neither card treats that as a hazard.
 import * as api from './api.js';
-import { el, icon } from './dom.js';
+import { el, icon, mount } from './dom.js';
 import { replaceDek, wrapForMaster } from './session.js';
 import * as transfer from './transfer.js';
 import { passwordWithToggle } from './unlock.js';
@@ -235,7 +235,7 @@ function importCard(vault, reload) {
   const showReview = () => {
     const counts = transfer.countKinds(parsed.records);
     const theirs = opened.profile ? opened.profile.mainCurrency : null;
-    review.replaceChildren(
+    mount(review, [
       el('div', { class: 'review-side' }, [
         el('h3', { class: 'group-heading', text: 'In the file' }),
         el('p', { text: `${counts.account} holdings` }),
@@ -260,7 +260,7 @@ function importCard(vault, reload) {
       parsed.formatVersion < transfer.FORMAT_VERSION
         ? el('p', { class: 'review-line', text: 'This file was written by an earlier version. It is brought up to date as it goes in.' })
         : null,
-    );
+    ]);
     review.hidden = false;
     stepConfirm.hidden = false;
   };
