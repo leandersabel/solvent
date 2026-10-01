@@ -377,6 +377,19 @@ function leaveOutsideFrame(bar) {
   document.title = 'Solvent';
 }
 
+/** The password screen and the registration screen sit outside the
+ *  shell: the wordmark above one card, and no bar at all. The vault
+ *  page loads locked and returns here on every lock, so the bar goes
+ *  back to hidden and the frame is put back, the inverse of
+ *  `leaveOutsideFrame`. Safe to call when the frame is already up. */
+export function enterOutsideFrame() {
+  const bar = document.querySelector('.topbar');
+  if (bar) bar.hidden = true;
+  if (document.body.classList.contains('outside-body')) return;
+  document.body.classList.add('outside-body');
+  document.body.prepend(el('p', { class: 'outside-wordmark', text: 'Solvent' }));
+}
+
 /** Draw the chrome the server had no kind to draw.
  *
  *  A page reached without a session carries the wordmark alone, so

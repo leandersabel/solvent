@@ -380,6 +380,35 @@ const sitting = async (session, name) =>
     });
   })()`));
 
+// What chrome a person can see, by what is rendered and not by what is
+// in the DOM: a bar with `hidden` is present and not drawn. Outside the
+// shell (password and registration screens) there is no top bar, no
+// navigation, no Update values and no Lock, only the wordmark above the
+// card (product/app-shell.md, What must be true).
+const chromeState = async (session) =>
+  JSON.parse(await session.eval(`(() => {
+    const shown = (n) => n.getClientRects().length > 0 && getComputedStyle(n).visibility !== 'hidden';
+    const visible = (selector) => [...document.querySelectorAll(selector)].filter(shown);
+    const bar = document.querySelector('.topbar');
+    return JSON.stringify({
+      bar: Boolean(bar) && shown(bar),
+      barParts: bar ? [...bar.querySelectorAll('*')].filter(shown).length : 0,
+      navs: visible('nav').length,
+      links: visible('.topbar a, nav a').length,
+      buttons: visible('.topbar button, .topbar-actions button, .btn-chrome').length,
+      topbarWordmark: visible('.topbar .wordmark').length,
+      outsideWordmark: visible('.outside-wordmark').length,
+      text: document.body.innerText,
+      card: Boolean(document.querySelector('#unlock-password')),
+    });
+  })()`));
+const noChrome = (state) =>
+  !state.bar && state.barParts === 0 && state.navs === 0 && state.links === 0 && state.buttons === 0 &&
+  state.topbarWordmark === 0 && state.outsideWordmark === 1 &&
+  !/Update values|Dashboard|Settings|\bLock\b/.test(state.text);
+const hasChrome = (state) =>
+  state.bar && state.navs === 1 && state.links === 2 && state.buttons === 2 && state.topbarWordmark === 1 && state.outsideWordmark === 0;
+
 // Waits for the vault to be showing, without throwing, so that a
 // failure is one failed check and the run goes on.
 const intoVault = (session, label, timeout = 90000) =>
@@ -519,6 +548,14 @@ try {
     'a vault owner invite renders the vault form',
     (await page.eval("document.querySelector('.card-heading').textContent")) === 'Create your vault',
   );
+  {
+    const registrationChrome = await chromeState(page);
+    check(
+      'the registration screen shows no top bar and no navigation',
+      !registrationChrome.bar && registrationChrome.navs === 0 && registrationChrome.links === 0 && registrationChrome.buttons === 0 && registrationChrome.outsideWordmark === 1,
+      JSON.stringify({ ...registrationChrome, text: undefined }),
+    );
+  }
   check('the currency warning sits at the point of choice', (await text()).includes('This cannot be changed later.'));
   check('the acknowledgement is required', (await text()).includes('permanently unreadable'));
 
@@ -567,6 +604,14 @@ try {
   // A page load discards the in-memory keys by definition.
   await page.goto(`${BASE}/dashboard`);
   check('a reload asks for the password again', (await text()).includes('Solvent cannot recover a lost password'));
+  {
+    const reloadedChrome = await chromeState(page);
+    check(
+      'the password screen after registering and reloading shows no top bar and no navigation',
+      noChrome(reloadedChrome),
+      JSON.stringify({ ...reloadedChrome, text: undefined }),
+    );
+  }
   await enterPassword(VAULT_PASSWORD);
   await page.waitUntil("document.body.innerText.includes('Add your first holding')", {
     timeout: 90000,
@@ -5236,9 +5281,31 @@ try {
       locked.card && !locked.keys && !(await sat.eval("Boolean(document.querySelector('#unlock-username'))")),
       JSON.stringify(locked),
     );
+    const lockedChrome = await chromeState(sat);
+    check(
+      'after Lock the password screen shows no top bar, no navigation, no Update values and no Lock, only the wordmark',
+      noChrome(lockedChrome),
+      JSON.stringify({ ...lockedChrome, text: undefined }),
+    );
+    // Nothing reaches the vault while it is locked, whatever the page's
+    // store is asked to do.
+    const lockedAddress = await sat.eval('location.href');
+    await sat.eval("(() => { Alpine.store('shell').update(); Alpine.store('vault').updateValues(); })()");
+    await sat.settle(300);
+    check(
+      'Update values while locked leaves the address and the card as they were',
+      (await sat.eval('location.href')) === lockedAddress && (await sat.eval("Boolean(document.querySelector('#unlock-password'))")),
+      await sat.eval('location.href'),
+    );
     await signInOn(sat, VAULT_PASSWORD);
     check('unlocking after the lock returns to the vault', await intoVault(sat, 'the vault after unlocking'));
     await sat.settle(500);
+    const unlockedChrome = await chromeState(sat);
+    check(
+      'after unlocking again the top bar, its two links and its two controls are back, and the outside wordmark is gone',
+      hasChrome(unlockedChrome),
+      JSON.stringify({ ...unlockedChrome, text: undefined }),
+    );
 
     // Back, after leaving the page while unlocked: the keys went with
     // the page, and nothing from the vault is shown.
@@ -5258,8 +5325,29 @@ try {
     await sat.settle(600);
     const refreshed = await sat.eval("(async () => JSON.stringify({ card: Boolean(document.querySelector('#unlock-password')), keys: (await import('/static/js/session.js')).currentVault() !== null }))()").then(JSON.parse);
     check('a refresh still asks for the password', refreshed.card && !refreshed.keys, JSON.stringify(refreshed));
+    const refreshedChrome = await chromeState(sat);
+    check(
+      'after a refresh the password screen shows no top bar and no navigation',
+      noChrome(refreshedChrome),
+      JSON.stringify({ ...refreshedChrome, text: undefined }),
+    );
   } finally {
     sittingBrowser.close();
+  }
+
+  // A visitor with no session at the bare host is sent to the sign-in
+  // screen on the vault page, and it draws no bar of any kind.
+  const visitorBrowser = await openBrowser(`${BASE}/`);
+  try {
+    await visitorBrowser.session.waitUntil("document.querySelector('#unlock-password')", { label: 'the card at the bare host' });
+    const visitorChrome = await chromeState(visitorBrowser.session);
+    check(
+      'a visitor with no session at the bare host sees the password screen with no top bar and no navigation',
+      noChrome(visitorChrome) && (await visitorBrowser.session.eval('location.pathname')) === '/dashboard',
+      JSON.stringify({ ...visitorChrome, text: undefined }),
+    );
+  } finally {
+    visitorBrowser.close();
   }
 
   // ---- Registration: the invite stays out of every request, and a failed first read ----

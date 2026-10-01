@@ -65,8 +65,14 @@ def login_page():
 @bp.get("/dashboard")
 @navigation
 def dashboard():
-    """The vault shell page, where the keys live once it is unlocked."""
-    return vault_page()
+    """The vault shell page, where the keys live once it is unlocked.
+
+    It loads locked, so it is served in the outside frame with the bar
+    hidden: the password screen has no bar and no navigation, and the
+    client shows the bar once the keys exist and hides it again on a
+    lock (ui/design-system.md, App shell).
+    """
+    return vault_page(locked=True)
 
 
 @bp.get("/settings")
