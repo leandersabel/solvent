@@ -18,8 +18,7 @@ Maintained by the compiler agent. Rows are in build order.
 | export-import | x | x | x |
 
 Verified means every acceptance criterion in the feature file is
-asserted. A row without it is asserted in the parts a server and a
-browser can reach, and its named gaps are in `spec/questions.md`.
+asserted.
 
 `admin-invites` comes before `register` because registration consumes
 an invite, and the invite table and `flask create-invite` are what

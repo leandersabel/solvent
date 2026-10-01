@@ -4,7 +4,8 @@
   "read": [
     {"file": "spec/features/app-shell.md", "sections": ["all"]},
     {"file": "spec/architecture.md", "sections": ["Components", "Status codes", "Refusals", "Application hardening", "Network & transport", "Supply chain", "Tech stack", "Accounts on this instance", "Credentials and vault key wrappers", "Key management"]},
-    {"file": "spec/ui/design-system.md", "sections": ["App shell", "Components", "States"], "role": "the chrome this feature renders, top bar, nav, Update values, Lock and the administrator's stripped bar. No screen of its own"},
+    {"file": "spec/ui/design-system.md", "sections": ["Typography", "Spacing and shape", "App shell", "Components", "States", "Accessibility"], "role": "the chrome this feature renders, top bar, nav, Update values, Lock and the administrator's stripped bar, and the sizes that change at phone width. No screen of its own"},
+    {"file": "spec/product/app-shell.md", "sections": ["On a phone"], "role": "the phone rule every screen follows, which each screen's At phone width section applies. Its criteria are not in What must be true"},
     {"file": "spec/features/admin-invites.md", "sections": ["The admin boundary"], "role": "the boundary the surface split is the routing half of"}
   ],
   "dependsOn": ["register", "login"],
@@ -75,6 +76,10 @@
     "chromeByKind": {"value": "vault owner: nav of Dashboard and Settings, Update values shown, right-hand control Lock, record and decryption layer loaded. Administrator: no nav entries at all, Update values absent rather than disabled, right-hand control Sign out, record and decryption layer not loaded. Both: the embedded KDF envelope and the Argon2id worker", "cite": "spec/features/app-shell.md#the-chrome"},
     "navHasNoAdminOrHoldingsEntry": {"value": "there is no Holdings entry and no Admin entry in either bar, in any state", "cite": "spec/ui/design-system.md#app-shell"},
     "contentMaxWidth": {"value": "1200px on the ground. Forms are 480px, and 900px covers the sweep, a recording's own screen and account detail", "cite": "spec/ui/design-system.md#app-shell"},
+    "phoneRule": {"value": "every screen can be read and operated end to end on a phone without panning sideways, entering figures and the update sweep included. A screen may take a different shape at a different width, chosen by the width of the screen. No action exists only inside a wide layout and no screen has a single route to something a narrow screen could not offer", "cite": "spec/product/app-shell.md#on-a-phone"},
+    "phoneWidthThreshold": {"value": "unresolved", "cite": "spec/ui/design-system.md#typography"},
+    "phoneSizes": {"value": "hero figure 40px with its currency code at 18px, screen heading 26px, section heading 17px, section label 11px, every other role unchanged. Page gutter 16px, card padding 16px, every button at least 44px tall", "cite": "spec/ui/design-system.md#typography, spec/ui/design-system.md#spacing-and-shape"},
+    "phoneChrome": {"value": "the nav drops to a second row of the bar, beneath the wordmark and the two buttons, and the lock button shows its icon alone with 'Lock' as its accessible name. A dialog is a full-screen sheet with the same content and focus behavior, and a segmented control spans its row", "cite": "spec/ui/design-system.md#app-shell, spec/ui/design-system.md#components"},
     "alpineBuild": {"value": "the CSP-safe build. The standard build needs unsafe-eval for x- expressions, which would gut the CSP", "cite": "spec/architecture.md#application-hardening"},
     "statusCodes": {
       "apiNoHeader": {"value": 403, "cite": "spec/architecture.md#status-codes", "condition": "an API request lacks the X-Solvent-Request header, whether or not its path exists and whatever the session (spec/architecture.md#refusals)"},
@@ -118,5 +123,7 @@
       "'no response body originating in the shell contains vault plaintext' cannot be checked by grepping the shell's templates, since the shell never holds plaintext to begin with. The assertion that matters is that no route wired to the shell ever receives decrypted content to render"
     ]
   },
-  "openQuestions": []
+  "openQuestions": [
+    "Where phone width begins is not stated in spec/. The design system names the sizes that change 'at phone width' and the screens name what restacks, and none gives the viewport width at which the layout switches. phoneWidthThreshold is unresolved until the designer states it."
+  ]
 }

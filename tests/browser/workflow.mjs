@@ -462,8 +462,9 @@ const intoVault = (session, label, timeout = 90000) =>
 
 // Holds the first read of the vault's records on its way to the server
 // until `release()`, so a test can act while the vault is being read.
-// `reached` resolves when the read is waiting. `stop()` removes it.
-const holdRecords = async (session) => {
+// `reached` resolves when the read is waiting. `stop()` removes it. The
+// read then goes on to the server, or is answered with `answer` when given.
+const holdRecords = async (session, answer = null) => {
   let release;
   let reach;
   const gate = new Promise((resolve) => { release = resolve; });
@@ -471,7 +472,7 @@ const holdRecords = async (session) => {
   const stop = await intercept(session, '*/api/records?type=*', async () => {
     reach();
     await gate;
-    return null;
+    return answer;
   });
   return { reached, release, stop };
 };
@@ -5989,6 +5990,11 @@ try {
     check('a new vault that could not be read yet holds its keys for the retry', await holdsKeys(registrant));
     await registrant.eval("window.dispatchEvent(new PageTransitionEvent('pagehide', { persisted: true }))");
     check('leaving the page drops the keys of a new vault that could not be read yet', !(await holdsKeys(registrant)));
+    check(
+      'and the card that asks for the password has no username field',
+      (await registrant.eval("Boolean(document.querySelector('#unlock-password'))")) &&
+        !(await registrant.eval("Boolean(document.querySelector('#unlock-username'))")),
+    );
     await release2();
 
     release2 = await registerUntilUnread('registrant.idle');
@@ -6008,6 +6014,10 @@ try {
     const heldRetry = await holdRecords(registrant);
     await registrant.eval("[...document.querySelectorAll('button')].find((b) => b.textContent === 'Try again').click()");
     await Promise.race([heldRetry.reached, registrant.settle(60000)]);
+    check(
+      'Try again is disabled while it reads again',
+      await registrant.eval("[...document.querySelectorAll('button')].find((b) => b.textContent === 'Try again').disabled"),
+    );
     await registrant.eval("window.dispatchEvent(new PageTransitionEvent('pagehide', { persisted: true }))");
     heldRetry.release();
     await registrant.settle(2500);
@@ -6018,6 +6028,74 @@ try {
       JSON.stringify(retried),
     );
     await heldRetry.stop();
+
+    // A lock that lands while a read is in flight wins when the read
+    // then fails as well: the card that asks stands, no failure card
+    // draws over it, and nothing is left that could open the vault.
+    const lockedAndFailed = async (state) => {
+      const text = await registrant.eval('document.body.innerText');
+      return {
+        ...state,
+        failureCard: text.includes('Your vault is created'),
+        usernameField: await registrant.eval("Boolean(document.querySelector('#unlock-username'))"),
+      };
+    };
+    const lockWon = (state) =>
+      !state.keys && !state.vault && state.card && !state.failureCard && !state.usernameField && !state.drawn && !state.nav;
+
+    await registrant.goto(`${BASE}/register?invite=${mintInvite('vault-owner')}`);
+    await fillRegistration('registrant.firstfail');
+    await registrant.settle(600);
+    await markDocument(registrant, 'registrant.firstfail');
+    const heldFirst = await holdRecords(registrant, { status: 503 });
+    await registrant.eval("document.querySelector('button[type=submit]').click()");
+    await Promise.race([heldFirst.reached, registrant.settle(60000)]);
+    await registrant.eval("window.dispatchEvent(new PageTransitionEvent('pagehide', { persisted: true }))");
+    heldFirst.release();
+    await registrant.settle(2500);
+    const firstFailed = await lockedAndFailed(await afterRead(registrant));
+    check(
+      'a lock during the first read of a new vault wins when that read then fails: the card asks for the password only, with no failure card and no keys',
+      lockWon(firstFailed),
+      JSON.stringify(firstFailed),
+    );
+    await heldFirst.stop();
+
+    release2 = await registerUntilUnread('registrant.retryfail');
+    check(
+      'the failure card is announced as an alert',
+      await registrant.eval("document.querySelector('.card[role=alert] .card-heading')?.textContent === 'Your vault is created'"),
+    );
+    await registrant.eval("window.oldRetry = [...document.querySelectorAll('button')].find((b) => b.textContent === 'Try again'); window.oldRetry.click()");
+    await registrant.waitUntil("[...document.querySelectorAll('button')].some((b) => b.textContent === 'Try again' && b !== window.oldRetry)", {
+      label: 'the failure card drawn again',
+    }).catch(() => {});
+    const failedAgain = await registrant.eval(`(() => {
+      const retry = [...document.querySelectorAll('button')].find((b) => b.textContent === 'Try again');
+      return Boolean(retry) && retry !== window.oldRetry && !retry.disabled && Boolean(retry.closest('[role=alert]'));
+    })()`);
+    check('a retry that fails again draws the failure card again, with a Try again that is ready', failedAgain);
+    await release2();
+
+    const heldAgain = await holdRecords(registrant, { status: 503 });
+    await registrant.eval("window.oldRetry = [...document.querySelectorAll('button')].find((b) => b.textContent === 'Try again'); window.oldRetry.click()");
+    await Promise.race([heldAgain.reached, registrant.settle(60000)]);
+    await registrant.eval("window.dispatchEvent(new PageTransitionEvent('pagehide', { persisted: true }))");
+    heldAgain.release();
+    await registrant.settle(2500);
+    const retryFailed = await lockedAndFailed(await afterRead(registrant));
+    check(
+      'a lock during a read again wins when that read then fails: the card asks for the password only, with no failure card and no keys',
+      lockWon(retryFailed),
+      JSON.stringify(retryFailed),
+    );
+    // The retry the failure card offered is gone with the card, and
+    // pressing it anyway opens nothing.
+    await heldAgain.stop();
+    await registrant.eval('window.oldRetry.disabled = false; window.oldRetry.click()');
+    await registrant.settle(2500);
+    const reopened = await lockedAndFailed(await afterRead(registrant));
+    check('a retry left over from the failure card opens nothing after a lock', lockWon(reopened), JSON.stringify(reopened));
   } finally {
     registrantBrowser.close();
   }

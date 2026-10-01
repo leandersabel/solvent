@@ -9,7 +9,7 @@
     {"file": "spec/features/record-rate.md", "sections": ["Where it lives: inside the vault", "Record shape", "Two entries on one date"], "role": "the second timeline the file must carry, and why version resetting to 1 rules out a version-based tiebreak"},
     {"file": "spec/features/net-worth-view.md", "sections": ["Data flow", "Current net worth"], "role": "the round-trip assertion that the chart and both totals come back identical"},
     {"file": "spec/features/app-shell.md", "sections": ["The two surfaces", "CSRF"], "role": "both routes are vault routes, and GET /api/export is the one GET that requires the header"},
-    {"file": "spec/ui/design-system.md", "sections": ["Components", "States", "Accessibility", "App shell"], "role": "the progress, dialog and file-input conventions both screens use"},
+    {"file": "spec/ui/design-system.md", "sections": ["Typography", "Spacing and shape", "Components", "States", "Accessibility", "App shell"], "role": "the progress, dialog and file-input conventions both screens use, and the phone-width sizes"},
     {"file": "spec/ui/export-import.md", "sections": ["all"], "role": "the download and restore screens"},
     {"file": "spec/ui/settings.md", "sections": ["Organizing", "Delete my account", "States"], "role": "where both screens are reached from, and the delete dialog that offers export first"}
   ],

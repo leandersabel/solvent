@@ -164,7 +164,13 @@ async function openVault(key, dek, wrapped, began) {
   masterKey = key;
   wrapper = wrapped;
   const next = new Vault(dek);
-  await next.load();
+  try {
+    await next.load();
+  } catch (error) {
+    // A lock during the read wins over the read failing.
+    stillOpen(began);
+    throw error;
+  }
   stillOpen(began);
   vault = next;
   // A byte-identical pair loses nothing by going (record-rate.md, Two

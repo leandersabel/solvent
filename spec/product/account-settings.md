@@ -87,7 +87,9 @@ Three things are said here, most surprising first:
   warning icon, because it is the one way you can believe you have
   locked something you have not.
 - Other sessions were signed out. The current one stays, and you do
-  not have to sign in again after changing your own password.
+  not have to sign in again after changing your own password. Nothing
+  is gained by ending it, because the key never changed and there is no
+  stolen copy of it to invalidate.
 
 A wrong current password is caught before anything is sent, and is
 reported plainly.
@@ -97,14 +99,16 @@ reported plainly.
 - **Idle lock**, five to sixty minutes, fifteen unless changed. One
   line of honest tradeoff beneath it: shorter is safer, and every
   unlock costs the deliberate wait while the password becomes a key
-  (`login.md`, which owns how long that is). There is no "never", and
-  the control does not offer one.
+  (`login.md`, which owns how long that is). Being adjustable is what
+  keeps that wait from taxing a long sitting. There is no "never", and
+  the control does not offer one (`login.md` says why).
 - **You are signed out twelve hours after signing in, regardless of
   activity.** Stated, not adjustable.
 - **Open sessions**, listed by when each started and when it was last
   used, with a line volunteering that Solvent records no IP addresses
   and no devices. Anyone who has used another product assumes those
-  are kept.
+  are kept. The list is the only way you can tell whether you are still
+  signed in somewhere else, because there is no other trace of it.
 - **Sign out**, and **sign out everywhere**, which ends the current
   session too.
 
@@ -280,22 +284,3 @@ single total.
   dimension, because a tag is a dimension with one value. Two
   vocabularies over the same holdings would mean two ways to spell one
   thing, and only one of them can be stacked and summed honestly.
-
-## Decisions taken on your behalf
-
-- **The idle lock is fifteen minutes unless changed, adjustable between
-  five and sixty, and cannot be switched off.** Unlocking is never
-  free, so a fixed fifteen would be a tax on a long sitting, and no
-  lock at all would undo the defense against somebody walking up to an
-  open screen.
-- **Changing a password signs out other sessions but not this one.**
-  The alternative, signing everybody out including whoever just
-  changed it, is defensible and more cautious. Keeping the current
-  session is the friendlier default and there is no stolen key to
-  invalidate, because the key never changed.
-- **Deleting a dimension archives it instead.** Nobody asked for
-  archiving. It exists because the honest alternative, editing every
-  holding to remove a setting, can fail halfway.
-- **Open sessions are listed at all.** Nobody asked for the list. It
-  is the only way you can tell whether you are still signed in
-  somewhere else, given that there is no other trace of it anywhere.

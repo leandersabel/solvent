@@ -142,7 +142,10 @@ What is missing is missing because there is nothing for it to act on:
 
 The navigation inside the admin area is that area's own business
 (`admin-invites.md`), not the product's main navigation. The two bars
-are told apart by what they carry rather than by looking different.
+are told apart by what they carry rather than by looking different. A
+chrome of its own would make the admin area feel like a second product
+bolted on, and the same restraint with fewer controls in it says more
+plainly that there is simply less here.
 
 ### The page below the bar
 
@@ -157,9 +160,9 @@ why a page refresh always costs a fresh decryption.
 
 ## On a phone
 
-Every screen works on a phone. Not a reduced set of them, and not
-reading only: entering figures works too, the monthly update sweep
-included.
+Every screen can be read and operated end to end on a phone, without
+panning sideways. Not a reduced set of them, and not reading only:
+entering figures works too, the monthly update sweep included.
 
 Working on a phone does not mean one layout that stretches. A screen is
 allowed two designs that do the same job in different shapes, and the
@@ -170,17 +173,8 @@ step at a time, one holding per step. Same act, same figures recorded
 at the end, different screen. So a screen is described at each size
 wherever the two differ, rather than described once and assumed to fit.
 
-Phone layouts are not in the first version, which ships the
-wide-screen ones. What it may not do is put the phone ones out of
-reach: no action exists only inside a wide table, and no screen has a
-single route to something a narrow screen could not offer.
-
-What the top bar becomes at phone width is a decision for whoever draws
-the phone layouts, not a question for you.
-
-When those layouts are built, the test is that every screen can be read
-and operated end to end on a phone, the update sweep included, without
-panning sideways.
+No action exists only inside a wide table, and no screen has a single
+route to something a narrow screen could not offer.
 
 ## What must be true
 
@@ -245,7 +239,10 @@ panning sideways.
     or not, and contain nothing about any person.
 22. Starting the app with its configuration incomplete fails
     immediately, and the failure names what is missing without printing
-    its value. No secret appears in a log line or on an error page.
+    its value. The app never fills in a missing value itself, which
+    would either sign everyone out on every restart or leave sessions
+    forgeable, and surface much later as something inexplicable. No
+    secret appears in a log line or on an error page.
 
 ## What it deliberately does not do
 
@@ -269,22 +266,3 @@ panning sideways.
   server that renders it holds no readable copy of anything in the
   vault. This is not a rule the shell follows, it is a thing it is
   incapable of.
-
-## Decisions taken on your behalf
-
-- **The navigation is Dashboard and Settings, with no Holdings entry.**
-  Reversing it means designing a separate holdings screen that does not
-  simply repeat the dashboard table.
-- **The admin area keeps the same bar rather than getting a look of its
-  own.** A visibly different chrome would make the admin area feel like
-  a second product bolted on. The same restraint, with fewer controls
-  in it, says more plainly that there is simply less here.
-- **Update values is an action in the bar rather than a navigation
-  entry.**
-- **Lock has no confirmation step.**
-- **Signing out lives in Settings rather than the bar.**
-- **The app refuses to start when its configuration is incomplete,
-  rather than filling in a missing value itself.** Starting anyway
-  would either sign everyone out on every restart or leave sessions
-  forgeable, and either way the problem would surface much later as
-  something inexplicable.

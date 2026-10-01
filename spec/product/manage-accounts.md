@@ -33,7 +33,9 @@ decorated, and nothing nags.
 - **Where it is filed.** Zero or more dimensions, each one a question you
   invented about your money: Liquidity, with values Cash, Investments,
   Retirement. A holding sits in exactly one value of each dimension, or
-  in none. What filing buys you is in `net-worth-view.md`.
+  in none. That is what makes the chart's bands add up to your net
+  worth, so a holding that is half retirement and half cash is two
+  holdings. What filing buys you is in `net-worth-view.md`.
 - **A note.** Optional, free text, for what was never a category:
   "joint with M", "sold half in 2024".
 
@@ -48,6 +50,10 @@ line per position.
 A short form: name, what it is measured in, one line per dimension you
 have configured, and a note hidden behind "Add a note" so it does not
 clutter the common case.
+
+The unit is the one choice on this form that is fixed once the holding
+has values (What must be true), so the picker offers the ordinary
+choices first and says what an unusual one commits you to.
 
 The unit is picked from a list an administrator maintains for the whole
 instance, with a "Something else..." option at the foot for anything
@@ -82,9 +88,15 @@ and every value you ever recorded for it stays. Your net worth for last
 year does not move. You can undo it.
 
 The same dialog offers to record a closing value on the archive date,
-prefilled at zero and editable: what it was worth when you closed it.
-This is the expected path rather than a nicety. With it, the chart runs
-down into the closing figure like any other recorded value. Skip it and
+editable: what it was worth when you closed it. It starts at zero,
+unless the holding already has a value on that date, in which case it
+starts at that value and saving it replaces that value. There is no
+separate question about replacing, because the field already shows
+what is there. Zero is right for a position that simply ended and wrong
+for one you sold at a figure, so the field is never saved without you
+looking at it. This is the expected path rather than a nicety. With
+it, the chart runs down into the closing figure like any other
+recorded value. Skip it and
 the chart still drops on that date, with nothing recorded to explain
 why, so the app says that in the dialog rather than letting you find out
 in a chart six months later. Either way the date is annotated as an
@@ -94,7 +106,7 @@ archive date and refreshes the rates like any other recording does.
 Where that date already holds a recording, the rates it holds stand
 (`record-snapshot.md`).
 
-**Delete permanently** is the other answer, and it removes the holding
+**Delete permanently** is the secondary answer, and it removes the holding
 and every value ever recorded against it. You type the holding's name to
 confirm, and the dialog states plainly that your past net worth figures
 will change, because the history is what is going away.
@@ -146,7 +158,9 @@ and the current total.
 - Once a holding has recorded values, the app refuses to change what it
   is measured in and says why, rather than quietly reinterpreting
   figures you entered in the old unit and revaluing its whole history
-  against a different run of rates.
+  against a different run of rates. Grams of gold and troy ounces of
+  gold are priced by different runs. A different unit means archiving
+  the holding and starting a new one, which breaks its history in two.
 - Editing a holding in two browser tabs at once does not silently lose
   one of the edits. The second one is told and asked to redo it.
 - A name, note or dimension label containing something that looks like
@@ -156,9 +170,8 @@ and the current total.
 
 - **No position level tracking of shares.** No tickers, no share counts,
   no cost basis, no per holding performance. A depot is one figure you
-  read off your broker, the same act as updating a bank balance. This is
-  the single largest scope decision in the product and it is what keeps
-  an update sitting to a few minutes.
+  read off your broker, the same act as updating a bank balance, and it
+  is what keeps an update sitting to a few minutes.
 - **No automatic connection to any bank.** A third party cannot encrypt
   on your behalf, so a bank feed and a vault only you can read cannot
   both exist. Values are entered by hand, and the sweep screen (record a
@@ -172,33 +185,3 @@ and the current total.
 - **No search or report the server runs for you.** It cannot read your
   list. Everything you see is assembled in your own browser after you
   unlock.
-
-## Decisions taken on your behalf
-
-- **Archive is preselected** in the stop dialog, and permanent delete is
-  the secondary action.
-- **The closing value is prefilled at zero.** Zero is right for a
-  position that simply ended and wrong for one you sold at a figure, so
-  the field is editable and never saved without you looking at it.
-- **What a holding is measured in is frozen once it has values.** A
-  unit is not a label. It decides which run of prices values the
-  holding, and grams of gold and troy ounces of gold are priced by
-  different runs, so changing it means both reinterpreting every
-  quantity recorded and repointing the holding at a different price
-  history. Until that exists, the only route to a different unit is to
-  archive the holding and start a new one, which breaks the history in
-  two. The picker earns its keep here by offering the ordinary choices
-  first and saying what an unusual one commits you to.
-
-  Changing a unit properly, by converting every recorded figure at a
-  factor you confirm and repointing the holding at the new unit's
-  prices, is wanted and is not in the first version. It is the one
-  operation in the product that would rewrite figures you personally
-  vouched for, which is why it needs the confirmation and why it is not
-  something to add in a hurry.
-- **A holding sits in at most one value of each dimension.** This is what
-  makes the chart's bands add up to your net worth. A holding that is
-  half retirement and half cash has to be two holdings.
-- **A dimension may hold as many values as you like**, but the chart
-  colors the first four and folds the rest into "Other"
-  (`net-worth-view.md`). The limit is the chart, not your data.

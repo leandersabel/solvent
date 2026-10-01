@@ -178,7 +178,7 @@ step). On a large vault this is the longest operation in the product.
   no schedule, no "it has been a while". The product does not know, and
   it is kept that way so a backup stays a plain file the person holds
   and nothing comes to depend on the app tracking it
-  (`product/export-import.md`, Decisions taken on your behalf). A screen
+  (`product/export-import.md`, What it deliberately does not do). A screen
   implying otherwise would be the first such dependency.
 - **No merge, and no control that could be read as one.** No "keep what
   I have", no per-record choice, no preview of what would survive.

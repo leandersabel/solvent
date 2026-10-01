@@ -192,12 +192,36 @@ two callers rather than two record writers.
   responsive.
 - **Registration POST fails after key derivation** → the client keeps
   form state so the user need not re-enter and re-derive.
+- **The first read of the new vault fails** (its `GET /api/records`
+  after a successful `POST /api/register`) → the registration stands:
+  the account exists and its session is live. The client keeps the
+  Master Key, DEK and wrapper in the same document, starts the idle
+  timer, and offers to read again (copy and layout: ui/register.md,
+  States). Reading again fetches and decrypts the vault in place and
+  enters it. There is no page load and no password prompt, because a
+  load drops the keys and asks for the password the person has just
+  chosen.
+  - The held keys are bound like an open vault's: the idle lock and the
+    lock on `pagehide` (architecture.md, Application hardening) discard
+    them and draw the unlock card, which asks for the password only.
+  - A lock during the first read or a later one wins. The read
+    finishing opens nothing, and the unlock card stands.
 
 ## Acceptance criteria
 
 - Given a valid unused invite, a compliant password, and a free
   username, registration succeeds and the user lands authenticated with
   Master Key and DEK in memory.
+- With the first `GET /api/records` after a vault owner registration
+  answering 503, the page stays the same document, holds the keys, and
+  shows no password field and no unlock card. Reading again with the
+  fetch answering lands at `/dashboard` in the same document, unlocked,
+  with no password typed.
+- While a new vault waits to be read again, the idle period passing
+  discards the keys and shows the unlock card with a password field and
+  no username field, and a `pagehide` discards the keys.
+- A `pagehide` while the retried read is in flight leaves no keys, no
+  vault, nothing of the vault drawn, and the unlock card shown.
 - The registration request body contains no password, no Master Key, and
   no unwrapped DEK — asserted against the captured request payload in a
   test, not by inspection.

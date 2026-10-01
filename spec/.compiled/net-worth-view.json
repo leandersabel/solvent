@@ -9,7 +9,8 @@
     {"file": "spec/features/record-api.md", "sections": ["Endpoints", "Schema migration", "Row shape"], "role": "the four fetches the model is built from and the unreadable-record cases the warning counts"},
     {"file": "spec/features/manage-accounts.md", "sections": ["Record shape", "Dimensions", "Delete: the user chooses"], "role": "the accounts, their units and the partition the bands come from"},
     {"file": "spec/features/account-settings.md", "sections": ["The profile record", "Dimensions"], "role": "the main currency and the configured band order"},
-    {"file": "spec/ui/design-system.md", "sections": ["Chart palette (validated)", "Colors by chart job", "Stacked areas", "The two neutral bands", "The estimated marker", "Components", "States", "Typography", "Accessibility", "App shell"], "role": "the chart palette, the entry mark, and the table and disclosure conventions"},
+    {"file": "spec/ui/design-system.md", "sections": ["Chart palette (validated)", "Colors by chart job", "Stacked areas", "The two neutral bands", "The estimated marker", "Components", "States", "Typography", "Spacing and shape", "Accessibility", "App shell"], "role": "the chart palette, the entry mark, the table and disclosure conventions, and the phone-width sizes"},
+    {"file": "spec/product/app-shell.md", "sections": ["On a phone"], "role": "the phone rule the dashboard's At phone width section applies"},
     {"file": "spec/ui/dashboard.md", "sections": ["all"], "role": "the screen this feature drives"},
     {"file": "spec/ui/account-detail.md", "sections": ["Header", "The holding's own list of values", "States"], "role": "one holding's figures and as-of dates, drawn from the same model"}
   ],
@@ -79,5 +80,8 @@
       "the no-network criterion must cover the range, the dimension, the absolute and percentage toggle, the pricing mode and band visibility together, captured as requests rather than inferred from the absence of a loading state"
     ]
   },
-  "openQuestions": []
+  "openQuestions": [
+    "Selecting a span by dragging has no stated answer on a phone. spec/product/net-worth-view.md says it 'needs an answer of its own' and points at spec/product/app-shell.md, which states only the general phone rule. spec/ui/dashboard.md describes Drag in Interaction, its At phone width section is silent on it, and its Keyboard bullet has no way to select a span. spec/ui/design-system.md, Accessibility, requires every drag to have a keyboard and pointer equivalent. How a span is chosen by touch and by keyboard is unresolved.",
+    "spec/product/net-worth-view.md says the screen carries one date for the rates it used, and that a rate's age is one date for the whole screen rather than a column. spec/features/net-worth-view.md (asOfDates) and spec/ui/dashboard.md say a row whose price is older than the vault's newest price also carries its own price date. The two differ when a hand-priced unit is older than the rest."
+  ]
 }

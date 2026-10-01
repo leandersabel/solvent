@@ -92,6 +92,10 @@ successfully**.
 - After a restore, you are signed out anywhere else you are signed in,
   and have to sign in again. Nothing typed there afterwards reaches the
   vault.
+- A file restores into any account on the instance, given the password
+  it was made under. Nothing in it names whose vault it was, which is
+  what lets a vault move to a new account or a fresh install without
+  anybody helping, and why a backup found by a stranger names nobody.
 - Two vaults are independent from the moment of a restore. If someone
   gives you their file and keeps using their own vault, nothing they
   enter later can appear in yours.
@@ -99,6 +103,9 @@ successfully**.
   made under, even after you change your password. The screen where you
   change it says so.
 - An empty vault downloads to a valid file rather than refusing.
+- The whole vault can be downloaded a few times an hour and no more. A
+  download reads everything you own, and nobody backs up more often
+  than that.
 - A file from a newer version of the app is refused with a clear
   message, never guessed at. A file from an older version is brought up
   to date as it goes in.
@@ -118,26 +125,7 @@ successfully**.
   Both jobs the file does mean the whole vault.
 - **No "do not ask me again"** on the confirmation. It destroys a vault
   every single time it is used.
-
-## Decisions taken on your behalf
-
-- **A file exported by one person can be restored into another
-  person's account on the same instance**, given that file's password.
-  The file says nothing about whose vault it was, and that is kept
-  rather than tolerated: it is what makes the file portable, it is why
-  a vault can move to a new account or a fresh install without anybody
-  helping, and it is why a backup found by a stranger names nobody.
-  Restoring still needs the password the file was made under, so it is
-  not something that can be done to you.
-- **Nothing reminds you to make a backup.** Every download is something
-  you do deliberately, and the app neither schedules one nor tells you
-  how long it has been.
-
-  Telling you how long it has been, or putting a copy somewhere by
-  itself, is wanted and is not in the first version. What the first
-  version owes those features is that a backup stays a plain file you hold,
-  with nothing else depending on the app knowing when one was
-  last made.
-- **There is a ceiling on how often the whole vault can be downloaded**,
-  a few times an hour. It reads everything you own, and nobody backs up
-  more often than that.
+- **Nothing reminds you to make a backup.** Every download is one you
+  start. The app neither schedules one nor tells you how long it has
+  been. A backup stays a plain file you hold, and nothing in the app
+  depends on knowing when one was last made.

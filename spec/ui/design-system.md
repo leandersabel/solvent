@@ -348,7 +348,7 @@ only its own content region.
   opens the sweep (`update-values.md`) at today, going straight into
   editing today's recording with no screen in between, which is what
   makes the sweep reachable while the user is deep in one holding
-  (`product/record-snapshot.md`, Decisions taken on your behalf).
+  (`product/app-shell.md`, Update values).
 - **The dashboard does not repeat it.** The dashboard hero carries
   **New recording**, which asks which date and routes on the answer
   (`dashboard.md`). One control goes to today and one asks the
