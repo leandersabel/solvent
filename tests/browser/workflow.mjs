@@ -2937,6 +2937,11 @@ try {
         !review.includes('This vault is kept in'),
       review,
     );
+    check(
+      'the review of a same-currency, current-version file prints no "null" where a line does not apply',
+      !/null/i.test(review) && !/null/i.test(await page.eval("document.querySelector('.review').textContent")),
+      review,
+    );
     await replaceVault();
     await page.settle(300);
     check(
@@ -3137,6 +3142,11 @@ try {
       check(
         'the review names a main currency that differs from this vault',
         (await page.eval("document.querySelector('.review').innerText")).includes('This vault is kept in EUR. Yours is currently in CHF.'),
+      );
+      check(
+        'the review of a different-currency file prints no "null" under the currency line',
+        !/null/i.test(await page.eval("document.querySelector('.review').textContent")),
+        await page.eval("document.querySelector('.review').textContent"),
       );
       await setValue('#import-erase', 'ERASE');
       await replaceVault();
@@ -4792,6 +4802,7 @@ try {
     await set('#snapshot-date', await format('date', D11));
     await rec.waitUntil(`${line('USD')} && ${line('USD')}.querySelector('input').value !== ''`, { label: 'the form proposals' });
     const formLine = await ev("document.querySelector('.prices-line').textContent");
+    const formBody = await ev("document.querySelector('.dialog .prices-body').textContent");
     await set('#snapshot-value', '31415.92');
     await formSave();
     check(
@@ -4803,6 +4814,11 @@ try {
     check(
       'record-snapshot: no request during the form carries the entered figure, in any field or encoding',
       traffic.every((r) => !['31415.92', 'MzE0MTUuOTI='].some((s) => (r.url + JSON.stringify(r.headers) + r.body).includes(s))),
+    );
+    check(
+      'record-snapshot: the prices section of a date with no recording holds no "null" where the open-the-recording link does not apply',
+      !/null/i.test(formBody),
+      formBody,
     );
     const firstEntry = on(await stored('snapshot'), D11).find((s) => s.accountId === id['Current account']);
     traffic.length = 0;

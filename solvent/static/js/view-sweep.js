@@ -7,7 +7,7 @@
 // own age in plain language instead.
 import * as decimal from './decimal.js';
 import * as writes from './writes.js';
-import { ageInWords, dialog, el } from './dom.js';
+import { ageInWords, dialog, el, mount } from './dom.js';
 
 // One sitting per date, kept across redraws of the same screen and
 // dropped whenever a route starts a sweep afresh.
@@ -36,7 +36,7 @@ export function sweepView(vault, date, actions = {}) {
   const banner = el('div', { class: 'banner', hidden: true, role: 'status' });
   const say = (text, { critical = false, children = [] } = {}) => {
     banner.className = critical ? 'banner banner-critical' : 'banner';
-    banner.replaceChildren(el('span', { text }), ...children);
+    mount(banner, [el('span', { text }), ...children]);
     banner.hidden = false;
   };
   // Refused whole: the screen shows the recording as it now stands, and
