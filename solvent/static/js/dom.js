@@ -330,12 +330,16 @@ export function reopenDialogs(kept, context) {
 
 /** "3 weeks ago", "about a year ago" (spec/ui/update-values.md, Age).
  *  Relative, because the question is how long this has been sitting
- *  and a date makes the reader do the arithmetic. */
-export function ageInWords(isoDate, today = new Date()) {
+ *  and a date makes the reader do the arithmetic. Both ends are
+ *  calendar dates with no hour, so the count is whole calendar days
+ *  and the time of day never changes the wording. */
+export function ageInWords(isoDate, reference = today()) {
   if (!isoDate) return 'never valued';
-  const days = Math.round(
-    (today - new Date(isoDate + 'T00:00:00Z')) / 86400000,
-  );
+  const day = (iso) => {
+    const [year, month, date] = iso.split('-').map(Number);
+    return Date.UTC(year, month - 1, date) / 86400000;
+  };
+  const days = day(reference) - day(isoDate);
   if (days <= 0) return 'today';
   if (days === 1) return 'yesterday';
   if (days < 14) return `${days} days ago`;

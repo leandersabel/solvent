@@ -702,6 +702,12 @@ try {
     'every recorded row says so',
     (await labels('.row-state')).every((state) => state === 'Recorded for this date.'),
   );
+  // A date has no hour, so a figure recorded now is "Today" at any hour.
+  check(
+    'a row recorded for today is aged "Today."',
+    (await labels('.row-age')).every((age) => age === 'Today.'),
+    (await labels('.row-age')).join(','),
+  );
   const rateValues = await page.eval("[...document.querySelectorAll('.rate-line input')].map(n => n.value)");
   check('the prices went in with the first row', rateValues.every(Boolean), rateValues.join(','));
   const rateCalls = () =>
@@ -777,6 +783,11 @@ try {
     (await labels('.form-actions button')).join(',') === 'Record a value,Edit,Archive,Delete',
   );
   check('there is no rate column on a holding', !(await text()).includes('Source'));
+  check(
+    'a figure recorded for today is aged "today" on the holding',
+    (await labels('.hero-age')).some((age) => age.startsWith('as of ') && age.endsWith(', today')),
+    (await labels('.hero-age')).join(','),
+  );
 
   // ---- A backdated figure, and the second recording ---------------------
 
