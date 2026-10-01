@@ -93,6 +93,12 @@ A product file's **"Decisions taken on your behalf"** section holds what
 the client never said and may overrule. That is what the heading means,
 so no file restates it in a preamble.
 
+## Economy
+
+Every agent loads the `skald:prose` skill before writing prose (spec,
+comments on GitHub, commit messages, pull requests) and the
+`skald:code` skill before writing code, and follows it at level full.
+
 ## Writing the spec
 
 **Document the target state, never the route to it.**

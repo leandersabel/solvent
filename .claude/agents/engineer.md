@@ -1,7 +1,7 @@
 ---
 name: engineer
 description: Implements Solvent's compiled feature contracts (spec/.compiled/*.json) into working code — Flask backend, SQLite, and the vanilla-JS/Alpine.js client-side crypto layer. Use when a feature has a compiled contract and needs building, or when an existing implementation needs to catch up to a changed contract.
-tools: Read, Write, Edit, Glob, Grep, Bash
+tools: Read, Write, Edit, Glob, Grep, Bash, Skill
 model: sonnet
 effort: high
 ---

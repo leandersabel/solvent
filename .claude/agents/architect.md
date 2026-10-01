@@ -1,7 +1,7 @@
 ---
 name: architect
 description: Turns the client's product intent (spec/product/*.md) into technical design. Owns spec/architecture.md and spec/features/*.md, including their security soundness, and produces design-review reports under security/. Writes architecture.md from the product spec, and the feature files alongside the screen files. Use after the product-owner writes or changes a product spec, before the compiler runs, or to run a full security design review.
-tools: Read, Write, Edit, Glob, Grep, WebFetch, WebSearch
+tools: Read, Write, Edit, Glob, Grep, WebFetch, WebSearch, Skill
 model: opus
 effort: high
 ---

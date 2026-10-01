@@ -1,7 +1,7 @@
 ---
 name: compiler
 description: Compiles the spec (spec/product/*.md, spec/architecture.md, spec/features/*.md, spec/ui/*.md) into strict per-feature implementation contracts under spec/.compiled/, and maintains spec/status.md. Use when the spec has changed and downstream agents need updated contracts, or to check whether spec and compiled output have drifted.
-tools: Read, Write, Edit, Glob, Grep
+tools: Read, Write, Edit, Glob, Grep, Skill
 model: sonnet
 effort: high
 ---

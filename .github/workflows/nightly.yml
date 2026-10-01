@@ -83,6 +83,8 @@ jobs:
           # which can be a bot.
           allowed_bots: claude,github-actions,dependabot
           bot_id: "209825114"
+          plugin_marketplaces: https://github.com/leandersabel/skald.git
+          plugins: skald@skald
           claude_args: |
             --model claude-opus-5-5
             --allowedTools Bash,Read,Write,Glob,Grep,Agent,Task,Skill,TodoWrite,mcp__playwright
