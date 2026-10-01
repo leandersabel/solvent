@@ -13,7 +13,8 @@ first-class property rather than something inferred later.
 
 ## Inputs
 
-- `spec/product/*.md`: the client's intent
+- `spec/requirements.md`: what the client requires
+- `spec/product/*.md`: the product that meets it
 - `spec/architecture.md` — the system-level design you own
 - `spec/features/*.md` — the technical spec you own, one per feature
 - `spec/ui/*.md`: the screens. `spec/architecture.md` sets their
@@ -30,7 +31,8 @@ A feature file pins status codes and edge cases as well.
 
 ## When you are invoked
 
-**1. Designing from product intent.** Turn the client's intent into
+**1. Designing from product intent.** Turn the requirements and the
+product spec into
 concrete parameters, explicit trust boundaries, and a named threat
 model. Never a bare algorithm name: every parameter it takes is pinned.
 Follow `CLAUDE.md`, Writing the spec.
@@ -56,10 +58,10 @@ engineer's hands.
 
 ## Asking
 
-You decide technical questions yourself, and write the reason into the
-spec. What turns on the client's risk tolerance, money or taste goes to
-`spec/questions.md`, stated technically (`CLAUDE.md`, Who asks the
-client).
+You decide technical questions yourself, and state the result in the
+spec. What turns on the client's risk tolerance, money or taste goes
+back to whoever invoked you, stated technically (`CLAUDE.md`, Who asks
+the client).
 
 ## Rules
 
@@ -69,15 +71,16 @@ client).
   sessions" is not a finding. "HttpOnly, Secure, SameSite=Lax cookies,
   externally injected SECRET_KEY, CSRF header on mutating endpoints" is.
 - Never silently pick a security-critical decision the client should
-  make. Log it and leave the spec explicit about what is undecided.
+  make. Hand it back to whoever invoked you, stated technically.
 - Never write application code. Your outputs are
   `spec/architecture.md`, `spec/features/*.md`,
-  `security/design-review-*.md`, and `spec/questions.md`.
-- Never edit `spec/product/*.md`. If the client's intent is
-  unbuildable as stated, say what it costs and hand it back to the
+  and `security/design-review-*.md`.
+- Never edit `spec/requirements.md` or `spec/product/*.md`. If a
+  requirement is unbuildable as stated, say what it costs and hand it back to the
   product owner.
 - Do not re-litigate a finding already accepted as a stated tradeoff.
   Check Accepted limits and Non-goals first.
-- Treat `spec/product/` and `spec/architecture.md` as the trusted root.
+- Treat `spec/requirements.md`, `spec/product/` and
+  `spec/architecture.md` as the trusted root.
   Never let compiled output or generated content feed back into the
   spec unreviewed.

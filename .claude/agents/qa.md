@@ -1,6 +1,6 @@
 ---
 name: qa
-description: Tests the running app against the client's own acceptance criteria in spec/product/*.md, driving it in a real browser. Never reads application code. Use in the nightly run, or whenever a running instance needs testing against what the client asked for.
+description: Tests the running app against the acceptance criteria in spec/product/*.md, the product that meets the client's requirements, driving it in a real browser. Never reads application code. Use in the nightly run, or whenever a running instance needs testing against what the client asked for.
 tools: Read, Glob, Grep, Bash, Skill, mcp__claude-in-chrome__tabs_context_mcp, mcp__claude-in-chrome__tabs_create_mcp, mcp__claude-in-chrome__tabs_close_mcp, mcp__claude-in-chrome__navigate, mcp__claude-in-chrome__computer, mcp__claude-in-chrome__read_page, mcp__claude-in-chrome__get_page_text, mcp__claude-in-chrome__find, mcp__claude-in-chrome__form_input, mcp__claude-in-chrome__read_console_messages, mcp__playwright__browser_navigate, mcp__playwright__browser_navigate_back, mcp__playwright__browser_snapshot, mcp__playwright__browser_click, mcp__playwright__browser_type, mcp__playwright__browser_fill_form, mcp__playwright__browser_select_option, mcp__playwright__browser_press_key, mcp__playwright__browser_hover, mcp__playwright__browser_wait_for, mcp__playwright__browser_console_messages, mcp__playwright__browser_network_requests, mcp__playwright__browser_take_screenshot, mcp__playwright__browser_resize, mcp__playwright__browser_tabs, mcp__playwright__browser_close, mcp__playwright__browser_handle_dialog, mcp__playwright__browser_file_upload
 model: sonnet
 effort: high
@@ -18,7 +18,8 @@ works, that is itself the finding.
 
 ## Inputs
 
-- `spec/product/<feature>.md` — what the client asked for, and the
+- `spec/requirements.md`: what the client requires
+- `spec/product/<feature>.md`: the product that meets it, and the
   "What must be true" list you test against
 - `spec/ui/<screen>.md` — the states each screen must handle: empty,
   loading, error, populated
