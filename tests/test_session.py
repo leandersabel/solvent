@@ -9,7 +9,7 @@ from __future__ import annotations
 from datetime import datetime, timedelta, timezone
 
 from solvent.session import COOKIE_NAME, sign_token
-from tests.helpers import CSRF, b64, connect, mint_invite, register, rows
+from tests.helpers import CSRF, b64, connect, mint_invite, register, register_body, rows
 
 
 def cookie_of(client):
@@ -135,3 +135,195 @@ def test_the_cookie_carries_its_pinned_flags(app):
     assert "HttpOnly" in header
     assert "Secure" in header
     assert "SameSite=Lax" in header
+
+
+# The session a sign-in issues (spec/features/login.md).
+
+LOGIN = "/api/auth/login"
+
+
+def log_in(client, username, auth_key):
+    return client.post(
+        LOGIN, json={"username": username, "authKey": auth_key}, headers=CSRF
+    )
+
+
+def alive(cookie_holder_app, cookie) -> bool:
+    client = cookie_holder_app.test_client()
+    client.set_cookie(COOKIE_NAME, cookie)
+    return client.get("/api/sessions", headers=CSRF).status_code == 200
+
+
+def age_session(app, session_id, **ago):
+    conn = connect(app)
+    try:
+        conn.execute(
+            "UPDATE sessions SET issued_at = ? WHERE id = ?",
+            ((datetime.now(timezone.utc) - timedelta(**ago)).isoformat(), session_id),
+        )
+        conn.commit()
+    finally:
+        conn.close()
+
+
+def test_repeated_sign_ins_from_one_client_keep_one_row_and_a_failed_one_changes_nothing(app):
+    client, auth_key = register(app, "owner")
+    first = rows(app, "SELECT * FROM sessions")
+    assert len(first) == 1
+    replaced = [cookie_of(client)]
+
+    assert log_in(client, "owner", auth_key).status_code == 200
+    replaced.append(cookie_of(client))
+    assert log_in(client, "owner", b64()).status_code == 401
+    carried_into_failure = cookie_of(client)
+    assert log_in(client, "owner", auth_key).status_code == 200
+
+    after = rows(app, "SELECT * FROM sessions")
+    assert len(after) == 1
+    assert (after[0]["id"], after[0]["issued_at"]) == (first[0]["id"], first[0]["issued_at"])
+    assert after[0]["token_hash"] != first[0]["token_hash"]
+    assert len(set(replaced + [carried_into_failure, cookie_of(client)])) == 3
+    for old in replaced:
+        assert not alive(app, old)
+    assert alive(app, cookie_of(client))
+
+
+def test_a_failed_sign_in_leaves_the_carried_session_working(app):
+    client, _ = register(app, "owner")
+    carried = cookie_of(client)
+    before = rows(app, "SELECT * FROM sessions")
+
+    assert log_in(client, "owner", b64()).status_code == 401
+
+    assert cookie_of(client) == carried
+    assert rows(app, "SELECT id, token_hash, issued_at FROM sessions") == [
+        {k: before[0][k] for k in ("id", "token_hash", "issued_at")}
+    ]
+    assert alive(app, carried)
+
+
+def test_unlocking_does_not_move_issued_at_so_the_expiry_counts_from_sign_in(app):
+    client, auth_key = register(app, "owner")
+    session_id = rows(app, "SELECT id FROM sessions")[0]["id"]
+
+    # Eleven hours after sign-in the owner unlocks.
+    age_session(app, session_id, hours=11)
+    signed_in_at = rows(app, "SELECT issued_at FROM sessions")[0]["issued_at"]
+    assert log_in(client, "owner", auth_key).status_code == 200
+    assert client.get("/api/sessions", headers=CSRF).status_code == 200
+    assert rows(app, "SELECT issued_at FROM sessions")[0]["issued_at"] == signed_in_at
+
+    # An hour on, the stored sign-in time is twelve hours old.
+    age_session(app, session_id, hours=12, minutes=1)
+    assert client.get("/api/sessions", headers=CSRF).status_code == 401
+
+
+def test_a_sign_in_on_an_expired_row_deletes_it_and_creates_a_new_one(app):
+    client, auth_key = register(app, "owner")
+    expired = rows(app, "SELECT id FROM sessions")[0]["id"]
+    age_session(app, expired, hours=12, minutes=1)
+
+    assert log_in(client, "owner", auth_key).status_code == 200
+
+    after = rows(app, "SELECT id FROM sessions")
+    assert len(after) == 1 and after[0]["id"] != expired
+    assert client.get("/api/sessions", headers=CSRF).status_code == 200
+
+
+def test_a_sign_in_deletes_the_signing_in_accounts_expired_rows_and_only_those(app):
+    _, auth_key = register(app, "owner")
+    register(app, "other")
+    # A second live row of the owner, then an expired row of each account.
+    log_in_new(app, "owner", auth_key)
+    ids = {
+        row["id"]: row["principal_id"] for row in rows(app, "SELECT * FROM sessions")
+    }
+    assert len(ids) == 3
+    owner_id = rows(app, "SELECT id FROM principals WHERE username = 'owner'")[0]["id"]
+    owner_rows = [i for i, p in ids.items() if p == owner_id]
+    other_row = next(i for i, p in ids.items() if p != owner_id)
+    stale_owner = owner_rows[1]
+    age_session(app, stale_owner, hours=13)
+    age_session(app, other_row, hours=13)
+
+    fresh = app.test_client()
+    assert log_in(fresh, "owner", auth_key).status_code == 200
+
+    left = {row["id"] for row in rows(app, "SELECT id FROM sessions")}
+    assert stale_owner not in left
+    assert other_row in left
+    assert owner_rows[0] in left
+    assert len(left) == 3
+
+
+def log_in_new(app, username, auth_key):
+    client = app.test_client()
+    assert log_in(client, username, auth_key).status_code == 200
+    return client
+
+
+def test_a_sign_in_with_no_cookie_leaves_the_accounts_other_live_rows_alone(app):
+    client, auth_key = register(app, "owner")
+    before = rows(app, "SELECT * FROM sessions")
+
+    log_in_new(app, "owner", auth_key)
+
+    after = rows(app, "SELECT * FROM sessions")
+    assert len(after) == 2
+    assert before[0] in after
+    assert alive(app, cookie_of(client))
+
+
+def test_a_sign_in_over_another_accounts_live_session_replaces_that_row(app):
+    owner, _ = register(app, "owner")
+    _, other_key = register(app, "other")
+    carried = cookie_of(owner)
+    owner_row = rows(app, "SELECT * FROM sessions WHERE principal_id = ?", (principal(app, "owner"),))[0]
+
+    assert log_in(owner, "other", other_key).status_code == 200
+
+    sessions = rows(app, "SELECT * FROM sessions")
+    assert owner_row["id"] not in {s["id"] for s in sessions}
+    assert len([s for s in sessions if s["principal_id"] == principal(app, "other")]) == 2
+    assert not alive(app, carried)
+    assert alive(app, cookie_of(owner))
+
+
+def principal(app, username):
+    return rows(app, "SELECT id FROM principals WHERE username = ?", (username,))[0]["id"]
+
+
+def test_the_session_list_leaves_off_an_expired_row_still_in_the_table(app):
+    client, auth_key = register(app, "owner")
+    stale = log_in_new(app, "owner", auth_key)
+    live_id = rows(app, "SELECT id FROM sessions ORDER BY issued_at")[0]["id"]
+    stale_id = next(r["id"] for r in rows(app, "SELECT id FROM sessions") if r["id"] != live_id)
+    age_session(app, stale_id, hours=12, minutes=1)
+
+    listed = client.get("/api/sessions", headers=CSRF).get_json()
+
+    assert [entry["id"] for entry in listed] == [live_id]
+    assert len(rows(app, "SELECT id FROM sessions")) == 2
+    assert stale.get("/api/sessions", headers=CSRF).status_code == 401
+
+
+def test_registration_replaces_another_accounts_live_session_and_a_failed_one_does_not(app):
+    owner, _ = register(app, "owner")
+    carried = cookie_of(owner)
+    owner_row = rows(app, "SELECT id FROM sessions")[0]["id"]
+
+    failed = owner.post(
+        "/api/register", json=register_body(app, inviteToken="nope", username="new"), headers=CSRF
+    )
+    assert failed.status_code == 400
+    assert cookie_of(owner) == carried and alive(app, carried)
+
+    ok = owner.post(
+        "/api/register", json=register_body(app, username="new"), headers=CSRF
+    )
+    assert ok.status_code == 200
+    sessions = rows(app, "SELECT * FROM sessions")
+    assert owner_row not in {s["id"] for s in sessions}
+    assert [s["principal_id"] for s in sessions] == [principal(app, "new")]
+    assert not alive(app, carried)
+    assert alive(app, cookie_of(owner))

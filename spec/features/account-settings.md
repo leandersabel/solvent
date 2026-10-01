@@ -273,7 +273,9 @@ from an administrator removing an account (admin-invites.md).
   client discards its keys and all decrypted state and shows an unlock
   prompt; the server session survives, so unlocking needs only the
   password (login.md, Rules, which states the rule and its one
-  exception). This screen owns only the period.
+  exception). Unlocking signs in on that same session and adds no row
+  (login.md, The session a sign-in issues). This screen owns only the
+  period.
   - **User-configurable, 5–60 minutes, default 15.** Stored as
     `idleLockMinutes` in the encrypted profile record, so it follows the
     user across devices and the server never sees it; absent means 15.
@@ -310,8 +312,11 @@ from an administrator removing an account (admin-invites.md).
   "all except this one" variant. Two acts do keep the current session
   alive, each as part of its own transaction: a password change, and an
   import (`export-import.md`).
-- A settings row lists active sessions by issue time and last activity —
+- A settings row lists live sessions by issue time and last activity —
   `GET /api/sessions` → `[{ id, issuedAt, lastActiveAt, current }]`.
+  Live means not past the absolute expiry. An expired row is left off
+  whether or not a sign-in has deleted it yet, because it can no longer
+  act.
   No IP or user-agent is stored — it would be metadata the app does not
   otherwise keep, for a household instance where it answers nothing —
   and no endpoint returns any, because none is recorded. `id` is an
@@ -370,7 +375,7 @@ from an administrator removing an account (admin-invites.md).
 - An administrator session receives Not Found from `/settings`,
   `GET /api/sessions`, `POST /api/auth/logout-all`, and
   `DELETE /api/auth/account`, and is unaffected by any idle period.
-- An administrator session is still dead 12 hours after issue,
+- An administrator session is still dead 12 hours after sign-in,
   asserted the same way a vault owner's is.
 - The deletion dialog presents export as the primary action.
 - `GET /api/sessions` returns no IP address and no user-agent for any
@@ -379,6 +384,10 @@ from an administrator removing an account (admin-invites.md).
   value.
 - `GET /api/sessions` returns only the session user's own sessions;
   none belonging to another user appear.
+- A session row past the absolute expiry and not yet deleted is absent
+  from `GET /api/sessions`.
+- Locking and unlocking leaves `GET /api/sessions` with the same
+  entries, same `id` and same `issuedAt` as before.
 - `POST /api/auth/logout` invalidates the calling session only; a second
   session for the same user still works afterwards.
 - Change password, `GET /api/sessions`, logout everywhere and account

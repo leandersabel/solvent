@@ -54,7 +54,10 @@ enumeration oracle login.md closes.
    its nonce and the profile record's id, schema version, ciphertext,
    and nonce. **The password never leaves the browser.**
 6. Server validates, stores, marks the invite used, and starts a
-   session. A vault owner lands logged in with keys already in memory.
+   session by the same rule as a sign-in (login.md, The session a
+   sign-in issues). The account is new, so the session the request
+   carried is at most another account's, and a live one is deleted and
+   replaced. A vault owner lands logged in with keys already in memory.
    An administrator lands in the admin area.
 
 **The payload's shape is checked against the invite, not chosen by the
@@ -230,6 +233,9 @@ two callers rather than two record writers.
   plaintext nowhere in the DB.
 - The invite's status is `used`, and a second registration with the same
   token fails.
+- A registration carrying another account's live session deletes that
+  row, and the old cookie answers Unauthorized. A failed registration
+  leaves the carried session working.
 - A POST carrying KDF parameters below the server minimum is rejected
   with Bad Request, even though the client UI would never send them.
 - A POST with a salt that is not 16 bytes is rejected with Bad

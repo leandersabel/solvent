@@ -118,6 +118,44 @@ If the upgrade POST fails, the session continues normally on the old
 parameters and retries on the next sign-in — a failed upgrade must
 never lock anyone out.
 
+## The session a sign-in issues
+
+A successful `POST /api/auth/login` always issues a new random token
+and sets it in the cookie. What it does to `sessions` rows depends on
+the session the request carried:
+
+- **A live session of the same account** → that row is updated in
+  place with the new `token_hash`. Its `id` and `issued_at` stay the
+  same, and the old token stops working at once.
+- **No live session** (no cookie, a bad signature, a token matching no
+  row, or an expired row) → a new row.
+- **A live session of another account** → that row is deleted and a
+  new row is created, because one client holds one cookie and the
+  replaced one would otherwise sit unreachable until expiry.
+
+In every case the signing-in account's expired rows are deleted in the
+same transaction. Live means not past the absolute expiry (Rules,
+Session lifetime). A failed login, a rate-limited or locked-out one
+included, writes no session row and leaves the carried session working.
+
+The unlock prompt after an idle lock, the lock button or a refresh
+calls this endpoint on a server session that is still live. Updating
+that row keeps one row per signed-in client, so locking and unlocking
+adds nothing to the session list. The token still changes on every
+sign-in, so a token planted or captured before it (session fixation)
+is dead after it.
+
+**There is no separate unlock endpoint.** Login is the one place that
+returns the key wrapper (architecture.md, One key, N wrappers), runs
+the decoy verification and is rate limited, and an unlock endpoint
+would have to repeat all three. The branch on the carried session runs only after
+the Auth Key verified, so the pre-authentication path is unchanged
+(Rules, Nothing pre-authentication branches on kind).
+
+**Unlocking does not move `issued_at`.** The absolute expiry counts
+from sign-in. Resetting it on unlock would make the limit sliding for
+anyone who unlocks more often than every twelve hours.
+
 ## Inputs / outputs
 
 - In (browser only): password.
@@ -193,8 +231,9 @@ never lock anyone out.
   plaintext — then shows a re-unlock prompt. Dropping the keys alone
   would leave the lock cosmetic against the threat it exists for:
   another household member at the unlocked machine, who can open
-  devtools. The server session may still be valid; unlocking re-derives
-  the keys and **re-decrypts the vault from scratch**, so the reload
+  devtools. The server session may still be valid; unlocking signs in
+  on it (The session a sign-in issues), re-derives the keys and
+  **re-decrypts the vault from scratch**, so the reload
   after an idle lock is by design, not a missed cache.
   - **One named exception: unsaved form input the user typed**, which
     survives so a lock mid-entry does not destroy work (`ui/unlock.md`).
@@ -206,12 +245,12 @@ never lock anyone out.
 - **No idle rule for an administrator** (account-settings.md, Session
   and lock, which owns the reason). An administrator session is bounded
   by the absolute expiry and by signing out.
-- **Session lifetime**: server-side session expires 12 hours after
-  issue, absolute, not sliding. Both kinds, and for an administrator it
-  is the only bound.
+- **Session lifetime**: a server-side session expires 12 hours after
+  its `issued_at`, absolute, not sliding. `issued_at` is the sign-in
+  that created the row, and no later unlock moves it. Both kinds, and
+  for an administrator it is the only bound.
 - A page refresh discards in-memory keys by definition and requires
   re-entering the password.
-- The session is rotated (new session id) on successful login.
 
 ## Edge cases
 
@@ -314,6 +353,20 @@ never lock anyone out.
   naming, counting, or describing any other credential.
 - If `/api/auth/upgrade-kdf` returns Server Error, the caller stays
   signed in and can still sign in afterwards with the old parameters.
+- From one client: sign in, sign in again, fail once with a wrong Auth
+  Key, sign in again, each request carrying the cookie the previous one
+  left. The account then has exactly one `sessions` row, whose `id` and
+  `issued_at` equal those after the first sign-in. Every cookie a later
+  sign-in replaced answers Unauthorized, and the cookie carried into the
+  failed attempt still worked after it.
+- A sign-in carrying a live session of another account deletes that
+  row, and the old cookie answers Unauthorized.
+- A sign-in with no cookie creates a new row and leaves the account's
+  other live rows untouched.
+- A sign-in deletes the signing-in account's expired rows, and only
+  those.
+- Signing in, then unlocking 11 hours later, leaves a session that
+  answers Unauthorized 12 hours after the first sign-in.
 - Exceeding the per-account attempt limit locks the account and returns
   the same response shape for a nonexistent account.
 - `/api/auth/login` with an unknown username takes statistically

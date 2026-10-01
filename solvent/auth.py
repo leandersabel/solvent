@@ -159,10 +159,12 @@ def login():
         response_body["wrappedDek"] = wrapper["wrapped_dek"]
         response_body["dekNonce"] = wrapper["dek_nonce"]
 
-    get_db().execute(
-        "UPDATE principals SET last_login_at = ? WHERE id = ?", (utcnow(), row["id"])
-    )
-    raw_token = sessions.issue(row["id"])
+    with write_transaction() as conn:
+        conn.execute(
+            "UPDATE principals SET last_login_at = ? WHERE id = ?",
+            (utcnow(), row["id"]),
+        )
+        raw_token = sessions.start(conn, row["id"])
     response = jsonify(response_body)
     sessions.set_cookie(response, raw_token)
     return response
@@ -191,8 +193,10 @@ def logout_all():
 
 @bp.get("/api/sessions")
 def list_sessions():
-    """No IP and no user-agent, because none is recorded. `id` is an
-    opaque handle, never the cookie's value."""
+    """Live sessions only: an expired row can no longer act, whether or
+    not a sign-in has deleted it yet. No IP and no user-agent, because
+    none is recorded. `id` is an opaque handle, never the cookie's
+    value."""
     rows = get_db().execute(
         "SELECT id, issued_at, last_active_at FROM sessions "
         "WHERE principal_id = ? ORDER BY issued_at",
@@ -207,6 +211,7 @@ def list_sessions():
                 "current": row["id"] == g.session["id"],
             }
             for row in rows
+            if sessions.is_live(row["issued_at"])
         ]
     )
 

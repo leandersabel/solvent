@@ -4,6 +4,7 @@
   "read": [
     {"file": "spec/features/register.md", "sections": ["all"]},
     {"file": "spec/architecture.md", "sections": ["Accounts on this instance", "Credentials and vault key wrappers", "Key management", "Storage & data handling", "Application hardening", "Status codes"]},
+    {"file": "spec/features/login.md", "sections": ["The session a sign-in issues"], "role": "the rule by which registration starts its session"},
     {"file": "spec/features/admin-invites.md", "sections": ["Invite lifecycle", "Bootstrap: the first administrator, and the locked-out one", "Rules", "Edge cases"], "role": "the invite row this consumes, its kind, and the generic refusal every bad invite shares"},
     {"file": "spec/features/record-api.md", "sections": ["Row shape", "The AAD encoding", "`accountId` on the wire"], "role": "the validator the profile record is written through"},
     {"file": "spec/features/account-settings.md", "sections": ["The profile record", "Main currency"], "role": "the payload shape whose two required keys registration writes"},
@@ -28,6 +29,7 @@
     "onePasswordCredential": {"value": "enforced by a unique index on principal_id restricted to method = 'password', written in the same transaction as the principal row", "cite": "spec/architecture.md#credentials-and-vault-key-wrappers"},
     "methodIsNotClientInput": {"value": "the server writes 'password' and no endpoint in v1 accepts any other value, so a payload carrying a method field is a Bad Request", "cite": "spec/features/register.md#what-registration-writes"},
     "kindIsNotClientInput": {"value": "the server copies kind from the invite row and no endpoint anywhere writes it again. A payload carrying a kind field of any value is rejected", "cite": "spec/features/register.md#what-registration-writes"},
+    "registrationSession": {"value": "the session starts by the same rule as a sign-in. The account is new, so the carried session is at most another account's, and a live one is deleted and replaced. A failed registration leaves the carried session working", "cite": "spec/features/register.md#flow"},
     "oneTransaction": {"value": "the principal row, its password credential row, its wrapper and profile record where they apply, and the invite's consumption commit together or not at all", "cite": "spec/features/register.md#what-registration-writes"},
     "passwordPolicy": {"value": "at least 12 characters and a zxcvbn score of at least 3, no composition rules. Client-enforced by construction, because the server never sees the password", "cite": "spec/features/admin-invites.md#invite-lifecycle"},
     "noRecoveryAcknowledgement": {"value": "the screen states plainly that there is no password recovery and requires an explicit acknowledgement before submitting. The administrator form carries none and claims nothing about recovery in its place", "cite": "spec/features/admin-invites.md#invite-lifecycle"},
@@ -49,7 +51,8 @@
       "a hand-built POST /api/register carrying a kind field, a method field, a wrapper against an administrator invite, a missing wrapper against a vault owner invite, KDF parameters below the server minimum, and a salt that is not 16 bytes",
       "a fault injected into the profile insert, for the all-or-nothing assertion including the unconsumed invite",
       "a seeded account of each kind holding the same username, for the cross-kind collision refusal",
-      "an account registered through PUT /api/records with an equivalent profile record, for the indistinguishability assertion"
+      "an account registered through PUT /api/records with an equivalent profile record, for the indistinguishability assertion",
+      "another account's live session cookie, carried into a successful and into a failed registration"
     ],
     "focus": [
       "the administrator path must leave zero dek_wrappers rows and zero records rows, asserted against both tables rather than against the response. Zero is the whole guarantee and an implementation that writes an empty wrapper row passes every behaviour test",
@@ -59,7 +62,8 @@
       "the request payload assertion has to run against the captured bytes, not against an inspection of the code, and it has to cover the password, the Master Key and the unwrapped DEK separately",
       "the four bad-invite responses must be byte-identical, not merely similar in wording. Any difference in length, ordering or status turns the page into an oracle",
       "the profile record written by registration must be indistinguishable from one written through PUT /api/records: same validation, same column values, same AAD. A second record writer that happens to produce the same columns today is exactly what this criterion exists to prevent",
-      "a registration that fails partway must leave the invite unconsumed, asserted against the invite row and not only against the absence of the account"
+      "a registration that fails partway must leave the invite unconsumed, asserted against the invite row and not only against the absence of the account",
+      "a registration carrying another account's live cookie must delete that sessions row, asserted against the table, and the old cookie must answer Unauthorized. A failed registration must leave the carried session working"
     ]
   },
   "openQuestions": []
