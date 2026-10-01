@@ -38,9 +38,9 @@ An administrator principal has no `dek_wrappers` row and no `records`
 row, and the schema refuses to give it either (`app-shell.md`,
 Database). So there is no key material in an administrator session for
 an endpoint to leak by accident, nothing for a mistaken join to pull
-back, and no vault that "their" account owns. The vault surface
-answers an administrator session Not Found at the request gate, before
-any handler runs (`app-shell.md`, The two surfaces).
+back, and no vault that "their" account owns. The request gate refuses
+an administrator session every vault route (`app-shell.md`, The two
+surfaces).
 
 On top of that structure, there is no endpoint, and must never be one,
 that returns any record ciphertext, or any field of any account's
@@ -107,11 +107,10 @@ An invite row: `id`, `token_hash`, `kind`, `created_by`, `created_at`,
 ## Endpoints
 
 The provisioning endpoints. `rate-lookup.md` owns the symbol table's,
-and more will be added as the platform needs them. All require a
-session whose principal is an `administrator`, and all writes are
-CSRF-protected. Every path under `/api/admin/`, whether or not this
-file names it, is refused to anyone but an administrator as an
-invented `/api/` path is (architecture.md, Status codes, Refusals).
+and more will be added as the platform needs them. Every path under
+`/api/admin/`, named here or not, is refused to anyone but an
+administrator as an invented `/api/` path is (architecture.md,
+Refusals).
 
 - `POST /api/admin/invites` `{ expiresInDays, label, kind }` →
   `{ id, token, url, expiresAt, kind }`. The only response that ever
@@ -314,7 +313,7 @@ invocation and nothing more.
   transaction's uniqueness constraint means exactly one wins; the other
   gets the generic invalid-invite error.
 - **A vault owner hits an admin endpoint** → refused as an invented
-  `/api/` path is, so nothing confirms the endpoint exists.
+  `/api/` path is (Endpoints).
 - **An administrator revokes their own outstanding invites** → allowed,
   no special case.
 - **The last administrator removes themselves** → Conflict, and
@@ -330,9 +329,8 @@ invocation and nothing more.
 - **An administrator removes an account that is currently signed in**
   → their sessions go with the transaction; their next request is an
   Unauthorized.
-- **Removing a username that does not exist** → Not Found, the same as
-  any other admin route reached by a vault owner, so a probe
-  distinguishes nothing.
+- **Removing a username that does not exist** → Not Found, identical
+  to the refusal of an invented `/api/` path.
 - **Bootstrap command run while an administrator exists, without
   `--force`** → refuses, exits non-zero, and prints how many accounts
   of each kind exist plus the flag that would proceed.

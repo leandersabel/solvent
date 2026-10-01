@@ -369,9 +369,9 @@ contract pins one value and prose stays readable.
 | OK | 200 | the request succeeded and carries a body |
 | No Content | 204 | the request was valid and there is nothing to return — a rate with no proposal available, never an error |
 | Bad Request | 400 | input is malformed, out of range, or names something the caller may safely learn does not exist |
-| Unauthorized | 401 | an API request with the `X-Solvent-Request` header and no valid session is refused (Refusals) |
-| Forbidden | 403 | an API request without the `X-Solvent-Request` header is refused (Refusals) |
-| Not Found | 404 | the target does not exist, **or** exists but belongs to someone else, **or** is a route the caller must not learn exists; and every other refusal (Refusals) |
+| Unauthorized | 401 | a refusal of an API request with the `X-Solvent-Request` header and no valid session (Refusals) |
+| Forbidden | 403 | a refusal of an API request without the `X-Solvent-Request` header (Refusals) |
+| Not Found | 404 | the target does not exist **or** belongs to someone else, and every other refusal (Refusals) |
 | Conflict | 409 | the write lost an optimistic-concurrency check, or the target's state forbids it |
 | Content Too Large | 413 | a storage cap would be exceeded (Storage & data handling) |
 | Too Many Requests | 429 | a rate limit engaged (Application hardening) |
@@ -379,10 +379,11 @@ contract pins one value and prose stays readable.
 
 ### Refusals
 
-**Every refusal looks the same, whether the address exists or not.**
-Its status comes from this table alone, so a probe learns nothing it
-did not send. A path under `/api/` is an API request, and any other
-path a page request.
+A refusal's status depends only on the namespace, the
+`X-Solvent-Request` header and the session, never on whether the path
+exists, its surface or its method, so a probe learns nothing it did
+not send. A path under `/api/` is an API request, any other a page
+request.
 
 | | No `X-Solvent-Request` header | Header, no valid session | Header, valid session |
 |---|---|---|---|
@@ -390,11 +391,10 @@ path a page request.
 | API | Forbidden | Unauthorized | Not Found |
 
 No valid session means no cookie, a badly signed one, or an expired or
-revoked session. A request that does not resolve is refused as an
-invented address: an unknown path, a method the route does not answer
-(`OPTIONS` included), or an address the router would redirect (`//admin`).
-Nothing answers Method Not Allowed and no refusal redirects. The gate
-that applies this is app-shell.md, The request gate.
+revoked session. An unknown path, a method the route does not answer
+(`OPTIONS` included) and an address the router would redirect
+(`//admin`) are refused as invented. Nothing answers Method Not Allowed,
+and no refusal redirects. app-shell.md, The request gate, applies this.
 
 ## Tech stack
 
@@ -805,11 +805,9 @@ Actors this design defends against vs. accepts:
   reached by navigation — every state-changing one (records, invite,
   import, password change, logout, account deletion) **and `GET
   /api/export`**. Same-origin cookie auth is not implicitly CSRF-safe.
-  **Every endpoint that requires the header is under `/api/`**, and
-  every other route is exempt from it and answers only `GET` and
-  `HEAD`. A request missing the header is refused before
-  authentication and before routing, and changes nothing (Status
-  codes, Refusals).
+  **Every route that requires the header is under `/api/`**, and every
+  other route is exempt and answers only `GET` and `HEAD`. A request
+  without the header changes nothing (app-shell.md, The request gate).
   - **A header rather than a token.** A cross-origin page cannot set a
     custom header without a preflight, and the preflight fails because
     no CORS headers are served. Every endpoint in this product is called
