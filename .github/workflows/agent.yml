@@ -51,9 +51,12 @@ jobs:
           dispatch() { gh workflow run agent.yml --ref master -f issue="$1"; }
           # The lowest-numbered queued issue starts once nothing is
           # being implemented.
+          # Once nothing carries `implementing`, the slot branch is free
+          # (advance skill, Implementation).
           next_queued() {
-            [ -z "$(gh issue list --state open --label implementing --json number --jq '.[].number')" ] &&
-              gh issue list --state open --label queued --json number --jq 'map(.number) | min // empty'
+            [ -z "$(gh issue list --state open --label implementing --json number --jq '.[].number')" ] || return 0
+            gh api -X DELETE "repos/$GH_REPO/git/refs/heads/claude/slot" >/dev/null 2>&1 || true
+            gh issue list --state open --label queued --json number --jq 'map(.number) | min // empty'
           }
           sender=$(jqe .sender.login)
           issue=

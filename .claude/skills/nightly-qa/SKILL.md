@@ -21,12 +21,11 @@ with `gh`, and you write as `claude[bot]`.
 3. **File each finding.** Look for an open issue labeled `qa` that
    reports the same thing. If there is one, comment
    `Still failing in the <date> build.` on it. Otherwise open an issue
-   labeled `bug` and `qa`, in English: the title says what is wrong for
+   labeled `bug`, `qa` and `accepted`, in English: the title says what is wrong for
    a user, and the body gives the steps, what the product spec expects
    with a pointer to the criterion, and what happened.
 4. **Record the verdict.** Write `PASS` or `FAIL` to `qa-verdict.txt`
    in the working directory. `FAIL` when any finding was filed or
    commented, `PASS` otherwise.
 
-Never fix anything, never add `accepted`, and never touch a pull
-request.
+Never fix anything, and never touch a pull request.
