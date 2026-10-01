@@ -135,10 +135,13 @@ jobs:
       checks: read
       id-token: write
     steps:
+      # The agent pushes only as claude[bot]: no workflow token is left
+      # in git for it to fall back on once its own expires.
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           ref: master
           fetch-depth: 0
+          persist-credentials: false
       - uses: ./.github/actions/setup
       - id: claude
         uses: anthropics/claude-code-action@fd1c128679612beff4ca259c78021c506e8aa7a7 # v1.0.237
