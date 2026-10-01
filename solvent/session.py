@@ -41,19 +41,49 @@ def sign_token(raw_token: str) -> str:
     return _signer().sign(raw_token.encode("utf-8")).decode("utf-8")
 
 
-def issue(principal_id: str) -> str:
-    """Write a session row and return the raw token for its cookie.
+def is_live(issued_at: str) -> bool:
+    """Not past the absolute expiry, which counts from `issued_at`."""
+    issued = datetime.fromisoformat(issued_at)
+    if issued.tzinfo is None:
+        issued = issued.replace(tzinfo=timezone.utc)
+    return datetime.now(timezone.utc) - issued <= SESSION_LIFETIME
 
-    Called on a successful login and on registration. The caller sets
-    the cookie, which is the only place the token is handed out.
+
+def start(conn, principal_id: str) -> str:
+    """Start the session a successful sign-in or registration holds and
+    return the raw token for its cookie, which is new every time
+    (spec/features/login.md, The session a sign-in issues).
+
+    A live session of the same account keeps its row, `id` and
+    `issued_at`, so an unlock adds nothing and does not slide the expiry.
+    A live session of another account is deleted. The account's expired
+    rows go in every case. Call it only once the credential has been
+    verified, inside the caller's transaction.
     """
     raw_token = secrets.token_urlsafe(32)
+    token_hash = hash_token(raw_token)
+
+    for row in conn.execute(
+        "SELECT id, issued_at FROM sessions WHERE principal_id = ?", (principal_id,)
+    ).fetchall():
+        if not is_live(row["issued_at"]):
+            conn.execute("DELETE FROM sessions WHERE id = ?", (row["id"],))
+
+    carried = g.session
+    if carried and g.principal["id"] == principal_id:
+        conn.execute(
+            "UPDATE sessions SET token_hash = ? WHERE id = ?", (token_hash, carried["id"])
+        )
+        return raw_token
+    if carried:
+        conn.execute("DELETE FROM sessions WHERE id = ?", (carried["id"],))
+
     now = utcnow()
-    get_db().execute(
+    conn.execute(
         "INSERT INTO sessions "
         "(id, token_hash, principal_id, issued_at, last_active_at) "
         "VALUES (?, ?, ?, ?, ?)",
-        (secrets.token_hex(16), hash_token(raw_token), principal_id, now, now),
+        (secrets.token_hex(16), token_hash, principal_id, now, now),
     )
     return raw_token
 
@@ -117,10 +147,7 @@ def load_into_g() -> bool:
     if row is None:
         return False
 
-    issued_at = datetime.fromisoformat(row["issued_at"])
-    if issued_at.tzinfo is None:
-        issued_at = issued_at.replace(tzinfo=timezone.utc)
-    if datetime.now(timezone.utc) - issued_at > SESSION_LIFETIME:
+    if not is_live(row["issued_at"]):
         return False
 
     g.session = {"id": row["session_id"]}

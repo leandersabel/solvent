@@ -15,7 +15,6 @@ with no main currency.
 from __future__ import annotations
 
 import json
-import secrets
 import uuid
 from datetime import datetime, timezone
 from typing import Optional
@@ -223,19 +222,7 @@ def register():
             (now, username, invite["id"]),
         )
 
-        raw_token = secrets.token_urlsafe(32)
-        conn.execute(
-            "INSERT INTO sessions "
-            "(id, token_hash, principal_id, issued_at, last_active_at) "
-            "VALUES (?, ?, ?, ?, ?)",
-            (
-                secrets.token_hex(16),
-                sessions.hash_token(raw_token),
-                principal_id,
-                now,
-                now,
-            ),
-        )
+        raw_token = sessions.start(conn, principal_id)
 
     response = jsonify({"kind": invite["kind"]})
     sessions.set_cookie(response, raw_token)

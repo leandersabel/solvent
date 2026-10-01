@@ -5591,6 +5591,12 @@ try {
       arrived && (await sat.eval("Boolean(document.querySelector('.hero-figure'))")) &&
         !(await sat.eval('document.body.innerText')).includes('Solvent cannot recover a lost password'),
     );
+    // login.md, The session a sign-in issues: each unlock below signs in
+    // on this same server session, so the list never grows.
+    const listSessions = async () =>
+      JSON.parse(await sat.eval(`fetch('/api/sessions', { headers: { 'X-Solvent-Request': '1' } })
+        .then((r) => r.json()).then((l) => JSON.stringify(l.map((s) => [s.id, s.issuedAt, s.current])))`));
+    const sessionsBefore = await listSessions();
     check(
       "a vault owner signed in at the sign-in address has the nav, Update values and Lock, and the outside frame is gone",
       signedIn && signedIn.nav.join(',') === 'Dashboard,Settings' && signedIn.controls.join(',') === 'Update values,Lock' &&
@@ -5679,6 +5685,21 @@ try {
       'after a refresh the password screen shows no top bar and no navigation',
       noChrome(refreshedChrome),
       JSON.stringify({ ...refreshedChrome, text: undefined }),
+    );
+
+    // Unlock again after the refresh, and the settings list shows the
+    // same sessions it showed after the first sign-in, one row each.
+    await signInOn(sat, VAULT_PASSWORD);
+    await intoVault(sat, 'the vault after the refresh');
+    await sat.eval(`document.querySelector('.topbar nav a[href="#/settings"]').click()`);
+    await sat.waitUntil("document.querySelector('.sessions-table tbody tr')", { label: 'the open sessions' });
+    const sessionsAfter = await listSessions();
+    const shownRows = await sat.eval("document.querySelectorAll('.sessions-table tbody tr').length");
+    check(
+      'locking, unlocking, reloading and unlocking again leaves Open sessions with the same rows, the same ids and the same start times',
+      JSON.stringify(sessionsAfter) === JSON.stringify(sessionsBefore) && shownRows === sessionsBefore.length &&
+        sessionsBefore.filter((entry) => entry[2]).length === 1,
+      JSON.stringify({ sessionsBefore, sessionsAfter, shownRows }),
     );
   } finally {
     sittingBrowser.close();
