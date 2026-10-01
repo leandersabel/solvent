@@ -49,10 +49,13 @@ def is_live(issued_at: str) -> bool:
     return datetime.now(timezone.utc) - issued <= SESSION_LIFETIME
 
 
-def start(conn, principal_id: str) -> str:
-    """Start the session a successful sign-in or registration holds and
-    return the raw token for its cookie, which is new every time
-    (spec/features/login.md, The session a sign-in issues).
+def start(conn, principal_id: str, now: str | None = None) -> str:
+    """Start the session a successful sign-in, unlock or registration
+    holds and return the raw token for its cookie, which is new every
+    time (spec/features/login.md, The session a sign-in issues).
+
+    This is the one writer of `principals.last_login_at`. A caller that
+    already holds a clock reading for the same event passes it as `now`.
 
     A live session of the same account keeps its row, `id` and
     `issued_at`, so an unlock adds nothing and does not slide the expiry.
@@ -60,6 +63,10 @@ def start(conn, principal_id: str) -> str:
     rows go in every case. Call it only once the credential has been
     verified, inside the caller's transaction.
     """
+    now = now or utcnow()
+    conn.execute(
+        "UPDATE principals SET last_login_at = ? WHERE id = ?", (now, principal_id)
+    )
     raw_token = secrets.token_urlsafe(32)
     token_hash = hash_token(raw_token)
 
@@ -79,7 +86,6 @@ def start(conn, principal_id: str) -> str:
     elif carried:
         conn.execute("DELETE FROM sessions WHERE id = ?", (carried["id"],))
 
-    now = utcnow()
     conn.execute(
         "INSERT INTO sessions "
         "(id, token_hash, principal_id, issued_at, last_active_at) "

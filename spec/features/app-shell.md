@@ -70,6 +70,17 @@ column set: no key material is a column of `principals`
 separate `credentials` and `dek_wrappers` tables rather than extending
 this one.
 
+**Every process start fills a null `principals.last_login_at` with the
+row's `created_at`**, in the one write transaction that creates the
+schema, before any request is served. Every account has signed in by
+the time it exists (login.md, The session a sign-in issues), so the
+column is never null where a request can read it, whichever build
+wrote the row. The DDL leaves the column nullable and the schema
+version unchanged: SQLite cannot add `NOT NULL` to an existing column
+without rebuilding `principals`, and a database at another schema
+version is refused at start, because this schema has no migration
+path beyond export and import.
+
 The schema is created in one place, so its triggers live here:
 
 - a `BEFORE INSERT` on `records` and
@@ -298,6 +309,11 @@ rearrangement:
   an administrator is rejected by the database itself, asserted
   against the schema with a direct SQL insert rather than through an
   endpoint.
+- Starting the app on a database holding a `principals` row with a
+  null `last_login_at` leaves that row's `last_login_at` equal to its
+  `created_at`, leaves every non-null `last_login_at` as it was, and
+  leaves the file's schema version unchanged. Starting it again
+  changes nothing.
 - The lock button discards keys and decrypted state and shows
   re-unlock with no confirmation dialog, and the server session
   survives it (login.md, Rules).

@@ -271,9 +271,7 @@ async function accounts(body) {
                 }),
               ]),
               el('td', { text: shortDate(row.createdAt.slice(0, 10)) }),
-              el('td', {
-                text: row.lastLoginAt ? shortDate(row.lastLoginAt.slice(0, 10)) : 'Never',
-              }),
+              el('td', { text: shortDate(row.lastLoginAt.slice(0, 10)) }),
               // Zero and "there is nothing to count" are different
               // statements, and a zero invites the reader to think a
               // vault is sitting there empty.

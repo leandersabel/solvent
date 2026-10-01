@@ -135,6 +135,9 @@ Refusals).
   administrator needs to see the other administrators to know whether
   they are the last one and to remove one.
 
+  `lastLoginAt` is a timestamp on every row and never null, because
+  registration is a sign-in (login.md, The session a sign-in issues).
+
   `recordCount` is **absent** for an administrator rather than zero.
   Zero and "has no vault" are different statements, and a zero invites
   the reader to think the vault is empty when the point is that there
@@ -420,4 +423,15 @@ invocation and nothing more.
 - `GET /api/admin/accounts` lists both kinds, and an administrator's
   row carries no `recordCount` field at all, asserted against the row's
   full key set rather than against its value.
+- Right after the first administrator registers through a
+  `flask create-invite` invite, and again after a vault owner and a
+  second administrator register through in-app invites, every row of
+  `GET /api/admin/accounts` carries a non-null `lastLoginAt` equal to
+  its `createdAt`. A sign-in of one account with the server clock
+  advanced moves its
+  `lastLoginAt` past its `createdAt` and leaves every other row's as
+  it was.
+- With a `principals` row whose `last_login_at` is null in the file
+  before the app starts, `GET /api/admin/accounts` returns that row's
+  `createdAt` as its `lastLoginAt` (app-shell.md, Database).
 - The invite token does not appear in the application's own log output.

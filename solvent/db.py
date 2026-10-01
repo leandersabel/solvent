@@ -66,6 +66,10 @@ def init_db(app: flask.Flask) -> None:
             _check_version(conn, db_path)
             conn.executescript(SCHEMA_PATH.read_text())
             _seed_symbols(conn)
+            conn.execute(
+                "UPDATE principals SET last_login_at = created_at "
+                "WHERE last_login_at IS NULL"
+            )
         except BaseException:
             conn.execute("ROLLBACK")
             raise

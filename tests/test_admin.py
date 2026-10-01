@@ -101,7 +101,7 @@ def test_the_account_list_carries_no_record_count_for_an_administrator(app, admi
     listed = {row["username"]: row for row in admin.get("/api/admin/accounts", headers=CSRF).get_json()}
     assert "recordCount" not in listed["root"]
     assert listed["sarah"]["recordCount"] == 1
-    assert listed["root"]["lastLoginAt"] is None
+    assert listed["root"]["lastLoginAt"] == listed["root"]["createdAt"]
 
 
 def test_no_admin_route_returns_a_credential_field_a_wrapper_or_a_ciphertext(app, admin):

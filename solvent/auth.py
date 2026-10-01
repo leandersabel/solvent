@@ -160,10 +160,6 @@ def login():
         response_body["dekNonce"] = wrapper["dek_nonce"]
 
     with write_transaction() as conn:
-        conn.execute(
-            "UPDATE principals SET last_login_at = ? WHERE id = ?",
-            (utcnow(), row["id"]),
-        )
         raw_token = sessions.start(conn, row["id"])
     response = jsonify(response_body)
     sessions.set_cookie(response, raw_token)

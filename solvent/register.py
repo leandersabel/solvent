@@ -229,7 +229,7 @@ def register():
             (now, username, invite["id"]),
         )
 
-        raw_token = sessions.start(conn, principal_id)
+        raw_token = sessions.start(conn, principal_id, now)
 
     response = jsonify({"kind": invite["kind"]})
     sessions.set_cookie(response, raw_token)
