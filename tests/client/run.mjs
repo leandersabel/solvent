@@ -1497,6 +1497,41 @@ await check('record-rate: the confirmation names each unit, how many holdings mo
   assert.ok(copy[2].startsWith('This is the only price recorded for XAU-ozt.'), copy[2]);
 });
 
+// ---- Age in words ------------------------------------------------------
+//
+// spec/features/record-snapshot.md: a figure's date is a calendar date
+// with no time or timezone, so its age is a count of calendar days and
+// the hour the reader looks at it never changes the wording.
+
+await check('a figure dated today is "today" at any hour, not "yesterday"', async () => {
+  const dom = await load('dom.js');
+  const RealDate = Date;
+  const at = (iso) => {
+    globalThis.Date = class extends RealDate {
+      constructor(...args) {
+        super(...(args.length ? args : [iso]));
+      }
+      static now() {
+        return new RealDate(iso).getTime();
+      }
+    };
+  };
+  try {
+    for (const hour of ['00:00:00Z', '11:59:59Z', '12:00:00Z', '15:00:00Z', '23:59:59Z']) {
+      at(`2026-09-30T${hour}`);
+      assert.equal(dom.today(), '2026-09-30');
+      assert.equal(dom.ageInWords('2026-09-30'), 'today', hour);
+      assert.equal(dom.ageInWords('2026-09-29'), 'yesterday', hour);
+      assert.equal(dom.ageInWords('2026-09-20'), '10 days ago', hour);
+      assert.equal(dom.ageInWords('2026-08-31'), '4 weeks ago', hour);
+      assert.equal(dom.ageInWords(null), 'never valued', hour);
+      assert.equal(dom.ageInWords(undefined), 'never valued', hour);
+    }
+  } finally {
+    globalThis.Date = RealDate;
+  }
+});
+
 // ---- Report -----------------------------------------------------------
 
 for (const [state, name] of results) console.log(`${state} ${name}`);
