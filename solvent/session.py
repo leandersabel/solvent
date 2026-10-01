@@ -71,11 +71,12 @@ def start(conn, principal_id: str) -> str:
 
     carried = g.session
     if carried and g.principal["id"] == principal_id:
-        conn.execute(
+        # The row may have expired or been revoked since the request began.
+        if conn.execute(
             "UPDATE sessions SET token_hash = ? WHERE id = ?", (token_hash, carried["id"])
-        )
-        return raw_token
-    if carried:
+        ).rowcount:
+            return raw_token
+    elif carried:
         conn.execute("DELETE FROM sessions WHERE id = ?", (carried["id"],))
 
     now = utcnow()
