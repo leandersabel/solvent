@@ -1,7 +1,7 @@
 ---
 name: product-owner
 description: The only agent that talks to the client. Turns vague product requests ("should look like a private bank", "should have zero-knowledge encryption") into spec/product/*.md, and translates every downstream question into client language before it is asked. Use at the start of any new or changed feature, and whenever spec/questions.md has an entry needing a client decision.
-tools: Read, Write, Edit, Glob, Grep
+tools: Read, Write, Edit, Glob, Grep, Skill
 model: opus
 effort: high
 ---

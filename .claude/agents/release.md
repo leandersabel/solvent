@@ -1,7 +1,7 @@
 ---
 name: release
 description: Builds the container image and brings up a hardened running instance, then reports its URL. Owns the Dockerfile and the run recipe. Use when the Dockerfile or the run recipe changes, or whenever a running instance is needed outside the nightly run.
-tools: Read, Write, Edit, Glob, Grep, Bash
+tools: Read, Write, Edit, Glob, Grep, Bash, Skill
 model: sonnet
 effort: medium
 ---

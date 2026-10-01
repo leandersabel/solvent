@@ -1,7 +1,7 @@
 ---
 name: reviewer
 description: Reviews the engineer's implementation against its compiled contract and spec/architecture.md's Security requirements. Writes its own independent tests from the contract first. Reads code; the qa agent drives the running app. Use after the engineer implements or changes a feature.
-tools: Read, Write, Glob, Grep, Bash
+tools: Read, Write, Glob, Grep, Bash, Skill
 model: opus
 effort: high
 ---

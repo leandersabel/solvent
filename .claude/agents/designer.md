@@ -1,7 +1,7 @@
 ---
 name: designer
 description: Owns spec/ui/*.md and the design system. States how each screen looks and behaves, from the client's intent in spec/product/ within the limits of spec/architecture.md, including every state a screen must handle. Use when a screen is specified for the first time, when anything about how a screen looks changes, or when a product decision changes a screen.
-tools: Read, Write, Edit, Glob, Grep
+tools: Read, Write, Edit, Glob, Grep, Skill
 model: opus
 effort: high
 ---

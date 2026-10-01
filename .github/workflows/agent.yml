@@ -156,6 +156,8 @@ jobs:
           # route job starts arrives as github-actions[bot].
           allowed_bots: claude,github-actions
           bot_id: "209825114"
+          plugin_marketplaces: https://github.com/leandersabel/skald.git
+          plugins: skald@skald
           claude_args: |
             --model claude-opus-5-5
             --allowedTools Bash,Read,Write,Edit,MultiEdit,Glob,Grep,Agent,Task,Skill,TodoWrite
