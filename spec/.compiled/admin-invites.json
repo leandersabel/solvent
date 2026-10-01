@@ -8,7 +8,7 @@
     {"file": "spec/features/register.md", "sections": ["What it does", "What registration writes", "Rules", "Edge cases"], "role": "the consumer of an invite and the writer of the kind it names"},
     {"file": "spec/features/account-settings.md", "sections": ["Change password", "Delete my account"], "role": "the shared change-password endpoint an administrator reaches, and the vault owner deletion path this one is not"},
     {"file": "spec/features/rate-lookup.md", "sections": ["The symbol table", "Maintaining the table"], "role": "the other administrator task on this surface, owned there and not here"},
-    {"file": "spec/ui/design-system.md", "sections": ["App shell", "Components", "States"], "role": "the administrator's frame, the section switcher that replaces nav inside the admin area, and the dialog and table conventions"},
+    {"file": "spec/ui/design-system.md", "sections": ["Typography", "Spacing and shape", "App shell", "Components", "States", "Accessibility"], "role": "the administrator's frame, the section switcher that replaces nav inside the admin area, the dialog and table conventions, and the phone-width sizes"},
     {"file": "spec/ui/admin.md", "sections": ["all"], "role": "the administration surface this feature drives"}
   ],
   "dependsOn": ["app-shell", "register", "login", "record-api", "account-settings"],

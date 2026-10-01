@@ -125,10 +125,12 @@ by its date and the dates are already in front of you.
 
 - **New recording**, a button on the main screen. It opens a date
   picker, set to today, with the dates that already hold a recording
-  marked in it. Pick a date nothing was recorded on and you go
-  straight to the sweep, starting one. Pick a marked one and you get
-  that recording's own screen, with no warning and nothing to confirm.
-  You asked for that date and you get that date, to look at first.
+  marked in it, so picking a date is never a guess at whether you are
+  starting a recording or opening one. Pick a date nothing was
+  recorded on and you go straight to the sweep, starting one. Pick a
+  marked one and you get that recording's own screen, with no warning
+  and nothing to confirm. You asked for that date and you get that
+  date, to look at first.
 - **A date in a holding's own list of values**, which opens the screen
   of the recording it belongs to. This is where a typo from eight
   months ago gets found.
@@ -137,6 +139,9 @@ by its date and the dates are already in front of you.
 
 The one route that skips all of that is the Update values action in
 the top bar (`app-shell.md`), which goes straight into editing today.
+It is the fast path for the act you perform every month, and a page in
+front of it would add a step to exactly what the product exists to make
+cheap.
 
 ### A recording's own screen
 
@@ -228,7 +233,10 @@ In the ordinary case you read it, it is right, and you finish.
 - **A published unit whose source did not answer.** The line says so
   and stays empty. Nothing is written for that unit, your total carries
   on at the most recent rate it has, and the line comes back filled in
-  as soon as the source does. You are never asked to type a dollar rate
+  as soon as the source does. The last rate is not written again under
+  this date, because that would put a figure nobody published into
+  your history under a date it was not published for, and nothing on
+  screen would reveal it. You are never asked to type a dollar rate
   in order to record a franc holding.
 
 The one time a rate is asked for rather than offered is when the unit
@@ -249,9 +257,8 @@ itself and leaves the others alone.
 On a phone this is the screen that changes shape rather than simply
 getting narrower. The wide table with every holding in view is the
 computer's answer, and a phone may walk you through one holding at a
-time instead. Same sweep, not a cut-down one, and it comes after the
-first version (`app-shell.md`, which owns the rule). Nothing here
-stands in its way: every question the sweep asks belongs to a single
+time instead. Same sweep, not a cut-down one (`app-shell.md`, which
+owns the rule). Every question the sweep asks belongs to a single
 holding or to a single unit, and both record one at a time.
 
 ### One holding, one date
@@ -333,12 +340,6 @@ What was typed into the attempt that lost is gone, and it is typed
 again on the reopened date. Nothing is held for them, and the screen
 never claims to have saved anything it did not. A rescue that works
 only some of the time is worse than none.
-
-Carrying those entries across, so the losing attempt opens the date
-with what was typed still in it, is wanted and is not in the first
-version. What the first version owes it is not standing in the way:
-the entries that lost are discarded because nothing keeps them yet,
-never because the date has been closed against them.
 
 #### What saving does to your history
 
@@ -599,49 +600,5 @@ worth around that date will change.
   changed there, where the holdings it moves are on the screen in
   front of you.
 - **No audit view across holdings.** "Show me every price I typed by
-  hand" is a different question with a different shape, and it is not in
-  this version. The provenance of each price is on the holding's page.
-
-## Decisions taken on your behalf
-
-- **One value per holding per date**, with entering a second one
-  offering to replace the first.
-- **Future dates are refused** outright rather than warned about.
-- **A published rate that could not be fetched writes nothing**, rather
-  than carrying the last one forward under a new date. Carrying it
-  forward would put a figure nobody published into your history under a
-  date it was not published for, quietly and in a way nothing on screen
-  would reveal.
-- **A rate only you can supply follows the quantity rule.** Your flat's
-  price per square meter is written when you set it and not otherwise.
-  The rule you gave was about exchange rates, and this is where the
-  line under it falls: a price you have to think about is gathered, and
-  the app does not write things you did not gather.
-- **Reopening looks up only what is missing.** A rate already written
-  for that date is shown as it stands and the source is not asked
-  about it, because it may be one you chose. A unit that went in empty
-  is looked up again, because the outage that emptied it is the reason
-  you came back.
-- **Update values in the top bar goes straight into editing today**,
-  skipping the recording's own screen. It is the fast path for the one
-  act somebody performs every month, and a page in front of it would
-  add a step to exactly the thing the product exists to make cheap.
-- **A figure on a recording's own screen opens its holding.** The line
-  names a holding, so the name is the link.
-- **Delete lives on the recording's own screen rather than in the
-  sweep**, so the screen you type into holds no button that destroys
-  a date.
-- **The date picker marks the dates that already hold a recording.**
-  Without the marks, picking a date would be a guess at whether you
-  are about to start one or open one, and the app already says where
-  your recordings are.
-- **The main screen carries the New recording button and the top bar
-  carries Update values**, rather than both screens carrying both.
-  One place asks which date and one place goes to today, so the main
-  screen does not hold two buttons for the same thing.
-- **Confirming on a reopened recording records the figure the holding
-  carried into that date**, meaning its last figure before that date
-  rather than the newest one in its history.
-- **The closing value offered when archiving a holding** follows the
-  same one value per date rule as everything else, so archiving on a
-  date that already has a value offers to replace it.
+  hand" is a different question with a different shape. The provenance
+  of each price is on the holding's page.

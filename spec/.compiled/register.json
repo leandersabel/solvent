@@ -4,16 +4,18 @@
   "read": [
     {"file": "spec/features/register.md", "sections": ["all"]},
     {"file": "spec/architecture.md", "sections": ["Accounts on this instance", "Credentials and vault key wrappers", "Key management", "Storage & data handling", "Application hardening", "Status codes"]},
-    {"file": "spec/features/login.md", "sections": ["The session a sign-in issues"], "role": "the rule by which registration starts its session"},
+    {"file": "spec/features/login.md", "sections": ["The session a sign-in issues", "Rules"], "role": "the rule by which registration starts its session, and the idle lock and pagehide lock that bind the keys a new vault holds while it waits to be read"},
+    {"file": "spec/features/net-worth-view.md", "sections": ["Data flow"], "role": "the first read and decryption of the vault that a failed first read repeats in place"},
     {"file": "spec/features/admin-invites.md", "sections": ["Invite lifecycle", "Bootstrap: the first administrator, and the locked-out one", "Rules", "Edge cases"], "role": "the invite row this consumes, its kind, and the generic refusal every bad invite shares"},
-    {"file": "spec/features/record-api.md", "sections": ["Row shape", "The AAD encoding", "`accountId` on the wire"], "role": "the validator the profile record is written through"},
+    {"file": "spec/features/record-api.md", "sections": ["Row shape", "The AAD encoding", "`accountId` on the wire", "Endpoints"], "role": "the validator the profile record is written through, and the GET /api/records the first read of a new vault calls"},
     {"file": "spec/features/account-settings.md", "sections": ["The profile record", "Main currency"], "role": "the payload shape whose two required keys registration writes"},
     {"file": "spec/features/rate-lookup.md", "sections": ["The symbol table", "Maintaining the table", "SSRF and egress hardening"], "role": "the kind: currency rows that are the whole of the main-currency list"},
     {"file": "spec/features/app-shell.md", "sections": ["Database", "CSRF", "The two surfaces", "Configuration"], "role": "the schema this writes into, the headers the page is served with, and the Public group that GET /register and POST /api/register belong to, which the gate passes with no session"},
-    {"file": "spec/ui/design-system.md", "sections": ["Components", "States", "App shell"], "role": "the form, input and progress conventions, and the fact that the unauthenticated screens sit outside the shell"},
-    {"file": "spec/ui/register.md", "sections": ["all"], "role": "the two forms the invite's kind chooses between"}
+    {"file": "spec/ui/design-system.md", "sections": ["Typography", "Spacing and shape", "Components", "States", "Accessibility", "App shell"], "role": "the form, input and progress conventions, the phone-width sizes, and the fact that the unauthenticated screens sit outside the shell"},
+    {"file": "spec/ui/register.md", "sections": ["all"], "role": "the two forms the invite's kind chooses between, and the card shown when the first read of a new vault fails"},
+    {"file": "spec/ui/unlock.md", "sections": ["all"], "role": "the unlock card a lock draws over a new vault that is waiting to be read, which asks for the password only"}
   ],
-  "dependsOn": ["app-shell", "admin-invites", "record-api", "rate-lookup"],
+  "dependsOn": ["app-shell", "admin-invites", "record-api", "rate-lookup", "login", "net-worth-view"],
   "parameters": {
     "page": {"value": "GET /register?invite=<token>, server-rendered Jinja, embedding the server's current default KDF envelope and, for a vault owner invite, the currency half of the symbol table. An invalid token renders an error page with no form", "cite": "spec/features/register.md#flow"},
     "formIsChosenByTheInvite": {"value": "the rendered form is the one the invite's kind calls for. An administrator invite renders no currency picker and states on the page that this link creates an administrator account with no vault. Nothing on either form lets the person choose the kind", "cite": "spec/features/register.md#flow"},
@@ -39,7 +41,12 @@
     "mainCurrencyStorage": {"value": "only inside the encrypted profile record, never as a plaintext column", "cite": "spec/features/admin-invites.md#invite-lifecycle"},
     "enumerationIsAcceptedHere": {"value": "a taken username is reported clearly. Username enumeration at registration is accepted rather than defended, because the endpoint is invite-gated. The refusal is the same whichever kind holds the name, so the attempt reveals existence but not kind", "cite": "spec/features/register.md#edge-cases"},
     "noWeakFallback": {"value": "a client that cannot run WASM Argon2id fails hard with no weaker fallback KDF, for both kinds. A client that can run WASM but cannot allocate the KDF's memory gets a distinct hard failure naming the moment rather than the device, with a retry and no vault created, and must not fall back to weaker parameters", "cite": "spec/features/register.md#edge-cases"},
-    "derivationRunsInAWorker": {"value": "run derivation in a Web Worker so the UI thread stays responsive, with a busy state", "cite": "spec/features/register.md#edge-cases"}
+    "derivationRunsInAWorker": {"value": "run derivation in a Web Worker so the UI thread stays responsive, with a busy state", "cite": "spec/features/register.md#edge-cases"},
+    "firstReadFailureStands": {"value": "when the first GET /api/records after a successful POST /api/register fails, the registration stands: the account exists and its session is live. The client keeps the Master Key, DEK and wrapper in the same document, starts the idle timer and offers to read again. There is no page load and no password prompt, because a load drops the keys and asks for the password just chosen", "cite": "spec/features/register.md#edge-cases"},
+    "firstReadRetry": {"value": "reading again fetches and decrypts the vault in place and enters it, landing at /dashboard in the same document, unlocked, with no password typed. Another failure draws the failure card again", "cite": "spec/features/register.md#acceptance-criteria"},
+    "heldKeysAreBound": {"value": "the keys held while a new vault waits to be read are bound like an open vault's: the idle lock and the lock on pagehide discard them and draw the unlock card, which asks for the password only, with no username field", "cite": "spec/features/register.md#edge-cases"},
+    "lockWinsOverRead": {"value": "a lock during the first read or a later one wins. The read finishing opens nothing, draws nothing of the vault, and the unlock card stands", "cite": "spec/features/register.md#edge-cases"},
+    "firstReadFailureCard": {"value": "vault form only. The form gives way to a card of the same width announced as an alert, with the heading 'Your vault is created' and a primary 'Try again' button that disables itself while it reads again in place. Copy beyond those two strings is in the cited section", "cite": "spec/ui/register.md#states"}
   },
   "verify": {
     "criteria": {"file": "spec/features/register.md", "section": "Acceptance criteria"},
@@ -52,7 +59,9 @@
       "a fault injected into the profile insert, for the all-or-nothing assertion including the unconsumed invite",
       "a seeded account of each kind holding the same username, for the cross-kind collision refusal",
       "an account registered through PUT /api/records with an equivalent profile record, for the indistinguishability assertion",
-      "another account's live session cookie, carried into a successful and into a failed registration"
+      "another account's live session cookie, carried into a successful and into a failed registration",
+      "GET /api/records stubbed to answer 503 on the first read after a successful registration and switchable to answer normally on the retry, for the first-read-failure assertions",
+      "control of the idle timer and a way to fire pagehide, for the held-keys assertions, including a pagehide fired while the retried read is in flight"
     ],
     "focus": [
       "the administrator path must leave zero dek_wrappers rows and zero records rows, asserted against both tables rather than against the response. Zero is the whole guarantee and an implementation that writes an empty wrapper row passes every behaviour test",
@@ -63,7 +72,10 @@
       "the four bad-invite responses must be byte-identical, not merely similar in wording. Any difference in length, ordering or status turns the page into an oracle",
       "the profile record written by registration must be indistinguishable from one written through PUT /api/records: same validation, same column values, same AAD. A second record writer that happens to produce the same columns today is exactly what this criterion exists to prevent",
       "a registration that fails partway must leave the invite unconsumed, asserted against the invite row and not only against the absence of the account",
-      "a registration carrying another account's live cookie must delete that sessions row, asserted against the table, and the old cookie must answer Unauthorized. A failed registration must leave the carried session working"
+      "a registration carrying another account's live cookie must delete that sessions row, asserted against the table, and the old cookie must answer Unauthorized. A failed registration must leave the carried session working",
+      "the first-read failure must be asserted as the same document: no navigation, no page load, no password field and no unlock card while the failure card shows, and the retry reaching /dashboard with no password typed. A test that reloads and signs in passes the outcome and breaks the rule",
+      "the held keys must be shown to be discarded by the idle period and by pagehide while the failure card shows, leaving the unlock card with a password field and no username field. A card that merely hides the keys passes a visual check and leaves them in memory",
+      "a pagehide while the retried read is in flight must leave no keys, no vault and nothing of the vault drawn, with the unlock card shown, asserted against the in-memory model and the DOM. A read that finishes after the lock and opens the vault anyway is the failure this catches"
     ]
   },
   "openQuestions": []

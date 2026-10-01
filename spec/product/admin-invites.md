@@ -110,8 +110,12 @@ Three choices, then one button.
   laptop", so that a list of outstanding links is tellable apart. This
   is the one thing you type anywhere in Solvent that the server can
   read, and the form says so at the moment of typing. The guidance is
-  to keep it to a nickname.
-- **How long the link stays good.** Between one and thirty days.
+  to keep it to a nickname. It is provisioning paperwork rather than
+  vault content, and encrypting it would mean the invite list could be
+  read only by the one administrator who wrote it.
+- **How long the link stays good.** Seven days unless changed, and
+  anywhere from one to thirty: short enough that a forgotten link
+  expires, long enough to survive a weekend.
 
 On creation the link appears once, ready to copy, with the plain fact
 beside it that it is not stored and cannot be shown again. An
@@ -156,8 +160,8 @@ cannot be brought back, and does not offer to save a copy first,
 because an administrator cannot read the vault they are about to
 destroy.
 
-The administrator is not asked for their own password first. That is a
-decision with a cost: an administrator session left open on an unlocked
+The administrator is not asked for their own password first. That has
+a cost: an administrator session left open on an unlocked
 machine can destroy somebody's whole history in two clicks, and nothing
 locks it short of the twelve-hour session limit (`login.md`), so what
 protects it is keeping the machine to yourself rather than anything the
@@ -174,7 +178,9 @@ Solvent, working directly on the machine it runs on. It is an invite
 for an administrator account and nothing else. The installer follows it
 in a browser, chooses a username and a password, and the instance has
 its first administrator. No vault is created, because an administrator
-account does not have one.
+account does not have one. The step on the machine produces an invite
+rather than an account, so the password is chosen in the browser by the
+person who will use it, and an account comes to exist in one way only.
 
 Every account after that comes from a link handed out inside the app.
 A **second administrator** is created the ordinary way: an existing
@@ -285,22 +291,3 @@ created the first administrator.
 - **The last administrator account cannot be removed**, or the instance
   could never hand out an account again without going back to the
   machine.
-
-## Decisions taken on your behalf
-
-- **A link lasts seven days unless changed, and can be set anywhere
-  from one to thirty.** Short enough that a forgotten link expires,
-  long enough to survive a weekend.
-- **The first administrator is created by following a link, like every
-  other account.** The step on the machine produces an invite rather
-  than an account with credentials set on the server, so a password is
-  chosen in the browser by the person who will use it, and there is one
-  way an account comes to exist rather than two.
-- **The note on an invite is readable by the server.** Everything else
-  you type in Solvent is not. This is provisioning paperwork
-  rather than vault content, and encrypting it would mean the invite
-  list could only be read by the one administrator who wrote it.
-- **The accounts list carries an item count and the dates.** All are
-  facts the server already has. They are listed because an
-  administrator removing an account should be able to see they have the
-  right one.

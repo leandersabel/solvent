@@ -78,14 +78,16 @@ meet one.
   the same unit reached twice in one sweep, or two people in the
   household updating on the same day, produce one lookup.
 - **The app keeps no record of who asked about what.**
+- **One person can ask for only so many prices in an hour**, a ceiling
+  set far above any real update, so a stolen session cannot be used to
+  hammer a source in your name.
 
 ## What it deliberately does not do
 
 - **No share or fund prices.** A brokerage holding is one entry in the
   currency your broker reports in, holding the total your broker states,
   and only that currency conversion is looked up. There is no ticker to
-  type anywhere in the app, and none is coming: this is the scope
-  decision recorded in `manage-accounts.md`, not a deferral.
+  type anywhere in the app (`manage-accounts.md`, which owns the rule).
 - **No silver, platinum, or palladium prices yet.** All three are in the
   unit list by name so you record them against the name the app will
   keep using, and you set the rate. Adding a source later changes
@@ -110,27 +112,22 @@ Currencies come from central bank data republished by a free open source
 service, gold from the Polish central bank directly. No account, no fee,
 no contract.
 
+The gold price you are offered is usually a day old, because the Polish
+central bank publishes one business day behind the London market,
+weekdays included. The app shows the day it is for rather than hiding
+the lag, and overriding it is one edit.
+
+Prices reach back as far as each source published. Gold does not reach
+before 2013, so older gold entries take a price you type.
+
 If a source stops or changes, there is nobody to call and prices get
 typed by hand until the app is changed. Silver, platinum and palladium
 have no source at all, so you set those rates yourself and they carry
-forward until you change them. A paid provider was weighed and
-rejected: the good ones require every copy of their data to be deleted
-when you stop paying, and Solvent cannot do that, because every rate is
-stored inside your encrypted vault, which the server can neither read
-nor delete.
+forward until you change them. A paid provider is not used: the good
+ones require every copy of their data to be deleted when you stop
+paying, and Solvent cannot do that, because every rate is stored inside
+your encrypted vault, which the server can neither read nor delete.
 
 What makes this survivable is that a price is only ever a proposal. You
 can overwrite any of them, and no entry is ever blocked by a lookup that
 failed.
-
-## Decisions taken on your behalf
-
-- **The gold price you are offered is usually a day old**, because the
-  Polish central bank publishes one business day behind the London
-  market, weekdays included. The app shows the day it is for rather than
-  hiding the lag. Overriding it is one edit.
-- **How far back prices reach is whatever each source published.** Gold
-  does not reach before 2013. Older gold entries take a price you type.
-- **There is a ceiling on how many prices one person can ask for in an
-  hour**, set far above any real update, so a stolen session cannot be
-  used to hammer the source in your name.

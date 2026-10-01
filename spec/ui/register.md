@@ -165,6 +165,20 @@ Both forms unless a state says otherwise.
   filled, including the password. Nobody re-types a password and waits
   again because of a network blip. The invite is untouched and the copy
   says so.
+- **Error, the new vault could not be read**, on the vault form only:
+  the account exists and the keys are held, and only the first read of
+  the vault failed (`spec/features/register.md`, Edge cases, "The first
+  read of the new vault fails"). The form gives way to a card of the
+  same width, announced as an alert:
+  - Heading, at section-heading size: "Your vault is created".
+  - Beneath it, in label/meta type: "It could not be read just now.
+    Nothing was lost, and you do not need to type your password again."
+  - A primary **Try again** button. Pressing it disables it and reads
+    again in place, with no page load and no password field. Success
+    lands as Populated does, and another failure draws this card again.
+  - A lock before the read finishes wins: the unlock card
+    (`ui/unlock.md`) stands, and the read finishing behind it opens
+    nothing.
 - **Populated**: success signs the person in and takes them where the
   account belongs. A vault owner lands on the dashboard with their keys
   already in memory. An administrator lands in the admin area

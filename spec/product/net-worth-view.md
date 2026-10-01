@@ -24,8 +24,7 @@ cannot tell two colors apart loses nothing.
 
 Everything described here is the screen on a computer. It works on a
 phone too, where picking a span by dragging across the chart needs an
-answer of its own. That shape is a later design and not part of the
-first version (`app-shell.md`, which owns the rule).
+answer of its own (`app-shell.md`, which owns the rule).
 
 ## The screens
 
@@ -93,12 +92,14 @@ same color, with the net worth line drawn over the top.
 
 It answers two questions at once: how the total moved, and what it was
 made of while it moved. Grouped by nothing, it is a single band, which
-is just your net worth over time.
+is just your net worth over time, and that is how it is grouped until
+you have set up a dimension.
 
 What it is for, in order:
 
 - **The shape of the last few years.** Range buttons for one month, six
-  months, one year and everything, defaulting to a year.
+  months, one year and everything, defaulting to a year, or to
+  everything when your history is shorter.
 - **What one part of your money did over a specific span.** You drag
   across the chart between any two dates, the selection stays after you
   let go, the total at the top becomes the change across exactly those
@@ -125,6 +126,9 @@ go on to correct it (`record-snapshot.md`, which owns that screen).
 
 Nothing you touch on the chart contacts the network. It is all already
 in front of you.
+
+A very long history is thinned out for drawing only. Totals are always
+computed on everything you recorded.
 
 ### The chart is mostly inferred, and says so
 
@@ -159,10 +163,12 @@ and they are the dates that open a recording when you click them, so
 the marking says which part of the line you gave it and where there is
 something to go back to.
 
-One control takes the marks away and leaves a clean line, for when you
-want to look at the shape rather than the evidence. The honest drawing
-is what you get without asking for it, and the tidier one is the thing
-you choose.
+One control, **Just the line**, takes the marks away and leaves a clean
+line, for when you want to look at the shape rather than the evidence.
+The honest drawing is what you get without asking for it, and the
+tidier one is the thing you choose. The name says what the control
+does without claiming the marked chart is the untidy one, since the
+marked chart is the accurate one.
 
 The chart is drawn as curves rather than steps deliberately. Real
 transfers are instant and sharp, but a decade of sparse entries drawn as
@@ -309,20 +315,3 @@ the section needs no small print.
   you like, but past four the rest are folded into "Other", because
   beyond that no set of colors stays distinguishable, including for
   color blind readers.
-
-## Decisions taken on your behalf
-
-- **The chart defaults to one year**, or everything when your history is
-  shorter, and defaults to grouping by nothing until you have set up a
-  dimension.
-- **The control that hides the marks is called Just the line.** It has
-  to say what it does without claiming the marked chart is the untidy
-  one, since the marked chart is the accurate one.
-- **The screen opens on latest rates.** That is the answer to what am I
-  worth. The other position answers a question you go looking for, and
-  opening on it would put a comparison where the headline belongs.
-- **Archived holdings leave the current total** and stay in history.
-- **A holding with no recorded values is left out of the total** rather
-  than counted as zero.
-- **A very long history is thinned out for drawing only.** Totals are
-  always computed on everything you recorded.

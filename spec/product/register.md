@@ -35,9 +35,10 @@ A single card, nothing else on the page. No navigation, no marketing:
 you arrived from a link to do one thing.
 
 - **Username.** Three to thirty-two characters, lowercase letters,
-  digits, dot, underscore, hyphen. It is lowercased as you type rather
-  than quietly changed afterwards, so what you see is what you will
-  sign in with.
+  digits, dot, underscore, hyphen. Lowercase only, so no two people
+  claim names that differ by capitalization alone. It is lowercased as
+  you type rather than quietly changed afterwards, so what you see is
+  what you will sign in with.
 - **Password, and again to confirm.** With a strength gauge that fills
   as you type and says, in words, roughly how long the password would
   hold up.
@@ -52,6 +53,11 @@ The bar is at least twelve characters, and a strength rating that
 common passwords and obvious patterns do not reach however long they
 are. Both have to pass before the button becomes usable, and whichever
 one is not met is named. Never a bare "password too weak".
+
+The password is the only defense if the stored data is ever stolen
+outright. Twelve characters with a strength rating, rather than a
+longer minimum, keeps a memorable four-word phrase comfortably inside
+the bar while ruling out anything on a common-password list.
 
 The gauge reads as a magnitude, not as a verdict: it fills, it does not
 go from red to green, because a weak password here is not an error you
@@ -97,7 +103,8 @@ responsive. It must never look like it has hung.
 This is the screen an invite for an administrator account opens, and it
 is a shorter one. A single card, same as the other, with a username and
 a password held to the same bar and measured by the same strength
-gauge.
+gauge. The bar is not relaxed here, because this password guards the
+power to delete every account on the instance.
 
 What is absent is absent because there is no vault:
 
@@ -209,31 +216,3 @@ You land in the admin area, signed in.
 - **No composition rules.** No required symbol, no required digit, no
   forced mixed case. They push people toward short passwords with
   punctuation, which is the wrong direction here.
-
-## Decisions taken on your behalf
-
-- **The password bar is twelve characters plus a strength rating.**
-  You asked for zero-knowledge, which makes the password the only
-  defense if the stored data is ever stolen outright. Twelve with a strength check, rather than a longer
-  minimum, keeps a memorable four-word phrase comfortably inside the
-  bar while ruling out anything on a common-password list.
-- **Username shape and length.** Lowercase, three to thirty-two
-  characters, with dot, underscore, and hyphen allowed. Nobody asked
-  for this. It exists so that two people cannot claim names that differ
-  only by capitalization.
-- **One pool of usernames for both kinds of account.** A person who
-  holds a user account and an administrator account picks a second name
-  for the second one rather than reusing the first. The cost is that
-  they have to think of one. What it buys is that a username names
-  exactly one account, so nobody ever has to say which kind they meant.
-- **An administrator password is held to the same bar as a vault
-  password.** It protects the ability to delete every account on the
-  instance, so it is not the place to relax the rule.
-- **Creating an administrator account lands you in the admin area,
-  signed in**, the same way creating a vault lands its owner inside
-  it. Nobody types a password they just chose a second time.
-- **The encryption was tuned so that a phone or tablet is comfortable
-  to use, at a cost of roughly one character of password strength.**
-  Reversible. The same setting governs setting a vault up and opening
-  it afterwards, and `login.md` states it, along with how Solvent
-  raises it again if phone browsers get faster.

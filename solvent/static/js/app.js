@@ -143,6 +143,8 @@ async function readRegistered(created) {
     width('outside');
     const retry = el('button', { type: 'button', class: 'btn-primary', text: 'Try again' });
     retry.addEventListener('click', () => {
+      // A lock took the keys this card was offering to read with.
+      if (!holdsKeys()) return;
       retry.disabled = true;
       readRegistered(created);
     });

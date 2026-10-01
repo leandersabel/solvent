@@ -27,6 +27,13 @@ in to, and you never say which you meant, because a username belongs
 to exactly one account on the instance. Somebody who holds both kinds
 holds two usernames and signs in to one at a time.
 
+Both kinds sign in at this screen, at the same address. A separate
+address for administrators would be one more thing to know and would
+hide nothing, since an address anybody can type is not a secret. One
+screen also means a probe cannot tell the two kinds apart by where a
+name was accepted. The cost is that the screen behaves differently
+after a correct password without hinting at it before one.
+
 ## The screens
 
 ### Unlock
@@ -54,6 +61,15 @@ second on a computer, and a little under two seconds on a phone or
 tablet, where the browser runs this kind of work much more slowly on
 otherwise comparable hardware. This is the screen's defining moment and
 it must never look like a hang.
+
+The phone figure is set on purpose. A strength that keeps a computer at
+a fraction of a second would leave somebody on a phone waiting eight to
+ten seconds at every unlock. Bringing that under two seconds costs
+roughly one character of password strength against somebody who has
+stolen a copy of the stored data, and the setting is one of the two the
+standard behind this encryption recommends. If phone browsers get
+faster, Solvent can raise it again on its own (Keeping the lock
+current). The same setting governs setting a vault up (`register.md`).
 
 On submit the button becomes a progress state labeled as deriving the
 key, and the form goes quiet. One line beneath: this takes a moment by
@@ -119,7 +135,10 @@ you are returned to where you were.
   wording or by how quickly it gives up, nor whether the name it was
   given belongs to a user account or an administrator account.
 - **Too many attempts.** Try again in a few minutes, said the same way
-  whether or not the account exists.
+  whether or not the account exists. Attempts are slowed and then
+  locked out for a few minutes. Whoever runs the instance sets the exact
+  numbers, because an install reachable only from the home network and
+  one facing the internet need different limits.
 - **The browser cannot do the encryption Solvent needs.** A hard stop
   with a plain explanation. No fallback is offered, because none
   exists.
@@ -177,7 +196,8 @@ that could lock somebody out would be worse than no upgrade.
   confirmation, and does not sign you out. Unlocking needs only the
   password.
 - Everybody is signed out twelve hours after signing in, however busy
-  they have been.
+  they have been: long enough for a day's work, short enough that a
+  forgotten tab is not a standing invitation.
 - A vault made when the instance protected vaults less strongly is
   brought up to current strength at the next sign-in, without being
   asked and without touching anything inside the vault. If that step
@@ -200,49 +220,14 @@ that could lock somebody out would be worse than no upgrade.
   (`account-settings.md`), never disabled. The lock is the last defense
   against somebody walking up to an unlocked screen, which is a threat
   this product takes seriously.
-- **No second factor.** Not in this version. The vault's protection is
-  the password itself rather than a check the server performs, so a
-  second factor at the door would guard the session, not the data. An
-  administrator account is where it would earn its keep soonest,
-  because there the password is the whole of what stands in front of
-  the power to delete every account on the instance. Named here so the
-  gap is a known one.
+- **No second factor.** The vault's protection is the password itself
+  rather than a check the server performs, so a second factor at the
+  door would guard the session, not the data. On an administrator
+  account the password is the whole of what stands in front of the
+  power to delete every account on the instance, and that gap is a
+  known one.
 - **No easier unlock offered to a device that is short of memory right
   now.** Unlocking with anything weaker would produce a key that opens
   nothing anyway, and weakening it for everybody would undo the one
   protection that stands between a stolen copy of the data and someone
   reading it. You close a tab and try again instead.
-- **Guessing who has an account is not fully closed off.** For vaults
-  at the current protection strength it is. A vault that has not been
-  signed into since the last raise is, until its owner next signs in,
-  tellable apart by a determined prober. Accepted for a small invited
-  household, where sign-in is already gated and registration accepts
-  the same exposure.
-
-## Decisions taken on your behalf
-
-- **Both kinds of account sign in at the same screen, at the same
-  address.** A separate address for administrators would be one more
-  thing to know and would not hide anything, since an address anybody
-  can type is not a secret. One screen also means a probe cannot tell
-  the two kinds of account apart by where the name was accepted. The
-  cost is that the screen has to behave differently after a correct
-  password without hinting at it before one. Reversible.
-- **Everybody is signed out twelve hours after signing in**, counted
-  from sign-in and not extended by activity. Long enough for a day's
-  work, short enough that a forgotten tab is not a standing invitation.
-- **Attempts are throttled and then locked out for a few minutes.** The
-  exact numbers are left to whoever runs the instance, because a
-  home-network-only install and an internet-facing one do not need the
-  same limits.
-- **The encryption was tuned so that a phone or tablet unlocks in
-  about two seconds instead of eight to ten.** Reversible. Phone and
-  tablet browsers run this particular computation many times slower
-  than a computer's does, so a setting that keeps a computer at a
-  fraction of a second would leave somebody on a phone waiting eight to
-  ten seconds every time they unlocked. The cost is real but small:
-  roughly one character of password strength against somebody who has
-  stolen a copy of the stored data, and the setting chosen is one of
-  the two the standard behind this encryption recommends. If phone
-  browsers get faster, Solvent can raise it again on its own. See
-  "Keeping the lock current".
