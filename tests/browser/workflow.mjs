@@ -4143,12 +4143,15 @@ try {
       nextDisabled: document.querySelector('.dialog [aria-label="Next month"]')?.disabled,
       previousDisabled: document.querySelector('.dialog [aria-label="Previous month"]')?.disabled,
       todayDated: document.querySelector('.date-day.is-today')?.dataset.date,
+      strayText: [...document.querySelectorAll('.dialog .date-picker')].flatMap(p => [...p.childNodes]).filter(n => n.nodeType !== 1).length,
+      showsNull: document.querySelector('.dialog').textContent.includes('null'),
     })`));
     check(
       'dashboard: New recording opens one dialog headed "New recording" whose body is the month grid, with no date field, hint, Open or popup',
       shape.heading === 'New recording' && shape.dialogs === 1 && shape.popups === 0 && shape.fields === 0 && shape.hints === 0 &&
         !shape.buttons.includes('Open') && !shape.buttons.includes('Close') && shape.actions.length === 1 &&
-        shape.actions[0] === 'Cancel:btn-secondary' && shape.title !== '' && shape.focusedToday && shape.todayDated === T,
+        shape.actions[0] === 'Cancel:btn-secondary' && shape.title !== '' && shape.focusedToday && shape.todayDated === T &&
+        shape.strayText === 0 && !shape.showsNull,
       JSON.stringify(shape),
     );
     check(
@@ -4846,7 +4849,8 @@ try {
     await press('Pick a date');
     check(
       'record-snapshot: a recording that is not there says so and offers the date picker',
-      gone.includes(`${await format('longDate', ago(3))} holds no recording.`) && (await ev("document.querySelector('.dialog-heading').textContent")) === 'New recording',
+      gone.includes(`${await format('longDate', ago(3))} holds no recording.`) && (await ev("document.querySelector('.dialog-heading').textContent")) === 'New recording' &&
+        (await ev("[...document.querySelectorAll('.dialog .date-picker')].flatMap(p => [...p.childNodes]).every(n => n.nodeType === 1) && !document.querySelector('.dialog').textContent.includes('null')")),
     );
     await press('Cancel', '.dialog');
 
