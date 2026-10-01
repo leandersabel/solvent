@@ -170,11 +170,10 @@ The client is `leandersabel`. No agent edits an issue body.
   Writing section.
 - An issue by `leandersabel` starts the loop when it is opened. Anyone
   else's issue starts it when `accepted` is added. An issue by
-  `github-actions[bot]` starts at once: only this repository's
-  workflows can write one, for a red `master`, and its text is
-  theirs. Adding a label takes
-  triage access to the repository, no form sets `accepted`, and no
-  agent adds it.
+  `github-actions[bot]` starts at once: only this repository's workflows
+  can write one, for a red `master`, and its text is theirs. Adding a
+  label takes triage access to the repository, no form sets `accepted`,
+  and no agent adds it except the QA run, to its own findings.
 - The loop reads an issue's body, the comments by `leandersabel` and
   its own comments. Nothing else on the issue is read, whatever it
   says. On an accepted issue it reads the body as it stood when
@@ -217,8 +216,9 @@ the client does.
 ### Implementation
 
 - Starts when a spec pull request merges, or when clarifying finds a
-  `bug` with nothing to ask. One implementation runs at a time: its
-  issue carries `implementing`, an issue ready meanwhile waits with
+  `bug` with nothing to ask. One implementation runs at a time, holding
+  the `claude/slot` branch, which GitHub creates only once: its issue
+  carries `implementing`, an issue ready meanwhile waits with
   `queued`, and the lowest-numbered queued issue starts when the running
   one merges.
 - On `claude/issue-<issue>`, `engineer` implements the contract, for a
@@ -267,9 +267,8 @@ the client does.
   client can start the same run by hand. Claude in Chrome is not used
   here, because it needs a desktop browser.
 - A finding that reproduces twice becomes a `bug` issue by
-  `claude[bot]` labeled `qa`, or a comment on the open one it repeats.
-  It waits for `accepted` like anyone else's issue, so nothing the loop
-  writes starts the loop.
+  `claude[bot]` labeled `qa` and `accepted`, which the loop takes up
+  at once, or a comment on the open one it repeats.
 - A passing night is a pre-release named by its date, `YYYY-MM-DD`,
   with the image on `ghcr.io/leandersabel/solvent` tagged `:<date>` and
   `:nightly`. There is at most one version a day, and a run on a day

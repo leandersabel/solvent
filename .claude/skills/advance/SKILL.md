@@ -165,11 +165,14 @@ closing `<details>` block.
 
 ## Implementation
 
-1. Another open issue carries `implementing`: add `queued`, comment
-   which issue it waits for, and stop. A `bug` opened by
-   `github-actions[bot]` for a red `master` skips this, since every
-   other implementation's checks fail until it is fixed. Otherwise add `implementing`
-   and remove `queued`.
+1. Take the implementation slot by creating the branch `claude/slot`
+   (`gh api -X POST repos/leandersabel/solvent/git/refs -f
+   ref=refs/heads/claude/slot -f sha=<origin/master>`). GitHub creates
+   it only once, so two runs never both hold the slot. Created: add
+   `implementing` and remove `queued`. It already exists: add `queued`,
+   comment which issue carries `implementing`, and stop. A `bug` opened
+   by `github-actions[bot]` for a red `master` skips the slot, since
+   every other implementation's checks fail until it is fixed.
 2. `git fetch origin`, and branch `claude/issue-<issue>` from
    `origin/master`. A leftover branch of that name without a pull
    request, holding commits beyond `origin/master`, is the last run's
