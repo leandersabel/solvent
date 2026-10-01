@@ -362,7 +362,7 @@ try {
   check('the button unlocks once the bar is met', await page.eval("!document.querySelector('button[type=submit]').disabled"));
   await submit();
   await page.waitUntil("location.pathname === '/admin'", { timeout: 90000, label: 'the admin area' });
-  await page.settle(600);
+  await page.waitUntil("document.querySelector('#app .section-switcher')", { label: 'the admin area to render' });
 
   check('an administrator lands in the admin area', (await page.eval('location.pathname')) === '/admin');
   check(
@@ -429,7 +429,7 @@ try {
   await page.settle(300);
   await submit();
   await page.waitUntil("location.pathname === '/dashboard'", { timeout: 90000, label: 'the dashboard' });
-  await page.settle(500);
+  await page.waitUntil("document.querySelector('#unlock-password')", { timeout: 90000, label: 'the unlock card' });
 
   // A page load discards the in-memory keys by definition.
   check('a reload asks for the password again', (await text()).includes('Solvent cannot recover a lost password'));
@@ -1440,7 +1440,7 @@ try {
     await other.settle(400);
     await other.eval("document.querySelector('button[type=submit]').click()");
     await other.waitUntil("location.pathname === '/dashboard'", { timeout: 90000, label: 'the new vault' });
-    await other.settle(500);
+    await other.waitUntil("document.querySelector('#unlock-password')", { timeout: 90000, label: 'the unlock card' });
     await signInOn(other, LEAVING_PASSWORD);
     await other.waitUntil("!document.querySelector('#unlock-password')", { timeout: 90000, label: 'the new vault unlocked' });
     await makeStale(other, 'leaving', LEAVING_PASSWORD);
@@ -1482,7 +1482,7 @@ try {
 
     await fillDelete();
     await other.waitUntil("location.pathname === '/login'", { timeout: 60000, label: 'the sign-in card after deleting' });
-    await other.settle(400);
+    await other.waitUntil("document.querySelector('#unlock-username')", { timeout: 60000, label: 'the sign-in card' });
     const left = ['credentials', 'records', 'sessions'].map((table) => [
       table,
       sql(`SELECT COUNT(*) AS n FROM ${table} WHERE principal_id = ?`, leavingRow.principal)[0].n,
