@@ -82,3 +82,36 @@ def test_the_vault_shell_page_is_not_kept_for_back(app):
     unlocked keeps no keys, so the vault shell page is never stored."""
     owner, _ = register(app, "owner")
     assert owner.get("/dashboard").headers["Cache-Control"] == "no-store"
+
+
+def test_the_sign_in_and_vault_registration_pages_are_not_kept_for_back(app, client):
+    """Both are served as the vault shell page, because the keys their
+    one derivation produces must land in the document that stays open
+    (architecture.md, Application hardening), so they carry the vault
+    shell page's `no-store` too."""
+    assert client.get("/login").headers["Cache-Control"] == "no-store"
+    token = mint_invite(app)
+    assert client.get(f"/register?invite={token}").headers["Cache-Control"] == "no-store"
+
+
+def test_every_register_response_says_no_referrer_in_the_header(app, client):
+    """The token rides in the URL, and the header applies to everything
+    the response goes on to load, which a meta tag only does from where
+    it sits (admin-invites.md, Rules)."""
+    for target in (
+        f"/register?invite={mint_invite(app)}",
+        f"/register?invite={mint_invite(app, 'administrator')}",
+        "/register?invite=not-an-invite",
+        "/register",
+    ):
+        assert client.get(target).headers["Referrer-Policy"] == "no-referrer", target
+
+
+def test_the_register_pages_set_their_policy_before_loading_anything(app, client):
+    """A stylesheet requested before the meta tag is parsed would carry
+    the page's address, token included, as its Referer."""
+    for kind in ("vault_owner", "administrator"):
+        body = client.get(f"/register?invite={mint_invite(app, kind)}").get_data(as_text=True)
+        meta = body.index('name="referrer"')
+        assert meta < body.index("<link")
+        assert meta < body.index("<script")

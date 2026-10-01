@@ -3,6 +3,10 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
+  {# Before any link or script, so that a policy a page sets applies to
+     the subresources it loads: a request made first would go out
+     carrying the page's address. #}
+  {% block meta %}{% endblock %}
   <title>{% block title %}Solvent{% endblock %}</title>
   <link rel="stylesheet" href="{{ url_for('static', filename='css/tokens.css') }}">
   {# The server's current default KDF envelope, embedded so a
@@ -11,16 +15,20 @@
      rides on an administrator's page too, because changing their
      password derives like any other account's. #}
   <script id="kdf-envelope" type="application/json">{{ kdf_envelope | tojson }}</script>
-  {% block head %}{% endblock %}
 </head>
-<body>
+<body{% if outside %} class="outside-body"{% endif %}>
+  {# The outside frame (ui/design-system.md, App shell): the wordmark
+     above one centered card, with the bar hidden. It is this page's
+     frame until a vault owner's keys exist, and the client then
+     removes it and shows the bar, in the same document. #}
+  {% if outside %}<p class="outside-wordmark">Solvent</p>{% endif %}
   <div x-data="shell">
     {# A visitor with no session has no kind, so there is no bar to
        draw for them: the page carries the sign-in card alone until
        one derivation has bought both the session and the keys. #}
-    <header class="topbar">
+    <header class="topbar"{% if outside %} hidden{% endif %}>
       <span class="wordmark">Solvent</span>
-      {% if g.get('principal') %}
+      {% if g.get('principal') and not outside %}
       <nav aria-label="Primary">
         <ul>
           {% for entry in nav_entries(g.principal) %}

@@ -6,6 +6,7 @@
 // records, so this is the only place those screens can be checked.
 // Run by tests/test_browser.py, which starts the server and mints the
 // bootstrap invite first.
+import { execFileSync } from 'node:child_process';
 import { DatabaseSync } from 'node:sqlite';
 import { launch, Session } from './cdp.mjs';
 
@@ -215,6 +216,15 @@ const signInOn = (session, password, username = null) =>
     document.querySelector('button[type=submit]').click();
   })()`);
 
+// The password alone, on a card that knows the username.
+const enterPasswordOn = (session, password) =>
+  session.eval(`(() => {
+    const node = document.querySelector('#unlock-password');
+    node.value = ${JSON.stringify(password)};
+    node.dispatchEvent(new Event('input', { bubbles: true }));
+    document.querySelector('button[type=submit]').click();
+  })()`);
+
 const text = () => page.eval('document.body.innerText');
 const labels = (selector) =>
   page.eval(`[...document.querySelectorAll(${JSON.stringify(selector)})].map(n => n.textContent.trim())`);
@@ -341,6 +351,101 @@ const reachable = async (needles) => {
   return needles.filter((needle) => strings.some((s) => s.includes(needle)));
 };
 
+// A document the test has marked, so a document load is told from a
+// change inside the page: a new document has no mark. Registration and
+// sign-in must reach the vault without one, because the keys live in
+// the document's memory and a new document has none (login.md, Rules;
+// register.md, Flow).
+const markDocument = (session, name) => session.eval(`window.__sitting = ${JSON.stringify(name)}`);
+
+// Whether `session` is in the vault, in the document marked `name`:
+// the keys in memory, no card asking for a password, and the chrome a
+// vault owner has.
+const sitting = async (session, name) =>
+  JSON.parse(await session.eval(`(async () => {
+    const s = await import('/static/js/session.js');
+    const bar = document.querySelector('.topbar');
+    return JSON.stringify({
+      sameDocument: window.__sitting === ${JSON.stringify(name)},
+      keys: s.currentVault() !== null,
+      card: Boolean(document.querySelector('#unlock-password')),
+      path: location.pathname,
+      hash: location.hash,
+      nav: [...document.querySelectorAll('.topbar nav a')].map((a) => a.textContent.trim()),
+      controls: [...document.querySelectorAll('.topbar-actions button')].map((b) => b.textContent.trim()),
+      barShown: Boolean(bar) && !bar.hidden && bar.offsetHeight > 0,
+      outsideFrame: document.body.classList.contains('outside-body') || Boolean(document.querySelector('.outside-wordmark')),
+      passwordFields: document.querySelectorAll('input[type=password]').length,
+      title: document.title,
+    });
+  })()`));
+
+// Waits for the vault to be showing, without throwing, so that a
+// failure is one failed check and the run goes on.
+const intoVault = (session, label, timeout = 90000) =>
+  session
+    .waitUntil("location.pathname === '/dashboard' && document.querySelector('#app').children.length > 0 && !document.querySelector('#unlock-password') && document.querySelector('.topbar nav a')", { timeout, label })
+    .then(() => true, () => false);
+
+// Holds the first read of the vault's records on its way to the server
+// until `release()`, so a test can act while the vault is being read.
+// `reached` resolves when the read is waiting. `stop()` removes it.
+const holdRecords = async (session) => {
+  let release;
+  let reach;
+  const gate = new Promise((resolve) => { release = resolve; });
+  const reached = new Promise((resolve) => { reach = resolve; });
+  const stop = await intercept(session, '*/api/records?type=*', async () => {
+    reach();
+    await gate;
+    return null;
+  });
+  return { reached, release, stop };
+};
+
+// What a page shows and holds once a vault read it began has finished:
+// whether any key or vault is held, whether the vault is drawn, and
+// whether the card asking for the password is.
+const afterRead = (session) =>
+  session.eval(`(async () => {
+    const s = await import('/static/js/session.js');
+    return JSON.stringify({
+      keys: s.holdsKeys(),
+      vault: s.currentVault() !== null,
+      card: Boolean(document.querySelector('#unlock-password')),
+      drawn: Boolean(document.querySelector('.hero-figure, .holdings-table, .sweep, .dialog')),
+      empty: document.body.innerText.includes('Add your first holding'),
+      nav: document.querySelectorAll('.topbar nav a').length > 0 && !document.querySelector('.topbar').hidden
+        && document.querySelector('.topbar nav a').offsetParent !== null && document.querySelectorAll('.topbar-actions button').length > 0
+        && document.body.innerText.includes('Update values'),
+    });
+  })()`).then(JSON.parse);
+
+// Where Back lands from a page left while unlocked.
+const backFromAway = async (session) => {
+  await session.goto('about:blank');
+  await session.send('Page.navigateToHistoryEntry', {
+    entryId: await session.send('Page.getNavigationHistory').then(({ currentIndex, entries }) => entries[currentIndex - 1].id),
+  });
+  const until = Date.now() + 30000;
+  while (Date.now() < until) {
+    await session.settle(250);
+    try {
+      const back = JSON.parse(await session.eval(`(async () => {
+        if (!document.querySelector('#unlock-password')) return 'null';
+        return JSON.stringify({
+          keys: (await import('/static/js/session.js')).currentVault() !== null,
+          text: document.body.innerText,
+        });
+      })()`));
+      if (back) return back;
+    } catch {
+      // Between documents.
+    }
+  }
+  return null;
+};
+
 try {
   // ---- The administrator, from the bootstrap invite ---------------
 
@@ -427,11 +532,40 @@ try {
     box.dispatchEvent(new Event('change', { bubbles: true }));
   })()`);
   await page.settle(300);
+  await markDocument(page, 'registration');
   await submit();
-  await page.waitUntil("location.pathname === '/dashboard'", { timeout: 90000, label: 'the dashboard' });
-  await page.waitUntil("document.querySelector('#unlock-password')", { timeout: 90000, label: 'the unlock card' });
+  const registered = await intoVault(page, 'the vault after registering');
+  await page.settle(500);
 
+  // register.md, Flow: "lands logged in with keys already in memory".
+  // The keys live in the memory of the document that derived them, so
+  // the vault is drawn in that document: a load of /dashboard would
+  // find nobody holding them and ask for the password just chosen.
+  const landed = registered ? await sitting(page, 'registration') : null;
+  check(
+    'registering a vault lands in the vault itself, in the same document, with the keys in memory and no password asked again',
+    landed && landed.sameDocument && landed.keys && !landed.card && landed.path === '/dashboard',
+    JSON.stringify(landed),
+  );
+  check(
+    'the vault the registration lands in is the new one, empty and offering its first holding',
+    registered && (await text()).includes('Add your first holding'),
+  );
+  check(
+    "a registered vault owner's bar has the nav, Update values and Lock, and the outside frame is gone",
+    landed && landed.nav.join(',') === 'Dashboard,Settings' && landed.controls.join(',') === 'Update values,Lock' &&
+      landed.barShown && !landed.outsideFrame && landed.title === 'Solvent',
+    JSON.stringify(landed),
+  );
+  check(
+    'after registering no password field is left and the invite token is nowhere in the page or the address',
+    landed && landed.passwordFields === 0 && !landed.hash.includes(vaultInvite) &&
+      !(await page.eval('location.href')).includes(vaultInvite) &&
+      !(await page.eval('document.documentElement.outerHTML')).includes(vaultInvite),
+    JSON.stringify(landed),
+  );
   // A page load discards the in-memory keys by definition.
+  await page.goto(`${BASE}/dashboard`);
   check('a reload asks for the password again', (await text()).includes('Solvent cannot recover a lost password'));
   await enterPassword(VAULT_PASSWORD);
   await page.waitUntil("document.body.innerText.includes('Add your first holding')", {
@@ -1438,11 +1572,14 @@ try {
       box.dispatchEvent(new Event('change', { bubbles: true }));
     })()`);
     await other.settle(400);
+    await markDocument(other, 'leaving');
     await other.eval("document.querySelector('button[type=submit]').click()");
-    await other.waitUntil("location.pathname === '/dashboard'", { timeout: 90000, label: 'the new vault' });
-    await other.waitUntil("document.querySelector('#unlock-password')", { timeout: 90000, label: 'the unlock card' });
-    await signInOn(other, LEAVING_PASSWORD);
-    await other.waitUntil("!document.querySelector('#unlock-password')", { timeout: 90000, label: 'the new vault unlocked' });
+    check('registering another vault lands in it, with no second password entry', await intoVault(other, 'the new vault'));
+    await other.settle(500);
+    check(
+      'that vault is the registering document itself, unlocked',
+      await sitting(other, 'leaving').then((s) => s.sameDocument && s.keys && !s.card),
+    );
     await makeStale(other, 'leaving', LEAVING_PASSWORD);
     const releaseLeaving = await intercept(other, '*/api/auth/upgrade-kdf', () => ({ status: 500 }));
     await other.goto(`${BASE}/settings`);
@@ -2877,8 +3014,6 @@ try {
       await second.settle(300);
       await second.eval("document.querySelector('button[type=submit]').click()");
       await second.waitUntil("location.pathname === '/dashboard'", { timeout: 90000, label: 'the second vault' });
-      await second.settle(400);
-      await signInOn(second, SECOND_PASSWORD);
       await second.waitUntil("document.body.innerText.includes('Add your first holding')", { timeout: 90000, label: 'the empty second vault' });
 
       // An empty vault's review says so, and asks for no typed word.
@@ -3306,12 +3441,6 @@ try {
         .find(b => b.textContent.trim() === ${JSON.stringify(label)}).click()`);
       await quiet();
     };
-    const unlockHere = async () => {
-      await set('input[type=password]', RECORDER_PASSWORD);
-      await ev("document.querySelector('button[type=submit]').click()");
-      await rec.waitUntil("!document.querySelector('#unlock-password')", { timeout: 90000, label: 'the recorder vault' });
-      await quiet();
-    };
     // The vault as the page's own crypto reads it back from the server,
     // each record with its bytes and its decrypted payload.
     const stored = async (type) => {
@@ -3495,8 +3624,9 @@ try {
     await rec.settle(300);
     await ev("document.querySelector('button[type=submit]').click()");
     await rec.waitUntil("location.pathname === '/dashboard'", { timeout: 90000, label: 'the recorder dashboard' });
+    await rec.waitUntil("!document.querySelector('#unlock-password') && document.body.innerText.includes('Add your first holding')", { timeout: 90000, label: 'the recorder vault' });
     await rec.settle(500);
-    await unlockHere();
+    await quiet();
 
     await go(`#/sweep/${T}`);
     const bare = await text();
@@ -5042,6 +5172,310 @@ try {
   );
   await unlockInPlace('the dashboard after arriving at the sign-in address');
 
+  // ---- Login: signing in keeps the sitting ---------------------------------
+
+  // login.md: only a refresh, the lock or leaving the page discards the
+  // keys. So a sign-in at the sign-in address draws the vault in the
+  // document that derived them, and everything a person can navigate to
+  // from there stays in that document. The mark on the window is lost by
+  // any document load.
+  const sittingBrowser = await openBrowser(`${BASE}/login`);
+  const sat = sittingBrowser.session;
+  try {
+    await markDocument(sat, 'sign-in');
+    await signInOn(sat, VAULT_PASSWORD, 'leander');
+    const arrived = await intoVault(sat, 'the vault after signing in at the sign-in address');
+    await sat.settle(800);
+    const signedIn = arrived ? await sitting(sat, 'sign-in') : null;
+    check(
+      'signing in at the sign-in address reaches the vault in the same document, with the keys in memory and no password asked again',
+      signedIn && signedIn.sameDocument && signedIn.keys && !signedIn.card && signedIn.path === '/dashboard',
+      JSON.stringify(signedIn),
+    );
+    check(
+      'the vault it reaches shows the real figures, not the unlock card',
+      arrived && (await sat.eval("Boolean(document.querySelector('.hero-figure'))")) &&
+        !(await sat.eval('document.body.innerText')).includes('Solvent cannot recover a lost password'),
+    );
+    check(
+      "a vault owner signed in at the sign-in address has the nav, Update values and Lock, and the outside frame is gone",
+      signedIn && signedIn.nav.join(',') === 'Dashboard,Settings' && signedIn.controls.join(',') === 'Update values,Lock' &&
+        signedIn.barShown && !signedIn.outsideFrame && signedIn.title === 'Solvent' && signedIn.passwordFields === 0,
+      JSON.stringify(signedIn),
+    );
+
+    // account-settings.md: nowhere a vault owner can navigate to asks
+    // twice in one sitting. Every control of the top bar, in turn.
+    const stays = async (label) => {
+      await sat.settle(600);
+      const now = await sitting(sat, 'sign-in');
+      check(`${label} keeps the sitting: same document, keys in memory, no password asked`, now.sameDocument && now.keys && !now.card, JSON.stringify(now));
+    };
+    await sat.eval(`document.querySelector('.topbar nav a[href="#/settings"]').click()`);
+    await sat.waitUntil("document.body.innerText.includes('Session and lock')", { label: 'settings' });
+    await stays('the Settings link');
+    await sat.eval(`document.querySelector('.topbar nav a[href="#/"]').click()`);
+    await sat.waitUntil("document.querySelector('.hero-figure')", { label: 'the dashboard' });
+    await stays('the Dashboard link');
+    await sat.eval("[...document.querySelectorAll('.topbar-actions button')].find((b) => b.textContent.trim() === 'Update values').click()");
+    await sat.waitUntil("location.hash.startsWith('#/sweep/')", { label: 'the sweep' });
+    await stays('Update values');
+    await sat.eval(`document.querySelector('.topbar nav a[href="#/"]').click()`);
+    await sat.waitUntil("document.querySelector('.hero-figure')", { label: 'the dashboard again' });
+    await stays('returning to the Dashboard');
+
+    // The lock asks, and unlocking again is in place.
+    const heldNames = JSON.parse(await sat.eval(`(async () => JSON.stringify(
+      [...(await import('/static/js/session.js')).currentVault().holdings.values()].map((h) => h.payload.name)
+    ))()`));
+    await sat.eval("[...document.querySelectorAll('.topbar-actions button')].find((b) => b.textContent.trim() === 'Lock').click()");
+    await sat.waitUntil("document.querySelector('#unlock-password')", { label: 'the card after locking' });
+    const locked = await sitting(sat, 'sign-in');
+    check(
+      'Lock still asks for the password, keeps only the password field, and drops the keys',
+      locked.card && !locked.keys && !(await sat.eval("Boolean(document.querySelector('#unlock-username'))")),
+      JSON.stringify(locked),
+    );
+    await signInOn(sat, VAULT_PASSWORD);
+    check('unlocking after the lock returns to the vault', await intoVault(sat, 'the vault after unlocking'));
+    await sat.settle(500);
+
+    // Back, after leaving the page while unlocked: the keys went with
+    // the page, and nothing from the vault is shown.
+    const back = await backFromAway(sat);
+    check(
+      'Back after signing in at the sign-in address and leaving shows the unlock card and no vault data',
+      Boolean(back) && !back.keys && heldNames.length > 0 && heldNames.every((name) => !back.text.includes(name)),
+      back ? heldNames.filter((name) => back.text.includes(name)).join(',') : 'no unlock card',
+    );
+
+    // A refresh asks for the password again.
+    await signInOn(sat, VAULT_PASSWORD);
+    await intoVault(sat, 'the vault before the refresh');
+    const reloaded = sat.waitFor('Page.loadEventFired');
+    await sat.send('Page.reload');
+    await reloaded;
+    await sat.settle(600);
+    const refreshed = await sat.eval("(async () => JSON.stringify({ card: Boolean(document.querySelector('#unlock-password')), keys: (await import('/static/js/session.js')).currentVault() !== null }))()").then(JSON.parse);
+    check('a refresh still asks for the password', refreshed.card && !refreshed.keys, JSON.stringify(refreshed));
+  } finally {
+    sittingBrowser.close();
+  }
+
+  // ---- Registration: the invite stays out of every request, and a failed first read ----
+
+  // admin-invites.md, Rules: /register carries Referrer-Policy:
+  // no-referrer, because the token rides in its URL and a subresource
+  // requested from that page would otherwise name it in a Referer.
+  // register.md: a vault owner lands logged in with keys already in
+  // memory, and never has to type the password they just chose, not
+  // even when the first read of the new vault fails.
+  const REGISTRANT_PASSWORD = 'plover ember quarry vellum';
+  const mintInvite = (kind) =>
+    execFileSync(
+      process.env.SOLVENT_PYTHON,
+      ['-m', 'flask', '--app', 'app', 'create-invite', '--kind', kind, '--expires-days', '1', '--force'],
+      { env: process.env, cwd: process.cwd() },
+    ).toString().trim().split('invite=').pop();
+  const registrantBrowser = await openBrowser();
+  const registrant = registrantBrowser.session;
+  try {
+    const registrantInvite = mintInvite('vault-owner');
+    const traffic = watched[watched.length - 1].requests;
+    await registrant.goto(`${BASE}/register?invite=${registrantInvite}`);
+    const fillRegistration = (name = 'registrant') =>
+      registrant.eval(`(() => {
+        const set = (selector, value, index = 0) => {
+          const node = document.querySelectorAll(selector)[index];
+          node.value = value;
+          node.dispatchEvent(new Event('input', { bubbles: true }));
+          node.dispatchEvent(new Event('change', { bubbles: true }));
+        };
+        set('input[type=text]', ${JSON.stringify(name)});
+        set('input[type=password]', ${JSON.stringify(REGISTRANT_PASSWORD)}, 0);
+        set('input[type=password]', ${JSON.stringify(REGISTRANT_PASSWORD)}, 1);
+        set('select', 'CHF');
+        const box = document.querySelector('input[type=checkbox]');
+        box.checked = true;
+        box.dispatchEvent(new Event('change', { bubbles: true }));
+      })()`);
+    await fillRegistration();
+    await registrant.settle(600);
+    await markDocument(registrant, 'registrant');
+
+    // The first read of the new vault fails once.
+    let refused = 0;
+    const release = await intercept(registrant, '*/api/records?type=*', () => (refused++ === 0 ? { status: 503 } : null));
+    await registrant.eval("document.querySelector('button[type=submit]').click()");
+    await registrant.waitUntil("document.body.innerText.includes('Your vault is created')", {
+      timeout: 90000,
+      label: 'the failed first read',
+    }).catch(() => {});
+    const unread = await sitting(registrant, 'registrant');
+    check(
+      'a failed first read of a new vault keeps the keys and offers to read again, with no password asked and no page load',
+      refused === 1 && unread.sameDocument && !unread.card && unread.passwordFields === 0 &&
+        (await registrant.eval('document.body.innerText')).includes('you do not need to type your password again'),
+      JSON.stringify({ refused, ...unread }),
+    );
+    await registrant.eval("[...document.querySelectorAll('button')].find((b) => b.textContent === 'Try again').click()");
+    const read = await intoVault(registrant, 'the vault after the second read');
+    await release();
+    await registrant.settle(500);
+    const readAgain = read ? await sitting(registrant, 'registrant') : null;
+    check(
+      'reading again lands in the new vault, in the same document, unlocked',
+      readAgain && readAgain.sameDocument && readAgain.keys && !readAgain.card && readAgain.path === '/dashboard',
+      JSON.stringify(readAgain),
+    );
+
+    // The browser lists an empty Referer for a request that sends none.
+    const sendsReferer = (r) => Object.entries(JSON.parse(r.headers)).some(([name, value]) => /^referer$/i.test(name) && value);
+    const referers = traffic.filter(sendsReferer);
+    check(
+      'no request the vault owner registration page makes carries a Referer, and the token is in no request header',
+      traffic.length > 0 && referers.length === 0 && traffic.every((r) => !r.headers.includes(registrantInvite)),
+      referers.map((r) => r.url).join(','),
+    );
+    // The instrument sees a Referer where there is one to see.
+    const before = traffic.length;
+    await registrant.goto(`${BASE}/login`);
+    check(
+      'the same capture sees the Referer an ordinary page sends',
+      traffic.slice(before).some(sendsReferer),
+    );
+
+    // architecture.md, Application hardening, and login.md, Rules: keys
+    // are held only while the page is open and unlocked, and the idle
+    // limit applies to every moment they are held. That includes a new
+    // vault whose first read failed and is waiting to be read again.
+    await registrant.send('Page.addScriptToEvaluateOnNewDocument', { source: CLOCK });
+    const holdsKeys = (session) =>
+      session.eval("import('/static/js/session.js').then((s) => s.holdsKeys())");
+    const registerUntilUnread = async (name) => {
+      await registrant.goto(`${BASE}/register?invite=${mintInvite('vault-owner')}`);
+      await fillRegistration(name);
+      await registrant.settle(600);
+      await markDocument(registrant, name);
+      const release = await intercept(registrant, '*/api/records?type=*', () => ({ status: 503 }));
+      await registrant.eval("document.querySelector('button[type=submit]').click()");
+      await registrant.waitUntil("document.body.innerText.includes('Your vault is created')", {
+        timeout: 90000,
+        label: `the unread vault of ${name}`,
+      });
+      return release;
+    };
+
+    let release2 = await registerUntilUnread('registrant.pagehide');
+    check('a new vault that could not be read yet holds its keys for the retry', await holdsKeys(registrant));
+    await registrant.eval("window.dispatchEvent(new PageTransitionEvent('pagehide', { persisted: true }))");
+    check('leaving the page drops the keys of a new vault that could not be read yet', !(await holdsKeys(registrant)));
+    await release2();
+
+    release2 = await registerUntilUnread('registrant.idle');
+    await registrant.eval(`window.testClock.advance(${16 * MINUTE})`);
+    await registrant.waitUntil("document.querySelector('#unlock-password')", { label: 'the idle lock of the unread vault' });
+    const idled = await sitting(registrant, 'registrant.idle');
+    check(
+      'the idle limit applies to a new vault that could not be read yet: the keys go and the card asks for the password only',
+      idled.sameDocument && !(await holdsKeys(registrant)) &&
+        !(await registrant.eval("Boolean(document.querySelector('#unlock-username'))")),
+      JSON.stringify(idled),
+    );
+    await release2();
+
+    release2 = await registerUntilUnread('registrant.race');
+    await release2();
+    const heldRetry = await holdRecords(registrant);
+    await registrant.eval("[...document.querySelectorAll('button')].find((b) => b.textContent === 'Try again').click()");
+    await Promise.race([heldRetry.reached, registrant.settle(60000)]);
+    await registrant.eval("window.dispatchEvent(new PageTransitionEvent('pagehide', { persisted: true }))");
+    heldRetry.release();
+    await registrant.settle(2500);
+    const retried = await afterRead(registrant);
+    check(
+      'a lock while a new vault is being read again wins: no keys, no vault, nothing drawn, the card asks',
+      !retried.keys && !retried.vault && retried.card && !retried.drawn && !retried.nav,
+      JSON.stringify(retried),
+    );
+    await heldRetry.stop();
+  } finally {
+    registrantBrowser.close();
+  }
+
+  // login.md, Rules: a vault that could not be read is not unlocked.
+  // The keys the sign-in derived are dropped with the error, and a
+  // page left afterwards holds none.
+  const unreadBrowser = await openBrowser(`${BASE}/login`);
+  const unread = unreadBrowser.session;
+  try {
+    const releaseUnread = await intercept(unread, '*/api/records?type=*', () => ({ status: 503 }));
+    await signInOn(unread, VAULT_PASSWORD, 'leander');
+    await unread.waitUntil("!document.querySelector('.field-error').hidden", { timeout: 90000, label: 'the error for a vault that would not open' });
+    await unread.settle(300);
+    const after = JSON.parse(await unread.eval(`(async () => {
+      const s = await import('/static/js/session.js');
+      return JSON.stringify({
+        keys: s.holdsKeys(), vault: s.currentVault() !== null,
+        error: document.querySelector('.field-error').textContent,
+        card: Boolean(document.querySelector('#unlock-password')),
+      });
+    })()`));
+    check(
+      'a vault that could not be read at sign-in shows the error and holds no keys',
+      !after.keys && !after.vault && after.card && after.error === 'Invalid username or password.',
+      JSON.stringify(after),
+    );
+    await unread.eval("window.dispatchEvent(new PageTransitionEvent('pagehide', { persisted: true }))");
+    check('and none after leaving the page', !(await unread.eval("import('/static/js/session.js').then((s) => s.holdsKeys())")));
+    await releaseUnread();
+  } finally {
+    unreadBrowser.close();
+  }
+
+  // architecture.md, Application hardening: a page left while unlocked
+  // keeps no keys and shows no vault. A lock that lands while the vault
+  // is still being read wins, and the read finishing opens nothing.
+  const racingBrowser = await openBrowser(`${BASE}/login`);
+  const racing = racingBrowser.session;
+  const pagehide = (session) =>
+    session.eval("window.dispatchEvent(new PageTransitionEvent('pagehide', { persisted: true }))");
+  try {
+    const held = await holdRecords(racing);
+    await signInOn(racing, VAULT_PASSWORD, 'leander');
+    await Promise.race([held.reached, racing.settle(60000)]);
+    await pagehide(racing);
+    held.release();
+    await racing.settle(2500);
+    const signedIn = await afterRead(racing);
+    check(
+      'a lock while a sign-in is reading the vault wins: no keys, no vault, nothing drawn, the card asks',
+      !signedIn.keys && !signedIn.vault && signedIn.card && !signedIn.drawn && !signedIn.nav && (await racing.eval('location.pathname')) === '/login',
+      JSON.stringify(signedIn),
+    );
+    await held.stop();
+
+    // The same on the dashboard, where the session is live and the card
+    // asks for the password alone.
+    await racing.goto(`${BASE}/dashboard`);
+    const heldUnlock = await holdRecords(racing);
+    await enterPasswordOn(racing, VAULT_PASSWORD);
+    await Promise.race([heldUnlock.reached, racing.settle(60000)]);
+    await pagehide(racing);
+    heldUnlock.release();
+    await racing.settle(2500);
+    const unlocked = await afterRead(racing);
+    check(
+      'a lock while an unlock is reading the vault wins: no keys, no vault, nothing drawn, the card asks',
+      // The bar is the server's for a session that already existed, and stays.
+      !unlocked.keys && !unlocked.vault && unlocked.card && !unlocked.drawn && !unlocked.empty,
+      JSON.stringify(unlocked),
+    );
+    await heldUnlock.stop();
+  } finally {
+    racingBrowser.close();
+  }
+
   // ---- Login: the one card, whatever the name -----------------------------
 
   const cardBrowser = await openBrowser(`${BASE}/login`);
@@ -5302,7 +5736,7 @@ try {
   );
   // Every password typed anywhere in the run, as typed and in the
   // encodings a careless client would send it in.
-  const everyPassword = [ADMIN_PASSWORD, VAULT_PASSWORD, NEW_PASSWORD, LEAVING_PASSWORD, 'not the password at all'];
+  const everyPassword = [ADMIN_PASSWORD, VAULT_PASSWORD, NEW_PASSWORD, LEAVING_PASSWORD, REGISTRANT_PASSWORD, 'not the password at all'];
   const forms = everyPassword.flatMap((pw) => [
     pw,
     encodeURIComponent(pw),

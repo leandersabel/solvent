@@ -8,7 +8,7 @@
 // exists.
 import { el } from './dom.js';
 import { DerivationError } from './crypto.js';
-import { SignInError, signIn, signOut } from './session.js';
+import { LockedWhileOpeningError, SignInError, signIn, signOut } from './session.js';
 
 export const WAIT_NOTE =
   'This takes a moment by design. It is what makes your password hard to attack.';
@@ -86,6 +86,9 @@ export function unlockCard({ knownUsername = null, onUnlocked }) {
       password.value = '';
       onUnlocked(result);
     } catch (failure) {
+      // The page was locked while the vault was being read. The lock
+      // has drawn its own card, and this one is no longer on screen.
+      if (failure instanceof LockedWhileOpeningError) return;
       show(error, messageFor(failure));
       if (failure instanceof DerivationError) {
         // Out of memory is a moment, and Try again can meet it. A

@@ -12,3 +12,16 @@ Format:
 
 What is undecided, and what it changes.
 ```
+
+## register: the state of a new vault whose first read failed          [asked by: engineer]
+
+A vault owner's registration succeeds and the new vault's first read of
+its records then fails. `ui/register.md` says a vault owner is never
+bounced to a sign-in screen to type the password they just chose
+(States, Populated), but names no screen for this moment. The
+implementation shows a card in the same document, headed "Your vault
+is created", reading "It could not be read just now. Nothing was lost,
+and you do not need to type your password again.", with a "Try again"
+button that reads again with the keys it holds. The keys sit under the
+idle lock while the card is up. Designer: please specify this state,
+its copy, and whether it offers anything beside Try again.

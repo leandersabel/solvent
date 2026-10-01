@@ -20,13 +20,14 @@ import uuid
 from datetime import datetime, timezone
 from typing import Optional
 
-from flask import Blueprint, abort, jsonify, render_template, request
+from flask import Blueprint, abort, jsonify, make_response, render_template, request
 
 from . import crypto
 from . import session as sessions
 from .auth import SALT_BYTES
 from .db import get_db, utcnow, write_transaction
 from .guard import navigation, public
+from .pages import vault_page
 from .rates import table_rows
 from .records import NONCE_BYTES, RecordWrite, store
 from .validation import Payload, decode_b64, kdf_envelope_ok, normalize_username, parse
@@ -79,6 +80,17 @@ def register_page():
     Both are needed before the user has a session, which is why they
     ride on the page rather than on an API the page cannot call.
     """
+    response = make_response(_register_page())
+    # The token rides in this page's URL, so it is this page's outbound
+    # requests that could carry it in a Referer header. Said in the
+    # header as well as the page's own meta, which only applies to what
+    # follows it, and on the error page too, whose address holds the
+    # token that was just refused (admin-invites.md, Rules).
+    response.headers["Referrer-Policy"] = "no-referrer"
+    return response
+
+
+def _register_page():
     token = request.args.get("invite", "")
     row = usable_invite(get_db(), token) if token else None
     if row is None:
@@ -93,6 +105,17 @@ def register_page():
         if row["kind"] == "vault_owner"
         else []
     )
+    if row["kind"] == "vault_owner":
+        # The vault shell page in the outside frame, so the keys this
+        # derivation produces are in the memory of the document that
+        # draws the vault. A page load afterwards would arrive without
+        # them and ask for the password just chosen (register.md, Flow).
+        return vault_page(
+            outside=True,
+            title="Create your Solvent account",
+            no_referrer=True,
+            registration={"kind": row["kind"], "token": token, "currencies": currencies},
+        )
     return render_template(
         "register.html",
         error=None,

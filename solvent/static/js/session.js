@@ -10,6 +10,8 @@ import * as crypto from './crypto.js';
 import { Vault } from './model.js';
 import { deleteRecord } from './writes.js';
 
+const DEFAULT_IDLE_MINUTES = 15;
+
 let masterKey = null;
 // The DEK as the server holds it, wrapped under the Master Key: what a
 // password change unwraps to prove the current password before sending
@@ -27,11 +29,29 @@ export function isUnlocked() {
   return vault !== null;
 }
 
+/** Whether any key material is held, which is wider than being
+ *  unlocked: a registration whose first read failed holds the keys
+ *  with no vault yet. What leaves a page must drop them all
+ *  (architecture.md, Application hardening). */
+export function holdsKeys() {
+  return masterKey !== null || vault !== null;
+}
+
 export function onLock(listener) {
   lockListeners.push(listener);
 }
 
 export class SignInError extends Error {}
+
+/** A lock came while the vault was being read, so the vault is not
+ *  opened: the lock wins, and the caller shows the card the lock drew
+ *  rather than the vault or an error. */
+export class LockedWhileOpeningError extends Error {}
+
+// Counts every discard of the keys. A read in flight compares it with
+// the count it began at, so a lock that lands while it awaits the
+// network is not undone by the read finishing.
+let generation = 0;
 
 /** The current password did not open the vault, found in the browser
  *  before anything was sent (account-settings.md, Change password). */
@@ -90,19 +110,79 @@ export async function signIn(username, password) {
     throw new SignInError('invalid');
   }
 
-  masterKey = keys.masterKey;
-  wrapper = { wrappedDek: answer.wrappedDek, dekNonce: answer.dekNonce };
-  vault = new Vault(dek);
-  await vault.load();
-  // A byte-identical pair loses nothing by going (record-rate.md, Two
-  // entries on one date). One that fails to go is still read as a
-  // pair, and tried again next unlock.
-  for (const extra of vault.redundantRateEntries()) {
-    await deleteRecord(vault, extra).catch(() => {});
+  const began = generation;
+  try {
+    await openVault(
+      keys.masterKey,
+      dek,
+      { wrappedDek: answer.wrappedDek, dekNonce: answer.dekNonce },
+      began,
+    );
+  } catch (error) {
+    // A vault that could not be read is not unlocked, and nothing
+    // keeps the keys it was opened with: the card shows its error and
+    // a page left now carries nothing.
+    discardKeys();
+    throw error;
   }
 
   if (answer.kdfStale) await upgradeQuietly(password, answer.kdf, dek);
+  // The upgrade is another wait on the network, and may have put the
+  // new Master Key in after a lock took the old one out.
+  stillOpen(began);
 
+  return begin(username);
+}
+
+/** What a vault owner's registration hands over: the keys the form
+ *  made, which the server never saw, and the name it just created.
+ *
+ *  Registration is the other way keys come to exist in a document, and
+ *  it ends the way a sign-in does: the vault is read, the idle timer
+ *  starts, and the document that holds the keys is the one that goes on
+ *  to draw the vault. A page load here would drop them. The keys come
+ *  in as arguments from the form in the same document and are not
+ *  stored anywhere but the variables above. */
+export async function startRegistered({ username, masterKey: key, dek, wrapper: wrapped }) {
+  const began = generation;
+  try {
+    await openVault(key, dek, wrapped, began);
+  } catch (error) {
+    // The keys are held for the retry, so the idle limit runs from now
+    // as it would on an open vault. A lock during the read took them
+    // already, and stays the last word.
+    if (!(error instanceof LockedWhileOpeningError)) startIdleTimer();
+    throw error;
+  }
+  return begin(username);
+}
+
+// Where both ways in meet: the keys are held, and the vault is read
+// with them. The vault is open only once it has been read whole, and
+// only if nothing locked it meanwhile.
+async function openVault(key, dek, wrapped, began) {
+  masterKey = key;
+  wrapper = wrapped;
+  const next = new Vault(dek);
+  await next.load();
+  stillOpen(began);
+  vault = next;
+  // A byte-identical pair loses nothing by going (record-rate.md, Two
+  // entries on one date). One that fails to go is still read as a
+  // pair, and tried again next unlock.
+  for (const extra of next.redundantRateEntries()) {
+    await deleteRecord(next, extra).catch(() => {});
+  }
+  stillOpen(began);
+}
+
+function stillOpen(began) {
+  if (generation === began) return;
+  discardKeys();
+  throw new LockedWhileOpeningError();
+}
+
+function begin(username) {
   startIdleTimer();
   // The name that just verified, for every screen that shows or sends
   // it, since a page served without a session was never told it.
@@ -197,12 +277,20 @@ export async function replaceDek(dek) {
  *  cosmetic against the threat it exists for: another household member
  *  at the unlocked machine, who can open devtools. */
 export function lock() {
+  discardKeys();
+  for (const listener of lockListeners) listener();
+}
+
+// The keys and the model, with nobody told: for a failure the screen
+// that asked is already reporting, and a redraw would take its message
+// away.
+function discardKeys() {
+  generation += 1;
   masterKey = null;
   wrapper = null;
   vault = null;
   clearTimeout(idleTimer);
   idleTimer = null;
-  for (const listener of lockListeners) listener();
 }
 
 let listening = false;
@@ -219,9 +307,12 @@ function startIdleTimer() {
 
 /** Counts the period from now, at whatever the profile holds now. */
 export function restartIdleTimer() {
-  if (!vault) return;
+  if (!holdsKeys()) return;
   clearTimeout(idleTimer);
-  idleTimer = setTimeout(lock, vault.idleLockMinutes * 60000);
+  // A vault not read yet has no profile to name a period, so it has
+  // the one a profile with no stored choice has (model.js).
+  const minutes = vault ? vault.idleLockMinutes : DEFAULT_IDLE_MINUTES;
+  idleTimer = setTimeout(lock, minutes * 60000);
 }
 
 export function signOut() {

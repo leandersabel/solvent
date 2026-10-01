@@ -136,6 +136,9 @@ def test_the_workflows_hold_in_a_browser(instance):
             env,
             SOLVENT_BASE=base,
             SOLVENT_INVITE=invite,
+            # For the invites a check mints for itself, the way an
+            # operator's shell would.
+            SOLVENT_PYTHON=sys.executable,
             # A date both providers publish for, so the backdated
             # figure exercises the proposal path rather than the
             # outage path.

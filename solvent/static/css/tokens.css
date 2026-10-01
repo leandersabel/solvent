@@ -293,6 +293,23 @@ h1, h2, h3 {
   padding-top: 24px;
 }
 
+/* The vault shell page served in the outside frame, at the sign-in and
+   registration addresses: the same document goes on to draw the vault,
+   so its card sits in the shell's own regions, which here take no room
+   of their own. The client lifts the frame once the keys exist. */
+.outside-body > [x-data] {
+  width: 100%;
+}
+
+.outside-body .content {
+  padding: 0;
+  max-width: none;
+}
+
+.outside-body .app-outside {
+  padding-top: 0;
+}
+
 .signin-card {
   max-width: 420px;
   margin: 0 auto;
