@@ -371,6 +371,44 @@ def test_every_api_route_is_forbidden_without_the_header_and_unauthorized_withou
                 assert matrix.send(state, method, path, True).status_code == 401, (rule.rule, method, state)
 
 
+# The spec's Public routes and vault navigation pages
+# (app-shell.md, The two surfaces), named here and not read off the gate.
+SERVED_SIGNED_OUT = {
+    ("/login", "GET"),
+    ("/register", "GET"),
+    ("/api/register", "POST"),
+    ("/api/auth/salt", "POST"),
+    ("/api/auth/login", "POST"),
+    ("/api/auth/logout", "POST"),
+    ("/", "GET"),
+    ("/static/<path:filename>", "GET"),
+    ("/dashboard", "GET"),
+    ("/settings", "GET"),
+    ("/settings/dimensions", "GET"),
+    ("/settings/export-import", "GET"),
+}
+
+
+def test_with_no_session_the_gate_serves_exactly_the_public_routes_and_the_vault_pages(app, matrix):
+    """Read from the route map at test time, so a route added later and
+    marked Public, or a page added under /admin, is caught here. A
+    handler's own answer, JSON or a redirect, is a served request. Only
+    the gate's HTML refusal is not."""
+    served = set()
+    for rule in app.url_map.iter_rules():
+        path = "/static/css/tokens.css" if rule.endpoint == "static" else concrete(rule)
+        for method in answered_methods(rule):
+            for header in (True, False):
+                if rule.rule.startswith("/api/") and not header:
+                    continue
+                if not a_refusal(matrix.send("absent", method, path, header)):
+                    served.add((rule.rule, method))
+    assert served == SERVED_SIGNED_OUT
+
+    for rule, _ in served:
+        assert not rule.startswith(("/admin", "/api/admin/")), rule
+
+
 def test_the_namespace_invariant_holds_over_the_route_map(app, matrix):
     """Every route that needs the header is under /api/, every other
     route is exempt and answers only GET and HEAD, and no route answers
