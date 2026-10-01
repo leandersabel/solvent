@@ -93,7 +93,6 @@
 
 ## Recording values
 
-- Updating your holdings in one sitting takes a few minutes.
 - You record a figure only for the holdings you have one for.
 - Solvent never writes a figure you did not give it.
 - Solvent never counts, flags or reminds you of the holdings you left
