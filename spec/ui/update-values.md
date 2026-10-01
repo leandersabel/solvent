@@ -158,10 +158,16 @@ Each line carries the unit, the figure, and where it came from. The
 provenance wording is one vocabulary across the product and is owned by
 `recording-detail.md`.
 
-The lines keep the rows' columns: the unit at the left, the figure in
-the field column, and the provenance chip in the control column. That
-column widens for a long chip on every line at once, so no field falls
-out of line with the others.
+While their block is at least 720px wide, the lines keep the rows'
+columns: the unit at the left, the figure in the field column, and the
+provenance chip in the control column. That column widens for a long
+chip on every line at once, so no field falls out of line with the
+others.
+
+Below 720px the lines stack, because the field column and a widened
+chip column leave the unit too narrow to read: the unit's name with its
+pair, then the field at full width, then the provenance chip beneath
+it, in full.
 
 Line states:
 
@@ -260,7 +266,8 @@ Editing a filled line flips its provenance the moment it changes, to
 
 A row stacks into one column: the name with its sentence and age, then
 the quantity field with the converted figure beneath it at the left,
-then the control at full width. A rate line stacks the same way.
+then the control at full width. The rate lines stack by their own rule
+(The rates, at the foot of the sweep).
 
 ## Writes
 

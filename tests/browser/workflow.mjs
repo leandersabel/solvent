@@ -4177,6 +4177,28 @@ try {
       head === 'PAINT' && asked.says.startsWith('What is 1 PAINT worth in CHF?'),
       `${head}: ${asked.says}`,
     );
+    // The asked line joins the grid: inside the card's border, with its
+    // field in line with the others'.
+    await rec.send('Emulation.setDeviceMetricsOverride', { width: 1280, height: 900, deviceScaleFactor: 1, mobile: false });
+    await rec.settle(200);
+    const askedBox = JSON.parse(await ev(`JSON.stringify((() => {
+      const l = ${line('PAINT')};
+      const card = l.parentElement.getBoundingClientRect();
+      const r = l.getBoundingClientRect();
+      const lefts = [...document.querySelectorAll('.rate-line input')].map((i) => Math.round(i.getBoundingClientRect().left));
+      return {
+        inGrid: l.parentElement.classList.contains('rate-block'),
+        inside: r.left >= card.left && r.right <= card.right,
+        lefts,
+        width: Math.round(l.querySelector('input').getBoundingClientRect().width),
+      };
+    })())`));
+    await rec.send('Emulation.clearDeviceMetricsOverride');
+    check(
+      'record-rate: the line asking for a price sits inside the block, its field in line with the others and in the field column',
+      askedBox.inGrid && askedBox.inside && new Set(askedBox.lefts).size === 1 && askedBox.width <= 260,
+      JSON.stringify(askedBox),
+    );
     check('record-snapshot: the row stays live while its unit has no price', (await rowState('Art')).disabled === false);
     await typeRow('Art', '');
     await typeRow('Current account', '1234.56');
@@ -5261,6 +5283,137 @@ try {
         on(await stored('snapshot'), DF).some((s) => s.accountId === id['Fund 1']),
       `${fillingLine} | ${atDP.map((r) => r.payload.symbol).join(',')} | asks ${rateAsks().length}`,
     );
+
+    // ---- record-rate: the rate lines' layout, on rendered geometry ---------
+
+    // Measured on boxes, not class names: every piece of a line inside
+    // its block, none overlapping another, nothing scrolled past its box.
+    // `stacked` is whether the field sits beneath the unit's name.
+    const layout = (scope) =>
+      ev(`JSON.stringify((() => {
+        const root = document.querySelector(${JSON.stringify(scope)});
+        const box = root.getBoundingClientRect();
+        const problems = [];
+        const lines = [...root.querySelectorAll('.rate-line')];
+        const seen = [];
+        for (const l of lines) {
+          const parts = [...l.querySelectorAll('.rate-unit, .row-status, input, .chip, .btn-inline')]
+            .filter((n) => n.getClientRects().length);
+          const named = (n) => n.className.split(' ')[0] || n.tagName;
+          for (const n of parts) {
+            const r = n.getBoundingClientRect();
+            if (r.left < box.left - 0.5 || r.right > box.right + 0.5) problems.push('outside the block: ' + named(n) + ' ' + n.textContent);
+            if (n.scrollWidth > n.clientWidth + 0.5 && n.tagName !== 'INPUT') problems.push('clipped: ' + named(n) + ' ' + n.textContent);
+          }
+          for (let i = 0; i < parts.length; i++) {
+            for (let j = i + 1; j < parts.length; j++) {
+              const a = parts[i].getBoundingClientRect();
+              const b = parts[j].getBoundingClientRect();
+              if (a.left < b.right - 0.5 && b.left < a.right - 0.5 && a.top < b.bottom - 0.5 && b.top < a.bottom - 0.5) {
+                problems.push('overlap: ' + named(parts[i]) + ' and ' + named(parts[j]));
+              }
+            }
+          }
+          const unit = l.querySelector('.rate-unit').getBoundingClientRect();
+          const field = l.querySelector('input');
+          const chip = [...l.querySelectorAll('.chip')].find((c) => c.textContent);
+          seen.push({
+            unit: l.querySelector('.rate-unit').textContent,
+            one: l.querySelector('.row-status').textContent,
+            chip: chip ? chip.textContent : '',
+            stacked: field ? field.getBoundingClientRect().top >= unit.bottom - 0.5 : null,
+            chipBelow: field && chip ? chip.getBoundingClientRect().top >= field.getBoundingClientRect().bottom - 0.5 : null,
+            fieldLeft: field ? Math.round(field.getBoundingClientRect().left) : null,
+          });
+        }
+        for (let n = root; n; n = n.parentElement) {
+          if (n.scrollWidth > n.clientWidth + 0.5 && getComputedStyle(n).overflowX !== 'visible') problems.push('scrolls sideways: ' + n.className);
+        }
+        return { width: Math.round(box.width), problems, seen };
+      })())`).then(JSON.parse);
+    const viewport = (width) =>
+      rec.send('Emulation.setDeviceMetricsOverride', { width, height: 900, deviceScaleFactor: 1, mobile: false });
+
+    // The opened prices line of the single-holding form: a dollar
+    // holding at a date with no recording, so both lines are proposals,
+    // then both edited by hand so each chip names the figure replaced.
+    const DW = ago(75);
+    const prices = async () => {
+      await openForm('Dollar cash');
+      await set('#snapshot-date', await format('date', DW));
+      await rec.waitUntil(`${line('USD')} && ${line('USD')}.querySelector('input').value !== ''`, { label: 'the form proposals for the layout' });
+      await ev("document.querySelectorAll('.dialog details').forEach(d => (d.open = true))");
+    };
+    const widths = {};
+    for (const width of [1280, 390]) {
+      await viewport(width);
+      await prices();
+      // Before any edit: the proposals, gold's naming the earlier day it is for.
+      const proposed = await layout('.dialog .rate-block');
+      await typeLine('USD', '0.812345678901');
+      await typeLine('XAU-ozt', '2111.123456789012');
+      await quiet();
+      const shown = await layout('.dialog .rate-block');
+      // The longest provenance the vocabulary allows, in place of the short one.
+      await ev(`document.querySelectorAll('.dialog .rate-meta .chip').forEach(c => { if (c.textContent) c.textContent = 'Edited from 0.931234567890123456'; })`);
+      const longest = await layout('.dialog .rate-block');
+      widths[width] = { proposed, shown, longest, dialog: await ev("document.querySelector('.dialog').getBoundingClientRect().width") };
+      await closeDialogs();
+    }
+    const formLayout = widths[1280];
+    check(
+      'record-snapshot: the opened prices line shows each unit in full, without overlap or clipping, at a desktop width',
+      formLayout.shown.problems.length === 0 && formLayout.longest.problems.length === 0 && formLayout.proposed.problems.length === 0 &&
+        formLayout.proposed.seen.some((l) => l.unit === 'Gold' && l.chip.startsWith('Market rate as of ')) &&
+        ['United States Dollar', 'Gold'].every((name) => formLayout.shown.seen.some((l) => l.unit === name && l.chip.startsWith('Edited from '))),
+      JSON.stringify(formLayout),
+    );
+    check(
+      'record-rate: the rate lines of the single-holding form stack at a desktop width and at a phone width, since its block is under 720px',
+      formLayout.shown.width < 720 && widths[390].shown.width < 720 &&
+        [1280, 390].every((w) => widths[w].proposed.seen.every((l) => l.stacked && l.chipBelow !== false) && widths[w].shown.seen.every((l) => l.stacked && l.chipBelow !== false) && widths[w].longest.seen.every((l) => l.stacked && l.chipBelow !== false)),
+      JSON.stringify(widths),
+    );
+    check(
+      'record-snapshot: the opened prices line has no overlap or clipping at a phone width',
+      widths[390].shown.problems.length === 0 && widths[390].longest.problems.length === 0 && widths[390].proposed.problems.length === 0,
+      JSON.stringify(widths[390]),
+    );
+
+    // The sweep keeps its columns while its block is 720px wide, under
+    // one window width, and stacks one pixel under.
+    await viewport(1280);
+    await go(`#/sweep/${T}`);
+    await ev("document.querySelector('.rate-section').scrollIntoView()");
+    const columns = await layout('.rate-lines');
+    const narrowed = {};
+    for (const width of [719, 720]) {
+      await ev(`document.querySelector('.rate-lines').style.width = '${width}px'`);
+      narrowed[width] = await layout('.rate-lines');
+    }
+    await ev("document.querySelector('.rate-lines').style.width = ''");
+    check(
+      'record-rate: the sweep\'s rate lines keep the rows\' columns at a desktop width, unclipped and clear of each other',
+      columns.width >= 720 && columns.problems.length === 0 && columns.seen.length >= 2 && columns.seen.every((l) => l.stacked === false),
+      JSON.stringify(columns),
+    );
+    check(
+      'record-rate: the rate lines switch at their block\'s 720px and not at the window\'s',
+      narrowed[719].width === 719 && narrowed[720].width === 720 &&
+        narrowed[719].seen.every((l) => l.stacked && l.chipBelow !== false) && narrowed[720].seen.every((l) => l.stacked === false) &&
+        narrowed[719].problems.length === 0 && narrowed[720].problems.length === 0,
+      JSON.stringify(narrowed),
+    );
+    await viewport(390);
+    await go(`#/sweep/${T}`);
+    const phone = await layout('.rate-lines');
+    check(
+      'record-rate: the sweep\'s rate lines stack at a phone width, in full',
+      phone.problems.length === 0 && phone.seen.every((l) => l.stacked && l.chipBelow !== false),
+      JSON.stringify(phone),
+    );
+    await rec.send('Emulation.clearDeviceMetricsOverride');
+    await home();
 
     const ratesBeforeEdit = (await stored('rate')).length;
     traffic.length = 0;

@@ -415,7 +415,9 @@ only its own content region.
   radius, 12px. Used for
   a dimension assignment (`Liquidity: Cash`), for status chips such as
   "Archived", and for a price's provenance, whose wording is owned by
-  `recording-detail.md`.
+  `recording-detail.md`. A chip never exceeds its container. Its text
+  wraps rather than clipping or truncating, because a provenance cut
+  short no longer says where the price came from.
 - **Date picker, marked**: a Dialog headed "New recording" whose body
   is the month grid itself, open the moment the control is pressed.
   There is no date field, no Open or confirm button and no popup of its

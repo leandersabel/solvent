@@ -407,15 +407,18 @@ function blockUnits(vault, date) {
  *  recording does, which is what the form shows when a figure it adds
  *  fills in the date's missing prices. */
 export function rateBlock(vault, date, { sit = null, readOnly = false, fillMissing = false, onChange = () => {} } = {}) {
-  const element = el('div', { class: 'rate-block' });
+  // The wrapper is the container the lines' breakpoint measures, because
+  // a container query cannot style the container itself.
+  const grid = el('div', { class: 'rate-block' });
+  const element = el('div', { class: 'rate-lines' }, [grid]);
   const units = blockUnits(vault, date);
   if (!units.length) {
-    element.append(
+    grid.append(
       el('p', { class: 'hint', text: 'Everything here is counted in your main currency, so there is nothing to convert.' }),
     );
   }
   const lines = units.map((unit) => rateLine(vault, unit, date, { sit, readOnly, fillMissing, onChange }));
-  element.append(...lines.map((line) => line.element));
+  grid.append(...lines.map((line) => line.element));
 
   const lineFor = (unit) => lines.find((line) => line.unit === unit) || null;
   return {
@@ -446,7 +449,7 @@ export function rateBlock(vault, date, { sit = null, readOnly = false, fillMissi
     ask: (unit) => {
       const line = lineFor(unit);
       if (!line || !line.ask()) return;
-      element.prepend(line.element);
+      grid.prepend(line.element);
     },
   };
 }
