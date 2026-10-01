@@ -13,9 +13,8 @@ import { el, today } from './dom.js';
 const WEEK_START_MONDAY = 1;
 
 /** `value` is an ISO date or the empty string. `max` and `min` are ISO
- *  dates. `marked` is a set of ISO dates the calendar marks as holding
- *  a recording (design-system.md, Components, Date picker, marked). */
-export function dateField(format, { id, value = '', min = null, max = null, onChange = null, marked = null } = {}) {
+ *  dates. */
+export function dateField(format, { id, value = '', min = null, max = null, onChange = null } = {}) {
   let current = value;
 
   const text = el('input', {
@@ -102,7 +101,6 @@ export function dateField(format, { id, value = '', min = null, max = null, onCh
     dateGrid(popover, format, current || today(), {
       min,
       max,
-      marked,
       selected: current,
       onPick: (iso) => {
         settle(iso);
@@ -117,12 +115,6 @@ export function dateField(format, { id, value = '', min = null, max = null, onCh
   return {
     element: wrap,
     input: text,
-    /** Open the month grid with today's date focused. */
-    openCalendar() {
-      if (popover.hidden) open.click();
-      const day = popover.querySelector('.date-day.is-today') || popover.querySelector('.date-day');
-      if (day) day.focus();
-    },
     get value() {
       return current;
     },
