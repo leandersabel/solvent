@@ -1,17 +1,17 @@
 """The request gate: the CSRF header check, authentication, and the
 surface split, in that order and in one place
-(spec/features/app-shell.md, CSRF and The two surfaces).
+(spec/features/app-shell.md, The request gate).
 
-The order is the design. The header check runs before authentication
-*and before routing*, so a caller without it gets the same Forbidden
-whether the session is valid, expired or absent and whether or not the
-path exists. The surface check runs immediately after authentication,
-once, so no individual endpoint repeats it.
+The order is the design. A refusal's status depends only on the
+namespace, the header and the session (architecture.md, Refusals), so
+nothing here asks whether a path exists, which surface it is on or what
+method it answers until the header and the session have been settled.
+The surface check runs once, so no individual endpoint repeats it.
 """
 from __future__ import annotations
 
 import flask
-from flask import abort, g, redirect, request
+from flask import abort, g, request
 
 from . import session as sessions
 
@@ -76,14 +76,13 @@ def surface_of(rule: str) -> str:
 
 
 def navigation(view_func):
-    """Mark a view as a shell page reached by navigation, exempt from
-    the CSRF header.
+    """Mark a view as a shell page reached by navigation.
 
-    An exemption is a named route, never a path pattern: apply this
-    directly to each exempt view, so an endpoint added later under the
-    same prefix inherits nothing.
+    Served without a session, so a vault page can render its own
+    sign-in card. Applied to each such view by name, never by path
+    pattern, so a page added later is refused until it is marked.
     """
-    view_func.csrf_exempt = True
+    view_func.navigation = True
     return view_func
 
 
@@ -98,16 +97,12 @@ def public(view_func):
 
 
 # Flask registers this endpoint itself, so it cannot carry the
-# decorators above. It is still one named endpoint rather than a path
-# pattern, and it must be exempt because no browser attaches a custom
-# header to a subresource request.
-_FRAMEWORK_EXEMPT = frozenset({"static"})
+# decorator above. Every signed-out page loads its files.
+_FRAMEWORK_PUBLIC = frozenset({"static"})
 
 
-def _flag(app: flask.Flask, endpoint: "str | None", name: str) -> bool:
-    if endpoint is None:
-        return False
-    if endpoint in _FRAMEWORK_EXEMPT:
+def _flag(app: flask.Flask, endpoint: str, name: str) -> bool:
+    if name == "public" and endpoint in _FRAMEWORK_PUBLIC:
         return True
     return bool(getattr(app.view_functions.get(endpoint), name, False))
 
@@ -115,38 +110,44 @@ def _flag(app: flask.Flask, endpoint: "str | None", name: str) -> bool:
 def init_app(app: flask.Flask) -> None:
     @app.before_request
     def gate() -> None:
-        endpoint = request.endpoint
+        path = request.environ["PATH_INFO"]
+        api = path.startswith("/api/")
 
-        # Before routing: an unmatched path is not exempt, so a
-        # header-less probe cannot map the route table by comparing
-        # Forbidden against Not Found.
-        if not _flag(app, endpoint, "csrf_exempt"):
-            if request.headers.get(HEADER_NAME) != REQUIRED_VALUE:
-                abort(403)
+        # 1. No API route is exempt, so this needs no routing: an
+        # unmatched path gets the same Forbidden as a real one.
+        if api and request.headers.get(HEADER_NAME) != REQUIRED_VALUE:
+            abort(403)
 
-        # Past the header, an unmatched path is an ordinary Not
-        # Found rather than an Unauthorized, so it reads the same to a
-        # caller with a session and one without.
+        # 2.
+        signed_in = sessions.load_into_g()
+
+        # The router strips a leading run of slashes and matches what is
+        # left, so `//admin` resolves. It is an invented address.
+        endpoint = None if path.startswith("//") else request.endpoint
+        public_route = endpoint is not None and _flag(app, endpoint, "public")
+
+        # 3.
+        if api and not signed_in and not public_route:
+            abort(401)
+
+        # 4. No route, a method it does not answer, or an address the
+        # router would redirect.
         if endpoint is None:
             abort(404)
 
-        if not sessions.load_into_g():
-            if _flag(app, endpoint, "public"):
+        # 5. A vault page renders its own sign-in card, so the one
+        # derivation that buys a session also buys the keys. The admin
+        # area is not one: it answers a caller with no session as an
+        # unknown path does.
+        if not signed_in:
+            if public_route:
                 return
-            if _flag(app, endpoint, "csrf_exempt"):
-                # A vault page renders its sign-in card itself, so the
-                # one derivation that buys a session also buys the
-                # keys. Bouncing through a separate address would cost
-                # the wait twice, on the screen that wait defines.
-                if surface_of(str(request.url_rule)) == ADMINISTRATION:
-                    # Except the admin area, which answers a caller
-                    # with no session exactly as an unknown path does.
-                    # Nothing anywhere hints that it exists.
-                    abort(404)
+            if _flag(app, endpoint, "navigation") and surface_of(str(request.url_rule)) != ADMINISTRATION:
                 return
-            abort(401)
+            abort(404)
 
         sessions.touch()
 
+        # 6.
         if g.principal["kind"] not in _REACHES[surface_of(str(request.url_rule))]:
             abort(404)

@@ -1,14 +1,17 @@
-"""The request gate: the CSRF header before authentication and before
-routing, and the surface split after it (spec/features/app-shell.md,
-CSRF and The two surfaces).
+"""The request gate: the header for an API request, authentication, the
+refusal a caller learns nothing from, and the surface split
+(spec/features/app-shell.md, The request gate and The two surfaces).
 """
 from __future__ import annotations
 
+import re
 from datetime import datetime, timedelta, timezone
+from pathlib import Path
 
 import pytest
 
 from solvent.guard import ADMINISTRATION, SHARED, UNPLACED, VAULT, surface_of
+from solvent.session import COOKIE_NAME
 from tests.helpers import CSRF, connect, register
 
 
@@ -42,30 +45,6 @@ def expired_client(app):
     finally:
         conn.close()
     return owner
-
-
-def test_missing_header_is_forbidden_across_every_session_state(app, sessions):
-    """Asserted across a valid, an expired and an absent session,
-    since the point of ordering the check first is that the three are
-    indistinguishable."""
-    seen = {
-        name: fingerprint(client.get("/api/records?type=account"))
-        for name, client in (
-            ("valid", sessions["owner"]),
-            ("expired", expired_client(app)),
-            ("absent", app.test_client()),
-        )
-    }
-    assert seen["valid"][0] == 403
-    assert len(set(seen.values())) == 1, seen
-
-
-def test_missing_header_is_forbidden_for_a_path_that_does_not_exist(app, sessions):
-    """The same comparison across an existing and a non-existent path,
-    which is what shows the check also precedes routing."""
-    existing = fingerprint(sessions["owner"].get("/api/records?type=account"))
-    missing = fingerprint(sessions["owner"].get("/api/no-such-route"))
-    assert existing == missing
 
 
 def test_header_present_and_no_session_is_unauthorized(client):
@@ -216,3 +195,239 @@ def test_every_json_endpoint_still_answers_unauthorized(app, client):
             assert response.status_code == 401, (rule.rule, method, response.status_code)
             checked += 1
     assert checked
+
+
+# ---- The refusal fingerprint matrix (app-shell.md, The request gate) ----
+
+NO_VALID_SESSION = ("absent", "expired")
+REFUSED = (401, 403, 404)
+# Named by the spec's Public list, not derived from the gate under test.
+PUBLIC_API = {
+    "/api/register",
+    "/api/auth/salt",
+    "/api/auth/login",
+    "/api/auth/logout",
+}
+PAGE_PROBES = (
+    ("GET", "/some-invented-page"),
+    ("GET", "//admin"),
+    ("GET", "/admin/"),
+    ("GET", "/favicon.ico"),
+    ("POST", "/login"),
+    ("PUT", "/dashboard"),
+    ("OPTIONS", "/login"),
+)
+API_PROBES = (
+    ("GET", "/api/invented"),
+    ("GET", "/api/admin/invented"),
+    ("GET", "/api/auth/login"),
+    ("DELETE", "/api/auth/salt"),
+    ("OPTIONS", "/api/auth/login"),
+    ("OPTIONS", "/api/admin/invites"),
+)
+# Nothing a route sets for itself, and nothing that names the route.
+ABSENT_FROM_A_REFUSAL = ("Set-Cookie", "Allow", "Location", "Cache-Control", "Referrer-Policy")
+
+
+class Matrix:
+    """Every request made from the same database, with the session
+    carried as a bare cookie, so a request that signs out or deletes
+    an account changes nothing for the next."""
+
+    def __init__(self, app, cookies):
+        self.app = app
+        self.cookies = cookies
+        self.snapshot = Path(app.config["DATABASE_PATH"]).read_bytes()
+
+    def send(self, state, method, path, header):
+        Path(self.app.config["DATABASE_PATH"]).write_bytes(self.snapshot)
+        headers = dict(CSRF) if header else {}
+        if self.cookies[state]:
+            headers["Cookie"] = f"{COOKIE_NAME}={self.cookies[state]}"
+        client = self.app.test_client(use_cookies=False)
+        # The test client reads a leading `//` as a host, so the path
+        # the server is handed is set on the environ instead.
+        if path.startswith("//"):
+            return client.open("/", method=method, headers=headers, json={},
+                               environ_overrides={"PATH_INFO": path})
+        return client.open(path, method=method, headers=headers, json={})
+
+
+@pytest.fixture
+def matrix(app):
+    # The expired session is made first: the update below ages every
+    # session that exists.
+    stale, _ = register(app, "stale")
+    conn = connect(app)
+    try:
+        conn.execute(
+            "UPDATE sessions SET issued_at = ?",
+            ((datetime.now(timezone.utc) - timedelta(hours=13)).isoformat(),),
+        )
+        conn.commit()
+    finally:
+        conn.close()
+    owner, _ = register(app, "owner")
+    admin, _ = register(app, "root", kind="administrator")
+    return Matrix(app, {
+        "absent": None,
+        "expired": stale.get_cookie(COOKIE_NAME).value,
+        "owner": owner.get_cookie(COOKIE_NAME).value,
+        "admin": admin.get_cookie(COOKIE_NAME).value,
+    })
+
+
+def a_refusal(response):
+    return response.status_code in REFUSED and response.mimetype == "text/html"
+
+
+def concrete(rule):
+    return re.sub(r"<[^>]+>", "x", rule.rule)
+
+
+def answered_methods(rule):
+    return sorted(rule.methods - {"HEAD"})
+
+
+def test_a_page_probe_is_refused_identically_in_every_cell(matrix):
+    """The same Not Found for an invented path, a path the router would
+    redirect, a method no route answers and OPTIONS, with or without
+    the header, whatever the session. This is the cell that leaked: a
+    browser navigation to /admin read as 404 and an invented path as
+    403."""
+    seen = {
+        (state, header, method, path): fingerprint(matrix.send(state, method, path, header))
+        for state in matrix.cookies
+        for header in (False, True)
+        for method, path in PAGE_PROBES
+    }
+    assert {key: fp[0] for key, fp in seen.items()} == {key: 404 for key in seen}
+    assert len(set(seen.values())) == 1
+
+
+def test_an_api_probe_is_refused_by_header_then_session(matrix):
+    cells = {}
+    for state in matrix.cookies:
+        for header in (False, True):
+            for method, path in API_PROBES:
+                cells[(state, header, method, path)] = fingerprint(
+                    matrix.send(state, method, path, header)
+                )
+
+    def of(*, header, states):
+        return {fp for (state, h, *_), fp in cells.items() if h is header and state in states}
+
+    forbidden = of(header=False, states=matrix.cookies)
+    unauthorized = of(header=True, states=NO_VALID_SESSION)
+    not_found = of(header=True, states=("owner", "admin"))
+    assert [len(group) for group in (forbidden, unauthorized, not_found)] == [1, 1, 1]
+    assert [next(iter(g))[0] for g in (forbidden, unauthorized, not_found)] == [403, 401, 404]
+
+    # A page and an API route answer the same Not Found, so a probe
+    # cannot tell which namespace it reached by its body.
+    page_missing = fingerprint(matrix.send("owner", "GET", "/some-invented-page", True))
+    assert not_found == {page_missing}
+
+
+def test_a_refusal_carries_nothing_a_route_sets_for_itself(matrix):
+    for state in matrix.cookies:
+        for header in (False, True):
+            for method, path in PAGE_PROBES + API_PROBES:
+                response = matrix.send(state, method, path, header)
+                assert response.status_code in REFUSED, (state, header, method, path)
+                for name in ABSENT_FROM_A_REFUSAL:
+                    assert name not in response.headers, (state, header, method, path, name)
+
+
+def test_every_registered_route_is_refused_like_every_other(app, matrix):
+    """The route map is read at test time, so a route added later joins
+    the matrix instead of being exempt from it. Whatever is refused,
+    under a given status, is one response."""
+    refusals: "dict[int, set]" = {}
+    for rule in app.url_map.iter_rules():
+        for method in answered_methods(rule):
+            for state in matrix.cookies:
+                for header in (False, True):
+                    response = matrix.send(state, method, concrete(rule), header)
+                    assert response.status_code != 405, (rule.rule, method, state, header)
+                    assert "Allow" not in response.headers, (rule.rule, method)
+                    if a_refusal(response):
+                        refusals.setdefault(response.status_code, set()).add(fingerprint(response))
+    assert set(refusals) == set(REFUSED)
+    assert [len(group) for group in refusals.values()] == [1, 1, 1]
+
+
+def test_every_api_route_is_forbidden_without_the_header_and_unauthorized_without_a_session(app, matrix):
+    for rule in app.url_map.iter_rules():
+        if not rule.rule.startswith("/api/"):
+            continue
+        for method in answered_methods(rule):
+            path = concrete(rule)
+            for state in matrix.cookies:
+                assert matrix.send(state, method, path, False).status_code == 403, (rule.rule, method, state)
+            if rule.rule in PUBLIC_API:
+                continue
+            for state in NO_VALID_SESSION:
+                assert matrix.send(state, method, path, True).status_code == 401, (rule.rule, method, state)
+
+
+# The spec's Public routes and vault navigation pages
+# (app-shell.md, The two surfaces), named here and not read off the gate.
+SERVED_SIGNED_OUT = {
+    ("/login", "GET"),
+    ("/register", "GET"),
+    ("/api/register", "POST"),
+    ("/api/auth/salt", "POST"),
+    ("/api/auth/login", "POST"),
+    ("/api/auth/logout", "POST"),
+    ("/", "GET"),
+    ("/static/<path:filename>", "GET"),
+    ("/dashboard", "GET"),
+    ("/settings", "GET"),
+    ("/settings/dimensions", "GET"),
+    ("/settings/export-import", "GET"),
+}
+
+
+def test_with_no_session_the_gate_serves_exactly_the_public_routes_and_the_vault_pages(app, matrix):
+    """Read from the route map at test time, so a route added later and
+    marked Public, or a page added under /admin, is caught here. A
+    handler's own answer, JSON or a redirect, is a served request. Only
+    the gate's HTML refusal is not."""
+    served = set()
+    for rule in app.url_map.iter_rules():
+        path = "/static/css/tokens.css" if rule.endpoint == "static" else concrete(rule)
+        for method in answered_methods(rule):
+            for header in (True, False):
+                if rule.rule.startswith("/api/") and not header:
+                    continue
+                if not a_refusal(matrix.send("absent", method, path, header)):
+                    served.add((rule.rule, method))
+    assert served == SERVED_SIGNED_OUT
+
+    for rule, _ in served:
+        assert not rule.startswith(("/admin", "/api/admin/")), rule
+
+
+def test_the_namespace_invariant_holds_over_the_route_map(app, matrix):
+    """Every route that needs the header is under /api/, every other
+    route is exempt and answers only GET and HEAD, and no route answers
+    OPTIONS."""
+    for rule in app.url_map.iter_rules():
+        path = concrete(rule)
+        assert "OPTIONS" not in rule.methods, rule.rule
+        if rule.rule.startswith("/api/"):
+            continue
+        assert rule.methods <= {"GET", "HEAD"}, rule.rule
+        # Exempt: without the header and without a session it is never
+        # Forbidden.
+        assert matrix.send("absent", "GET", path, False).status_code != 403, rule.rule
+    for rule in app.url_map.iter_rules():
+        for state in matrix.cookies:
+            for header in (False, True):
+                response = matrix.send(state, "OPTIONS", concrete(rule), header)
+                assert response.status_code in REFUSED, (rule.rule, state, header)
+
+
+def test_the_router_does_not_merge_slashes(app):
+    assert app.url_map.merge_slashes is False

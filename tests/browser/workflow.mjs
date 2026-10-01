@@ -6370,6 +6370,61 @@ try {
       bare.close();
     }
   }
+
+  // ---- App shell: one Not Found, whoever navigates to it ----------------
+  //
+  // app-shell.md, Refusals: a page refusal is the same page whatever the
+  // session, the kind or the header, so a navigation to /admin cannot be
+  // told apart from one to an address that was never there. Each is a
+  // real top-level navigation, in a browser holding the session it names.
+  // `//admin` is left to tests/test_guard.py: the development server
+  // collapses the leading slashes before the app sees them.
+  {
+    const signedOut = await openBrowser();
+    const owner = await openBrowser(`${BASE}/login`);
+    const administrator = await openBrowser(`${BASE}/login`);
+    try {
+      await signInOn(administrator.session, ADMIN_PASSWORD, 'ops.leander');
+      await administrator.session.waitUntil("location.pathname === '/admin'", { timeout: 90000, label: 'the admin area for the Not Found check' });
+      await signInOn(owner.session, VAULT_PASSWORD, 'leander');
+      await owner.session.waitUntil("location.pathname === '/dashboard' && document.querySelector('.topbar nav a')", { timeout: 90000, label: 'the dashboard for the Not Found check' });
+
+      const answers = {};
+      for (const [name, who, path] of [
+        ['/admin signed out', signedOut, '/admin'],
+        ['/admin as a vault owner', owner, '/admin'],
+        ['/settings as an administrator', administrator, '/settings'],
+        ['an invented page path', signedOut, '/some-invented-page'],
+        ['/favicon.ico signed out', signedOut, '/favicon.ico'],
+      ]) {
+        await who.session.goto(`${BASE}${path}`);
+        await who.session.settle(500);
+        answers[name] = {
+          status: await who.session.eval("performance.getEntriesByType('navigation')[0].responseStatus"),
+          path: await who.session.eval('location.pathname'),
+          html: await who.session.eval('document.documentElement.outerHTML'),
+        };
+      }
+      const names = Object.keys(answers);
+      for (const name of names) {
+        check(`${name} answers Not Found without redirecting`, answers[name].status === 404, answers[name].status);
+      }
+      check(
+        'every address that is not served renders the identical Not Found page',
+        names.every((name) => answers[name].html === answers[names[0]].html),
+        names.filter((name) => answers[name].html !== answers[names[0]].html).join(', '),
+      );
+      check(
+        'no refused navigation is sent anywhere else',
+        names.every((name, i) => answers[name].path === ['/admin', '/admin', '/settings', '/some-invented-page', '/favicon.ico'][i]),
+        names.map((name) => answers[name].path).join(' '),
+      );
+    } finally {
+      signedOut.close();
+      owner.close();
+      administrator.close();
+    }
+  }
 } catch (error) {
   check('the workflow ran to the end', false, error.message);
 } finally {
