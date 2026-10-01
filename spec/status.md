@@ -4,10 +4,10 @@ Maintained by the compiler agent. Rows are in build order.
 
 | Feature | Compiled | Implemented | Verified |
 |---|---|---|---|
-| app-shell | x | x | x |
+| app-shell | x | | |
 | record-api | x | x | x |
 | rate-lookup | x | x | x |
-| admin-invites | x | x | x |
+| admin-invites | x | | |
 | register | x | x | x |
 | login | x | x | x |
 | account-settings | x | x | x |

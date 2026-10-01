@@ -237,9 +237,8 @@ panning sideways.
 18. Another website cannot make the app do anything with a signed-in
     person's session. A request that did not originate in the app is
     refused and changes nothing.
-19. Someone probing addresses gets an identical refusal whether the
-    address exists or was invented, and whether their session is valid,
-    expired, or absent. The answer never reveals which.
+19. Every refusal looks the same whether the address exists or was
+    invented. An expired sign-in is refused like an absent one.
 20. A mistyped address and an unexpected failure are answered with the
     same protections as any working page.
 21. The styling and scripts the app serves load for anyone, signed in

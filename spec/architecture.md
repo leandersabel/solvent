@@ -369,18 +369,32 @@ contract pins one value and prose stays readable.
 | OK | 200 | the request succeeded and carries a body |
 | No Content | 204 | the request was valid and there is nothing to return — a rate with no proposal available, never an error |
 | Bad Request | 400 | input is malformed, out of range, or names something the caller may safely learn does not exist |
-| Unauthorized | 401 | no valid session |
-| Forbidden | 403 | the required `X-Solvent-Request` header is absent (Application hardening) |
-| Not Found | 404 | the target does not exist, **or** exists but belongs to someone else, **or** is a route the caller must not learn exists |
+| Unauthorized | 401 | a refusal of an API request with the `X-Solvent-Request` header and no valid session (Refusals) |
+| Forbidden | 403 | a refusal of an API request without the `X-Solvent-Request` header (Refusals) |
+| Not Found | 404 | the target does not exist **or** belongs to someone else, and every other refusal (Refusals) |
 | Conflict | 409 | the write lost an optimistic-concurrency check, or the target's state forbids it |
 | Content Too Large | 413 | a storage cap would be exceeded (Storage & data handling) |
 | Too Many Requests | 429 | a rate limit engaged (Application hardening) |
 | Server Error | 500 | an unhandled failure. Never a designed answer; it appears in this spec only where a test stubs one |
 
-Not Found's conditions are indistinguishable by construction rather
-than by convention. Splitting them would answer the question the
-attacker is asking: whether an id, an account, or an admin route
-exists.
+### Refusals
+
+A refusal's status depends only on the namespace, the
+`X-Solvent-Request` header and the session, never on whether the path
+exists, its surface or its method, so a probe learns nothing it did
+not send. A path under `/api/` is an API request, any other a page
+request.
+
+| | No `X-Solvent-Request` header | Header, no valid session | Header, valid session |
+|---|---|---|---|
+| Page | Not Found | Not Found | Not Found |
+| API | Forbidden | Unauthorized | Not Found |
+
+No valid session means no cookie, a badly signed one, or an expired or
+revoked session. An unknown path, a method the route does not answer
+(`OPTIONS` included) and an address the router would redirect
+(`//admin`) are refused as invented. Nothing answers Method Not Allowed,
+and no refusal redirects. app-shell.md, The request gate, applies this.
 
 ## Tech stack
 
@@ -790,12 +804,10 @@ Actors this design defends against vs. accepts:
   `X-Solvent-Request: 1`, on every endpoint that is not meant to be
   reached by navigation — every state-changing one (records, invite,
   import, password change, logout, account deletion) **and `GET
-  /api/export`**. Same-origin cookie auth is not implicitly CSRF-safe. A
-  request missing the header is rejected with **Forbidden** and changes
-  nothing. The check runs **before authentication and before routing**,
-  so the response is identical whether or not the session is valid and
-  whether or not the path exists — a caller without the header learns
-  nothing about session state and cannot map the route table.
+  /api/export`**. Same-origin cookie auth is not implicitly CSRF-safe.
+  **Every route that requires the header is under `/api/`**, and every
+  other route is exempt and answers only `GET` and `HEAD`. A request
+  without the header changes nothing (app-shell.md, The request gate).
   - **A header rather than a token.** A cross-origin page cannot set a
     custom header without a preflight, and the preflight fails because
     no CORS headers are served. Every endpoint in this product is called

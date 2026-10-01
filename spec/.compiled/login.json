@@ -4,7 +4,7 @@
   "read": [
     {"file": "spec/features/login.md", "sections": ["all"]},
     {"file": "spec/architecture.md", "sections": ["Key management", "Credentials and vault key wrappers", "Application hardening", "Accounts on this instance", "Status codes", "Threat model"]},
-    {"file": "spec/features/app-shell.md", "sections": ["The two surfaces", "CSRF", "Database", "The chrome"], "role": "the shared surface this flow sits on and the root path that resolves by kind"},
+    {"file": "spec/features/app-shell.md", "sections": ["The two surfaces", "CSRF", "Database", "The chrome"], "role": "the Public group that /login, POST /api/auth/salt and POST /api/auth/login belong to, the Shared group that POST /api/auth/upgrade-kdf belongs to, and the root path that resolves by kind"},
     {"file": "spec/features/account-settings.md", "sections": ["Session and lock", "Change password"], "role": "owns the idle period and the session endpoints this flow's rules refer to"},
     {"file": "spec/features/register.md", "sections": ["What registration writes", "Rules"], "role": "the credential row and envelope this flow reads"},
     {"file": "spec/ui/design-system.md", "sections": ["Components", "States", "App shell"], "role": "the input, button and progress conventions, and the fact that the unauthenticated screens sit outside the shell"},

@@ -8,7 +8,7 @@
     {"file": "spec/features/record-api.md", "sections": ["Row shape", "The AAD encoding", "`accountId` on the wire"], "role": "the validator the profile record is written through"},
     {"file": "spec/features/account-settings.md", "sections": ["The profile record", "Main currency"], "role": "the payload shape whose two required keys registration writes"},
     {"file": "spec/features/rate-lookup.md", "sections": ["The symbol table", "Maintaining the table", "SSRF and egress hardening"], "role": "the kind: currency rows that are the whole of the main-currency list"},
-    {"file": "spec/features/app-shell.md", "sections": ["Database", "CSRF", "The two surfaces", "Configuration"], "role": "the schema this writes into and the headers the page is served with"},
+    {"file": "spec/features/app-shell.md", "sections": ["Database", "CSRF", "The two surfaces", "Configuration"], "role": "the schema this writes into, the headers the page is served with, and the Public group that GET /register and POST /api/register belong to, which the gate passes with no session"},
     {"file": "spec/ui/design-system.md", "sections": ["Components", "States", "App shell"], "role": "the form, input and progress conventions, and the fact that the unauthenticated screens sit outside the shell"},
     {"file": "spec/ui/register.md", "sections": ["all"], "role": "the two forms the invite's kind chooses between"}
   ],
