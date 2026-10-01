@@ -10,6 +10,7 @@ from __future__ import annotations
 import dataclasses
 
 import flask
+from werkzeug.routing import Map
 
 from . import (
     admin,
@@ -39,8 +40,26 @@ BLUEPRINTS = (
 )
 
 
+class _Map(Map):
+    """Slashes are never merged, so the router has no redirect of its
+    own to answer (app-shell.md, The request gate)."""
+
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, merge_slashes=False, **kwargs)
+
+
+class _Flask(flask.Flask):
+    """No route answers OPTIONS: Flask would add the method to each one
+    and answer it with an Allow header, which a refusal must not carry."""
+
+    url_map_class = _Map
+
+    def add_url_rule(self, rule, endpoint=None, view_func=None, provide_automatic_options=None, **options):
+        super().add_url_rule(rule, endpoint, view_func, provide_automatic_options=False, **options)
+
+
 def create_app(config_overrides: dict | None = None) -> flask.Flask:
-    app = flask.Flask(__name__, instance_relative_config=True)
+    app = _Flask(__name__, instance_relative_config=True)
 
     # Let this raise straight out of create_app so a misconfigured
     # deployment never serves a request (app-shell.md, Configuration).

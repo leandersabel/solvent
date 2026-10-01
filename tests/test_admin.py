@@ -9,6 +9,7 @@ from pathlib import Path
 
 from solvent.guard import ADMINISTRATION, surface_of
 from tests.helpers import CSRF, b64, connect, mint_invite, register, rows
+from tests.test_guard import fingerprint
 
 REPO_ROOT = Path(__file__).resolve().parent.parent
 
@@ -143,6 +144,32 @@ def test_a_vault_owner_gets_not_found_from_every_admin_route(app):
         response = owner.open(path, method=method, json={"kind": "administrator"}, headers=CSRF)
         assert response.status_code == 404, (path, method)
     assert rows(app, "SELECT * FROM invites") == before
+
+
+def test_every_admin_route_is_refused_as_an_invented_api_path_is(app, client):
+    """Enumerated at test time, under every method each route answers.
+    Without the header the answer is Forbidden and with it Unauthorized,
+    for a caller with no session and for a vault owner alike, so a
+    probe cannot tell /api/admin/invites from /api/admin/invented."""
+    owner, _ = register(app, "owner")
+    routes = [
+        (re.sub(r"<[^>]+>", "x", rule.rule), method)
+        for rule in app.url_map.iter_rules()
+        if surface_of(str(rule)) == ADMINISTRATION and rule.rule.startswith("/api/admin/")
+        for method in sorted(rule.methods - {"HEAD"})
+    ]
+    assert routes
+    for caller, header, status in (
+        (client, {}, 403),
+        (owner, {}, 403),
+        (client, CSRF, 401),
+        (owner, CSRF, 404),
+    ):
+        invented = caller.get("/api/admin/invented", headers=header)
+        assert invented.status_code == status
+        for path, method in routes:
+            response = caller.open(path, method=method, headers=header, json={})
+            assert fingerprint(response) == fingerprint(invented), (path, method, status)
 
 
 def test_no_route_anywhere_changes_an_existing_accounts_kind(app, admin):
