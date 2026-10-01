@@ -59,7 +59,9 @@ enumeration oracle login.md closes.
    session by the same rule as a sign-in (login.md, The session a
    sign-in issues). The account is new, so the session the request
    carried is at most another account's, and a live one is deleted and
-   replaced. A vault owner lands logged in with keys already in memory.
+   replaced. Starting that session is the account's first sign-in and
+   writes its `last_login_at`. A vault owner lands logged in with keys
+   already in memory.
    An administrator lands in the admin area.
 
 **The payload's shape is checked against the invite, not chosen by the
@@ -78,8 +80,10 @@ and Credentials and vault key wrappers).
 
 - **`principals`**: identity and kind only, meaning the normalized
   username, the kind copied from the invite, and the two timestamps.
-  Registration adds **no key column** to this table. The app shell
-  already creates it (`app-shell.md`, Database).
+  `created_at`, `last_login_at` and the invite's `used_at` take one
+  server clock reading, so a new account's last sign-in is its
+  creation time. Registration adds **no key column** to this table.
+  The app shell already creates it (`app-shell.md`, Database).
 - **`credentials`**: exactly one row, `method: 'password'`, for **both
   kinds**. Its `params` take the request's salt and KDF envelope
   verbatim and its `verifier` takes the Argon2id hash of the submitted
@@ -349,6 +353,11 @@ of the rule have drifted, which the shared fixture (Rules) prevents.
 - A registration carrying another account's live session deletes that
   row, and the old cookie answers Unauthorized. A failed registration
   leaves the carried session working.
+- A successful registration leaves the new `principals` row with a
+  non-null `last_login_at` equal to its `created_at` and to the
+  invite's `used_at`. Asserted for a vault owner invite, an
+  administrator invite, and an administrator invite minted by
+  `flask create-invite`.
 - A POST carrying KDF parameters below the server minimum is rejected
   with Bad Request, even though the client UI would never send them.
 - A POST with a salt that is not 16 bytes is rejected with Bad

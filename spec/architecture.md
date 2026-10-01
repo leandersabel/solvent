@@ -134,7 +134,7 @@ demotion, and no endpoint writes `kind` after the insert
 | `username` | plaintext | normalized, unique across both kinds |
 | `kind` | plaintext | `vault_owner` \| `administrator`, `CHECK`-constrained |
 | `created_at` | plaintext | server clock |
-| `last_login_at` | plaintext | server clock, rewritten on each successful login |
+| `last_login_at` | plaintext | server clock, written by every session start, registration included (login.md, The session a sign-in issues). Never null once the app serves requests (app-shell.md, Database) |
 
 - A **vault owner** owns a vault: a DEK, records, a profile, an export.
 - An **administrator** owns none of that. No DEK, no wrapper, no

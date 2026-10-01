@@ -28,6 +28,7 @@
     "initialProfilePayload": {"value": "{ mainCurrency, createdAt }, the two required keys of the profile payload. The optional ones are written later by the settings that own them", "cite": "spec/features/register.md#flow"},
     "profileAad": {"value": "account_id empty, record_type profile, its own record_id, its own schema_version, version 1, built entirely before the request is sent because principal_id is not part of the AAD", "cite": "spec/features/register.md#what-registration-writes"},
     "tablesWritten": {"value": "principals takes identity and kind only, meaning the normalized username, the kind copied from the invite, and the two timestamps, and no key column. credentials takes exactly one row with method 'password' for both kinds, its params holding the request's salt and KDF envelope verbatim and its verifier the Argon2id hash of the submitted Auth Key. dek_wrappers takes exactly one row for a vault owner and none at all for an administrator", "cite": "spec/features/register.md#what-registration-writes"},
+    "firstSignIn": {"value": "starting the registration session is the account's first sign-in and writes its last_login_at. created_at, last_login_at and the invite's used_at take one server clock reading, so a new account's last sign-in is its creation time, for both kinds and for an invite minted by flask create-invite", "cite": "spec/features/register.md#flow, spec/features/register.md#what-registration-writes"},
     "onePasswordCredential": {"value": "enforced by a unique index on principal_id restricted to method = 'password', written in the same transaction as the principal row", "cite": "spec/architecture.md#credentials-and-vault-key-wrappers"},
     "methodIsNotClientInput": {"value": "the server writes 'password' and no endpoint in v1 accepts any other value, so a payload carrying a method field is a Bad Request", "cite": "spec/features/register.md#what-registration-writes"},
     "kindIsNotClientInput": {"value": "the server copies kind from the invite row and no endpoint anywhere writes it again. A payload carrying a kind field of any value is rejected", "cite": "spec/features/register.md#what-registration-writes"},
@@ -68,6 +69,7 @@
       "a seeded account of each kind holding the same username, for the cross-kind collision refusal",
       "an account registered through PUT /api/records with an equivalent profile record, for the indistinguishability assertion",
       "another account's live session cookie, carried into a successful and into a failed registration",
+      "an administrator invite minted by flask create-invite, alongside the in-app invites, for the created_at, last_login_at and used_at equality assertion",
       "GET /api/records stubbed to answer 503 on the first read after a successful registration and switchable to answer normally on the retry, for the first-read-failure assertions",
       "control of the idle timer and a way to fire pagehide, for the held-keys assertions, including a pagehide fired while the retried read is in flight",
       "tests/fixtures/usernames.json, shared by pytest and the client tests",
@@ -94,6 +96,7 @@
       "the browser's check and the server's normalization must each be run over the whole shared fixture through the real code on both sides. A client test that re-implements the rule in the test passes while the two copies drift",
       "a disabled button must be shown to block the derivation, not merely look disabled: press Enter in each field and assert against the derivation call and the captured requests",
       "each stubbed answer must show its own message and no other, and every field, the password included, must keep its value in all but the invite's. Only Server Error, Service Unavailable and a dropped connection show the network wording",
+      "created_at, last_login_at and the invite's used_at must be shown equal and non-null after a registration, asserted for a vault owner invite, an administrator invite and an administrator invite minted by flask create-invite. Equality is the point: a last_login_at left null, or written from a second clock reading, passes a test that only checks it is set",
       "every refusal, Conflict included, must leave the invite pending and no principal row, asserted against both tables and not against the response"
     ]
   },

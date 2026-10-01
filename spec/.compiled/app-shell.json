@@ -51,6 +51,7 @@
     "sessionCookie": {"value": "HttpOnly, Secure, SameSite=Lax, carrying only a random session token signed with the Flask SECRET_KEY. No key material of any kind rides in the cookie. A valid signature alone is not a session: the token must hash to a stored row", "cite": "spec/architecture.md#application-hardening"},
     "secretKeyStartupRule": {"value": "the app refuses to start when SECRET_KEY is absent or empty rather than generating one, and the failure names the variable without printing any value", "cite": "spec/features/app-shell.md#configuration"},
     "schemaOwnership": {"value": "one place creates the schema and opens the SQLite file on its writable volume. Each table's columns are stated by the feature that owns them: records by record-api.md, principals and credentials and dek_wrappers by register.md, invites by admin-invites.md, sessions by architecture.md Application hardening", "cite": "spec/features/app-shell.md#database"},
+    "lastLoginBackfill": {"value": "every process start fills a null principals.last_login_at with the row's created_at, in the one write transaction that creates the schema, before any request is served. The DDL leaves the column nullable and the schema version unchanged, because SQLite cannot add NOT NULL to an existing column without rebuilding principals. A database at another schema version is refused at start. Non-null values are left as they were, and a second start changes nothing", "cite": "spec/features/app-shell.md#database, spec/architecture.md#accounts-on-this-instance"},
     "administratorTriggers": {"value": "a BEFORE INSERT on records and a BEFORE INSERT on dek_wrappers, each resolving the row's principal and aborting when its kind is administrator. A SQLite CHECK cannot reach another table, which is why these are triggers", "cite": "spec/features/app-shell.md#database"},
     "publicRoutes": {
       "value": [
@@ -102,6 +103,7 @@
       "a real browser session for the top-level navigation assertions: /admin signed out and as a vault owner, /settings as an administrator, and an invented page path",
       "a process-launch harness that can start the app with SECRET_KEY unset or empty and capture the failure output",
       "a direct SQL insert path into records and into dek_wrappers, bypassing every endpoint, for the two triggers",
+      "a SQLite file written before the app starts, holding a principals row with a null last_login_at and one with a non-null value, at the current schema version, for the backfill assertion and its restart",
       "a headless browser with console capture, loading a shell page and a Not Found page, for the no-console-error and icon-declaration assertions"
     ],
     "focus": [
@@ -119,6 +121,7 @@
       "an administrator's GET /api/records must return Not Found and not an empty list, asserted specifically. An empty list passes any test that only checks no other vault's rows came back",
       "the page Not Found must be identical in a real browser for /admin signed out, /admin as a vault owner, /settings as an administrator and an invented path. A server-side comparison alone does not show that the rendered page depends on neither session nor kind",
       "the two triggers must be asserted with a direct SQL insert, not through an endpoint. An endpoint that happens to refuse the insert for its own reasons hides whether the schema refuses it at all",
+      "the last_login_at backfill must be asserted by starting the app on a pre-written file, not by calling the schema function on a fresh database. The null row must equal its created_at, the non-null row must be untouched, the file's schema version must be unchanged, and a second start must change nothing. A backfill that overwrites every row, or one run per request, passes a test over the null row alone",
       "the SECRET_KEY criterion needs a real process start attempt and inspection of the failure output for the variable name and the absence of any value. A unit test of a config loader in isolation is not the same thing",
       "'no response body originating in the shell contains vault plaintext' cannot be checked by grepping the shell's templates, since the shell never holds plaintext to begin with. The assertion that matters is that no route wired to the shell ever receives decrypted content to render"
     ]

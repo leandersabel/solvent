@@ -136,7 +136,14 @@ the session the request carried:
 In every case the signing-in account's expired rows are deleted in the
 same transaction. Live means not past the absolute expiry (Rules,
 Session lifetime). A failed login, a rate-limited or locked-out one
-included, writes no session row and leaves the carried session working.
+included, writes no session row, leaves `last_login_at` as it was, and
+leaves the carried session working.
+
+**Starting a session writes the account's `last_login_at`** to the
+server clock, in the same transaction, and nothing else writes it. A
+sign-in, an unlock and a registration (register.md, Flow) all start a
+session this way, so the column records the last time the account
+proved its password, and an account that exists has one.
 
 The unlock prompt after an idle lock, the lock button or a refresh
 calls this endpoint on a server session that is still live. Updating
@@ -154,7 +161,8 @@ the Auth Key verified, so the pre-authentication path is unchanged
 
 **Unlocking does not move `issued_at`.** The absolute expiry counts
 from sign-in. Resetting it on unlock would make the limit sliding for
-anyone who unlocks more often than every twelve hours.
+anyone who unlocks more often than every twelve hours. Unlocking does
+move `last_login_at`, which no expiry reads.
 
 ## Inputs / outputs
 
@@ -367,6 +375,12 @@ anyone who unlocks more often than every twelve hours.
   those.
 - Signing in, then unlocking 11 hours later, leaves a session that
   answers Unauthorized 12 hours after the first sign-in.
+- A sign-in sets the account's `last_login_at` to the time of the
+  request, and so does an unlock on a live session, while that
+  session's `issued_at` stays. Asserted for both kinds with the server
+  clock stubbed.
+- A wrong Auth Key, a rate-limited attempt and a locked-out attempt
+  each leave `last_login_at` unchanged.
 - Exceeding the per-account attempt limit locks the account and returns
   the same response shape for a nonexistent account.
 - `/api/auth/login` with an unknown username takes statistically

@@ -314,8 +314,8 @@ def test_a_wrong_auth_key_against_either_kind_and_a_stranger_is_byte_identical(a
 
 def test_login_writes_last_login_at_and_rotates_the_session(app):
     owner, auth_key = register(app, "owner")
-    before = rows(app, "SELECT last_login_at FROM principals")[0]["last_login_at"]
-    assert before is None
+    created = rows(app, "SELECT created_at, last_login_at FROM principals")[0]
+    assert created["last_login_at"] == created["created_at"]
     sign_in(app, "owner", auth_key)
     assert rows(app, "SELECT last_login_at FROM principals")[0]["last_login_at"]
     assert len(rows(app, "SELECT * FROM sessions")) == 2

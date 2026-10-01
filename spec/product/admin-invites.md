@@ -148,6 +148,10 @@ One row per account: its username, which kind of account it is, when it
 was created, and when it was last signed in to. A user account also
 shows how many items its vault holds.
 
+Registering ends signed in (`register.md`), so creating an account is
+its first sign-in, for the first administrator as much as anyone. No
+account reads as never signed in.
+
 That item count and those dates are the only facts about somebody
 else's account that exist anywhere in this product, and an
 administrator about to remove an account reads them to check they have
@@ -237,6 +241,9 @@ created the first administrator.
   account.
 - More than one administrator account can exist on an instance at the
   same time, and each can do everything any other administrator can.
+- The accounts list shows a last sign-in for every account. A new
+  account of either kind, the first administrator included, shows the
+  time it was created, and every sign-in after that moves it forward.
 - A link works once. The second person to try it is turned away.
 - A link stops working when its time runs out.
 - A link that has been called back stops working immediately, even
