@@ -3280,14 +3280,17 @@ try {
     await page.settle(400);
     const recordedDay = [...snapshotDates].sort()[0];
     await page.eval("[...document.querySelectorAll('button')].find(b => b.textContent.trim() === 'New recording').click()");
-    await page.waitUntil("document.querySelector('.dialog #recording-date')", { label: 'the date picker' });
-    await setValue('#recording-date', recordedDay);
-    await page.settle(200);
-    const pickerNote = await page.eval("document.querySelector('.dialog .hint').textContent");
+    await page.waitUntil("document.querySelector('.dialog .date-day')", { label: 'the date picker' });
+    await page.eval(`(() => {
+      for (let i = 0; i < 600 && !document.querySelector('.dialog .date-day[data-date="${recordedDay}"]'); i += 1) {
+        document.querySelector('.dialog [aria-label="Previous month"]').click();
+      }
+    })()`);
+    const pickerName = await page.eval(`document.querySelector('.dialog .date-day[data-date="${recordedDay}"]').getAttribute('aria-label')`);
     check(
-      "with year-first saved, the date picker's note writes the day as YYYY-MM-DD",
-      pickerNote === `${recordedDay} already holds a recording. Opening it.`,
-      pickerNote,
+      "with year-first saved, the date picker's marked day names itself as YYYY-MM-DD",
+      pickerName === `${recordedDay}, has a recording`,
+      pickerName,
     );
     await page.eval("[...document.querySelectorAll('.dialog button')].find(b => b.textContent === 'Cancel').click()");
     await page.settle(200);
@@ -3658,6 +3661,48 @@ try {
         .find(b => b.textContent.trim() === ${JSON.stringify(label)}).click()`);
       await quiet();
     };
+    // What a person does, through the protocol. element.click() ignores
+    // whatever is drawn over a control, so a control a popup covers passes
+    // every check made with it. A real mouse event lands on whatever is
+    // painted at the point, which is the only way to test "can be pressed".
+    const centerOf = (selector, label = null) =>
+      ev(`(() => {
+        const nodes = [...document.querySelectorAll(${JSON.stringify(selector)})];
+        const node = ${label === null ? 'nodes[0]' : `nodes.find(n => n.textContent.trim() === ${JSON.stringify(label)})`};
+        if (!node) return null;
+        node.scrollIntoView({ block: 'center' });
+        const r = node.getBoundingClientRect();
+        return { x: r.left + r.width / 2, y: r.top + r.height / 2 };
+      })()`);
+    const realClickAt = async ({ x, y }) => {
+      await rec.send('Input.dispatchMouseEvent', { type: 'mouseMoved', x, y });
+      await rec.send('Input.dispatchMouseEvent', { type: 'mousePressed', x, y, button: 'left', clickCount: 1 });
+      await rec.send('Input.dispatchMouseEvent', { type: 'mouseReleased', x, y, button: 'left', clickCount: 1 });
+      await quiet();
+    };
+    const realClick = async (selector, label = null) => {
+      const at = await centerOf(selector, label);
+      if (!at) throw new Error(`nothing to click for ${selector} ${label ?? ''}`);
+      await realClickAt(at);
+    };
+    // The element painted at a control's own centre is that control (or
+    // part of it), so nothing covers it.
+    const uncovered = (selector, label = null) =>
+      ev(`(() => {
+        const nodes = [...document.querySelectorAll(${JSON.stringify(selector)})];
+        const node = ${label === null ? 'nodes[0]' : `nodes.find(n => n.textContent.trim() === ${JSON.stringify(label)})`};
+        if (!node) return false;
+        node.scrollIntoView({ block: 'center' });
+        const r = node.getBoundingClientRect();
+        const hit = document.elementFromPoint(r.left + r.width / 2, r.top + r.height / 2);
+        return Boolean(hit) && node.contains(hit);
+      })()`);
+    const realKey = async (key, code, keyCode) => {
+      for (const type of ['rawKeyDown', 'keyUp']) {
+        await rec.send('Input.dispatchKeyEvent', { type, key, code, windowsVirtualKeyCode: keyCode });
+      }
+      await rec.settle(50);
+    };
     // The vault as the page's own crypto reads it back from the server,
     // each record with its bytes and its decrypted payload.
     const stored = async (type) => {
@@ -3799,14 +3844,31 @@ try {
       await rec.settle(200);
       await quiet();
     };
-    const newRecording = async (iso) => {
+    // Opens the picker, steps back to the month holding `iso`, and picks
+    // the day with a real click. Says what the day's mark and accessible
+    // name were, which is how the picker tells a recorded date from a free one.
+    const pickerDay = (iso) => `.dialog .date-day[data-date="${iso}"]`;
+    const newRecording = async (iso, { wait = true } = {}) => {
       await press('New recording');
-      await set('#recording-date', await format('date', iso));
-      const said = await ev("document.querySelector('.dialog .hint').textContent");
-      await press('Open', '.dialog');
+      for (let step = 0; step < 400 && !(await ev(`Boolean(document.querySelector('${pickerDay(iso)}'))`)); step += 1) {
+        await ev(`document.querySelector('.dialog [aria-label="Previous month"]').click()`);
+      }
+      const day = JSON.parse(await ev(`(() => {
+        const d = document.querySelector('${pickerDay(iso)}');
+        return JSON.stringify({ name: d.getAttribute('aria-label'), dotted: d.classList.contains('has-recording') });
+      })()`));
+      if (wait) await realClick(pickerDay(iso));
+      else {
+        // Without waiting for the network to go quiet, for a step that
+        // looks at the screen while a request is still pending.
+        const at = await centerOf(pickerDay(iso));
+        for (const type of ['mouseMoved', 'mousePressed', 'mouseReleased']) {
+          await rec.send('Input.dispatchMouseEvent', { type, ...at, button: 'left', clickCount: 1 });
+        }
+      }
       await rec.settle(200);
-      await quiet();
-      return said;
+      if (wait) await quiet();
+      return { marked: day.dotted && day.name === `${await format('dayMonth', iso)}, has a recording`, name: day.name, dotted: day.dotted };
     };
     const sweepToday = async () => {
       await ev("[...document.querySelectorAll('.topbar-actions button')].find(b => b.textContent.trim() === 'Update values').click()");
@@ -4015,15 +4077,118 @@ try {
     );
     check('net-worth-view: dismissing the date picker writes nothing and asks nothing', traffic.length === 0);
 
+    // The New recording dialog is the month grid and a Cancel, nothing
+    // else, and nothing is painted over any part of it. The checks above
+    // press with element.click(), which does not notice a calendar laid
+    // over the dialog, so these use hit-testing and real input events.
+    traffic.length = 0;
+    // A person presses it, so it is the focused control, which is where
+    // Cancel and Escape have to return the focus to.
+    await realClick('button', 'New recording');
+    const shape = JSON.parse(await ev(`JSON.stringify({
+      heading: document.querySelector('.dialog-heading')?.textContent,
+      dialogs: document.querySelectorAll('.dialog').length,
+      popups: document.querySelectorAll('.date-popover').length,
+      fields: document.querySelectorAll('.dialog input, .dialog .date-field, #recording-date').length,
+      hints: document.querySelectorAll('.dialog .hint').length,
+      buttons: [...document.querySelectorAll('.dialog button')].filter(b => !b.classList.contains('date-day')).map(b => b.textContent.trim() || b.getAttribute('aria-label')),
+      actions: [...document.querySelectorAll('.dialog-actions button')].map(b => b.textContent + ':' + b.className),
+      title: document.querySelector('.dialog .date-title')?.textContent || '',
+      focusedToday: document.activeElement.classList.contains('is-today'),
+      nextDisabled: document.querySelector('.dialog [aria-label="Next month"]')?.disabled,
+      previousDisabled: document.querySelector('.dialog [aria-label="Previous month"]')?.disabled,
+      todayDated: document.querySelector('.date-day.is-today')?.dataset.date,
+    })`));
+    check(
+      'dashboard: New recording opens one dialog headed "New recording" whose body is the month grid, with no date field, hint, Open or popup',
+      shape.heading === 'New recording' && shape.dialogs === 1 && shape.popups === 0 && shape.fields === 0 && shape.hints === 0 &&
+        !shape.buttons.includes('Open') && !shape.buttons.includes('Close') && shape.actions.length === 1 &&
+        shape.actions[0] === 'Cancel:btn-secondary' && shape.title !== '' && shape.focusedToday && shape.todayDated === T,
+      JSON.stringify(shape),
+    );
+    check(
+      'dashboard: the date picker opens on the current month, with Next month disabled and Previous month enabled',
+      shape.nextDisabled === true && shape.previousDisabled === false,
+      JSON.stringify(shape),
+    );
+    const covered = [];
+    for (const [selector, label] of [
+      ['.dialog-heading', null],
+      ['.dialog .date-title', null],
+      ['.dialog [aria-label="Previous month"]', null],
+      ['.dialog .date-day.is-today', null],
+      ['.dialog-actions button', 'Cancel'],
+    ]) {
+      if (!(await uncovered(selector, label))) covered.push(label || selector);
+    }
+    check(
+      'dashboard: nothing is painted over the dialog\'s heading, month, buttons, today or Cancel',
+      covered.length === 0,
+      covered.join(', '),
+    );
+    traffic.length = 0;
+    await realClick('.dialog-actions button', 'Cancel');
+    check(
+      'dashboard: a real click on Cancel closes the picker at once, writes and asks nothing, and returns focus to New recording',
+      (await ev("document.querySelectorAll('.dialog').length")) === 0 && traffic.length === 0 &&
+        (await ev("document.activeElement.textContent.trim()")) === 'New recording',
+      `${await ev("document.querySelectorAll('.dialog').length")} dialogs, ${traffic.length} requests, focus on ${await ev('document.activeElement.textContent.trim()')}`,
+    );
+    await realClick('button', 'New recording');
+    await realKey('Escape', 'Escape', 27);
+    check(
+      'dashboard: a real Escape closes the picker with no traffic and returns focus to New recording',
+      (await ev("document.querySelectorAll('.dialog').length")) === 0 && traffic.length === 0 &&
+        (await ev("document.activeElement.textContent.trim()")) === 'New recording',
+    );
+
+    // Arrow keys move the focus a day and a week at a time, and cannot
+    // leave the past.
+    await press('New recording');
+    const focusedDate = () => ev('document.activeElement.dataset.date || null');
+    await realKey('ArrowLeft', 'ArrowLeft', 37);
+    const dayBefore = await focusedDate();
+    await realKey('ArrowUp', 'ArrowUp', 38);
+    const weekBefore = await focusedDate();
+    await realKey('ArrowRight', 'ArrowRight', 39);
+    const weekLess = await focusedDate();
+    await realKey('ArrowDown', 'ArrowDown', 40);
+    const backToday = await focusedDate();
+    await realKey('ArrowDown', 'ArrowDown', 40);
+    await realKey('ArrowRight', 'ArrowRight', 39);
+    const stillToday = await focusedDate();
+    check(
+      'dashboard: the arrow keys move the focus by a day and by a week, and stop at today',
+      dayBefore === ago(1) && weekBefore === ago(8) && weekLess === ago(7) && backToday === T && stillToday === T,
+      JSON.stringify({ dayBefore, weekBefore, weekLess, backToday, stillToday }),
+    );
+    const titleNow = await ev("document.querySelector('.dialog .date-title').textContent");
+    await realClick('.dialog [aria-label="Previous month"]');
+    const titleBefore = await ev("document.querySelector('.dialog .date-title').textContent");
+    const nextOnPast = await ev("document.querySelector('.dialog [aria-label=\"Next month\"]').disabled");
+    await realClick('.dialog [aria-label="Next month"]');
+    check(
+      'dashboard: Previous month shows the month before, which can be stepped forward again, and the future is not reachable',
+      titleBefore !== titleNow && nextOnPast === false &&
+        (await ev("document.querySelector('.dialog .date-title').textContent")) === titleNow &&
+        (await ev("document.querySelector('.dialog [aria-label=\"Next month\"]').disabled")) === true &&
+        (await ev("[...document.querySelectorAll('.dialog .date-day')].filter(b => b.dataset.date > " + JSON.stringify(T) + ").every(b => b.disabled)")),
+    );
+    traffic.length = 0;
+    await realClick(`.dialog .date-day[data-date="${T}"]`);
+    check(
+      'dashboard: a real click on a marked day closes the picker and opens its recording at once, with no request',
+      (await ev("document.querySelectorAll('.dialog').length")) === 0 && (await ev('location.hash')) === `#/recording/${T}` && traffic.length === 0,
+      `${await ev('location.hash')} ${traffic.length}`,
+    );
+    await home();
+
     // ---- record-rate: fifteen rows at one past date -------------------------
 
     traffic.length = 0;
     rateDelay = 1500;
-    await press('New recording');
-    await set('#recording-date', await format('date', D10));
-    const saidEmpty = await ev("document.querySelector('.dialog .hint').textContent");
-    await ev("[...document.querySelectorAll('.dialog button')].find(b => b.textContent === 'Open').click()");
-    await rec.settle(300);
+    const emptyDay = await newRecording(D10, { wait: false });
+    await rec.settle(100);
     const resolving = await ev(`JSON.stringify({
       skeleton: Boolean(${line('USD')}.querySelector('.skeleton:not([hidden])')),
       usable: [...document.querySelectorAll('.sweep-row input')].every(i => !i.disabled),
@@ -4035,7 +4200,11 @@ try {
       resolving.skeleton && resolving.usable,
       JSON.stringify(resolving),
     );
-    check('record-snapshot: a date holding nothing is started as a recording', saidEmpty.includes('holds nothing yet'), saidEmpty);
+    check(
+      'record-snapshot: a date holding nothing is unmarked in the picker and is started as a recording',
+      !emptyDay.marked && !emptyDay.dotted && emptyDay.name === null && (await ev('location.hash')) === `#/sweep/${D10}`,
+      JSON.stringify(emptyDay),
+    );
     await rec.waitUntil(`${line('USD')}.querySelector('input').value !== ''`, { label: 'the proposals for the backdate' });
     check('record-snapshot: the sweep carries a row for each of the fifteen holdings', (await ev("document.querySelectorAll('.sweep-row').length")) === 15);
     await typeLine('XAU-ozt', '2711.13');
@@ -4575,7 +4744,7 @@ try {
       'record-snapshot: leaving with a figure typed and not saved says so and names it',
       (await text()).includes(`You left the recording for ${await format('longDate', D2)} with changes that were not saved: Current account.`),
     );
-    check('record-snapshot: an emptied recording still holds its date in the picker', (await newRecording(D2)).includes('already holds a recording'));
+    check('record-snapshot: an emptied recording still holds its date in the picker', (await newRecording(D2)).marked);
 
     // The first recording had no dollar price. Its line asks for one only
     // when asked to.
@@ -4867,6 +5036,10 @@ try {
     const DR = ago(50);
     await openForm('Savings');
     await set('#snapshot-date', await format('date', DR));
+    // A person leaves the date field before touching a price. The page
+    // has had real input by now, so it is focused and the date field
+    // really does blur, which draws the prices again.
+    await ev('document.activeElement.blur()');
     await rec.waitUntil(`${line('USD')} && ${line('USD')}.querySelector('input').value !== ''`, { label: 'the form proposals to change' });
     await typeLine('USD', '0.7777');
     await set('#snapshot-value', '5400');
@@ -5021,8 +5194,8 @@ try {
     const saidMarked = await newRecording(D10);
     check(
       'record-snapshot: picking a date that holds a recording opens it, with no request and no create',
-      saidMarked.includes('already holds a recording') && (await ev('location.hash')) === `#/recording/${D10}` && traffic.length === 0,
-      saidMarked,
+      saidMarked.marked && (await ev('location.hash')) === `#/recording/${D10}` && traffic.length === 0,
+      JSON.stringify(saidMarked),
     );
     await go(`#/recording/${D1}`);
     let deletes = 0;
@@ -5043,8 +5216,8 @@ try {
     const freeAgain = await newRecording(D1);
     check(
       'record-snapshot: deleting a recording removes every figure and price at the date, and the date is new again',
-      goneAtFirst === 0 && freeAgain.includes('holds nothing yet'),
-      freeAgain,
+      goneAtFirst === 0 && !freeAgain.marked && !freeAgain.dotted,
+      JSON.stringify(freeAgain),
     );
   } catch (error) {
     check('recording: the recorder section ran to the end', false, error.stack || error.message);

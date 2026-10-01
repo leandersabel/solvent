@@ -1735,6 +1735,31 @@ select {
   color: #ffffff;
 }
 
+/* The month grid as the body of the New recording dialog: it fills the
+   dialog's width, and nothing is positioned over any part of it. */
+.date-picker .date-head {
+  margin-bottom: 12px;
+}
+
+.date-picker .date-step {
+  min-width: 44px;
+  min-height: 44px;
+}
+
+.date-picker .date-step:disabled {
+  color: var(--ink-muted);
+  cursor: default;
+}
+
+.date-picker .date-grid {
+  grid-template-columns: repeat(7, minmax(0, 1fr));
+  gap: 4px;
+}
+
+.date-picker .date-day {
+  min-height: 44px;
+}
+
 /* Read aloud, never drawn: a label the sighted reader gets from the
    field's own placeholder. */
 .visually-hidden {

@@ -6,7 +6,7 @@
 import * as decimal from './decimal.js';
 import { chartTable, fillFor, trendChart } from './chart.js';
 import { dialog, el, icon, mount, resumable, today } from './dom.js';
-import { dateField } from './datepicker.js';
+import { dateGrid } from './datepicker.js';
 import { dayNumber, isoFromDay } from './model.js';
 import * as writes from './writes.js';
 import { snapshotDialog } from './view-forms.js';
@@ -223,54 +223,32 @@ function switchButton(label, active, onclick) {
   }, label);
 }
 
-/** The marked date picker. A date holding no recording goes straight
- *  to the sweep; a marked one opens that recording's own screen, with
- *  no warning and nothing to confirm, because the picker can see what
- *  is there (ui/dashboard.md). */
+/** The marked date picker: a dialog whose body is the month grid and
+ *  nothing else. Picking a day closes it and routes at once. A date
+ *  holding no recording goes straight to the sweep; a marked one opens
+ *  that recording's own screen, with no warning and nothing to confirm,
+ *  because the picker can see what is there (ui/dashboard.md). */
 export function datePicker(vault, actions) {
   const marked = new Set(vault.recordingDates());
-  const note = el('p', { class: 'hint' });
-  const describe = () => {
-    if (!input.value) {
-      note.textContent = '';
-      return;
-    }
-    note.textContent = marked.has(input.value)
-      ? `${vault.format.longDate(input.value)} already holds a recording. Opening it.`
-      : `${vault.format.longDate(input.value)} holds nothing yet. Starting a recording there.`;
-  };
-  const input = dateField(vault.format, {
-    id: 'recording-date',
+  const host = el('div', { class: 'date-picker' });
+  const grid = dateGrid(host, vault.format, today(), {
     max: today(),
-    value: today(),
     marked,
-    onChange: describe,
+    onPick: (iso) => {
+      close();
+      if (marked.has(iso)) actions.openRecording(iso);
+      else actions.openSweep(iso);
+    },
   });
-  describe();
 
   const close = dialog({
     heading: 'New recording',
     resume: resumable(reopenDatePicker),
-    body: [
-      input.element,
-      note,
-    ],
-    actions: [
-      el('button', { class: 'btn-secondary', text: 'Cancel', onclick: () => close() }),
-      el('button', {
-        class: 'btn-primary',
-        text: 'Open',
-        onclick: () => {
-          if (!input.value) return;
-          close();
-          if (marked.has(input.value)) actions.openRecording(input.value);
-          else actions.openSweep(input.value);
-        },
-      }),
-    ],
+    body: [host],
+    actions: [el('button', { class: 'btn-secondary', text: 'Cancel', onclick: () => close() })],
   });
   // The marked picker opens on today, with today focused.
-  input.openCalendar();
+  grid.focus();
 }
 
 function reopenDatePicker(context) {
