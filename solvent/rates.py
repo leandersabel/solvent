@@ -16,6 +16,7 @@ from __future__ import annotations
 import json
 import re
 import threading
+import time
 import urllib.error
 import urllib.request
 from datetime import date, datetime, timedelta, timezone
@@ -194,8 +195,14 @@ def _fetch_json(url: str) -> "object | None":
     config = current_app.config
     if breaker.is_open(timedelta(minutes=config["RATE_BREAKER_COOLOFF_MINUTES"])):
         return None
+    # One deadline for the whole proxy request: gold makes several calls
+    # in series, and each is given only what is left of it.
+    deadline = g.get("rate_deadline", time.monotonic() + EGRESS_TIMEOUT_SECONDS)
+    remaining = deadline - time.monotonic()
+    if remaining <= 0:
+        return None
     try:
-        with _opener.open(_request(url), timeout=EGRESS_TIMEOUT_SECONDS) as response:
+        with _opener.open(_request(url), timeout=remaining) as response:
             if response.status != 200:
                 raise urllib.error.URLError(f"status {response.status}")
             payload = json.loads(response.read(MAX_RESPONSE_BYTES))
@@ -328,6 +335,7 @@ def _resolve(symbols: list, quote: str, on: date) -> "dict[str, dict]":
     for a single symbol.
     """
     wanted = [row for row in symbols if row["lookup"]]
+    g.rate_deadline = time.monotonic() + EGRESS_TIMEOUT_SECONDS
 
     on_str = on.isoformat()
     resolved: "dict[str, dict]" = {}
@@ -357,10 +365,11 @@ def _resolve(symbols: list, quote: str, on: date) -> "dict[str, dict]":
         return resolved
 
     fx = None
+    tables: "dict[str, dict | None]" = {}
     if any(row["kind"] == "currency" for row in pending) or any(
         row["symbol"].startswith("XAU-") for row in pending
     ):
-        fx = _fx_table(on, quote)
+        fx = tables[on_str] = _fx_table(on, quote)
 
     gold_pln = None
     if any(row["symbol"].startswith("XAU-") for row in pending):
@@ -380,7 +389,7 @@ def _resolve(symbols: list, quote: str, on: date) -> "dict[str, dict]":
             }
         elif symbol.startswith("XAU-") and gold_pln is not None:
             per_gram_pln, as_of = gold_pln
-            leg = _quote_leg(per_gram_pln, as_of, quote)
+            leg = _quote_leg(per_gram_pln, as_of, quote, tables)
             if leg is not None:
                 per_gram, source = leg
                 if symbol == "XAU-ozt":
@@ -399,15 +408,20 @@ def _resolve(symbols: list, quote: str, on: date) -> "dict[str, dict]":
     return resolved
 
 
-def _quote_leg(pln: Decimal, as_of: str, quote: str) -> "tuple[Decimal, str] | None":
+def _quote_leg(
+    pln: Decimal, as_of: str, quote: str, tables: "dict[str, dict | None]"
+) -> "tuple[Decimal, str] | None":
     """Convert a PLN figure into `quote` at the **asOf** date, not the
     requested one: pairing a rate with FX from a different day
     misprices it. Either leg failing yields no proposal, because a
-    half-composed rate is never returned.
+    half-composed rate is never returned. `tables` holds the FX tables
+    already fetched, by date, so a date is fetched once per request.
     """
     if quote == "PLN":
         return pln, "nbp"
-    leg = _fx_table(date.fromisoformat(as_of), quote)
+    if as_of not in tables:
+        tables[as_of] = _fx_table(date.fromisoformat(as_of), quote)
+    leg = tables[as_of]
     if not leg or "PLN" not in leg:
         return None
     return pln * leg["PLN"][0], "nbp+frankfurter"

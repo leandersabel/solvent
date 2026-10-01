@@ -8,6 +8,7 @@ never made.
 from __future__ import annotations
 
 import json
+import time
 from datetime import date, timedelta
 
 import pytest
@@ -259,6 +260,39 @@ def test_the_circuit_breaker_opens_and_closes(app, owner, monkeypatch):
     rates.breaker.record_success()
     owner.get(f"/api/rates?date={PAST}&quote=CHF&symbol=USD", headers=CSRF)
     assert len(attempts) > opened
+
+
+def test_a_whole_table_request_holding_gold_stays_within_one_egress_timeout(
+    owner, monkeypatch
+):
+    """The deadline is per proxy request, not per outbound call: gold
+    makes several in series, and a provider that hangs must not stack
+    their timeouts."""
+    monkeypatch.setattr(rates, "EGRESS_TIMEOUT_SECONDS", 0.4)
+
+    def hang(request, timeout=None):
+        time.sleep(timeout)
+        raise TimeoutError("provider hangs")
+
+    monkeypatch.setattr(rates._opener, "open", hang)
+    rates.breaker.record_success()
+
+    started = time.monotonic()
+    response = owner.get(f"/api/rates?date={PAST}&quote=CHF", headers=CSRF)
+    elapsed = time.monotonic() - started
+
+    assert response.status_code == 204
+    assert elapsed < 0.4 + 0.15
+
+
+def test_the_fx_table_is_fetched_once_when_gold_is_published_on_the_requested_date(
+    owner, provider
+):
+    provider.answers["frankfurter"] = fx(PAST, {"PLN": 4.0, "USD": 0.8})
+    provider.answers["cenyzlota"] = [{"data": PAST, "cena": 300.0}]
+
+    owner.get(f"/api/rates?date={PAST}&quote=CHF", headers=CSRF)
+    assert sum("frankfurter" in url for url in provider.calls) == 1
 
 
 def test_redirects_are_disabled_rather_than_followed():

@@ -139,9 +139,9 @@ def test_the_workflows_hold_in_a_browser(instance):
             # For the invites a check mints for itself, the way an
             # operator's shell would.
             SOLVENT_PYTHON=sys.executable,
-            # A date both providers publish for, so the backdated
-            # figure exercises the proposal path rather than the
-            # outage path.
+            # Past today, so the backdated figure is a second
+            # recording. The page's rate proxy is stubbed, so the date
+            # needs no provider data.
             SOLVENT_BACKDATE=(date.today() - timedelta(days=45)).isoformat(),
             SOLVENT_ADMIN_PASSWORD=PASSWORDS["ops.leander"],
             SOLVENT_VAULT_PASSWORD=PASSWORDS["leander"],

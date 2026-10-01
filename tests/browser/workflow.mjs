@@ -120,6 +120,50 @@ const recordsOf = (principal) =>
   JSON.stringify(sql('SELECT * FROM records WHERE principal_id = ? ORDER BY record_id', principal));
 const OWN = "JOIN principals ON principals.id = records.principal_id WHERE principals.username = 'leander'";
 
+// The rate proxy as the main page sees it. It is answered here, so no
+// check waits on a live provider, and every ask is kept for the checks
+// that count them. Fetch.enable replaces the patterns in force and
+// Fetch.disable drops them all, so the helpers below keep this one in
+// force on the page and skip its requests.
+const RATES = { urlPattern: '*/api/rates\\?*', requestStage: 'Request' };
+const proxyAsks = [];
+const isRateAsk = (session, request) => session === page && request.url.includes('/api/rates?');
+const fetchOn = (session, urlPattern, requestStage = 'Request') =>
+  session.send('Fetch.enable', {
+    patterns: [{ urlPattern, requestStage }, ...(session === page ? [RATES] : [])],
+  });
+const fetchOff = (session) =>
+  session === page ? session.send('Fetch.enable', { patterns: [RATES] }) : session.send('Fetch.disable');
+const wholeTable = (date, quote) => {
+  const day = Math.round(Date.parse(`${date}T00:00:00Z`) / 86400000);
+  const before = new Date((day - 1) * 86400000).toISOString().slice(0, 10);
+  const entry = (symbol, rate, asOf, source) => ({ rate, base: `1 ${symbol}`, asOf, source, cached: false });
+  const rates = {};
+  for (const [code, rate] of [['USD', 0.85], ['EUR', 0.93], ['GBP', 1.1], ['JPY', 0.0059]]) {
+    if (code !== quote) rates[code] = entry(code, (rate + (day % 7) / 100).toFixed(4), date, 'frankfurter');
+  }
+  rates['XAU-ozt'] = entry('XAU-ozt', String(2600 + (day % 50)), before, 'nbp+frankfurter');
+  rates['XAU-g'] = entry('XAU-g', (80 + (day % 50) / 10).toFixed(2), before, 'nbp+frankfurter');
+  return { date, quote, rates };
+};
+
+page.on(async (message) => {
+  if (message.method !== 'Fetch.requestPaused') return;
+  const { requestId, request } = message.params;
+  if (!isRateAsk(page, request)) return;
+  proxyAsks.push(request.url);
+  const query = Object.fromEntries(new URL(request.url).searchParams);
+  await page.send('Fetch.fulfillRequest', {
+    requestId,
+    responseCode: 200,
+    responseHeaders: [{ name: 'Content-Type', value: 'application/json' }],
+    body: Buffer.from(JSON.stringify(wholeTable(query.date, query.quote))).toString('base64'),
+  }).catch(() => {
+    /* the page went away mid-request */
+  });
+});
+await page.send('Fetch.enable', { patterns: [RATES] });
+
 // Answers each request matching `pattern` with what `respond` returns
 // for it, { status, body } to fulfil or null to let it through, until
 // the returned function is called. `respond` may take its time, which
@@ -128,6 +172,7 @@ async function intercept(session, pattern, respond) {
   const handler = async (message) => {
     if (message.method !== 'Fetch.requestPaused') return;
     const { requestId, request } = message.params;
+    if (isRateAsk(session, request)) return;
     const answer = await respond(request);
     if (!answer) {
       await session.send('Fetch.continueRequest', { requestId });
@@ -141,10 +186,10 @@ async function intercept(session, pattern, respond) {
     });
   };
   session.on(handler);
-  await session.send('Fetch.enable', { patterns: [{ urlPattern: pattern, requestStage: 'Request' }] });
+  await fetchOn(session, pattern);
   return async () => {
     session.handlers = session.handlers.filter((h) => h !== handler);
-    await session.send('Fetch.disable');
+    await fetchOff(session);
   };
 }
 
@@ -153,6 +198,7 @@ const answering = async (match, status, body) => {
   const handler = async (message) => {
     if (message.method !== 'Fetch.requestPaused') return;
     const { requestId, request } = message.params;
+    if (isRateAsk(page, request)) return;
     if (match(request)) {
       await page.send('Fetch.fulfillRequest', { requestId, responseCode: status, body: '' });
     } else {
@@ -160,11 +206,11 @@ const answering = async (match, status, body) => {
     }
   };
   page.on(handler);
-  await page.send('Fetch.enable', { patterns: [{ urlPattern: '*/api/*', requestStage: 'Request' }] });
+  await fetchOn(page, '*/api/*');
   try {
     await body();
   } finally {
-    await page.send('Fetch.disable');
+    await fetchOff(page);
     page.handlers = page.handlers.filter((h) => h !== handler);
   }
 };
@@ -664,6 +710,7 @@ try {
   // ---- The sweep ----------------------------------------------------
 
   check('the vault store backs the top bar', await page.eval("Boolean(window.Alpine && Alpine.store('vault'))"));
+  const asksBeforeSweep = proxyAsks.length;
   await page.eval("document.querySelector('.topbar-actions button').click()");
   await page.waitUntil("location.hash.startsWith('#/sweep/')", { label: 'the sweep' });
   await page.settle(1500);
@@ -708,9 +755,8 @@ try {
   );
   const rateValues = await page.eval("[...document.querySelectorAll('.rate-line input')].map(n => n.value)");
   check('the prices went in with the first row', rateValues.every(Boolean), rateValues.join(','));
-  const rateCalls = () =>
-    page.eval("performance.getEntriesByType('resource').filter(e => e.name.includes('/api/rates?')).length");
-  const requests = await rateCalls();
+  const rateCalls = () => proxyAsks.length - asksBeforeSweep;
+  const requests = rateCalls();
   check('a four-row sweep asks the proxy once', requests === 1, `issued ${requests}`);
   const rateNames = await labels('.rate-unit');
   check('a rate line is headed by the unit\'s name', rateNames.join(',') === 'United States Dollar,Gold', rateNames.join(','));
@@ -761,12 +807,12 @@ try {
   const chips = await labels('.chip');
   check('each price says where it came from', chips.some((chip) => chip.startsWith('Market rate')), chips.join(','));
   check('the recording offers Update and Delete', (await labels('.form-actions button')).join(',') === 'Update,Delete');
-  const beforeOpen = await rateCalls();
+  const beforeOpen = rateCalls();
   await page.eval("location.hash = '#/'");
   await page.settle(400);
   await page.eval("document.querySelector('.entry-mark').dispatchEvent(new MouseEvent('click', { bubbles: true }))");
   await page.settle(900);
-  check('opening a recording asks the source nothing', (await rateCalls()) === beforeOpen);
+  check('opening a recording asks the source nothing', rateCalls() === beforeOpen);
 
   // ---- A holding's own screen ------------------------------------------
 
@@ -3507,10 +3553,11 @@ try {
   );
 
   // A second client, handed every record list in the opposite order.
-  await page.send('Fetch.enable', { patterns: [{ urlPattern: '*/api/records*', requestStage: 'Response' }] });
+  await fetchOn(page, '*/api/records*', 'Response');
   const reverse = async (message) => {
     if (message.method !== 'Fetch.requestPaused') return;
     const { requestId, request, responseHeaders = [] } = message.params;
+    if (isRateAsk(page, request)) return;
     if (request.method !== 'GET' || !request.url.includes('?type=')) {
       await page.send('Fetch.continueRequest', { requestId });
       return;
@@ -3531,7 +3578,7 @@ try {
     check('the planted pairs read the same in either order', reversed === inOrder, `${inOrder} vs ${reversed}`);
   } finally {
     page.handlers = page.handlers.filter((h) => h !== reverse);
-    await page.send('Fetch.disable');
+    await fetchOff(page);
   }
 
   const roundTrip = JSON.parse(await importOwnExport());
