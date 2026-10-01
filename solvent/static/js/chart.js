@@ -106,7 +106,7 @@ export function stack(bands, percentage = false) {
  *  keeps its hue on both sides. A band in `hidden` is left out of the
  *  stack and the line, and keeps its color slot. */
 function drawChart({
-  days, bands, marks, annotations, percentage, justTheLine, onPickDate, onHover, onSelect, width = 900, locale,
+  days, bands, marks, annotations, percentage, justTheLine, onPickDate, onHover, onSelect, width = 900, locale, formatDay, formatDate,
   hidden = new Set(), selection = null,
 }) {
   // A phone-width card gets a shorter plot, fewer gridlines, and the
@@ -215,7 +215,7 @@ function drawChart({
       });
       tick.addEventListener('click', () => onPickDate && onPickDate(date));
       const title = svg('title');
-      title.textContent = `${date}, recorded. Open this recording.`;
+      title.textContent = `${formatDate(date)}, recorded. Open this recording.`;
       tick.append(title);
       root.append(tick);
     }
@@ -237,7 +237,7 @@ function drawChart({
     root.append(marker);
   }
 
-  for (const { day, text } of timeLabels(firstDay, lastDay, plotWidth, locale)) {
+  for (const { day, text } of timeLabels(firstDay, lastDay, plotWidth, locale, formatDay)) {
     const label = svg('text', {
       x: x(day),
       y: plotBottom + (narrow ? 30 : 34),
@@ -353,7 +353,7 @@ function drawChart({
 /** Labels along the time axis: years over a long span, months over a
  *  shorter one, days over a few weeks. Spaced so no two collide, and
  *  none placed where it would run off either end of the plot. */
-function timeLabels(firstDay, lastDay, plotWidth, locale) {
+function timeLabels(firstDay, lastDay, plotWidth, locale, formatDay) {
   const perDay = plotWidth / Math.max(1, lastDay - firstDay);
   const dayOf = (year, month, date = 1) => Math.round(Date.UTC(year, month, date) / 86400000);
   const first = new Date(firstDay * 86400000);
@@ -379,11 +379,15 @@ function timeLabels(firstDay, lastDay, plotWidth, locale) {
       candidates.push({ day, text: at.getUTCMonth() === 0 ? `${name} ${at.getUTCFullYear()}` : name });
     }
   } else {
-    const short = new Intl.DateTimeFormat(locale, { day: 'numeric', month: 'short', timeZone: 'UTC' });
-    const step = Math.max(1, Math.ceil(72 / perDay));
-    margin = 24;
+    // Days are written by the reader's formatter, so a chosen date
+    // style reaches the axis too. A numeric date is ten characters
+    // against a spelled day's six, so it gets the room it needs.
+    const written = (day) => formatDay(isoFromDay(day));
+    const wide = /^[^A-Za-z]{10}$/.test(written(firstDay));
+    const step = Math.max(1, Math.ceil((wide ? 96 : 72) / perDay));
+    margin = wide ? 36 : 24;
     for (let day = firstDay; day <= lastDay; day += step) {
-      candidates.push({ day, text: short.format(new Date(day * 86400000)) });
+      candidates.push({ day, text: written(day) });
     }
   }
   return candidates.filter(({ day }) => {

@@ -95,9 +95,11 @@ export function formatter(profile) {
     : 2;
 
   const style = DATE_STYLES.find((d) => d.value === settings.dateStyle);
-  const date = style && style.value !== 'locale'
-    ? { order: style.order, sep: style.sep }
-    : localeOrder(locale);
+  // A style the reader chose applies to every date that shows a day,
+  // prose and headings included. Only under the language's own order
+  // does a date keep its spelled month.
+  const chosenStyle = Boolean(style && style.value !== 'locale');
+  const date = chosenStyle ? { order: style.order, sep: style.sep } : localeOrder(locale);
 
   return {
     locale,
@@ -139,24 +141,37 @@ export function formatter(profile) {
     date: (iso) => writeDate(iso, date.order, date.sep),
 
     /** The same date with the month spelled, for prose where a run of
-     *  digits would read as a figure. */
-    longDate: (iso) => spelled(iso, locale, { day: 'numeric', month: 'short', year: 'numeric' }),
+     *  digits would read as a figure. Under a chosen style it is the
+     *  date in that style, since the style is what the reader asked
+     *  every date to look like. */
+    longDate: (iso) =>
+      chosenStyle ? writeDate(iso, date.order, date.sep) : spelled(iso, locale, { day: 'numeric', month: 'short', year: 'numeric' }),
 
     /** The month spelled out and the year alone: how far back a
      *  long chart range reaches. */
     monthYear: (iso) => spelled(iso, locale, { month: 'long', year: 'numeric' }),
 
     /** A date with its month spelled out in full, for a heading. */
-    fullDate: (iso) => spelled(iso, locale, { day: 'numeric', month: 'long', year: 'numeric' }),
+    fullDate: (iso) =>
+      chosenStyle ? writeDate(iso, date.order, date.sep) : spelled(iso, locale, { day: 'numeric', month: 'long', year: 'numeric' }),
 
-    /** A day and its month, for a label that already implies the year. */
-    dayMonth: (iso, month = 'long') => spelled(iso, locale, { day: 'numeric', month }),
+    /** A day and its month, for a label that already implies the year.
+     *  A chosen style has no shape without a year, and a rate delay can
+     *  cross New Year, so it writes the whole date. */
+    dayMonth: (iso, month = 'long') =>
+      chosenStyle ? writeDate(iso, date.order, date.sep) : spelled(iso, locale, { day: 'numeric', month }),
 
     /** A moment, such as when a session started, in this browser's
      *  time zone. */
     dateTime: (timestamp) => {
       const at = new Date(timestamp);
-      const day = at.toLocaleDateString(locale, { day: 'numeric', month: 'short', year: 'numeric' });
+      const day = chosenStyle
+        ? writeDate(
+            `${String(at.getFullYear()).padStart(4, '0')}-${String(at.getMonth() + 1).padStart(2, '0')}-${String(at.getDate()).padStart(2, '0')}`,
+            date.order,
+            date.sep,
+          )
+        : at.toLocaleDateString(locale, { day: 'numeric', month: 'short', year: 'numeric' });
       const time = at.toLocaleTimeString(locale, { hour: '2-digit', minute: '2-digit' });
       return `${day}, ${time}`;
     },
