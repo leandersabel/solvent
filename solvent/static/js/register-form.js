@@ -69,7 +69,7 @@ export function registerForm({ kind, token: inviteToken, currencies, kdf, onCrea
     refresh();
   });
   username.addEventListener('blur', () => {
-    blurred = usernameProblem(username.value, true) !== null;
+    blurred = usernameProblem(username.value, false) === null && usernameProblem(username.value, true) !== null;
     showUsername();
   });
 
@@ -92,6 +92,14 @@ export function registerForm({ kind, token: inviteToken, currencies, kdf, onCrea
   const acknowledge = el('input', { type: 'checkbox' });
   const mismatch = el('p', { id: 'register-confirm-line', class: 'field-error', 'aria-live': 'polite', hidden: true });
   const error = el('p', { class: 'field-error', hidden: true });
+  // Closing other tabs can free the memory, so this derives again.
+  const retry = el('button', {
+    type: 'button',
+    class: 'btn-secondary',
+    text: 'Try again',
+    hidden: true,
+    onclick: () => form.requestSubmit(),
+  });
   const note = el('p', { class: 'hint', hidden: true, text: WAIT_NOTE });
   const submit = el('button', {
     type: 'submit',
@@ -147,6 +155,7 @@ export function registerForm({ kind, token: inviteToken, currencies, kdf, onCrea
         ])
       : null,
     error,
+    retry,
     submit,
     note,
   ]);
@@ -156,6 +165,7 @@ export function registerForm({ kind, token: inviteToken, currencies, kdf, onCrea
     // Enter sends nothing while the button is disabled.
     if (submit.disabled) return;
     error.hidden = true;
+    retry.hidden = true;
     mismatch.hidden = true;
     if (password.value !== confirm.value) {
       mismatch.textContent = 'The two passwords do not match.';
@@ -232,9 +242,10 @@ export function registerForm({ kind, token: inviteToken, currencies, kdf, onCrea
     await onCreated(created);
   });
 
-  function fail(text) {
+  function fail(text, retryable = false) {
     error.textContent = text;
     error.hidden = false;
+    retry.hidden = !retryable;
   }
 
   /** Each answer in its own words (spec/features/register.md, In the
@@ -242,9 +253,20 @@ export function registerForm({ kind, token: inviteToken, currencies, kdf, onCrea
   function refused(failure) {
     const { status, body } = failure;
     const reason = body && typeof body === 'object' ? body.refused : undefined;
-    if (failure.outOfMemory) {
+    if (failure instanceof crypto.DerivationError && !failure.outOfMemory) {
+      // A hard stop: no weaker derivation exists to fall back to.
+      root.replaceChildren(
+        el('div', { class: 'card card-narrow', role: 'alert' }, [
+          el('h1', {
+            class: 'card-heading',
+            text: 'This browser cannot run the encryption Solvent needs. There is no weaker fallback.',
+          }),
+        ]),
+      );
+    } else if (failure.outOfMemory) {
       fail(
         `This device does not have enough memory available right now. No ${isVault ? 'vault' : 'account'} was created and your invite link is still good. Close some other tabs and try again.`,
+        true,
       );
     } else if (status === undefined || status >= 500) {
       fail(NETWORK);

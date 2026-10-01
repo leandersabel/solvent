@@ -26,13 +26,24 @@ await page.send('Network.enable');
 await page.send('Page.addScriptToEvaluateOnNewDocument', {
   source: `window.__workers = 0;
     const Original = window.Worker;
-    window.Worker = class extends Original { constructor(...args) { window.__workers++; super(...args); } };`,
+    window.__derivations = 0;
+    // With __fail set, the worker answers as one that cannot derive:
+    // 'memory' as a refused allocation, anything else as no WebAssembly.
+    window.Worker = class extends Original {
+      constructor(...args) { window.__workers++; super(...args); }
+      postMessage(message, ...rest) {
+        window.__derivations++;
+        if (!window.__fail) return super.postMessage(message, ...rest);
+        const data = { id: message.id, ok: false, outOfMemory: window.__fail === 'memory', message: 'refused' };
+        setTimeout(() => this.dispatchEvent(new MessageEvent('message', { data })), 10);
+      }
+    };`,
 });
 
 const posts = [];
 page.on((message) => {
   if (message.method === 'Network.requestWillBeSent' && message.params.request.method === 'POST') {
-    posts.push(message.params.request.url);
+    posts.push(message.params.request);
   }
 });
 
@@ -82,12 +93,18 @@ const fillRest = async (vault) => {
   }
   await page.settle(300);
 };
-const enter = async () => {
-  await page.eval(`${q('input[type=text]')}.focus()`);
-  for (const type of ['keyDown', 'keyUp']) {
-    await page.send('Input.dispatchKeyEvent', { type, key: 'Enter', code: 'Enter', windowsVirtualKeyCode: 13, text: type === 'keyDown' ? '\r' : undefined });
+// Enter pressed in each field of the form in turn, then how much was
+// derived and sent.
+const enterEverywhere = async () => {
+  const fields = await page.eval(`document.querySelectorAll('form input').length`);
+  for (let index = 0; index < fields; index++) {
+    await page.eval(`document.querySelectorAll('form input')[${index}].focus()`);
+    for (const type of ['keyDown', 'keyUp']) {
+      await page.send('Input.dispatchKeyEvent', { type, key: 'Enter', code: 'Enter', windowsVirtualKeyCode: 13, text: type === 'keyDown' ? '\r' : undefined });
+    }
   }
   await page.settle(500);
+  return { fields, derived: await page.eval('window.__derivations'), workers: await workers(), sent: posts.length };
 };
 
 const HINT = 'Use 3 to 32 characters: letters a to z, digits, dot, underscore or hyphen.';
@@ -110,8 +127,12 @@ try {
   check('Bo b! is reported on its own line at once, as an error', (await line()) === NOT_ALLOWED && (await lineClass()) === 'field-error');
   check('the input is marked invalid while it is an error', (await page.eval(`${q('input[type=text]')}.getAttribute('aria-invalid')`)) === 'true');
   check('the button stays disabled with everything else valid', await disabled());
-  await enter();
-  check('Enter derives nothing and sends nothing while it is disabled', (await workers()) === 0 && posts.length === 0, `${await workers()} ${posts.length}`);
+  const pressed = await enterEverywhere();
+  check(
+    'Enter in each field derives nothing and sends nothing while the button is disabled',
+    pressed.fields >= 4 && pressed.derived === 0 && pressed.workers === 0 && pressed.sent === 0,
+    JSON.stringify(pressed),
+  );
   check('no network wording appears', !(await text()).includes('did not go through'));
 
   await type('input[type=text]', 'a'.repeat(33));
@@ -146,7 +167,7 @@ try {
   for (const [name, stub, where, expected] of cases) {
     await open('vault');
     await fillRest(true);
-    await type('input[type=text]', 'Bob');
+    await type('input[type=text]', '  Bob  ');
     answer = stub;
     posts.length = 0;
     await page.eval(`${q('button[type=submit]')}.click()`);
@@ -156,8 +177,12 @@ try {
     check(`${name} shows its own message`, others(expected).every((message) => !shown.includes(message)), shown);
     check(`${name}: the message is where the spec puts it`, where === 'user' ? (await line()).startsWith(expected.slice(0, 20)) : !(await line()).startsWith('That username') && (await line()) === HINT, await line());
     check(`${name}: every field keeps its value and the button works again`,
-      (await page.eval(`JSON.stringify([${q('input[type=text]')}.value, ${q('input[type=password]')}.value, document.querySelectorAll('input[type=password]')[1].value])`)) === JSON.stringify(['bob', PASSWORD, PASSWORD]) && !(await disabled()));
-    check(`${name}: the request carried the checked username`, posts.length === 1);
+      (await page.eval(`JSON.stringify([${q('input[type=text]')}.value, ${q('input[type=password]')}.value, document.querySelectorAll('input[type=password]')[1].value])`)) === JSON.stringify(['  bob  ', PASSWORD, PASSWORD]) && !(await disabled()));
+    check(
+      `${name}: the one request carried the checked, trimmed username`,
+      posts.length === 1 && JSON.parse(posts[0].postData ?? '{}').username === 'bob',
+      JSON.stringify(posts.map((post) => post.postData)),
+    );
     if (where === 'user') {
       await type('input[type=text]', 'bobb');
       check(`${name}: editing the username returns the line to the hint`, (await line()) === HINT);
@@ -172,13 +197,49 @@ try {
   await page.waitUntil(`document.body.innerText.includes('This invite link is not valid.')`, { label: 'the invite card' });
   check('a refused invite gives way to the bare card with no form', !(await page.eval(q('form') + ' !== null')) && (await page.eval(`document.querySelectorAll('.card-heading').length`)) === 1);
 
+  // ---- A browser that cannot derive -------------------------------
+  const MEMORY = (what) => `This device does not have enough memory available right now. No ${what} was created and your invite link is still good. Close some other tabs and try again.`;
+  const tryAgain = `[...document.querySelectorAll('form button')].find((b) => b.textContent === 'Try again' && !b.hidden)`;
+  for (const [which, what] of [['vault', 'vault'], ['admin', 'account']]) {
+    await open(which);
+    await fillRest(which === 'vault');
+    await type('input[type=text]', 'Bob');
+    await page.eval("window.__fail = 'memory'");
+    posts.length = 0;
+    await page.eval(`${q('button[type=submit]')}.click()`);
+    await page.waitUntil(`document.body.innerText.includes(${JSON.stringify(MEMORY(what))})`, { label: `not enough memory, ${which}` });
+    await page.settle(200);
+    check(`${which}: not enough memory names the moment and offers Try again`, await page.eval(`Boolean(${tryAgain})`));
+    check(`${which}: not enough memory sent nothing, kept the fields and left the button usable`,
+      posts.length === 0 && (await page.eval(`${q('input[type=password]')}.value`)) === PASSWORD && !(await disabled()));
+    await page.eval(`${tryAgain}.click()`);
+    await page.waitUntil('window.__derivations === 2', { label: 'Try again deriving again' });
+    await page.settle(200);
+    check(`${which}: Try again derives again`, (await page.eval('window.__derivations')) === 2 && posts.length === 0);
+  }
+
+  await open('vault');
+  await fillRest(true);
+  await type('input[type=text]', 'Bob');
+  await page.eval("window.__fail = 'unsupported'");
+  posts.length = 0;
+  await page.eval(`${q('button[type=submit]')}.click()`);
+  const STOP = 'This browser cannot run the encryption Solvent needs. There is no weaker fallback.';
+  await page.waitUntil(`document.body.innerText.includes(${JSON.stringify(STOP)})`, { label: 'the hard stop' });
+  check('a browser that cannot run the encryption gets a hard stop with no form, no retry and no request',
+    !(await page.eval(`${q('form')} !== null`)) && !(await page.eval(`${q('button')} !== null`)) && posts.length === 0 && !(await text()).includes('did not go through'));
+
   // ---- The administrator form -------------------------------------
   await open('admin');
   await fillRest(false);
   await type('input[type=text]', 'Bo b!');
   check('on the administrator form the same line reports Bo b! and holds the button', (await line()) === NOT_ALLOWED && (await disabled()));
-  await enter();
-  check('Enter on the administrator form derives nothing and sends nothing', (await workers()) === 0);
+  const adminPressed = await enterEverywhere();
+  check(
+    'Enter in each field of the administrator form derives nothing and sends nothing',
+    adminPressed.fields >= 3 && adminPressed.derived === 0 && adminPressed.workers === 0 && adminPressed.sent === 0,
+    JSON.stringify(adminPressed),
+  );
   await type('input[type=text]', 'Bob');
   answer = { status: 400, body: '{}' };
   await page.eval(`${q('button[type=submit]')}.click()`);
