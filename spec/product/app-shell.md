@@ -237,12 +237,8 @@ panning sideways.
 18. Another website cannot make the app do anything with a signed-in
     person's session. A request that did not originate in the app is
     refused and changes nothing.
-19. A refusal never reveals whether the address asked for exists or
-    was invented. An expired sign-in is refused exactly like one that
-    never existed. An address typed into a browser, or a request sent by
-    another website, gets the same refusal whatever the state of the
-    browser's sign-in. The one thing anyone can learn is whether the
-    sign-in they hold still works, because a working one opens the app.
+19. Every refusal looks the same whether the address exists or was
+    invented. An expired sign-in is refused like an absent one.
 20. A mistyped address and an unexpected failure are answered with the
     same protections as any working page.
 21. The styling and scripts the app serves load for anyone, signed in

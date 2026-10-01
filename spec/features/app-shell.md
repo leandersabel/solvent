@@ -54,27 +54,8 @@ stylesheet or script fetched by `<link>` or `<script src>` would fail.
 It is also a Public route (The two surfaces), which says why it needs
 no session and why what it serves may be fetched by anyone.
 
-**The header is checked per named route; the namespace picks only the
-status a refusal carries.** The check runs before authentication and
-before any handler, on every route not named exempt, wherever it sits.
-Which status a refused request gets is decided by its namespace, the
-header and the session, never by the route (architecture.md, Status
-codes, Refusals), so no route's CSRF protection depends on its path and
-no refusal depends on whether the path exists. Two invariants make the
-split safe, and a route that would break either is a design change:
-
-- **Every route that requires the header is in the API namespace**,
-  under `/api/`. Outside it a missing header is refused with Not Found,
-  which the app's own client reads as done on a `DELETE`.
-- **Every route in the page namespace is a named navigation route or
-  the static endpoint**, exempt from the header, and answers only `GET`
-  and `HEAD`. So a page route changes nothing, and a cross-site
-  navigation to one does nothing the header would have stopped.
-
-No route answers `OPTIONS`: automatic `OPTIONS` responses are turned
-off. No CORS headers are served, so the method has no use, and an
-automatic answer carries an `Allow` header naming the route's methods,
-which an invented path cannot imitate.
+Which routes sit under `/api/`, and the status a refusal carries, are
+architecture.md, Application hardening and Status codes, Refusals.
 
 ## Database
 
@@ -113,31 +94,17 @@ principal kind when there is one, decides whether the route answers at
 all. The surface check is one step of the request gate (below), which
 runs once per request, so no individual endpoint repeats it.
 
-- **Public**, the routes that must answer a caller who holds no valid
-  session, each for the reason given beside it. They answer a caller
-  with no session and a session of either kind. Each is a named route:
-  - `GET /login`, the sign-in screen, which is where a session is
-    asked for (login.md).
-  - `GET /register`, the invite landing, which a person opens before
-    they have an account at all (register.md).
-  - `POST /api/register`, which creates the account and starts its
-    first session. The invite token gates it, not a session
-    (register.md).
-  - `POST /api/auth/salt`, because the sign-in derivation needs the
-    salt and envelope before there is anything to authenticate with
-    (login.md, Flow).
-  - `POST /api/auth/login`, which issues the session (login.md, Flow).
-  - `POST /api/auth/logout`, because signing out of an absent or
-    expired session answers OK rather than being refused
-    (account-settings.md, Session and lock). A client whose session
-    lapsed can still sign out cleanly.
-  - `GET /`, the root path, because a bookmark of the bare host has to
-    work signed out (below).
-  - The static endpoint, the framework's own `static` route, because
-    every page served without a session, a vault page's sign-in card
-    included, loads its stylesheet and scripts before a session exists. What it serves is public by construction: the design
-    tokens, the client-side code, and the vendored libraries. Nothing
-    under it depends on who asks.
+- **Public**, the routes that answer without a session, to anyone:
+  - `GET /login` and `POST /api/auth/login` (login.md).
+  - `POST /api/auth/salt`, needed before there is anything to
+    authenticate with (login.md, Flow).
+  - `GET /register` and `POST /api/register`, gated by the invite
+    rather than a session (register.md).
+  - `POST /api/auth/logout`, which answers OK to an absent or expired
+    session (account-settings.md, Session and lock).
+  - `GET /`, the root path (below).
+  - The framework's `static` route, whose files every signed-out page
+    loads and which depend on nobody.
 
   Public lifts the session requirement and nothing else. A Public JSON
   endpoint still requires the header (CSRF), and each keeps the checks
@@ -159,11 +126,6 @@ runs once per request, so no individual endpoint repeats it.
   written for yet. An administrator reaches these. **A vault owner
   gets Not Found.**
 
-A session of the wrong kind is refused as architecture.md, Status
-codes, Refusals says for a valid session. For an administrator on a
-vault route the resulting Not Found is also literally accurate, because
-that account has no vault for the route to address.
-
 The **root path** resolves by kind: the Dashboard for a vault owner,
 the Admin area for an administrator. It is the only route that
 resolves to different content per kind, and it does so because a
@@ -174,68 +136,39 @@ the Admin area (`ui/unlock.md`).
 
 **Public is a list of named routes; the other groups are placed by
 prefix.** A route is public only by being named in Public, never by a
-path pattern, so an endpoint added later beside `/api/auth/login` or
-`/api/register` inherits no sessionless access, for the same reason a
-header exemption is a named route (CSRF). No Public route is
-`/admin` or under `/api/admin/`, so nothing on the administration
-surface ever answers without a session. Outside Public, everything
-under `/api/admin/` is administration and everything else that touches
-a vault is vault, so a route added later is placed by where it sits
-rather than by being added here. The administrator role is expected to
-grow (`admin-invites.md`), and a surface rule that had to be edited for
-each new task would eventually be edited wrong. A route matching no
-group is unreachable, which is the safe direction to fail.
+path pattern, and none is `/admin` or under `/api/admin/`. Outside
+Public, everything under `/api/admin/` is administration and everything
+else that touches a vault is vault, so a route added later is placed by
+where it sits; the administrator role is expected to grow
+(`admin-invites.md`). A route matching no group is unreachable.
 
 ### The request gate
 
-Every request passes these steps in order, before any handler runs,
-and the first that refuses decides the response. Each refusal's status
-is the one architecture.md, Status codes, Refusals gives for the
-request's namespace, header and session, which is what these steps are
-arranged to produce.
+Every request passes these steps in order, before any handler runs.
+The first that refuses decides the response, at the status
+architecture.md, Status codes, Refusals gives.
 
-1. **Header.** A request in the API namespace without
-   `X-Solvent-Request: 1` is Forbidden, resolved or not. No API route
-   is exempt, so this step needs no routing.
+1. **Header.** An API request without `X-Solvent-Request: 1` is
+   refused. No API route is exempt, so this needs no routing.
 2. **Authentication.** The session cookie is read and looked up.
-   Absent, expired, revoked and badly signed are one outcome: no valid
-   session.
-3. **Unauthenticated API request.** A request in the API namespace with
-   no valid session is Unauthorized unless it resolved to a Public
-   route (The two surfaces), whether or not its path exists.
-4. **Unresolved.** A request that did not resolve is Not Found. Only a
-   page-namespace request, or an API request with a valid session,
-   reaches this step.
-5. **No session, page namespace.** A Public page is served. A vault
-   navigation page is served and renders its own sign-in card, so the
-   derivation that buys the session also buys the keys. Any other page
-   is Not Found, which is what makes `/admin` answer a signed-out
-   visitor exactly as an invented address does.
-6. **Surface.** With a valid session, a route whose surface the
-   session's kind does not reach is Not Found.
+3. **No session, API.** An API request with no valid session is
+   refused unless it resolved to a Public route.
+4. **Unresolved.** A request that did not resolve is refused.
+5. **No session, page.** A Public page is served. A vault navigation
+   page is served and renders its own sign-in card. Any other page is
+   refused.
+6. **Surface.** A route whose group the session's kind does not reach
+   is refused.
 
-**A request is served only when** it resolves, it is exempt or carries
-the header, and one of these holds: the route is Public; it is a vault
-navigation page requested without a session; or the session is valid
-and its kind reaches the route's group. Every other request is
-refused.
+The URL map sets `merge_slashes = False` and turns off automatic
+`OPTIONS` responses. Any other redirect or Method Not Allowed the
+router would raise is refused at step 4 as unresolved.
 
-**Unresolved means any routing outcome other than a match**: an
-unknown path, a method the route does not answer, or an address the
-router would redirect to its canonical form (architecture.md, Status
-codes, Refusals). The URL map sets `merge_slashes = False`, so `//admin`
-has no canonical form to be redirected to. The gate is the backstop
-for every other redirect or Method Not Allowed the router would still
-raise: it refuses the request as unresolved before either can be
-answered.
-
-**A refusal carries the headers every response carries** (Response
-headers) **and no others**, and its body depends on its status and
-namespace alone. No `Set-Cookie`, no `Allow`, no `Location`, and no
-header a route sets on its own response, such as `Cache-Control:
-no-store` on the vault shell or `Referrer-Policy` on admin pages. The
-page-namespace Not Found renders nothing that depends on the session or
-the kind.
+A refusal carries only the headers every response carries (Response
+headers), and its body depends only on its status and on whether it
+is an API or a page request: no `Set-Cookie`, `Allow` or `Location`,
+and no header a route sets on its own response, such as
+`Cache-Control: no-store` or `Referrer-Policy`.
 
 ## The chrome
 
@@ -302,22 +235,8 @@ rearrangement:
 
 - **`SECRET_KEY` unset or empty** → the app does not start, and the
   failure names the variable without printing any value.
-- **A request to an unknown path** → refused exactly as a registered
-  route the caller cannot reach would be in its namespace
-  (architecture.md, Status codes, Refusals), carrying the same headers
-  as any other response.
-- **A method a route does not answer, or an address the router would
-  redirect** (`POST /admin`, `DELETE /api/auth/salt`, `//admin`) →
-  refused as an unknown path is, never Method Not Allowed and never a
-  redirect (The request gate).
-- **A state-changing request from a logged-out session** → Forbidden
-  when the header is missing, because the check precedes authentication;
-  Unauthorized when the header is present and the session is not,
-  unless the route is Public (The two surfaces).
 - **Lock pressed with unsaved form input** → the one named exception in
   login.md, Rules applies; the shell adds no confirmation of its own.
-- **A vault owner or a signed-out visitor opens `/admin`** → Not Found,
-  the same response as an invented address gets.
 - **An administrator navigates to a vault route by typing it**
   (`/settings`) → Not Found, the same page an invented address gets. No
   message explains the kind mismatch, because explaining it is the
@@ -337,27 +256,20 @@ rearrangement:
 - A shell page's stylesheet, `shell.js`, and the Alpine bundle are all
   fetchable with no header and no session, and carry the same headers
   as any other response.
-- **The refusal fingerprint matrix.** For each session state (absent,
-  expired, vault owner, administrator) and each header state (absent,
-  present), one cell. Within a cell, every request the gate refuses
-  matches every other on status, body, and every header except `Date`,
-  within its namespace, and carries the status architecture.md, Status
-  codes, Refusals gives for that cell. The requests in each cell are:
-  every registered route enumerated from the route map under every
-  method it answers, kept where the gate refuses it; an invented page
-  path; `//admin`; a method a registered route does not answer, in each
-  namespace; `/api/invented`; and `/api/admin/invented`. A route added
-  later joins the matrix without being listed.
-- Without the header, a refusal in either namespace is identical across
-  all four session states. With the header, a refusal to an expired
-  session is identical to one to an absent session.
-- The namespace invariant holds over the route map, enumerated at test
-  time: every route requiring the header starts with `/api/`, and every
-  route outside `/api/` is exempt from the header and answers only `GET`
-  and `HEAD`. No route answers `OPTIONS`.
-- In a real browser, top-level navigations to `/admin` signed out and
-  as a vault owner, to `/settings` as an administrator, and to an
-  invented page path each render the identical Not Found.
+- **Refusal fingerprint matrix.** Under every session state (absent,
+  expired, vault owner, administrator) and header state (absent,
+  present), every refused request has the status architecture.md,
+  Status codes, Refusals gives, and matches every other refusal of the
+  same status, API or page, on body and every header except `Date`.
+  The requests: every route in the route map under every method it
+  answers, an invented page path, `//admin`, an unanswered method on
+  a page and an API route, `/api/invented` and `/api/admin/invented`.
+- Over the route map, every route requiring the header is under
+  `/api/`, every other route is exempt and answers only `GET` and
+  `HEAD`, and no route answers `OPTIONS`.
+- In a real browser, `/admin` signed out and as a vault owner,
+  `/settings` as an administrator, and an invented page path render
+  the identical Not Found.
 - Starting the app with `SECRET_KEY` unset fails, and the message
   contains the variable name and no key material.
 - Nav shows Dashboard and Settings for a vault owner. An
@@ -373,14 +285,9 @@ rearrangement:
   and calling each with a session of both kinds. A route that answers
   something other than Not Found to the wrong kind, or that appears in
   no group, fails the test.
-- The Public group is asserted over the route map, enumerated at test
-  time, against the list in The two surfaces. With the header and no
-  session, every Public route is passed by the gate, and every other
-  registered API route is Unauthorized under every method it answers.
-  Without a session, the only pages served are the Public pages and the
-  vault navigation pages. No Public route is `/admin` or under
-  `/api/admin/`. A route that answers without a session and is not
-  named in Public fails the test.
+- Over the route map, with no session, the gate passes exactly the
+  Public routes (with the header, for API routes) and the vault
+  navigation pages, and refuses every other route under every method.
 - An administrator's `GET /api/records` returns Not Found, not an
   empty list, asserted specifically (`record-api.md`).
 - The root path renders the Dashboard for a vault owner and the Admin
