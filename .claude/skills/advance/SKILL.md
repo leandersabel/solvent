@@ -11,7 +11,9 @@ take the one next step, and stop. Every run can be repeated without
 harm, so when in doubt, read again rather than assume.
 
 GitHub is reached with `gh`. The client is `leandersabel`, and you
-write as `claude[bot]`. Every comment you write ends with the line
+write as `claude[bot]`. Every subagent runs in the foreground and you
+wait for its result: the run ends with your turn, and work still in
+flight is lost. Every comment you write ends with the line
 `<!-- advance -->`, which is how a later run tells your comments from
 anything else `claude[bot]` wrote.
 
