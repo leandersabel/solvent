@@ -37,7 +37,9 @@ you arrived from a link to do one thing.
 - **Username.** Three to thirty-two characters, lowercase letters,
   digits, dot, underscore, hyphen. It is lowercased as you type rather
   than quietly changed afterwards, so what you see is what you will
-  sign in with.
+  sign in with. A line under the field always says what is allowed,
+  and turns into an error when what you typed breaks the rule. The
+  button stays unusable until the username fits.
 - **Password, and again to confirm.** With a strength gauge that fills
   as you type and says, in words, roughly how long the password would
   hold up.
@@ -95,9 +97,9 @@ responsive. It must never look like it has hung.
 ### Create an administrator account
 
 This is the screen an invite for an administrator account opens, and it
-is a shorter one. A single card, same as the other, with a username and
-a password held to the same bar and measured by the same strength
-gauge.
+is a shorter one. A single card, same as the other, with a username
+under the same rule and the same line beneath it, and a password held
+to the same bar and measured by the same strength gauge.
 
 What is absent is absent because there is no vault:
 
@@ -124,9 +126,17 @@ You land in the admin area, signed in.
 - **The link is no good.** No form at all, just: this invite link is
   not valid. Wrong, used, expired, and called back all say exactly
   that, word for word.
-- **The username is taken.** Said plainly. Somebody holding a valid
-  invite to a small household instance learning that a username exists
-  is accepted rather than defended against here. A username is taken
+- **The link stops being valid while the page is open.** The invite is
+  used, expires, or is called back after the form appeared. Submitting
+  shows the same message as a link that was no good from the start.
+- **The username breaks the rule.** The line under the field says what
+  is allowed, and the button stays unusable, so the slow setup never
+  starts for a name that would be refused. If Solvent refuses the name
+  anyway, the screen shows that same message.
+- **The username is taken.** Said plainly, at the username field.
+  Somebody holding a valid invite to a small household instance
+  learning that a username exists is accepted rather than defended
+  against here. A username is taken
   once, across the whole instance, whichever kind of account holds it,
   so a person who holds both a user account and an administrator
   account signs in to them under two different names.
@@ -137,9 +147,12 @@ You land in the admin area, signed in.
   and the invite is still good, and offers a retry after closing other
   tabs. It does not quietly set up a weaker vault instead, and it never
   tells you that your phone cannot do this.
-- **The submit fails after the slow part.** Everything typed is still
-  there. Nobody re-types a password and waits again because of a
-  network blip.
+- **Solvent refuses for any other reason.** The screen says Solvent
+  could not accept this, that nothing was created, and to open the
+  invite link again.
+- **Solvent cannot be reached, or fails, after the slow part.**
+  Everything typed is still there. Nobody re-types a password and waits
+  again because of a network blip. This message appears only then.
 
 ## What must be true
 
@@ -167,6 +180,10 @@ You land in the admin area, signed in.
   up the link. You try again with the same link.
 - A password under twelve characters, or one that fails the strength
   rating, cannot be submitted, and the slow setup never starts.
+- A username outside the rule cannot be submitted, the slow setup never
+  starts, and the screen says what is allowed.
+- When Solvent turns a registration down, the screen says why in the
+  terms above. It never says Solvent could not be reached.
 - The vault form cannot be submitted without ticking the no-recovery
   acknowledgement. The administrator form does not carry one, and does
   not claim anything about recovery in its place.
@@ -220,7 +237,9 @@ You land in the admin area, signed in.
 - **Username shape and length.** Lowercase, three to thirty-two
   characters, with dot, underscore, and hyphen allowed. Nobody asked
   for this. It exists so that two people cannot claim names that differ
-  only by capitalization.
+  only by capitalization. A character the username cannot hold is
+  flagged rather than dropped as you type, because keystrokes that
+  vanish leave you unsure what you will sign in with.
 - **One pool of usernames for both kinds of account.** A person who
   holds a user account and an administrator account picks a second name
   for the second one rather than reusing the first. The cost is that

@@ -22,9 +22,9 @@ The card outside the shell (`design-system.md`, App shell), max-width
 The form a user invite renders.
 
 1. Heading: "Create your vault".
-2. **Username**. 3 to 32 characters, `[a-z0-9._-]`, lowercased in the
-   field as it is typed rather than quietly changed on submit, so what
-   they see is what they will sign in with.
+2. **Username**, with its message line (The username rule). Lowercased
+   in the field as it is typed rather than quietly changed on submit,
+   so what they see is what they will sign in with.
 3. **Password**, and **Confirm password**, with the strength gauge.
 4. **Main currency**.
 5. The no-recovery acknowledgement.
@@ -43,7 +43,8 @@ The form an administrator invite renders, and a shorter one.
    > finances in Solvent, that is a separate account and you need a
    > separate invite for it.
 
-3. **Username**, the same rule and the same live lowercasing.
+3. **Username**, the same rule, the same message line and the same
+   live lowercasing.
 4. **Password**, and **Confirm password**, with the same strength gauge
    held to the same bar. This password protects the power to remove
    every account on the instance, so it is not the place to relax it.
@@ -59,6 +60,27 @@ Absent here, each because there is no vault:
   direction.
 - **No vault being built.** The account is made and that is the whole
   of it (Setting up, below).
+
+## The username rule
+
+Both forms. The username's message line (`design-system.md`, Input)
+always reads:
+
+> Use 3 to 32 characters: letters a to z, digits, dot, underscore or
+> hyphen.
+
+- It judges the value trimmed and lowercased.
+- It turns to the error presentation the moment the value holds a
+  character outside the rule or passes 32 characters.
+- A value under 3 characters turns it on blur or on Enter, not while
+  the person is still typing.
+- An empty field never turns it.
+- It returns to the hint as soon as the value meets the rule.
+- Hint and error carry the same words, so the error says what is
+  allowed rather than only that something is wrong.
+- The field has no `maxlength` and blocks no key. A character the rule
+  refuses stays visible and flagged, because keystrokes that vanish
+  leave the person unsure what they will sign in with.
 
 ## The strength gauge
 
@@ -77,8 +99,8 @@ unchanged.
 - One line of guidance under it, the one place in the product where
   advice changes the outcome: "Length beats symbols. A four-word phrase
   you can remember is stronger than `P@ssw0rd!`."
-- The button stays disabled until both conditions pass, and whichever
-  one is unmet is named inline. Never a bare "password too weak".
+- Whichever condition is unmet is named inline. Never a bare "password
+  too weak".
 
 ## The acknowledgement
 
@@ -126,7 +148,8 @@ in `ui/unlock.md`, The derivation wait.
 
 ## States
 
-Both forms unless a state says otherwise.
+Both forms unless a state says otherwise. Which server answer leads to
+which state is `register.md`'s.
 
 - **The link is no good**: no form renders at all. A bare card: "This
   invite link is not valid." Identical wording for a link that is
@@ -136,13 +159,32 @@ Both forms unless a state says otherwise.
   would have shown.
 - **Loading**: none. The page is server-rendered and fetches nothing.
 - **Working**: as above, Setting up.
-- **Error, that username is taken**: inline beneath the field, plain:
-  "That username is taken." A username is taken once across the whole
+- **Error, the username breaks the rule**: the username's message line
+  in its error presentation (The username rule), and the button stays
+  disabled, so the slow part never starts for a name that would be
+  refused. When the server refuses the name anyway, after the slow
+  part, the screen shows the same line, moves focus to the username,
+  and keeps every field.
+- **Error, that username is taken**: the username's message line reads
+  "That username is taken." in its error presentation, focus moves to
+  the username, and every field is kept. Editing the username brings
+  the rule's line back. A username is taken once across the whole
   instance, whichever kind of account holds it, so somebody who holds
   both picks a second name for the second one. Enumeration is accepted
   here (`register.md`, Edge cases), so do not contort the message.
-- **Error, the passwords do not match**: inline beneath the
-  confirmation field, before anything is derived.
+- **Error, the invite stopped being valid while the page was open**:
+  the form is replaced by the bare card of The link is no good, "This
+  invite link is not valid.", word for word.
+- **Error, refused for another reason**: above the primary button,
+  every field kept and the button usable.
+  - On the vault form: "Solvent could not accept this. No vault was
+    created and your invite link is still good. Open the link again to
+    start over."
+  - On the administrator form: "Solvent could not accept this. No
+    account was created and your invite link is still good. Open the
+    link again to start over."
+- **Error, the passwords do not match**: in the confirmation field's
+  message line, before anything is derived.
 - **Error, this browser cannot run the encryption**: a hard stop with a
   plain explanation and no form. No fallback is offered, because none
   exists.
@@ -161,10 +203,13 @@ Both forms unless a state says otherwise.
   - No weaker setup is offered. Falling back would create an account
     permanently easier to break into, and record that weakness as
     though it had been chosen, because of one busy moment.
-- **Error, the submit failed after the slow part**: every field is still
-  filled, including the password. Nobody re-types a password and waits
-  again because of a network blip. The invite is untouched and the copy
-  says so.
+- **Error, the submit did not go through**: the server gave no answer,
+  or failed. Above the primary button: "That did not go through. Your
+  invite link is still good and everything you typed is still here."
+  Every field is still filled, including the password, because nobody
+  should re-type a password and wait again for a network blip. Never
+  shown for an answer that refused, because that would tell the person
+  to retry something Solvent has already turned down.
 - **Populated**: success signs the person in and takes them where the
   account belongs. A vault owner lands on the dashboard with their keys
   already in memory. An administrator lands in the admin area
@@ -173,6 +218,10 @@ Both forms unless a state says otherwise.
 
 ## Rules
 
+- **Create vault** and **Create account** stay disabled until the
+  username meets its rule and the password clears the bar, and on the
+  vault form until the acknowledgement is ticked. Each unmet condition
+  is named by its own line or control.
 - The page drops the invite token out of the address bar as soon as the
   form holds it, so a bookmark, a shared screen, or a synced browser
   history afterwards carries nothing (`admin-invites.md`, Rules).
@@ -192,3 +241,7 @@ Both forms unless a state says otherwise.
   the wrong direction here.
 - **No sign-in link.** Somebody on this page holds an invite and does
   not have an account yet.
+- **No check whether a name is free before submitting.** The page
+  fetches nothing (States, Loading), and a name is free or taken only
+  at the moment the server creates the account, so an earlier answer
+  could be wrong by then.

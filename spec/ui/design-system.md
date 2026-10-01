@@ -397,6 +397,15 @@ only its own content region.
   holding name writes a stored login into an encrypted record nobody
   but its owner can ever review. A Password field opts back in by
   naming its autocomplete tokens.
+
+  **Message line**: at most one line directly beneath a field, in
+  Label / meta. As a hint it is ink-secondary. When the value breaks
+  what the hint states, the same words turn critical with the critical
+  icon, and the input takes `aria-invalid`. A field with nothing to
+  hint shows the line only for an error. The line is the input's
+  `aria-describedby` in both presentations, so it is read on focus, and
+  it is not a live region, because a line that changes as somebody
+  types would interrupt every keystroke.
 - **Quantity field**: the money input. The holding's own unit sits as a
   suffix inside the box, `inputmode="decimal"`, and the converted
   main-currency figure appears beneath it in ink-secondary as you type,
@@ -542,8 +551,10 @@ differently.
   skeletons.
 - **Empty**: one sentence naming what is missing, one primary action.
   Never an empty table with headers.
-- **Error**: inline, above the relevant control, critical text with an
-  icon. Never a toast for anything the user must act on.
+- **Error**: critical text with the critical icon. A message about one
+  field's value is that field's message line (Components, Input). A
+  message about the submission as a whole sits above the primary
+  button. Never a toast for anything the user must act on.
 - **Populated**: the real thing.
 
 These failures recur across screens, and a screen writes only its own

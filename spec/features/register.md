@@ -136,12 +136,27 @@ two callers rather than two record writers.
   Password/passphrase policy).
 - The registration screen must state plainly that **there is no password
   recovery** and require an explicit acknowledgement before submitting.
-- Username is normalized (trimmed, lowercased) before storage and
-  comparison. Allowed: 3–32 chars, `[a-z0-9._-]`. **One namespace
+- **Username.** Trimmed and lowercased, then matched against
+  `^[a-z0-9._-]{3,32}$`, before storage and comparison. The server
+  matches with `fullmatch`, so no anchor admits a trailing newline.
+  `system:bootstrap` is refused too (admin-invites.md). **One namespace
   across both kinds** (architecture.md, Accounts on this instance), so
   a person holding an administrator account and a vault account needs
   two distinct usernames. The product suggests no convention and
   enforces none beyond uniqueness.
+- **The browser holds the username to the same rule before anything is
+  derived.** It lowercases as typed, trims at submit, and checks the
+  exact value it will send against the same pattern. The submit button
+  stays disabled until it passes, so a malformed name never starts
+  derivation. `system:bootstrap` needs no browser rule, because its
+  colon already breaks the pattern.
+- **Each language holds its own copy of the pattern**, and
+  `tests/fixtures/usernames.json` holds the copies together: each row is
+  a raw input and either the stored value or a refusal, and both the
+  client suite and pytest read it. The pattern is not embedded in the
+  page. It is a constant of the product rather than of the instance, and
+  Python and JavaScript regular expressions differ in dialect, so
+  agreeing verdicts tie the copies tighter than a shared string.
 - Server validates: salt is exactly 16 bytes; KDF envelope parameters
   are at or above the server's configured minimum (a client must not be
   able to register itself a weak KDF); wrapped DEK and profile blobs are
@@ -160,12 +175,48 @@ two callers rather than two record writers.
   rate lookup that would need one is on the vault surface
   (app-shell.md, The two surfaces).
 
+## Refused registrations
+
+Each answer to `POST /api/register` maps to one state of the form
+(`ui/register.md`, States). A reason, where there is one, is a JSON
+object whose only key is `refused`.
+
+| Refused because | Answer | The form shows |
+|---|---|---|
+| The username breaks the rule after trimming and lowercasing | Bad Request, `{"refused":"username"}` | The username breaks the rule, beneath the username field |
+| The invite is unknown, used, revoked or expired when the request arrives | Bad Request, `{"refused":"invite"}`, byte-identical for all four | The link is no good: the form gives way to the bare not-valid card |
+| The username is taken | Conflict | The username is taken, beneath the username field |
+| Anything else malformed: a body that fails to parse, `kind` or `method` present, the salt, the KDF envelope, a blob size, the payload's shape against the invite | Bad Request, no `refused` key | Solvent refuses for any other reason, above the button |
+| Any other client-error status | As answered | Solvent refuses for any other reason, above the button |
+| No response, or Server Error | | Solvent cannot be reached, the only state with the network wording |
+
+- **The client reads a reason only from a Bad Request, and only the two
+  values above.** Any other value, or none, is the general refusal. A
+  Bad Request is never read as a username refusal without
+  `{"refused":"username"}`.
+- **The username is checked before the invite**, because it needs no
+  database and the rule is public, so answering it to a holder of a dead
+  invite teaches nothing.
+- **The invite is checked before the username's availability**, so
+  learning that a name is taken takes a live invite (Edge cases,
+  Username already taken).
+- `{"refused":"invite"}` tells the caller nothing `GET /register` with
+  the same token would not.
+- Refusals carry the hardened response headers like every other answer
+  (architecture.md, Application hardening).
+
 ## Edge cases
 
 - **Invalid, expired, already-used, or revoked invite** → error page, no
   form rendered. All four render an identical message ("This invite link
   is not valid") so a probe learns nothing about which state applies.
-- **Username already taken** → plain error, reported clearly. This
+  An invite that stops being valid while the form is open is answered
+  at submit (Refused registrations).
+- **Username breaks the rule** → the submit button stays disabled and
+  nothing is derived (Rules). A request that reaches the server anyway,
+  hand-built or sent past a disagreement between the two copies of the
+  pattern, gets the username refusal (Refused registrations).
+- **Username already taken** → Conflict (Refused registrations). This
   endpoint is invite-gated and the audience is a small trusted household,
   so username enumeration *here* is **accepted** rather than defended;
   architecture.md's decoy-salt control covers *login*, where the attacker
@@ -190,8 +241,10 @@ two callers rather than two record writers.
 - **KDF derivation is slow** → show a busy state; the tab must not
   appear frozen. Run derivation in a Web Worker so the UI thread stays
   responsive.
-- **Registration POST fails after key derivation** → the client keeps
-  form state so the user need not re-enter and re-derive.
+- **Registration POST gets no response or a Server Error after key
+  derivation** → the client keeps form state so the user need not
+  re-enter and re-derive. Every other answer is a refusal (Refused
+  registrations), never this state.
 
 ## Acceptance criteria
 
@@ -240,8 +293,36 @@ two callers rather than two record writers.
   with Bad Request, even though the client UI would never send them.
 - A POST with a salt that is not 16 bytes is rejected with Bad
   Request.
-- Invalid, expired, used, and revoked invites produce byte-identical
-  error responses.
+- Unknown, expired, used, and revoked invites render byte-identical
+  `GET /register` pages. A well-formed `POST /api/register` against each
+  answers Bad Request with `{"refused":"invite"}`, and the four responses
+  are byte-identical.
+- A `POST /api/register` with the username `ab`, 33 × `x`, `bo b!`,
+  `no/slash`, `system:bootstrap`, the empty string, or `björn` answers
+  Bad Request with `{"refused":"username"}`, writes nothing, and leaves
+  the invite unconsumed and the carried session working.
+- A malformed username sent with an unknown invite token answers the
+  username refusal, not the invite refusal.
+- Usernames of 3 and of 32 characters register, and so do `a.b`, `a_b`
+  and `a-b`. `"  MiXeD  "` is stored as `mixed`.
+- Every row of `tests/fixtures/usernames.json` gets the same verdict
+  from the browser check and from the server's normalization, asserted
+  in both suites.
+- On both forms, the username `Bo b!` shows the username-rule state and
+  keeps the submit button disabled, with a strong matching password
+  and, on the vault form, the acknowledgement ticked. No POST is
+  captured and no derivation starts.
+- Correcting the username enables the button. `"  bob  "` is not
+  flagged, and is sent as `bob`.
+- With the POST stubbed to answer `{"refused":"username"}`, the form
+  shows the username-rule state beneath the username field, keeps every
+  field filled, and shows no network wording.
+- With the POST stubbed to answer `{"refused":"invite"}`, the form gives
+  way to the link-is-no-good card. A Bad Request with no `refused` key,
+  or a Forbidden, shows the general refusal. Only a Server Error or an
+  aborted request shows the network wording.
+- With the POST stubbed to answer Conflict, the username-taken state
+  shows beneath the username field.
 - A password of 11 characters, or one scoring below zxcvbn 3, is blocked
   client-side and never derives keys.
 - Submitting without the "no password recovery" acknowledgement is
