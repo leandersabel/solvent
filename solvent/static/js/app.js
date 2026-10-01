@@ -333,14 +333,6 @@ function registerVaultStore() {
     updateValues() {
       if (isUnlocked()) openSweep(today());
     },
-    signOut() {
-      if (!isUnlocked()) return;
-      const leaving = signOut();
-      held = null;
-      leaving.finally(() => {
-        window.location.href = '/login';
-      });
-    },
   });
 }
 

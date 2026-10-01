@@ -39,9 +39,5 @@ function shellStore() {
     update() {
       Alpine.store('vault')?.updateValues();
     },
-
-    signOut() {
-      Alpine.store('vault')?.signOut();
-    },
   };
 }

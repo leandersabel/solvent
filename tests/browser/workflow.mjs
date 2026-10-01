@@ -6230,6 +6230,40 @@ try {
         !(await admin.eval("Boolean(document.querySelector('#unlock-password'))")) &&
         (await admin.eval("document.body.innerText")).includes('Invites'),
     );
+
+    // app-shell.md: Sign out is an administrator's only way out, by
+    // mouse and by keyboard. Each is a real input event, not a
+    // scripted .click(), so what the button is wired to is what runs.
+    const adminRequests = watched.at(-1).requests;
+    const logouts = () => adminRequests.filter((r) => r.method === 'POST' && r.url.endsWith('/api/auth/logout')).length;
+    const sessionStatus = () => admin.eval("fetch('/api/admin/accounts', { headers: { 'X-Solvent-Request': '1' } }).then((r) => r.status)");
+    const leavesByInput = async (how, act) => {
+      await adminSignIn(`the admin area before signing out by ${how}`);
+      const before = logouts();
+      check(`an administrator is signed in before signing out by ${how}`, (await sessionStatus()) === 200);
+      await act();
+      await admin.waitUntil("location.pathname === '/login'", { timeout: 15000, label: `the sign-in card after Sign out by ${how}` });
+      check(`Sign out by ${how} sends the logout request`, logouts() === before + 1);
+      check(`Sign out by ${how} ends the session`, (await sessionStatus()) === 401);
+    };
+    const signOutBox = () =>
+      admin.eval(`(() => {
+        const b = [...document.querySelectorAll('.topbar-actions button')].find((x) => x.textContent.trim() === 'Sign out');
+        const r = b.getBoundingClientRect();
+        return { x: r.x + r.width / 2, y: r.y + r.height / 2 };
+      })()`);
+    await leavesByInput('mouse', async () => {
+      const { x, y } = await signOutBox();
+      for (const type of ['mouseMoved', 'mousePressed', 'mouseReleased']) {
+        await admin.send('Input.dispatchMouseEvent', { type, x, y, button: 'left', clickCount: 1 });
+      }
+    });
+    await leavesByInput('keyboard', async () => {
+      await admin.eval("[...document.querySelectorAll('.topbar-actions button')].find((x) => x.textContent.trim() === 'Sign out').focus()");
+      const key = { key: 'Enter', code: 'Enter', windowsVirtualKeyCode: 13 };
+      await admin.send('Input.dispatchKeyEvent', { type: 'keyDown', text: '\r', ...key });
+      await admin.send('Input.dispatchKeyEvent', { type: 'keyUp', ...key });
+    });
   } finally {
     adminBrowser.close();
   }

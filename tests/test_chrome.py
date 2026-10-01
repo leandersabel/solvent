@@ -135,6 +135,16 @@ def test_the_lock_button_makes_no_request_and_has_no_route(app):
     ] == []
 
 
+def test_an_administrators_sign_out_is_the_button_the_admin_script_listens_on(app):
+    admin, _ = register(app, "root", kind="administrator")
+    bar = topbar(admin.get("/admin").get_data(as_text=True))
+    button = bar[bar.rindex("<button", 0, bar.index("Sign out")) : bar.index("</button>")]
+    assert 'id="chrome-signout"' in button
+    # The admin page loads no vault store, so a store call would do nothing.
+    assert "$store" not in button
+    assert "getElementById('chrome-signout')" in (STATIC / "js" / "page-admin.js").read_text()
+
+
 def test_the_top_bar_uses_the_chrome_button_not_the_secondary_one(app):
     owner, _ = register(app, "owner")
     bar = topbar(owner.get("/dashboard").get_data(as_text=True))

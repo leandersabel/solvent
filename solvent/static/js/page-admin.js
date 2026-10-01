@@ -6,7 +6,7 @@
 // session.
 import * as api from './api.js';
 import { dialog, el, inlineRename, mount, shortDate } from './dom.js';
-import { changePassword } from './session.js';
+import { changePassword, signOut } from './session.js';
 import { passwordWithToggle } from './unlock.js';
 import { strengthGauge } from './strength.js';
 
@@ -594,7 +594,7 @@ function passwordCard() {
 const signOutButton = document.getElementById('chrome-signout');
 if (signOutButton) {
   signOutButton.addEventListener('click', () =>
-    api.post('/api/auth/logout', {}).finally(() => {
+    signOut().finally(() => {
       window.location.href = '/login';
     }),
   );
