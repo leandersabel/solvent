@@ -416,13 +416,30 @@ only its own content region.
   a dimension assignment (`Liquidity: Cash`), for status chips such as
   "Archived", and for a price's provenance, whose wording is owned by
   `recording-detail.md`.
-- **Date picker, marked**: a month grid on a white surface, opening on
-  today. A date that already holds a recording carries a petrol-600 dot
-  under the numeral **and** says so in its accessible name ("31 July,
-  has a recording"), because a dot is a color and identity is never
-  color-alone. Future dates are not selectable at all, rather than
-  selectable and then refused (`record-snapshot.md`). Used by **New
-  recording** (`dashboard.md`).
+- **Date picker, marked**: a Dialog headed "New recording" whose body
+  is the month grid itself, open the moment the control is pressed.
+  There is no date field, no Open or confirm button and no popup of its
+  own, and nothing covers any part of the dialog.
+  - **Above the grid**, the month and year, with a previous month and a
+    next month button. Next month is disabled on the current month,
+    since everything after it is in the future.
+  - **The grid opens on today's month with focus on today.** Arrow keys
+    move the focus by a day left and right and by a week up and down.
+  - **A date that already holds a recording** carries a petrol-600 dot
+    under the numeral **and** says so in its accessible name ("31 July,
+    has a recording"), because a dot is a color and identity is never
+    color-alone.
+  - **Future dates are not selectable at all**, rather than selectable
+    and then refused (`record-snapshot.md`).
+  - **Picking a day closes the dialog and routes at once**, with nothing
+    to confirm. Where it routes is owned by the screen that opens it.
+  - **One Button, secondary, "Cancel", beneath the grid** closes it as
+    Escape does and writes nothing. It is there because Escape serves
+    only a keyboard, and the full-screen sheet at phone width has no
+    scrim to tap.
+
+  Used by **New recording** (`dashboard.md`) and by a recording that is
+  gone (`recording-detail.md`, Error, the recording is gone).
 - **Card**: white surface, hairline border, 10px radius, 24px padding.
 - **Table**: no vertical rules; `rule` horizontal dividers; money columns
   right-aligned and tabular.

@@ -8,12 +8,12 @@
     {"file": "spec/architecture.md", "sections": ["Data model", "Record storage API", "Key management", "Storage & data handling"]},
     {"file": "spec/features/manage-accounts.md", "sections": ["Record shape", "Delete: the user chooses", "Rules", "Edge cases"], "role": "the account a snapshot belongs to, its unit, and the archive flow's closing snapshot"},
     {"file": "spec/features/net-worth-view.md", "sections": ["Data flow", "Current net worth", "Values between entries"], "role": "the in-memory model a recording is an index over"},
-    {"file": "spec/ui/design-system.md", "sections": ["Components", "States", "App shell"], "role": "the date picker, dialog, disclosure and table conventions every screen below uses"},
+    {"file": "spec/ui/design-system.md", "sections": ["Components", "States", "App shell"], "role": "the marked date picker (Components, Date picker, marked), the New recording dialog, and the dialog, disclosure and table conventions every screen below uses"},
     {"file": "spec/ui/update-values.md", "sections": ["all"], "role": "the sweep, which is both the primary recording screen and the editor for an existing recording"},
     {"file": "spec/ui/recording-detail.md", "sections": ["all"], "role": "a recording's own screen, where it is read and where it is deleted"},
     {"file": "spec/ui/snapshot-entry.md", "sections": ["all"], "role": "the single-holding form, the other door onto the same write"},
     {"file": "spec/ui/account-detail.md", "sections": ["all"], "role": "a holding's own list of values, where a past entry is found, edited, moved and deleted"},
-    {"file": "spec/ui/dashboard.md", "sections": ["1. Hero figure", "2. Trend chart"], "role": "New recording and the chart's marked dates, the two routes into a recording"}
+    {"file": "spec/ui/dashboard.md", "sections": ["1. Hero figure", "2. Trend chart", "States"], "role": "New recording, its date picker states and the chart's marked dates, the two routes into a recording"}
   ],
   "dependsOn": ["app-shell", "record-api", "record-rate", "rate-lookup", "register", "login", "account-settings", "manage-accounts", "net-worth-view"],
   "parameters": {
