@@ -19,6 +19,7 @@ jobs:
     timeout-minutes: 180
     environment: agent
     permissions:
+      actions: write
       contents: write
       packages: write
       issues: write
@@ -32,6 +33,9 @@ jobs:
         with:
           ref: master
           fetch-depth: 0
+
+      # Files any code scanning alert the route after a merge missed.
+      - run: gh workflow run agent.yml --ref master -f issue=alerts
 
       # At most one version a day, and none for a night whose only
       # changes are to the spec, the docs or the pipeline.

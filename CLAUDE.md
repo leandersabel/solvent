@@ -175,7 +175,8 @@ The client is `leandersabel`. No agent edits an issue body.
 - An issue by `leandersabel` starts the loop when it is opened. Anyone
   else's issue starts it when `accepted` is added. An issue by
   `github-actions[bot]` starts at once: only this repository's workflows
-  can write one, for a red `master`, and its text is theirs. Adding a
+  can write one, for a red `master` or a code scanning alert, and its
+  text is theirs. Adding a
   label takes triage access to the repository, no form sets `accepted`,
   and no agent adds it except the QA run, to its own findings.
 - The loop reads an issue's body, the comments by `leandersabel` and
@@ -309,6 +310,11 @@ the client does.
 - A failing check on `master` opens a `bug` issue as
   `github-actions[bot]`, which starts at once and skips the
   implementation queue, and that night has no QA.
+- A code scanning alert on `master` opens a `code-scanning` issue as
+  `github-actions[bot]`, which starts at once. Anyone can scan the
+  public code, so its fix is public, unlike a report under
+  `SECURITY.md`. An alert still open after its fix merged reopens the
+  issue once, and after a second fix the issue is `stuck`.
 - Disabling `agent.yml`, or removing the token from the `agent`
   environment, stops the loop.
 

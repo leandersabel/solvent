@@ -18,7 +18,7 @@ on:
   workflow_dispatch:
     inputs:
       issue:
-        description: Issue number
+        description: Issue number, or `alerts` to file an issue for every open code scanning alert
         required: true
       resume:
         description: Set by a run whose work is pushed but has no pull request yet
@@ -36,6 +36,7 @@ jobs:
       issues: write
       pull-requests: read
       actions: write
+      security-events: read
     outputs:
       issue: ${{ steps.route.outputs.issue }}
     steps:
@@ -57,6 +58,46 @@ jobs:
             [ -z "$(gh issue list --state open --label implementing --json number --jq '.[].number')" ] || return 0
             gh api -X DELETE "repos/$GH_REPO/git/refs/heads/claude/slot" >/dev/null 2>&1 || true
             gh issue list --state open --label queued --json number --jq 'map(.number) | min // empty'
+          }
+          # Each code scanning alert on master gets an issue of its own,
+          # which starts at once (CLAUDE.md, The loop, Intake). One whose
+          # fix merged, yet a later scan still finds it, reopens once and
+          # then goes to the client.
+          file_alerts() {
+            local filed n alert found number state reason fix
+            filed=$(gh issue list --state all --label code-scanning --limit 1000 --json number,title,state,stateReason)
+            for n in $(gh api --paginate "repos/$GH_REPO/code-scanning/alerts?state=open&ref=refs/heads/master" --jq '.[].number'); do
+              alert=$(gh api "repos/$GH_REPO/code-scanning/alerts/$n")
+              found=$(jq -r --arg p "Code scanning alert $n:" \
+                '[.[] | select(.title | startswith($p))][0] // empty | "\(.number) \(.state) \(.stateReason)"' <<<"$filed")
+              read -r number state reason <<<"$found"
+              if [ -z "$number" ]; then
+                number=$(gh issue create --label code-scanning \
+                  --title "Code scanning alert $n: $(jq -r .rule.description <<<"$alert")" \
+                  --body "$(jq -r '"\(.rule.security_severity_level // .rule.severity) severity, rule `\(.rule.id)`, in `\(.most_recent_instance.location.path)` line \(.most_recent_instance.location.start_line).\n\n> \(.most_recent_instance.message.text)\n\n\(.html_url)"' <<<"$alert")" \
+                  | sed 's#.*/##')
+                dispatch "$number"
+              elif [ "$state" = CLOSED ] && [ "$reason" = COMPLETED ]; then
+                # Until master is scanned after the fix, the alert is
+                # still open on the scan before it.
+                fix=$(gh issue view "$number" --json closedByPullRequestsReferences --jq '.closedByPullRequestsReferences[-1].number // empty')
+                [ -n "$fix" ] || continue
+                fix=$(gh pr view "$fix" --json mergeCommit --jq '.mergeCommit.oid // empty')
+                [ -n "$fix" ] || continue
+                case $(gh api "repos/$GH_REPO/compare/$fix...$(jq -r .most_recent_instance.commit_sha <<<"$alert")" --jq .status) in
+                  identical|ahead) ;;
+                  *) continue ;;
+                esac
+                if [ "$(gh api --paginate "repos/$GH_REPO/issues/$number/timeline" --jq '.[] | select(.event == "reopened") | 1' | wc -l)" -eq 0 ]; then
+                  gh issue reopen "$number" --comment "The alert is still open on master after this issue's fix merged."
+                  dispatch "$number"
+                else
+                  gh issue reopen "$number"
+                  gh issue edit "$number" --add-label stuck
+                  gh issue comment "$number" --body "@$OWNER The alert is still open on master after a second fix merged. Any comment here starts the next run."
+                fi
+              fi
+            done
           }
           sender=$(jqe .sender.login)
           issue=
@@ -91,6 +132,9 @@ jobs:
               # finished check on a spec may let an approval merge.
               if [ "$(jqe .workflow_run.head_repository.full_name)" = "$GH_REPO" ]; then
                 branch=$(jqe .workflow_run.head_branch)
+                # CodeQL scans master alongside the checks. An alert it
+                # reports after they finish is filed by the nightly.
+                [ "$branch" = master ] && file_alerts
                 conclusion=$(jqe .workflow_run.conclusion)
                 if [[ "$branch" == claude/issue-* && "$conclusion" == failure ]] || [[ "$branch" == claude/spec-* ]]; then
                   issue=$(from_branch "$branch")
@@ -98,7 +142,8 @@ jobs:
               fi ;;
             workflow_dispatch)
               issue=$(jqe .inputs.issue)
-              [[ "$issue" =~ ^[0-9]+$ ]] || { echo "Not an issue number: $issue"; exit 1; } ;;
+              [ "$issue" = alerts ] && { issue=; file_alerts; }
+              [[ -z "$issue" || "$issue" =~ ^[0-9]+$ ]] || { echo "Not an issue number: $issue"; exit 1; } ;;
             push)
               # A merge frees the implementation slot, can leave the
               # loop's other pull requests conflicting, and lets the
