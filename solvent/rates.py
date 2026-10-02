@@ -9,7 +9,8 @@ the user accepted.
 Nothing about the outbound request is client-influenced. Hosts and URL
 templates are the constants below, `symbol` is checked against the
 server's own table before use, redirects are off and egress is capped,
-because this proxy runs where internal NAS services are reachable.
+because this proxy runs where other services on the host's network are
+reachable.
 """
 from __future__ import annotations
 

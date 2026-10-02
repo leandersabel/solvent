@@ -140,6 +140,11 @@ two callers rather than two record writers.
   does not pretend it is a server-side control. Bar: **≥12 characters
   and a zxcvbn score of ≥3**, no composition rules (architecture.md,
   Password/passphrase policy).
+- **The strength gauge never takes a script source from the page's
+  markup**, because content rendered into the page could plant one and
+  have any same-origin script run. `strength.js` resolves zxcvbn's path
+  against its own module URL and holds that file's hash as a constant,
+  and the test suite checks both against the pinned version and hash.
 - The registration screen must state plainly that **there is no password
   recovery** and require an explicit acknowledgement before submitting.
 - **The username rule.** Normalized (trimmed, lowercased) before

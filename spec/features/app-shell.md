@@ -28,8 +28,8 @@ second thing to keep in sync.
 
 ## Configuration
 
-- `SECRET_KEY` and any provider key are read from the environment
-  (architecture.md, Tech stack).
+- `SECRET_KEY` is read from the environment (architecture.md, Tech
+  stack).
 - **The app refuses to start when `SECRET_KEY` is absent or empty**,
   rather than generating one. A generated key is new on every restart
   and silently invalidates every session row. A committed default is

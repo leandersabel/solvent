@@ -61,7 +61,7 @@ meet one.
   pattern of lookups is the same whether you updated one holding or
   fifteen, and the same whichever one it was.
 - **The amount you hold never goes out with a lookup, in any form.**
-  What leaves your NAS is which currency or metal was asked about, for
+  What leaves your server is which currency or metal was asked about, for
   which day, and which currency you keep your total in. Never how much
   of it you have.
 - **A proposed price always shows the day it is actually for.** On a

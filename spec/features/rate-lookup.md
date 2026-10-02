@@ -7,8 +7,7 @@
 A server-side proxy and cache that fetches conversion rates (FX, metals)
 from a whitelisted public provider and serves an entry-date rate
 **proposal** to the client. It exists so requests get cached and so no
-browser individually leaks its update timing to a third party
-(architecture.md, Data model).
+browser individually leaks its update timing to a third party.
 
 The proposal is advice, never authority: the user can always override
 it, and the value that lands in the price timeline is whatever the user
@@ -76,8 +75,7 @@ every symbol in the table individually, which is what keeps
 **The endpoint accepts no amount parameter, in any form.** This is the
 base-amount rule made structural: the rate is always for one fixed base
 unit (1 troy oz, one unit of the base currency), so there is no
-field an amount could travel in even by mistake (architecture.md,
-Base-amount rule). Any request carrying an unrecognised query parameter
+field an amount could travel in even by mistake. Any request carrying an unrecognised query parameter
 is rejected with Bad Request rather than ignored.
 
 The same rule covers the other direction. **A price the person typed or
@@ -200,10 +198,13 @@ Rejected, the licensing being largely closed:
   out on fit rather than terms — 25 requests/day shared across the whole
   instance, and thin coverage of European listings.
 
-The objection that generalizes is the constraint binding every future
-provider (architecture.md, Conversion-rate lookup). Any future provider
-for any asset class must be checked against it, not merely against
-request volume, the same test that eliminates LBMA for gold.
+The objection that generalizes binds every future provider for any
+asset class. A rate is stored permanently as a vault record, inside
+ciphertext the server cannot read, enumerate or delete, so terms
+requiring deletion of all data on termination are unsatisfiable by
+construction, not a cache policy a shorter TTL could fix. A provider is
+checked against this, not merely against request volume, the same test
+that eliminates LBMA for gold.
 
 ## The symbol table
 
@@ -347,8 +348,8 @@ symbols and none are coming** (Listed securities, above).
 
 ## SSRF and egress hardening
 
-Non-negotiable, because the proxy runs where internal NAS services are
-reachable (architecture.md, SSRF hardening):
+Non-negotiable, because the proxy runs where other services on the
+host's network are reachable:
 
 - Provider hosts and URL templates are **server-side constants**. No
   part of the outbound URL's scheme, host, or port is derived from
@@ -373,8 +374,6 @@ reachable (architecture.md, SSRF hardening):
 - HTTP redirects are **disabled**, not followed to a validated target.
 - Egress has a hard timeout (5 s connect + read) and a response size cap.
 - Outbound requests go to HTTPS only, with certificate verification on.
-- The provider API key, if any, is injected via environment config and
-  never appears in a response, a log line, or an error message.
 
 ## Rate limiting and failure
 
