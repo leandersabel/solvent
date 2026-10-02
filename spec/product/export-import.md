@@ -11,8 +11,8 @@ anyone who has it without the password.
 
 It does two jobs for you:
 
-- **A backup you hold yourself**, independent of whatever the NAS does
-  with its own snapshots. It is also the way out: you can leave with
+- **A backup you hold yourself**, independent of whatever your server does
+  with its own backups. It is also the way out: you can leave with
   your data, and it is readable without asking anyone's permission.
 - **The way your vault survives an upgrade** that changes how records
   are shaped. A file written by an older version of the app is brought

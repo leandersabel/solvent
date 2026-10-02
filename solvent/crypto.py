@@ -39,8 +39,8 @@ _hasher = PasswordHasher(
 
 # architecture.md, Concurrency cap: N parallel verifications allocate
 # N x 64 MiB before the rate limiter's verdict matters, which is a
-# memory-exhaustion lever on a NAS. A request over the cap waits for a
-# slot, and a wait past the bound answers Too Many Requests, the same
+# memory-exhaustion lever on a small host. A request over the cap waits
+# for a slot, and a wait past the bound answers Too Many Requests, the same
 # answer any other limit gives. One gate per app, sized by its config.
 _gate_lock = threading.Lock()
 

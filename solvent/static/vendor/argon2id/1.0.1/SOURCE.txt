@@ -23,4 +23,4 @@ Re-pin by re-running the build against the new version:
   python3 tools/vendor-argon2id.py package
 and updating this file and ARGON2ID_SRI with the hash it prints.
 This dependency is in the auth path, so a version bump needs manual
-review and never auto-merge (architecture.md, Tech stack).
+review and never auto-merge (architecture.md, Supply chain).

@@ -24,8 +24,8 @@ sitting in a backup for no benefit. This is the reason the password
 method is mandatory and permanent: it is what makes a vault exportable
 at all.
 
-It serves two jobs: a **user-held backup** independent of the NAS's ZFS
-snapshots, and the **migration path across data-model upgrades**. It is
+It serves two jobs: a **user-held backup** independent of the host's own
+backups, and the **migration path across data-model upgrades**. It is
 explicitly *not* a password-recovery mechanism (architecture.md, No
 password recovery) and not a sync mechanism.
 
@@ -144,8 +144,7 @@ written.
 
 - The server assigns `principal_id` from the session on every imported
   record. It never reads a `principalId` from the uploaded payload, so
-  one account's import can never write into another's vault
-  (architecture.md, Import authorization). Export and import are both
+  one account's import can never write into another's vault. Export and import are both
   on the vault surface, so an administrator session receives Not Found
   from either (`app-shell.md`, The two surfaces).
 - Strict server-side validation before any write: total payload size

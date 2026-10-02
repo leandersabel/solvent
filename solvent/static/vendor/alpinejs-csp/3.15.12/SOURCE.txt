@@ -17,5 +17,5 @@ Re-pin by re-downloading the new version's cdn.min.js, recomputing:
   openssl dgst -sha384 -binary cdn.min.js | openssl base64 -A
 and updating both this file and ALPINE_SRI in solvent/shell.py.
 Dependencies touching the auth/session path (this one, per
-architecture.md, Tech stack -- CI/CD & updates) need manual review on
-any version bump, never auto-merge.
+architecture.md, Supply chain) need manual review on any version bump,
+never auto-merge.
