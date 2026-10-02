@@ -160,8 +160,7 @@ The client is `leandersabel`. No agent edits an issue body.
   next step. Repeating or restarting a run does no harm.
 - Changes reach `master` only as pull requests from `claude[bot]` or
   Dependabot. The client changes the pipeline through an issue like any
-  other change, and a Claude session on the client's machine does not
-  push. Workflow files are the exception: the Claude GitHub App cannot
+  other change. Workflow files are the exception: the Claude GitHub App cannot
   write them, so the client changes them in a pull request of their
   own, which merges on green. A security fix is made by the client in
   its advisory's private fork, because a loop pull request is public
