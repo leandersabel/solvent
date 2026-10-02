@@ -8,6 +8,7 @@ from __future__ import annotations
 
 from datetime import datetime, timedelta, timezone
 
+from solvent.config import DEFAULT_KDF_ENVELOPE
 from solvent.session import COOKIE_NAME, sign_token
 from tests.helpers import CSRF, b64, connect, mint_invite, register, register_body, rows
 
@@ -102,6 +103,24 @@ def test_last_active_at_is_written_on_every_authenticated_request(app):
     after = rows(app, "SELECT last_active_at FROM sessions")[0]["last_active_at"]
     assert after != "2000-01-01T00:00:00+00:00"
     assert after >= before[:4]
+
+
+def test_last_active_at_is_written_on_a_request_the_route_refuses(app):
+    owner, _ = register(app, "owner")
+    conn = connect(app)
+    try:
+        conn.execute("UPDATE sessions SET last_active_at = '2000-01-01T00:00:00+00:00'")
+        conn.commit()
+    finally:
+        conn.close()
+    refused = owner.post(
+        "/api/auth/upgrade-kdf",
+        json={"salt": b64(16), "kdf": dict(DEFAULT_KDF_ENVELOPE), "authKey": b64()},
+        headers=CSRF,
+    )
+    after = rows(app, "SELECT last_active_at FROM sessions")[0]["last_active_at"]
+    assert refused.status_code == 400
+    assert after != "2000-01-01T00:00:00+00:00"
 
 
 def test_the_session_row_carries_no_kind_column(app):

@@ -437,7 +437,9 @@ EVERY_TABLE = KEY_TABLES + ("records", "sessions", "invites")
 
 def snapshot(app, tables=KEY_TABLES):
     """Every row of each table, keyed by its primary key, so a
-    comparison names exactly which rows a request changed."""
+    comparison names exactly which rows a request changed. Session
+    rows omit last_active_at, which a request the route refuses
+    still writes."""
     keys = {
         "principals": ("id",),
         "credentials": ("id",),
@@ -448,7 +450,11 @@ def snapshot(app, tables=KEY_TABLES):
     }
     return {
         table: {
-            tuple(row[column] for column in keys[table]): row
+            tuple(row[column] for column in keys[table]): {
+                column: value
+                for column, value in row.items()
+                if not (table == "sessions" and column == "last_active_at")
+            }
             for row in rows(app, f"SELECT * FROM {table}")
         }
         for table in tables
@@ -859,8 +865,11 @@ def test_the_settings_writes_need_the_request_header(app, method, path, body):
     elif body == "delete":
         body = {"authKey": auth_key, "confirmUsername": "owner"}
     before = snapshot(app, EVERY_TABLE)
+    sessions = rows(app, "SELECT * FROM sessions")
     assert owner.open(path, method=method, json=body).status_code == 403
     assert snapshot(app, EVERY_TABLE) == before
+    # Refused before the session loads, so last_active_at stays too.
+    assert rows(app, "SELECT * FROM sessions") == sessions
 
 
 def test_an_already_authenticated_caller_at_login_is_sent_to_the_root(app):
