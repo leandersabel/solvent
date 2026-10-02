@@ -3987,27 +3987,37 @@ try {
       })()`).then(JSON.parse);
 
     // The sweep's rows and rate lines.
-    const row = (name) =>
-      `[...document.querySelectorAll('.sweep-row')].find(r => r.querySelector('.holding-name').textContent === ${JSON.stringify(name)})`;
+    // A row is found by its holding's name, which reaches the page as data.
     const typeRow = (name, value) =>
-      ev(`(() => {
-        const field = ${row(name)}.querySelector('input');
-        field.value = ${JSON.stringify(value)};
+      rec.call((holding, text) => {
+        const r = [...document.querySelectorAll('.sweep-row')].find(r => r.querySelector('.holding-name').textContent === holding);
+        const field = r.querySelector('input');
+        field.value = text;
         field.dispatchEvent(new Event('input', { bubbles: true }));
-      })()`);
-    const control = (name) => ev(`${row(name)}.querySelector(':scope > button').textContent`);
+      }, name, value);
+    const clickRow = (name, selector) =>
+      rec.call((holding, target) =>
+        [...document.querySelectorAll('.sweep-row')].find(r => r.querySelector('.holding-name').textContent === holding)
+          .querySelector(target).click(), name, selector);
     const pressRow = async (name) => {
-      await ev(`${row(name)}.querySelector(':scope > button').click()`);
+      await clickRow(name, ':scope > button');
       await rec.settle(200);
       await quiet();
     };
+    // Undefined when the sweep has no such row.
     const rowState = (name) =>
-      ev(`JSON.stringify((() => { const r = ${row(name)}; return {
-        state: r.querySelector('.row-state').textContent,
-        field: r.querySelector('input').value,
-        error: r.querySelector('.field-error').hidden ? '' : r.querySelector('.field-error').textContent,
-        disabled: r.querySelector(':scope > button').disabled,
-      }; })())`).then(JSON.parse);
+      rec.call((holding) => {
+        const r = [...document.querySelectorAll('.sweep-row')].find(r => r.querySelector('.holding-name').textContent === holding);
+        return r && {
+          state: r.querySelector('.row-state').textContent,
+          field: r.querySelector('input').value,
+          error: r.querySelector('.field-error').hidden ? '' : r.querySelector('.field-error').textContent,
+          label: r.querySelector(':scope > button').textContent,
+          disabled: r.querySelector(':scope > button').disabled,
+          saved: r.querySelector('.row-saved').textContent,
+          keeps: r.querySelectorAll('.sweep-pair button').length,
+        };
+      }, name);
     const line = (unit) => `document.querySelector('.rate-line[data-unit="${unit}"]')`;
     const lineState = (unit) =>
       ev(`JSON.stringify((() => { const l = ${line(unit)}; return l && {
@@ -4246,10 +4256,10 @@ try {
     await typeRow('Art', '');
     await typeRow('Current account', '1234.56');
     await pressRow('Current account');
+    const savedRow = await rowState('Current account');
     check(
       'record-snapshot: a saved row stays, says so quietly, and reads as recorded',
-      (await ev(`${row('Current account')}.querySelector('.row-saved').textContent`)) === 'Saved.' &&
-        (await rowState('Current account')).state === 'Recorded for this date.',
+      savedRow.saved === 'Saved.' && savedRow.state === 'Recorded for this date.',
     );
     const today = on(await stored('rate'), T).map((r) => r.payload);
     check(
@@ -4440,7 +4450,7 @@ try {
     );
     const confirmLabels = [];
     for (const name of ['Current account', 'Savings', 'Brokerage', 'Gold bars', 'Silver coins', 'Flat', 'Mortgage', 'Fund 1', 'Fund 2', 'Fund 3', 'Fund 4', script]) {
-      confirmLabels.push(await control(name));
+      confirmLabels.push((await rowState(name)).label);
       await pressRow(name);
     }
     await typeRow('Dollar cash', '350.77');
@@ -4763,7 +4773,7 @@ try {
     check(
       'record-snapshot: an archived holding takes no new figure except the closing one its archive wrote',
       closing && closing.payload.value === '0' && !archivedActions.includes('Record a value') &&
-        !(await ev(`Boolean(${row('Fund 3')})`)) && !(await ev(`Boolean(${row('Fund 4')})`)),
+        !(await rowState('Fund 3')) && !(await rowState('Fund 4')),
       JSON.stringify({ closing: closing && closing.payload, archivedActions }),
     );
     await home();
@@ -4792,7 +4802,7 @@ try {
 
     traffic.length = 0;
     await typeRow('Current account', '1111');
-    const saveLabel = await control('Current account');
+    const saveLabel = (await rowState('Current account')).label;
     await pressRow('Current account');
     const change = writesSent();
     const storedCurrent = secondBefore.snapshot.find((s) => s.accountId === id['Current account']);
@@ -4997,8 +5007,7 @@ try {
     await reread();
     await go(`#/recording/${DP}`);
     await press('Update');
-    const pairRow = await ev(`JSON.stringify({ state: ${row('Savings')}.querySelector('.row-state').textContent,
-      keeps: ${row('Savings')}.querySelectorAll('.sweep-pair button').length })`).then(JSON.parse);
+    const pairRow = await rowState('Savings');
     const pairLine = await ev(`JSON.stringify({ flagged: ${line('USD')}.classList.contains('flagged'),
       keeps: [...${line('USD')}.querySelectorAll('.rate-pair button')].length, says: ${line('USD')}.querySelector(':scope > .hint').textContent })`).then(JSON.parse);
     check(
@@ -5011,7 +5020,7 @@ try {
       pairLine.flagged && pairLine.keeps === 2 && pairLine.says.startsWith('Two prices for this unit share this date.'),
       JSON.stringify(pairLine),
     );
-    await ev(`${row('Savings')}.querySelector('.sweep-pair button').click()`);
+    await clickRow('Savings', '.sweep-pair button');
     await quiet();
     await ev(`${line('USD')}.querySelector('.rate-pair button').click()`);
     await quiet();
@@ -5121,7 +5130,7 @@ try {
     await newRecording(D9);
     await rec.settle(300);
     traffic.length = 0;
-    const confirmOffered = await control('Savings');
+    const confirmOffered = (await rowState('Savings')).label;
     await pressRow('Savings');
     const confirmed = writesSent();
     await typeRow('Euro account', '40');
