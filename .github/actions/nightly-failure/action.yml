@@ -1,0 +1,18 @@
+name: Nightly failure
+description: Leaves an issue the loop takes up for a failed night.
+inputs:
+  today:
+    description: The night's date
+    required: true
+  steps:
+    description: The nightly job's steps context, as JSON
+    required: true
+runs:
+  using: composite
+  steps:
+    - run: python3 "$GITHUB_ACTION_PATH/report.py"
+      shell: bash
+      env:
+        TODAY: ${{ inputs.today }}
+        STEPS: ${{ inputs.steps }}
+        RUN: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}

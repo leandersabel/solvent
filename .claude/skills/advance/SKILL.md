@@ -42,11 +42,18 @@ skip a step gets a question to the client instead.
   checks, the client's reviews with their commit, line comments and
   conversation comments, and your marked comments on them.
 - Which other open issues carry `implementing` or `queued`.
+- The issue's rating labels, and who added or removed each (the
+  issue's timeline).
 
 "The client wrote since" below means the client wrote something newer
 than your latest marked comment on the issue and its pull requests.
 
 ## Take the first step that applies
+
+Past steps 1 and 2, a problem issue with no rating that counts
+(`CLAUDE.md`, The loop, Severity) gets one first, creating the label
+with `gh label create` if the repository lacks it. An issue QA filed
+for criteria it could not check stays unrated.
 
 1. **Not started.** The issue is closed, or has no `accepted` and was
    not opened by `github-actions[bot]` (`app/github-actions` in `gh`'s
@@ -129,8 +136,8 @@ Then one comment, and exactly one outcome:
 
 - **Unclear:** the questions, `needs-answer` added, `@leandersabel`
   mentioned.
-- **Bug:** what the requirement is and what Solvent does,
-  `needs-answer` removed, then Implementation.
+- **Bug:** what the requirement is and what Solvent does, its rating
+  added when it has none, `needs-answer` removed, then Implementation.
 - **Maintenance:** what changes in the code and why, `maintenance`
   added, `needs-answer` removed, then Implementation.
 - **Change**, including a pipeline change: the requirements it adds,
@@ -177,9 +184,10 @@ closing `<details>` block.
    ref=refs/heads/claude/slot -f sha=<origin/master>`). GitHub creates
    it only once, so two runs never both hold the slot. Created: add
    `implementing` and remove `queued`. It already exists: add `queued`,
-   comment which issue carries `implementing`, and stop. A `bug` opened
-   by `github-actions[bot]` for a red `master` skips the slot, since
-   every other implementation's checks fail until it is fixed.
+   comment which issue carries `implementing`, and stop. A `bug` titled
+   `The checks fail on master`, opened by `github-actions[bot]`, skips
+   the slot, since every other implementation's checks fail until it is
+   fixed.
 2. `git fetch origin`, and branch `claude/issue-<issue>` from
    `origin/master`. A leftover branch of that name without a pull
    request, holding commits beyond `origin/master`, is the last run's

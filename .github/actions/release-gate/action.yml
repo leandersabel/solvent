@@ -1,0 +1,17 @@
+name: Release gate
+description: Fails while something holds back the version, and lists it in release-blocked.txt.
+inputs:
+  commit:
+    description: The commit to release
+    required: true
+  since:
+    description: The last version's tag. Issues closed since it are checked for a fix in the version, or every closed issue when empty.
+    default: ""
+runs:
+  using: composite
+  steps:
+    - run: python3 "$GITHUB_ACTION_PATH/gate.py"
+      shell: bash
+      env:
+        COMMIT: ${{ inputs.commit }}
+        SINCE: ${{ inputs.since }}
