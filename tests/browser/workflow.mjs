@@ -1507,8 +1507,10 @@ try {
 
   // A second session for the same account, held outside the browser.
   const otherSession = async (username, password) => {
-    const authKey = await page.eval(
-      `(async () => (await import('/static/js/session.js')).authKeyFor(${JSON.stringify(username)}, ${JSON.stringify(password)}))()`,
+    const authKey = await page.call(
+      async (u, p) => (await import('/static/js/session.js')).authKeyFor(u, p),
+      username,
+      password,
     );
     const response = await fetch(`${DIRECT}/api/auth/login`, {
       method: 'POST',
