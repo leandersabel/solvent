@@ -209,6 +209,52 @@ rearrangement:
 - **The current default KDF envelope is still embedded**
   (architecture.md, Key management), for the same reason.
 
+### The bar above a dialog
+
+**While any dialog is open, a vault owner's Lock stays visible and
+operable above it**, at every width, so one press locks whatever is on
+screen (`product/app-shell.md`, Lock). An administrator's dialog covers
+the whole page, bar included: its scrim starts at the viewport's top
+and the bar is `inert` with the rest of the page, because nothing on
+that surface is decrypted and there is nothing for a control above the
+dialog to protect. Everything below describes the vault owner's bar.
+
+- **Layering.** While a dialog is open the bar is `position: sticky;
+  top: 0` and stacks above every scrim. Each scrim, and the full-screen
+  sheet at phone width, starts at the bar's lower edge rather than at
+  the viewport's top: its top is `var(--chrome-height)`. Nothing a
+  scrim or sheet draws overlaps the bar.
+- **What the bar carries.** The nav and Update values take `hidden`
+  when the first dialog opens and lose it when the last one closes,
+  so the bar shows the wordmark and Lock alone. They
+  are hidden rather than made inert, because an inert control still
+  looks pressable.
+- **`--chrome-height`** is the bar's rendered height, set on the root
+  element through the CSSOM (`style.setProperty`, which `style-src
+  'self'` allows), measured after the nav is hidden and measured again
+  whenever the bar's size changes while a dialog is open. At phone
+  width the hidden nav takes its second row with it, so the sheet
+  starts below one row.
+- **Modality is `inert`, not `aria-modal`.** While a dialog is open,
+  everything outside the topmost dialog is `inert` except the bar:
+  the content region and every dialog beneath the topmost. A dialog
+  carries `role="dialog"` and no `aria-modal`, because `aria-modal`
+  hides everything outside the dialog from assistive technology, Lock
+  included. Closing the topmost dialog makes the one beneath it the
+  topmost, and closing the last removes every `inert` this rule set.
+- **The focus trap** cycles Lock and the topmost dialog's focusable
+  elements, in document order: Tab from the dialog's last element
+  reaches Lock, and Tab from Lock reaches the dialog's first. Focus
+  never leaves the two while a dialog is open.
+- **Escape closes the topmost dialog only**, wherever focus is inside
+  the cycle. A dialog beneath stays open. Closing a dialog lifts the
+  `inert` from what lies beneath before focus returns to what opened
+  it, because focus cannot land in an inert region.
+- **Lock with a dialog open** is the lock every other route takes
+  (login.md, Rules). Every dialog closes, and which come back after
+  unlock is `ui/unlock.md`, Rules. A dialog that comes back puts the
+  bar back in this state.
+
 ## Inputs / outputs
 
 - **In**: the session cookie (or none), the environment, and the
@@ -241,6 +287,11 @@ rearrangement:
   failure names the variable without printing any value.
 - **Lock pressed with unsaved form input** → the one named exception in
   login.md, Rules applies; the shell adds no confirmation of its own.
+- **The viewport is resized or rotated with a dialog open** → the bar
+  keeps its place, `--chrome-height` follows its new height, and the
+  scrim or sheet still starts below it.
+- **The page is scrolled when a dialog opens** → the bar sits at the
+  viewport's top, not where it was in the page.
 - **An administrator navigates to a vault route by typing it**
   (`/settings`) → the Not Found an invented address gets, with nothing
   about the kind.
@@ -317,4 +368,36 @@ rearrangement:
 - The lock button discards keys and decrypted state and shows
   re-unlock with no confirmation dialog, and the server session
   survives it (login.md, Rules).
+- **Every Lock assertion with a dialog open is driven by real input**:
+  a mouse click or a touch tap dispatched at the screen coordinates of
+  Lock's center, or key presses. None uses a scripted
+  `element.click()`, which skips hit-testing and so passes with Lock
+  covered.
+- With a Record a value dialog open, at desktop width and at phone
+  width with touch, the element at Lock's center point is Lock or a
+  descendant of it, and no scrim or sheet box intersects the bar's box.
+- With that dialog open and a figure typed into it, one mouse click on
+  Lock at desktop width, and one touch tap on it at phone width, each
+  leave no dialog, no figure and no vault plaintext in the DOM, and show
+  the password screen. Unlocking reopens the dialog with the typed
+  figure (`ui/unlock.md`, Rules).
+- With a confirmation open over a form dialog, one click on Lock closes
+  both, and unlocking restores what `ui/unlock.md`, Rules says comes
+  back.
+- With a dialog open, the bar's nav and Update values are hidden, and
+  the wordmark and Lock are visible. Closing the last dialog shows them
+  again.
+- With a dialog open, the content region and every dialog beneath the
+  topmost are `inert`, the bar is not, and no dialog carries
+  `aria-modal`. In the accessibility tree, Lock is exposed and the
+  content region is not.
+- With a dialog open, repeated Tab presses visit only Lock and the
+  topmost dialog's focusable elements, cycling in both directions, and
+  Tab then Enter on Lock locks as a click does.
+- With a confirmation open over a form dialog, Escape closes the
+  confirmation alone and focus returns to what opened it. A second
+  Escape closes the form.
+- At phone width with a dialog open, `--chrome-height` equals the bar's
+  rendered height and the sheet's top equals the bar's bottom, before
+  and after rotating the viewport.
 - No response body originating in the shell contains vault plaintext.

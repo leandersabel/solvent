@@ -168,8 +168,72 @@ export function mount(node, children) {
   return node;
 }
 
-// Every dialog open right now, so a lock can close them all.
+// Every dialog open right now, bottom to top: a Set keeps insertion
+// order, so the last is the topmost.
 const openDialogs = new Set();
+const topmost = () => [...openDialogs].pop();
+const FOCUSABLE = 'button, [href], input, select, textarea, summary, [tabindex]:not([tabindex="-1"])';
+let barWatch = null;
+
+/** The bar's rendered height, which the scrim and the phone sheet start
+ *  below. Measured rather than fixed, because it changes with the width
+ *  and with what the bar wraps. Set through the CSSOM, which
+ *  `style-src 'self'` allows. */
+function measureBar() {
+  const bar = document.querySelector('.topbar');
+  document.documentElement.style.setProperty('--chrome-height', `${bar.getBoundingClientRect().height}px`);
+}
+
+/** Put the page in the state the open dialogs call for (spec/features/
+ *  app-shell.md, The bar above a dialog). A vault owner's bar stays
+ *  above the scrim with Lock operable and everything else outside the
+ *  topmost dialog inert. An administrator's has no Lock and nothing to
+ *  protect, so the scrim covers it and it goes inert with the rest. */
+function syncPage() {
+  const open = openDialogs.size > 0;
+  const bar = document.querySelector('.topbar');
+  const vaultBar = bar?.querySelector('.btn-lock') ? bar : null;
+  for (const entry of openDialogs) entry.scrim.inert = entry !== topmost();
+  const content = document.querySelector('main');
+  if (content) content.inert = open;
+  if (bar && !vaultBar) bar.inert = open;
+  if (!vaultBar) return;
+
+  vaultBar.classList.toggle('over-dialog', open);
+  // Hidden rather than inert: an inert control still looks pressable.
+  for (const part of vaultBar.querySelectorAll('nav, .topbar-actions > :not(.btn-lock)')) part.hidden = open;
+  if (open) {
+    measureBar();
+    barWatch ??= new ResizeObserver(measureBar);
+    barWatch.observe(vaultBar);
+  } else {
+    barWatch?.disconnect();
+    document.documentElement.style.removeProperty('--chrome-height');
+  }
+}
+
+/** Escape closes the topmost dialog only. Tab cycles Lock, where there
+ *  is one, and the topmost dialog's controls: the one control outside a
+ *  dialog that acts is Lock. */
+function onKey(event) {
+  const top = topmost();
+  if (!top) return;
+  if (event.key === 'Escape') top.close();
+  if (event.key !== 'Tab') return;
+  const lock = document.querySelector('.topbar .btn-lock');
+  const cycle = [
+    ...(lock ? [lock] : []),
+    ...[...top.panel.querySelectorAll(FOCUSABLE)].filter((node) => !node.disabled && node.checkVisibility()),
+  ];
+  if (!cycle.length) return;
+  const at = cycle.indexOf(document.activeElement);
+  const last = cycle.length - 1;
+  if (at < 0) cycle[event.shiftKey ? last : 0].focus();
+  else if (event.shiftKey && at === 0) cycle[last].focus();
+  else if (!event.shiftKey && at === last) cycle[0].focus();
+  else return;
+  event.preventDefault();
+}
 
 /** A focus-trapping dialog with the Escape and restore behaviour every
  *  one in the product shares (spec/ui/design-system.md, Components).
@@ -180,42 +244,30 @@ const openDialogs = new Set();
  *  nothing the person typed. */
 export function dialog({ heading, body, actions, resume = null }) {
   const opener = document.activeElement;
-  const panel = el('div', { class: 'dialog', role: 'dialog', 'aria-modal': 'true' }, [
+  // No `aria-modal`: it hides everything outside the dialog from a
+  // screen reader, Lock included. `inert` does the modal's work.
+  const panel = el('div', { class: 'dialog', role: 'dialog' }, [
     el('h2', { class: 'dialog-heading', text: heading }),
     el('div', { class: 'dialog-body' }, body),
     el('div', { class: 'dialog-actions' }, actions),
   ]);
   const scrim = el('div', { class: 'scrim' }, [panel]);
 
-  const entry = { panel, resume, close: null };
+  const entry = { panel, scrim, resume, close: null };
   const close = ({ refocus = true } = {}) => {
     openDialogs.delete(entry);
     scrim.remove();
-    document.removeEventListener('keydown', onKey);
+    // Before focus returns: it cannot land in an inert region.
+    syncPage();
+    if (!openDialogs.size) document.removeEventListener('keydown', onKey);
     if (refocus && opener && opener.focus) opener.focus();
   };
   entry.close = close;
-  const onKey = (event) => {
-    if (event.key === 'Escape') close();
-    if (event.key !== 'Tab') return;
-    const focusable = panel.querySelectorAll(
-      'button, [href], input, select, textarea, [tabindex]:not([tabindex="-1"])',
-    );
-    if (!focusable.length) return;
-    const first = focusable[0];
-    const last = focusable[focusable.length - 1];
-    if (event.shiftKey && document.activeElement === first) {
-      last.focus();
-      event.preventDefault();
-    } else if (!event.shiftKey && document.activeElement === last) {
-      first.focus();
-      event.preventDefault();
-    }
-  };
 
   document.addEventListener('keydown', onKey);
   document.body.append(scrim);
   openDialogs.add(entry);
+  syncPage();
   trackEdits(panel);
   const focusTarget = panel.querySelector('input, button');
   if (focusTarget) focusTarget.focus();

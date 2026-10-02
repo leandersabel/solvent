@@ -186,6 +186,14 @@ a:hover {
   padding: 8px 14px;
 }
 
+/* While a dialog is open a vault owner's bar stays at the top of the
+   viewport above every scrim, which starts at its lower edge. */
+.topbar.over-dialog {
+  position: sticky;
+  top: 0;
+  z-index: 11;
+}
+
 /* ---- The content region ---- */
 
 .content {
@@ -1550,6 +1558,7 @@ th.numeric {
 .scrim {
   position: fixed;
   inset: 0;
+  top: var(--chrome-height, 0);
   background: rgba(17, 29, 32, 0.4);
   display: flex;
   align-items: center;
@@ -1564,7 +1573,9 @@ th.numeric {
   padding: 32px;
   max-width: 480px;
   width: 100%;
-  max-height: 90vh;
+  /* Within the scrim, which starts below the bar, so a short viewport
+     never lets the box reach up under it. */
+  max-height: min(90vh, 100%);
   overflow-y: auto;
   box-shadow: 0 8px 32px rgba(17, 29, 32, 0.18);
 }

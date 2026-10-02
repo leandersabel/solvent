@@ -72,6 +72,11 @@ Those two buttons are outlined in white and styled for the dark bar
 rather than borrowed from the light page below, so their text and focus
 outline stay readable against it.
 
+While a dialog is open, the bar shows only the wordmark and **Lock**,
+above the dialog, on a computer and on a phone. The navigation and
+Update values cannot act until the dialog closes, so they are hidden
+rather than left looking pressable.
+
 The password screen and the registration screen sit outside the shell.
 They are a single centered card on the warm ground with nothing else on
 the page: no bar, no navigation, no copy selling the product.
@@ -107,7 +112,8 @@ do it and where choosing the date is worth a click
 ### Lock
 
 One press of **Lock** immediately discards the keys and everything
-decrypted from them, and shows the password screen. There is no "are
+decrypted from them, closes any open dialog, and shows the password
+screen. It works the same with a dialog open as without. There is no "are
 you sure". This is the control you reach for when somebody else walks
 into the room, and a confirmation step spends the seconds the control
 exists to save.
@@ -117,7 +123,9 @@ needs the password only and the username is not asked for again.
 
 A lock does not throw away text typed into an open form and not yet
 saved, so locking in the middle of entering figures does not destroy
-the work. Nothing else survives it (`login.md`).
+the work. A form in a dialog comes back after unlocking, with what you
+typed. A confirmation holds nothing you typed, so it does not come
+back. Nothing else survives a lock (`login.md`).
 
 Signing out fully, and signing out everywhere at once, live in Settings
 rather than in the bar, so that two similar controls never sit side by
@@ -182,7 +190,8 @@ route to something a narrow screen could not offer.
 
 1. Every screen a vault owner sees when signed in shows the same top
    bar: the wordmark at the left, the navigation beside it, Update
-   values and Lock at the right.
+   values and Lock at the right. While a dialog is open, the bar shows
+   only the wordmark and Lock.
 2. Everybody with a vault sees exactly two navigation entries,
    Dashboard and Settings. Nobody, ever, sees a Holdings entry or an
    Admin entry. An administrator sees the bar carrying the wordmark and
@@ -197,12 +206,15 @@ route to something a narrow screen could not offer.
    with no screen in between, and it is the same sweep the dashboard's
    New recording button reaches once a date has been picked.
 6. One press of Lock clears every figure from the screen and shows the
-   password screen, with no confirmation step in between.
+   password screen, with no confirmation step in between. This holds
+   with a dialog open too: Lock stays visible and usable above it, on a
+   computer and on a phone, and the same press closes the dialog.
 7. After locking, entering the password alone returns you to the app.
    The username is not asked for again.
 8. Locking while a form holds unsaved typed input, then unlocking,
-   returns that typed input. Nothing else comes back without being
-   decrypted again.
+   returns that typed input, in a dialog as on a page. A confirmation
+   open at the lock does not come back. Nothing else comes back without
+   being decrypted again.
 9. Nothing in the bar or the navigation ever shows a holding's name, a
    figure, or a note.
 
