@@ -78,11 +78,13 @@ Every figure reaches the screen through one formatter built from the
 profile, so a setting cannot apply on one screen and not another.
 The formatter answers:
 
-- **money** — a currency figure at `moneyPlaces`, grouped and pointed
-  as configured. Rounding is half-even, like every other rounding in
-  the product (`net-worth-view.md`).
-- **quantity** — a figure in a unit that is not money, always at two
-  places. It does not follow `moneyPlaces`, because rounding 12.5
+- **money** — a figure in any currency at `moneyPlaces`, grouped and
+  pointed as configured: the main currency, and a holding's own unit
+  whose `kind` in the symbol table is `currency` (`rate-lookup.md`).
+  Rounding is half-even, like every other rounding in the product
+  (`net-worth-view.md`).
+- **quantity** — a figure in any other unit, a metal or free text,
+  always at two places. It does not follow `moneyPlaces`, because rounding 12.5
   ounces of gold to 13 loses the holding.
 - **rate** — six places, because a currency pair moves in the fourth.
 - **date** and **parseDate** — an ISO date written in the configured
@@ -363,6 +365,11 @@ from an administrator removing an account (admin-invites.md).
 - A password change on a vault with old KDF parameters results in
   parameters equal to the server's current default.
 - The main currency field is not editable and states why.
+- With main currency `CHF`, `groupSeparator` `apostrophe` and
+  `moneyPlaces` `0`, a `USD` holding valued 1000.40 shows `USD 1’000`
+  wherever its amount appears with its unit, and `1’000` in its holding
+  page's list of values. An `XAU-ozt` holding of 12.5 shows `12.50` in
+  both places.
 - Account deletion removes the principal row, its credential rows, its
   wrappers, all records, and all sessions; a subsequent login with
   those credentials fails.

@@ -168,10 +168,17 @@ export class Vault {
     return { symbol, currency, name, short, one: currency ? `1 ${symbol}` : `1 ${counted || short}` };
   }
 
+  /** A figure in its unit's own places: money places for a currency,
+   *  two for any other unit, where rounding 12.5 ounces to 13 would
+   *  lose the holding. */
+  figure(value, symbol) {
+    return this.unitOf(symbol).currency ? this.format.money(value) : this.format.quantity(value);
+  }
+
   /** A quantity with its unit: "CHF 48’210.35", "12.50 ozt". */
   amount(value, symbol) {
     const unit = this.unitOf(symbol);
-    const figure = this.format.quantity(value);
+    const figure = this.figure(value, symbol);
     return unit.currency ? `${unit.symbol} ${figure}` : `${figure} ${unit.short}`;
   }
 

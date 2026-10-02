@@ -941,6 +941,33 @@ try {
     !(await page.eval("Boolean(document.querySelector('#unlock-password'))")),
   );
 
+  // Decimals on money = None: a holding in a currency loses its cents
+  // (8300.50 is a tie and rounds to the even franc), one in another unit
+  // keeps its two places (12.5 ounces must not read 13).
+  const nativeFigure = (name) => page.eval(`(() => {
+    const row = [...document.querySelectorAll('.data-table tbody tr')]
+      .find((r) => r.querySelector('.row-name')?.textContent === ${JSON.stringify(name)});
+    return row.querySelector('.cell-native').textContent;
+  })()`);
+  const dollars = await nativeFigure('UBS dollar account');
+  const gold = await nativeFigure('Gold bars');
+  check('a dollar holding on the dashboard reads without cents', dollars === 'USD 8’300', dollars);
+  check('an ounce holding on the dashboard keeps its two places', gold === '12.50 ozt', gold);
+  for (const [name, hero, listed] of [
+    ['UBS dollar account', 'USD 8’300', '8’300'],
+    ['Gold bars', '12.50 ozt', '12.50'],
+  ]) {
+    await page.eval(`[...document.querySelectorAll('.data-table tbody .row-name')].find((b) => b.textContent === ${JSON.stringify(name)}).click()`);
+    await page.waitUntil("location.hash.startsWith('#/holding/')", { label: `${name} page` });
+    await page.settle(500);
+    const header = await page.eval("document.querySelector('.hero-figure').textContent");
+    const first = await page.eval("document.querySelector('.card .data-table tbody tr td.numeric').textContent");
+    check(`${name}: the page header follows the unit's kind`, header === hero, header);
+    check(`${name}: the list of values follows the unit's kind`, first === listed, first);
+    await page.eval("location.hash = '#/'");
+    await page.settle(500);
+  }
+
   await page.eval(`document.querySelector('.topbar nav a[href="#/settings"]').click()`);
   await page.waitUntil("document.body.innerText.includes('Main currency')", { timeout: 20000, label: 'settings once more' });
   await page.settle(400);
