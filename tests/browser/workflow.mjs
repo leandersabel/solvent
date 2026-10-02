@@ -7251,7 +7251,6 @@ try {
   // collapses the leading slashes before the app sees them.
   {
     const signedOut = await openBrowser();
-    const signedOutRequests = watched.at(-1).requests;
     const owner = await openBrowser(`${BASE}/login`);
     const administrator = await openBrowser(`${BASE}/login`);
     try {
@@ -7297,6 +7296,24 @@ try {
       await signedOut.session.goto(`${BASE}/login`);
       await signedOut.session.waitUntil("document.querySelector('.signin-card')", { timeout: 30000, label: 'the sign-in card' });
       const signInFont = await signedOut.session.eval("getComputedStyle(document.querySelector('.signin-card')).fontFamily");
+      // Every resource the page asks for answers OK and nothing is
+      // logged but the browser's note on the page's own 404.
+      const answered = [];
+      const logged = [];
+      signedOut.session.on((message) => {
+        if (message.method === 'Network.responseReceived' && message.params.type !== 'Document') {
+          answered.push(`${message.params.response.url} ${message.params.response.status}`);
+        }
+        if (
+          message.method === 'Log.entryAdded' &&
+          message.params.entry.level === 'error' &&
+          message.params.entry.url !== `${BASE}/a/b/c/`
+        ) {
+          logged.push(`${message.params.entry.url || ''} ${message.params.entry.text}`);
+        }
+        if (message.method === 'Runtime.consoleAPICalled' && message.params.type === 'error') logged.push('console.error');
+      });
+      await signedOut.session.send('Log.enable');
       await signedOut.session.goto(`${BASE}/a/b/c/`);
       await signedOut.session.settle(500);
       const drawn = await signedOut.session.eval(`(() => {
@@ -7306,15 +7323,20 @@ try {
           ground: 'rgb(' + rgb + ')',
           background: getComputedStyle(document.body).backgroundColor,
           font: getComputedStyle(document.querySelector('.card h1')).fontFamily,
+          padding: getComputedStyle(document.querySelector('.card')).paddingLeft,
+          bottom: getComputedStyle(document.querySelector('.card')).marginBottom,
         };
       })()`);
       check('the Not Found page is on the ground colour', drawn.background === drawn.ground, `${drawn.background} vs ${drawn.ground}`);
       check('the Not Found page is set in the sign-in card typeface', drawn.font === signInFont && !/^["']?Times/.test(drawn.font), `${drawn.font} vs ${signInFont}`);
+      check('at desktop width the card pads 32px and has no bottom margin', drawn.padding === '32px' && drawn.bottom === '0px', `${drawn.padding}, ${drawn.bottom}`);
       check(
-        'the stylesheet and icon of a deep invented path are asked for from /static/',
-        ['/static/css/tokens.css', '/static/icon.png'].every((path) => signedOutRequests.some((r) => r.url === `${BASE}${path}`)),
-        signedOutRequests.map((r) => r.url).join(' '),
+        'the stylesheet of a deep invented path loads from /static/ and every resource answers OK (a revalidated 304 included)',
+        answered.some((entry) => entry.startsWith(`${BASE}/static/css/tokens.css `)) &&
+          answered.every((entry) => Number(entry.split(' ').at(-1)) < 400),
+        answered.join(' | '),
       );
+      check('the deep invented path logs no console error', logged.length === 0, logged.join(' | '));
       await signedOut.session.send('Emulation.setDeviceMetricsOverride', { width: 390, height: 844, deviceScaleFactor: 2, mobile: false });
       await signedOut.session.settle(300);
       const phone = await signedOut.session.eval(`(() => {

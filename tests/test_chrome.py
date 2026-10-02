@@ -445,6 +445,15 @@ def test_a_server_error_is_one_body_for_every_visitor(visitors):
     assert FAILURE not in visitors[0].get("/a/b/c/").get_data(as_text=True)
 
 
+def test_a_server_error_with_the_database_unavailable_is_the_same_body(app, visitors, tmp_path):
+    with_database = visitors[0].get("/static/__boom").get_data()
+    app.config["DATABASE_PATH"] = str(tmp_path / "no-such-directory" / "solvent.db")
+    for visitor in visitors:
+        response = visitor.get("/static/__boom")
+        assert response.status_code == 500
+        assert response.get_data() == with_database
+
+
 def test_both_error_bodies_carry_the_head_and_the_one_link_and_nothing_else(visitors):
     for path in ("/a/b/c/", "/static/__boom"):
         body = visitors[0].get(path).get_data(as_text=True)
