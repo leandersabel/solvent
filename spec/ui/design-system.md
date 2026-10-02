@@ -352,6 +352,12 @@ only its own content region.
 - **At phone width** the nav drops to a second row of the bar, beneath
   the wordmark and the two buttons, and the lock button shows its icon
   alone, keeping "Lock" as its accessible name.
+- **While a dialog is open** a vault owner's bar carries only the
+  wordmark and Lock. The nav and Update values are hidden, not disabled, because
+  neither can act until the dialog closes (`product/app-shell.md`, The
+  top bar). The bar stays pinned to the top of the viewport above the
+  scrim, at every width and however far the page had scrolled, so at
+  phone width it is then a single row.
 - **Nav is Dashboard and Settings**, the same for everybody who has a
   vault.
   - There is deliberately **no "Holdings" entry**: the dashboard's own
@@ -380,7 +386,10 @@ only its own content region.
   discards the keys and all decrypted state and shows the re-unlock
   screen (`unlock.md`, with the rule in `login.md`, Rules). The server
   session stays alive, so unlocking needs only the password. No
-  confirmation dialog (`product/app-shell.md`, Lock).
+  confirmation dialog (`product/app-shell.md`, Lock). With a dialog
+  open it is the one control outside the dialog that acts (Components,
+  Dialog), and the same click closes every open dialog. Which of them
+  come back after unlocking is `unlock.md`'s (Rules).
 - Content max-width 1200px on the ground, and each screen states its
   own narrower width.
 - The shell is server-rendered Jinja (`architecture.md`, Components)
@@ -494,9 +503,31 @@ only its own content region.
   turns on in words beside itself.
 - **Dialog**: white surface, 10px radius, 32px padding, max-width
   480px, centered on an ink-primary scrim at 40%. **The one place a
-  soft shadow is permitted.** It traps focus, restores it to whatever
-  opened it, closes on Escape, and its first line is a heading that
-  names the act rather than asking "Are you sure".
+  soft shadow is permitted.** Its first line is a heading that names
+  the act rather than asking "Are you sure".
+  - **The scrim and the dialog start below a vault owner's top bar**,
+    never over it, so Lock stays in view (App shell). In the
+    administrator's frame there is no Lock to keep in view, so the
+    scrim covers the whole viewport, bar included, and so does the
+    sheet at phone width. The scrim covers the
+    viewport from the bar's lower edge down and the dialog centers in
+    that space. The bar's height is measured into `--chrome-height`
+    rather than fixed, because it changes with the width and with what
+    the bar wraps.
+  - **Modal to everything but Lock.** While a dialog is open,
+    everything outside it is `inert` except the Lock button. Focus is
+    trapped in one cycle of the dialog's controls and Lock: Tab from
+    the dialog's last control reaches Lock, and Tab from Lock returns
+    to the dialog's first. The dialog carries no `aria-modal`, because
+    that tells a screen reader nothing outside is reachable, Lock
+    included. In the administrator's frame everything outside the
+    dialog is inert.
+  - **A dialog opened from inside another**, such as a confirmation
+    over a form, stacks above it, and the one beneath is inert with the
+    rest of the page until the top one closes.
+  - **Escape closes the topmost dialog only.** Closing a dialog, by
+    Escape or by its own controls, returns focus to whatever opened
+    it.
   - **A destructive dialog** names the consequence in its body and
     carries the filled critical confirm (Button, destructive). One
     confirmation, never a ladder.
@@ -510,9 +541,10 @@ only its own content region.
     stops a slip of the hand before it costs everything. Anywhere else
     a typed word would only teach people to type it without reading,
     and the confirm button alone is the confirmation.
-  - **At phone width it is a full-screen sheet**, same content and same
-    focus behavior, because a centered box inside a narrow viewport
-    leaves nothing for the scrim to show. The first version ships the
+  - **At phone width it is a full-screen sheet** filling the viewport
+    below a vault owner's top bar, same content and same focus behavior, because a
+    centered box inside a narrow viewport leaves nothing for the scrim
+    to show. The first version ships the
     dialog, and nothing about the sheet is out of reach from it
     (`app-shell.md`).
 - **Disclosure**: a label with a chevron that opens a section in place.
@@ -609,8 +641,9 @@ upward from zero reads as a slot machine. Respect
 - Visible focus ring on every interactive element, never suppressed.
 - Identity is never color-alone: charts carry a legend for ≥2 series and
   direct labels for ≤4; status carries an icon and a label.
-- All interactive elements reachable and operable by keyboard; modals
-  trap focus and restore it on close.
+- All interactive elements reachable and operable by keyboard. A
+  dialog traps focus with Lock in its cycle and restores focus on close
+  (Components, Dialog).
 - **Phones and tablets are supported targets, not a degraded case.**
   Every screen is reachable, usable and submittable on a touch screen,
   and no action anywhere lives only in a wide layout

@@ -148,6 +148,14 @@ moment it is shown the screen does not know which it is.
   discarding all decrypted state (`login.md`, Rules). Everything else
   on that view is re-read and re-decrypted, so it repopulates rather
   than reappearing.
+- **A dialog opened to fill in or choose something comes back**,
+  destructive or not, reopening over the restored view with what was
+  typed in it. A password field comes back empty, because a password
+  never outlives a lock.
+- **A confirmation that asks only yes or no does not come back**,
+  because it holds nothing typed. Where one was open over a form, the
+  form comes back alone, and the act it confirmed waits for the form's
+  own button to be pressed again.
 - The page embeds the server's current default KDF envelope, since it
   sits outside the app shell and has no session with which to fetch one
   (`design-system.md`, App shell).
