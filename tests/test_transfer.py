@@ -247,10 +247,12 @@ def test_a_fault_mid_import_leaves_the_original_vault_intact(app, fault):
     sign_in(app, "owner", auth_key)
     holding_with_snapshots(owner)
     records = [dict(record, version=1, nonce=b64(12)) for record in exported_records(owner)]
+    # Not last_active_at: each request between the reads writes it.
+    sessions = "SELECT id, token_hash, principal_id, issued_at FROM sessions ORDER BY id"
     before = (
         all_rows(app),
         rows(app, "SELECT * FROM dek_wrappers"),
-        rows(app, "SELECT * FROM sessions ORDER BY id"),
+        rows(app, sessions),
     )
     listed = owner.get("/api/records?type=snapshot", headers=CSRF).get_json()
 
@@ -264,7 +266,7 @@ def test_a_fault_mid_import_leaves_the_original_vault_intact(app, fault):
     assert (
         all_rows(app),
         rows(app, "SELECT * FROM dek_wrappers"),
-        rows(app, "SELECT * FROM sessions ORDER BY id"),
+        rows(app, sessions),
     ) == before
     assert owner.get("/api/records?type=snapshot", headers=CSRF).get_json() == listed
 

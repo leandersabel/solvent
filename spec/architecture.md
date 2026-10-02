@@ -788,8 +788,14 @@ Actors this design defends against vs. accepts:
     column.** Kind is read through `principal_id`, so there is exactly
     one place it is written and a session can never disagree with the
     account it belongs to.
-  - **`last_active_at` is written on every authenticated request**, not
-    only read. It is what `GET /api/sessions` reports.
+  - **`last_active_at` is written on every request with a valid
+    session that passes step 4 of app-shell.md, The request gate**,
+    including one the gate or the route refuses afterwards, because the
+    session was used either way. It is what `GET /api/sessions`
+    reports. Where `spec/features/` says such a refused request "writes
+    nothing" or "changes nothing", it means nothing beyond this one
+    column. A request the gate refuses at or before step 4, one without
+    the header included, writes nothing at all.
 - **Session cookies**: `HttpOnly`, `Secure`, `SameSite=Lax`. Flask
   `SECRET_KEY` must be a strong value injected externally (TrueNAS app
   env), never a default or committed value — the signature is what
