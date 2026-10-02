@@ -16,8 +16,8 @@ the current default KDF envelope (architecture.md, Key management).
 Set in one place and carried by every response, including error
 responses:
 
-- **CSP** — the literal policy in architecture.md, Application
-  hardening. It does not vary by route. A route that would need a
+- **CSP** — as stated in architecture.md, Application hardening. It
+  does not vary by route. A route that would need a
   looser policy is a design change, not a local override.
 - **HSTS** — as stated in architecture.md, Network & transport,
   including the condition on `preload`.
@@ -299,8 +299,7 @@ dialog to protect. Everything below describes the vault owner's bar.
 ## Acceptance criteria
 
 - Every response — a shell page, a JSON endpoint, a Not Found, and a
-  Server Error — carries the CSP byte-identical to architecture.md's,
-  and carries HSTS.
+  Server Error — carries the same CSP, and carries HSTS.
 - No screen, the error pages reached by navigation included, produces
   any error in the browser console, and the Alpine build served is the
   CSP-safe one.

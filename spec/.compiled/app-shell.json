@@ -12,7 +12,7 @@
   ],
   "dependsOn": ["register", "login", "record-snapshot"],
   "parameters": {
-    "csp": {"value": "default-src 'none'; script-src 'self' 'wasm-unsafe-eval'; connect-src 'self'; img-src 'self'; style-src 'self'; frame-ancestors 'none'; base-uri 'none'; form-action 'self'", "cite": "spec/architecture.md#application-hardening"},
+    "csp": {"value": "everything refused by default. Scripts, styles, images, connections and form posts to the page's own origin only. wasm-unsafe-eval for the Argon2id module and nothing else. No unsafe-inline or unsafe-eval, no base, no framing (frame-ancestors 'none')", "cite": "spec/architecture.md#application-hardening"},
     "cspIsInvariant": {"value": "the policy does not vary by route. A route that would need a looser policy is a design change, not a local override", "cite": "spec/features/app-shell.md#response-headers"},
     "noXFrameOptions": {"value": "no separate X-Frame-Options header is served. frame-ancestors 'none' in the CSP covers framing", "cite": "spec/features/app-shell.md#response-headers"},
     "hsts": {"value": "includeSubDomains always, plus preload only once the deployment is internet-reachable on a fixed domain that has served the header stably for the required probation period. Not applicable to a LAN or VPN-only deployment", "cite": "spec/architecture.md#network-transport"},

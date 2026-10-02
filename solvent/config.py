@@ -66,8 +66,7 @@ MIN_KDF_ENVELOPE = dict(DEFAULT_KDF_ENVELOPE)
 # in depth, not the work factor (login.md, Rules).
 SERVER_VERIFY_PARAMS = {"m": 65536, "t": 2, "p": 1}
 
-# Two years, the conventional HSTS max-age. The spec does not pin it,
-# unlike the CSP string and the header names.
+# Two years, the conventional HSTS max-age. The spec does not pin it.
 _DEFAULT_HSTS_MAX_AGE = 63072000
 
 _TRUTHY = ("1", "true", "yes")
