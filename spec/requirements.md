@@ -80,7 +80,10 @@
 - A vault with no filing works fully.
 - When a holding ends, you choose between archiving it and deleting it
   for good with all its history.
-- Archiving can be undone.
+- Archiving a holding sets it to zero on the date it is archived. On the
+  chart it runs gradually from its last figure to that zero.
+- Archiving can be undone. Undoing it lets you enter values for the
+  holding again, and leaves its history as it is.
 
 ## Main currency
 
@@ -94,7 +97,8 @@
 ## Recording values
 
 - You record a figure only for the holdings you have one for.
-- Solvent never writes a figure you did not give it.
+- Solvent never writes a figure you did not give it. Archiving a holding
+  is how you give it its zero.
 - Solvent never counts, flags or reminds you of the holdings you left
   alone.
 - You can record figures for past dates, years back, including dates
