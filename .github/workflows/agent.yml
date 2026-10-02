@@ -50,14 +50,17 @@ jobs:
           jqe() { jq -r "$1" "$GITHUB_EVENT_PATH"; }
           from_branch() { sed -nE "s#^claude/(spec|issue)-([0-9]+)\$#\2#p" <<<"$1"; }
           dispatch() { gh workflow run agent.yml --ref master -f issue="$1"; }
-          # The lowest-numbered queued issue starts once nothing is
-          # being implemented.
+          # Once nothing is being implemented, the queued issue that
+          # starts is the lowest-numbered critical one, then high, then
+          # any (CLAUDE.md, The loop, Severity).
           # Once nothing carries `implementing`, the slot branch is free
           # (advance skill, Implementation).
           next_queued() {
             [ -z "$(gh issue list --state open --label implementing --json number --jq '.[].number')" ] || return 0
             gh api -X DELETE "repos/$GH_REPO/git/refs/heads/claude/slot" >/dev/null 2>&1 || true
-            gh issue list --state open --label queued --json number --jq 'map(.number) | min // empty'
+            gh issue list --state open --label queued --json number,labels --jq '
+              map([(.labels | map(.name) | if index("severity: critical") then 0 elif index("severity: high") then 1 else 2 end), .number])
+              | min // empty | .[1]'
           }
           # Each code scanning alert on master gets an issue of its own,
           # which starts at once (CLAUDE.md, The loop, Intake). One whose
@@ -72,7 +75,9 @@ jobs:
                 '[.[] | select(.title | startswith($p))][0] // empty | "\(.number) \(.state) \(.stateReason)"' <<<"$filed")
               read -r number state reason <<<"$found"
               if [ -z "$number" ]; then
-                number=$(gh issue create --label code-scanning \
+                rating="severity: $(jq -r '.rule.security_severity_level // (if .rule.severity == "error" then "medium" else "low" end)' <<<"$alert")"
+                gh label create "$rating" >/dev/null 2>&1 || true
+                number=$(gh issue create --label code-scanning --label "$rating" \
                   --title "Code scanning alert $n: $(jq -r .rule.description <<<"$alert")" \
                   --body "$(jq -r '"\(.rule.security_severity_level // .rule.severity) severity, rule `\(.rule.id)`, in `\(.most_recent_instance.location.path)` line \(.most_recent_instance.location.start_line).\n\n> \(.most_recent_instance.message.text)\n\n\(.html_url)"' <<<"$alert")" \
                   | sed 's#.*/##')
