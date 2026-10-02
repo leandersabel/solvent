@@ -19,12 +19,6 @@
          data-kind="{{ invite_kind }}"
          data-token="{{ invite_token }}"
          data-currencies='{{ currencies | tojson }}'></div>
-    {# zxcvbn is loaded only by the screens that score a password
-       (architecture.md, Supply chain). It is the largest file the
-       browser loads and the app shell has no use for it, so it does
-       not ride along on every authenticated page. #}
-    <script src="{{ url_for('static', filename='vendor/zxcvbn/' ~ zxcvbn_version ~ '/zxcvbn.js') }}"
-            integrity="{{ zxcvbn_sri }}" crossorigin="anonymous"></script>
     <script type="module" src="{{ url_for('static', filename='js/page-register.js') }}"></script>
   {% endif %}
 {% endblock %}

@@ -15,7 +15,6 @@ from __future__ import annotations
 import flask
 
 from .config import DEFAULT_KDF_ENVELOPE
-from .crypto import ZXCVBN_SRI, ZXCVBN_VERSION
 
 # The CSP-safe Alpine build, self-hosted with a pinned version and SRI
 # (spec/architecture.md, Supply chain). See
@@ -49,6 +48,4 @@ def init_app(app: flask.Flask) -> None:
         kdf_envelope=DEFAULT_KDF_ENVELOPE,
         alpine_version=ALPINE_VERSION,
         alpine_sri=ALPINE_SRI,
-        zxcvbn_version=ZXCVBN_VERSION,
-        zxcvbn_sri=ZXCVBN_SRI,
     )
