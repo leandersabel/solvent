@@ -176,6 +176,33 @@ export class Session {
     return result.result.value;
   }
 
+  // Real input at screen coordinates, which is hit-tested like a
+  // person's: whatever is on top at (x, y) receives it. A scripted
+  // element.click() skips that, and so passes with the control covered.
+  async mouseClick(x, y) {
+    const at = { x, y, button: 'left', clickCount: 1 };
+    await this.send('Input.dispatchMouseEvent', { type: 'mouseMoved', x, y });
+    await this.send('Input.dispatchMouseEvent', { type: 'mousePressed', ...at });
+    await this.send('Input.dispatchMouseEvent', { type: 'mouseReleased', ...at });
+  }
+
+  async tap(x, y) {
+    await this.send('Input.dispatchTouchEvent', { type: 'touchStart', touchPoints: [{ x, y }] });
+    await this.send('Input.dispatchTouchEvent', { type: 'touchEnd', touchPoints: [] });
+  }
+
+  async key(name, { shift = false } = {}) {
+    const keys = {
+      Tab: { code: 'Tab', windowsVirtualKeyCode: 9 },
+      Enter: { code: 'Enter', windowsVirtualKeyCode: 13, text: '\r' },
+      Escape: { code: 'Escape', windowsVirtualKeyCode: 27 },
+    };
+    const { text, ...rest } = keys[name];
+    const modifiers = shift ? 8 : 0;
+    await this.send('Input.dispatchKeyEvent', { type: text ? 'keyDown' : 'rawKeyDown', key: name, text, modifiers, ...rest });
+    await this.send('Input.dispatchKeyEvent', { type: 'keyUp', key: name, modifiers, ...rest });
+  }
+
   settle(ms = 120) {
     return new Promise((r) => setTimeout(r, ms));
   }
