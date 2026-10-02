@@ -64,7 +64,8 @@ what you see, that is:
 
 ### The top bar
 
-Deep petrol blue, full width, on every signed-in screen. Left to right:
+Deep petrol blue, full width, on every signed-in screen except a page
+that cannot be shown (see below). Left to right:
 the wordmark "Solvent", the navigation beside it, and at the right the
 **Update values** action and the **Lock** button.
 
@@ -166,6 +167,28 @@ A content region arrives empty and fills once the browser has decrypted
 what belongs in it. That is why a screen shows its skeleton first, and
 why a page refresh always costs a fresh decryption.
 
+### A page that cannot be shown
+
+An address with no page behind it, such as a mistyped one, shows a
+single centered card on the warm ground, like the password screen: the
+name Solvent above it, the sentence "There is no page at this address."
+and one button, **Go to Solvent**, which opens the screen Solvent
+starts on for you.
+
+An address you may not open shows exactly the same page. The admin area
+opened from inside a vault is one, and a vault screen opened by an
+administrator is another. Telling the two apart would confirm which
+addresses exist, which this instance does not hand out
+(`admin-invites.md`).
+
+An unexpected failure shows the same card with the sentence "Something
+went wrong and this page could not be shown." It says nothing about the
+cause.
+
+These pages carry no top bar, because the bar depends on who is signed
+in, and these pages look the same to everybody: a stranger, a vault
+owner and an administrator.
+
 ## On a phone
 
 Every screen can be read and operated end to end on a phone, without
@@ -191,7 +214,8 @@ route to something a narrow screen could not offer.
 1. Every screen a vault owner sees when signed in shows the same top
    bar: the wordmark at the left, the navigation beside it, Update
    values and Lock at the right. While a dialog is open, the bar shows
-   only the wordmark and Lock.
+   only the wordmark and Lock. A page that cannot be shown is the one
+   exception (23).
 2. Everybody with a vault sees exactly two navigation entries,
    Dashboard and Settings. Nobody, ever, sees a Holdings entry or an
    Admin entry. An administrator sees the bar carrying the wordmark and
@@ -255,6 +279,22 @@ route to something a narrow screen could not offer.
     would either sign everyone out on every restart or leave sessions
     forgeable, and surface much later as something inexplicable. No
     secret appears in a log line or on an error page.
+
+**A page that cannot be shown**
+
+23. Opening an address with no page behind it shows a single card on
+    the warm off-white ground, in the same type as the rest of the app,
+    never the browser's default: the name Solvent above it, the
+    sentence "There is no page at this address." and one button, Go to
+    Solvent. There is no top bar.
+24. An address you may not open, such as the admin area while signed in
+    to a vault, shows exactly that page. Nothing on it tells a refused
+    address from one that does not exist.
+25. An unexpected failure shows the same card with the sentence
+    "Something went wrong and this page could not be shown." and one
+    button, Go to Solvent, and nothing about the cause.
+26. Each of these pages looks the same whether you are signed out,
+    signed in to a vault, or signed in as an administrator.
 
 ## What it deliberately does not do
 

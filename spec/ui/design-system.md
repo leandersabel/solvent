@@ -394,11 +394,12 @@ only its own content region.
   own narrower width.
 - The shell is server-rendered Jinja (`architecture.md`, Components)
   and carries no plaintext, only nav labels and the wordmark.
-- **Outside the shell** sit unlock and register (`unlock.md`,
-  `register.md`): one centered card on the warm ground under the
-  wordmark in petrol-800, no navigation and no marketing, each setting
-  its own width. Having no session with which to fetch one, each
-  embeds the server's current default KDF envelope in its own page.
+- **Outside the shell** sit unlock, register and the error page
+  (`unlock.md`, `register.md`, `error-page.md`): one centered card on
+  the warm ground under the wordmark in petrol-800, no navigation and
+  no marketing, each setting its own width. Unlock and register, having
+  no session with which to fetch one, each embed the server's current
+  default KDF envelope in their own page.
 
 ## Components
 

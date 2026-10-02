@@ -4,12 +4,14 @@
 
 One Flask application wraps every other feature: it sets the response
 headers, enforces the CSRF header, issues and reads the session cookie,
-opens the SQLite file, and renders the chrome the authenticated screens
-sit inside. Each is stated once here and holds for every route.
+opens the SQLite file, renders the chrome the authenticated screens
+sit inside, and renders the error pages. Each is stated once here and
+holds for every route.
 
 The shell never handles plaintext financial data (architecture.md,
-Components). What it renders as text is nav labels, the wordmark, and
-the current default KDF envelope (architecture.md, Key management).
+Components). What it renders as text is nav labels, the wordmark, the
+error pages' fixed copy, and the current default KDF envelope
+(architecture.md, Key management).
 
 ## Response headers
 
@@ -173,6 +175,41 @@ A refusal carries only the headers every response carries (Response
 headers), and its body depends only on its status and namespace: no
 `Set-Cookie`, `Allow` or `Location`, and no header a route sets on its
 own response, such as `Cache-Control: no-store` or `Referrer-Policy`.
+A Forbidden or Not Found body is the one Error pages pins.
+
+## Error pages
+
+Forbidden, Not Found and Server Error answer with one HTML document,
+rendered from `error.html` (`product/app-shell.md`, A page that cannot
+be shown). Its layout, copy and document title are `ui/error-page.md`.
+
+- **Two bodies, not three.** The template takes one variant, `missing`
+  or `failure`. Forbidden and Not Found render `missing` and are
+  byte-identical, so the body never tells a refused address from an
+  invented one. Server Error renders `failure`.
+- **The variant is the template's only input.** It reads no session,
+  principal kind, path, query string, request header or database value,
+  and no context processor hands it one. So the page is the same for
+  every visitor, and a Server Error caused by the database still
+  renders.
+- **The head** is `<meta charset="utf-8">`, `<meta name="viewport"
+  content="width=device-width, initial-scale=1">`, the title, the
+  stylesheet `css/tokens.css` and the icon (CSRF), on `<html
+  lang="en">`. The page loads nothing else.
+- **Root-absolute URLs.** The stylesheet and icon are referenced as
+  the static endpoint builds them, `/static/...`, never relative. The
+  page answers paths of any depth, and a relative URL under an invented
+  path resolves to another invented path, whose refusal is a console
+  error and leaves the page unstyled.
+- **No script and no inline style.** No `<script>` element of any type,
+  so no KDF envelope either, unlike the pages outside the shell:
+  nothing on the page acts. No `<style>` element and no `style`
+  attribute, which `style-src 'self'` refuses.
+- **One link.** Exactly one `<a>`, `href="/"`, which the root path
+  resolves by kind (The two surfaces). No form, and the wordmark is
+  text, not a link.
+- **No bar.** The chrome depends on the kind, which this page does not
+  read.
 
 ## The chrome
 
@@ -295,6 +332,12 @@ dialog to protect. Everything below describes the vault owner's bar.
 - **An administrator navigates to a vault route by typing it**
   (`/settings`) → the Not Found an invented address gets, with nothing
   about the kind.
+- **A browser opens an API path without the header** (`/api/export`)
+  → Forbidden, with the `missing` body.
+- **An invented path several segments deep** (`/a/b/c/`) → the
+  stylesheet and icon still load from `/static/`.
+- **A Server Error during a signed-in request** → the same `failure`
+  body a signed-out request gets.
 
 ## Acceptance criteria
 
@@ -329,6 +372,28 @@ dialog to protect. Everything below describes the vault owner's bar.
 - In a real browser, `/admin` signed out and as a vault owner,
   `/settings` as an administrator, and an invented page path render
   the identical Not Found.
+- The body of `GET /api/export` without the header (Forbidden) equals
+  the body of an invented page path (Not Found) byte for byte, and
+  each is byte-identical with no session, a vault owner's and an
+  administrator's.
+- A stubbed Server Error has the same body with no session, a vault
+  owner's and an administrator's. It contains "Something went wrong and
+  this page could not be shown." and not "There is no page at this
+  address.", and the Not Found body the reverse.
+- In both bodies: the viewport meta above, exactly one
+  `<link rel="stylesheet">` with `href` `/static/css/tokens.css`, the
+  icon link, exactly one `<a>` with `href="/"`, and no `<script>`,
+  `<style>`, `style` attribute, `<form>` or `<nav>`.
+- In a real browser, at an invented path several segments deep and on a
+  stubbed Server Error: the body's computed background color equals
+  the root's `--ground`, the card text's computed `font-family` equals
+  the sign-in card's, every resource the page requests answers OK, and
+  the console has no error.
+- At a 390px-wide viewport, both bodies have no horizontal overflow:
+  the document's `scrollWidth` does not exceed its `clientWidth`.
+- Activating Go to Solvent navigates to `/`, which shows the sign-in
+  card with no session, the Dashboard for a vault owner and the Admin
+  area for an administrator.
 - Starting the app with `SECRET_KEY` unset fails, and the message
   contains the variable name and no key material.
 - Nav shows Dashboard and Settings for a vault owner. An

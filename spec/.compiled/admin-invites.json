@@ -4,7 +4,7 @@
   "read": [
     {"file": "spec/features/admin-invites.md", "sections": ["all"]},
     {"file": "spec/architecture.md", "sections": ["Accounts on this instance", "Credentials and vault key wrappers", "Threat model", "Application hardening", "Storage & data handling", "Status codes", "Refusals"]},
-    {"file": "spec/features/app-shell.md", "sections": ["The two surfaces", "The request gate", "Database", "CSRF", "The chrome", "Acceptance criteria"], "role": "the request gate that refuses every /api/admin/ request before any handler runs, at the status the Refusals table gives, and the administrator's stripped chrome. Its refusal fingerprint matrix is where the admin routes' refusals are matched"},
+    {"file": "spec/features/app-shell.md", "sections": ["The two surfaces", "The request gate", "Error pages", "Database", "CSRF", "The chrome", "Acceptance criteria"], "role": "the request gate that refuses every /api/admin/ request before any handler runs, at the status the Refusals table gives, the error page a refused /admin navigation shows, and the administrator's stripped chrome. Its refusal fingerprint matrix is where the admin routes' refusals are matched"},
     {"file": "spec/features/register.md", "sections": ["What it does", "What registration writes", "Rules", "Edge cases"], "role": "the consumer of an invite and the writer of the kind it names"},
     {"file": "spec/features/login.md", "sections": ["The session a sign-in issues"], "role": "the rule that writes last_login_at, which GET /api/admin/accounts reports as lastLoginAt"},
     {"file": "spec/features/account-settings.md", "sections": ["Change password", "Delete my account"], "role": "the shared change-password endpoint an administrator reaches, and the vault owner deletion path this one is not"},
@@ -66,6 +66,7 @@
       "a fault injected mid-delete, for the target account being fully intact and able to sign in afterwards",
       "captured application log output over an invite creation and a registration, for the token-absence assertion",
       "a vault owner session and an invented /api/ path as the comparison baseline, for the admin-route refusal",
+      "a real browser opening /admin signed out and as a vault owner next to an invented page path, for the page a refused admin address shows (app-shell.md owns the page and its assertions)",
       "a first administrator registered through a flask create-invite invite, then a vault owner and a second administrator registered through in-app invites, for the lastLoginAt-equals-createdAt assertion over every row",
       "a stubbed server clock that can advance before one account's sign-in, for the lastLoginAt-moves-for-that-row-only assertion",
       "a SQLite file holding a principals row with a null last_login_at before the app starts, for the backfilled lastLoginAt assertion"

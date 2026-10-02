@@ -87,8 +87,8 @@ to somebody who has just locked themselves out.
 
 Reachable only by signing in to an administrator account. Nobody else
 ever sees the entry, and if they go looking for the address directly
-the app behaves as though the page does not exist rather than telling
-them they are not allowed in. Confirming that an admin area exists is
+the app shows the page a mistyped address shows (`app-shell.md`, A page
+that cannot be shown) rather than telling them they are not allowed in. Confirming that an admin area exists is
 itself information this instance does not hand out.
 
 The area opens with the boundary stated plainly, in the app's own

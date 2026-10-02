@@ -77,7 +77,9 @@ def test_every_error_page_declares_the_icon(app, client, boom):
 
 def test_an_error_body_depends_only_on_the_status_code(app, client, boom):
     """Forbidden whether the session is valid or absent, and whichever
-    path was asked for: a body that varied would be a probe."""
+    path was asked for: a body that varied would be a probe. It is also
+    the Not Found body, so a refused address shows nothing a missing one
+    does not."""
     owner, _ = register(app, "owner")
     forbidden = {
         client.get(path).get_data()
@@ -90,7 +92,7 @@ def test_an_error_body_depends_only_on_the_status_code(app, client, boom):
         client.get("/admin").get_data(),
     }
     assert len(not_found) == 1
-    assert forbidden != not_found
+    assert forbidden == not_found
 
 
 def test_the_icon_loads_with_no_header_and_no_session(client):

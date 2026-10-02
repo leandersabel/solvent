@@ -1,8 +1,8 @@
 {# Unlock and register sit outside the shell: one centered card on the
    warm ground under the wordmark, no navigation and no marketing
-   (spec/ui/design-system.md, App shell). Having no session with which
-   to fetch one, each embeds the server's current default KDF
-   envelope. #}
+   (spec/ui/design-system.md, App shell). A page that has no session
+   with which to fetch the server's current default KDF envelope embeds
+   it in the envelope block. #}
 <!doctype html>
 <html lang="en">
 <head>
@@ -12,7 +12,7 @@
   {% block meta %}{% endblock %}
   <link rel="stylesheet" href="{{ url_for('static', filename='css/tokens.css') }}">
   <link rel="icon" href="{{ url_for('static', filename='icon.png') }}" type="image/png">
-  <script id="kdf-envelope" type="application/json">{{ kdf_envelope | tojson }}</script>
+  {% block envelope %}{% endblock %}
 </head>
 <body class="outside-body">
   <p class="outside-wordmark">Solvent</p>
