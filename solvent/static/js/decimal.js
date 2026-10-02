@@ -76,8 +76,20 @@ export function toDisplay(value, places, group = '\u2009', point = '.') {
     .padStart(places + 1, '0');
   const whole = places ? digits.slice(0, -places) : digits;
   const fraction = places ? digits.slice(-places) : '';
-  const grouped = group ? whole.replace(/\B(?=(\d{3})+(?!\d))/g, group) : whole;
-  return (negative ? '\u2212' : '') + grouped + (fraction ? point + fraction : '');
+  return (negative ? '\u2212' : '') + grouped(whole, group) + (fraction ? point + fraction : '');
+}
+
+function grouped(whole, group) {
+  return group ? whole.replace(/\B(?=(\d{3})+(?!\d))/g, group) : whole;
+}
+
+// A stored decimal string, digit for digit: never rounded, never
+// padded (spec/features/account-settings.md, Dates and numbers).
+export function toStoredDisplay(stored, group, point) {
+  const match = /^(-?)(\d+)(?:\.(\d+))?$/.exec(stored);
+  if (!match) return String(stored);
+  const [, sign, whole, fraction] = match;
+  return (sign ? '\u2212' : '') + grouped(whole, group) + (fraction ? point + fraction : '');
 }
 
 // The form a figure takes in a field the reader edits, which
@@ -86,7 +98,6 @@ export function toDisplay(value, places, group = '\u2009', point = '.') {
 export function toEditable(value, minPlaces, group, point) {
   const [whole, fraction = ''] = format(value < 0n ? -value : value).split('.');
   const places = Math.max(minPlaces, fraction.length);
-  const grouped = group ? whole.replace(/\B(?=(\d{3})+(?!\d))/g, group) : whole;
   const digits = fraction.padEnd(places, '0');
-  return (value < 0n ? '\u2212' : '') + grouped + (digits ? point + digits : '');
+  return (value < 0n ? '\u2212' : '') + grouped(whole, group) + (digits ? point + digits : '');
 }

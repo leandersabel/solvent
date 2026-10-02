@@ -53,7 +53,8 @@ holding's row on the dashboard.
 A table, **newest first**. Columns: Date · Value (native unit) · In
 main currency · (row actions).
 
-- Money columns right-aligned, `tabular-nums`.
+- Value and In main currency are figure columns, and each figure shows
+  as `design-system.md`, Typography, sets it.
 - **The date is a link**, opening the recording it belongs to
   (`recording-detail.md`). That is where the rest of that evening is,
   where the price that values this row can be corrected, and it is how

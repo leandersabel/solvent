@@ -85,7 +85,7 @@ function figureRow(vault, { holding, snapshot }, onOpenHolding, onChanged) {
     ]),
     el('td', {
       class: 'numeric',
-      text: vault.amount(quantity, holding.payload.unit),
+      text: vault.amount(snapshot.payload.value, holding.payload.unit),
     }),
     el('td', {
       class: 'numeric',

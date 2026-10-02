@@ -117,7 +117,7 @@ export function formatter(profile) {
      *  carry the exact amounts. */
     whole: (value) => decimal.toDisplay(value, 0, group, point),
 
-    /** A figure as a field shows it for editing: grouped, every stored
+    /** A rate as a field shows it for editing: grouped, every stored
      *  digit kept, and read back exactly by `parseFigure`. */
     editable: (value, minPlaces = 2) => decimal.toEditable(value, minPlaces, group, point),
 
@@ -125,13 +125,30 @@ export function formatter(profile) {
      *  group marks, as an exact scale-12 value, or null. A group mark
      *  counts only between groups of three digits, so a mark typed as
      *  a decimal point is refused rather than read as a thousand. */
-    parseFigure: (typed) => readFigure(typed, group, point),
+    parseFigure: (typed) => {
+      const read = readDecimal(typed, group, point);
+      return read === null ? null : decimal.parse(read);
+    },
 
-    /** A quantity of something that is not money: ounces of gold,
-     *  square metres. Its precision is the unit's, never the money
-     *  setting, because rounding 12.5 ounces to 13 loses the holding.
-     */
-    quantity: (value) => decimal.toDisplay(value, 2, group, point),
+    /** A stored decimal string, digit for digit: ounces of gold,
+     *  square metres, and every figure a field prefills for editing,
+     *  money included. Its digits are what was typed, never the money
+     *  setting's, because rounding 12.125 ounces misstates the holding
+     *  and a prefill at money places, saved untouched, writes the
+     *  rounding. */
+    quantity: (stored) => decimal.toStoredDisplay(stored, group, point),
+
+    /** What the reader typed into a quantity field, as the canonical
+     *  decimal string, or null. */
+    parseQuantity: (typed) => readDecimal(typed, group, point),
+
+    /** What a field that edits a stored figure saves: the stored string
+     *  itself while the text still equals its prefill, so nothing is
+     *  reparsed and rounded, and what was typed, read, otherwise. */
+    readField: (typed, stored) =>
+      stored != null && String(typed).trim() === decimal.toStoredDisplay(stored, group, point)
+        ? stored
+        : readDecimal(typed, group, point),
 
     /** A rate, which needs more places than money: a currency pair
      *  moves in the fourth decimal. */
@@ -197,13 +214,18 @@ function spelled(iso, locale, parts) {
 const SPACES = [' ', '\u2009', '\u202f', '\u00a0'];
 const APOSTROPHES = ["'", '\u2019'];
 
-function readFigure(typed, group, point) {
+/** The canonical decimal string for what was typed
+ *  (spec/features/record-snapshot.md, Record shape), or null. The
+ *  point is the configured one, and a period too wherever a period is
+ *  not the group mark. */
+function readDecimal(typed, group, point) {
   let text = String(typed).trim();
   const negative = /^[-\u2212]/.test(text);
   if (negative) text = text.slice(1);
+  const marks = SPACES.includes(group) ? SPACES : APOSTROPHES.includes(group) ? APOSTROPHES : group ? [group] : [];
+  if (point !== '.' && !marks.includes('.')) text = text.replaceAll('.', point);
   const [whole, fraction, extra] = text.split(point);
   if (extra !== undefined) return null;
-  const marks = SPACES.includes(group) ? SPACES : APOSTROPHES.includes(group) ? APOSTROPHES : group ? [group] : [];
   let digits = whole;
   if (marks.some((mark) => whole.includes(mark))) {
     const grouped = marks.reduce((acc, mark) => acc.split(mark).join('_'), whole);
@@ -211,7 +233,9 @@ function readFigure(typed, group, point) {
     digits = grouped.replaceAll('_', '');
   }
   if (!/^\d*$/.test(digits) || (fraction !== undefined && !/^\d*$/.test(fraction))) return null;
-  return decimal.parse((negative ? '-' : '') + digits + (fraction === undefined ? '' : '.' + fraction));
+  if ((!digits && !fraction) || (fraction ?? '').length > decimal.SCALE) return null;
+  const canonical = (digits.replace(/^0+(?=\d)/, '') || '0') + (fraction ? '.' + fraction : '');
+  return negative && /[1-9]/.test(canonical) ? '-' + canonical : canonical;
 }
 
 function otherPoint(point) {

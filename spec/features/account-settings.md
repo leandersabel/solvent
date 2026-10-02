@@ -83,9 +83,25 @@ The formatter answers:
   whose `kind` in the symbol table is `currency` (`rate-lookup.md`).
   Rounding is half-even, like every other rounding in the product
   (`net-worth-view.md`).
-- **quantity** — a figure in any other unit, a metal or free text,
-  always at two places. It does not follow `moneyPlaces`, because rounding 12.5
-  ounces of gold to 13 loses the holding.
+- **quantity** — a stored `value` in any other unit, a metal or free
+  text, shown digit for digit from its decimal string
+  (`record-snapshot.md`, Record shape): never rounded, never padded,
+  with the group mark in force between groups of three in the integer
+  part and the configured decimal point. `"12.125"` reads `12.125`,
+  `"12.50"` reads `12.50` and `"80"` reads `80`. It does not follow
+  `moneyPlaces`, because rounding 12.125 ounces of gold misstates the
+  holding and padding 80 m² to `80.00` claims a precision nobody
+  measured. It formats a stored string and nothing computed, so there
+  is nothing to round. A negative value is signed as money is.
+- **parseQuantity** — the reverse, for a field. The configured decimal
+  point is the point, and so is `.` wherever `.` is not the group mark
+  in force, because a keyboard does not always offer the configured
+  one. The group mark in force is accepted only between groups of three
+  digits in the integer part, and anywhere else the input is malformed
+  rather than the mark being dropped, because reading `12.5` as 125
+  under a period group mark is a silent tenfold error. It returns the
+  canonical decimal string (`record-snapshot.md`, Record shape) or
+  nothing.
 - **rate** — six places, because a currency pair moves in the fourth.
 - **date** and **parseDate** — an ISO date written in the configured
   order, and the reverse. `parseDate` returns nothing rather than
@@ -97,6 +113,13 @@ rather than tabulated, so there is no second and staler copy of what
 the engine already knows. A `groupSeparator` equal to that locale's
 decimal point is not applied, because `1.234` would then mean two
 things; the locale's own pairing stands.
+
+**A field that edits a stored figure prefills it through `quantity`,
+whatever the unit**, money included, because a prefill at
+`moneyPlaces` saved untouched would write the rounding. A field whose
+text still equals its prefill is untouched and is never parsed, so what
+it saves is the stored string itself (`record-snapshot.md`, Confirming
+a previous value).
 
 Nothing here touches stored data. Values stay exact at scale 12 and
 dates stay ISO, so any of these settings can be changed and changed
@@ -368,8 +391,19 @@ from an administrator removing an account (admin-invites.md).
 - With main currency `CHF`, `groupSeparator` `apostrophe` and
   `moneyPlaces` `0`, a `USD` holding valued 1000.40 shows `USD 1’000`
   wherever its amount appears with its unit, and `1’000` in its holding
-  page's list of values. An `XAU-ozt` holding of 12.5 shows `12.50` in
-  both places.
+  page's list of values. Under the same profile an `XAU-ozt` holding
+  stored as `"12.125"` shows `12.125` in both places, one stored as
+  `"12.50"` shows `12.50`, and an `m²` holding stored as `"80"` shows
+  `80`.
+- With locale `de-DE` and `groupSeparator` `apostrophe`, an `m²`
+  holding stored as `"1234.5"` shows `1’234,5`.
+- Under that profile `parseQuantity` reads `1’234,50` as `"1234.50"`
+  and `12.5` as `"12.5"`. With locale `de-DE` and `groupSeparator`
+  `period` it reads `1.234,5` as `"1234.5"` and refuses `12.5`.
+- With locale `de-CH` and `moneyPlaces` `0`, the edit dialog for a past
+  snapshot of a `USD` holding stored as `"1000.40"` prefills `1’000.40`,
+  and changing only its note writes `value` `"1000.40"`. The same dialog
+  for an `XAU-ozt` snapshot stored as `"12.125"` prefills `12.125`.
 - Account deletion removes the principal row, its credential rows, its
   wrappers, all records, and all sessions; a subsequent login with
   those credentials fails.

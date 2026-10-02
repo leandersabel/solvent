@@ -428,18 +428,30 @@ await check('the locale supplies the defaults and each control overrules it', as
   assert.equal(formatter({ locale: 'en-US', groupSeparator: 'none' }).money(million), '1234567.89');
 });
 
-await check('a quantity keeps its places whatever money is set to', async () => {
+await check('a quantity shows digit for digit whatever money is set to', async () => {
   const { formatter } = await load('format.js');
-  // Rounding 12.5 ounces of gold to 13 would lose the holding.
-  const shape = formatter({ locale: 'en-US', moneyPlaces: '0' });
-  assert.equal(shape.quantity(12500000000000n), '12.50');
+  for (const moneyPlaces of ['0', '2']) {
+    const shape = formatter({ locale: 'en-US', moneyPlaces });
+    // Rounding 12.125 ounces would misstate the holding, padding 80 m2
+    // would claim a precision nobody measured.
+    assert.equal(shape.quantity('12.125'), '12.125');
+    assert.equal(shape.quantity('12.50'), '12.50');
+    assert.equal(shape.quantity('12.5'), '12.5');
+    assert.equal(shape.quantity('80'), '80');
+    assert.equal(shape.quantity('1234567.000000000001'), '1,234,567.000000000001');
+    assert.equal(shape.quantity('-1234.5'), '−1,234.5');
+    assert.equal(shape.quantity('0.10'), '0.10');
+  }
   // 12 rather than 13: display rounding is half-even like every other
   // rounding in the product, and 12.5 lies on the tie.
+  const shape = formatter({ locale: 'en-US', moneyPlaces: '0' });
   assert.equal(shape.money(12500000000000n), '12');
   assert.equal(shape.money(12600000000000n), '13');
+  assert.equal(formatter({ locale: 'de-DE', groupSeparator: 'apostrophe' }).quantity('1234.5'), '1’234,5');
+  assert.equal(formatter({ locale: 'de-CH', groupSeparator: 'apostrophe' }).quantity('1234567'), '1’234’567');
 });
 
-await check('a holding in any currency follows money places and one in any other unit keeps its quantity places', () => {
+await check('a holding in any currency follows money places and one in any other unit shows its stored digits', () => {
   const vault = new Vault(null);
   vault.profile = { mainCurrency: 'CHF', locale: 'en-US', groupSeparator: 'apostrophe', moneyPlaces: '0' };
   vault.symbols = new Map([
@@ -447,15 +459,68 @@ await check('a holding in any currency follows money places and one in any other
     ['USD', { symbol: 'USD', label: 'United States Dollar', kind: 'currency' }],
     ['XAU-ozt', { symbol: 'XAU-ozt', label: 'Gold, troy ounce', kind: 'metal' }],
   ]);
-  // The tie rounds to the even franc; 12.5 ounces of gold stay 12.50.
-  assert.equal(vault.amount(decimal.parse('200.00'), 'CHF'), 'CHF 200');
-  assert.equal(vault.amount(decimal.parse('1000.40'), 'USD'), 'USD 1’000');
-  assert.equal(vault.amount(decimal.parse('12.5'), 'XAU-ozt'), '12.50 ozt');
-  assert.equal(vault.figure(decimal.parse('1000.40'), 'USD'), '1’000');
-  assert.equal(vault.figure(decimal.parse('12.5'), 'XAU-ozt'), '12.50');
-  // Back at two places every unit keeps its cents.
+  assert.equal(vault.amount('200.00', 'CHF'), 'CHF 200');
+  assert.equal(vault.amount('1000.40', 'USD'), 'USD 1’000');
+  assert.equal(vault.amount('12.125', 'XAU-ozt'), '12.125 ozt');
+  assert.equal(vault.amount('12.50', 'XAU-ozt'), '12.50 ozt');
+  assert.equal(vault.amount('80', 'm²'), '80 m²');
+  assert.equal(vault.figure('1000.40', 'USD'), '1’000');
+  assert.equal(vault.figure('12.125', 'XAU-ozt'), '12.125');
+  // Back at two places every currency keeps its cents, and a quantity
+  // is the same.
   vault.profile = { ...vault.profile, moneyPlaces: '2' };
-  assert.equal(vault.amount(decimal.parse('1000.40'), 'USD'), 'USD 1’000.40');
+  assert.equal(vault.amount('1000.40', 'USD'), 'USD 1’000.40');
+  assert.equal(vault.amount('12.125', 'XAU-ozt'), '12.125 ozt');
+  assert.equal(vault.amount('80', 'm²'), '80 m²');
+});
+
+await check('a typed quantity is read to its canonical decimal string', async () => {
+  const { formatter } = await load('format.js');
+  const shape = formatter({ locale: 'en-US' });
+  const canonical = /^-?(0|[1-9][0-9]*)(\.[0-9]{1,12})?$/;
+  for (const [typed, stored] of [
+    ['12.50', '12.50'],
+    ['007', '7'],
+    ['.5', '0.5'],
+    ['12.', '12'],
+    ['-0.00', '0.00'],
+    ['-0', '0'],
+    ['1,234.50', '1234.50'],
+    ['−5', '-5'],
+    ['0.123456789012', '0.123456789012'],
+  ]) {
+    const read = shape.parseQuantity(typed);
+    assert.equal(read, stored, typed);
+    assert.match(read, canonical);
+  }
+  for (const typed of ['', '-', '.', 'abc', '1.0000000000001', '1.2.3', '12,34.5', '1,23']) {
+    assert.equal(shape.parseQuantity(typed), null, typed);
+  }
+  // The configured point, and a period wherever a period is not the
+  // group mark.
+  const swissGerman = formatter({ locale: 'de-DE', groupSeparator: 'apostrophe' });
+  assert.equal(swissGerman.parseQuantity('1’234,50'), '1234.50');
+  assert.equal(swissGerman.parseQuantity('12.5'), '12.5');
+  // A period group mark is never dropped: 12.5 is refused, not read as 125.
+  const german = formatter({ locale: 'de-DE', groupSeparator: 'period' });
+  assert.equal(german.parseQuantity('1.234,5'), '1234.5');
+  assert.equal(german.parseQuantity('12.5'), null);
+  assert.equal(german.parseQuantity('1.234'), '1234');
+});
+
+await check('a field that edits a stored figure reads back the stored string itself while untouched', async () => {
+  const { formatter } = await load('format.js');
+  const swiss = formatter({ locale: 'de-CH', groupSeparator: 'apostrophe', moneyPlaces: '0' });
+  for (const stored of ['1000.40', '12.125', '12.5', '80', '-1234567.50', '0.000000000001']) {
+    const prefill = swiss.quantity(stored);
+    assert.equal(swiss.readField(prefill, stored), stored, prefill);
+    assert.equal(swiss.parseQuantity(prefill), stored, prefill);
+  }
+  assert.equal(swiss.quantity('1000.40'), '1’000.40');
+  // Typed over, the field is read as typed: 12.50 over "12.5" is an edit.
+  assert.equal(swiss.readField('12.50', '12.5'), '12.50');
+  assert.equal(swiss.readField('abc', '12.5'), null);
+  assert.equal(swiss.readField('12.5', null), '12.5');
 });
 
 await check('a thousands separator never collides with the decimal point', async () => {

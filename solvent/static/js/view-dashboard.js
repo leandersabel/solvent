@@ -601,7 +601,7 @@ function holdingsTable(vault, state, render, actions, grouping) {
             // would only repeat the converted one.
             el('td', {
               class: holding.payload.unit === vault.mainCurrency ? 'numeric cell-native same-unit' : 'numeric cell-native',
-              text: vault.amount(value.quantity, holding.payload.unit),
+              text: vault.amount(value.stored, holding.payload.unit),
             }),
             el('td', { class: 'numeric cell-converted', text: vault.format.money(value.converted) }),
             el('td', { class: 'cell-asof' }, [

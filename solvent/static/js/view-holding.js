@@ -55,7 +55,7 @@ export function holdingView(vault, accountId, { editing = false, onOpenRecording
         text:
           value.state === 'unvalued'
             ? 'Not yet valued'
-            : vault.amount(value.quantity, holding.payload.unit),
+            : vault.amount(value.stored, holding.payload.unit),
       }),
       // A holding in the main currency converts to itself, so the
       // figure is not repeated.
@@ -226,7 +226,7 @@ function historyRow(vault, holding, snapshot, flagged, { onOpenRecording, onChan
           })
         : null,
     ]),
-    el('td', { class: 'numeric', text: vault.figure(quantity, holding.payload.unit) }),
+    el('td', { class: 'numeric', text: vault.figure(snapshot.payload.value, holding.payload.unit) }),
     el('td', {
       class: 'numeric',
       text: price
@@ -276,7 +276,7 @@ function confirmDeleteSnapshot(vault, holding, snapshot, error, onChanged) {
     heading: 'Delete this snapshot?',
     body: [
       el('p', {
-        text: `Delete the snapshot of ${vault.amount(decimal.parse(snapshot.payload.value), holding.payload.unit)} for ${vault.format.longDate(snapshot.payload.date)}?`,
+        text: `Delete the snapshot of ${vault.amount(snapshot.payload.value, holding.payload.unit)} for ${vault.format.longDate(snapshot.payload.date)}?`,
       }),
       el('p', {
         text: only

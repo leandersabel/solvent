@@ -305,9 +305,26 @@ currency code at 18px, the screen heading to 26px, the section heading
 to 17px, and the section label to 11px. Every other role keeps its
 size.
 
-**`font-variant-numeric: tabular-nums` on every money column, table row,
-and axis tick** — anything that must align vertically. The hero figure
-keeps proportional figures.
+**`font-variant-numeric: tabular-nums` on every figure column, table
+row, and axis tick** — anything that must align vertically. The hero
+figure keeps proportional figures.
+
+**A figure column is right-aligned, money and quantity alike.** Figures
+with different decimals line up at their right edge, never at the
+decimal point, because the requirements ask for right-aligned columns.
+
+### Figures
+
+Every figure is grouped and pointed as Settings sets it
+(`settings.md`, Dates and numbers).
+
+- **Money** shows the places Decimals on money sets.
+- **A quantity in a unit that is not a currency shows exactly the
+  decimals it was entered with**, as text and in a field alike. 12.125,
+  12.5, 12.50 and 80 read as typed, never rounded and never padded.
+  Decimals on money does not reach it, because rounding 12.5 ounces of
+  gold to 13 loses part of the holding, and padding it to 12.50 claims
+  a precision nobody recorded.
 
 ## Spacing and shape
 
@@ -455,8 +472,8 @@ only its own content region.
   Used by **New recording** (`dashboard.md`) and by a recording that is
   gone (`recording-detail.md`, Error, the recording is gone).
 - **Card**: white surface, hairline border, 10px radius, 24px padding.
-- **Table**: no vertical rules; `rule` horizontal dividers; money columns
-  right-aligned and tabular.
+- **Table**: no vertical rules; `rule` horizontal dividers; figure
+  columns as Typography sets them.
 - **Select**: the Input's box, border, radius and focus ring, with a
   petrol-400 chevron. A native `select` wherever the list is short and
   fixed, because it is the control every device already knows and it

@@ -15,7 +15,7 @@ export function snapshotDialog(vault, holding, existing, onSaved, onOpenRecordin
   const value = el('input', {
     type: 'text',
     inputmode: 'decimal',
-    value: existing ? existing.payload.value : '',
+    value: existing ? vault.format.quantity(existing.payload.value) : '',
     id: 'snapshot-value',
   });
   const note = el('textarea', { rows: '2', text: existing ? existing.payload.note || '' : '' });
@@ -90,8 +90,12 @@ export function snapshotDialog(vault, holding, existing, onSaved, onOpenRecordin
   // The live result converts at the price for the date on the form: the
   // date's own price where one exists, and the proposal for it
   // otherwise.
+  // What the field saves: the stored string while it is untouched,
+  // never its text read again (record-snapshot.md, Confirming).
+  const typedValue = () => vault.format.readField(value.value, existing ? existing.payload.value : null);
   const describeConverted = () => {
-    const quantity = decimal.parse(value.value);
+    const stored = typedValue();
+    const quantity = stored === null ? null : decimal.parse(stored);
     const price = block ? block.figureFor(holding.payload.unit) : null;
     converted.textContent =
       quantity === null || price === null || holding.payload.unit === vault.mainCurrency
@@ -135,7 +139,7 @@ export function snapshotDialog(vault, holding, existing, onSaved, onOpenRecordin
     cancel.onclick = done;
   };
 
-  const create = async (on, quantity) => {
+  const create = async (on, stored) => {
     const claim = sit || writes.sitting(vault, on);
     const refusal = await writes.claimDate(vault, claim, {
       snapshots: [holding.recordId],
@@ -147,7 +151,7 @@ export function snapshotDialog(vault, holding, existing, onSaved, onOpenRecordin
     }
     await writes.saveSnapshot(vault, holding.recordId, null, {
       date: on,
-      value: decimal.format(quantity),
+      value: stored,
       note: note.value.trim() || null,
     });
     if (!sit) return done();
@@ -169,8 +173,8 @@ export function snapshotDialog(vault, holding, existing, onSaved, onOpenRecordin
     text: 'Save',
     onclick: async () => {
       error.hidden = true;
-      const quantity = decimal.parse(value.value);
-      if (quantity === null) {
+      const stored = typedValue();
+      if (stored === null) {
         return fail('Enter a number, with at most twelve decimal places.');
       }
       if (!date.value) {
@@ -183,7 +187,7 @@ export function snapshotDialog(vault, holding, existing, onSaved, onOpenRecordin
       const atDate = vault
         .snapshotsFor(holding.recordId)
         .find((s) => s.payload.date === on && s !== existing);
-      const payload = { date: on, value: decimal.format(quantity), note: note.value.trim() || null };
+      const payload = { date: on, value: stored, note: note.value.trim() || null };
 
       const attempt = async (step) => {
         submit.disabled = true;
@@ -236,7 +240,7 @@ export function snapshotDialog(vault, holding, existing, onSaved, onOpenRecordin
         return fail('A price on the prices line does not read as a number. Nothing was saved.');
       }
       const changedLines = block ? block.lines.filter((line) => line.changed()) : [];
-      if (!changedLines.length) return attempt(() => create(on, quantity));
+      if (!changedLines.length) return attempt(() => create(on, stored));
       // A line changed here is the same act as one changed on the
       // sweep, and says what it moves before anything goes through.
       const confirm = dialog({
@@ -251,7 +255,7 @@ export function snapshotDialog(vault, holding, existing, onSaved, onOpenRecordin
             text: 'Save',
             onclick: () => {
               confirm();
-              attempt(() => create(on, quantity));
+              attempt(() => create(on, stored));
             },
           }),
         ],
@@ -298,7 +302,7 @@ function confirmReplace(stored, holding, vault, onConfirm) {
     heading: 'Replace the figure already recorded?',
     body: [
       el('p', {
-        text: `You already recorded ${vault.amount(decimal.parse(stored.payload.value), holding.payload.unit)} for ${vault.format.longDate(stored.payload.date)}. Replace it?`,
+        text: `You already recorded ${vault.amount(stored.payload.value, holding.payload.unit)} for ${vault.format.longDate(stored.payload.date)}. Replace it?`,
       }),
     ],
     actions: [
@@ -320,7 +324,7 @@ function confirmMove(stored, holding, vault, onConfirm) {
     heading: 'Move this entry onto an occupied date?',
     body: [
       el('p', {
-        text: `${vault.format.longDate(stored.payload.date)} already holds a snapshot of ${vault.amount(decimal.parse(stored.payload.value), holding.payload.unit)}. Moving this entry there will delete it.`,
+        text: `${vault.format.longDate(stored.payload.date)} already holds a snapshot of ${vault.amount(stored.payload.value, holding.payload.unit)}. Moving this entry there will delete it.`,
       }),
     ],
     actions: [

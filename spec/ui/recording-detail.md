@@ -47,7 +47,8 @@ on one day are one recording, because the date is the identity.
 
 One line each: the holding, the figure in that holding's own unit, and
 the same figure in the main currency at the price captured that day.
-Money right-aligned and tabular.
+Both figures form columns, and each shows as `design-system.md`,
+Typography, sets it.
 
 - **The holding's name is the link**, opening that holding
   (`account-detail.md`), because "which holding was that" is the
