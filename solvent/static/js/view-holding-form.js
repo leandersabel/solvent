@@ -4,7 +4,6 @@
 // Names, notes, labels and unit text are decrypted or server-supplied
 // strings and reach the page through `textContent` only.
 import * as api from './api.js';
-import * as decimal from './decimal.js';
 import * as writes from './writes.js';
 import { dialog, el, resumable, today } from './dom.js';
 import { newId } from './view-dimensions.js';
@@ -565,7 +564,7 @@ export function deleteHoldingDialog(vault, holding, onDone, then = 'reload', sai
     type: 'text',
     inputmode: 'decimal',
     id: 'closing-value',
-    value: vault.format.editable(atDate ? decimal.parse(atDate.payload.value) : decimal.ZERO),
+    value: vault.format.quantity(atDate ? atDate.payload.value : '0'),
   });
   let skipped = false;
   const skipNote = el('p', {
@@ -649,7 +648,7 @@ export function deleteHoldingDialog(vault, holding, onDone, then = 'reload', sai
       error.hidden = true;
       let quantity = null;
       if (!skipped) {
-        quantity = vault.format.parseFigure(closing.value);
+        quantity = vault.format.readField(closing.value, atDate ? atDate.payload.value : '0');
         if (quantity === null) {
           error.textContent = 'Enter the closing value as a number, or skip it.';
           error.hidden = false;
@@ -667,7 +666,7 @@ export function deleteHoldingDialog(vault, holding, onDone, then = 'reload', sai
         try {
           await writes.saveSnapshot(vault, holding.recordId, atDate || null, {
             date: archiveDate,
-            value: decimal.format(quantity),
+            value: quantity,
             note: atDate ? atDate.payload.note : null,
           });
         } catch {

@@ -47,9 +47,10 @@ and can be changed back.
   apostrophe, a comma, a period, or nothing.
 - **Decimals on money**, two or none. None is for people who do not
   want to look at centimes. It rounds what is shown, never what is
-  held, and quantities of things that are not money keep their
-  decimals regardless: a holding of 12.5 ounces of gold is never
-  written as 13.
+  held. It applies to money only. A quantity of something that is not
+  money keeps exactly the decimals you typed, never rounded and never
+  padded with zeros: 12.125 ounces of gold reads 12.125, never 12.12,
+  and 80 m² reads 80, never 80.00.
 
 Each of the last three starts at whatever the language does and can
 be set against it, because a language is a coarse guess at taste. A
@@ -201,8 +202,9 @@ single total.
   does not exist is refused rather than quietly moved.
 - Changing any of the date or number settings and changing it back
   leaves every stored figure and date exactly as it was.
-- Rounding money to whole units never rounds a quantity of something
-  that is not money.
+- A quantity of something that is not money shows exactly the
+  decimals you typed, on every screen and whatever Decimals on money
+  says: no digit dropped, no zero added.
 - The settings come back the same on another browser, because they
   live in the vault.
 - Changing the password works, and afterwards everything written under

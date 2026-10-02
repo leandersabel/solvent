@@ -205,7 +205,8 @@ currency · As of · (row action).
   (`Liquidity: Cash`), omitting dimensions the holding has no value for
   rather than printing "Unassigned" on every row. With no dimensions
   configured, the column is absent entirely.
-- Money columns right-aligned, `tabular-nums`.
+- Latest value and In main currency are figure columns, and each
+  figure shows as `design-system.md`, Typography, sets it.
 - Rows in the order the holdings were created, oldest first. A row
   never moves because its figure changed.
 - **"As of" is the date of the quantity, never of the rate.** A holding

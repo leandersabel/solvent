@@ -751,7 +751,7 @@ try {
   };
   await recordRow(0, '12450.00');
   await recordRow(1, '8300.50');
-  await recordRow(2, '12.5');
+  await recordRow(2, '12.125');
   await recordRow(3, '-410000.00');
 
   check(
@@ -943,7 +943,7 @@ try {
 
   // Decimals on money = None: a holding in a currency loses its cents
   // (8300.50 is a tie and rounds to the even franc), one in another unit
-  // keeps its two places (12.5 ounces must not read 13).
+  // shows exactly the digits stored (12.125 ounces must not read 12.12).
   const nativeFigure = (name) => page.eval(`(() => {
     const row = [...document.querySelectorAll('.data-table tbody tr')]
       .find((r) => r.querySelector('.row-name')?.textContent === ${JSON.stringify(name)});
@@ -952,10 +952,10 @@ try {
   const dollars = await nativeFigure('UBS dollar account');
   const gold = await nativeFigure('Gold bars');
   check('a dollar holding on the dashboard reads without cents', dollars === 'USD 8’300', dollars);
-  check('an ounce holding on the dashboard keeps its two places', gold === '12.50 ozt', gold);
+  check('an ounce holding on the dashboard shows its stored digits', gold === '12.125 ozt', gold);
   for (const [name, hero, listed] of [
     ['UBS dollar account', 'USD 8’300', '8’300'],
-    ['Gold bars', '12.50 ozt', '12.50'],
+    ['Gold bars', '12.125 ozt', '12.125'],
   ]) {
     await page.eval(`[...document.querySelectorAll('.data-table tbody .row-name')].find((b) => b.textContent === ${JSON.stringify(name)}).click()`);
     await page.waitUntil("location.hash.startsWith('#/holding/')", { label: `${name} page` });
@@ -964,6 +964,25 @@ try {
     const first = await page.eval("document.querySelector('.card .data-table tbody tr td.numeric').textContent");
     check(`${name}: the page header follows the unit's kind`, header === hero, header);
     check(`${name}: the list of values follows the unit's kind`, first === listed, first);
+    // The edit dialog prefills the stored figure digit for digit
+    // through the quantity formatter, money included, and a save that
+    // changes only the note writes the stored string character for
+    // character, not the prefill read again.
+    const stored = name === 'Gold bars' ? '12.125' : '8300.50';
+    const valuesOf = () => page.eval(`(async () => {
+      const v = (await import('/static/js/session.js')).currentVault();
+      return JSON.stringify([...v.snapshots.values()].flat().filter((x) => x.payload.value === ${JSON.stringify(stored)}).map((x) => x.payload.value));
+    })()`);
+    await page.eval("[...document.querySelectorAll('.card .data-table tbody tr')][0].querySelectorAll('button.btn-inline').forEach((b) => b.textContent === 'Edit' && b.click())");
+    await page.waitUntil("document.querySelector('#snapshot-value')", { label: `${name} edit dialog` });
+    const prefill = await page.eval("document.querySelector('#snapshot-value').value");
+    check(`${name}: the edit dialog prefills the stored figure as stored`, prefill === (name === 'Gold bars' ? '12.125' : '8\u2019300.50'), prefill);
+    await page.eval("(() => { const n = document.querySelector('.dialog textarea'); n.value = 'only the note'; n.dispatchEvent(new Event('input', { bubbles: true })); })()");
+    await page.eval("[...document.querySelectorAll('.dialog button')].find((b) => b.textContent === 'Save').click()");
+    await page.waitUntil('!document.querySelector(".dialog")', { timeout: 60000, label: `${name} note-only save` });
+    await page.settle(800);
+    const after = await valuesOf();
+    check(`${name}: saving only the note writes the stored string unchanged`, after === JSON.stringify([stored]), after);
     await page.eval("location.hash = '#/'");
     await page.settle(500);
   }
@@ -4193,8 +4212,8 @@ try {
       payload: { symbol, date, rate, rateTarget: 'CHF', rateSource, rateAsOf: rateSource === 'manual' ? null : date, proposedRate: null },
     });
     const FIRST = {
-      'Current account': '1000', Savings: '5000', Brokerage: '2000', 'Dollar cash': '300', 'Gold bars': '10',
-      'Silver coins': '100', Flat: '95', Mortgage: '-400000', 'Fund 1': '100', 'Fund 2': '101', 'Fund 3': '102',
+      'Current account': '1000', Savings: '5000', Brokerage: '2000', 'Dollar cash': '300', 'Gold bars': '12.5',
+      'Silver coins': '100.10', Flat: '95', Mortgage: '-400000', 'Fund 1': '100', 'Fund 2': '101', 'Fund 3': '102',
       'Fund 4': '103', 'Fund 5': '104', [script]: '105',
     };
     await plantHere([
@@ -4482,6 +4501,20 @@ try {
       flipped.chip === `Edited from ${proposalsFor(D10)['XAU-ozt'].rate}`,
       flipped.chip,
     );
+    // A row prefilled from "12.5" offers Confirm, Record once edited and
+    // Confirm again when the prefill is typed back, and 12.50 typed over
+    // it is an edit, compared as strings.
+    const goldCycle = [];
+    for (const typed of [null, '12.50', '12.5']) {
+      if (typed !== null) await typeRow('Gold bars', typed);
+      const state = await rowState('Gold bars');
+      goldCycle.push(`${state.field}:${state.label}`);
+    }
+    check(
+      'record-snapshot: a row prefilled from "12.5" offers Confirm, Record once edited and Confirm again when the prefill is typed back',
+      goldCycle.join(',') === '12.5:Confirm,12.50:Record,12.5:Confirm',
+      goldCycle.join(','),
+    );
     const confirmLabels = [];
     for (const name of ['Current account', 'Savings', 'Brokerage', 'Gold bars', 'Silver coins', 'Flat', 'Mortgage', 'Fund 1', 'Fund 2', 'Fund 3', 'Fund 4', script]) {
       confirmLabels.push((await rowState(name)).label);
@@ -4524,10 +4557,11 @@ try {
     const valueAt = (name, date) => (on(snapshots, date).find((s) => s.accountId === id[name]) || { payload: {} }).payload.value;
     check(
       'record-snapshot: Confirm writes the carried figure exactly, for francs, dollars and a unit with no source alike',
-      valueAt('Current account', D10) === '1100' && valueAt('Brokerage', D10) === '2100' && valueAt('Silver coins', D10) === '100',
+      valueAt('Current account', D10) === '1100' && valueAt('Brokerage', D10) === '2100' && valueAt('Silver coins', D10) === '100.10',
       ['Current account', 'Brokerage', 'Silver coins'].map((n) => valueAt(n, D10)).join(','),
     );
     check('record-snapshot: a figure in a unit nobody prices saves anyway', valueAt('Art', D10) === '3');
+    check('record-snapshot: Confirm writes the stored string character for character', valueAt('Gold bars', D10) === '12.5', valueAt('Gold bars', D10));
     const leaks = ['1234.56', '350.77', '2711.13', ...accountIds];
     const encoded = leaks.flatMap((s) => [s, Buffer.from(s).toString('base64')]);
     const asks = rateAsks().concat(traffic.filter((r) => r.url.includes('/api/rates')));
@@ -5167,7 +5201,7 @@ try {
     const confirmOffered = (await rowState('Savings')).label;
     await pressRow('Savings');
     const confirmed = writesSent();
-    await typeRow('Euro account', '40');
+    await typeRow('Euro account', '40.50');
     const euroLive = !(await rowState('Euro account')).disabled;
     await pressRow('Euro account');
     const noContent = on(await stored('rate'), D9);
@@ -5183,7 +5217,7 @@ try {
     await home();
     check(
       'record-snapshot: a figure in a symbol whose lookup returned nothing saves with the control live and is listed as not priced',
-      euroLive && on(await stored('snapshot'), D9).some((s) => s.accountId === id['Euro account']) && (await group('Not priced')).includes('Euro account'),
+      euroLive && on(await stored('snapshot'), D9).some((s) => s.accountId === id['Euro account'] && s.payload.value === '40.50') && (await group('Not priced')).includes('Euro account'),
     );
     rateMode = 'answer';
 

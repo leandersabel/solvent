@@ -153,10 +153,9 @@ function sweepRow(vault, holding, date, { sit, block, refused, ensurePrices, onT
   // history.
   const carriedInto = () =>
     [...vault.usableSnapshots(holding.recordId)].reverse().find((s) => s.payload.date < date) || null;
-  const same = (figure) => {
-    const typed = format.parseFigure(field.value);
-    return typed !== null && typed === decimal.parse(figure);
-  };
+  // Untouched, or typed to the stored string itself: compared as
+  // strings, so 12.50 over a stored "12.5" is an edit.
+  const same = (stored) => format.readField(field.value, stored) === stored;
 
   const field = el('input', { type: 'text', inputmode: 'decimal', class: 'quantity' });
   const unit = vault.unitOf(holding.payload.unit);
@@ -181,7 +180,7 @@ function sweepRow(vault, holding, date, { sit, block, refused, ensurePrices, onT
   const reset = (row.reset = () => {
     const [stored] = atDate();
     const reference = stored || carriedInto();
-    field.value = reference ? format.editable(decimal.parse(reference.payload.value)) : '';
+    field.value = reference ? format.quantity(reference.payload.value) : '';
     field.className = stored ? 'quantity recorded' : 'quantity carried';
     row.describe();
   });
@@ -199,7 +198,7 @@ function sweepRow(vault, holding, date, { sit, block, refused, ensurePrices, onT
       pair.replaceChildren(
         ...entries.map((entry) =>
           el('p', { class: 'flag-note' }, [
-            `${vault.amount(decimal.parse(entry.payload.value), holding.payload.unit)} `,
+            `${vault.amount(entry.payload.value, holding.payload.unit)} `,
             el('button', {
               class: 'btn-inline',
               text: 'Keep this one',
@@ -264,8 +263,8 @@ function sweepRow(vault, holding, date, { sit, block, refused, ensurePrices, onT
   });
   // Leaving the field groups what was typed, once it reads as a figure.
   field.addEventListener('blur', () => {
-    const typed = format.parseFigure(field.value);
-    if (typed !== null) field.value = format.editable(typed);
+    const typed = format.parseQuantity(field.value);
+    if (typed !== null) field.value = format.quantity(typed);
   });
 
   const saved = () => {
@@ -307,8 +306,10 @@ function sweepRow(vault, holding, date, { sit, block, refused, ensurePrices, onT
       return;
     }
 
-    const quantity = format.parseFigure(text);
-    if (quantity === null) {
+    const carried = carriedInto();
+    const reference = stored || carried;
+    const value = format.readField(text, reference ? reference.payload.value : null);
+    if (value === null) {
       showError(message, 'Enter a number, with at most twelve decimal places.');
       return;
     }
@@ -319,7 +320,7 @@ function sweepRow(vault, holding, date, { sit, block, refused, ensurePrices, onT
         // no price and asks the proxy nothing.
         await writes.saveSnapshot(vault, holding.recordId, stored, {
           ...stored.payload,
-          value: decimal.format(quantity),
+          value,
         });
         saved();
         return;
@@ -335,15 +336,15 @@ function sweepRow(vault, holding, date, { sit, block, refused, ensurePrices, onT
         refused();
         return;
       }
-      const carried = carriedInto();
       // The quantity goes first and the prices after, on their own
       // requests, so a price write can never fail a quantity write.
-      if (carried && quantity === decimal.parse(carried.payload.value)) {
+      const claimed = carriedInto();
+      if (claimed && value === claimed.payload.value) {
         await writes.confirmFigure(vault, holding, date);
       } else {
         await writes.saveSnapshot(vault, holding.recordId, null, {
           date,
-          value: decimal.format(quantity),
+          value,
           note: null,
         });
       }

@@ -168,17 +168,19 @@ export class Vault {
     return { symbol, currency, name, short, one: currency ? `1 ${symbol}` : `1 ${counted || short}` };
   }
 
-  /** A figure in its unit's own places: money places for a currency,
-   *  two for any other unit, where rounding 12.5 ounces to 13 would
-   *  lose the holding. */
-  figure(value, symbol) {
-    return this.unitOf(symbol).currency ? this.format.money(value) : this.format.quantity(value);
+  /** A stored value as its unit shows it: money places for a currency,
+   *  and for any other unit exactly the stored digits, where rounding
+   *  12.125 ounces would misstate the holding. */
+  figure(stored, symbol) {
+    return this.unitOf(symbol).currency
+      ? this.format.money(decimal.parse(stored))
+      : this.format.quantity(stored);
   }
 
-  /** A quantity with its unit: "CHF 48’210.35", "12.50 ozt". */
-  amount(value, symbol) {
+  /** A stored value with its unit: "CHF 48’210.35", "12.125 ozt". */
+  amount(stored, symbol) {
     const unit = this.unitOf(symbol);
-    const figure = this.figure(value, symbol);
+    const figure = this.figure(stored, symbol);
     return unit.currency ? `${unit.symbol} ${figure}` : `${figure} ${unit.short}`;
   }
 
@@ -346,11 +348,12 @@ export class Vault {
         ? this.priceOn(holding.payload.unit, snapshot.payload.date)
         : this.latestPrice(holding.payload.unit);
     if (!price) {
-      return { state: 'unpriced', quantity, asOf: snapshot.payload.date };
+      return { state: 'unpriced', quantity, stored: snapshot.payload.value, asOf: snapshot.payload.date };
     }
     return {
       state: 'valued',
       quantity,
+      stored: snapshot.payload.value,
       asOf: snapshot.payload.date,
       priceDate: price.date,
       converted: decimal.multiply(quantity, price.rate),

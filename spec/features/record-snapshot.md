@@ -51,6 +51,14 @@ holding. Decrypted payload:
     rounding mode — the helpers above — against one more file to
     self-host, pin, hash, and re-verify on every bump, inside a page
     that handles the password (architecture.md, Supply chain).
+- **`value` keeps the fraction digits it was typed with**, in canonical
+  form: `-?(0|[1-9][0-9]*)(\.[0-9]{1,12})?`, and a zero carries no
+  sign. Typed `12.50` is stored `"12.50"`, `007` is `"7"`, `.5` is
+  `"0.5"`, `12.` is `"12"` and `-0.00` is `"0.00"`. The digits typed
+  are the precision the person measured, and the display shows them
+  back (`account-settings.md`, Dates and numbers). Arithmetic reads the
+  same string at scale 12 and does not care. Reading never rewrites a
+  value: a stored string stays as stored until the person changes it.
 - `date` is a calendar date (`YYYY-MM-DD`), no time, no timezone — a
   snapshot is "what it was worth that day."
 - `note` is free text, optional, `null` when unset.
@@ -95,8 +103,17 @@ carries a confirm of its own (`manage-accounts.md`).
 
 A snapshot can be written by **confirming** a holding's last recorded
 quantity at a new date rather than typing it (`ui/update-values.md`). It
-writes an ordinary snapshot: same `value`, new `date`, new `record_id`.
-No new field and nothing for the record shape to learn.
+writes an ordinary snapshot: new `date`, new `record_id`, and the
+stored `value` string character for character, never the field's text
+parsed again, so a confirmed figure is never rounded or reformatted. No
+new field and nothing for the record shape to learn.
+
+**Unchanged is decided on stored forms.** A field counts as untouched
+while its text equals its prefill (`account-settings.md`, Dates and
+numbers), which keeps a sweep row on Confirm and a recorded row's Save
+inert. An edited field is parsed and compared with the stored `value`
+as strings, not as numbers, so `12.50` typed over a stored `"12.5"` is
+an edit and writes `"12.50"`.
 
 **Confirming asserts the quantity, and only the quantity.** You still
 own 12.5 troy ounces. What gold has done since is the price timeline's
@@ -438,6 +455,13 @@ a quiet wrong number.
   otherwise drift on.
 - A value with more than twelve decimal places is rejected at input
   rather than silently truncated.
+- Typed `12.50`, `007`, `.5`, `12.` and `-0.00` store `value` as
+  `"12.50"`, `"7"`, `"0.5"`, `"12"` and `"0.00"`, and every stored
+  `value` matches `^-?(0|[1-9][0-9]*)(\.[0-9]{1,12})?$` with no zero
+  carrying `-`.
+- A snapshot stored as `"12.5"` reads `12.5`, and displaying it,
+  opening its recording and confirming it at a new date leave its own
+  record byte-identical.
 - Re-entering a date that already has a snapshot prompts to replace and,
   on confirm, results in **one** record for that (holding, date) with
   `version` incremented and a different nonce.
@@ -459,10 +483,16 @@ a quiet wrong number.
   Conflict and does not overwrite.
 - Editing a snapshot's value, note, or date issues no request to
   `/api/rates` and writes no `rate` record.
-- Confirming writes a snapshot whose `value` equals the holding's last
-  recorded one at the new date, for a holding in the main currency, one
-  with a live rate source, and one with none, with no branch between
-  them.
+- Confirming writes a snapshot whose `value` is the holding's last
+  recorded string character for character at the new date, for a
+  holding in the main currency, one with a live rate source, and one
+  with none, with no branch between them. Under `moneyPlaces` `0`,
+  confirming an `XAU-ozt` holding stored as `"12.125"` writes
+  `"12.125"` and a `USD` holding stored as `"1000.40"` writes
+  `"1000.40"`.
+- A sweep row prefilled from `"12.5"` offers Confirm, offers Record once
+  edited, offers Confirm again when the prefill is typed back, and with
+  `12.50` typed writes `"12.50"`.
 - Confirming stays available and stays one click with the rate proxy
   stubbed to No Content.
 - Confirming a holding with no snapshots is not offered, and the
