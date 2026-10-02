@@ -48,14 +48,12 @@ than your latest marked comment on the issue and its pull requests.
 
 ## Take the first step that applies
 
-1. **Not started.** The issue is closed, or an issue not by
-   `github-actions[bot]` (`app/github-actions` in `gh`'s output) without
-   `accepted`, the client's own included: stop without a word. An issue by
-   `github-actions[bot]` was opened by this repository's own workflows
-   for a red `master` or a code scanning alert, and needs no `accepted`.
-2. **Edited after acceptance.** Someone else's issue whose title or
-   body someone other than the client edited after `accepted` was
-   added: remove `accepted`, add `needs-answer`, and comment to
+1. **Not started.** The issue is closed, or has no `accepted` and was
+   not opened by `github-actions[bot]` (`app/github-actions` in `gh`'s
+   output): stop without a word.
+2. **Edited after acceptance.** Someone other than the client edited
+   the title or body after `accepted` was added: remove `accepted`, add
+   `needs-answer`, and comment to
    `@leandersabel` that the text changed after it was accepted and that
    adding `accepted` again resumes it. Stop.
 3. **Stuck, and the client wrote since.** Remove `stuck`. Fix attempts
