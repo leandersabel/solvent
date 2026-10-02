@@ -20,6 +20,7 @@ jobs:
       packages: write
       pull-requests: read
       issues: read
+      security-events: read
     env:
       GH_TOKEN: ${{ github.token }}
       GH_REPO: ${{ github.repository }}
@@ -29,6 +30,14 @@ jobs:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           fetch-depth: 0
+      # A nightly something now holds back is not made stable.
+      - id: gate
+        uses: ./.github/actions/release-gate
+        with:
+          commit: ${{ env.TAG }}
+          since: ${{ env.TAG }}
+      - if: failure() && steps.gate.outcome == 'failure'
+        run: gh release edit "$TAG" --prerelease
       - run: |
           echo "${{ github.token }}" | docker login ghcr.io -u "${{ github.actor }}" --password-stdin
           docker buildx imagetools create -t "$IMAGE:stable" "$IMAGE:$TAG"
