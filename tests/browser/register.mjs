@@ -67,29 +67,36 @@ page.on(async (message) => {
 });
 await page.send('Fetch.enable', { patterns: [{ urlPattern: '*/api/register', requestStage: 'Request' }] });
 
-const q = (selector) => `document.querySelector(${JSON.stringify(selector)})`;
 const text = () => page.eval('document.body.innerText');
+const shows = (message, label) =>
+  page.waitUntil((expected) => document.body.innerText.includes(expected), { args: [message], label });
 const open = async (which) => {
   await page.goto(`${BASE}/register?invite=${INVITES[which]}`);
-  await page.waitUntil(q('input[type=text]'), { label: 'the form' });
+  await page.waitUntil(() => document.querySelector('input[type=text]') !== null, { label: 'the form' });
 };
 const type = (selector, value, index = 0) =>
-  page.eval(`(() => {
-    const el = document.querySelectorAll(${JSON.stringify(selector)})[${index}];
+  page.call((selector, value, index) => {
+    const el = document.querySelectorAll(selector)[index];
     el.focus();
-    el.value = ${JSON.stringify(value)};
+    el.value = value;
     el.dispatchEvent(new Event('input', { bubbles: true }));
-  })()`);
-const leave = () => page.eval(`${q('input[type=text]')}.blur()`);
-const line = () => page.eval(`document.getElementById(${q('input[type=text]')}.getAttribute('aria-describedby')).textContent`);
-const lineClass = () => page.eval(`document.getElementById(${q('input[type=text]')}.getAttribute('aria-describedby')).className`);
-const disabled = () => page.eval(`${q('button[type=submit]')}.disabled`);
+  }, selector, value, index);
+const leave = () => page.eval("document.querySelector('input[type=text]').blur()");
+const usernameValue = () => page.eval("document.querySelector('input[type=text]').value");
+const line = () => page.eval("document.getElementById(document.querySelector('input[type=text]').getAttribute('aria-describedby')).textContent");
+const lineClass = () => page.eval("document.getElementById(document.querySelector('input[type=text]').getAttribute('aria-describedby')).className");
+const disabled = () => page.eval("document.querySelector('button[type=submit]').disabled");
+const submit = () => page.eval("document.querySelector('button[type=submit]').click()");
 const workers = () => page.eval('window.__workers');
 const fillRest = async (vault) => {
   await type('input[type=password]', PASSWORD, 0);
   await type('input[type=password]', PASSWORD, 1);
   if (vault) {
-    await page.eval(`(() => { const box = ${q('input[type=checkbox]')}; box.checked = true; box.dispatchEvent(new Event('change', { bubbles: true })); })()`);
+    await page.call((selector) => {
+      const box = document.querySelector(selector);
+      box.checked = true;
+      box.dispatchEvent(new Event('change', { bubbles: true }));
+    }, 'input[type=checkbox]');
   }
   await page.settle(300);
 };
@@ -98,7 +105,7 @@ const fillRest = async (vault) => {
 const enterEverywhere = async () => {
   const fields = await page.eval(`document.querySelectorAll('form input').length`);
   for (let index = 0; index < fields; index++) {
-    await page.eval(`document.querySelectorAll('form input')[${index}].focus()`);
+    await page.call((index) => document.querySelectorAll('form input')[index].focus(), index);
     for (const type of ['keyDown', 'keyUp']) {
       await page.send('Input.dispatchKeyEvent', { type, key: 'Enter', code: 'Enter', windowsVirtualKeyCode: 13, text: type === 'keyDown' ? '\r' : undefined });
     }
@@ -114,18 +121,18 @@ try {
   // ---- The username field, on the vault form ----------------------
   await open('vault');
   const attributes = await page.eval(`(() => {
-    const input = ${q('input[type=text]')};
+    const input = document.querySelector('input[type=text]');
     return JSON.stringify(['autocapitalize', 'autocorrect', 'spellcheck', 'autocomplete', 'maxlength', 'aria-invalid'].map((n) => input.getAttribute(n)));
   })()`);
   check('the field is told not to capitalize or correct, and has no maxlength', attributes === JSON.stringify(['none', 'off', 'false', 'username', null, null]), attributes);
   check('the line starts as the hint', (await line()) === HINT && (await lineClass()) === 'hint');
-  check('the line is a polite live region', (await page.eval(`document.getElementById(${q('input[type=text]')}.getAttribute('aria-describedby')).getAttribute('aria-live')`)) === 'polite');
+  check('the line is a polite live region', (await page.eval("document.getElementById(document.querySelector('input[type=text]').getAttribute('aria-describedby')).getAttribute('aria-live')")) === 'polite');
 
   await fillRest(true);
   await type('input[type=text]', 'Bo b!');
-  check('the field lowercases as it is typed', (await page.eval(`${q('input[type=text]')}.value`)) === 'bo b!');
+  check('the field lowercases as it is typed', (await usernameValue()) === 'bo b!');
   check('Bo b! is reported on its own line at once, as an error', (await line()) === NOT_ALLOWED && (await lineClass()) === 'field-error');
-  check('the input is marked invalid while it is an error', (await page.eval(`${q('input[type=text]')}.getAttribute('aria-invalid')`)) === 'true');
+  check('the input is marked invalid while it is an error', (await page.eval("document.querySelector('input[type=text]').getAttribute('aria-invalid')")) === 'true');
   check('the button stays disabled with everything else valid', await disabled());
   const pressed = await enterEverywhere();
   check(
@@ -136,7 +143,7 @@ try {
   check('no network wording appears', !(await text()).includes('did not go through'));
 
   await type('input[type=text]', 'a'.repeat(33));
-  check('a 33rd character is reported and kept in the field', (await line()) === 'That is more than 32 characters.' && (await page.eval(`${q('input[type=text]')}.value.length`)) === 33);
+  check('a 33rd character is reported and kept in the field', (await line()) === 'That is more than 32 characters.' && (await usernameValue()).length === 33);
   await type('input[type=text]', 'ab');
   check('two characters are not an error until the field is left', (await line()) === HINT);
   await leave();
@@ -170,14 +177,14 @@ try {
     await type('input[type=text]', '  Bob  ');
     answer = stub;
     posts.length = 0;
-    await page.eval(`${q('button[type=submit]')}.click()`);
-    await page.waitUntil(`document.body.innerText.includes(${JSON.stringify(expected)})`, { label: name });
+    await submit();
+    await shows(expected, name);
     await page.settle(200);
     const shown = await text();
     check(`${name} shows its own message`, others(expected).every((message) => !shown.includes(message)), shown);
     check(`${name}: the message is where the spec puts it`, where === 'user' ? (await line()).startsWith(expected.slice(0, 20)) : !(await line()).startsWith('That username') && (await line()) === HINT, await line());
     check(`${name}: every field keeps its value and the button works again`,
-      (await page.eval(`JSON.stringify([${q('input[type=text]')}.value, ${q('input[type=password]')}.value, document.querySelectorAll('input[type=password]')[1].value])`)) === JSON.stringify(['  bob  ', PASSWORD, PASSWORD]) && !(await disabled()));
+      (await page.eval("JSON.stringify([document.querySelector('input[type=text]').value, document.querySelector('input[type=password]').value, document.querySelectorAll('input[type=password]')[1].value])")) === JSON.stringify(['  bob  ', PASSWORD, PASSWORD]) && !(await disabled()));
     check(
       `${name}: the one request carried the checked, trimmed username`,
       posts.length === 1 && JSON.parse(posts[0].postData ?? '{}').username === 'bob',
@@ -193,26 +200,32 @@ try {
   await fillRest(true);
   await type('input[type=text]', 'Bob');
   answer = { status: 400, body: '{"refused":"invite"}' };
-  await page.eval(`${q('button[type=submit]')}.click()`);
-  await page.waitUntil(`document.body.innerText.includes('This invite link is not valid.')`, { label: 'the invite card' });
-  check('a refused invite gives way to the bare card with no form', !(await page.eval(q('form') + ' !== null')) && (await page.eval(`document.querySelectorAll('.card-heading').length`)) === 1);
+  await submit();
+  await shows('This invite link is not valid.', 'the invite card');
+  check('a refused invite gives way to the bare card with no form', !(await page.eval("document.querySelector('form') !== null")) && (await page.eval(`document.querySelectorAll('.card-heading').length`)) === 1);
 
   // ---- A browser that cannot derive -------------------------------
   const MEMORY = (what) => `This device does not have enough memory available right now. No ${what} was created and your invite link is still good. Close some other tabs and try again.`;
-  const tryAgain = `[...document.querySelectorAll('form button')].find((b) => b.textContent === 'Try again' && !b.hidden)`;
+  // Whether a visible Try again button exists, and with `click`, presses it.
+  const tryAgain = (click = false) =>
+    page.call((click) => {
+      const button = [...document.querySelectorAll('form button')].find((b) => b.textContent === 'Try again' && !b.hidden);
+      if (click) button.click();
+      return Boolean(button);
+    }, click);
   for (const [which, what] of [['vault', 'vault'], ['admin', 'account']]) {
     await open(which);
     await fillRest(which === 'vault');
     await type('input[type=text]', 'Bob');
     await page.eval("window.__fail = 'memory'");
     posts.length = 0;
-    await page.eval(`${q('button[type=submit]')}.click()`);
-    await page.waitUntil(`document.body.innerText.includes(${JSON.stringify(MEMORY(what))})`, { label: `not enough memory, ${which}` });
+    await submit();
+    await shows(MEMORY(what), `not enough memory, ${which}`);
     await page.settle(200);
-    check(`${which}: not enough memory names the moment and offers Try again`, await page.eval(`Boolean(${tryAgain})`));
+    check(`${which}: not enough memory names the moment and offers Try again`, await tryAgain());
     check(`${which}: not enough memory sent nothing, kept the fields and left the button usable`,
-      posts.length === 0 && (await page.eval(`${q('input[type=password]')}.value`)) === PASSWORD && !(await disabled()));
-    await page.eval(`${tryAgain}.click()`);
+      posts.length === 0 && (await page.eval("document.querySelector('input[type=password]').value")) === PASSWORD && !(await disabled()));
+    await tryAgain(true);
     await page.waitUntil('window.__derivations === 2', { label: 'Try again deriving again' });
     await page.settle(200);
     check(`${which}: Try again derives again`, (await page.eval('window.__derivations')) === 2 && posts.length === 0);
@@ -223,11 +236,11 @@ try {
   await type('input[type=text]', 'Bob');
   await page.eval("window.__fail = 'unsupported'");
   posts.length = 0;
-  await page.eval(`${q('button[type=submit]')}.click()`);
+  await submit();
   const STOP = 'This browser cannot run the encryption Solvent needs. There is no weaker fallback.';
-  await page.waitUntil(`document.body.innerText.includes(${JSON.stringify(STOP)})`, { label: 'the hard stop' });
+  await shows(STOP, 'the hard stop');
   check('a browser that cannot run the encryption gets a hard stop with no form, no retry and no request',
-    !(await page.eval(`${q('form')} !== null`)) && !(await page.eval(`${q('button')} !== null`)) && posts.length === 0 && !(await text()).includes('did not go through'));
+    !(await page.eval("document.querySelector('form') !== null")) && !(await page.eval("document.querySelector('button') !== null")) && posts.length === 0 && !(await text()).includes('did not go through'));
 
   // ---- The administrator form -------------------------------------
   await open('admin');
@@ -242,8 +255,8 @@ try {
   );
   await type('input[type=text]', 'Bob');
   answer = { status: 400, body: '{}' };
-  await page.eval(`${q('button[type=submit]')}.click()`);
-  await page.waitUntil(`document.body.innerText.includes('No account was created')`, { label: 'the administrator refusal' });
+  await submit();
+  await shows('No account was created', 'the administrator refusal');
   check('the administrator form words the refusal for an account', (await text()).includes(refusal('account')));
 } catch (error) {
   check('the checks ran to the end', false, error.message);
