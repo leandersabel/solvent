@@ -12,21 +12,26 @@ const MIN_SCORE = 3;
 
 const RATINGS = ['very weak', 'weak', 'fair', 'strong', 'very strong'];
 
-/** Fetch zxcvbn if this page was handed where to find it and has not
- *  got it already. Resolves either way: a gauge that cannot score
- *  still enforces the length floor, and the submit rule below refuses
- *  anything it could not score. */
+// The path and hash of the pinned zxcvbn (ZXCVBN_VERSION and ZXCVBN_SRI
+// in solvent/crypto.py, which a test holds this to). They live here and
+// not in the page's markup, because markup could plant a source of its
+// own.
+const ZXCVBN_URL = new URL('../vendor/zxcvbn/4.4.2/zxcvbn.js', import.meta.url);
+const ZXCVBN_SRI = 'sha384-LXuP8lknSGBOLVn4fwVOl+rWR+zOEtZx6CF9ZLaN6gKBgLByU4D79VWWjV4/gefq';
+
+/** Load zxcvbn unless the page already has it. A function is the test,
+ *  because an element with id="zxcvbn" also answers to window.zxcvbn. Resolves
+ *  either way: a gauge that cannot score still enforces the length
+ *  floor, and the submit rule below refuses anything it could not
+ *  score. */
 let fetching = null;
 function ensureZxcvbn() {
-  if (window.zxcvbn) return Promise.resolve();
+  if (typeof window.zxcvbn === 'function') return Promise.resolve();
   if (fetching) return fetching;
-  const source = document.getElementById('zxcvbn-source');
-  if (!source) return Promise.resolve();
-  const { src, integrity } = JSON.parse(source.textContent);
   fetching = new Promise((resolve) => {
     const tag = document.createElement('script');
-    tag.src = src;
-    tag.integrity = integrity;
+    tag.src = ZXCVBN_URL.href;
+    tag.integrity = ZXCVBN_SRI;
     tag.crossOrigin = 'anonymous';
     tag.addEventListener('load', resolve);
     tag.addEventListener('error', resolve);
@@ -42,7 +47,7 @@ export function strengthGauge(input, onChange) {
 
   const evaluate = () => {
     const value = input.value;
-    const result = window.zxcvbn ? window.zxcvbn(value) : { score: 0 };
+    const result = typeof window.zxcvbn === 'function' ? window.zxcvbn(value) : { score: 0 };
     segments.forEach((segment, index) => {
       segment.classList.toggle('filled', value.length > 0 && index < result.score + 1);
     });

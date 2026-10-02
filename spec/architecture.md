@@ -928,8 +928,8 @@ Actors this design defends against vs. accepts:
   would otherwise sit inside the trust boundary and could silently
   exfiltrate passwords via a malicious script.
 - Every vendored file has a pinned SHA-384 hash, and the test suite
-  checks each file against it. A page that loads one by script tag also
-  carries the hash as Subresource Integrity for the browser to enforce.
+  checks each file against it. Every script tag that loads one carries
+  the hash as Subresource Integrity for the browser to enforce.
   The `argon2id` import inside the KDF worker cannot carry one, and
   enforcing it by hand would need `blob:` in `script-src`, which costs
   more than it buys: the hash is served by the same origin as the file,
@@ -943,11 +943,16 @@ Actors this design defends against vs. accepts:
   import added in passing. That is why decimal arithmetic is written
   against `BigInt` (record-snapshot.md) and the trend chart is drawn in
   SVG (net-worth-view.md) rather than pulled in.
-- **zxcvbn is loaded only by the two screens that score a password**,
-  registration (`ui/register.md`) and change password
-  (`ui/settings.md`). It is the largest of them and the app shell
-  has no use for it, so it does not ride along on every authenticated
-  page.
+- **zxcvbn is loaded only where a password is scored**, by the
+  strength gauge (`ui/register.md`). It is the largest of them and the
+  app shell has no use for it, so it does not ride along on every
+  authenticated page.
+- **The gauge never takes where to load a script from out of the
+  page's markup**, because content rendered into the page could plant
+  a source of its own and have any same-origin script run.
+  `strength.js` resolves zxcvbn's path against its own module URL and
+  holds that file's hash as a constant, and the test suite checks both
+  against the pinned version and hash.
 
 ## Non-goals
 
