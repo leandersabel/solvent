@@ -5835,19 +5835,16 @@ try {
   })()`));
   const shownType = await page.eval(`${passwordCard}.querySelectorAll('input')[1].type`);
   await idleLock();
-  const keptPasswords = await reachable(typedPasswords);
+  // Only counts leave these checks, so a failure never prints a password.
+  const kept = (await reachable(typedPasswords)).length;
   check(
     'no password typed into settings is kept across the lock, shown or not',
-    shownType === 'text' && keptPasswords.length === 0,
-    `${keptPasswords.length} kept, the second field was ${shownType}`,
+    shownType === 'text' && kept === 0,
+    `${kept} kept, the second field was ${shownType}`,
   );
   await unlockInPlace('the vault after unlocking over the password card');
-  const passwords = await page.eval(`JSON.stringify([...${passwordCard}.querySelectorAll('input')].map(f => f.value))`);
-  check(
-    'no password field is refilled after unlocking',
-    JSON.parse(passwords).every((value) => value === ''),
-    passwords,
-  );
+  const filled = await page.eval(`[...${passwordCard}.querySelectorAll('input')].filter(f => f.value !== '').length`);
+  check('no password field is refilled after unlocking', filled === 0, `${filled} filled`);
 
   // ---- Login: a session that runs out mid-action ------------------------
 
