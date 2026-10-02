@@ -1404,11 +1404,13 @@ try {
     await page.waitUntil("document.body.innerText.includes('Main currency')", { label });
     await page.settle(400);
   };
-  const cardWith = (words) => `[...document.querySelectorAll('.card')].find((c) => c.textContent.includes(${JSON.stringify(words)}))`;
   await toSettings('settings for its own states');
   check(
     'the main currency is shown and offers no control to change it',
-    await page.eval(`!${cardWith('Main currency')}.querySelector('input, select, textarea, button')`),
+    await page.call(
+      (words) => !([...document.querySelectorAll('.card')].find((c) => c.textContent.includes(words))).querySelector('input, select, textarea, button'),
+      'Main currency',
+    ),
   );
 
   // The session list waits on its own fetch, alone.
@@ -1419,10 +1421,13 @@ try {
   await page.eval("location.hash = '#/'");
   await page.settle(300);
   await toSettings('settings with the session list held');
-  const waiting = JSON.parse(await page.eval(`JSON.stringify({
-    skeleton: ${cardWith('Session and lock')}.querySelectorAll('.skeleton-row').length,
-    elsewhere: document.querySelectorAll('.skeleton-row').length,
-  })`));
+  const waiting = await page.call((words) => {
+    const card = [...document.querySelectorAll('.card')].find((c) => c.textContent.includes(words));
+    return {
+      skeleton: card.querySelectorAll('.skeleton-row').length,
+      elsewhere: document.querySelectorAll('.skeleton-row').length,
+    };
+  }, 'Session and lock');
   check(
     'the session card alone shows skeleton rows while its list loads',
     waiting.skeleton > 0 && waiting.elsewhere === waiting.skeleton,
@@ -1439,7 +1444,10 @@ try {
     select.value = '2';
     select.dispatchEvent(new Event('change', { bubbles: true }));
   })()`);
-  await page.eval(`[...${cardWith('Session and lock')}.querySelectorAll('button')].find((b) => b.textContent === 'Retry').click()`);
+  await page.call((words) => {
+    const card = [...document.querySelectorAll('.card')].find((c) => c.textContent.includes(words));
+    [...card.querySelectorAll('button')].find((b) => b.textContent === 'Retry').click();
+  }, 'Session and lock');
   await page.waitUntil("document.body.innerText.includes('This session')", { label: 'the list after a retry' });
   check(
     'a retry reloads the session card alone',
@@ -1535,42 +1543,44 @@ try {
   check('the other session is open before the change', (await statusWith(elsewhere)) === 200);
 
   const NEW_PASSWORD = 'marble quarry violet anchor';
-  const passwordForm = cardWith('Change password');
+  const PASSWORD_CARD = 'Change password';
   const fillPasswords = async (current, next) => {
-    await page.eval(`(() => {
-      const card = ${passwordForm};
-      const set = (selector, value) => {
-        const node = card.querySelector(selector);
+    await page.call((words, currentValue, nextValue) => {
+      const card = [...document.querySelectorAll('.card')].find((c) => c.textContent.includes(words));
+      const set = (node, value) => {
         node.value = value;
         node.dispatchEvent(new Event('input', { bubbles: true }));
       };
-      set('input[autocomplete=current-password]', ${JSON.stringify(current)});
-      const [next, confirm] = card.querySelectorAll('input[autocomplete=new-password]');
-      for (const node of [next, confirm]) {
-        node.value = ${JSON.stringify(next)};
-        node.dispatchEvent(new Event('input', { bubbles: true }));
-      }
-    })()`);
-    await page.waitUntil(`!${passwordForm}.querySelector('.btn-primary').disabled`, { label: 'the strength gauge' });
+      set(card.querySelector('input[autocomplete=current-password]'), currentValue);
+      for (const node of card.querySelectorAll('input[autocomplete=new-password]')) set(node, nextValue);
+    }, PASSWORD_CARD, current, next);
+    await page.waitUntil(
+      (words) => ![...document.querySelectorAll('.card')].find((c) => c.textContent.includes(words)).querySelector('.btn-primary').disabled,
+      { args: [PASSWORD_CARD], label: 'the strength gauge' },
+    );
   };
+  const submitPasswords = () =>
+    page.call((words) => {
+      [...document.querySelectorAll('.card')].find((c) => c.textContent.includes(words)).querySelector('.btn-primary').click();
+    }, PASSWORD_CARD);
   const changeRequests = () =>
     watched[0].requests.filter((r) => r.url.endsWith('/api/auth/change-password'));
 
   await fillPasswords('not the password at all', NEW_PASSWORD);
-  await page.eval(`${passwordForm}.querySelector('.btn-primary').click()`);
+  await submitPasswords();
   await page.waitUntil("document.body.innerText.includes('That is not your current password.')", {
     timeout: 60000,
     label: 'the wrong current password',
   });
-  const wrongCurrent = JSON.parse(await page.eval(`(() => {
-    const card = ${passwordForm};
+  const wrongCurrent = await page.call((words) => {
+    const card = [...document.querySelectorAll('.card')].find((c) => c.textContent.includes(words));
     const error = card.querySelector('.field-error:not([hidden])');
     const first = card.querySelector('input');
-    return JSON.stringify({
+    return {
       above: Boolean(error.compareDocumentPosition(first) & Node.DOCUMENT_POSITION_FOLLOWING),
       kept: [...card.querySelectorAll('input')].map((i) => i.value),
-    });
-  })()`));
+    };
+  }, PASSWORD_CARD);
   check(
     'a wrong current password is caught in the browser, above the first field, and nothing is sent',
     wrongCurrent.above && changeRequests().length === 0,
@@ -1582,15 +1592,15 @@ try {
   );
 
   await fillPasswords(VAULT_PASSWORD, NEW_PASSWORD);
-  const working = JSON.parse(await page.eval(`(() => {
-    const card = ${passwordForm};
+  const working = await page.call((words) => {
+    const card = [...document.querySelectorAll('.card')].find((c) => c.textContent.includes(words));
     const button = card.querySelector('.btn-primary');
     button.click();
-    return JSON.stringify({
+    return {
       label: button.textContent,
       quiet: [...card.querySelectorAll('input, .password-field button')].every((n) => n.disabled),
-    });
-  })()`));
+    };
+  }, PASSWORD_CARD);
   check(
     'changing the password shows its working state and the form goes quiet',
     working.label === 'Changing your password' && working.quiet,
@@ -1664,7 +1674,7 @@ try {
   // Back to the password the rest of the run signs in with.
   await toSettings('settings to change the password back');
   await fillPasswords(NEW_PASSWORD, VAULT_PASSWORD);
-  await page.eval(`${passwordForm}.querySelector('.btn-primary').click()`);
+  await submitPasswords();
   await page.waitUntil("document.body.innerText.includes('Your password is changed.')", {
     timeout: 60000,
     label: 'the password changed back',
