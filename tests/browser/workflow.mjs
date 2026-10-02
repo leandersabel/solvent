@@ -1092,11 +1092,11 @@ try {
   const accountRecords = () =>
     JSON.stringify(sql("SELECT record_id, version, nonce, ciphertext FROM records WHERE record_type = 'account' ORDER BY record_id"));
   const bandsOf = (dimensionId) =>
-    page.eval(`(async () => {
+    page.call(async (id) => {
       const v = (await import('/static/js/session.js')).currentVault();
-      const d = v.dimensions.find((x) => x.id === ${JSON.stringify(dimensionId)});
+      const d = v.dimensions.find((x) => x.id === id);
       return JSON.stringify(Object.fromEntries(v.activeHoldings().map((h) => [h.payload.name, v.bandOf(h, d).label])));
-    })()`).then(JSON.parse);
+    }, dimensionId).then(JSON.parse);
   const settled = "!document.querySelector('.dimension-list[aria-busy]') && !document.querySelector('.dialog')";
   // One operation, and the PUTs it sent.
   const writesOf = async (label, act) => {
@@ -1108,35 +1108,38 @@ try {
     return (await page.eval('window.__puts')) - before;
   };
   const inCard = (dimension, button) =>
-    page.eval(`(() => {
+    page.call((name, label) => {
       const card = [...document.querySelectorAll('.dimension-card')]
-        .find((c) => c.querySelector('.card-head .strong').textContent === ${JSON.stringify(dimension)});
+        .find((c) => c.querySelector('.card-head .strong').textContent === name);
       [...card.querySelector('.card-head').querySelectorAll('button')]
-        .find((b) => b.textContent === ${JSON.stringify(button)} || b.getAttribute('aria-label') === ${JSON.stringify(button)})
+        .find((b) => b.textContent === label || b.getAttribute('aria-label') === label)
         .click();
-    })()`);
+    }, dimension, button);
   const inRow = (value, button) =>
-    page.eval(`(() => {
+    page.call((name, label) => {
       const row = [...document.querySelectorAll('li.value-row')]
-        .find((r) => r.querySelector('.strong').textContent === ${JSON.stringify(value)});
-      [...row.querySelectorAll('button')].find((b) => b.textContent === ${JSON.stringify(button)}).click();
-    })()`);
+        .find((r) => r.querySelector('.strong').textContent === name);
+      [...row.querySelectorAll('button')].find((b) => b.textContent === label).click();
+    }, value, button);
   const inDialog = async (fields, button) => {
     await page.waitUntil("document.querySelector('.dialog')");
     await page.settle(200);
     for (const [index, value] of fields.entries()) await setValue('.dialog input', value, index);
-    await page.eval(`[...document.querySelectorAll('.dialog button')].find((b) => b.textContent === ${JSON.stringify(button)}).click()`);
+    await page.call((label) => [...document.querySelectorAll('.dialog button')].find((b) => b.textContent === label).click(), button);
   };
   const restore = (label) =>
-    page.eval(`(() => {
+    page.call((name) => {
       document.querySelectorAll('#app details').forEach((d) => (d.open = true));
-      const row = [...document.querySelectorAll('.settings-row')].find((r) => r.firstChild.textContent === ${JSON.stringify(label)});
+      const row = [...document.querySelectorAll('.settings-row')].find((r) => r.firstChild.textContent === name);
       row.querySelector('button').click();
-    })()`);
-  // The first dimension's card, the one every value below belongs to.
-  const firstCard = () => `document.querySelector('.dimension-card[data-dimension=${JSON.stringify(liquidity.id)}]')`;
+    }, label);
+  // The first dimension's card is the one every value below belongs to; the
+  // page functions find it by the id they are handed.
   const liveValues = () =>
-    page.eval(`JSON.stringify([...${firstCard()}.querySelectorAll('li.value-row .strong')].map((n) => n.textContent))`).then(JSON.parse);
+    page.call((id) => {
+      const card = [...document.querySelectorAll('.dimension-card')].find((c) => c.dataset.dimension === id);
+      return [...card.querySelectorAll('li.value-row .strong')].map((n) => n.textContent);
+    }, liquidity.id);
 
   const addValue = (label) =>
     writesOf(`the value ${label}`, async () => {
@@ -1303,14 +1306,15 @@ try {
 
   // The drag handle, the reorder control's other route.
   writeCounts['drag a value'] = await writesOf('the drag', () =>
-    page.eval(`(() => {
-      const rows = [...${firstCard()}.querySelectorAll('li.value-row')];
+    page.call((id) => {
+      const card = [...document.querySelectorAll('.dimension-card')].find((c) => c.dataset.dimension === id);
+      const rows = [...card.querySelectorAll('li.value-row')];
       const from = rows.find((r) => r.querySelector('.strong').textContent === 'Investments');
       const transfer = new DataTransfer();
       from.querySelector('.drag-handle').dispatchEvent(new DragEvent('dragstart', { bubbles: true, dataTransfer: transfer }));
       rows[0].dispatchEvent(new DragEvent('dragover', { bubbles: true, cancelable: true, dataTransfer: transfer }));
       rows[0].dispatchEvent(new DragEvent('drop', { bubbles: true, cancelable: true, dataTransfer: transfer }));
-    })()`),
+    }, liquidity.id),
   );
   const announced = await page.eval("document.querySelector('[aria-live]').textContent");
   check(
@@ -1340,10 +1344,13 @@ try {
   const storedOrder = await liveValues();
   await inRow('Investments', 'Move down');
   await page.settle(300);
-  const whileSaving = JSON.parse(await page.eval(`JSON.stringify({
-    order: [...${firstCard()}.querySelectorAll('li.value-row .strong')].map((n) => n.textContent),
-    disabled: [...${firstCard()}.querySelectorAll('li.value-row button')].filter((b) => /Move|Archive/.test(b.textContent)).every((b) => b.disabled),
-  })`));
+  const whileSaving = await page.call((id) => {
+    const card = [...document.querySelectorAll('.dimension-card')].find((c) => c.dataset.dimension === id);
+    return {
+      order: [...card.querySelectorAll('li.value-row .strong')].map((n) => n.textContent),
+      disabled: [...card.querySelectorAll('li.value-row button')].filter((b) => /Move|Archive/.test(b.textContent)).every((b) => b.disabled),
+    };
+  }, liquidity.id);
   check(
     'a move is shown at once, with the controls disabled until it answers',
     whileSaving.order.join(',') === 'Pension,Investments,Cash' && whileSaving.disabled,
