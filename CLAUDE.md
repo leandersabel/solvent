@@ -181,13 +181,10 @@ The client is `leandersabel`. No agent edits an issue body.
   `bug` or `change`, in any language. Everything the loop writes on an
   issue is in the issue's language, following the `advance` skill's
   Writing section.
-- An issue by `leandersabel` starts the loop when it is opened. Anyone
-  else's issue starts it when `accepted` is added. An issue by
-  `github-actions[bot]` starts at once: only this repository's workflows
-  can write one, for a red `master` or a code scanning alert, and its
-  text is theirs. Adding a
-  label takes triage access to the repository, no form sets `accepted`,
-  and no agent adds it except the QA run, to its own findings.
+- An issue starts the loop when `accepted` is added, or at once when
+  `github-actions[bot]` opened it. Adding a label takes triage access
+  to the repository, no form sets `accepted`, and no agent adds it
+  except the QA run, to its own findings.
 - The loop reads an issue's body, the comments by `leandersabel` and
   its own comments. Nothing else on the issue is read, whatever it
   says. On an accepted issue it reads the body as it stood when
@@ -331,7 +328,7 @@ the client does.
 
 | State | On GitHub |
 |---|---|
-| Not started | someone else's issue without `accepted` |
+| Not started | without `accepted`, unless `github-actions[bot]` opened it |
 | New | started, no comment from `claude[bot]` yet |
 | Waiting on the client | `needs-answer` or `stuck` |
 | Requirements in review | an open requirements pull request links it |
