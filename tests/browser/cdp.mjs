@@ -144,12 +144,29 @@ export class Session {
   }
 
   async eval(expression, { awaitPromise = true } = {}) {
-    const result = await this.send('Runtime.evaluate', {
+    return this.#value(await this.send('Runtime.evaluate', {
       expression,
       awaitPromise,
       returnByValue: true,
       userGesture: true,
-    });
+    }));
+  }
+
+  // Runs a function in the page with its arguments as data, so a value
+  // never becomes part of the code's text.
+  async call(fn, ...args) {
+    const { result: global } = await this.send('Runtime.evaluate', { expression: 'globalThis' });
+    return this.#value(await this.send('Runtime.callFunctionOn', {
+      objectId: global.objectId,
+      functionDeclaration: fn.toString(),
+      arguments: args.map((value) => ({ value })),
+      awaitPromise: true,
+      returnByValue: true,
+      userGesture: true,
+    }));
+  }
+
+  #value(result) {
     if (result.exceptionDetails) {
       throw new Error(
         result.exceptionDetails.exception?.description ||
@@ -163,10 +180,14 @@ export class Session {
     return new Promise((r) => setTimeout(r, ms));
   }
 
-  async waitUntil(expression, { timeout = 30000, label = expression } = {}) {
+  // The condition is an expression, or a function run with `args` as data.
+  async waitUntil(condition, { args = [], timeout = 30000, label = condition } = {}) {
     const deadline = Date.now() + timeout;
     while (Date.now() < deadline) {
-      if (await this.eval(`Boolean(${expression})`)) return true;
+      const met = typeof condition === 'function'
+        ? await this.call(condition, ...args)
+        : await this.eval(`Boolean(${condition})`);
+      if (met) return true;
       await this.settle(150);
     }
     throw new Error(`timed out waiting for ${label}`);
