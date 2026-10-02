@@ -13,7 +13,7 @@ import re
 from pathlib import Path
 
 from solvent.config import DEFAULT_KDF_ENVELOPE
-from solvent.crypto import ARGON2ID_SRI, ZXCVBN_SRI
+from solvent.crypto import ARGON2ID_SRI, ZXCVBN_SRI, ZXCVBN_VERSION
 from solvent.shell import ALPINE_SRI, nav_entries
 from tests.helpers import mint_invite, register
 
@@ -190,6 +190,19 @@ def test_the_zxcvbn_bundle_matches_its_pinned_hash():
     assert sri_of(VENDOR / "zxcvbn" / "4.4.2" / "zxcvbn.js") == ZXCVBN_SRI
 
 
+def test_the_gauge_names_the_pinned_zxcvbn_and_the_vault_page_names_none(app):
+    """strength.js holds the path and the hash itself, since a source
+    read from markup could be planted. The planting is exercised in
+    test_register_browser.py."""
+    owner, _ = register(app, "owner")
+    assert "zxcvbn-source" not in owner.get("/dashboard").get_data(as_text=True)
+
+    script = (STATIC / "js" / "strength.js").read_text()
+    path = re.search(r"new URL\('\.\./vendor/(zxcvbn/[^/']+)/zxcvbn\.js', import\.meta\.url\)", script)
+    assert path.group(1) == f"zxcvbn/{ZXCVBN_VERSION}"
+    assert re.search(r"const ZXCVBN_SRI = '([^']+)'", script).group(1) == ZXCVBN_SRI
+
+
 def test_no_third_party_cdn_is_referenced_anywhere(app):
     owner, _ = register(app, "owner")
     admin, _ = register(app, "root", kind="administrator")
@@ -298,8 +311,8 @@ def test_a_vault_owner_invite_serves_the_vault_page_carrying_the_form_data(app, 
     assert 'data-kind="vault_owner"' in body
     assert f'data-token="{token}"' in body
     assert 'name="referrer" content="no-referrer"' in body
-    # zxcvbn is handed over for the strength gauge, never loaded here.
-    assert 'id="zxcvbn-source"' in body
+    # zxcvbn is loaded by the strength gauge, never named by the page.
+    assert "zxcvbn" not in body
 
 
 def test_an_administrator_invite_keeps_its_own_page(app, client):

@@ -17,14 +17,5 @@
   {% endif %}
 {% endblock %}
 {% block scripts %}
-  {# zxcvbn is the largest file the browser can load here and only the
-     change-password card and the registration form score anything, so
-     the vault surface is handed where to get it rather than getting it
-     (architecture.md, Supply chain). static/js/strength.js fetches it
-     on the first gauge it builds. #}
-  <script id="zxcvbn-source" type="application/json">
-    {{ {'src': url_for('static', filename='vendor/zxcvbn/' ~ zxcvbn_version ~ '/zxcvbn.js'),
-        'integrity': zxcvbn_sri} | tojson }}
-  </script>
   <script type="module" src="{{ url_for('static', filename='js/app.js') }}"></script>
 {% endblock %}

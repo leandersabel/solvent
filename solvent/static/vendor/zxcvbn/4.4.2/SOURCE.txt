@@ -15,4 +15,5 @@ so it runs under the CSP unchanged.
 
 Re-pin by re-downloading dist/zxcvbn.js, recomputing:
   openssl dgst -sha384 -binary zxcvbn.js | openssl base64 -A
-and updating this file and ZXCVBN_SRI in solvent/shell.py.
+and updating this file, ZXCVBN_SRI in solvent/crypto.py and the copy of
+it in static/js/strength.js.

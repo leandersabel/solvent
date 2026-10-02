@@ -10,6 +10,7 @@ import time
 
 import pytest
 
+from solvent.crypto import ZXCVBN_SRI, ZXCVBN_VERSION
 from tests.test_browser import REPO_ROOT, free_port, needs_browser
 
 RUNNER = REPO_ROOT / "tests" / "browser" / "register.mjs"
@@ -60,6 +61,26 @@ def test_the_registration_forms_answer_each_refusal_in_its_own_words(instance):
         ["node", str(RUNNER)],
         cwd=REPO_ROOT,
         env=dict(env, SOLVENT_BASE=base, SOLVENT_VAULT_INVITE=invites["vault"], SOLVENT_ADMIN_INVITE=invites["admin"]),
+        capture_output=True, text=True, timeout=600,
+    )
+    print(result.stdout)
+    assert result.returncode == 0, result.stdout + result.stderr
+
+
+@needs_browser
+def test_the_gauge_loads_only_the_pinned_zxcvbn_whatever_the_page_plants(instance):
+    base, invites, env = instance
+    result = subprocess.run(
+        ["node", str(REPO_ROOT / "tests" / "browser" / "zxcvbn.mjs")],
+        cwd=REPO_ROOT,
+        env=dict(
+            env,
+            SOLVENT_BASE=base,
+            SOLVENT_VAULT_INVITE=invites["vault"],
+            PINNED_PATH=f"/static/vendor/zxcvbn/{ZXCVBN_VERSION}/zxcvbn.js",
+            PINNED_SRI=ZXCVBN_SRI,
+            PLANTED_PATH="/static/planted-zxcvbn.js",
+        ),
         capture_output=True, text=True, timeout=600,
     )
     print(result.stdout)
