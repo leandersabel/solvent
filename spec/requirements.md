@@ -81,9 +81,7 @@
 - When a holding ends, you choose between archiving it and deleting it
   for good with all its history.
 - Archiving a holding sets it to zero on the date it is archived, and
-  leaves every figure you recorded before that exactly as it was. On the
-  chart, only the stretch from its last recorded figure to the archive
-  date changes: the line runs gradually down to that zero.
+  leaves every figure you recorded before that exactly as it was.
 - Archiving can be undone. Undoing it lets you enter values for the
   holding again, and leaves its history as it is.
 
@@ -99,8 +97,7 @@
 ## Recording values
 
 - You record a figure only for the holdings you have one for.
-- Solvent never writes a figure you did not give it. Archiving a holding
-  is how you give it its zero.
+- Solvent never writes a figure you did not give it.
 - Solvent never counts, flags or reminds you of the holdings you left
   alone.
 - You can record figures for past dates, years back, including dates
