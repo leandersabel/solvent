@@ -80,8 +80,10 @@
 - A vault with no filing works fully.
 - When a holding ends, you choose between archiving it and deleting it
   for good with all its history.
-- Archiving a holding sets it to zero on the date it is archived. On the
-  chart it runs gradually from its last figure to that zero.
+- Archiving a holding sets it to zero on the date it is archived, and
+  leaves every figure you recorded before that exactly as it was. On the
+  chart, only the stretch from its last recorded figure to the archive
+  date changes: the line runs gradually down to that zero.
 - Archiving can be undone. Undoing it lets you enter values for the
   holding again, and leaves its history as it is.
 
