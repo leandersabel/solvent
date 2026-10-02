@@ -439,6 +439,25 @@ await check('a quantity keeps its places whatever money is set to', async () => 
   assert.equal(shape.money(12600000000000n), '13');
 });
 
+await check('a holding in any currency follows money places and one in any other unit keeps its quantity places', () => {
+  const vault = new Vault(null);
+  vault.profile = { mainCurrency: 'CHF', locale: 'en-US', groupSeparator: 'apostrophe', moneyPlaces: '0' };
+  vault.symbols = new Map([
+    ['CHF', { symbol: 'CHF', label: 'Swiss Franc', kind: 'currency' }],
+    ['USD', { symbol: 'USD', label: 'United States Dollar', kind: 'currency' }],
+    ['XAU-ozt', { symbol: 'XAU-ozt', label: 'Gold, troy ounce', kind: 'metal' }],
+  ]);
+  // The tie rounds to the even franc; 12.5 ounces of gold stay 12.50.
+  assert.equal(vault.amount(decimal.parse('200.00'), 'CHF'), 'CHF 200');
+  assert.equal(vault.amount(decimal.parse('1000.40'), 'USD'), 'USD 1’000');
+  assert.equal(vault.amount(decimal.parse('12.5'), 'XAU-ozt'), '12.50 ozt');
+  assert.equal(vault.figure(decimal.parse('1000.40'), 'USD'), '1’000');
+  assert.equal(vault.figure(decimal.parse('12.5'), 'XAU-ozt'), '12.50');
+  // Back at two places every unit keeps its cents.
+  vault.profile = { ...vault.profile, moneyPlaces: '2' };
+  assert.equal(vault.amount(decimal.parse('1000.40'), 'USD'), 'USD 1’000.40');
+});
+
 await check('a thousands separator never collides with the decimal point', async () => {
   const { formatter } = await load('format.js');
   // German writes 1.234,56, so a period between thousands would make

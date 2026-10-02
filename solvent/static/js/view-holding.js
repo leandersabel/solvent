@@ -226,7 +226,7 @@ function historyRow(vault, holding, snapshot, flagged, { onOpenRecording, onChan
           })
         : null,
     ]),
-    el('td', { class: 'numeric', text: vault.format.quantity(quantity) }),
+    el('td', { class: 'numeric', text: vault.figure(quantity, holding.payload.unit) }),
     el('td', {
       class: 'numeric',
       text: price
