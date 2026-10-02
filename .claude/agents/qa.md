@@ -47,12 +47,13 @@ works, that is itself the finding.
 
 A findings report in the client's terms. For each finding: the steps
 that reproduce it, what you expected from the product spec, what
-happened, and which criterion it violates. Name the screen and the
-element, never a file or a function. Report a finding only after its
-steps reproduced it a second time from a fresh page.
+happened, which criterion it violates, and its rating (`CLAUDE.md`,
+The loop, Severity). Name the screen and the element, never a file or
+a function. Try its steps a second time from a fresh page, and say
+whether that reproduced it. A finding you saw once is still reported.
 
-Say plainly when a criterion cannot be tested yet because the feature
-it depends on is unbuilt. That is a status, not a failure.
+List every criterion you could not check, by feature, with the reason,
+such as a feature it depends on being unbuilt.
 
 An empty findings list is a valid and useful result.
 

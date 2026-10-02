@@ -21,11 +21,23 @@ with `gh`, and you write as `claude[bot]`.
 3. **File each finding.** Look for an open issue labeled `qa` that
    reports the same thing. If there is one, comment
    `Still failing in the <date> build.` on it. Otherwise open an issue
-   labeled `bug`, `qa` and `accepted`, in English: the title says what is wrong for
-   a user, and the body gives the steps, what the product spec expects
-   with a pointer to the criterion, and what happened.
-4. **Record the verdict.** Write `PASS` or `FAIL` to `qa-verdict.txt`
-   in the working directory. `FAIL` when any finding was filed or
-   commented, `PASS` otherwise.
+   labeled `bug`, `qa`, `accepted` and the finding's rating
+   (`CLAUDE.md`, The loop, Severity), creating the label with
+   `gh label create` if the repository lacks it. It is in English: the
+   title says what is wrong for a user, ending in ` (seen once)` when
+   `qa` could not reproduce it, and the body gives the steps, what the
+   product spec expects with a pointer to the criterion, and what
+   happened.
+4. **File what could not be checked.** Each feature with criteria `qa`
+   could not check gets an issue titled `QA could not check <feature>`,
+   labeled `bug`, `qa` and `accepted` without a rating, whose body
+   lists each criterion and why. If one is open, comment
+   `Still not checkable in the <date> build.` with the criteria that
+   changed since.
+5. **Keep what could not be filed.** When filing fails, write the issue
+   to `qa-unfiled/<n>.json` as `{"title": ..., "body": ..., "labels":
+   [...]}`, and go on. The workflow files it.
+6. **Finish.** Write `qa-done.txt` in the working directory last. Its
+   absence tells the workflow QA did not finish.
 
 Never fix anything, and never touch a pull request.

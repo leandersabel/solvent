@@ -233,8 +233,9 @@ the client does.
   finds a `bug` or `maintenance` with nothing to ask. One implementation runs at a time, holding
   the `claude/slot` branch, which GitHub creates only once: its issue
   carries `implementing`, an issue ready meanwhile waits with
-  `queued`, and the lowest-numbered queued issue starts when the running
-  one merges.
+  `queued`, and when the running one merges the next starts: critical
+  problems first, then high ones, then the rest, each lowest number
+  first (Severity).
 - On `claude/issue-<issue>`, the spec is brought to the requirements
   first, where it falls short, and the contracts recompiled. Then
   `engineer` implements the contract, for a
@@ -272,6 +273,32 @@ the client does.
   days, which a review of its release notes would not reveal. Security
   updates skip the wait.
 
+### Severity
+
+Every problem issue, a `bug` or a `code-scanning` one, carries one
+rating:
+
+- `severity: critical`: records are lost, changed or seen by someone
+  who should not see them, or someone gets in who should not.
+- `severity: high`: something the client requires cannot be done, or a
+  figure is shown wrong.
+- `severity: medium`: something works wrongly, but there is a way
+  around it.
+- `severity: low`: something looks or reads wrong, but nothing is lost
+  or blocked.
+
+QA rates its own findings. A code scanning issue takes its alert's
+security rating, or medium for an error and low otherwise. The loop
+rates every other problem the next time it runs on it. A rating the
+client set stands, and the client can change any. Only a rating label
+set by `leandersabel`, `claude[bot]` or `github-actions[bot]` counts,
+so one anyone else adds or removes changes nothing, and the highest
+that counts wins. An issue for criteria QA could not check has no
+rating.
+
+A problem rated high or critical holds back a version, however it was
+found and even when QA saw it once.
+
 ### Nightly and stable
 
 - Every night that code on `master` changed since the last version,
@@ -282,9 +309,21 @@ the client does.
   since the last version, and a smoke path through the rest. The
   client can start the same run by hand. Claude in Chrome is not used
   here, because it needs a desktop browser.
-- A finding that reproduces twice becomes a `bug` issue by
-  `claude[bot]` labeled `qa` and `accepted`, which the loop takes up
-  at once, or a comment on the open one it repeats.
+- Every finding becomes a `bug` issue by `claude[bot]` labeled `qa`,
+  `accepted` and its rating, which the loop takes up at once, or a
+  comment on the open one it repeats. A finding QA saw once says so in
+  its title. Each feature with criteria QA could not check gets an
+  issue saying which and why, the same way. A finding QA could not
+  file, the workflow files.
+- A night passes when the suite, the image and QA finish, and nothing
+  holds back the version: no open problem rated high or critical
+  (Severity), no such issue closed by anyone but the client without its
+  fix in the version, and no runtime Dependabot alert rated high or
+  critical. That check is the workflow's, never a model's.
+- A failed night always leaves an issue the loop takes up: the open
+  problems that held it back, or else a `bug` by `github-actions[bot]`
+  titled `The nightly failed: <cause>`, or a comment on the open one
+  with that title. It queues like any other issue.
 - A passing night is a pre-release named by its date, `YYYY-MM-DD`,
   with the image on `ghcr.io/leandersabel/solvent` tagged `:<date>` and
   `:nightly`. There is at most one version a day, and a run on a day
@@ -292,7 +331,9 @@ the client does.
 - The client promotes a nightly by marking its release the latest
   instead of a pre-release. That tags the same image `:stable` without
   a rebuild, rewrites the notes to cover everything since the last
-  stable, and deletes the nightlies before it.
+  stable, and deletes the nightlies before it. While something would
+  hold back that nightly, promotion is refused and the release turns
+  back into a pre-release.
 - Release notes are assembled from the merged pull requests' titles,
   without a model, grouped into changes and fixes, fixes found by QA,
   and maintenance. Each line names who asked, who approved the spec
