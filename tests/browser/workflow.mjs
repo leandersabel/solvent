@@ -378,7 +378,17 @@ const CLOCK = `(() => {
 })();`;
 const MINUTE = 60000;
 
-// Which of `needles` a devtools user could still find: every string
+// How many of `needles` satisfy `found`. Only this count leaves a probe,
+// so a failing check never prints what it searched for.
+const occurring = (needles, found) => {
+  let count = 0;
+  for (const needle of needles) {
+    if (found(needle)) count += 1;
+  }
+  return count;
+};
+
+// How many of `needles` a devtools user could still find: every string
 // reachable from the page's heap, after a collection.
 const reachable = async (needles) => {
   const chunks = [];
@@ -392,7 +402,7 @@ const reachable = async (needles) => {
   await page.send('HeapProfiler.disable');
   page.handlers = page.handlers.filter((h) => h !== collect);
   const { strings } = JSON.parse(chunks.join(''));
-  return needles.filter((needle) => strings.some((s) => s.includes(needle)));
+  return occurring(needles, (needle) => strings.some((s) => s.includes(needle)));
 };
 
 // A document the test has marked, so a document load is told from a
@@ -2994,10 +3004,11 @@ try {
         // The page is still between documents.
       }
     }
+    const shownAgain = back ? occurring(leftNames, (name) => back.text.includes(name)) : 0;
     check(
       'Back to a page left while unlocked shows the unlock card and no vault data',
-      Boolean(back) && !back.keys && leftNames.length > 0 && leftNames.every((name) => !back.text.includes(name)),
-      back ? `${back.how}, names ${leftNames.filter((name) => back.text.includes(name)).join(',')}` : 'no unlock card',
+      Boolean(back) && !back.keys && leftNames.length > 0 && shownAgain === 0,
+      back ? `${back.how}, ${shownAgain} names shown` : 'no unlock card',
     );
 
     // -- Import: files and passwords that go nowhere ---------------------------
@@ -5588,17 +5599,17 @@ try {
   const heroFigure = await page.eval("document.querySelector('.hero-figure').textContent");
   // The strings a devtools user would look for: every holding name and
   // every figure distinctive enough not to occur by chance.
-  const secrets = JSON.parse(await page.eval(`(async () => {
+  const probes = JSON.parse(await page.eval(`(async () => {
     const v = (await import('/static/js/session.js')).currentVault();
     const names = [...v.holdings.values()].map(h => h.payload.name);
     const values = [...v.snapshots.values()].flat().map(s => s.payload.value).filter(x => x.length >= 7);
     return JSON.stringify([...new Set([...names, ...values])]);
   })()`));
-  const seen = await reachable(secrets);
+  const seen = await reachable(probes);
   check(
     'the heap probe finds the decrypted vault while unlocked',
-    seen.length === secrets.length,
-    secrets.filter((secret) => !seen.includes(secret)).join(','),
+    seen === probes.length,
+    `${probes.length - seen} of ${probes.length} not found`,
   );
 
   await activity();
@@ -5613,17 +5624,18 @@ try {
   check('the idle lock shows the unlock card', (await text()).includes('Solvent cannot recover a lost password'));
   check('unlocking after the idle lock asks only for the password', !(await page.eval("Boolean(document.querySelector('#unlock-username'))")));
   const screen = await text();
+  const onScreen = occurring([...probes, heroFigure], (probe) => screen.includes(probe));
   check(
     'the idle lock leaves no decrypted name or figure on screen',
-    [...secrets, heroFigure].every((secret) => !screen.includes(secret)),
-    [...secrets, heroFigure].filter((secret) => screen.includes(secret)).join(','),
+    onScreen === 0,
+    `${onScreen} on screen`,
   );
   check(
     'the idle lock drops the in-memory vault',
     await page.eval("(async () => (await import('/static/js/session.js')).currentVault() === null)()"),
   );
-  const left = await reachable(secrets);
-  check('nothing decrypted is reachable after the idle lock', left.length === 0, left.join(','));
+  const left = await reachable(probes);
+  check('nothing decrypted is reachable after the idle lock', left === 0, `${left} reachable`);
 
   const reads = () => page.eval("performance.getEntriesByType('resource').filter(e => e.name.includes('/api/records?type=')).length");
   const readsBefore = await reads();
@@ -5744,13 +5756,14 @@ try {
   check('an open form is idle-locked too', await locked());
   check('the lock closes the open form', !(await page.eval("Boolean(document.querySelector('.dialog'))")));
   const withForm = await text();
+  const onScreenWithForm = occurring(probes, (probe) => withForm.includes(probe));
   check(
     'an open form leaves no decrypted name or figure on screen after the idle lock',
-    secrets.every((secret) => !withForm.includes(secret)),
-    secrets.filter((secret) => withForm.includes(secret)).join(','),
+    onScreenWithForm === 0,
+    `${onScreenWithForm} on screen`,
   );
-  const leftWithForm = await reachable(secrets);
-  check('an open form keeps nothing decrypted reachable after the idle lock', leftWithForm.length === 0, leftWithForm.join(','));
+  const leftWithForm = await reachable(probes);
+  check('an open form keeps nothing decrypted reachable after the idle lock', leftWithForm === 0, `${leftWithForm} reachable`);
   await unlockInPlace('the vault after unlocking over the form');
   check('unlocking returns to the screen the lock found', (await page.eval('location.hash')) === typedAt);
   check(
@@ -5771,11 +5784,11 @@ try {
   await page.eval("document.querySelectorAll('#app details').forEach(d => (d.open = true))");
   await setValue('#app textarea', 'typed before the lock');
   await idleLock();
-  const leftWithEditor = await reachable(secrets);
+  const leftWithEditor = await reachable(probes);
   check(
     'a prefilled field left alone keeps nothing decrypted reachable across the lock',
-    leftWithEditor.length === 0,
-    leftWithEditor.join(','),
+    leftWithEditor === 0,
+    `${leftWithEditor} reachable`,
   );
   await unlockInPlace('the vault after unlocking over the editor');
   const editor = JSON.parse(await page.eval(`JSON.stringify({
@@ -5823,7 +5836,7 @@ try {
   const passwordCard = "[...document.querySelectorAll('.card')].find(c => c.querySelector('input[autocomplete=new-password]'))";
   // Made up inside the page, so no script source the test sent carries
   // them and the heap search below finds only what the page kept.
-  const typedPasswords = JSON.parse(await page.eval(`(() => {
+  const typedValues = JSON.parse(await page.eval(`(() => {
     const fields = ${passwordCard}.querySelectorAll('input');
     const type = (field) => {
       field.value = 'pw-' + crypto.randomUUID();
@@ -5838,7 +5851,7 @@ try {
   const shownType = await page.eval(`${passwordCard}.querySelectorAll('input')[1].type`);
   await idleLock();
   // Only counts leave these checks, so a failure never prints a password.
-  const kept = (await reachable(typedPasswords)).length;
+  const kept = await reachable(typedValues);
   check(
     'no password typed into settings is kept across the lock, shown or not',
     shownType === 'text' && kept === 0,
@@ -5999,10 +6012,11 @@ try {
     // Back, after leaving the page while unlocked: the keys went with
     // the page, and nothing from the vault is shown.
     const back = await backFromAway(sat);
+    const shownAfterAway = back ? occurring(heldNames, (name) => back.text.includes(name)) : 0;
     check(
       'Back after signing in at the sign-in address and leaving shows the unlock card and no vault data',
-      Boolean(back) && !back.keys && heldNames.length > 0 && heldNames.every((name) => !back.text.includes(name)),
-      back ? heldNames.filter((name) => back.text.includes(name)).join(',') : 'no unlock card',
+      Boolean(back) && !back.keys && heldNames.length > 0 && shownAfterAway === 0,
+      back ? `${shownAfterAway} names shown` : 'no unlock card',
     );
 
     // A refresh asks for the password again.
