@@ -105,6 +105,15 @@ Every agent loads the `skald:prose` skill before writing prose (spec,
 comments on GitHub, commit messages, pull requests) and the
 `skald:code` skill before writing code, and follows it at level full.
 
+## Code standards
+
+All code in the repository, tests, fixtures and scripts included, meets
+the bar of the code that ships. Coding practice is the `skald:code`
+skill. Security practice is the Security section of
+`spec/architecture.md` and every rule code scanning runs. "Only a test"
+or "nothing ships" is never a reason to keep a weakness. A value
+reaches code as data, never written into its text.
+
 ## Writing the spec
 
 **Document the target state, never the route to it.**
