@@ -80,7 +80,10 @@
 - A vault with no filing works fully.
 - When a holding ends, you choose between archiving it and deleting it
   for good with all its history.
-- Archiving can be undone.
+- Archiving a holding sets it to zero on the date it is archived, and
+  leaves every figure you recorded before that exactly as it was.
+- Archiving can be undone. Undoing it lets you enter values for the
+  holding again, and leaves its history as it is.
 
 ## Main currency
 
