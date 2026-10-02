@@ -11,14 +11,15 @@ import flask
 from flask import render_template
 from werkzeug.exceptions import HTTPException
 
-# The answers a person can reach by navigation. Each body is rendered
-# from the status code alone, so it is the same for every path and
-# every session, and it declares the app's icon.
-_PAGES = {403: "Forbidden", 404: "Not Found", 500: "Internal Server Error"}
+# The page is rendered from the variant alone, so it is the same for
+# every path and every session, and a refused address is
+# indistinguishable from a missing one (spec/features/app-shell.md,
+# Error pages).
+_VARIANTS = {403: "missing", 404: "missing", 500: "failure"}
 
 
 def _page(code: int):
-    return render_template("error.html", code=code, name=_PAGES[code]), code
+    return render_template("error.html", variant=_VARIANTS[code]), code
 
 
 def init_app(app: flask.Flask) -> None:

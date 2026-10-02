@@ -10,10 +10,14 @@ import base64
 import hashlib
 import json
 import re
+from html.parser import HTMLParser
 from pathlib import Path
+
+import pytest
 
 from solvent.config import DEFAULT_KDF_ENVELOPE
 from solvent.crypto import ARGON2ID_SRI, ZXCVBN_SRI, ZXCVBN_VERSION
+from solvent.guard import navigation
 from solvent.shell import ALPINE_SRI, nav_entries
 from tests.helpers import mint_invite, register
 
@@ -385,3 +389,83 @@ def test_the_client_returns_to_the_outside_frame_on_every_lock():
     # Nothing in the store acts on a vault that is locked.
     store = app_js[app_js.index("function registerVaultStore()") :]
     assert store.count("isUnlocked()") >= 3
+
+
+# ---- Error pages (spec/features/app-shell.md, Error pages) -----------------
+
+MISSING = "There is no page at this address."
+FAILURE = "Something went wrong and this page could not be shown."
+
+
+class Elements(HTMLParser):
+    def __init__(self, body):
+        super().__init__()
+        self.found = []
+        self.feed(body)
+
+    def handle_starttag(self, tag, attrs):
+        self.found.append((tag, dict(attrs)))
+
+    def tags(self, name):
+        return [attrs for tag, attrs in self.found if tag == name]
+
+
+@pytest.fixture
+def visitors(app):
+    """One client per session state, and a route that raises."""
+
+    # Under a prefix both kinds reach, so every visitor gets the failure.
+    @app.route("/static/__boom")
+    @navigation
+    def boom():
+        raise RuntimeError("stubbed failure")
+
+    owner, _ = register(app, "owner")
+    admin, _ = register(app, "root", kind="administrator")
+    return [app.test_client(), owner, admin]
+
+
+def test_forbidden_and_not_found_are_one_body_for_every_visitor(visitors):
+    bodies = {
+        visitor.get(path).get_data()
+        for visitor in visitors
+        for path in ("/a/b/c/", "/api/export")
+    }
+    assert len(bodies) == 1
+    assert MISSING in bodies.pop().decode()
+
+
+def test_a_server_error_is_one_body_for_every_visitor(visitors):
+    responses = [visitor.get("/static/__boom") for visitor in visitors]
+    assert {r.status_code for r in responses} == {500}
+    assert len({r.get_data() for r in responses}) == 1
+    body = responses[0].get_data(as_text=True)
+    assert FAILURE in body
+    assert MISSING not in body
+    assert FAILURE not in visitors[0].get("/a/b/c/").get_data(as_text=True)
+
+
+def test_both_error_bodies_carry_the_head_and_the_one_link_and_nothing_else(visitors):
+    for path in ("/a/b/c/", "/static/__boom"):
+        body = visitors[0].get(path).get_data(as_text=True)
+        page = Elements(body)
+        assert {"name": "viewport", "content": "width=device-width, initial-scale=1"} in page.tags("meta")
+        assert [l["href"] for l in page.tags("link") if l.get("rel") == "stylesheet"] == [
+            "/static/css/tokens.css"
+        ]
+        assert {"rel": "icon", "href": "/static/icon.png", "type": "image/png"} in page.tags("link")
+        assert [a["href"] for a in page.tags("a")] == ["/"]
+        assert "Go to Solvent" in body
+        names = {tag for tag, _ in page.found}
+        assert not names & {"script", "style", "form", "nav", "header"}
+        assert not any("style" in attrs for _, attrs in page.found)
+        assert "<title>Solvent</title>" in body
+        assert page.tags("html") == [{"lang": "en"}]
+
+
+def test_an_error_body_names_no_code_and_repeats_no_address(client):
+    body = client.get("/a/b/c/?secret=1").get_data(as_text=True)
+    assert "404" not in body
+    assert "Not Found" not in body
+    assert "secret" not in body
+    assert "/a/b/c" not in body

@@ -7,6 +7,7 @@
    navigations that could carry it in a Referer header
    (admin-invites.md, Rules). #}
 {% block meta %}<meta name="referrer" content="no-referrer">{% endblock %}
+{% block envelope %}<script id="kdf-envelope" type="application/json">{{ kdf_envelope | tojson }}</script>{% endblock %}
 {% block body %}
   {% if error %}
     <div class="outside">

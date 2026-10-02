@@ -1911,6 +1911,8 @@ select {
   .card { padding: 16px; margin-bottom: 20px; }
   .card-head { margin-bottom: 12px; }
   .signin-card { padding: 24px; }
+  /* The error page's card pads as a card does. */
+  .outside > .signin-card { padding: 16px; }
 
   .dashboard { gap: 20px; }
 
