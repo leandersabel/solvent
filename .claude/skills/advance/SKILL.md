@@ -48,9 +48,9 @@ than your latest marked comment on the issue and its pull requests.
 
 ## Take the first step that applies
 
-1. **Not started.** The issue is closed, or an issue by neither the
-   client nor `github-actions[bot]` (`app/github-actions` in `gh`'s
-   output) without `accepted`: stop without a word. An issue by
+1. **Not started.** The issue is closed, or an issue not by
+   `github-actions[bot]` (`app/github-actions` in `gh`'s output) without
+   `accepted`, the client's own included: stop without a word. An issue by
    `github-actions[bot]` was opened by this repository's own workflows
    for a red `master` or a code scanning alert, and needs no `accepted`.
 2. **Edited after acceptance.** Someone else's issue whose title or
