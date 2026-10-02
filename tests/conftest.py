@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+from datetime import datetime
+
 import pytest
 
 from tests.helpers import register
@@ -36,6 +38,22 @@ def owner(app):
 def admin(app):
     client, _ = register(app, "root", kind="administrator")
     return client
+
+
+@pytest.fixture
+def frozen_clock(monkeypatch):
+    """Timestamps written through `solvent.db.utcnow` read one instant,
+    so a request cannot change `sessions.last_active_at` by crossing a
+    second boundary. Session expiry reads its own clock and is
+    unaffected."""
+    now = datetime.now().astimezone()
+
+    class Frozen(datetime):
+        @classmethod
+        def now(cls, tz=None):
+            return now.astimezone(tz)
+
+    monkeypatch.setattr("solvent.db.datetime", Frozen)
 
 
 @pytest.fixture(autouse=True)
