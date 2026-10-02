@@ -242,6 +242,7 @@ def test_import_replaces_the_wrapper_and_leaves_the_credential_untouched(app):
     ],
     ids=["mid-insert", "at-the-wrapper"],
 )
+@pytest.mark.usefixtures("frozen_clock")
 def test_a_fault_mid_import_leaves_the_original_vault_intact(app, fault):
     owner, auth_key = register(app, "owner")
     sign_in(app, "owner", auth_key)

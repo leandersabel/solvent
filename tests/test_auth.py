@@ -575,6 +575,7 @@ def test_raising_the_server_default_upgrades_an_account_at_the_old_one(app, monk
     assert rows(app, "SELECT * FROM records") == records_before
 
 
+@pytest.mark.usefixtures("frozen_clock")
 def test_the_server_discriminates_on_kind_not_on_which_fields_arrived(app):
     register(app, "root", kind="administrator")
     admin, admin_key = register(app, "root2", kind="administrator")
@@ -679,6 +680,7 @@ def test_an_administrator_changes_their_password_without_a_wrapper(app):
     ).status_code == 401
 
 
+@pytest.mark.usefixtures("frozen_clock")
 def test_the_change_password_wrapper_follows_the_session_kind(app):
     """An administrator carrying a wrapper, and a vault owner without
     one, are each a Bad Request that writes nothing."""
@@ -700,6 +702,7 @@ def test_the_change_password_wrapper_follows_the_session_kind(app):
     assert snapshot(app, EVERY_TABLE) == before
 
 
+@pytest.mark.usefixtures("frozen_clock")
 def test_a_wrong_current_auth_key_is_refused_server_side(app):
     """Called directly, with no client-side unwrap in front of it."""
     owner, auth_key = register(app, "owner")
@@ -780,6 +783,7 @@ def test_logout_ends_only_the_calling_session(app):
     assert replay.get("/api/sessions", headers=CSRF).status_code == 401
 
 
+@pytest.mark.usefixtures("frozen_clock")
 def test_deleting_an_account_needs_the_auth_key_and_the_typed_username(app):
     """Called directly, since a client bypassing the dialog is the case
     that matters."""
@@ -819,6 +823,7 @@ def test_deleting_an_account_needs_the_auth_key_and_the_typed_username(app):
     assert owner.get("/api/sessions", headers=CSRF).status_code == 401
 
 
+@pytest.mark.usefixtures("frozen_clock")
 def test_an_administrator_cannot_delete_through_the_vault_owners_path(app):
     """Not Found and nothing deleted, including when they are not the
     last administrator."""
@@ -858,6 +863,7 @@ def test_the_settings_endpoints_need_a_session(client, method, path):
         ("DELETE", "/api/auth/account", "delete"),
     ],
 )
+@pytest.mark.usefixtures("frozen_clock")
 def test_the_settings_writes_need_the_request_header(app, method, path, body):
     owner, auth_key = register(app, "owner")
     if body == "rotation":
