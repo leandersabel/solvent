@@ -16,9 +16,16 @@ export function newId(vault, minted = []) {
     ...minted,
     ...vault.dimensions.flatMap((d) => [d.id, ...d.values.map((v) => v.id)]),
   ]);
+  // Six bits per byte, and a value of 36 or more is discarded, so each
+  // of the 36 characters is equally likely.
   for (;;) {
-    const bytes = crypto.getRandomValues(new Uint8Array(8));
-    const id = [...bytes].map((byte) => (byte % 36).toString(36)).join('');
+    let id = '';
+    while (id.length < 8) {
+      for (const byte of crypto.getRandomValues(new Uint8Array(8))) {
+        const value = byte & 63;
+        if (value < 36 && id.length < 8) id += value.toString(36);
+      }
+    }
     if (!taken.has(id)) return id;
   }
 }

@@ -199,8 +199,10 @@ their wealth.
 
 - **`id` is opaque and immutable**: 8 characters of `[a-z0-9]` from
   `crypto.getRandomValues`, minted at creation, checked for uniqueness
-  against the profile already in memory. It is never shown, never typed,
-  and never derived from the label.
+  against the profile already in memory. Each character is drawn
+  uniformly from the 36: a random value outside the range is rejected
+  and redrawn, never reduced modulo 36, because modulo biases the draw.
+  It is never shown, never typed, and never derived from the label.
 - **`label` is free display text** in any script, renamable at any time.
   A rename writes one record, the profile, and touches no holding.
   Why ids are not slugs is `manage-accounts.md`, Dimensions.

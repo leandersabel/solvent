@@ -1189,6 +1189,22 @@ try {
   });
   check('a renamed value keeps its place', (await liveValues()).join(',') === 'Investments,Cash,Pension');
 
+  // Bytes of 36 or more are discarded, not folded onto the alphabet.
+  const minted = await page.call(async (batches) => {
+    const { newId } = await import('/static/js/view-dimensions.js');
+    const real = crypto.getRandomValues;
+    crypto.getRandomValues = (array) => {
+      array.set(batches.shift());
+      return array;
+    };
+    try {
+      return newId({ dimensions: [] });
+    } finally {
+      crypto.getRandomValues = real;
+    }
+  }, [[36, 63, 255, 0, 1, 2, 3, 4], [5, 6, 7, 8, 9, 10, 11, 12]]);
+  check('an id is drawn uniformly, discarding bytes outside the 36 characters', minted === '01234567', minted);
+
   // The next id the page mints is made to collide with one the profile
   // already holds, which the uniqueness check has to catch.
   await page.eval(`(() => {
