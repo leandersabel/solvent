@@ -52,7 +52,7 @@ than your latest marked comment on the issue and its pull requests.
    client nor `github-actions[bot]` (`app/github-actions` in `gh`'s
    output) without `accepted`: stop without a word. An issue by
    `github-actions[bot]` was opened by this repository's own workflows
-   for a red `master`, and needs no `accepted`.
+   for a red `master` or a code scanning alert, and needs no `accepted`.
 2. **Edited after acceptance.** Someone else's issue whose title or
    body someone other than the client edited after `accepted` was
    added: remove `accepted`, add `needs-answer`, and comment to
@@ -143,7 +143,9 @@ Then one comment, and exactly one outcome:
 A `bug` where a requirement is what is wrong is relabeled `change`, and
 a `change` the requirements already ask for is relabeled `bug`, and the
 comment says so. A decision the client never made is asked, never
-settled on their behalf. A decision exists only as a statement in
+settled on their behalf. A code scanning alert is fixed where it
+arises, in the app or the tests, and never dismissed. One that names no
+real flaw is doubtful. A decision exists only as a statement in
 `spec/requirements.md` or in the client's own words: earlier marked
 comments propose, they never decide. The comment follows Writing, with the technical reading in a
 closing `<details>` block.
