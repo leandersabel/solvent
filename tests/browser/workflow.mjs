@@ -1833,12 +1833,18 @@ try {
   const snapshotState = () =>
     page.eval(`(async () => {
       const api = await import('/static/js/api.js');
+      const decimal = await import('/static/js/decimal.js');
       const v = (await import('/static/js/session.js')).currentVault();
       const rows = await api.get('/api/records?type=snapshot');
       const here = v.snapshotsFor('${archivingId}').filter((s) => s.payload.date === '${archiveDay}');
       return JSON.stringify({
         stored: rows.length,
-        here: here.map((s) => ({ id: s.recordId, version: s.version, value: s.payload.value })),
+        here: here.map((s) => ({
+          id: s.recordId,
+          version: s.version,
+          value: s.payload.value,
+          figure: String(decimal.parse(s.payload.value)),
+        })),
       });
     })()`).then(JSON.parse);
   // The chart's own table, every row but the archive date's.
@@ -1879,9 +1885,7 @@ try {
     const v = (await import('/static/js/session.js')).currentVault();
     return String(v.format.parseFigure(document.querySelector('#closing-value').value));
   })()`);
-  const storedFigure = await page.eval(
-    `(async () => String((await import('/static/js/decimal.js')).parse(${JSON.stringify(beforeArchive.here[0]?.value || '')})))()`,
-  );
+  const storedFigure = beforeArchive.here[0]?.figure;
   check(
     'an occupied archive date prefills the stored figure rather than 0',
     beforeArchive.here.length === 1 && prefilled === storedFigure,
