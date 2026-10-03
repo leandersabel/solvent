@@ -402,8 +402,6 @@ def build_vault(account: dict, today: date) -> "tuple[dict, dict]":
 
 
 def check_coverage(plan: dict) -> None:
-    if plan.get("partial"):
-        return
     covered = set()
     for item in plan.get("accounts", []) + plan.get("invites", []) + plan.get("backups", []):
         covered.update(item.get("covers", []))
@@ -441,7 +439,7 @@ def prepare(plan: dict, today: date, base: Path) -> "tuple[dict, dict]":
 
     script = {
         "today": today.isoformat(),
-        "coverage": [] if plan.get("partial") else COVERAGE,
+        "coverage": COVERAGE,
         "accounts": accounts,
         "invites": [
             {key: invite[key] for key in ("label", "kind", "covers")}

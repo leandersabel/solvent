@@ -12,6 +12,7 @@ from __future__ import annotations
 import os
 import secrets
 import shutil
+import signal
 import subprocess
 import sys
 import tempfile
@@ -109,6 +110,10 @@ def main(argv: "list[str]") -> int:
         print(f"{out} must be empty or absent", file=sys.stderr)
         return 2
     existed = out.exists()
+    # A signal unwinds through the cleanup below, so the keys never
+    # outlive the script.
+    for number in (signal.SIGTERM, signal.SIGINT):
+        signal.signal(number, lambda signum, _frame: sys.exit(128 + signum))
     work = Path(tempfile.mkdtemp(prefix="solvent-ca-"))
     try:
         make(work)

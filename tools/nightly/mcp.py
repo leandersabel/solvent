@@ -167,7 +167,12 @@ class Harness:
             checked = check_arguments(name, arguments)
         except Refused as refusal:
             return text({"error": f"{refusal.argument} {refusal.reason}", "argument": refusal.argument}, True)
-        return getattr(self, f"tool_{name}")(**checked)
+        try:
+            return getattr(self, f"tool_{name}")(**checked)
+        except subprocess.TimeoutExpired:
+            return text({"error": "docker did not answer in time"}, True)
+        except OSError:
+            return text({"error": "docker could not be run"}, True)
 
     def tool_server_log(self, since: int = 0) -> dict:
         done = self.docker("logs", self.container, merge=True)

@@ -16,6 +16,7 @@ import json
 import os
 import re
 import shutil
+import signal
 import socket
 import sqlite3
 import ssl
@@ -158,6 +159,35 @@ def test_a_failed_signing_leaves_no_key_and_no_output(tmp_path):
     assert not list(scratch.rglob("*")) and not out.exists()
 
 
+@needs_openssl
+@pytest.mark.parametrize("name", ["SIGTERM", "SIGINT"])
+def test_a_signal_during_signing_still_deletes_the_keys(tmp_path, name):
+    shim = tmp_path / "bin"
+    shim.mkdir()
+    marker = tmp_path / "signing"
+    real = shutil.which("openssl")
+    (shim / "openssl").write_text(
+        f'#!/bin/sh\ncase "$*" in *-CAkey*) touch {marker}; exec sleep 60;; esac\nexec {real} "$@"\n'
+    )
+    (shim / "openssl").chmod(0o755)
+    scratch = tmp_path / "scratch"
+    scratch.mkdir()
+    out = tmp_path / "tls"
+    process = subprocess.Popen(
+        [sys.executable, str(TOOLS / "ca.py"), str(out)],
+        env=dict(os.environ, PATH=f"{shim}:{os.environ['PATH']}", TMPDIR=str(scratch)),
+        stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL,
+    )
+    for _ in range(300):
+        if marker.exists():
+            break
+        time.sleep(0.1)
+    assert marker.exists() and list(scratch.rglob("*.key")), "never reached signing with keys on disk"
+    process.send_signal(getattr(signal, name))
+    assert process.wait(timeout=30) != 0
+    assert not list(scratch.rglob("*")) and not out.exists()
+
+
 def test_the_ca_refuses_a_directory_that_is_not_empty(tmp_path):
     (tmp_path / "something").write_text("x")
     done = subprocess.run([sys.executable, str(TOOLS / "ca.py"), str(tmp_path)], capture_output=True, text=True)
@@ -272,6 +302,9 @@ def test_the_stand_in_answers_every_row_of_the_table(server):
         status, _, body = server.get("api.nbp.pl", target)
         assert (status, body) == (404, b"Not Found"), target
     assert server.get("api.nbp.pl", "/api/cenyzlota/2026-07-20/2026-07-27?format=json", "POST")[0] == 404
+    # Whatever the method, Frankfurter's refusal is its own JSON.
+    status, headers, body = server.get("api.frankfurter.dev", "/v1/2026-07-24?base=CHF", "POST")
+    assert (status, json.loads(body), headers["Content-Type"]) == (404, {"message": "not found"}, "application/json; charset=utf-8")
     # Any other host, whatever name the handshake used.
     status, _, body = server.get("example.org", "/v1/2026-07-24?base=CHF")
     assert (status, body) == (421, b"")
@@ -333,6 +366,36 @@ def test_every_request_is_a_line_with_every_field_and_seq_continues_across_a_res
     assert [line["status"] for line in lines[1:3]] == [400, 505]
     assert lines[1]["method"] == "NOT" and lines[2]["method"] == "GET"
     assert (lines[3]["sni"], lines[3]["status"]) == ("api.nbp.pl", 200)
+
+
+@needs_openssl
+def test_a_request_that_stalls_is_still_recorded_with_what_was_read(pki, tmp_path, monkeypatch):
+    monkeypatch.setattr(standin.Handler, "timeout", 1)
+    running = standin.Standin(("127.0.0.1", 0), standin.make_context(str(pki[0] / "leaf.pem"), str(pki[0] / "leaf.key")), standin.State(tmp_path))
+    threading.Thread(target=running.serve_forever, daemon=True).start()
+    context = ssl.create_default_context(cafile=str(pki[0] / "ca.pem"))
+
+    def stalled(raw: bytes) -> bytes:
+        with socket.create_connection(("127.0.0.1", running.server_address[1]), timeout=10) as raw_socket:
+            with context.wrap_socket(raw_socket, server_hostname="api.nbp.pl") as tls:
+                tls.sendall(raw)
+                answer = b""
+                with contextlib.suppress(OSError):
+                    while chunk := tls.recv(4096):
+                        answer += chunk
+                return answer
+
+    try:
+        assert stalled(b"GET /v1/2026-07-24?base=CHF HTTP/1.1\r\nHost: api.frankfurter.dev\r\nX-A: 1\r\n").startswith(b"HTTP/1.1 408")
+        assert stalled(b"POST /x HTTP/1.1\r\nHost: api.nbp.pl\r\nContent-Length: 10\r\n\r\nabc").startswith(b"HTTP/1.1 408")
+        assert stalled(b"") == b""
+    finally:
+        running.shutdown()
+    head, short = [json.loads(line) for line in (tmp_path / "requests.jsonl").read_text().splitlines()]
+    assert (head["seq"], head["status"], head["method"], head["target"], head["body"]) == (1, 408, "GET", "/v1/2026-07-24?base=CHF", "")
+    assert head["headers"] == [["Host", "api.frankfurter.dev"], ["X-A", "1"]] and head["host"] == "api.frankfurter.dev"
+    assert (short["status"], short["method"], short["body"], short["sni"]) == (408, "POST", "abc", "api.nbp.pl")
+    assert set(head) == set(short)
 
 
 # ---- Known prices -------------------------------------------------------
@@ -496,6 +559,13 @@ def test_prepare_refuses_a_plan_that_leaves_a_coverage_name_out(name, tmp_path):
     assert not (tmp_path / "out").exists()
 
 
+def test_no_plan_is_exempt_from_the_coverage_check():
+    legacy = json.loads((FIXTURES / "backup-format-1.plan.json").read_text())
+    assert "partial" not in legacy
+    with pytest.raises(prices.PlanError, match="covers nothing for"):
+        prices.prepare(legacy, date.today(), FIXTURES)
+
+
 def mixed(plan: dict) -> dict:
     return next(a for a in plan["accounts"] if a["username"] == "mixed.owner")
 
@@ -568,9 +638,9 @@ def test_the_older_backup_and_its_plan_and_figures_are_committed():
     assert "daysAgo" not in json.dumps(plan) and "monthEnds" not in json.dumps(plan)
     counts = {kind: sum(r["recordType"] == kind for r in backup["records"]) for kind in ("account", "snapshot", "rate", "profile")}
     assert counts["account"] == len(owner["holdings"]) and counts["profile"] == 1
-    # The plan's own expected figures are what prepare computes for it.
-    _, computed = prices.prepare(plan, date(2026, 10, 3), FIXTURES)
-    assert computed[owner["username"]] == expected
+    # The figures kept with it are what the plan's vault works out to. The
+    # plan is no full nightly plan, so it is built, not prepared.
+    assert prices.build_vault(owner, date(2026, 10, 3))[1] == expected
 
 
 # ---- The relay ----------------------------------------------------------
@@ -932,6 +1002,27 @@ def test_an_argument_outside_the_schema_is_refused_by_name_and_runs_nothing(tool
     assert tools.docker_calls() == [] and not (tools.state / "modes.json").exists()
 
 
+def test_a_docker_that_hangs_is_an_error_result_and_the_server_keeps_serving(tmp_path, monkeypatch):
+    shim = tmp_path / "bin"
+    shim.mkdir()
+    (shim / "docker").write_text("#!/bin/sh\nexec sleep 30\n")
+    (shim / "docker").chmod(0o755)
+    monkeypatch.setenv("PATH", f"{shim}:{os.environ['PATH']}")
+    monkeypatch.setattr(mcp, "DOCKER_SECONDS", 1)
+    harness = mcp.Harness("solvent", tmp_path, "http://127.0.0.1:1")
+    messages = [
+        {"jsonrpc": "2.0", "id": 1, "method": "tools/call", "params": {"name": "server_log", "arguments": {}}},
+        {"jsonrpc": "2.0", "id": 2, "method": "tools/call", "params": {"name": "app_stop", "arguments": {}}},
+        {"jsonrpc": "2.0", "id": 3, "method": "ping"},
+    ]
+    sink = io.StringIO()
+    mcp.serve(harness, io.StringIO("".join(json.dumps(m) + "\n" for m in messages)), sink)
+    first, second, third = [json.loads(line) for line in sink.getvalue().splitlines()]
+    for answer in (first, second):
+        assert answer["result"]["isError"] and "in time" in answer["result"]["content"][0]["text"]
+    assert third == {"jsonrpc": "2.0", "id": 3, "result": {}}
+
+
 def test_the_tools_run_docker_with_exactly_these_argument_lists(tools):
     log, error = tools.call("server_log")
     assert not error and log["lines"][:2] == ["line 1", "line 2"] and log["next"] == 500
@@ -1037,6 +1128,17 @@ def test_the_generator_imports_node_builtins_and_the_chrome_driver_alone():
         ), name
     assert "../../tests/browser/cdp.mjs" in imported
     assert [p.name for p in TOOLS.glob("*.mjs")] == ["fixtures.mjs"]
+
+
+@pytest.mark.skipif(shutil.which("node") is None, reason="needs Node")
+@pytest.mark.parametrize("invite", ["abc", "invite=abc", "https://example.com/register?invite=abc", ""])
+def test_the_generator_takes_the_invite_as_the_path_the_cli_prints_and_nothing_else(invite, tmp_path):
+    done = subprocess.run(
+        ["node", str(TOOLS / "fixtures.mjs"), "--base", "http://localhost:1", "--invite", invite,
+         "--plan", str(tmp_path / "p"), "--out", str(tmp_path)],
+        capture_output=True, text=True, timeout=60,
+    )
+    assert done.returncode == 2 and "usage" in done.stderr
 
 
 def test_the_generator_writes_no_record_by_its_own_crypto():

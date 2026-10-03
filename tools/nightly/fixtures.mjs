@@ -34,6 +34,7 @@ try {
     strict: true,
   }));
   for (const name of ['base', 'invite', 'plan', 'out']) if (!args[name]) throw new Error(`--${name} is required`);
+  if (!args.invite.startsWith('/register?invite=')) throw new Error('--invite is the path the CLI prints, /register?invite=<token>');
 } catch (error) {
   console.error(`usage: node fixtures.mjs --base <url> --invite <path> --plan <plan> --out <dir>\n${error.message}`);
   process.exit(2);
@@ -48,8 +49,7 @@ if (JSON.stringify(plan.accounts.map((a) => a.username)) !== JSON.stringify(scri
   console.error('script.json was not prepared from this plan');
   process.exit(2);
 }
-// The CLI prints /register?invite=<token>, and a bare token is as good.
-const invitePath = args.invite.startsWith('/') ? args.invite : `/register?invite=${args.invite}`;
+const invitePath = args.invite;
 
 const browsers = [];
 // Every request to the rate proxy any page sends. There must be none: the

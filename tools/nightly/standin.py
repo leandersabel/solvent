@@ -12,9 +12,11 @@ import argparse
 import json
 import re
 import signal
+import io
 import ssl
 import sys
 import threading
+import time
 from datetime import date, datetime, timedelta, timezone
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
@@ -77,8 +79,8 @@ def answer(host: str, method: str, target: str, today: "date | None" = None) -> 
     source = HOSTS[host]
     split = urlsplit(target)
     query = parse_qsl(split.query, keep_blank_values=True)
-    if method == "GET" and source == "frankfurter":
-        found = FX_PATH.match(split.path)
+    if source == "frankfurter":
+        found = FX_PATH.match(split.path) if method == "GET" else None
         day = parse_day(found.group(1)) if found else None
         if day and len(query) == 1 and query[0][0] == "base" and query[0][1] in prices.REF and day >= prices.FRANKFURTER_START:
             published = prices.last_publication_day("frankfurter", day, today)
@@ -105,6 +107,20 @@ def answer(host: str, method: str, target: str, today: "date | None" = None) -> 
     return 404, TEXT_TYPE, b"Not Found"
 
 
+class HeaderList:
+    """The few things the handler asks of a header block, for one that
+    was only partly read."""
+
+    def __init__(self, pairs: "list[list[str]]") -> None:
+        self.pairs = pairs
+
+    def get(self, name: str, default=None):
+        return next((value for key, value in self.pairs if key.lower() == name.lower()), default)
+
+    def items(self):
+        return self.pairs
+
+
 class Handler(BaseHTTPRequestHandler):
     server: "Standin"
     protocol_version = "HTTP/1.1"
@@ -119,18 +135,68 @@ class Handler(BaseHTTPRequestHandler):
 
     def handle_one_request(self) -> None:
         self.close_connection = True
-        self.raw_requestline = self.rfile.readline(LINE_BYTES + 1)
-        if not self.raw_requestline:
+        deadline = time.monotonic() + self.timeout
+        buffer, complete = self._read(b"", b"\r\n\r\n", deadline, LINE_BYTES)
+        if not buffer:
             return
-        if len(self.raw_requestline) > LINE_BYTES:
+        if not complete:
+            # Stalled or over the limit: what was read is still a request.
+            self._record_partial(buffer, 431 if len(buffer) >= LINE_BYTES else 408)
+            return
+        head, _, rest = buffer.partition(b"\r\n\r\n")
+        first, _, fields = head.partition(b"\r\n")
+        self.raw_requestline = first + b"\r\n"
+        self.rfile = io.BytesIO(fields + b"\r\n\r\n")
+        if len(first) >= LINE_BYTES:
             self.send_error(414)
             return
         if not self.parse_request():
             return
-        self.respond()
+        try:
+            length = max(0, int(self.headers.get("Content-Length") or 0))
+        except ValueError:
+            length = 0
+        body, whole = self._read(rest, None, deadline, min(length, BODY_READ_BYTES))
+        if not whole:
+            self._send(408, TEXT_TYPE, b"", "up", body)
+            return
+        self.respond(body)
 
-    def respond(self) -> None:
-        body = self._body()
+    def _read(self, buffer: bytes, marker: "bytes | None", deadline: float, limit: int) -> "tuple[bytes, bool]":
+        """Reads until `marker` is in the buffer, or `limit` bytes are,
+        or the deadline passes. Whether it got what it waited for."""
+        while True:
+            if marker is not None and marker in buffer:
+                return buffer, True
+            if marker is None and len(buffer) >= limit:
+                return buffer[:limit], True
+            if len(buffer) >= limit:
+                return buffer, False
+            remaining = deadline - time.monotonic()
+            if remaining <= 0:
+                return buffer, False
+            try:
+                self.request.settimeout(remaining)
+                chunk = self.request.recv(65536)
+            except OSError:
+                return buffer, False
+            if not chunk:
+                return buffer, False
+            buffer += chunk
+
+    def _record_partial(self, buffer: bytes, status: int) -> None:
+        """A request whose head never finished: the lines that did."""
+        lines = buffer.decode("latin-1").split("\r\n")
+        words = lines[0].split()
+        fields = [[name, value.strip()] for name, colon, value in (line.partition(":") for line in lines[1:]) if colon]
+        self.raw_requestline = lines[0].encode("latin-1")
+        self.request_version = self.protocol_version
+        self.headers = HeaderList(fields)
+        self.command = words[0] if words else ""
+        self.path = words[1] if len(words) > 1 else ""
+        self._send(status, TEXT_TYPE, b"", "up", b"")
+
+    def respond(self, body: bytes) -> None:
         host = (self.headers.get("Host") or "").split(":")[0].lower()
         source = HOSTS.get(host)
         mode = self.server.state.modes()[source] if source else "up"
@@ -147,13 +213,6 @@ class Handler(BaseHTTPRequestHandler):
         what could be read and the status as sent."""
         self._send(code, TEXT_TYPE, b"", "up", b"")
 
-    def _body(self) -> bytes:
-        try:
-            length = max(0, int(self.headers.get("Content-Length") or 0))
-        except ValueError:
-            return b""
-        return self.rfile.read(min(length, BODY_READ_BYTES))
-
     def _send(self, status: int, kind: str, payload: bytes, mode: str, body: bytes) -> None:
         self.close_connection = True
         words = (getattr(self, "raw_requestline", b"") or b"").decode("latin-1").split()
@@ -169,12 +228,17 @@ class Handler(BaseHTTPRequestHandler):
             "mode": mode,
             "status": status,
         })
-        self.send_response_only(status)
-        self.send_header("Content-Type", kind)
-        self.send_header("Content-Length", str(len(payload)))
-        self.send_header("Connection", "close")
-        self.end_headers()
-        self.wfile.write(payload)
+        try:
+            self.request.settimeout(self.timeout)
+            self.send_response_only(status)
+            self.send_header("Content-Type", kind)
+            self.send_header("Content-Length", str(len(payload)))
+            self.send_header("Connection", "close")
+            self.end_headers()
+            self.wfile.write(payload)
+        except OSError:
+            # The client went away, and the line is already written.
+            pass
 
     def log_message(self, *_args) -> None:
         """The request list is the log."""
