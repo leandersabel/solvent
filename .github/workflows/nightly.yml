@@ -13,22 +13,23 @@ permissions: {}
 # A run by hand and the scheduled one never race for the same day.
 concurrency: nightly
 
+env:
+  GH_TOKEN: ${{ github.token }}
+  IMAGE: ghcr.io/${{ github.repository }}
+
 jobs:
-  nightly:
+  build:
     runs-on: ubuntu-latest
-    timeout-minutes: 180
-    environment: agent
+    timeout-minutes: 40
     permissions:
       actions: write
-      contents: write
-      packages: write
-      issues: write
-      pull-requests: read
-      security-events: read
-      id-token: write
-    env:
-      GH_TOKEN: ${{ github.token }}
-      IMAGE: ghcr.io/${{ github.repository }}
+      contents: read
+    outputs:
+      go: ${{ steps.decide.outputs.go }}
+      today: ${{ steps.decide.outputs.today }}
+      last: ${{ steps.decide.outputs.last }}
+      image: ${{ steps.app.outputs.image }}
+      failed: ${{ steps.failed.outputs.failed }}
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
@@ -63,22 +64,128 @@ jobs:
         id: suite
         run: python -m pytest -q
 
+      # Built once, so every shard tests, and the release publishes, the
+      # same image.
       - if: steps.decide.outputs.go == 'true'
         id: app
+        env:
+          TODAY: ${{ steps.decide.outputs.today }}
         run: |
-          docker build -t "$IMAGE:${{ steps.decide.outputs.today }}" .
+          docker build -t "$IMAGE:$TODAY" .
+          echo "image=$(docker image inspect -f '{{.Id}}' "$IMAGE:$TODAY")" >> "$GITHUB_OUTPUT"
+          docker save -o image.tar "$IMAGE:$TODAY"
+      - if: steps.decide.outputs.go == 'true'
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+        with:
+          name: image
+          path: image.tar
+          retention-days: 1
+
+      # Which steps failed, for the failure report. Inline, because the
+      # model in this job could rewrite anything in the working tree.
+      - if: failure() || cancelled()
+        id: failed
+        env:
+          STEPS: ${{ toJSON(steps) }}
+        run: echo "failed=$(jq -r '[to_entries[] | select(.value.outcome == "failure" or .value.outcome == "cancelled") | .key] | join(" ")' <<< "$STEPS")" >> "$GITHUB_OUTPUT"
+
+  plan:
+    needs: build
+    if: needs.build.outputs.go == 'true'
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    environment: agent
+    permissions:
+      contents: read
+      issues: read
+      id-token: write
+    outputs:
+      shards: ${{ steps.split.outputs.shards }}
+      failed: ${{ steps.failed.outputs.failed }}
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: master
+          fetch-depth: 0
+
+      # With no last version, every feature is walked in full.
+      - if: needs.build.outputs.last != ''
+        id: plan
+        uses: anthropics/claude-code-action@fd1c128679612beff4ca259c78021c506e8aa7a7 # v1.0.237
+        with:
+          claude_code_oauth_token: ${{ secrets.CLAUDE_CODE_OAUTH_TOKEN }}
+          prompt: >-
+            Run the `nightly-qa` skill with the arguments
+            `plan ${{ needs.build.outputs.last }}`.
+          allowed_bots: claude,github-actions,dependabot
+          bot_id: "209825114"
+          plugin_marketplaces: https://github.com/leandersabel/skald.git
+          plugins: skald@skald
+          claude_args: |
+            --model claude-opus-5-5
+            --allowedTools Read,Write,Glob,Grep,Skill,"Bash(gh issue list:*)","Bash(gh issue view:*)","Bash(git diff:*)","Bash(git log:*)"
+
+      # The plan is checked and split without a model, from the commit's
+      # own copy, so only known feature names reach the shards.
+      - run: git checkout -q HEAD -- .github/actions
+      - id: split
+        env:
+          LAST: ${{ needs.build.outputs.last }}
+        run: python3 .github/actions/qa-plan/plan.py >> "$GITHUB_OUTPUT"
+
+      # Which steps failed, for the failure report. Inline, because the
+      # model in this job could rewrite anything in the working tree.
+      - if: failure() || cancelled()
+        id: failed
+        env:
+          STEPS: ${{ toJSON(steps) }}
+        run: echo "failed=$(jq -r '[to_entries[] | select(.value.outcome == "failure" or .value.outcome == "cancelled") | .key] | join(" ")' <<< "$STEPS")" >> "$GITHUB_OUTPUT"
+
+  qa:
+    needs: [build, plan]
+    runs-on: ubuntu-latest
+    timeout-minutes: 70
+    environment: agent
+    permissions:
+      contents: read
+      issues: read
+      id-token: write
+    outputs:
+      failed: ${{ steps.failed.outputs.failed }}
+    strategy:
+      fail-fast: false
+      matrix:
+        shard: ${{ fromJSON(needs.plan.outputs.shards) }}
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: master
+
+      - uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8.0.1
+        with:
+          name: image
+      - id: image
+        env:
+          TODAY: ${{ needs.build.outputs.today }}
+          BUILT: ${{ needs.build.outputs.image }}
+        run: |
+          docker load -i image.tar
+          [ "$(docker image inspect -f '{{.Id}}' "$IMAGE:$TODAY")" = "$BUILT" ]
+
+      # This shard's own instance, at every default an installation has.
+      - id: app
+        run: |
           docker run -d --name solvent -p 8000:8000 \
             -e SECRET_KEY="$(openssl rand -hex 32)" \
             -v solvent-data:/data \
             --read-only --tmpfs /dev/shm:size=64m \
             --cap-drop ALL --security-opt no-new-privileges:true \
-            "$IMAGE:${{ steps.decide.outputs.today }}"
+            "$IMAGE:${{ needs.build.outputs.today }}"
           curl -fsS --retry 10 --retry-all-errors --retry-delay 1 -o /dev/null http://localhost:8000/login
           echo "invite=$(docker exec solvent flask --app app create-invite --kind administrator | tail -n 1)" >> "$GITHUB_OUTPUT"
 
-      - if: steps.decide.outputs.go == 'true'
-        id: qa
-        timeout-minutes: 140
+      - id: qa
+        timeout-minutes: 60
         uses: anthropics/claude-code-action@fd1c128679612beff4ca259c78021c506e8aa7a7 # v1.0.237
         env:
           CLAUDE_CODE_DISABLE_BACKGROUND_TASKS: "1"
@@ -86,7 +193,8 @@ jobs:
           claude_code_oauth_token: ${{ secrets.CLAUDE_CODE_OAUTH_TOKEN }}
           prompt: >-
             Run the `nightly-qa` skill with the arguments
-            `http://localhost:8000 ${{ steps.app.outputs.invite }} ${{ steps.decide.outputs.last }}`.
+            `walk http://localhost:8000 ${{ steps.app.outputs.invite }}
+            full=${{ join(matrix.shard.full, ',') }} smoke=${{ join(matrix.shard.smoke, ',') }}`.
           # A scheduled run's actor is whoever last changed this file,
           # which can be a bot.
           allowed_bots: claude,github-actions,dependabot
@@ -98,14 +206,76 @@ jobs:
             --allowedTools Bash,Read,Write,Glob,Grep,Agent,Task,Skill,TodoWrite,mcp__playwright
             --mcp-config '{"mcpServers":{"playwright":{"command":"npx","args":["-y","@playwright/mcp@0.0.83","--headless","--browser","chrome","--isolated"]}}}'
 
-      # QA could write to the working tree, so what decides the night
-      # runs from the commit's own copy.
-      - if: always() && steps.decide.outputs.go == 'true'
+      - if: always()
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+        with:
+          name: qa-${{ matrix.shard.id }}
+          path: |
+            qa-unfiled/
+            qa-done.txt
+          if-no-files-found: ignore
+
+      - if: failure()
+        run: docker logs solvent || true
+
+      # Which steps failed, for the failure report. Inline, because the
+      # model in this job could rewrite anything in the working tree.
+      - if: failure() || cancelled()
+        id: failed
+        env:
+          STEPS: ${{ toJSON(steps) }}
+        run: echo "failed=$(jq -r '[to_entries[] | select(.value.outcome == "failure" or .value.outcome == "cancelled") | .key] | join(" ")' <<< "$STEPS")" >> "$GITHUB_OUTPUT"
+
+  finish:
+    needs: [build, plan, qa]
+    if: always() && needs.build.outputs.go == 'true'
+    runs-on: ubuntu-latest
+    timeout-minutes: 40
+    environment: agent
+    permissions:
+      actions: write
+      contents: write
+      packages: write
+      issues: write
+      pull-requests: read
+      security-events: read
+      id-token: write
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: master
+          fetch-depth: 0
+
+      # A night whose build or plan failed has no walk to judge.
+      - id: upstream
+        run: '[ "${{ needs.plan.result }}" = success ]'
+
+      - uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8.0.1
+        with:
+          pattern: qa-*
+          path: shards
+
+      # Records from different shards that report the same thing
+      # become one.
+      - if: hashFiles('shards/*/qa-unfiled/*.json') != ''
+        timeout-minutes: 15
+        uses: anthropics/claude-code-action@fd1c128679612beff4ca259c78021c506e8aa7a7 # v1.0.237
+        with:
+          claude_code_oauth_token: ${{ secrets.CLAUDE_CODE_OAUTH_TOKEN }}
+          prompt: Run the `nightly-qa` skill with the arguments `merge shards`.
+          allowed_bots: claude,github-actions,dependabot
+          bot_id: "209825114"
+          claude_args: |
+            --model claude-opus-5-5
+            --allowedTools Read,Write,Glob,Skill
+
+      # The merge could write to the working tree, so what decides the
+      # night runs from the commit's own copy.
+      - if: always()
         run: git checkout -q HEAD -- .github/actions
 
-      # QA's token can expire during a long walk, so a fresh run files
-      # what it recorded, as claude[bot].
-      - if: always() && steps.decide.outputs.go == 'true' && hashFiles('qa-unfiled/*.json') != ''
+      # A fresh run files what QA recorded, as claude[bot].
+      - if: always() && hashFiles('qa-unfiled/*.json') != ''
         timeout-minutes: 10
         continue-on-error: true
         uses: anthropics/claude-code-action@fd1c128679612beff4ca259c78021c506e8aa7a7 # v1.0.237
@@ -120,26 +290,36 @@ jobs:
 
       # What that run could not file, the workflow files before the
       # night is judged.
-      - if: always() && steps.decide.outputs.go == 'true'
+      - if: always()
         uses: ./.github/actions/qa-file
 
-      # QA finished.
-      - if: steps.decide.outputs.go == 'true'
-        id: qa-done
-        run: '[ -f qa-done.txt ]'
+      # Every shard finished.
+      - id: qa-done
+        env:
+          SHARDS: ${{ needs.plan.outputs.shards }}
+        run: '[ "$(find shards -name qa-done.txt | wc -l)" -eq "$(jq length <<< "$SHARDS")" ]'
 
-      - if: steps.decide.outputs.go == 'true'
-        id: gate
+      - id: gate
         uses: ./.github/actions/release-gate
         with:
           commit: HEAD
-          since: ${{ steps.decide.outputs.last }}
+          since: ${{ needs.build.outputs.last }}
 
-      - if: steps.decide.outputs.go == 'true'
-        id: publish
+      - uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8.0.1
+        with:
+          name: image
+      - id: image
         env:
-          TODAY: ${{ steps.decide.outputs.today }}
-          LAST: ${{ steps.decide.outputs.last }}
+          TODAY: ${{ needs.build.outputs.today }}
+          BUILT: ${{ needs.build.outputs.image }}
+        run: |
+          docker load -i image.tar
+          [ "$(docker image inspect -f '{{.Id}}' "$IMAGE:$TODAY")" = "$BUILT" ]
+
+      - id: publish
+        env:
+          TODAY: ${{ needs.build.outputs.today }}
+          LAST: ${{ needs.build.outputs.last }}
         run: |
           echo "${{ github.token }}" | docker login ghcr.io -u "${{ github.actor }}" --password-stdin
           docker tag "$IMAGE:$TODAY" "$IMAGE:nightly"
@@ -150,12 +330,10 @@ jobs:
           python3 tools/release-notes.py "$LAST" HEAD > notes.md
           gh release create "$TODAY" --target "$(git rev-parse HEAD)" --prerelease --title "$TODAY" --notes-file notes.md
 
-      - if: failure()
-        run: docker logs solvent || true
-
       # A failed night always leaves an issue the loop takes up.
-      - if: (failure() || cancelled()) && steps.decide.outputs.go == 'true'
+      - if: failure() || cancelled()
         uses: ./.github/actions/nightly-failure
         with:
-          today: ${{ steps.decide.outputs.today }}
+          today: ${{ needs.build.outputs.today }}
           steps: ${{ toJSON(steps) }}
+          needs: ${{ toJSON(needs) }}
