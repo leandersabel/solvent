@@ -312,8 +312,11 @@ found and even when QA saw it once.
   `accepted` and its rating, which the loop takes up at once, or a
   comment on the open one it repeats. A finding QA saw once says so in
   its title. Each feature with criteria QA could not check gets an
-  issue saying which and why, the same way. A finding QA could not
-  file, the workflow files.
+  issue saying which and why, the same way. QA only records them during
+  the walk, and a short run after it files them with a fresh token, so
+  a long walk never outlasts the token. What that run could not file,
+  the workflow files the same way, as `github-actions[bot]`, before the
+  night is judged.
 - A night passes when the suite, the image and QA finish, and nothing
   holds back the version: no open problem rated high or critical
   (Severity), no such issue closed by anyone but the client without its

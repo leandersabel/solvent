@@ -10,6 +10,10 @@ inputs:
 runs:
   using: composite
   steps:
+    # Files what QA recorded, as a last resort. Its failure must not
+    # stop the issue below.
+    - uses: ./.github/actions/qa-file
+      continue-on-error: true
     - run: python3 "$GITHUB_ACTION_PATH/report.py"
       shell: bash
       env:
