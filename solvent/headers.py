@@ -12,7 +12,7 @@ from __future__ import annotations
 
 import flask
 
-# Byte-identical to spec/architecture.md, Application hardening. A
+# What it must allow is spec/architecture.md, Application hardening. A
 # route needing a looser policy is a design change, not a local
 # override (app-shell.md, Response headers).
 CSP = (

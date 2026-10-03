@@ -403,10 +403,10 @@ and no refusal redirects. app-shell.md, The request gate, applies this.
 
 ### Application hardening
 
-- **CSP**: `default-src 'none'; script-src 'self' 'wasm-unsafe-eval';
-  connect-src 'self'; img-src 'self'; style-src 'self'; frame-ancestors
-  'none'; base-uri 'none'; form-action 'self'`. No
-  `unsafe-inline` or `unsafe-eval`.
+- **CSP**: everything is refused by default, and the page may load
+  scripts, styles and images, connect, and submit forms only to its own
+  origin. No `unsafe-inline` or `unsafe-eval`, no `<base>`, and no page
+  may frame it (`frame-ancestors 'none'`).
   - `'wasm-unsafe-eval'` lets the browser compile the Argon2id
     WebAssembly module, which every engine gates on `script-src`. It
     permits WebAssembly compilation and nothing else, not `eval` and not

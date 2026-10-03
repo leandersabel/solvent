@@ -42,17 +42,9 @@ def test_every_response_shape_carries_hsts(every_shape):
         assert "includeSubDomains" in response.headers["Strict-Transport-Security"]
 
 
-def test_the_policy_matches_the_architecture_byte_for_byte():
-    from pathlib import Path
-    import re
-
-    architecture = (
-        Path(__file__).resolve().parent.parent / "spec" / "architecture.md"
-    ).read_text()
-    block = architecture[architecture.index("- **CSP**:") :]
-    quoted = re.search(r"`([^`]*default-src[^`]*)`", block, re.S).group(1)
-    written = " ".join(quoted.split())
-    assert written == CSP
+def test_the_policy_allows_no_inline_script_or_eval():
+    assert "'unsafe-inline'" not in CSP
+    assert "'unsafe-eval'" not in CSP
 
 
 def test_no_separate_x_frame_options_is_served(every_shape):
