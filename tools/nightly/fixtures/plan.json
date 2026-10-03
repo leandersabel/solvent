@@ -1,0 +1,534 @@
+{
+ "accounts": [
+  {
+   "username": "harness.admin",
+   "password": "granite orchard vellum tundra",
+   "kind": "administrator",
+   "mainCurrency": "CHF",
+   "covers": [
+    "harness-admin"
+   ],
+   "about": "The administrator through whom the invites were made."
+  },
+  {
+   "username": "anna.household",
+   "password": "cobalt meadow thistle ranger",
+   "kind": "vault_owner",
+   "mainCurrency": "CHF",
+   "covers": [
+    "household"
+   ],
+   "about": "One of two vault owners with the same main currency, each holding USD and gold, both recorded on one date.",
+   "profile": {
+    "groupSeparator": "none"
+   },
+   "holdings": [
+    {
+     "name": "Savings",
+     "unit": "CHF"
+    },
+    {
+     "name": "Dollar account",
+     "unit": "USD"
+    },
+    {
+     "name": "Gold coins",
+     "unit": "XAU-ozt"
+    }
+   ],
+   "steps": [
+    {
+     "recording": {
+      "date": {
+       "daysAgo": 60
+      },
+      "figures": {
+       "Savings": "15200.00",
+       "Dollar account": "4100.50",
+       "Gold coins": "3.5"
+      }
+     }
+    },
+    {
+     "recording": {
+      "date": {
+       "daysAgo": 20
+      },
+      "figures": {
+       "Savings": "15800.00",
+       "Dollar account": "4300.00",
+       "Gold coins": "3.5"
+      }
+     }
+    }
+   ]
+  },
+  {
+   "username": "ben.household",
+   "password": "ember quartz lantern marble",
+   "kind": "vault_owner",
+   "mainCurrency": "CHF",
+   "covers": [
+    "household"
+   ],
+   "about": "The other household vault: the same units, recorded on the same date, so that date reaches each price source once.",
+   "profile": {
+    "groupSeparator": "none"
+   },
+   "holdings": [
+    {
+     "name": "Savings",
+     "unit": "CHF"
+    },
+    {
+     "name": "Dollar account",
+     "unit": "USD"
+    },
+    {
+     "name": "Gold coins",
+     "unit": "XAU-ozt"
+    }
+   ],
+   "steps": [
+    {
+     "recording": {
+      "date": {
+       "daysAgo": 75
+      },
+      "figures": {
+       "Savings": "15200.00",
+       "Dollar account": "4100.50",
+       "Gold coins": "3.5"
+      }
+     }
+    },
+    {
+     "recording": {
+      "date": {
+       "daysAgo": 20
+      },
+      "figures": {
+       "Savings": "15800.00",
+       "Dollar account": "4300.00",
+       "Gold coins": "3.5"
+      }
+     }
+    }
+   ]
+  },
+  {
+   "username": "history.owner",
+   "password": "juniper harbour velvet anchor",
+   "kind": "vault_owner",
+   "mainCurrency": "CHF",
+   "covers": [
+    "long-history",
+    "current-backup"
+   ],
+   "about": "A vault recorded at every month end from mid-2012 on, with a debt. Gold before 2013 is priced by hand. Its current backup is prepared.",
+   "backup": true,
+   "profile": {
+    "groupSeparator": "none"
+   },
+   "holdings": [
+    {
+     "name": "Checking",
+     "unit": "CHF"
+    },
+    {
+     "name": "Dollar deposit",
+     "unit": "USD"
+    },
+    {
+     "name": "Gold",
+     "unit": "XAU-g"
+    },
+    {
+     "name": "Mortgage",
+     "unit": "CHF"
+    }
+   ],
+   "steps": [
+    {
+     "monthEnds": {
+      "from": "2012-06-30",
+      "series": {
+       "Checking": {
+        "start": "8000.00",
+        "step": "55.00"
+       },
+       "Dollar deposit": {
+        "start": "3000.00",
+        "step": "20.00"
+       },
+       "Gold": {
+        "start": "40.00",
+        "step": "0.25"
+       },
+       "Mortgage": {
+        "start": "-300000.00",
+        "step": "300.00"
+       }
+      },
+      "prices": {
+       "XAU-g": {
+        "manual": "35.10"
+       }
+      }
+     }
+    }
+   ]
+  },
+  {
+   "username": "mixed.owner",
+   "password": "plover cinder walnut ridge",
+   "kind": "vault_owner",
+   "mainCurrency": "CHF",
+   "covers": [
+    "many-dimension-values",
+    "rate-edited-long-ago",
+    "no-source-unit",
+    "own-unit",
+    "archived-holding",
+    "damaged-record",
+    "same-date-pair"
+   ],
+   "about": "Five dimension values each held, a holding priced by hand in silver, one in a unit of its own priced once in 2019, an archived holding, a rate edited in 2019, an unreadable record and a pair of figures on one date.",
+   "profile": {
+    "groupSeparator": "none",
+    "dimensions": [
+     {
+      "id": "liq00001",
+      "label": "Liquidity",
+      "archivedAt": null,
+      "values": [
+       {
+        "id": "cash0001",
+        "label": "Cash",
+        "archivedAt": null
+       },
+       {
+        "id": "liqd0002",
+        "label": "Liquid investments",
+        "archivedAt": null
+       },
+       {
+        "id": "fixd0003",
+        "label": "Fixed investments",
+        "archivedAt": null
+       },
+       {
+        "id": "ret00004",
+        "label": "Retirement",
+        "archivedAt": null
+       },
+       {
+        "id": "prop0005",
+        "label": "Property",
+        "archivedAt": null
+       }
+      ]
+     }
+    ]
+   },
+   "holdings": [
+    {
+     "name": "Cash account",
+     "unit": "CHF",
+     "dims": {
+      "liq00001": "cash0001"
+     }
+    },
+    {
+     "name": "Dollar account",
+     "unit": "USD",
+     "dims": {
+      "liq00001": "liqd0002"
+     }
+    },
+    {
+     "name": "Silver bars",
+     "unit": "XAG-ozt",
+     "dims": {
+      "liq00001": "fixd0003"
+     }
+    },
+    {
+     "name": "Pension fund",
+     "unit": "CHF",
+     "dims": {
+      "liq00001": "ret00004"
+     }
+    },
+    {
+     "name": "Flat",
+     "unit": "m²",
+     "dims": {
+      "liq00001": "prop0005"
+     }
+    },
+    {
+     "name": "Old dollar savings",
+     "unit": "USD",
+     "dims": {
+      "liq00001": "liqd0002"
+     }
+    },
+    {
+     "name": "Closed account",
+     "unit": "CHF"
+    }
+   ],
+   "steps": [
+    {
+     "recording": {
+      "date": "2019-03-29",
+      "figures": {
+       "Cash account": "9000.00",
+       "Old dollar savings": "8200.00",
+       "Dollar account": "1000.00",
+       "Silver bars": "40",
+       "Pension fund": "50000.00",
+       "Flat": "95",
+       "Closed account": "700.00"
+      },
+      "prices": {
+       "m²": {
+        "manual": "9500"
+       },
+       "XAG-ozt": {
+        "manual": "24.50"
+       }
+      }
+     }
+    },
+    {
+     "edit": {
+      "unit": "USD",
+      "date": "2019-03-29",
+      "rate": "0.9876"
+     }
+    },
+    {
+     "pair": {
+      "holding": "Dollar account",
+      "date": "2021-06-30",
+      "value": "1111.00",
+      "other": "1222.00"
+     }
+    },
+    {
+     "damaged": {
+      "holding": "Cash account",
+      "date": "2021-09-30",
+      "value": "123.00"
+     }
+    },
+    {
+     "recording": {
+      "date": "2023-12-29",
+      "figures": {
+       "Cash account": "9500.00",
+       "Dollar account": "1500.00",
+       "Silver bars": "42",
+       "Pension fund": "52000.00",
+       "Closed account": "300.00"
+      }
+     }
+    },
+    {
+     "recording": {
+      "date": "2024-06-28",
+      "figures": {
+       "Cash account": "9800.00",
+       "Dollar account": "1600.00",
+       "Silver bars": "42",
+       "Pension fund": "53000.00"
+      },
+      "prices": {
+       "XAG-ozt": {
+        "manual": "26.10"
+       }
+      }
+     }
+    },
+    {
+     "archive": {
+      "holding": "Closed account",
+      "date": "2024-06-28"
+     }
+    },
+    {
+     "recording": {
+      "date": {
+       "daysAgo": 15
+      },
+      "figures": {
+       "Cash account": "10100.00",
+       "Dollar account": "1700.00",
+       "Silver bars": "43",
+       "Pension fund": "54000.00"
+      }
+     }
+    }
+   ]
+  },
+  {
+   "username": "euro.owner",
+   "password": "saffron glacier timber orbit",
+   "kind": "vault_owner",
+   "mainCurrency": "EUR",
+   "covers": [
+    "other-main-currency"
+   ],
+   "about": "A vault whose main currency is EUR.",
+   "profile": {
+    "groupSeparator": "none"
+   },
+   "holdings": [
+    {
+     "name": "Giro",
+     "unit": "EUR"
+    },
+    {
+     "name": "Dollar savings",
+     "unit": "USD"
+    },
+    {
+     "name": "Gold",
+     "unit": "XAU-g"
+    }
+   ],
+   "steps": [
+    {
+     "recording": {
+      "date": {
+       "daysAgo": 40
+      },
+      "figures": {
+       "Giro": "7400.00",
+       "Dollar savings": "2500.00",
+       "Gold": "20"
+      }
+     }
+    },
+    {
+     "recording": {
+      "date": {
+       "daysAgo": 8
+      },
+      "figures": {
+       "Giro": "7650.00",
+       "Dollar savings": "2500.00",
+       "Gold": "20"
+      }
+     }
+    }
+   ]
+  },
+  {
+   "username": "empty.owner",
+   "password": "nectar falcon prairie lichen",
+   "kind": "vault_owner",
+   "mainCurrency": "CHF",
+   "covers": [
+    "empty-vault"
+   ],
+   "about": "A vault with no holdings.",
+   "profile": {
+    "groupSeparator": "none"
+   },
+   "holdings": [],
+   "steps": []
+  },
+  {
+   "username": "old.owner",
+   "password": "basalt meadow cricket opal",
+   "kind": "vault_owner",
+   "mainCurrency": "CHF",
+   "covers": [
+    "older-vault"
+   ],
+   "about": "A vault whose credential was made with a smaller key derivation than the server now uses.",
+   "kdfMemory": 32768,
+   "profile": {
+    "groupSeparator": "none"
+   },
+   "holdings": [
+    {
+     "name": "Savings",
+     "unit": "CHF"
+    }
+   ],
+   "steps": [
+    {
+     "recording": {
+      "date": {
+       "daysAgo": 30
+      },
+      "figures": {
+       "Savings": "5000.00"
+      }
+     }
+    }
+   ]
+  },
+  {
+   "username": "aged.owner",
+   "password": "willow summit pewter drift",
+   "kind": "vault_owner",
+   "mainCurrency": "CHF",
+   "covers": [
+    "aged-session"
+   ],
+   "about": "Open the dashboard before anything else: the browser holds this session, issued more than 12 hours ago.",
+   "agedSession": {
+    "issuedMinutesAgo": 725,
+    "lastActiveMinutesAgo": 1
+   },
+   "profile": {
+    "groupSeparator": "none"
+   },
+   "holdings": [
+    {
+     "name": "Savings",
+     "unit": "CHF"
+    }
+   ],
+   "steps": [
+    {
+     "recording": {
+      "date": {
+       "daysAgo": 30
+      },
+      "figures": {
+       "Savings": "5000.00"
+      }
+     }
+    }
+   ]
+  }
+ ],
+ "invites": [
+  {
+   "label": "expired-invite-fixture",
+   "kind": "vault_owner",
+   "createdMinutesAgo": 11520,
+   "expiresMinutesAgo": 1440,
+   "covers": [
+    "expired-invite"
+   ]
+  }
+ ],
+ "backups": [
+  {
+   "file": "backup-format-1.json",
+   "password": "quill marble thicket ember",
+   "formatVersion": 1,
+   "covers": [
+    "older-backup"
+   ],
+   "expected": "backup-format-1.expected.json"
+  }
+ ]
+}

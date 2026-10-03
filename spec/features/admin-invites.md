@@ -296,11 +296,17 @@ invocation and nothing more.
   `history.replaceState` once the form has taken it, so a bookmark,
   a shared screen, or a browser-history sync afterwards carries nothing.
   The form submits the token it already holds, not the URL's copy.
-- The token must not appear in server access logs. Since it rides in a
-  query string on `/register`, the app strips or redacts it in its own
-  logging, and the deployment's reverse proxy / tunnel logging is
-  documented as a place it may still appear — the invite's short expiry
-  and single-use nature are what bound that exposure.
+- **No line the container writes to its standard output or standard
+  error carries an invite token**, the access log included. The token
+  rides in the query string of `/register`, and the access log records
+  the path without its query (architecture.md, Storage & data
+  handling). No app log line names the query string or the body of a request the
+  app received.
+  `flask create-invite` prints its invite to its own standard output,
+  which `docker exec` hands to the operator and the container's log
+  never receives. A deployment's reverse proxy or tunnel may still log
+  the full URL, which is documented. The invite's short expiry and
+  single use bound that exposure.
 
 ## Edge cases
 
@@ -434,4 +440,10 @@ invocation and nothing more.
 - With a `principals` row whose `last_login_at` is null in the file
   before the app starts, `GET /api/admin/accounts` returns that row's
   `createdAt` as its `lastLoginAt` (app-shell.md, Database).
-- The invite token does not appear in the application's own log output.
+- No invite token appears in the server's standard output or standard
+  error. gunicorn runs with the Dockerfile's command arguments, an
+  invite is created through `POST /api/admin/invites` and another with
+  `flask create-invite`, and `/register?invite=<token>` is requested for
+  a valid, a used, an expired, a revoked and an unknown token, followed
+  by a registration with the valid one. After gunicorn stops, neither
+  stream contains any of the tokens.

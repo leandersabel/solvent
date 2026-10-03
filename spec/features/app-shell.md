@@ -469,6 +469,9 @@ dialog to protect. Everything below describes the vault owner's bar.
 - The image's gunicorn command sets `--access-logformat` to exactly
   the format in architecture.md, Storage & data handling, and
   `--log-level` to `error`, asserted by reading the Dockerfile.
+- The Dockerfile copies `requirements.txt`, `app.py` and `solvent` and
+  nothing else, and `.dockerignore` lists `tests` and `tools`, asserted
+  by reading both files (architecture.md, Tech stack, Packaging).
 - **No server log line carries the peer's address.** gunicorn runs as
   a subprocess with the Dockerfile's command arguments, bound to
   `127.0.0.1` on a free port, and a client connects from source

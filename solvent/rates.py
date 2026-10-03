@@ -96,8 +96,11 @@ SEEDED_SYMBOLS = [
     for symbol, label, lookup in _METALS
 ]
 
-FX_HOST = "https://api.frankfurter.dev"
-NBP_HOST = "https://api.nbp.pl"
+# Constants, not settings: nothing names a provider, and the nightly
+# source check imports these names (rate-lookup.md, SSRF and egress
+# hardening).
+FX_URL = "https://api.frankfurter.dev/v1/{date}?base={quote}"
+NBP_URL = "https://api.nbp.pl/api/cenyzlota/{start}/{end}?format=json"
 
 # NBP publishes from 2013-01-02 and Frankfurter from 1999-01-04. A
 # single global floor would either reject valid FX dates or wave through
@@ -235,7 +238,7 @@ def _fx_table(on: date, quote: str) -> "dict[str, tuple[Decimal, str]] | None":
     the provider does not publish resolves to its prior close, which is
     what the `date` field in the response carries.
     """
-    payload = _fetch_json(f"{FX_HOST}/v1/{on.isoformat()}?base={quote}")
+    payload = _fetch_json(FX_URL.format(date=on.isoformat(), quote=quote))
     if not isinstance(payload, dict):
         return None
     as_of = payload.get("date")
@@ -264,9 +267,7 @@ def _gold_pln(on: date) -> "tuple[Decimal, str] | None":
     prior-close rule in one request.
     """
     start = (on - _PRIOR_CLOSE_WINDOW).isoformat()
-    payload = _fetch_json(
-        f"{NBP_HOST}/api/cenyzlota/{start}/{on.isoformat()}?format=json"
-    )
+    payload = _fetch_json(NBP_URL.format(start=start, end=on.isoformat()))
     if not isinstance(payload, list) or not payload:
         return None
     last = payload[-1]

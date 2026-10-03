@@ -1,0 +1,245 @@
+{
+  "feature": "nightly-harness",
+  "summary": "Pipeline tooling under tools/nightly/ that the nightly run puts around the unchanged image: a run-scoped certificate authority and a price stand-in answering the providers' real names, a one-way relay, source checks, prepared vaults and backups made through the app's own browser code, a dating-back patch, and an MCP server that is qa's only way to the server. It is never in the image.",
+  "read": [
+    {"file": "spec/features/nightly-harness.md", "sections": ["all"]},
+    {"file": "CLAUDE.md", "sections": ["The loop"], "role": "Nightly and stable is the requirement this feature serves: shards on a network of their own with no route out, the stand-in under the real source names, the vaults made with the app's own browser code, qa reaching the server only through harness tools, and nothing of the harness in the image"},
+    {"file": "spec/architecture.md", "sections": ["Tech stack", "Status codes", "Application hardening", "Storage & data handling", "Threat model"], "role": "Tech stack, Packaging: the image holds nothing of the harness. Status codes: the stand-in's statuses are the providers' own and outside this set. Application hardening: the session, the sign-in limits each shard spends and the egress rules the stand-in is trusted under"},
+    {"file": "spec/features/rate-lookup.md", "sections": ["Providers", "Seeded symbols", "SSRF and egress hardening", "Rate limiting and failure", "Edge cases"], "role": "the composition known_table must equal exactly, the seeded currency list prices.py must equal, the constants that name no setting, and the breaker that app_stop and app_start reset"},
+    {"file": "spec/features/net-worth-view.md", "sections": ["Current net worth", "Archived holdings"], "role": "the expected figures prepare computes independently: latest quantity times price, assets and debts, archived and unpriced holdings excluded"},
+    {"file": "spec/features/record-rate.md", "sections": ["Record shape", "The refresh", "The write path", "Reading", "Editing a captured rate"], "role": "the rate records the script writes, the proposals it passes to refreshPrices, the price as recorded, and editedRatePayload"},
+    {"file": "spec/features/record-snapshot.md", "sections": ["Record shape", "Same holding, same date: upsert"], "role": "the snapshot records written, and the same-date pair the plan plants"},
+    {"file": "spec/features/manage-accounts.md", "sections": ["Record shape", "Archiving"], "role": "holdings with their units and the archive date the archived-holding coverage depends on"},
+    {"file": "spec/features/record-api.md", "sections": ["The AAD encoding", "Endpoints"], "role": "the AAD under which the damaged record is encrypted for another record_id"},
+    {"file": "spec/features/export-import.md", "sections": ["Export", "Rules", "Acceptance criteria"], "role": "GET /api/export with the X-Solvent-Request header, the backup file shape, formatVersion and kdf envelope, and why a format-1 fixture is never regenerated"},
+    {"file": "spec/features/admin-invites.md", "sections": ["Invite lifecycle", "Endpoints", "Bootstrap: the first administrator, and the locked-out one"], "role": "the administrator invite minted through the CLI and --force, the invites made through POST /api/admin/invites, and the status the expired one carries"},
+    {"file": "spec/features/register.md", "sections": ["Flow", "What registration writes", "Rules"], "role": "what /register?invite= does, so fixtures.mjs registers as the page does"},
+    {"file": "spec/features/login.md", "sections": ["Stale-KDF upgrade", "The session a sign-in issues", "Rules"], "role": "/api/auth/upgrade-kdf for the older vault, and the session's absolute 12-hour expiry the aged session is dated past"},
+    {"file": "spec/features/account-settings.md", "sections": ["The profile record", "Session and lock"], "role": "saveProfile's record and the session the aged cookie belongs to"},
+    {"file": "spec/features/app-shell.md", "sections": ["Configuration", "Database", "Acceptance criteria"], "role": "SECRET_KEY, the writable volume and the tables patch.py touches, and the Dockerfile and .dockerignore criteria that keep tools out of the image"}
+  ],
+  "dependsOn": ["app-shell", "record-api", "rate-lookup", "admin-invites", "register", "login", "account-settings", "manage-accounts", "record-rate", "record-snapshot", "net-worth-view", "export-import"],
+  "parameters": {
+    "location": {"value": "tools/nightly/, pipeline tooling, never in the image. Standard library only, Python 3.12 or later and Node 24 or later. No script adds a dependency. Imports beyond those are exactly the ones in imports", "cite": "spec/features/nightly-harness.md#files"},
+    "imports": {"value": {
+      "allowed": "the standard library and node: built-ins, plus exactly these",
+      "prices": "standin.py, mcp.py and prices.py prepare import prices, their sibling in tools/nightly/, on the path as the running script's own directory. Every price comes from that one module",
+      "solventRates": "sources.py imports from solvent.rates the constants rate-lookup.md names for it, in tonight's image with PYTHONPATH=/app",
+      "cdp": "fixtures.mjs imports tests/browser/cdp.mjs, the Chrome driver, rather than keeping a second one",
+      "nothingElse": "nothing else imports from solvent or tests/. Nothing in solvent imports from tools/, and the harness's own tests are the only code outside it that does"
+    }, "cite": "spec/features/nightly-harness.md#files, spec/features/nightly-harness.md#acceptance-criteria"},
+    "files": {"value": ["ca.py", "standin.py", "prices.py", "relay.py", "sources.py", "fixtures.mjs", "patch.py", "mcp.py", "fixtures/plan.json", "fixtures/backup-format-1.json", "fixtures/backup-format-1.plan.json", "fixtures/backup-format-1.expected.json", "fixtures/out/ (generated, ignored by git)"], "cite": "spec/features/nightly-harness.md#files"},
+    "scriptExitCodes": {"value": {"0": "success", "1": "a check that failed", "2": "a usage error"}, "cite": "spec/features/nightly-harness.md#files", "condition": "a script that runs to an end. No script writes anything but its stated outputs"},
+    "qaMayRead": {"value": ["fixtures/plan.json", "fixtures/out/manifest.json", "the backup files"], "cite": "spec/features/nightly-harness.md#files", "condition": "never the code"},
+    "imageUnderTest": {"value": "tonight's image, unchanged. Every harness container runs it with its entrypoint overridden and tools/nightly/ mounted read-only. No step builds, commits or tags an image", "cite": "spec/features/nightly-harness.md#what-it-does"},
+    "harnessContainerFlags": {"value": "--read-only --cap-drop ALL --security-opt no-new-privileges:true on every harness container", "cite": "spec/features/nightly-harness.md#what-the-workflow-does"},
+    "networks": {"value": {"nightly": "created with --internal: the app, the stand-in and one leg of the relay, nothing on it has a route out", "nightly-edge": "an ordinary bridge: the relay's other leg, publishing 127.0.0.1:8000"}, "cite": "spec/features/nightly-harness.md#the-network"},
+    "standinAliases": {"value": ["api.frankfurter.dev", "api.nbp.pl"], "cite": "spec/features/nightly-harness.md#the-network", "condition": "network aliases of the stand-in on nightly, so Docker's resolver answers the providers' real names with its address"},
+    "trustBoundaries": {"value": {
+      "noRouteOut": "the app's only network is internal, so a lookup reaches the stand-in or nothing",
+      "trustByNameAndMount": "the stand-in is trusted by name and by a mounted trust store holding only the run's CA over the image's system store, never by a setting",
+      "caScope": "the CA vouches for the two provider names alone, for one day, and signs once. Its key is deleted as soon as the stand-in's certificate is signed, and it is name-constrained",
+      "qaOnlyThroughTools": "the tools have fixed names and argument shapes, take no command, path, container name or URL as an argument, and run with an empty environment, so no token reaches them. The walk step holds no unrestricted shell",
+      "serverTextIsUntrusted": "the log and the request list return to qa as JSON strings, never interpreted",
+      "fixturePasswordsArePublic": "committed in the plan, they open only throwaway vaults on an instance nobody outside the runner can reach, and are never reused",
+      "preparedDataStaysOnRunner": "the output directory and the TLS directory are never uploaded as artifacts"
+    }, "cite": "spec/features/nightly-harness.md#trust-boundaries"},
+    "ca": {
+      "command": {"value": "python3 tools/nightly/ca.py <dir>, running the openssl command line with argument lists and never a shell. <dir> must be empty or absent", "cite": "spec/features/nightly-harness.md#the-runs-certificate-authority"},
+      "outputs": {"value": {"ca.pem": "the CA certificate", "leaf.pem": "the stand-in's certificate", "leaf.key": "its private key, mode 0600", "trust/ca-certificates.crt": "ca.pem, byte for byte", "trust/<subject hash>.0": "ca.pem again, named by openssl x509 -subject_hash"}, "cite": "spec/features/nightly-harness.md#the-runs-certificate-authority"},
+      "caPrivateKey": {"value": "exists only in a temporary directory deleted before the script exits, whether or not signing succeeded", "cite": "spec/features/nightly-harness.md#the-runs-certificate-authority"},
+      "certificateFields": {"value": {
+        "key": {"ca": "EC P-256", "leaf": "EC P-256"},
+        "signature": {"ca": "ecdsa-with-SHA256", "leaf": "ecdsa-with-SHA256, by the CA"},
+        "validity": {"ca": "from now, 1 day", "leaf": "from now, 1 day"},
+        "subject": {"ca": "CN=Solvent nightly CA", "leaf": "CN=api.frankfurter.dev"},
+        "serial": {"ca": "128 random bits", "leaf": "128 random bits"},
+        "basicConstraints": {"ca": "critical, CA:TRUE, pathlen:0", "leaf": "critical, CA:FALSE"},
+        "keyUsage": {"ca": "critical, keyCertSign, cRLSign", "leaf": "critical, digitalSignature"},
+        "extendedKeyUsage": {"ca": "none", "leaf": "serverAuth"},
+        "subjectAltName": {"ca": "none", "leaf": "DNS:api.frankfurter.dev, DNS:api.nbp.pl"},
+        "nameConstraints": {"ca": "critical, permitted DNS:api.frankfurter.dev and DNS:api.nbp.pl, excluded IP:0.0.0.0/0.0.0.0 and IP:::/0", "leaf": "none"},
+        "keyIdentifiers": {"ca": "subjectKeyIdentifier", "leaf": "subjectKeyIdentifier, authorityKeyIdentifier"}
+      }, "cite": "spec/features/nightly-harness.md#the-runs-certificate-authority"},
+      "strictness": {"value": "both conform to RFC 5280 as OpenSSL's X509_V_FLAG_X509_STRICT checks it, because the image's Python enables that flag in its default context and would otherwise refuse the stand-in", "cite": "spec/features/nightly-harness.md#the-runs-certificate-authority"},
+      "mount": {"value": "trust/ read-only at /etc/ssl/certs in the app container, the image's OpenSSL CA directory", "cite": "spec/features/nightly-harness.md#the-runs-certificate-authority"}
+    },
+    "standin": {
+      "command": {"value": "python /harness/standin.py --cert <leaf.pem> --key <leaf.key> --state <dir> [--port 443], in a container of tonight's image on nightly", "cite": "spec/features/nightly-harness.md#the-stand-in"},
+      "server": {"value": "HTTPS only, TLS 1.2 or later, a ThreadingHTTPServer behind ssl.SSLContext(PROTOCOL_TLS_SERVER) holding the leaf alone. Routes on the Host header, and any other host gets 421 with an empty body", "cite": "spec/features/nightly-harness.md#the-stand-in"},
+      "answers": {"value": [
+        {"host": "api.frankfurter.dev", "request": "GET /v1/<D>?base=<Q>, Q a known currency, D on or after 1999-01-04", "answer": "200, {\"amount\": 1.0, \"base\": Q, \"date\": <last publication day <= D>, \"rates\": {C: ...}} for every known C != Q"},
+        {"host": "api.frankfurter.dev", "request": "anything else", "answer": "404, {\"message\": \"not found\"}"},
+        {"host": "api.nbp.pl", "request": "GET /api/cenyzlota/<S>/<E>?format=json, S <= E, span at most 93 days, a publication day in range", "answer": "200, [{\"data\": <day>, \"cena\": ...}, ...], every publication day in range, ascending"},
+        {"host": "api.nbp.pl", "request": "same, no publication day in range", "answer": "404, 'Not Found - Brak danych' as text/plain"},
+        {"host": "api.nbp.pl", "request": "same, S > E or span over 93 days", "answer": "400, 'Bad Request' as text/plain"},
+        {"host": "api.nbp.pl", "request": "anything else", "answer": "404, 'Not Found' as text/plain"}
+      ], "cite": "spec/features/nightly-harness.md#what-it-answers"},
+      "jsonContentType": {"value": "application/json; charset=utf-8", "cite": "spec/features/nightly-harness.md#what-it-answers"},
+      "statusesAreTheProvidersOwn": {"value": "outside Solvent's status set", "cite": "spec/features/nightly-harness.md#the-stand-in"},
+      "failureModes": {"value": "<state>/modes.json is {\"frankfurter\": \"up\" | \"down\", \"nbp\": \"up\" | \"down\"}, read on every request. Absent, unreadable or malformed, both sources are up. A source that is down answers every request 503 with an empty body, after recording it", "cite": "spec/features/nightly-harness.md#failure-modes"},
+      "requestList": {"value": {"file": "<state>/requests.jsonl", "writing": "one line per request, appended before the answer is sent, the file opened, appended and closed under a lock per request", "fields": ["seq", "at", "sni", "host", "method", "target", "headers", "body", "mode", "status"], "seq": "counts from 1 and continues from the file's existing line count at start", "targetAndHeaders": "exactly as received, in order. headers is a list of [name, value] pairs", "body": "the received body decoded as Latin-1, up to 64 KiB", "at": "ISO 8601 with +00:00, as in 2026-07-31T01:12:09+00:00", "unparsableRequest": "still a line, with what could be read and status as sent"}, "cite": "spec/features/nightly-harness.md#the-request-list"}
+    },
+    "knownPrices": {
+      "home": {"value": "prices.py is the one home of every price the stand-in publishes. A price is a pure function of the source, the date and the currency", "cite": "spec/features/nightly-harness.md#known-prices"},
+      "publicationDays": {"value": "Monday to Friday, no holidays, up to and including the stand-in's current UTC date. Frankfurter publishes from 1999-01-04 and NBP from 2013-01-02, the start of the real series the app calls and each symbol's date floor. The app sends no earlier date, so the stand-in's 404 before them is never exercised by it", "cite": "spec/features/nightly-harness.md#known-prices"},
+      "currencies": {"value": "Frankfurter's list, the same set as the seeded currency half of the symbol table, each with a reference value ref[C], units of C per euro, in a constant table in prices.py, with ref[\"EUR\"] = 1", "cite": "spec/features/nightly-harness.md#known-prices"},
+      "frankfurterFormula": {"value": "for publication day p, base Q and symbol C != Q: rates[C] = ref[C] / ref[Q] x f(p), rounded half-even to 5 significant digits, where f(p) = 1 + ((p.toordinal() mod 101) - 50) / 2000", "cite": "spec/features/nightly-harness.md#known-prices"},
+      "nbpFormula": {"value": "for publication day p: cena = 250 x g(p), rounded half-even to 2 decimal places, where g(p) = 1 + ((p.toordinal() mod 89) - 44) / 1000", "cite": "spec/features/nightly-harness.md#known-prices"},
+      "arithmetic": {"value": "decimal.Decimal in the default context. A value is written into JSON as a number with exactly those digits, so the app's parse through float and str returns the same decimal", "cite": "spec/features/nightly-harness.md#known-prices"},
+      "knownTable": {"value": "prices.known_table(date, quote) is what /api/rates must answer for the whole table on that date and quote, without cached: every currency but quote, and XAU-g and XAU-ozt where NBP published within the 14-day window, each {rate, base, asOf, source}. It applies rate-lookup.md's composition exactly as pinned in Providers", "cite": "spec/features/nightly-harness.md#known-prices"}
+    },
+    "relay": {"value": "python /harness/relay.py --listen 0.0.0.0:8000 --to solvent:8000, in a container of tonight's image. It copies bytes both ways between each accepted connection and one new connection to the fixed target, closes both when either side closes, and reads, logs and alters nothing. It is the runner's only way to the app, and the app sees it as every client's peer", "cite": "spec/features/nightly-harness.md#the-relay"},
+    "sources": {
+      "command": {"value": "python /harness/sources.py check|probe, in a container of tonight's image with PYTHONPATH=/app, importing FX_URL, NBP_URL, USER_AGENT, EGRESS_TIMEOUT_SECONDS, MAX_RESPONSE_BYTES and SEEDED_SYMBOLS from solvent.rates and opening each URL with the default context and redirects off, as the app does", "cite": "spec/features/nightly-harness.md#the-source-checks"},
+      "request": {"value": "one request to each source, for quote CHF and the date D seven days before the current UTC date (NBP from D - 14 days to D)", "cite": "spec/features/nightly-harness.md#the-source-checks"},
+      "outputLine": {"value": "<frankfurter|nbp> <ok|no-answer|changed> <reason>, one per source. The reason names the status, exception class or first shape violation, never the body", "cite": "spec/features/nightly-harness.md#the-source-checks"},
+      "frankfurterShape": {"value": "an object whose base is CHF, whose date is an ISO date within [D - 7 days, D], and whose rates maps three-letter upper-case codes to numbers above zero, every seeded currency but CHF among them. A boolean is not a number", "cite": "spec/features/nightly-harness.md#the-source-checks"},
+      "nbpShape": {"value": "a non-empty array, ascending by data, of objects whose data is an ISO date within [D - 14 days, D] and whose cena is a number above zero. A boolean is not a number", "cite": "spec/features/nightly-harness.md#the-source-checks"},
+      "checkOutcomes": {"value": {
+        "no-answer": "name resolution, connection or TLS failure, a timeout, 429 or any 5xx",
+        "changed": "any other status but 200, 3xx included because the app follows no redirect. A 200 body over the size cap, not JSON, or off the shape",
+        "ok": "200 with the shape"
+      }, "cite": "spec/features/nightly-harness.md#the-source-checks"},
+      "checkRuns": {"value": "once a night against the real sources, in the build job, on the default bridge network. Exits 1 when any source is changed and 0 otherwise. Its no-answer lines are the note in the run's summary", "cite": "spec/features/nightly-harness.md#the-source-checks"},
+      "probeRuns": {"value": "per shard against the stand-in, on nightly with trust/ mounted as in the app. Exits 0 only when both sources are ok and a TCP connection to 1.1.1.1:443 does not open within 3 seconds, which proves the trust store, the aliases and the missing route out together", "cite": "spec/features/nightly-harness.md#the-source-checks"}
+    },
+    "coverageNames": {"value": ["household", "long-history", "many-dimension-values", "rate-edited-long-ago", "no-source-unit", "own-unit", "archived-holding", "other-main-currency", "damaged-record", "same-date-pair", "older-vault", "empty-vault", "aged-session", "expired-invite", "current-backup", "older-backup", "harness-admin"], "cite": "spec/features/nightly-harness.md#the-plan", "condition": "each must be covered by at least one prepared item, a test fails a plan that leaves one out, and prepare exits 1 naming it. What each item must be is stated in the plan table there"},
+    "coverageDefinitions": {"value": {
+      "long-history": "every month end from before 2013-01-02 through the last month end before today, holding the main currency, USD, XAU-g and a debt. Gold dates before 2013-01-02 carry a price typed by hand",
+      "many-dimension-values": "a dimension with at least five values, each held by at least one holding",
+      "rate-edited-long-ago": "a proposed rate more than five years back, edited to a figure other than the known price, and a holding whose latest quantity sits on that date",
+      "no-source-unit": "a holding in XAG-ozt, priced by hand",
+      "own-unit": "a holding in a unit outside the symbol table, priced by hand on one old date only",
+      "archived-holding": "archived on a recording date at which every unit already has a price, so archiving makes no lookup",
+      "other-main-currency": "a vault whose main currency is EUR",
+      "damaged-record": "a snapshot encrypted under the AAD of another record_id, so it fails authentication",
+      "older-vault": "the credential's KDF envelope has m = 32768 and is otherwise the default",
+      "aged-session": "issued 12 hours 5 minutes before patch.py ran and last active 1 minute before it",
+      "expired-invite": "a vault-owner invite that expired one day before patch.py ran",
+      "current-backup": "tonight's export of the long-history vault",
+      "older-backup": "fixtures/backup-format-1.json"
+    }, "cite": "spec/features/nightly-harness.md#the-plan"},
+    "planUniqueness": {"value": "neither the damaged record nor the pair is its holding's latest quantity, and neither sits on a holding's archive date, so every expected total has exactly one correct value. Every other quantity and rate in the plan is one the app's own screens could write", "cite": "spec/features/nightly-harness.md#the-plan"},
+    "prepare": {
+      "command": {"value": "python3 tools/nightly/prices.py prepare <plan> <out>, expanding the plan against the current UTC date", "cite": "spec/features/nightly-harness.md#pricespy-prepare"},
+      "outputs": {"value": {"<out>/script.json": "per account, in order, every write the generator makes, with concrete dates, values and, for each proposed rate, the proposal from known_table", "<out>/expected.json": "per vault, and for each backup file, the expected figures under both pricing modes"}, "cite": "spec/features/nightly-harness.md#pricespy-prepare"},
+      "expectedFigures": {"value": "computed independently of the app in Decimal. Each active, priced holding's figure is its latest quantity times its price (the latest price, or the price as recorded), rounded half-even at scale 12, as static/js/decimal.js multiplies. The total is the sum of those at scale 12. assets sums the figures above zero and debts those below. Each is given as exact (scale 12 without trailing zeros) and display (rounded half-even to the places the vault's profile shows, no grouping, '-' for a negative). Archived holdings, holdings with no quantity and holdings with no price are listed by name under excluded, with the reason", "cite": "spec/features/nightly-harness.md#pricespy-prepare"},
+      "dateReadOnce": {"value": "prepare reads the date once and writes it as the manifest's today, and the expected figures hold for that date, since no later price is written", "cite": "spec/features/nightly-harness.md#edge-cases"}
+    },
+    "fixtures": {
+      "command": {"value": "node tools/nightly/fixtures.mjs --base <url> --invite <path> --plan <plan> --out <dir>, with CHROME naming the browser. Reads <dir>/script.json and <dir>/expected.json", "cite": "spec/features/nightly-harness.md#fixturesmjs"},
+      "registration": {"value": "accounts register through /register?invite= as the page does, one fresh Chrome profile per account. --invite is a CLI-minted administrator invite, which registers harness-admin. Every other invite is made through POST /api/admin/invites from that administrator's page, the expired one with the plan's label", "cite": "spec/features/nightly-harness.md#fixturesmjs"},
+      "writes": {"value": "only through the served modules /static/js/session.js, writes.js, crypto.js and api.js: saveProfile, saveHolding, saveSnapshot, refreshPrices with the script's proposals, saveRate with editedRatePayload, and archiveHolding. The damaged record and the pair are the exceptions, written as tests/browser/harness.mjs plant writes. No record is written by the generator's own crypto", "cite": "spec/features/nightly-harness.md#fixturesmjs"},
+      "noLookup": {"value": "proposals come from the script, so the generator sends nothing to /api/rates and spends no part of any limit", "cite": "spec/features/nightly-harness.md#fixturesmjs"},
+      "olderVault": {"value": "rotated through /api/auth/upgrade-kdf with keys derived at m = 32768, as tests/browser/harness.mjs makeStale does, and patch.py then records that parameter", "cite": "spec/features/nightly-harness.md#fixturesmjs"},
+      "currentBackup": {"value": "the body of GET /api/export, fetched by the page with the X-Solvent-Request header", "cite": "spec/features/nightly-harness.md#fixturesmjs"},
+      "agedCookie": {"value": "read with CDP Network.getCookies in that account's profile, right after it registers", "cite": "spec/features/nightly-harness.md#fixturesmjs"},
+      "outputs": {"value": {"manifest.json": "the manifest", "backup-<username>.json": "each current backup", "patches.json": "the dating back for patch.py", "storage-state.json": "Playwright storage state, {\"cookies\": [<the aged session's cookie>], \"origins\": []}, with expires, httpOnly, secure and sameSite as CDP reported them"}, "cite": "spec/features/nightly-harness.md#fixturesmjs"}
+    },
+    "manifest": {"value": {
+      "top": ["app", "today", "accounts", "invites", "browserSession", "backups", "expected"],
+      "app": "http://localhost:8000",
+      "accounts[]": ["username", "password", "kind", "mainCurrency", "covers", "about"],
+      "invites[]": ["path (/register?invite=...)", "covers"],
+      "browserSession": ["username", "covers", "about"],
+      "backups[]": ["file (tools/nightly/fixtures/out/backup-....json)", "password", "formatVersion", "covers"],
+      "expected": "keyed by username or backup file, each {latest, asRecorded}, each holding total, assets, debts, holdings (by name) and excluded (by name, with the reason). Every figure is {exact, display}",
+      "coverageRule": "every coverage name appears under some covers, and qa reads nothing else to know what is prepared"
+    }, "cite": "spec/features/nightly-harness.md#the-manifest"},
+    "patch": {
+      "command": {"value": "python /harness/patch.py <database> <patches.json>, in a one-off container of tonight's image with --network none, the app's volume, and the app stopped", "cite": "spec/features/nightly-harness.md#dating-back"},
+      "patchesShape": {"value": {"sessions": ["username", "issuedMinutesAgo", "lastActiveMinutesAgo"], "invites": ["label", "createdMinutesAgo", "expiresMinutesAgo"], "credentials": ["username", "kdfMemory"]}, "example": {"issuedMinutesAgo": 725, "lastActiveMinutesAgo": 1, "createdMinutesAgo": 11520, "expiresMinutesAgo": 1440, "kdfMemory": 32768}, "cite": "spec/features/nightly-harness.md#dating-back"},
+      "times": {"value": "count back from patch.py's own clock and are written as the app writes them, YYYY-MM-DDTHH:MM:SS+00:00", "cite": "spec/features/nightly-harness.md#dating-back"},
+      "statements": {"value": [
+        "UPDATE sessions SET issued_at = ?, last_active_at = ? WHERE principal_id = (SELECT id FROM principals WHERE username = ?)",
+        "UPDATE invites SET created_at = ?, expires_at = ? WHERE label = ? AND status = 'pending'",
+        "UPDATE credentials SET params = json_set(params, '$.kdf.m', ?) WHERE principal_id = (SELECT id FROM principals WHERE username = ?) AND method = 'password'"
+      ], "cite": "spec/features/nightly-harness.md#dating-back", "condition": "these statements, with every value bound as a parameter, are all it runs, and it touches no other table"},
+      "transaction": {"value": "one transaction. A statement that changes no row, or a credential change to a value outside 8192 <= m < 65536, rolls it all back and exits 1. An unknown key exits 2 before anything is opened", "cite": "spec/features/nightly-harness.md#dating-back"},
+      "connection": {"value": "opens the file through sqlite3 with PRAGMA secure_delete = ON, as the app does", "cite": "spec/features/nightly-harness.md#dating-back"}
+    },
+    "olderBackup": {"value": "fixtures/backup-format-1.json was made once, by prepare and fixtures.mjs from backup-format-1.plan.json, at the server's default KDF envelope of that build, with every date absolute. It has formatVersion 1 and a kdf envelope at m = 65536, t = 3, p = 1. Its plan and expected files are kept and none of the three is ever regenerated. The manifest carries its password and points at it", "cite": "spec/features/nightly-harness.md#the-older-backup-file, spec/features/nightly-harness.md#acceptance-criteria"},
+    "mcp": {
+      "command": {"value": "env -i PATH=/usr/bin:/bin python3 tools/nightly/mcp.py --container solvent --state <dir> --url http://localhost:8000. An MCP server over stdio, JSON-RPC 2.0, one message per line, no network listener", "cite": "spec/features/nightly-harness.md#the-harness-tools"},
+      "protocol": {"value": "initialize answers with the protocolVersion the client sent, capabilities {tools: {}} and serverInfo {name: \"harness\"}. tools/list lists the tools below and nothing else. ping answers {}. Any other method is error -32601. Notifications get no reply", "cite": "spec/features/nightly-harness.md#the-harness-tools"},
+      "schemas": {"value": "every tool's inputSchema sets additionalProperties: false. An argument outside its schema returns isError: true naming the argument, and does nothing. A result is one text content item holding a JSON document", "cite": "spec/features/nightly-harness.md#the-harness-tools"},
+      "docker": {"value": "runs with an argument list, never a shell. The container name and the state directory come only from the server's own arguments", "cite": "spec/features/nightly-harness.md#the-harness-tools"},
+      "startCount": {"value": "at start it records the request list's line count, and price_requests shows only requests after it", "cite": "spec/features/nightly-harness.md#the-harness-tools"},
+      "tools": {"value": {
+        "server_log": {"arguments": "since: integer >= 0, default 0", "does": "docker logs <container>, stderr merged into stdout", "returns": "{\"lines\": [...], \"next\": n}, at most 500 lines from line since"},
+        "price_requests": {"arguments": "since: integer >= 0, default 0", "does": "reads requests.jsonl", "returns": "{\"requests\": [...], \"next\": seq}, at most 200 entries with seq above both since and the start count"},
+        "price_source": {"arguments": "source: frankfurter | nbp, state: up | down", "does": "writes modes.json through a temporary file and os.replace", "returns": "the modes now in force"},
+        "known_prices": {"arguments": "date: YYYY-MM-DD on or before today, quote: a known currency", "does": "prices.known_table", "returns": "the table, independent of the modes"},
+        "app_stop": {"arguments": "none", "does": "docker stop --time 10 <container>", "returns": "{\"state\": \"stopped\"}"},
+        "app_start": {"arguments": "none", "does": "docker start <container>, then polls <url>/login until it answers 200, at most 60 seconds", "returns": "{\"state\": \"running\"}, or isError: true with {\"state\": \"not answering\"}"}
+      }, "cite": "spec/features/nightly-harness.md#the-harness-tools"},
+      "breakerReset": {"value": "app_stop and app_start reset the app's circuit breaker, because it lives in process memory. app_start on a running container changes nothing and answers running", "cite": "spec/features/nightly-harness.md#edge-cases"}
+    },
+    "workflowRequirements": {
+      "buildJob": {"value": "after the image is built and before any shard starts, a step with the id sources runs sources.py check in a container of tonight's image on the default network, appends its output to the step summary, and fails the job on exit 1", "cite": "spec/features/nightly-harness.md#what-the-workflow-does"},
+      "shardSteps": {"value": [
+        "1 run the setup action, for Node and CHROME",
+        "2 ca.py \"$RUNNER_TEMP/tls\", and create $RUNNER_TEMP/standin",
+        "3 create nightly with --internal and nightly-edge",
+        "4 start standin on nightly with both aliases, as the runner's own user, with --sysctl net.ipv4.ip_unprivileged_port_start=443, tls/ and tools/nightly/ read-only and standin/ writable",
+        "5 start solvent on nightly alone, with the hardening it has today, a fresh SECRET_KEY, and tls/trust/ read-only at /etc/ssl/certs",
+        "6 start relay on nightly-edge publishing 127.0.0.1:8000:8000, then connect it to nightly",
+        "7 run sources.py probe in a one-off container on nightly with tls/trust/ mounted as in step 5",
+        "8 wait for /login, mint an administrator invite, run prices.py prepare and then fixtures.mjs with that invite",
+        "9 stop solvent, run patch.py against its volume, start it, and wait for /login",
+        "10 mint qa's administrator invite with --force, because harness-admin exists"
+      ], "cite": "spec/features/nightly-harness.md#what-the-workflow-does", "condition": "steps whose failure fails the shard as the harness"},
+      "walkStep": {"value": "passes tools/nightly/fixtures/out/manifest.json as the manifest, adds the harness MCP server and --storage-state tools/nightly/fixtures/out/storage-state.json to the Playwright server's arguments, allows mcp__harness and mcp__playwright and no Bash beyond gh issue list and gh issue view. On failure it prints docker logs of solvent and standin", "cite": "spec/features/nightly-harness.md#what-the-workflow-does"},
+      "owner": {"value": ".github/workflows/nightly.yml is the client's. An agent cannot write it, so these requirements reach it as the exact change in the pull request and its comment on the issue (CLAUDE.md, When something fails)", "cite": "spec/features/nightly-harness.md#what-the-workflow-does"}
+    },
+    "failureBehaviour": {"value": {
+      "sourceChanged": "the build job fails at sources, before any shard, and the failure issue names that step",
+      "sourceDoesNotAnswer": "noted in the summary and the night goes on, since the stand-in answers the shards either way",
+      "trustStoreMoved": "the probe fails the shard as the harness, rather than every lookup failing as a finding",
+      "breakerOpened": "the app skips that source for the cool-off after it comes back up, and app_stop then app_start resets it"
+    }, "cite": "spec/features/nightly-harness.md#edge-cases"}
+  },
+  "verify": {
+    "criteria": {"file": "spec/features/nightly-harness.md", "section": "Acceptance criteria"},
+    "productCriteria": [],
+    "fixtures": [
+      "a built openssl command line, for reading ca.pem and leaf.pem back with openssl x509 -text, and a recursive listing of the output directory and the system's temporary directory afterwards for private keys",
+      "a Python 3.13 default ssl context loaded with ca.pem alone, handshaking with standin.py on 127.0.0.1 under each server_hostname",
+      "standin.py started with a state directory, with modes.json absent, holding invalid JSON, and setting each source down in turn, and a restart of it over an existing requests.jsonl",
+      "requests the stand-in cannot parse, and a weekend date and a weekday-free range for the answers table",
+      "the app's opener stubbed to answer from standin.py's routing, for the known_table equality check on a weekday, a weekend, the day before 2013-01-02 and today, for CHF, EUR and PLN",
+      "the seeded currency list read from solvent.rates, for the prices.py list equality",
+      "sources.py's classifier fed a timeout, a refused connection, 429, 503, 301, 404, a non-JSON 200, a body over the cap, a missing PLN, a missing seeded currency, a boolean rate, an empty NBP array, a date outside the window, and the real providers' documented shapes",
+      "a pair of sockets for relay.py, to compare bytes in both directions and closure",
+      "a plan missing each coverage name in turn, a plan whose damaged record is its holding's latest quantity, and a plan whose pair is, for prepare's refusals",
+      "a hand-computed vault covering an archived holding, an unpriced one, a main-currency one, a debt and an edited rate, for expected.json under both pricing modes",
+      "a fresh instance of the app and a headless Chrome, for fixtures.mjs and then patch.py on that instance's database, with a request log that shows no call to /api/rates",
+      "a dump of every table before and after patch.py, a patch naming an unknown username, an unknown label, and a kdfMemory of 65536",
+      "backup-format-1.json with its plan and expected files, committed",
+      "a stand-in docker first on PATH, recording its argument list, for server_log, app_stop and app_start",
+      "mcp.py driven over stdio with an extra argument, a wrong enum value and a malformed date",
+      "GH_TOKEN and CLAUDE_CODE_OAUTH_TOKEN set in the parent's environment when mcp.py starts under env -i, read back from /proc/<pid>/environ",
+      "every file under tools/nightly/, parsed for its imports"
+    ],
+    "focus": [
+      "the CA's private key must be shown to exist nowhere afterwards by listing both the output directory and the system's temporary directory, and the script must be made to fail mid-signing to show the key is still deleted. A check of the success path alone passes a key left behind by an error",
+      "every certificate field in the table must be read back from the certificate with openssl x509 -text, and the handshake must be shown to fail under any other server name. A handshake that succeeds under one name shows nothing about the name constraints or the SAN",
+      "the handshake test must use a default Python context, because that context enables X509_V_FLAG_X509_STRICT. A hand-built context with verification relaxed passes a certificate the image would refuse",
+      "known_table must equal the app's own /api/rates for the whole table on all four dates and three quotes, with the app's opener stubbed to answer from the stand-in's routing. Comparing known_table to itself, or to a hand-written figure, shows nothing about composition order or rounding",
+      "a source that is down must be recorded with mode: down and still answered 503. A stand-in that skips the record when down leaves qa blind to the very request that failed",
+      "seq must be shown to continue across a restart, and a malformed request must still be a line with every field. Asserting only the happy path passes a stand-in that logs after parsing",
+      "sources.py must be shown to classify 3xx as changed and 429 and 5xx as no-answer. The two sets differ by one status and an implementation that treats every non-200 alike passes half the table",
+      "probe's missing-route-out check must be run on the real nightly network. A probe that only reaches the stand-in passes when the network has a route out",
+      "prepare's refusals need a plan whose damaged record or pair is its holding's latest quantity, not only a plan missing a coverage name. The first would give two correct totals and no oracle",
+      "fixtures.mjs must be shown to write no record by its own crypto, which a request log cannot show. Assert the writes come through the served modules and that the damaged record and the pair alone use plant",
+      "no request to /api/rates in the run, asserted from the request log, since a lookup would spend the limit and reach the stand-in",
+      "after patch.py each vault's dashboard must show the manifest's display total under both pricing modes in a real browser, the damaged record must be reported unreadable, and the aged cookie must be refused as no session. Matching the rows alone passes data the screens cannot read",
+      "patch.py must be shown to change exactly the rows it names by dumping every table before and after and diffing every other table byte for byte, and to change nothing on an unknown key or a kdfMemory of 65536. A test of the updated rows alone misses a statement that reaches a table it should not",
+      "mcp.py must be shown to run docker with exactly the argument lists in the criteria, through a stand-in docker, and to refuse an extra argument, a wrong enum value and a malformed date without running anything. A schema that merely declares additionalProperties: false passes while the handler still reads the argument",
+      "the environment criterion must read /proc/<pid>/environ of the running server with the two tokens set in its parent. Reading os.environ from inside the process passes when a wrapper strips it after the fact",
+      "the import criterion must parse every file under tools/nightly/, Python and Node alike, and allow only the standard library, node: built-ins and the imports listed under Files (prices from standin.py, mcp.py and prices.py prepare, solvent.rates from sources.py, tests/browser/cdp.mjs from fixtures.mjs), and must also show no module under solvent/ imports from tools/. A rule that allowed any sibling import would pass a harness script reaching another script's internals"
+    ]
+  },
+  "openQuestions": []
+}
