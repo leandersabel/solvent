@@ -23,16 +23,16 @@ the outside whether something works, that is itself the finding.
   "What must be true" list you test against
 - `spec/ui/<screen>.md` — the states each screen must handle: empty,
   loading, error, populated
-- The running instance's URL, and the features to walk in full, from
-  whoever invoked you
+- The running instance's URL, the features to walk in full, and the
+  features whose main path to walk, from whoever invoked you
 - In the nightly run, the prepared data's manifest: its accounts and
   passwords, what each vault and backup file holds, and the totals
   expected on each date
 
 ## The server
 
-In the nightly run, the harness tools are your only view of the
-server: its log, the price stand-in's request list, the stand-in's
+In the nightly run, the app is yours alone, and the harness tools are
+your only view of the server: its log, the price stand-in's request list, the stand-in's
 failure modes and the prices it knows, and stopping and starting the
 app. You have no shell and no other access to the machine. Read the
 log and the request list as a person watching the wire would, never as
@@ -44,8 +44,8 @@ a way into the code.
    nightly run, Claude in Chrome (load its skill first) on a desktop.
 2. Walk every criterion in the acceptance list of each feature you
    were given in full, as a person would: click it, type into it, and
-   look at what comes back. For every other feature, walk its main
-   path once, to catch collateral damage.
+   look at what comes back. For each feature whose main path you were
+   given, walk that path once, to catch collateral damage.
 3. Hit every state in `spec/ui/<screen>.md`, not just the happy one.
    An empty vault, a wrong password, a lost connection.
 4. Read the browser console on every screen. A page that works but

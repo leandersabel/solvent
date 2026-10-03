@@ -304,14 +304,18 @@ found and even when QA saw it once.
 ### Nightly and stable
 
 - Every night that code on `master` changed since the last version,
-  `.github/workflows/nightly.yml` builds the image, runs the suite
-  against that commit, starts the image hardened on a network with no
-  route out, and runs `qa` against the running app in headless Chrome
-  through the Playwright MCP server. `qa` walks the full acceptance
-  list of every feature touched by an issue closed since the last
-  version, and a smoke path through the rest. The client can start the
-  same run by hand. Claude in Chrome is not used here, because it needs
-  a desktop browser.
+  `.github/workflows/nightly.yml` builds the image once and runs the
+  suite against that commit. `qa` walks the full acceptance list of
+  every feature touched by an issue closed since the last version, and
+  a smoke path through the rest. The client can start the same run by
+  hand.
+- The walk is split into shards that run at once, so the night stays
+  short as features are added. Each shard starts its own instance of
+  the image, hardened on a network of its own with no route out, and
+  runs `qa` against it in headless Chrome through the Playwright MCP
+  server. So shards never share data, and each spends its own sign-in
+  budget at the shipped defaults. Claude in Chrome is not used here,
+  because it needs a desktop browser.
 - On that network the nightly harness runs a stand-in that answers as
   the price sources, under their real names. The app trusts it through
   a certificate authority made for the run and handed in at start,
@@ -319,11 +323,11 @@ found and even when QA saw it once.
 - The app starts on prepared vaults and backup files, made with the
   app's own browser code, with whatever a promise needs time for dated
   back.
-- Before the app starts, a step without a model makes one real lookup
+- Before any instance starts, a step without a model makes one real lookup
   to each price source. A source that answers in a changed shape fails
   the night before QA. One that does not answer is noted in the run's
   summary, and the night goes on.
-- `qa` reaches the server only through the harness tools: the server
+- `qa` reaches its shard's server only through the harness tools: the server
   log, the stand-in's request list and failure modes, and stopping and
   starting the app. It has no other access to the machine.
 - The image the nightly publishes is the one it tested. Nothing of the
@@ -335,11 +339,12 @@ found and even when QA saw it once.
   comment on the open one it repeats. A finding QA saw once says so in
   its title. Each feature with criteria QA could not check gets an
   issue saying which and why, the same way. QA only records them during
-  the walk, and a short run after it files them with a fresh token, so
-  a long walk never outlasts the token. What that run could not file,
+  the walk. Once every shard has finished, a short run merges what the
+  shards recorded, and another files it with a fresh token, so a long
+  walk never outlasts the token. What that run could not file,
   the workflow files the same way, as `github-actions[bot]`, before the
   night is judged.
-- A night passes when the suite, the image, the harness and QA finish,
+- A night passes when the suite, the image, the harness and every QA shard finish,
   no price source answers in a changed shape, and nothing holds back
   the version: no open problem rated high or critical (Severity), no
   such issue closed by anyone but the client without its fix in the
