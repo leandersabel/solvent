@@ -14,6 +14,8 @@ RUN = os.environ["RUN"]
 # The nightly's steps in order, by id, and what it means when one fails.
 CAUSES = {
     "suite": "the test suite failed",
+    "sources": "a real price source answers in a changed shape",
+    "harness": "the harness did not start",
     "app": "the image did not build or start",
     "qa": "QA did not finish",
     "qa-done": "QA did not finish",

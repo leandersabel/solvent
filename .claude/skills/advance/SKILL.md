@@ -243,7 +243,10 @@ closing `<details>` block.
    block. Turn on auto-merge with squash.
 7. Reviewer findings still open: list them in the pull request's body
    and go to Stuck.
-8. Comment on the issue with the link.
+8. Comment on the issue with the link. When the issue also needs a
+   change to a workflow file, the pull request's body and this comment
+   carry it in a `<details>` block, ready for the client's own pull
+   request, with a `Closes` line for each issue only it covers.
 
 An implementation never changes `spec/requirements.md`,
 `spec/design/`, `.github/`, `.claude/`, `CLAUDE.md` or `SECURITY.md`.
