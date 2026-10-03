@@ -202,6 +202,7 @@ class Standin:
         self.pki, self.state, self.port = pki_dir, state, free_port()
         self.process = None
         self.context = ssl.create_default_context(cafile=str(pki_dir / "ca.pem"))
+        self.context.minimum_version = ssl.TLSVersion.TLSv1_2
 
     def start(self) -> None:
         self.process = subprocess.Popen(
@@ -374,6 +375,7 @@ def test_a_request_that_stalls_is_still_recorded_with_what_was_read(pki, tmp_pat
     running = standin.Standin(("127.0.0.1", 0), standin.make_context(str(pki[0] / "leaf.pem"), str(pki[0] / "leaf.key")), standin.State(tmp_path))
     threading.Thread(target=running.serve_forever, daemon=True).start()
     context = ssl.create_default_context(cafile=str(pki[0] / "ca.pem"))
+    context.minimum_version = ssl.TLSVersion.TLSv1_2
 
     def stalled(raw: bytes) -> bytes:
         with socket.create_connection(("127.0.0.1", running.server_address[1]), timeout=10) as raw_socket:
