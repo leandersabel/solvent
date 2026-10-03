@@ -103,7 +103,7 @@ def test_the_generator_writes_every_output_and_the_manifest_covers_every_name(ge
         *(c for b in manifest["backups"] for c in b["covers"]),
     }
     names = json.loads((generated.out / "script.json").read_text())["coverage"]
-    assert len(names) == 17 and set(names) <= covered
+    assert len(names) == 18 and set(names) <= covered
     assert manifest["invites"][0]["path"].startswith("/register?invite=")
     current, older = manifest["backups"]
     assert (current["file"], older["file"]) == (
@@ -142,7 +142,8 @@ def test_patch_changes_only_the_rows_it_names_and_the_aged_session_is_refused(ge
     conn.close()
 
 
-def test_each_dashboard_shows_the_manifests_totals_under_both_modes_and_the_damaged_record_is_unreadable(generated, patched):
+@pytest.fixture(scope="module")
+def dashboards(generated, patched):
     shown = subprocess.run(
         ["node", str(REPO_ROOT / "tests" / "browser" / "nightly.mjs")],
         cwd=REPO_ROOT,
@@ -150,7 +151,10 @@ def test_each_dashboard_shows_the_manifests_totals_under_both_modes_and_the_dama
         capture_output=True, text=True, timeout=900,
     )
     assert shown.returncode == 0, shown.stdout + shown.stderr
-    dashboards = json.loads(shown.stdout.strip().splitlines()[-1])
+    return json.loads(shown.stdout.strip().splitlines()[-1])
+
+
+def test_each_dashboard_shows_the_manifests_totals_under_both_modes_and_the_damaged_record_is_unreadable(generated, dashboards):
     vaults = [a["username"] for a in generated.manifest["accounts"] if a["kind"] == "vault_owner"]
     assert sorted(dashboards) == sorted(vaults)
     for username in vaults:
@@ -164,3 +168,9 @@ def test_each_dashboard_shows_the_manifests_totals_under_both_modes_and_the_dama
         assert dashboards[username]["unreadable"] == (1 if username == "mixed.owner" else 0), username
     mixed = generated.manifest["expected"]["mixed.owner"]
     assert mixed["latest"]["total"] != mixed["asRecorded"]["total"]
+
+
+def test_the_out_of_range_idle_lock_is_stored_as_zero_and_shown_as_five_minutes(generated, dashboards):
+    owner = next(a["username"] for a in generated.manifest["accounts"] if "idle-lock-out-of-range" in a["covers"])
+    assert (dashboards[owner]["storedIdleLock"], dashboards[owner]["shownIdleLock"]) == (0, "5")
+    assert [u for u, entry in dashboards.items() if "storedIdleLock" in entry] == [owner]

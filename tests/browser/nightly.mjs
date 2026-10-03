@@ -1,7 +1,8 @@
 // What each prepared vault shows on its dashboard, for
 // tests/test_nightly_browser.py: signs in to every vault owner in the
 // manifest and prints, as JSON, the figures under both pricing modes
-// and how many records the vault could not read.
+// how many records the vault could not read and, for the vault covering
+// idle-lock-out-of-range, the idle lock it stores and the one Settings shows.
 //
 // SOLVENT_BASE is the server and NIGHTLY_MANIFEST the manifest.
 import { readFileSync } from 'node:fs';
@@ -62,6 +63,14 @@ for (const account of manifest.accounts.filter((a) => a.kind === 'vault_owner'))
       entry.asRecorded = await read();
     }
     entry.unreadable = await page.eval("import('/static/js/session.js').then((s) => s.currentVault().unreadable.length)");
+    if (account.covers.includes('idle-lock-out-of-range')) {
+      entry.storedIdleLock = await page.eval("import('/static/js/session.js').then((s) => s.currentVault().profile.idleLockMinutes)");
+      await page.eval(`document.querySelector('.topbar nav a[href="#/settings"]').click()`);
+      await page.waitUntil("document.body.innerText.includes('Session and lock')", { label: 'the settings screen' });
+      entry.shownIdleLock = await page.eval(
+        "[...document.querySelectorAll('.card')].find((c) => c.textContent.includes('Session and lock')).querySelector('select').value",
+      );
+    }
     shown[account.username] = entry;
   } finally {
     opened.child.kill();
