@@ -226,7 +226,15 @@ and no refusal redirects. app-shell.md, The request gate, applies this.
 
 ## Tech stack
 
-- **Packaging**: one container image, which is what deploys.
+- **Packaging**: one container image, which is what deploys. It holds
+  `app.py`, `solvent/` and the dependencies `requirements.txt` pins, on
+  the base image, and nothing else: no test, no tool and nothing of the
+  nightly harness. The Dockerfile copies those paths by name, so the
+  build context's contents cannot widen it. The nightly tests that
+  image unchanged and publishes the one it tested (nightly-harness.md).
+  It has no setting that names a price source or a certificate
+  authority (rate-lookup.md, SSRF and egress hardening), so nothing
+  built for testing can redirect an installation's lookups.
 - **Base image**: the current Python release's `-slim` image, pinned by
   digest. The Dockerfile's `FROM` line is the one place the Python
   version is written, and CI tests on that same version, so Dependabot

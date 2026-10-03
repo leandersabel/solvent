@@ -87,18 +87,40 @@ asks questions rather than reporting answers.
 
 The proxy routes a request to a provider by the symbol's asset class.
 Each provider is a server-side constant — host, URL template, and any
-key — and never influenced by client input (see SSRF hardening below).
+key — and never influenced by client input or by any setting (SSRF
+and egress hardening, below).
+
+**Every proposal is composed in `Decimal` at the default context's 28
+significant digits and rounded once**, to 8 decimal places, half to
+even, written as a plain decimal string with no trailing zeros and no
+exponent. The steps before that rounding are pinned per provider below,
+so an independent computation in the same order reaches the same digits
+(nightly-harness.md, Known prices).
 
 ### FX
 
 **Frankfurter's public instance, `api.frankfurter.dev`.** HTTPS, no API
 key, no daily or monthly quota; requests are rate-limited only against
 abuse, and the operators ask heavy users to cache, which this design
-already does (see Caching). History goes back to 1948.
+already does (see Caching). The `/v1` endpoints the app calls serve the
+European Central Bank's reference rates, which begin on 1999-01-04,
+and that date is the FX floor (SSRF and egress hardening). Frankfurter
+advertises history back to 1948 from other central banks' series. It
+is not the API the app calls.
 
 - An FX symbol is the **base currency's ISO 4217 code** (`USD`, `EUR`),
   which is the holding's unit, and `quote` is the user's main currency.
   A unit names the base asset only (`manage-accounts.md`).
+- **Request**: `FX_URL`, `https://api.frankfurter.dev/v1/{date}?base={quote}`,
+  with headers `User-Agent: USER_AGENT`, which is
+  `Solvent/1.0 (self-hosted net worth tracker)`, and
+  `Accept: application/json`. Both providers front their public
+  instance with a CDN that refuses an unnamed client. One request
+  returns every currency against `quote`.
+- **Read**: `base`, which must equal `quote`; `date`, the publication
+  day, which becomes `asOf`; and `rates`, mapping each code to how many
+  of it one `quote` buys. The price of one unit of a code is
+  `1 / rates[code]`. Nothing else in the body is read.
 - The currency half of the operator's symbol table can be seeded
   directly from the provider's own currency list rather than typed by
   hand.
@@ -121,9 +143,13 @@ price of 1 g of fine gold (millesimal fineness 1000) in PLN, daily, from
 FX provider, and chosen for the same reasons: a central bank rather than
 a vendor, nothing to sign up for, and one host constant to unwind.
 
-- Lookup is a **range query**, not a single-date query: `GET
-  /api/cenyzlota/{date−14d}/{date}` returns only the days NBP actually
-  published, and the adapter takes the last entry on or before `date`.
+- Lookup is a **range query**, not a single-date query: `NBP_URL`,
+  `https://api.nbp.pl/api/cenyzlota/{start}/{end}?format=json` with
+  `start` 14 days before `date` and `end` equal to it, and the same
+  headers as the FX request. It returns only the days NBP actually
+  published, and the adapter takes the last entry on or before `date`,
+  reading its `cena`, PLN per gram, and its `data`, which becomes
+  `asOf`.
   That satisfies the prior-close rule in one request with no retry loop,
   and an empty result inside the window means No Content. A single-date
   query returns Not Found on every weekend and Polish holiday, so it is
@@ -136,7 +162,9 @@ a vendor, nothing to sign up for, and one host constant to unwind.
   (`"nbp+frankfurter"`, or `"nbp"` when the quote is PLN).
 - **Unit conversion is exact**: `XAU-g` takes NBP's figure directly,
   `XAU-ozt` multiplies by 31.1034768. Compose at full precision and
-  round once, at the end.
+  round once, at the end, in this order: `cena × (1 / rates["PLN"])`
+  from the `asOf` table (`cena` alone when the quote is PLN), then
+  `× 31.1034768` for `XAU-ozt`, then the rounding above.
 - **NBP's price trails the London fixing by one business day.** Its
   published price for date D is the previous business day's LBMA AM
   fixing at NBP's USD rate of that day, within 0.1%. So `asOf` is
@@ -368,12 +396,31 @@ host's network are reachable:
   the user's main currency on every request the vault ever makes.
 - `date` must parse as a calendar date, not be in the future, and not
   precede the floor configured **for that symbol** — 2013-01-02 for
-  gold, the provider's own history start for others. A single global
-  floor would either reject valid FX dates or wave through gold dates
-  the provider has no data for.
+  gold, 1999-01-04 for a currency, each provider's own history start.
+  A date before the floor is a Bad Request and reaches no provider. A
+  single global floor would either reject valid FX dates or wave
+  through gold dates the provider has no data for.
 - HTTP redirects are **disabled**, not followed to a validated target.
-- Egress has a hard timeout (5 s connect + read) and a response size cap.
+- Egress has a hard timeout, `EGRESS_TIMEOUT_SECONDS` = 5 for connect
+  and read together across one proxy request, and a response size cap,
+  `MAX_RESPONSE_BYTES` = 1 MiB.
+- `solvent.rates` exposes `FX_URL`, `NBP_URL`, `USER_AGENT`,
+  `EGRESS_TIMEOUT_SECONDS`, `MAX_RESPONSE_BYTES` and `SEEDED_SYMBOLS`
+  under those names, because the nightly source check imports them to
+  request exactly what the app requests (nightly-harness.md, The source
+  checks). Renaming one breaks that check.
 - Outbound requests go to HTTPS only, with certificate verification on.
+- **No setting names a provider.** No environment variable,
+  configuration value, command-line flag or request names a provider
+  host, a URL template or a certificate authority. Verification runs
+  against the image's system trust store at OpenSSL's default paths,
+  and the app adds no CA of its own. So nothing built for testing can
+  redirect an installation's lookups: the nightly harness reaches its
+  stand-in through name resolution and a trust store mounted over the
+  system's (nightly-harness.md).
+- A proxy in the deployment's `https_proxy`, which `urllib` honours, can
+  carry a connection and cannot change where it ends: the certificate
+  is still verified against the provider's own name.
 
 ## Rate limiting and failure
 
@@ -521,6 +568,20 @@ host's network are reachable:
   returned.
 - A gold request dated 2012-12-31 returns Bad Request.
 - `symbol=CHF&quote=CHF` returns `rate: "1"` with no outbound request.
+- Every outbound request is `FX_URL` or `NBP_URL` with only its
+  placeholders filled, carrying exactly the two pinned headers,
+  asserted against a stubbed opener for an FX table, gold quoted in PLN
+  and gold quoted in CHF.
+- A proposal equals the pinned composition: with a stub publishing
+  `rates["USD"] = 1.0876` and `rates["PLN"] = 4.2537` against CHF and
+  `cena = 251.37`, `USD` is `0.91945568` and `XAU-g` and `XAU-ozt` each
+  equal `cena × (1 / 4.2537)`, the latter times 31.1034768, computed in
+  `Decimal` and rounded half-even to 8 places, digit for digit.
+- The environment variables the app reads are those app-shell.md,
+  Configuration, names and the proxy variables `urllib` reads, and no
+  others, asserted by recording every read of `os.environ` through
+  start-up and a whole-table lookup. None of them changes the outbound
+  URL or the TLS context.
 - A `quote` that is a valid ISO 4217 code but absent from the symbol
   table is rejected with Bad Request — asserted with a code the FX
   provider does not serve, since that is the case a plain ISO check
