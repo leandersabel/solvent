@@ -34,7 +34,15 @@
   nothing else.
 - Signing in reveals nothing about which usernames exist, or which
   belong to administrators.
-- Solvent records no IP addresses and no devices.
+- Too many wrong passwords lock signing in for a few minutes. Trying
+  again during a lock does not make it longer.
+- A lock shuts out every username, administrators included, from the
+  connection the guesses came from, because otherwise someone could try
+  a few passwords on every name on your instance.
+- Solvent keeps no IP address readable and records no devices. A
+  connection that failed to sign in leaves a scrambled trace. Nobody
+  can read it back without the server's secret key, and it is deleted
+  after about a quarter of an hour.
 
 ## How it looks
 
