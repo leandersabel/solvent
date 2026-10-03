@@ -891,7 +891,7 @@ try {
   check('the main currency is shown and fixed', (await text()).includes('Fixed when you created your vault'));
   check('the change-password card explains the speed', (await text()).includes('Your data is not re-encrypted'));
   check('it warns that old export files still open', (await text()).includes('still open with your old password'));
-  check('the absence of IP records is volunteered', (await text()).includes('Solvent records no IP addresses'));
+  check('the absence of IP records is volunteered', (await text()).includes('Solvent keeps no IP address readable and records no devices.'));
   check('the session list marks this one', (await text()).includes('This session'));
 
   // ---- Dates and numbers -------------------------------------------------

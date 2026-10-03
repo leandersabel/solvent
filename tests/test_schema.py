@@ -7,12 +7,14 @@ whether the schema refuses it at all.
 """
 from __future__ import annotations
 
+import dataclasses
 import sqlite3
 import uuid
 
 import pytest
 
 from solvent import db
+from solvent.config import load_config
 from tests.helpers import connect, register
 
 
@@ -183,7 +185,10 @@ def test_two_processes_starting_on_an_empty_file_both_start(tmp_path, monkeypatc
 
     def run(role):
         app = flask.Flask(role)
-        app.config["DATABASE_PATH"] = str(path)
+        app.config.update(
+            {k.upper(): v for k, v in dataclasses.asdict(load_config({"SECRET_KEY": "k"})).items()},
+            DATABASE_PATH=str(path),
+        )
         try:
             db.init_db(app)
             results[role] = None

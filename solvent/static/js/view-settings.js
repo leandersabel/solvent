@@ -343,7 +343,7 @@ function sessionCard(vault) {
     el('div', { class: 'sessions' }, [
       el('p', { class: 'eyebrow', text: 'Open sessions' }),
       list,
-      el('p', { class: 'hint', text: 'Solvent records no IP addresses and no devices.' }),
+      el('p', { class: 'hint', text: 'Solvent keeps no IP address readable and records no devices.' }),
     ]),
     el('div', { class: 'form-actions' }, [
       el('button', {

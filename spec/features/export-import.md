@@ -279,3 +279,6 @@ written.
 - `GET /api/export` as a plain top-level navigation returns Forbidden
   and writes no file, with a valid session cookie present — the
   regression test for the header requirement.
+- An export over the per-user limit returns Too Many Requests and
+  writes no `attempts` row, so the limit lifts an hour after the oldest
+  export it let through, however often the client retried.

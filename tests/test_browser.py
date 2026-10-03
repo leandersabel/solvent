@@ -62,9 +62,9 @@ def instance(tmp_path_factory):
         os.environ,
         SECRET_KEY="browser-test-key",
         DATABASE_PATH=str(database),
-        # The sampled sign-ins spend one salt request each from the
-        # per-IP budget. The limiter still runs on every request.
-        LOGIN_REQUESTS_PER_IP_HOUR="100000",
+        # The sampled wrong passwords all fail from one address. The
+        # limiter still runs on every request.
+        LOGIN_FAILURES_PER_ADDRESS="100000",
     )
     port = free_port()
 

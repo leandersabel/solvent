@@ -116,8 +116,10 @@ CREATE TABLE IF NOT EXISTS rate_cache (
 -- Throttling (architecture.md, Rate limiting; rate-lookup.md, Rate
 -- limiting and failure). One row per counted event, in SQLite rather
 -- than process memory so several gunicorn workers share one budget and
--- a restart does not hand an attacker a fresh one. A lockout is derived
--- from the rows in its window rather than stored, so it cannot drift.
+-- a restart does not hand an attacker a fresh one. A throttle is
+-- derived from the rows in its window. A lock is its own `login-lock:`
+-- or `address-lock:` row. No bucket holds an address except as a key, and a row is deleted once older than its bucket's longest
+-- window (app-shell.md, Database).
 CREATE TABLE IF NOT EXISTS attempts (
     bucket TEXT NOT NULL,
     outcome TEXT NOT NULL CHECK (outcome IN ('request', 'failure')),

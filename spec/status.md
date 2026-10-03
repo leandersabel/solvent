@@ -6,7 +6,7 @@ Maintained by the compiler agent. Rows are in build order.
 |---|---|---|---|
 | app-shell | x | | |
 | record-api | x | x | x |
-| rate-lookup | x | x | x |
+| rate-lookup | x | | |
 | admin-invites | x | | |
 | register | x | | |
 | login | x | | |
@@ -15,7 +15,7 @@ Maintained by the compiler agent. Rows are in build order.
 | record-rate | x | | |
 | record-snapshot | x | | |
 | net-worth-view | x | | |
-| export-import | x | x | x |
+| export-import | x | | |
 
 Verified means every acceptance criterion in the feature file is
 asserted.

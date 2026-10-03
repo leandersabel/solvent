@@ -38,6 +38,30 @@ second thing to keep in sync.
   forgeable.
 - No secret reaches a log line or an error page.
 
+Every other setting is an environment variable read once at start.
+Each default lives with the rule it tunes:
+
+| Variable | Sets |
+|---|---|
+| `DATABASE_PATH` | the SQLite file (Database) |
+| `HSTS_PRELOAD`, `HSTS_MAX_AGE` | HSTS (architecture.md, Network & transport) |
+| `TRUSTED_PROXY_HOPS` | how many proxies' `X-Forwarded-For` entries are trusted, default 0 (architecture.md, Network & transport) |
+| `LOGIN_ATTEMPTS_PER_ACCOUNT`, `LOGIN_ACCOUNT_WINDOW_MINUTES` | the per-username throttle (architecture.md, Rate limiting) |
+| `LOGIN_LOCKOUT_THRESHOLD`, `LOGIN_LOCKOUT_WINDOW_MINUTES`, `LOGIN_LOCKOUT_MINUTES` | the per-username lock |
+| `LOGIN_FAILURES_PER_ADDRESS`, `LOGIN_ADDRESS_WINDOW_MINUTES`, `LOGIN_ADDRESS_LOCK_MINUTES` | the per-address lock |
+| `VERIFY_CONCURRENCY`, `VERIFY_WAIT_SECONDS` | the concurrency cap (architecture.md, Application hardening) |
+| `RATE_REQUESTS_PER_HOUR`, `RATE_BREAKER_FAILURES`, `RATE_BREAKER_COOLOFF_MINUTES` | the rate lookup's limit and breaker (rate-lookup.md) |
+| `EXPORTS_PER_USER_HOUR` | the export limit (export-import.md) |
+
+- **A limit, a window, a lock, a wait or a concurrency is a whole
+  number of at least 1**, and `TRUSTED_PROXY_HOPS` a whole number of at
+  least 0. Anything else refuses to start.
+- **`LOGIN_REQUESTS_PER_IP_HOUR` refuses to start whenever it is set**,
+  empty included. Ignoring it would leave an operator believing a
+  limit holds that does not exist. The message names it and the
+  variables of the per-address lock.
+- Every refusal to start names the variable and never its value.
+
 ## CSRF
 
 The `X-Solvent-Request` header check (architecture.md, Application
@@ -63,7 +87,11 @@ One place creates the schema and opens the SQLite file on its writable
 volume (architecture.md, Tech stack). Each table's columns are stated
 by the feature that owns them: records (record-api.md), principals and
 credentials (register.md), DEK wrappers (register.md), invites
-(admin-invites.md), sessions (architecture.md, Application hardening).
+(admin-invites.md), sessions (architecture.md, Application hardening),
+attempts (architecture.md, Rate limiting).
+
+**Every connection the app opens sets `PRAGMA secure_delete = ON`**
+(architecture.md, Storage & data handling).
 
 `principals` carries identity and kind and nothing else, so the columns
 the shell needs to resolve a session and choose a nav are its whole
@@ -82,6 +110,21 @@ version unchanged: SQLite cannot add `NOT NULL` to an existing column
 without rebuilding `principals`, and a database at another schema
 version is refused at start, because this schema has no migration
 path beyond export and import.
+
+**Expired `attempts` rows are deleted** (architecture.md, Rate
+limiting):
+
+- **At every process start**, in that same write transaction, together
+  with every row whose bucket starts with `ip:`. Such a row holds a
+  plaintext address. No code writes one, and the start deletes any it
+  finds, so a file any build wrote keeps none past its first start.
+- **Once every 60 seconds in each serving process**, by one daemon
+  thread the app factory starts. Each pass opens its own connection as
+  `file:<DATABASE_PATH>?mode=rw`, so it never creates a file, sets
+  `secure_delete`, deletes in one transaction and closes. A failed pass
+  logs `attempts.prune_failed` with the exception's type and no
+  message, and the next pass runs as usual. The deletion is one
+  function taking the current time, which tests call directly.
 
 The schema is created in one place, so its triggers live here:
 
@@ -322,6 +365,12 @@ dialog to protect. Everything below describes the vault owner's bar.
 
 - **`SECRET_KEY` unset or empty** → the app does not start, and the
   failure names the variable without printing any value.
+- **`LOGIN_REQUESTS_PER_IP_HOUR` set**, to any value or none → the app
+  does not start (Configuration).
+- **`TRUSTED_PROXY_HOPS` negative or not a whole number** → the app
+  does not start.
+- **The database file is removed while a process runs** → the pruning
+  pass fails, logs, and creates no file.
 - **Lock pressed with unsaved form input** → the one named exception in
   login.md, Rules applies; the shell adds no confirmation of its own.
 - **The viewport is resized or rotated with a dialog open** → the bar
@@ -395,6 +444,41 @@ dialog to protect. Everything below describes the vault owner's bar.
   area for an administrator.
 - Starting the app with `SECRET_KEY` unset fails, and the message
   contains the variable name and no key material.
+- Starting the app with `LOGIN_REQUESTS_PER_IP_HOUR` set, to `60` and
+  to the empty string, fails, and the message names it,
+  `LOGIN_FAILURES_PER_ADDRESS`, `LOGIN_ADDRESS_WINDOW_MINUTES` and
+  `LOGIN_ADDRESS_LOCK_MINUTES`.
+- Starting the app with `TRUSTED_PROXY_HOPS` set to `-1`, or with any
+  rate-limit variable set to `0` or `ten`, fails, and the message names
+  the variable and not its value.
+- With `TRUSTED_PROXY_HOPS` unset, the app's WSGI callable is not
+  wrapped in `ProxyFix`. With it set to 2, it is wrapped with `x_for=2`
+  and every other `ProxyFix` count 0.
+- Starting the app on a database holding an `attempts` row in an `ip:`
+  bucket, an expired row in each other bucket, and an unexpired one in
+  each, leaves exactly the unexpired rows outside `ip:` buckets, and
+  the database file's bytes no longer contain the `ip:` row's address.
+- Calling the pruning function with the clock at a row's `at` plus its
+  bucket's retention leaves the row, and one second later deletes it,
+  for every bucket in architecture.md, Rate limiting.
+- The app factory starts one pruning thread, a daemon. A pass against
+  a `DATABASE_PATH` whose file is gone logs `attempts.prune_failed`,
+  raises nothing, and leaves no file at that path.
+- Every connection the app opens, the pruner's included, reads
+  `PRAGMA secure_delete` as 1.
+- The image's gunicorn command sets `--access-logformat` to exactly
+  the format in architecture.md, Storage & data handling, and
+  `--log-level` to `error`, asserted by reading the Dockerfile.
+- **No server log line carries the peer's address.** gunicorn runs as
+  a subprocess with the Dockerfile's command arguments, bound to
+  `127.0.0.1` on a free port, and a client connects from source
+  address `127.0.0.2`. It sends a request with an invalid request
+  line, one with an invalid header name, one whose request line
+  exceeds gunicorn's limit, and a wrong Auth Key to
+  `/api/auth/login`. After gunicorn stops, neither its standard output
+  nor its standard error contains `127.0.0.2`. The same requests with
+  `--log-level warning` in place of `error` produce a line containing
+  `ip=127.0.0.2`, which proves the test sees the line the flag drops.
 - Nav shows Dashboard and Settings for a vault owner. An
   administrator's bar shows no nav entries at all, and its only
   control is Sign out. There is no Holdings entry and no Admin entry

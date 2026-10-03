@@ -106,8 +106,8 @@ reported plainly.
 - **You are signed out twelve hours after signing in, regardless of
   activity.** Stated, not adjustable.
 - **Open sessions**, listed by when each started and when it was last
-  used, with a line volunteering that Solvent records no IP addresses
-  and no devices. Anyone who has used another product assumes those
+  used, with a line volunteering that Solvent keeps no IP address
+  readable and records no devices (`login.md`). Anyone who has used another product assumes those
   are kept. The list is the only way you can tell whether you are still
   signed in somewhere else, because there is no other trace of it.
 - **Sign out**, and **sign out everywhere**, which ends the current
@@ -232,8 +232,7 @@ single total.
   instance. No vault is exempt.
 - The delete dialog offers exporting first as its main action.
 - The list of open sessions shows only your own sessions, never anyone
-  else's, and carries no IP address and no device information, because
-  none is recorded anywhere.
+  else's, and carries no IP address and no device information.
 - Signing out ends the current session and leaves another session on
   the same account working. Signing out everywhere ends that one too,
   including the current one.
@@ -278,8 +277,9 @@ single total.
   keeps the current session alive is changing the password, which does
   it as part of the same act.
 - **No IP addresses, no device names, no login history beyond open
-  sessions.** It is metadata the product does not otherwise keep, and
-  on a household instance it answers no question worth the record.
+  sessions.** On a household instance it answers no question worth the
+  record. The only trace of a connection is the scrambled one a failed
+  sign-in leaves for the lock, which nobody can read back (`login.md`).
 - **No soft delete, no grace period, no recycle bin** on deleting an
   account. There is no readable vault to hold in reserve.
 - **No freeform tags.** Every way of labeling a holding is a

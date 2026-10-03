@@ -14,7 +14,7 @@ from datetime import date, timedelta
 import pytest
 
 import solvent.rates as rates
-from tests.helpers import CSRF, mint_invite, register
+from tests.helpers import CSRF, mint_invite, register, rows
 
 
 @pytest.fixture
@@ -238,6 +238,25 @@ def test_exceeding_the_per_user_limit_is_too_many_requests(app, owner, provider)
         for _ in range(4)
     ]
     assert 429 in codes
+
+
+def test_a_refused_lookup_writes_no_row_and_the_limit_lifts_an_hour_after_the_oldest(
+    app, owner, provider, clock
+):
+    app.config["RATE_REQUESTS_PER_HOUR"] = 2
+    provider.answers["frankfurter"] = fx(PAST, {"USD": 0.8})
+    url = f"/api/rates?date={PAST}&quote=CHF&symbol=USD"
+    assert [owner.get(url, headers=CSRF).status_code for _ in range(2)] == [200, 200]
+    before = rows(app, "SELECT * FROM attempts")
+    assert len(before) == 2
+
+    for _ in range(59):
+        clock.advance(60)
+        assert owner.get(url, headers=CSRF).status_code == 429
+    assert rows(app, "SELECT * FROM attempts") == before
+
+    clock.advance(61)
+    assert owner.get(url, headers=CSRF).status_code == 200
 
 
 def test_the_circuit_breaker_opens_and_closes(app, owner, monkeypatch):

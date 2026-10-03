@@ -22,6 +22,11 @@ The app refuses to start without `SECRET_KEY` (spec/features/app-shell.md,
 Configuration). `DATABASE_PATH` defaults to `instance/solvent.db`, which
 is created on first start.
 
+Behind a reverse proxy, set `TRUSTED_PROXY_HOPS` to the number of
+proxies in front of the app. At the default of 0 every client counts as
+the proxy's address, so one person's failed sign-ins lock everyone out
+together. Set too high, a client chooses its own address.
+
 The first account is created out of band, because registration needs
 an invite and invites need an administrator:
 

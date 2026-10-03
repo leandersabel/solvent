@@ -25,10 +25,24 @@ class SchemaMismatch(RuntimeError):
     """A database file this build cannot serve."""
 
 
+def now() -> datetime:
+    return datetime.now(timezone.utc)
+
+
 def utcnow() -> str:
     """The server clock, in the one format every timestamp column
     holds. Set server-side, never accepted from a client."""
-    return datetime.now(timezone.utc).isoformat(timespec="seconds")
+    return now().isoformat(timespec="seconds")
+
+
+def connect(target, **kwargs) -> sqlite3.Connection:
+    """The one way the app opens the file, so every connection
+    overwrites what it deletes: a deleted `attempts` row would
+    otherwise leave its bytes in a free page (architecture.md,
+    Storage & data handling)."""
+    conn = sqlite3.connect(target, **kwargs)
+    conn.execute("PRAGMA secure_delete = ON")
+    return conn
 
 
 def init_app(app: flask.Flask) -> None:
@@ -59,13 +73,14 @@ def init_db(app: flask.Flask) -> None:
     db_path.parent.mkdir(parents=True, exist_ok=True)
     # `autocommit=True` leaves transaction control here, and keeps
     # `executescript` from committing the transaction it runs in.
-    conn = sqlite3.connect(db_path, timeout=_INIT_TIMEOUT, autocommit=True)
+    conn = connect(db_path, timeout=_INIT_TIMEOUT, autocommit=True)
     try:
         conn.execute("BEGIN IMMEDIATE")
         try:
             _check_version(conn, db_path)
             conn.executescript(SCHEMA_PATH.read_text())
             _seed_symbols(conn)
+            _prune_attempts(conn, app)
             conn.execute(
                 "UPDATE principals SET last_login_at = created_at "
                 "WHERE last_login_at IS NULL"
@@ -99,6 +114,12 @@ def _check_version(conn: sqlite3.Connection, db_path: Path) -> None:
     )
 
 
+def _prune_attempts(conn: sqlite3.Connection, app: flask.Flask) -> None:
+    from .ratelimit import prune
+
+    prune(conn, app.config, now())
+
+
 def _seed_symbols(conn: sqlite3.Connection) -> None:
     from .rates import SEEDED_SYMBOLS
 
@@ -119,7 +140,7 @@ def get_db() -> sqlite3.Connection:
     (admin-invites.md, the last-administrator guard).
     """
     if "db" not in flask.g:
-        conn = sqlite3.connect(
+        conn = connect(
             flask.current_app.config["DATABASE_PATH"], isolation_level=None
         )
         conn.row_factory = sqlite3.Row

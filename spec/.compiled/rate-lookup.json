@@ -4,7 +4,7 @@
   "read": [
     {"file": "spec/features/rate-lookup.md", "sections": ["all"]},
     {"file": "spec/architecture.md", "sections": ["Data model", "Status codes", "Application hardening", "Network & transport", "Tech stack", "Threat model"]},
-    {"file": "spec/features/app-shell.md", "sections": ["The two surfaces", "CSRF", "Database"], "role": "GET /api/rates/symbols is a vault route and every /api/admin/symbols route is an administration route, each Not Found to the other kind"},
+    {"file": "spec/features/app-shell.md", "sections": ["Configuration", "The two surfaces", "CSRF", "Database"], "role": "GET /api/rates/symbols is a vault route and every /api/admin/symbols route is an administration route, each Not Found to the other kind. Configuration names the variables for the limit and the breaker, and Database the attempts table the limit's rows live in and their pruning"},
     {"file": "spec/features/record-rate.md", "sections": ["The refresh", "Record shape", "Edge cases"], "role": "the consumer of a proposal and the reason the client never names a symbol"},
     {"file": "spec/features/manage-accounts.md", "sections": ["Record shape", "Rules", "Edge cases"], "role": "an account's unit is its rate symbol, which is what the table is a picker for"},
     {"file": "spec/features/register.md", "sections": ["Rules"], "role": "the kind: currency rows are the whole of the main-currency list"},
@@ -49,13 +49,14 @@
     "quoteValidation": {"value": "quote must be a kind: currency row of the server's symbol table, not merely a known ISO 4217 code", "cite": "spec/features/rate-lookup.md#ssrf-and-egress-hardening"},
     "dateValidation": {"value": "date must parse as a calendar date, not be in the future, and not precede the floor configured for that symbol. A single global floor is wrong in both directions", "cite": "spec/features/rate-lookup.md#ssrf-and-egress-hardening"},
     "egressHardening": {"value": "provider hosts and URL templates are server-side constants with no part of the outbound URL derived from client input, redirects are disabled rather than followed to a validated target, egress has a hard timeout of 5 seconds connect plus read and a response size cap, requests go to HTTPS only with certificate verification on, and any provider API key is injected via environment config and appears in no response, log line or error message", "cite": "spec/features/rate-lookup.md#ssrf-and-egress-hardening"},
-    "perUserRateLimit": {"value": "default 120 per hour on the endpoint, independent of the login limiter. Operator config with that default", "cite": "spec/features/rate-lookup.md#rate-limiting-and-failure"},
-    "circuitBreaker": {"value": "opens after 5 consecutive provider failures and serves No Content directly for a 5-minute cool-off instead of retrying per request. Operator config with those defaults", "cite": "spec/features/rate-lookup.md#rate-limiting-and-failure"},
+    "perUserRateLimit": {"value": "default 120 per hour on the endpoint, independent of the login limiter. Operator config with that default, variable RATE_REQUESTS_PER_HOUR. A sweep of any size costs one request, so the limit sits far above honest use", "cite": "spec/features/rate-lookup.md#rate-limiting-and-failure, spec/features/app-shell.md#configuration"},
+    "perUserRateLimitRows": {"value": "one request row in the bucket rates:<principal id> per lookup let through, deleted once older than 60 minutes. A refused request writes no row, in this limiter as in every other, so the limit lifts an hour after the oldest lookup it let through, however often the client retried", "cite": "spec/architecture.md#application-hardening, spec/features/rate-lookup.md#acceptance-criteria"},
+    "circuitBreaker": {"value": "opens after 5 consecutive provider failures and serves No Content directly for a 5-minute cool-off instead of retrying per request. Operator config with those defaults, variables RATE_BREAKER_FAILURES and RATE_BREAKER_COOLOFF_MINUTES", "cite": "spec/features/rate-lookup.md#rate-limiting-and-failure, spec/features/app-shell.md#configuration"},
     "statusCodes": {
       "noProposalAvailable": {"value": 204, "cite": "spec/architecture.md#status-codes", "condition": "a symbol with no provider yet, no data for that date, a provider unreachable, a lookup: false symbol, a failed FX leg on gold, or a whole-table request where every symbol failed. Never an error (spec/features/rate-lookup.md#edge-cases)"},
       "identityRate": {"value": 200, "cite": "spec/architecture.md#status-codes", "condition": "symbol equals quote answers rate '1', base naming that unit, asOf the requested date, source 'identity', cached false, and no outbound request (spec/features/rate-lookup.md#edge-cases)"},
       "unknownSymbolOrParameter": {"value": 400, "cite": "spec/architecture.md#status-codes", "condition": "a symbol absent from the table, an unrecognised query parameter, a future date, or a date below the symbol's own floor (spec/features/rate-lookup.md#edge-cases)"},
-      "overPerUserLimit": {"value": 429, "cite": "spec/architecture.md#status-codes"},
+      "overPerUserLimit": {"value": 429, "cite": "spec/architecture.md#status-codes", "condition": "and no attempts row is written (spec/features/rate-lookup.md#acceptance-criteria)"},
       "unauthenticated": {"value": 401, "cite": "spec/architecture.md#status-codes", "condition": "and no outbound request is made (spec/features/rate-lookup.md#acceptance-criteria)"},
       "wrongSurface": {"value": 404, "cite": "spec/architecture.md#status-codes", "condition": "every /api/admin/symbols route to a vault owner, and GET /api/rates/symbols to an administrator (spec/features/rate-lookup.md#acceptance-criteria)"}
     }
@@ -71,7 +72,8 @@
       "a route enumerator over the registered routes, for the assertion that no route deletes a symbol",
       "a seeded administrator session and a seeded vault owner session, for the two Not Found directions",
       "a quote that is a valid ISO 4217 code the FX provider does not serve, which is the case a plain ISO check waves through",
-      "a fifteen-account, six-symbol vault, for the one-request sweep assertion"
+      "a fifteen-account, six-symbol vault, for the one-request sweep assertion",
+      "a stubbed clock and the attempts table readable row for row, for the refused-request-writes-no-row and lifts-an-hour-after-the-oldest assertions"
     ],
     "focus": [
       "the accepted parameter set must be enumerated and asserted to be exactly {symbol, date, quote}. This is the structural form of the base-amount rule, and a handler that simply ignores extra parameters passes every functional test while leaving a field an amount could travel in",
@@ -83,6 +85,7 @@
       "the whole-table and single-symbol forms must be shown to share one cache, by following a table request with a single-symbol request and asserting no second outbound request",
       "a fifteen-row sweep across six symbols must issue exactly one request here, asserted as a count. Every data assertion passes under a per-symbol fan-out",
       "no /api/admin/symbols response may carry a count, list or any other indication of which accounts use a symbol, asserted against the full response shape rather than against the fields the screen happens to read",
+      "exceeding the per-user limit must be shown to write no attempts row: retry repeatedly while over it, compare the table row for row, and show the limit lifting an hour after the oldest lookup it let through. A limiter that records each refused request extends the throttle with every retry and never lifts",
       "the provider API key rule has to be checked against a real log line, response body and error page, even though no provider in this design has a key. The rule exists to bind a keyed provider added later"
     ]
   },

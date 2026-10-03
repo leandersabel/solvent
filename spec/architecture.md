@@ -288,6 +288,10 @@ and no refusal redirects. app-shell.md, The request gate, applies this.
     recording's burst of writes), and request sizes.
   - Whatever a deployment's own TLS-terminating intermediary (reverse
     proxy, CDN edge, tunnel) sees of connection metadata.
+  - Someone holding both `SECRET_KEY` and the database can recover the
+    address behind an address key still in the `attempts` table, by
+    hashing every candidate address, for as long as Rate limiting keeps
+    the key.
   - The rate proxy learning the user's main currency, which travels as
     `quote` on every lookup, and the date of each lookup.
   - Wholesale deletion of a vault's record set. Detecting it needs a
@@ -400,6 +404,23 @@ and no refusal redirects. app-shell.md, The request gate, applies this.
   has served the header stably through the preload probation period.
 - How the instance is reached (LAN, VPN, reverse proxy, tunnel) is the
   deployment's choice.
+- **The client address is the TCP peer's**, unless `TRUSTED_PROXY_HOPS`
+  is N > 0. Then Werkzeug's `ProxyFix(x_for=N)` wraps the WSGI app and
+  takes the Nth entry from the right of `X-Forwarded-For`, the one the
+  outermost of N trusted proxies appended. Only `x_for` is set. Scheme,
+  host, port and prefix are never read from a header, because the
+  cookie is `Secure` and HSTS is sent whatever the scheme.
+  - **Too low**, and every client shares the proxy's address, so one
+    guesser's lock shuts out the whole instance (Rate limiting).
+  - **Too high**, and a client writes its own entry into the header and
+    gets a fresh address per guess, which leaves only the per-username
+    limit.
+  - With N = 0, the first request in a process that carries
+    `X-Forwarded-For` logs `config.proxy_header_ignored` once, at
+    WARNING, naming `TRUSTED_PROXY_HOPS` and no header value.
+- **The address is used for the address limit and nothing else**
+  (Rate limiting). No table, response or log line carries it
+  (Storage & data handling).
 
 ### Application hardening
 
@@ -467,20 +488,89 @@ and no refusal redirects. app-shell.md, The request gate, applies this.
     caller has proven they are entitled to know. The size difference
     falls under the accepted request-size leak.
   - Any future pre-authentication step needs the same decoy treatment.
-- **Rate limiting**: per-account and per-IP limits and a lockout on the
-  login and salt-fetch endpoints. The Argon2id derivation runs
-  client-side, so a scripted attacker pays nothing per guess and
-  throttling is the only bound. An account over its limit is throttled,
-  and one that keeps failing is locked out, with no backoff between.
-  - **Defaults**: per account, 10 attempts per 15 minutes, then a
-    15-minute lockout once 20 fail within an hour. Per IP, 60 requests
-    per hour across `/api/auth/login` and `/api/auth/salt` together,
-    because splitting the budget lets an attacker spend twice.
+- **Rate limiting** guards `/api/auth/salt` and `/api/auth/login`. The
+  Argon2id derivation runs client-side, so a scripted attacker pays
+  nothing per guess and throttling is the only bound. Both endpoints
+  check every limit below before doing any work, and a request any one
+  refuses gets Too Many Requests with the same body and headers, whether
+  or not the username exists and whatever its kind.
+  - **Per username**: 10 failed sign-ins within 15 minutes throttle the
+    username until the oldest leaves the window. 20 within 60 minutes
+    lock it for 15 minutes from the failure that tripped the lock.
+  - **Per address**: 30 failed sign-ins from one client address within
+    15 minutes lock that address for 15 minutes from the failure that
+    tripped the lock. The lock refuses every username from that
+    address, administrators' included, on both endpoints. Without it an
+    attacker stays under the per-username limit by trying a few
+    passwords on every username.
+  - **A failed sign-in** is a `/api/auth/login` whose verification,
+    real or decoy, did not match. Nothing else
+    counts: not the salt fetch, which verifies nothing and whose
+    enumeration the decoy closes (Login enumeration), not a Bad
+    Request, and not a request the concurrency cap or a limit turned
+    away. Counting salt fetches or successes would let a household
+    behind one address lock itself out by signing in.
+  - **A refused request writes no row**, in this limiter and every
+    other (rate-lookup.md, export-import.md). So a lock runs from the
+    failure that tripped it, and retrying during a throttle or a lock
+    never lengthens it.
+  - A failure while the window still holds the threshold trips a fresh
+    lock, so a lock shorter than its window can follow another at once.
+  - **A successful sign-in deletes its username's `login:` and
+    `login-lock:` rows and none of its address's**, because one valid
+    account would otherwise reset its address's budget between guesses.
+  - **The address is stored only as a key.** Its key is the first 16
+    bytes, as lowercase hex, of HMAC-SHA256 under the address subkey
+    over the canonical address in ASCII. The subkey is HKDF-SHA256
+    (RFC 5869) with `SECRET_KEY`'s UTF-8 bytes as input keying
+    material, no salt (32 zero bytes), info `solvent attempts address
+    v1` in ASCII, and 32 bytes of output. An unkeyed hash is rejected,
+    because a 32-bit address space reverses in seconds. The subkey
+    separates this use from the decoy salt's HMAC under the same secret.
+    HKDF is the standard library's `hmac` in RFC 5869's two steps,
+    checked against its Test Case 1, rather than a dependency added for
+    one function.
+  - **The canonical address**: an IPv4 address in dotted decimal. An
+    IPv4-mapped IPv6 address as its IPv4 address. Any other IPv6
+    address as its /64 network in Python's compressed form
+    (`2001:db8:1:2::/64`), because one subscriber holds a whole /64 and
+    would otherwise have a fresh address per guess. A value that parses
+    as neither is the literal `invalid`, one shared key, so garbage
+    cannot buy fresh keys either.
+  - **Rows**: the `attempts` table is `(bucket, outcome, at)`, indexed
+    on `(bucket, at)`, with `outcome` one of `request` and `failure`
+    and `at` from the server clock. It is SQLite rather than process
+    memory, so every gunicorn worker shares one budget and a restart
+    hands an attacker no fresh one. A row is deleted once it is older
+    than the longest window any check reads its bucket over:
+
+    | Bucket | One row per | Deleted once older than |
+    |---|---|---|
+    | `login:<normalized username>` | failed sign-in, `failure` | the longer of the per-username throttle window and lock window |
+    | `login-lock:<normalized username>` | lock tripped, `failure` | the per-username lock |
+    | `address:<address key>` | failed sign-in, `failure` | the address window |
+    | `address-lock:<address key>` | lock tripped, `failure` | the address lock |
+    | `rates:<principal id>` | lookup let through, `request` | 60 minutes |
+    | `export:<principal id>` | export let through, `request` | 60 minutes |
+
+    **A lock is its own row**, `login-lock:` or `address-lock:`,
+    written in the transaction of the failure that tripped it, and
+    holds while its `at` is within the lock's length. Nothing else
+    decides whether a lock holds, because a lock derived from the
+    failures in its window would lift early once the earliest of them
+    aged out. The throttle and the rates and export limits are derived
+    from the rows in their windows. No bucket holds an address in any
+    other form. Deletion runs at process start and once a minute in
+    each serving process (app-shell.md, Database), so at the defaults a
+    failed connection's trace is gone within about a quarter of an
+    hour.
   - Every limit here and the concurrency cap below is **operator
-    config with the stated default**, because the right number depends
-    on the deployment's exposure. Tests assert behaviour at the
-    configured value: the limit engages, the lockout holds, and the
-    response does not reveal whether the account exists.
+    config with the stated default** (app-shell.md, Configuration),
+    because the right number depends on the deployment's exposure. The
+    address window and address lock also set how long an address key
+    is kept. Tests assert behaviour at the configured value: the limit
+    engages, the lock holds and ends on time, and the response does not
+    reveal whether the account exists.
 - **Concurrency cap** on Auth Key verification: every
   `/api/auth/login`, real or decoy, runs Argon2id over the Auth Key at
   64 MiB, so N parallel attempts allocate N × 64 MiB before the rate
@@ -488,9 +578,13 @@ and no refusal redirects. app-shell.md, The request gate, applies this.
   **default 4**, so peak Argon2id memory is about 256 MiB. A
   verification waits **at most 10 seconds** for a slot, then gets the
   ordinary throttle response.
-- **Alerting is a structured log line**: a lockout emits an event with
-  a stable name, the account and the window, at a level container-log
-  tooling can filter on. There is no email or push path.
+- **Alerting is a structured log line.** Each lock logs one line at
+  WARNING when it trips, never on the requests it refuses:
+  `auth.lockout scope=username username=<name> lock_minutes=<n>` or
+  `auth.lockout scope=address lock_minutes=<n>`. `<name>` is the
+  normalized username as a JSON string, so a crafted username cannot
+  forge a line. The address line carries no address and no address
+  key. There is no email or push path.
 
 ### Storage & data handling
 
@@ -504,6 +598,33 @@ and no refusal redirects. app-shell.md, The request gate, applies this.
     honest use.
 - **Invite tokens**: ≥128-bit entropy, single-use, time-limited, stored
   hashed.
+- **No client address and no device is kept.** No table, response or
+  log line carries a client address, a user agent or a referrer. The
+  `attempts` table's address keys are the one trace a connection
+  leaves (Rate limiting).
+  - gunicorn's access log format is exactly
+    `%(t)s "%(m)s %(U)s" %(s)s %(b)s %(M)s`: time, method, path,
+    status, bytes and milliseconds. Its default carries the peer
+    address (`%(h)s`), the user agent (`%(a)s`) and the referrer
+    (`%(f)s`), and the full request line (`%(r)s`) would log a live
+    invite token from `/register?invite=` (admin-invites.md, Rules).
+  - gunicorn's error log runs at `--log-level error`. gunicorn logs a
+    request it cannot parse as `Invalid request from ip=<peer>` at
+    WARNING, in the request error handler every worker class shares.
+    In the pinned release no line at ERROR or above carries a client's
+    address, only the server's own bind address. The app's own lines
+    are unaffected: they go through the app's logger, which the flag
+    does not set. gunicorn's INFO and WARNING lines (boot, worker
+    exits, malformed requests) are what the deployment gives up. A
+    logging filter that strips addresses is rejected, because it has to
+    recognise every address form in every message, and a level drops
+    the whole line. The image test sends malformed requests and fails
+    on any log line carrying the peer's address (app-shell.md,
+    Acceptance criteria), so an upgrade that moves the line up a level
+    is caught.
+  - **Every SQLite connection sets `PRAGMA secure_delete = ON`**, so a
+    deleted row's bytes are overwritten rather than left in a free
+    page.
 
 ### Supply chain
 

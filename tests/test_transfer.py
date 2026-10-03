@@ -452,6 +452,23 @@ def test_exports_older_than_the_hour_do_not_count(app, owner):
     assert owner.get("/api/export", headers=CSRF).status_code == 200
 
 
+def test_a_refused_export_writes_no_row_and_the_limit_lifts_an_hour_after_the_oldest(
+    app, owner, clock
+):
+    app.config["EXPORTS_PER_USER_HOUR"] = 2
+    assert [owner.get("/api/export", headers=CSRF).status_code for _ in range(2)] == [200, 200]
+    before = rows(app, "SELECT * FROM attempts")
+    assert len(before) == 2
+
+    for _ in range(59):
+        clock.advance(60)
+        assert owner.get("/api/export", headers=CSRF).status_code == 429
+    assert rows(app, "SELECT * FROM attempts") == before
+
+    clock.advance(61)
+    assert owner.get("/api/export", headers=CSRF).status_code == 200
+
+
 def test_the_export_ceiling_is_operator_config(tmp_path, monkeypatch):
     from solvent import create_app
     from solvent.config import load_config
