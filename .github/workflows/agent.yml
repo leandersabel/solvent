@@ -21,7 +21,7 @@ on:
         description: Issue number, or `alerts` to file an issue for every open code scanning alert
         required: true
       resume:
-        description: Set by a run whose work is pushed but has no pull request yet
+        description: Set by a run that left finished work for a fresh run to push or open
         type: boolean
         default: false
 
@@ -196,6 +196,8 @@ jobs:
       - uses: ./.github/actions/setup
       - id: claude
         uses: anthropics/claude-code-action@fd1c128679612beff4ca259c78021c506e8aa7a7 # v1.0.237
+        # Below the job's limit, so the steps after it still run.
+        timeout-minutes: 165
         # A headless run ends when its own turn does, so a subagent left
         # running in the background would be cut off unfinished.
         env:
@@ -218,29 +220,77 @@ jobs:
           name: session
           path: ${{ steps.claude.outputs.execution_file }}
           retention-days: 14
-      # The agent's GitHub token lasts an hour, so a long run can push
-      # its branch and lose the token before it opens the pull request.
-      # One fresh run, with a fresh token, opens it.
-      - if: success() && github.event.inputs.resume != 'true'
+      # The agent's GitHub token lasts an hour, and a run can outlast it.
+      # The agent sets claude/<kind>-<issue> only to finished work
+      # (advance skill). What it could not push is saved here with the
+      # job's token, and one fresh run pushes it as claude[bot], so its
+      # checks run. These steps follow the agent on a runner it
+      # controlled, so they hold nothing it did not: the job's token
+      # cannot write workflows or master, and its pushes start nothing.
+      - id: save
+        if: always()
         env:
           GH_TOKEN: ${{ github.token }}
           GH_REPO: ${{ github.repository }}
           ISSUE: ${{ needs.route.outputs.issue }}
+          RESUME: ${{ github.event.inputs.resume }}
         run: |
           [ "$(gh issue view "$ISSUE" --json state --jq .state)" = OPEN ] || exit 0
+          # No hook or credential the agent left takes part in the push.
+          git() { command git -c core.hooksPath=/dev/null -c credential.helper= "$@"; }
+          remote="https://x-access-token:$GH_TOKEN@github.com/$GH_REPO.git"
+          due=
           for kind in spec issue; do
             branch="claude/$kind-$ISSUE"
-            gh api "repos/$GH_REPO/branches/$branch" >/dev/null 2>&1 || continue
-            [ -z "$(gh pr list --head "$branch" --state open --json number --jq '.[].number')" ] || continue
-            gh workflow run agent.yml --ref master -f issue="$ISSUE" -f resume=true
-            exit 0
+            there=$(git ls-remote "$remote" "refs/heads/$branch" | cut -f1)
+            merged=$(gh pr list --head "$branch" --state merged --json number --jq '.[].number')
+            if here=$(git rev-parse -q --verify "refs/heads/$branch^{commit}") &&
+              [ "$here" != "$there" ] && [ -z "$merged" ]; then
+              git push --force "$remote" "$here:refs/heads/claude/saved/$kind-$ISSUE"
+              due=1
+            elif [ -n "$there" ] &&
+              [ -z "$(gh pr list --head "$branch" --state all --json number --jq '.[].number')" ]; then
+              # Pushed, but the pull request never opened.
+              due=1
+            fi
           done
-      - if: failure() || cancelled()
+          if [ -n "$due" ] && [ "$RESUME" != true ]; then
+            gh workflow run agent.yml --ref master -f issue="$ISSUE" -f resume=true
+            echo "resumed=true" >> "$GITHUB_OUTPUT"
+          fi
+      # The loop never stops in silence: a run that leaves its issue in
+      # none of the states under CLAUDE.md, The loop, Issue state labels
+      # it stuck (CLAUDE.md, The loop, When something fails).
+      - if: always() && steps.save.outputs.resumed != 'true'
         env:
           GH_TOKEN: ${{ github.token }}
           GH_REPO: ${{ github.repository }}
           ISSUE: ${{ needs.route.outputs.issue }}
+          OWNER: ${{ github.repository_owner }}
+          FINISHED: ${{ steps.claude.outcome == 'success' }}
           RUN: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
         run: |
+          issue=$(gh api "repos/$GH_REPO/issues/$ISSUE")
+          [ "$(jq -r .state <<<"$issue")" = open ] || exit 0
+          if [ "$FINISHED" = true ]; then
+            why="The run ended without a pull request or a question"
+            # Waiting on the client or the queue, or not started.
+            jq -e '[.labels[].name] as $l
+              | any($l[]; . == "needs-answer" or . == "stuck" or . == "queued")
+                or ((any($l[]; . == "accepted") | not) and .user.login != "github-actions[bot]")' \
+              <<<"$issue" >/dev/null && exit 0
+            # A pull request waits on its checks or the client's review.
+            for kind in spec issue; do
+              [ -z "$(gh pr list --head "claude/$kind-$ISSUE" --state open --json number --jq '.[].number')" ] || exit 0
+            done
+            # A requirements pull request the client closed leaves the issue to them.
+            closed=$(gh pr list --head "claude/spec-$ISSUE" --state closed --json closedAt,mergedAt \
+              --jq 'map(select(.mergedAt == null) | .closedAt) | max // empty')
+            wrote=$(gh api --paginate "repos/$GH_REPO/issues/$ISSUE/comments" \
+              --jq ".[] | select(.user.login == \"$OWNER\") | .created_at" | tail -n 1)
+            [ -n "$closed" ] && [[ "$wrote" < "$closed" ]] && exit 0
+          else
+            why="The agent's run did not finish"
+          fi
           gh issue edit "$ISSUE" --add-label stuck
-          gh issue comment "$ISSUE" --body "@${{ github.repository_owner }} The agent's run did not finish: $RUN. Any comment here starts the next one."
+          gh issue comment "$ISSUE" --body "@$OWNER $why: $RUN. Any comment here starts the next one."
