@@ -70,8 +70,8 @@ await run(async () => {
   await r.reread();
   await r.home();
   const {
-    rec, D1, D10, traffic, faults, ev, press, stored,
-    on, go, figure, home, newRecording, price,
+    rec, D1, D10, ago, id, proxy, traffic, faults, ev, press, set, quiet, stored,
+    on, bytes, go, figure, format, home, newRecording, plantHere, reread, rateAsks, snap, price, proposalsFor,
   } = r;
 
   // ---- record-snapshot: the date picker and deleting a recording ----------
@@ -105,5 +105,92 @@ await run(async () => {
     'record-snapshot: deleting a recording removes every figure and price at the date, and the date is new again',
     goneAtFirst === 0 && !freeAgain.marked && !freeAgain.dotted,
     JSON.stringify(freeAgain),
+  );
+
+  // ---- record-rate: a moved figure is priced at its new date ------------
+
+  // A dollar figure from 2010 and the one dollar price of that year.
+  const DY = '2010-01-05';
+  await plantHere([snap('Brokerage', DY, '100'), price('USD', DY, '1.0287', 'proposed')]);
+  await reread();
+  const figureAt = async (to, name) => {
+    await go(`#/recording/${to}`);
+    return rec.call((holding) => ({
+      cells: [...document.querySelectorAll('.recording .card')[0].querySelectorAll('tbody tr')]
+        .find(row => row.cells[0].textContent === holding).cells[2].textContent,
+      prices: document.querySelectorAll('.recording .card')[1].textContent,
+    }), name);
+  };
+  const moveFigure = async (from, to) => {
+    await go(`#/holding/${id.Brokerage}`);
+    const label = await format('longDate', from);
+    await rec.call((day) => [...document.querySelectorAll('.card .data-table tbody tr')].find(r => r.cells[0].textContent.startsWith(day))
+      .querySelectorAll('button').forEach(b => { if (b.textContent === 'Edit') b.click(); }), label);
+    await rec.waitUntil("document.querySelector('#snapshot-value')", { label: 'the edit form' });
+    await quiet();
+    traffic.length = 0;
+    await set('#snapshot-date', await format('date', to));
+    await quiet();
+    await ev("[...document.querySelectorAll('.dialog button')].find(b => b.textContent === 'Save').click()");
+    await quiet();
+    return figureAt(to, 'Brokerage');
+  };
+  const usdAtDY = bytes(on(await stored('rate'), DY));
+  const DM = ago(70);
+  const priced = await moveFigure(DY, DM);
+  const proposedUsd = proposalsFor(DM).USD.rate;
+  check(
+    'record-rate: a figure moved onto an empty date is priced at that date, from one request for it',
+    rateAsks().length === 1 && rateAsks()[0].url.includes(`date=${DM}`) &&
+      on(await stored('rate'), DM).some((p) => p.payload.symbol === 'USD' && p.payload.rate === proposedUsd) &&
+      figure(priced.cells) === Number((100 * Number(proposedUsd)).toFixed(2)) && !priced.cells.includes('priced'),
+    `${rateAsks().length} asks | ${priced.cells}`,
+  );
+  check(
+    'record-rate: a move rewrites no stored price and the date the entry left keeps its own',
+    bytes(on(await stored('rate'), DY)) === usdAtDY && on(await stored('snapshot'), DY).length === 0,
+  );
+  // The source answers nothing for the next date: the figure reads not
+  // priced, though 2010 and the date it left both hold a dollar price.
+  proxy.mode = 'none';
+  const DN = ago(80);
+  const unpriced = await moveFigure(DM, DN);
+  proxy.mode = 'answer';
+  check(
+    'record-rate: a moved figure whose date has no price reads not priced, never at another day\'s',
+    rateAsks().length === 1 && on(await stored('rate'), DN).length === 0 &&
+      unpriced.cells === 'not priced' && unpriced.prices.includes('No prices were captured at this date.'),
+    `${unpriced.cells} | ${unpriced.prices}`,
+  );
+
+  // The holding's own list reads the same way: not priced where a
+  // sourced unit has no price on the row's date.
+  await go(`#/holding/${id.Brokerage}`);
+  const historyCell = (iso) =>
+    format('longDate', iso).then((label) => rec.call((day) => [...document.querySelectorAll('.card .data-table tbody tr')]
+      .find(row => row.cells[0].textContent.startsWith(day)).cells[2].textContent, label));
+  check(
+    'record-rate: the holding\'s own list reads not priced on a date its sourced unit holds no price for',
+    (await historyCell(DN)) === 'not priced',
+    await historyCell(DN),
+  );
+
+  // A unit nobody publishes a price for keeps its owner's estimate, dated.
+  const DE = ago(150);
+  const DS = ago(15);
+  await plantHere([price('XAG-ozt', DE, '26'), snap('Silver coins', DS, '10')]);
+  await reread();
+  const aged = await figureAt(DS, 'Silver coins');
+  check(
+    'record-rate: a figure in a unit with no rate source converts at its newest earlier estimate, dated beneath the figure',
+    aged.cells.endsWith(`priced ${await format('longDate', DE)}`) && figure(aged.cells.split('priced')[0]) === 260,
+    aged.cells,
+  );
+  await go(`#/holding/${id['Silver coins']}`);
+  const silverCell = await historyCell(DS);
+  check(
+    'record-rate: the holding\'s own list dates the estimate beneath the figure too',
+    silverCell.endsWith(`priced ${await format('longDate', DE)}`),
+    silverCell,
   );
 });

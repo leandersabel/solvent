@@ -127,8 +127,8 @@ export async function fetchProposals(vault, date) {
 
 /** Whether a recording at `date` would have anything to ask the proxy:
  *  a unit with no entry there that somebody publishes a price for. */
-export function needsLookup(vault, date) {
-  return vault.missingUnits(date).some((unit) => vault.quotable(unit));
+export function needsLookup(vault, date, also = null) {
+  return vault.missingUnits(date, also).some((unit) => vault.quotable(unit));
 }
 
 /** Decrypt a freshly read list of records the way the load does,
@@ -178,19 +178,20 @@ export function sitting(vault, date) {
 
 /** Claim the date for a sitting about to create records at it, or say
  *  why it cannot. `snapshots` names the holdings and `rates` the units
- *  the write would create an entry for.
+ *  the write would create an entry for. `except` is the one record of
+ *  those holdings the write may find there, the one it deletes.
  *
  *  A date another session recorded since the sitting began, or any slot
  *  already taken, refuses the whole save before a single write. The
  *  model then takes the reloaded records, so the screen can show the
  *  recording as it now stands. */
-export async function claimDate(vault, sit, { snapshots = [], rates = [] }) {
+export async function claimDate(vault, sit, { snapshots = [], rates = [], except = null }) {
   if (sit.claimed) return null;
   const fresh = await reloadCreateTypes(vault);
   const at = (list) => list.filter((record) => record.payload.date === sit.date);
   const taken =
     (sit.dateWasEmpty && (at(fresh.snapshot).length > 0 || at(fresh.rate).length > 0)) ||
-    at(fresh.snapshot).some((r) => snapshots.includes(r.accountId)) ||
+    at(fresh.snapshot).some((r) => snapshots.includes(r.accountId) && r.recordId !== except) ||
     at(fresh.rate).some((r) => rates.includes(r.payload.symbol));
   if (taken) {
     vault.replaceType('snapshot', fresh.snapshot);
@@ -234,12 +235,12 @@ export function rateEntry(vault, unit, date, part) {
  *
  *  Issued after the quantity, on its own requests, so a price write
  *  can never fail a quantity write. What did not land is returned and
- *  named rather than swallowed. */
-export async function refreshPrices(vault, date, proposals, choose = null) {
+ *  named rather than swallowed. `also` is a moved entry's own unit. */
+export async function refreshPrices(vault, date, proposals, choose = null, also = null) {
   const pick = choose || ((unit) => (proposals[unit] ? ratePart({ figure: decimal.parse(proposals[unit].rate), proposal: proposals[unit] }) : null));
   const written = [];
   const failed = [];
-  for (const unit of vault.missingUnits(date)) {
+  for (const unit of vault.missingUnits(date, also)) {
     const part = pick(unit);
     // No proposal and nothing typed: nothing is written, and a previous
     // entry stays the symbol's latest. Degraded, not wrong.
@@ -251,6 +252,48 @@ export async function refreshPrices(vault, date, proposals, choose = null) {
     }
   }
   return { written, failed };
+}
+
+/** Saving an edited snapshot (record-snapshot.md, Editing an existing
+ *  snapshot). Moved to another date it is recording the quantity there:
+ *  the new date is claimed first, then the snapshot PUT, then the date's
+ *  missing prices, then the DELETE of `displaced`, the holding's own
+ *  record already at that date. The quantity gates the prices and the
+ *  deletion goes last, so a move that fails partway has destroyed
+ *  nothing, and a failed price skips nothing after it. Edited where it
+ *  stands it claims nothing and prices nothing.
+ *
+ *  `sit` is the sitting that refreshes the new date, or null for a date
+ *  whose prices are complete; the prices written are `proposals` as
+ *  they came, or what `choose(unit)` says. Resolves to `{ refused }` before any
+ *  write, else `{ moved, failed, undeleted }`: the saved entry, the
+ *  units whose price did not land, and whether the displaced record
+ *  stayed. */
+export async function editSnapshot(vault, holding, existing, payload, { sit = null, displaced = null, proposals = {}, choose = null }) {
+  const unit = holding.payload.unit;
+  const on = payload.date;
+  if (on !== existing.payload.date) {
+    // The slot at the new date is one the move creates, unless it holds
+    // the record the person agreed to delete: any other record of the
+    // holding there refuses the move.
+    const refusal = await claimDate(vault, sit || sitting(vault, on), {
+      snapshots: [holding.recordId],
+      except: displaced ? displaced.recordId : null,
+      rates: sit ? vault.missingUnits(on, unit) : [],
+    });
+    if (refusal) return { refused: true };
+  }
+  const moved = await saveSnapshot(vault, holding.recordId, existing, payload);
+  const { failed } = sit ? await refreshPrices(vault, on, proposals, choose, unit) : { failed: [] };
+  let undeleted = false;
+  if (displaced) {
+    try {
+      await deleteRecord(vault, displaced);
+    } catch {
+      undeleted = true;
+    }
+  }
+  return { moved, failed, undeleted };
 }
 
 /** Editing a captured rate by hand moves `proposed` to `edited` and

@@ -70,8 +70,9 @@ unit, which `net-worth-view.md` selects from the price timeline.
 
 1. User picks a holding and a date (defaults to today).
 2. User enters the value. The client shows the converted main-currency
-   figure live, using the price it already holds or the proposal for
-   that date (`record-rate.md`).
+   figure live, at the figure on the unit's rate line for that date,
+   which is the stored entry or the proposal, else at the price at that
+   date (`record-rate.md`, Reading).
 3. Client encrypts and `PUT`s the record.
 4. On success, the recording date's price entries are written
    (`record-rate.md`, The write path).
@@ -256,7 +257,9 @@ decryption warning rather than silently shaping the list.
   rule in `record-api.md`, which is the check that catches another
   session on exactly those records. The reload buys nothing there,
   because there is no slot to claim. Adding a holding that has no
-  record at the date is a create, and it brings the reload with it.
+  record at the date is a create, and it brings the reload with it, as
+  does moving an entry onto another date (Editing an existing
+  snapshot).
 - **The reload runs once per sitting, not once per row.** After it, the
   date belongs to this session: another session's attempt to create a
   recording there is refused by its own reload, so the rows that follow
@@ -352,18 +355,56 @@ fields.
 ## Editing an existing snapshot
 
 Value, note, and **date** are all editable (`ui/account-detail.md` is
-where a past snapshot is found). Editing is an ordinary versioned write,
-except when the date moves onto a date the holding already holds. An
+where a past snapshot is found). Editing is an ordinary versioned write
+of that snapshot, same `record_id`. Moving its date also ensures the new
+date's prices, and onto a date the holding already holds, deletes the
+entry there. An
 archived holding's entries are limited further (`manage-accounts.md`,
 While archived).
 
-**No edit here touches a price.** Correcting a typo in a value, or
-moving an entry from 30 July to 31 July, changes which price the holding
-is valued at only because the price for a date is looked up by date. The
-prices themselves are untouched, none is fetched, and there is no
-proposal to accept or decline. Fixing a price is a separate record,
-edited in the recording for its date (`record-rate.md`, Editing a
-captured rate).
+**Changing the value or the note touches no price.** None is fetched,
+none is written, and there is no proposal to accept or decline. Fixing
+a price is a separate record, edited in the recording for its date
+(`record-rate.md`, Editing a captured rate).
+
+**Moving the date is recording the quantity at its new date.** The
+entry leaves the recording it was in and joins the one at the new date,
+or starts one there, and the prices behave exactly as for a figure
+added at that date on the single-holding form:
+
+- **The refresh runs over the new date** (`record-rate.md`, The
+  refresh), covering the moved entry's own unit. It writes an entry
+  only for a symbol the new date has none for. With the new date's
+  prices complete it issues no request to `/api/rates`.
+- **No stored price is rewritten.** An entry already at the new date
+  stands, and the date the entry left keeps every one of its prices,
+  for the reason deleting a snapshot deletes none (Edge cases).
+- **A move that leaves its symbol without a price still saves.** When
+  the source does not answer, nothing is written for that symbol and
+  the entry reads not priced at its new date (`record-rate.md`,
+  Reading), on the recording and on the holding's page, until that date
+  has an entry. It never borrows the price of the date it left or of
+  any earlier one.
+- **The dialog shows the new date's prices as soon as the date
+  changes**, the same folded line the form shows for a new figure:
+  proposals fetched for an empty date, the missing lines filled for a
+  date that has some, and the stored ones read-only where nothing is
+  missing. Picking the entry's own date again shows its stored prices
+  and fetches nothing.
+- **Order: the snapshot `PUT`, then the rate `PUT`s, then the displaced
+  record's `DELETE`.** The quantity goes first and gates the prices, as
+  on every recording (`record-rate.md`, The write path), and the
+  deletion runs last, after every rate `PUT` has answered, so a move
+  that fails partway has destroyed nothing. A failed rate `PUT` skips
+  nothing after it. The dialog reports the entry moved and names each
+  symbol whose price did not land.
+- **A move claims its new date first**, by the pre-create reload
+  (Creating and reopening are distinct acts), and is refused whole on
+  the same terms, before its `PUT`. The snapshot keeps its `record_id`,
+  but it takes the holding's slot at the new date as a create would, so
+  that slot counts as one the move creates unless it holds the record
+  the move's confirmation named for deletion. Changing only the value or
+  the note claims nothing and runs no reload.
 
 ### Moving the date onto an occupied date
 
@@ -373,8 +414,9 @@ replaces the one being written. It must read differently:
 > 30 July already holds a snapshot of 12 100.00 USD. Moving this entry
 > there will delete it.
 
-**Order the two operations write-then-delete.** The move is a `PUT`
-(this record, new date) plus a `DELETE` (the record being displaced),
+**Order the operations write-then-delete.** The move is a `PUT` (this
+record, new date), the new date's rate `PUT`s, and a `DELETE` (the
+record being displaced), in that order (Editing an existing snapshot),
 and no transaction spans two records in this API. Delete-first risks
 losing the displaced record while the `PUT` fails, leaving a hole with
 nothing to show for it. Write-first risks a moment where two snapshots
@@ -497,8 +539,32 @@ a quiet wrong number.
   entry point and every date.
 - Editing a snapshot from a second tab with a stale `version` returns
   Conflict and does not overwrite.
-- Editing a snapshot's value, note, or date issues no request to
-  `/api/rates` and writes no `rate` record.
+- Editing a snapshot's value or note issues no request to `/api/rates`
+  and writes no `rate` record.
+- Moving a `USD` snapshot from 2010-03-31 to 2026-04-10, a date holding
+  no records, issues exactly one request to `/api/rates`, for
+  2026-04-10, and writes a `rate` entry at 2026-04-10 for every symbol
+  the refresh covers. The figure then converts at the 2026-04-10 `USD`
+  entry on that date's recording and in the holding's list of values,
+  and every `rate` entry at 2010-03-31 is byte-identical afterwards.
+- With the rate proxy answering No Content for that move, the snapshot
+  moves, no `USD` entry is written, and the figure reads not priced on
+  the 2026-04-10 recording and in the holding's list of values, never
+  at the 2010-03-31 rate.
+- Moving a snapshot onto a date whose prices are complete issues no
+  request to `/api/rates` and leaves every `rate` entry at that date
+  byte-identical. Onto a date missing one symbol, it writes that
+  symbol's entry and no other.
+- Moving an archived holding's entry to an earlier date with no entry
+  for its unit writes that unit's entry at that date.
+- A move issues the snapshot `PUT`, then every rate `PUT`, then the
+  displaced record's `DELETE`, asserted on the order of requests. With
+  the snapshot `PUT` stubbed to fail, no rate `PUT` and no `DELETE` is
+  issued. With a rate `PUT` stubbed to fail, the `DELETE` still runs
+  and the dialog names the symbol.
+- A move whose reload finds the holding's slot at the new date taken by
+  a record its confirmation did not name writes nothing and names the
+  date.
 - Confirming writes a snapshot whose `value` is the holding's last
   recorded string character for character at the new date, for a
   holding in the main currency, one with a live rate source, and one
@@ -516,9 +582,8 @@ a quiet wrong number.
 - Moving a snapshot's date onto an occupied date prompts with copy
   naming the deletion, and on confirm leaves exactly one record for that
   date.
-- The move issues the `PUT` before the `DELETE`: with the `DELETE`
-  stubbed to fail, both records still exist afterwards and neither is
-  lost.
+- With the move's `DELETE` stubbed to fail, both records still exist
+  afterwards and neither is lost.
 - With two snapshots present for one (holding, date), the history view
   shows both flagged, the client picks neither, and that date is
   excluded from the interpolated series until resolved.

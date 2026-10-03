@@ -158,6 +158,14 @@ export function markCurrentNav() {
   }
 }
 
+/** The price date line (design-system.md, Components): the day a
+ *  converted figure's price is from, beneath the figure, when that day
+ *  is earlier than the figure's own. Null otherwise. */
+export function priceDateLine(vault, priceDate, figureDate) {
+  if (!priceDate || !figureDate || priceDate >= figureDate) return null;
+  return el('span', { class: 'price-date', text: `priced ${vault.format.longDate(priceDate)}` });
+}
+
 export function clear(node) {
   node.replaceChildren();
   return node;

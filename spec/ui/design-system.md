@@ -445,6 +445,24 @@ only its own content region.
   than twelve decimal places is refused at input rather than truncated,
   and a non-numeric or malformed value is refused inline with nothing
   submitted.
+- **Price date line**: "priced 15 Jan 2024", directly beneath a
+  converted figure valued at a price from a day earlier than the one
+  the figure is shown for. Label/meta type in ink-secondary, tabular
+  figures, aligned with the figure above it. ink-secondary rather than
+  ink-muted, because the line is the only place that date is stated.
+  - The date follows Settings (`settings.md`, Dates and numbers) and
+    always carries its year, because the price it dates can be years
+    old.
+  - It sits in the figure's own cell or slot, so it is read with the
+    figure and is never a column.
+  - It never takes a status color or an icon. An old price is a date,
+    not a warning (Status).
+  - It is absent where the price is from the figure's own day, on a
+    main-currency figure, which has no price, and on a figure reading
+    "not priced".
+  - Which day counts as the figure's own is each screen's to state: the
+    recording's date, a row's date, or the dashboard's rate position
+    (`dashboard.md`, Holdings table).
 - **Password field**: `type=password` with a show-and-hide toggle,
   never auto-submitted, never logged, and cleared from the DOM on
   success. Each one carries autocomplete tokens, named by its own

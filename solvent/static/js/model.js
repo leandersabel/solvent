@@ -220,9 +220,12 @@ export class Vault {
 
   /** The distinct units the next recording refreshes: every active
    *  holding's unit, minus the main currency, whose rate is 1 by
-   *  definition and is stored nowhere (record-rate.md, The refresh). */
-  unitsToRefresh() {
+   *  definition and is stored nowhere (record-rate.md, The refresh).
+   *  `also` is a moved entry's own unit, which an archived holding's
+   *  entry brings with it. */
+  unitsToRefresh(also = null) {
     const units = new Set(this.activeHoldings().map((h) => h.payload.unit));
+    if (also) units.add(also);
     units.delete(this.mainCurrency);
     return [...units].sort();
   }
@@ -230,8 +233,8 @@ export class Vault {
   /** The units a recording at `date` would still price: those the
    *  refresh covers with no entry at that date. A date whose prices are
    *  complete asks the proxy nothing (record-rate.md, The refresh). */
-  missingUnits(date) {
-    return this.unitsToRefresh().filter(
+  missingUnits(date, also = null) {
+    return this.unitsToRefresh(also).filter(
       (unit) => !this.entriesFor(unit).some((entry) => entry.payload.date === date),
     );
   }
@@ -322,8 +325,22 @@ export class Vault {
     return { rate: decimal.parse(last.payload.rate), date: last.payload.date };
   }
 
-  /** The greatest `date` at or before `on`: what the holding was
-   *  priced at when its quantity was last recorded. */
+  /** The price a figure shown at its own date `on` takes
+   *  (record-rate.md, Reading). A unit with a rate source has the entry
+   *  at exactly that date or none, so a published price is never read
+   *  from another day. One without takes its owner's newest estimate at
+   *  or before the date, and the `date` it returns says how old that
+   *  is. */
+  priceAtDate(unit, on) {
+    if (unit === this.mainCurrency) return { rate: decimal.ONE, date: null };
+    if (!this.quotable(unit)) return this.priceOn(unit, on);
+    const found = this.usableEntries(unit).find((entry) => entry.payload.date === on);
+    return found ? { rate: decimal.parse(found.payload.rate), date: on } : null;
+  }
+
+  /** The greatest `date` at or before `on`, whatever the symbol: what
+   *  the holding was priced at when its quantity was last recorded
+   *  (record-rate.md, Reading, the price as recorded). */
   priceOn(unit, on) {
     if (unit === this.mainCurrency) return { rate: decimal.ONE, date: null };
     const entries = this.usableEntries(unit);

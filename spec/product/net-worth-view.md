@@ -46,7 +46,10 @@ holding states the date of its own last figure, and the screen states
 one date for the rates, which is the day you last recorded anything.
 Recording anything refreshes every rate, so there is one rate date for
 the whole vault rather than one per holding (`record-snapshot.md`,
-which owns that rule).
+which owns that rule). A holding valued at a price older than the date
+it is shown for, most often a price you set yourself, carries that
+price's date beside its figure, so no figure passes off an older price
+as the screen's.
 
 A **New recording** button sits here, because the total is where you
 arrive already intending to update it. It opens a date picker for the
@@ -193,7 +196,8 @@ currency, and the date that figure is as of.
 The as of date is the date of the quantity, never of the rate. A
 holding has two ages and only one of them is yours: the rate's age is
 one date for the whole screen rather than a column, because you cannot
-act on it and because it is the same for everything. The
+act on it here and it is the same for nearly everything (The total).
+The
 quantity's age sorts, which is how you find what you have not touched in
 a while without the app deciding for you what counts as too long. Each
 date in a holding's own list opens the screen of the recording that
@@ -227,6 +231,10 @@ the section needs no small print.
   checkable by hand.
 - Every figure on screen carries the date of the quantity behind it,
   and the screen carries one date for the rates it used.
+- A figure valued at a price older than the date it is shown for
+  carries that price's date beside it: older than the screen's rate
+  date on latest rates, older than the figure's own date on rates as of
+  each figure. A flat you last priced two years ago shows that date.
 - A rate written today adds a point at today and moves nothing before
   it. No past point in the chart and no quantity you recorded changes.
 - The chart's past moves only when you move it. Opening a recording
@@ -302,7 +310,9 @@ the section needs no small print.
 
   This is about the age of a quantity, the only age that is yours. A
   rate's age is the app's to keep down and it is stated once for the
-  whole screen, so there is nothing to badge there either.
+  whole screen, so there is nothing to badge there either. A price
+  older than that is dated beside the figure it values, which is a
+  date and not a warning.
 - **No rate lookup from this screen.** Opening the overview fetches
   nothing. Rates move when you record something (`record-snapshot.md`),
   which is why the control reads latest rates and not today's rates.

@@ -40,7 +40,12 @@ The view has a **pricing mode**, and it selects the price:
   holding's unit (`record-rate.md`, Reading).
 - **Rates as of each figure**: the **price as recorded** for that
   holding. This is what the holding was worth when it was last
-  recorded, which is a real question and a different number.
+  recorded, which is a real question and a different number. It takes
+  the newest entry at or before the quantity's date for every symbol,
+  published ones included, rather than reading not priced where that
+  date has no entry, because every holding in the total must carry a
+  figure for the total to add up. The figure carries the entry's date
+  instead (below).
 
 Both modes use the same quantity. The mode changes only which price is
 paired with it, and switching modes makes no network request, because
@@ -58,11 +63,13 @@ vault is whatever the last recording wrote.
   both modes (`record-rate.md`, Reading).
 - Each holding's figure carries its **quantity's as-of date** wherever
   it appears, because that is the date the person acts on
-  (`ui/update-values.md`). A row whose price is older than the newest
-  price in the vault also carries **its price's date**, since latest
-  rates is then not true of that row. That case is a holding
-  with no rate source, whose price only moves when its owner revisits
-  it.
+  (`ui/update-values.md`). A row whose price is older than the date it
+  is shown for also carries **its price's date**, so no figure passes
+  an older price off as the screen's. On latest rates that is a price
+  entry dated before the screen's rate date, the newest `date` of any
+  entry in the vault. On rates as of each figure it is a price entry
+  dated before the row's quantity date. Most often it is a holding with
+  no rate source, whose price moves only when its owner revisits it.
 - **There is no staleness threshold and no stale-holding warning.** No
   single number fits a product built on uneven cadence — a current
   holding moves monthly, unlisted property every few years — so any
@@ -473,6 +480,13 @@ the sub-pixel bound above. The figure shown is the model's.
 - A holding whose unit has a quantity but no price entry is listed as
   not priced, is excluded from the total, and its quantity never appears
   in the total unconverted.
+- On rates as of each figure, a `USD` holding whose latest quantity is
+  at 2026-04-10, with `USD` entries at 2010-03-31 only, counts in the
+  total at the 2010-03-31 rate and its row carries 2010-03-31. A row
+  whose price entry sits at its quantity date carries no price date.
+- On latest rates, in a vault whose newest entry is at 2026-04-10, a
+  free-text holding priced only at 2024-01-15 carries 2024-01-15, and a
+  `USD` holding priced at 2026-04-10 carries no price date.
 - A holding last valued in March shows an "as of March" marker and
   still contributes to the current total, with no warning attached at
   any age.

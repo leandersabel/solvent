@@ -129,7 +129,8 @@ not (architecture.md, Data model). The person sees a proposal, and
 doing nothing accepts and writes it.
 
 - **The recording date is the date of the entry being written**, the
-  sweep's date or the single-holding form's date, and not today. A
+  sweep's date, the single-holding form's date or the date a moved
+  entry lands on, and not today. A
   March figure entered in September writes its quantity at March and
   refreshes prices **at March**, so the chart's March is priced with
   March's prices. A backfill therefore inserts price knots into the
@@ -141,7 +142,10 @@ doing nothing accepts and writes it.
   An archived holding's symbol is not refreshed. **Archiving is
   recording**: its zero refreshes the archive date like any quantity,
   written while the holding is still active, so its unit is among the
-  symbols (`manage-accounts.md`, Archiving).
+  symbols (`manage-accounts.md`, Archiving). **A moved entry's own unit
+  is always among them**, so an archived holding's entry moved to an
+  earlier date (`manage-accounts.md`, While archived) is priced there
+  too.
 - **At most one refresh per recording date.** The entries for a date
   are ensured once for the whole sitting, not once per row, so a
   fifteen-row sweep writes one set of prices and issues one rate
@@ -150,10 +154,13 @@ doing nothing accepts and writes it.
   The refresh is an ensure over the recording date: it writes where the
   date has no entry for a symbol and leaves every entry that is there
   alone, so running it twice at one date is a no-op the second time.
-  Adding a value for a holding skipped at a past date is recording a
-  quantity, so it ensures that date's prices and can fill a symbol that
-  had none. Changing a figure, changing a rate, or clearing one is not
-  recording a quantity and ensures nothing.
+  **Recording a quantity means a quantity arriving at a date it was not
+  at**: a new figure, a figure added for a holding skipped at a past
+  date, and an entry moved onto another date (`record-snapshot.md`,
+  Editing an existing snapshot). Each ensures that date's prices and
+  can fill a symbol that had none. Changing a figure or a note where it
+  stands, changing a rate, or clearing a figure is not recording a
+  quantity and ensures nothing.
 - **A rate request is issued only when a symbol the date needs has no
   entry at it.** A date whose prices are complete asks the proxy
   nothing, which is why opening an old recording is silent
@@ -167,7 +174,9 @@ doing nothing accepts and writes it.
   - **No proposal came back** (provider down, circuit breaker open, No
     Content for that date) and the symbol has a previous entry, so
     **nothing is written**. The previous entry stays the symbol's
-    latest. Degraded, not wrong.
+    latest. Degraded, not wrong. The date holds no entry for the
+    symbol, so a figure at it reads not priced (Reading) until one is
+    written there.
   - **No rate source at all** (free text, or a `lookup: false` symbol)
     and a previous entry exists, so **nothing is written unless the
     person edits it**. The previous entry stays the latest, at its own
@@ -337,16 +346,39 @@ and the other after, drawing a different chart from the same vault.
 
 The client holds `symbol -> entries sorted by date` in the same
 in-memory model as everything else (`net-worth-view.md`, Data flow).
-Three definitions, used everywhere:
+These definitions are used everywhere, and no screen picks a price any
+other way:
 
 - **The latest price** for a symbol is the entry with the greatest
   `date`, never the most recently written.
+- **The price at a date** values a figure shown at its own date: a
+  recording's figures (`ui/recording-detail.md`), a holding's own list
+  of values (`ui/account-detail.md`), and the converted figure on the
+  sweep and the single-holding form wherever the unit's rate line for
+  that date holds no figure. Which entry it takes turns on whether the
+  symbol has a rate source, a row of the operator's symbol table with
+  `lookup: true` (`rate-lookup.md`):
+  - **With a rate source**, the entry at exactly that date and no
+    other. Without one, the figure is **not priced** at that date. A
+    published price exists for that day and simply was not captured,
+    so an earlier entry would show a 2026 dollar figure at a 2010 rate
+    with nothing on screen to say so.
+  - **Without a rate source** (free text, or `lookup: false`), the
+    entry with the greatest `date` at or before that date, because the
+    owner's estimate stands until they change it (The refresh). When
+    that entry's `date` is earlier than the figure's, **the figure
+    carries the entry's date**, so the age of the estimate is never
+    hidden. With no entry at or before the date, not priced.
+  - A flagged pair (Two entries on one date) is no entry at its date.
 - **The price as recorded** for a holding is the entry with the
   greatest `date` at or before the date of that holding's latest
-  quantity entry. This is what the holding was priced at when its
-  quantity was last recorded.
+  quantity entry, whatever its symbol. This is what the holding was
+  priced at when its quantity was last recorded, and it values the
+  dashboard's rates as of each figure, where a not priced holding would
+  leave the total (`net-worth-view.md`, Current net worth, which owns
+  the date such a figure carries).
 - **A unit equal to `mainCurrency`** prices at exactly `"1"`, from no
-  entry. It is not an unpriced holding.
+  entry and with no date. It is not an unpriced holding.
 
 A symbol with quantities and no entry at all leaves those holdings
 **unpriced**, which `net-worth-view.md` owns.
@@ -438,6 +470,11 @@ to win silently.
   rewrites a stored entry. The revision reaches the vault only if the
   person records at that date again, which finds an entry and writes
   nothing, or edits the entry by hand.
+- **A symbol whose `lookup` flag changes** is read by the flag as it
+  stands (`rate-lookup.md`). Once a provider makes it `true`, a past
+  figure at a date between two hand-set entries reads not priced until
+  that date has an entry, which Look it up on its recording fills. No
+  stored entry changes either way.
 - **Two symbols for the same metal** (`XAU-g` and `XAU-ozt`) are two
   series. They are priced independently and never derived from one
   another client-side, because the conversion belongs to the proxy
@@ -505,6 +542,20 @@ to win silently.
 - Adding a value for a holding skipped at a past date leaves every rate
   entry at that date byte-identical, and writes an entry only for a
   symbol that had none.
+- With `USD` entries at 2010-03-31 only, the price at a date for `USD`
+  at 2026-04-10 is none, and a `USD` figure at that date reads not
+  priced on its recording and in its holding's list of values. With an
+  entry added at 2026-04-10, it is that entry's `rate`.
+- With a free-text unit's only entry at 2024-01-15, the price at a date
+  at 2026-04-10 is that entry and carries 2024-01-15, at 2024-01-15 it
+  carries no date, and at 2024-01-14 it is none. Asserted for a
+  `lookup: false` symbol as well.
+- The main currency prices at `"1"` at any date, carrying no date.
+- A flagged pair at a date gives a symbol with a rate source no price
+  at that date.
+- The price as recorded for a `USD` holding whose latest quantity is at
+  2026-04-10, with `USD` entries at 2010-03-31 only, is the 2010-03-31
+  entry.
 - A rate-lines save changing two rates and clearing a third issues both
   rate `PUT`s before the `DELETE`.
 - With the second rate `PUT` of that save stubbed to fail, the first

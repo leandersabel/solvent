@@ -8,7 +8,8 @@ wrong figure gets found, and where the date it belongs to is one click
 away.
 
 Exercises: `spec/features/record-snapshot.md` (the editing and deleting
-half), `spec/features/manage-accounts.md` (archive lifecycle).
+half), `spec/features/manage-accounts.md` (archive lifecycle),
+`spec/features/record-rate.md` (Reading).
 
 ## Layout
 
@@ -29,11 +30,12 @@ holding's row on the dashboard.
     (`dashboard.md`). That control is a comparison, and this screen
     answers what one holding is worth now, with nothing beside it to
     compare against.
-  - **Two dates, and the second one is stated once.** The as of date is
-    the quantity's, the only age that belongs to the person. The
-    price's date is stated beside the converted figure, plainly, and
-    never as a per-row column, because it is the same for every figure
-    on this screen and nobody can act on it.
+  - **Two dates, and the second one is never a column.** The as of date
+    is the quantity's, the only age that belongs to the person. The
+    price's date is stated beside the converted figure, plainly. The
+    list below has no price-date column, because a row's price is from
+    its own date, and a row whose price is older carries that date in
+    its own cell (The holding's own list of values).
 - A holding with no snapshots shows "Not yet valued", not 0. An
   unarchived holding whose last figure is the archive's zero shows 0,
   because that zero is a figure like any other.
@@ -60,10 +62,18 @@ main currency · (row actions).
   (`recording-detail.md`). That is where the rest of that evening is,
   where the price that values this row can be corrected, and it is how
   a typo from eight months ago gets put right.
-- **In main currency** converts at the price for **that row's own
-  date**, which is what the holding was worth that day. Where the unit
-  had no price at or before that date, the cell reads "not priced"
-  rather than repeating the quantity.
+- **In main currency** converts at the price at **that row's own
+  date** (`record-rate.md`, Reading), which is what the holding was
+  worth that day. A cell that cannot convert reads "not priced", never
+  repeating the quantity.
+  - **A unit with a rate source** converts at its price at exactly that
+    date. With none there, "not priced", never a conversion at another
+    day's price.
+  - **A unit with no rate source** converts at its newest price at or
+    before that date. Where that price is from an earlier day, the price
+    date line sits beneath the figure, "priced 15 Jan 2024"
+    (`design-system.md`, Components). With no price at or before the
+    date, "not priced".
 - **There is no Rate column and no Source column.** An entry carries
   no rate at all: a quantity and a price are two separate timelines,
   and a price belongs to a unit rather than to a holding

@@ -78,6 +78,18 @@ its unit as the suffix and the converted figure right-aligned beneath
 it. The control fills a 112px column at the right, so every row's
 control lines up whatever it reads.
 
+**The converted figure uses this date's rate line** for the holding's
+unit: whatever figure the line holds, proposed, stored or typed. Where
+the line holds none, it is the price at this date (`record-rate.md`,
+Reading):
+
+- **A unit with a rate source** reads **not priced** in place of the
+  converted figure, never a conversion at the unit's last rate.
+- **A unit with no rate source** converts at its newest earlier price,
+  with the price date line beneath the converted figure, "priced 15
+  Jan 2024" (`design-system.md`, Components). With no price at or
+  before this date it reads **not priced**.
+
 **Every row states in words whether this date already holds a figure
 for it.** That sentence, not the contents of the field, is what tells a
 reader where they stand, and the two row states differ in wording and
@@ -195,8 +207,10 @@ Line states:
   color: "No market rate came back for USD. Nothing will be recorded
   for it for this date." The copy names the date rather than today,
   because a backdated sweep asks about a past date. Nothing is written
-  for that unit, the total carries on at the most recent rate it has,
-  and the line comes back filled in as soon as the source does. Nobody
+  for that unit, and every row in it reads not priced (A row). The
+  dashboard's total carries on at the most recent rate the unit has
+  (`net-worth-view.md`, Current net worth), and the line
+  comes back filled in as soon as the source does. Nobody
   is ever asked to type a dollar rate in order to record a franc
   holding.
 - **A unit only its owner can price**, free text or a symbol the proxy
@@ -281,7 +295,8 @@ Editing a filled line flips its provenance the moment it changes, to
 ## At phone width
 
 A row stacks into one column: the name with its sentence and age, then
-the quantity field with the converted figure beneath it at the left,
+the quantity field with the converted figure and any price date line
+beneath it at the left,
 then the control at full width. The rate lines stack by their own rule
 (The rates, at the foot of the sweep).
 

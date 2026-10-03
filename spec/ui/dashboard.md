@@ -56,7 +56,8 @@ Components).
   - **"Rates as of each figure"**, each holding at the rate that
     applied the day it was last recorded. In this position the label
     carries no date, because the rate date is the row's own as-of date
-    in the table below.
+    in the table below, or the date a row carries where its price is
+    older (Holdings table).
   - It changes the total, the holdings table and the breakdown, and
     **leaves the chart untouched**: every point in the chart is already
     drawn at the rates of its own date, so there is nothing there for
@@ -235,11 +236,19 @@ currency · As of · (row action).
   for everything and nobody can act on it. The quantity's age sorts,
   which is what answers "what have I not touched in a while" without a
   threshold deciding it for the user. Shown plainly, at any age.
-  - A row whose unit is priced **older than the vault's newest rate**
-    carries that price's date as well, because "latest rates" is not
-    true of that row. That is a holding nobody publishes a price for,
-    whose price moves only when its owner revisits it
-    (`net-worth-view.md`).
+  - **A row valued at a price older than the date it is shown for**
+    carries the price date line beneath its converted figure, "priced
+    15 Jan 2024" (`design-system.md`, Components), because the screen's
+    rate date is not true of that row (`net-worth-view.md`, Current net
+    worth). Which date that is follows Which rates:
+    - **Latest rates**: a price dated before the rate date in the
+      control's label.
+    - **Rates as of each figure**: a price dated before the row's own
+      As of date. A unit with a rate source reaches it where the row's
+      quantity date has no price.
+
+    Most often it is a holding nobody publishes a price for, whose
+    price moves only when its owner revisits it.
 - Holdings with no snapshots are listed in a separate "Not yet valued"
   group below the table — **not shown as 0**, which is a real value
   meaning something different.
@@ -276,9 +285,9 @@ The regions keep their order and stack, 20px apart.
   zero baseline beneath it.
 - **Holdings table**: a list rather than a table, with no column
   headings. Each row holds the name with its dimension chips beneath
-  it at the left, and at the right the main-currency figure with the
-  as-of date beneath it, preceded by the native figure where the unit
-  is not the main currency.
+  it at the left, and at the right the main-currency figure with any
+  price date line and then the as-of date beneath it, preceded by the
+  native figure where the unit is not the main currency.
 
 ## States
 

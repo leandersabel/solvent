@@ -142,6 +142,12 @@ await run(async () => {
     figure(silver.value) === 25 && silver.says.startsWith('Estimated ') && silver.says.includes('No market price for silver yet. This one is yours to set.'),
     JSON.stringify(silver),
   );
+  const silverConverted = await ev("[...document.querySelectorAll('.sweep-row')].find(r => r.querySelector('.holding-name').textContent === 'Silver coins').querySelector('.sweep-input .hint').textContent");
+  check(
+    'record-rate: a sweep row valued at the estimate carried from an earlier day dates it beneath the figure',
+    silverConverted.endsWith(`priced ${await format('longDate', D1)}`),
+    silverConverted,
+  );
   const flat = await lineState('m2');
   check('record-rate: a free-text unit says nobody publishes a price for it', flat.says.includes('Nobody publishes a price for m2'), flat.says);
   await typeRow('Art', '3');
@@ -326,8 +332,8 @@ await run(async () => {
   const silverRow = await tableRow('Silver coins');
   check(
     'record-rate: a price only its owner sets keeps its own date on screen after a recording',
-    silverRow.asOf.includes(`priced ${await format('longDate', D1)}`),
-    silverRow.asOf,
+    silverRow.converted.endsWith(`priced ${await format('longDate', D1)}`) && !silverRow.asOf.includes('priced'),
+    `${silverRow.converted} | ${silverRow.asOf}`,
   );
   const fund5 = await tableRow('Fund 5');
   check(
