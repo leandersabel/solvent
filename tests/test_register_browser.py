@@ -3,55 +3,31 @@
 from __future__ import annotations
 
 import os
-import socket
+import secrets
 import subprocess
-import sys
-import time
 
 import pytest
 
 from solvent.crypto import ZXCVBN_SRI, ZXCVBN_VERSION
-from tests.test_browser import REPO_ROOT, free_port, needs_browser
+from tests.helpers import REPO_ROOT, flask, serve
+from tests.test_browser import needs_browser
 
 RUNNER = REPO_ROOT / "tests" / "browser" / "register.mjs"
 
 
 @pytest.fixture(scope="module")
 def instance(tmp_path_factory):
-    env = dict(
-        os.environ,
-        SECRET_KEY="browser-test-key",
-        DATABASE_PATH=str(tmp_path_factory.mktemp("register") / "solvent.db"),
-    )
+    directory = tmp_path_factory.mktemp("register")
+    env = dict(os.environ, SECRET_KEY=secrets.token_hex(32), DATABASE_PATH=str(directory / "solvent.db"))
 
     def mint(kind):
-        minted = subprocess.run(
-            [sys.executable, "-m", "flask", "--app", "app", "create-invite", "--kind", kind, "--expires-days", "1"],
-            cwd=REPO_ROOT, env=env, capture_output=True, text=True, timeout=120,
-        )
+        minted = flask("create-invite", "--kind", kind, "--expires-days", "1", env=env)
         assert minted.returncode == 0, minted.stderr
         return minted.stdout.strip().split("invite=")[-1]
 
     invites = {"vault": mint("vault-owner"), "admin": mint("administrator")}
-    port = free_port()
-    server = subprocess.Popen(
-        [sys.executable, "-m", "flask", "--app", "app", "run", "--host", "::1", "--port", str(port)],
-        cwd=REPO_ROOT, env=env, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL,
-    )
-    for _ in range(80):
-        try:
-            with socket.create_connection(("::1", port), timeout=0.5):
-                break
-        except OSError:
-            time.sleep(0.25)
-    else:
-        server.kill()
-        pytest.fail("the server did not come up")
-    try:
-        yield f"http://localhost:{port}", invites, env
-    finally:
-        server.terminate()
-        server.wait(timeout=10)
+    with serve(env, directory / "server.log") as base:
+        yield base, invites, env
 
 
 @needs_browser
