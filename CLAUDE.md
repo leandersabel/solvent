@@ -237,6 +237,11 @@ the client does.
   `queued`, and when the running one merges the next starts: critical
   problems first, then high ones, then the rest, each lowest number
   first (Severity).
+- When a problem rated `severity: low` takes the slot, every other
+  `queued` problem rated low on the same feature or screen joins it in
+  one batch: one implementation, one branch and one pull request, each
+  `bug` with its own failing test, all carrying `implementing`. Every
+  other issue is implemented on its own.
 - On `claude/issue-<issue>`, the spec is brought to the requirements
   first, where it falls short, and the contracts recompiled. Then
   `engineer` implements the contract, for a
@@ -246,8 +251,8 @@ the client does.
   against the contract, and its findings go back to `engineer` for a
   bounded number of rounds.
 - The pull request's title is English and says what changes for users.
-  Its body starts with `Closes #<issue>` and says the same in the
-  issue's language, with the technical part collapsed. Auto-merge is on
+  Its body starts with a `Closes #<issue>` line for each issue it
+  fixes and says the same in the issue's language, with the technical part collapsed. Auto-merge is on
   from the start.
 - An implementation never changes `spec/requirements.md` or the
   pipeline. When a requirement has to change, the issue goes back to
@@ -362,7 +367,8 @@ found and even when QA saw it once.
 - Release notes are assembled from the merged pull requests' titles,
   without a model, grouped into changes and fixes, fixes found by QA,
   and maintenance. Each line names who asked, who approved the spec
-  and who implemented it.
+  and who implemented it. A batch is one line naming who asked for each
+  fix in it.
 - Deploying is the client's. Watching the repository's releases
   notifies the client of every version.
 
@@ -392,6 +398,10 @@ found and even when QA saw it once.
   fixes it on the same branch. When it still fails after a bounded
   number of attempts, or reviewer findings remain, the pull request
   becomes a draft without auto-merge and the issue is `stuck`.
+- A fix in a batch that cannot be finished, or whose rating rises above
+  low, leaves the batch for the queue, and the rest go on. One that
+  needs a requirement change goes back to clarifying. When the fix of
+  the issue that took the slot fails, the batch is `stuck`.
 - Every merge to `master` rebases the loop's open pull requests.
 - A failing check on `master` opens a `bug` issue as
   `github-actions[bot]`, which starts at once and skips the
