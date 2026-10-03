@@ -1,0 +1,68 @@
+{
+ "latest": {
+  "total": {
+   "exact": "-137249.73453835",
+   "display": "-137250"
+  },
+  "assets": {
+   "exact": "12550.26546165",
+   "display": "12550"
+  },
+  "debts": {
+   "exact": "-149800",
+   "display": "-149800"
+  },
+  "holdings": {
+   "Checking": {
+    "exact": "6400",
+    "display": "6400.00"
+   },
+   "Dollar account": {
+    "exact": "1705.099053",
+    "display": "1705.10"
+   },
+   "Gold bars": {
+    "exact": "4445.16640865",
+    "display": "4445.17"
+   },
+   "Mortgage": {
+    "exact": "-149800",
+    "display": "-149800.00"
+   }
+  },
+  "excluded": {}
+ },
+ "asRecorded": {
+  "total": {
+   "exact": "-137249.73453835",
+   "display": "-137250"
+  },
+  "assets": {
+   "exact": "12550.26546165",
+   "display": "12550"
+  },
+  "debts": {
+   "exact": "-149800",
+   "display": "-149800"
+  },
+  "holdings": {
+   "Checking": {
+    "exact": "6400",
+    "display": "6400.00"
+   },
+   "Dollar account": {
+    "exact": "1705.099053",
+    "display": "1705.10"
+   },
+   "Gold bars": {
+    "exact": "4445.16640865",
+    "display": "4445.17"
+   },
+   "Mortgage": {
+    "exact": "-149800",
+    "display": "-149800.00"
+   }
+  },
+  "excluded": {}
+ }
+}

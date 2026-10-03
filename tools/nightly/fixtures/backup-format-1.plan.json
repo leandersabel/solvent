@@ -1,0 +1,70 @@
+{
+ "partial": true,
+ "accounts": [
+  {
+   "username": "legacy.admin",
+   "password": "granite orchard vellum tundra",
+   "kind": "administrator",
+   "mainCurrency": "CHF",
+   "covers": [],
+   "about": "The administrator who made the invite."
+  },
+  {
+   "username": "legacy.owner",
+   "password": "quill marble thicket ember",
+   "kind": "vault_owner",
+   "mainCurrency": "CHF",
+   "covers": [
+    "older-backup"
+   ],
+   "about": "The vault the older backup file holds.",
+   "backup": true,
+   "created": "2024-01-02",
+   "profile": {
+    "groupSeparator": "none"
+   },
+   "holdings": [
+    {
+     "name": "Checking",
+     "unit": "CHF"
+    },
+    {
+     "name": "Dollar account",
+     "unit": "USD"
+    },
+    {
+     "name": "Gold bars",
+     "unit": "XAU-ozt"
+    },
+    {
+     "name": "Mortgage",
+     "unit": "CHF"
+    }
+   ],
+   "steps": [
+    {
+     "recording": {
+      "date": "2024-01-31",
+      "figures": {
+       "Checking": "6200.00",
+       "Dollar account": "2000.00",
+       "Gold bars": "2.5",
+       "Mortgage": "-150000.00"
+      }
+     }
+    },
+    {
+     "recording": {
+      "date": "2024-02-29",
+      "figures": {
+       "Checking": "6400.00",
+       "Dollar account": "2100.00",
+       "Gold bars": "2.5",
+       "Mortgage": "-149800.00"
+      }
+     }
+    }
+   ]
+  }
+ ]
+}

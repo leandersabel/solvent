@@ -17,5 +17,8 @@ instance/
 # Vendored node package unpacked for tools/vendor-argon2id.py
 package/
 
+# Tonight's prepared nightly data (tools/nightly/fixtures.mjs)
+tools/nightly/fixtures/out/
+
 # Real credentials for a manual tester run -- never committed
 *.local.json

@@ -12,9 +12,10 @@ instance
 .DS_Store
 node_modules
 
-# The design, the agents, and the tests are not part of the image.
+# The design, the agents, the tests and the tooling are not part of the image.
 spec
 tests
+tools
 .claude
 CLAUDE.md
 README.md

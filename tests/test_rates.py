@@ -8,7 +8,9 @@ never made.
 from __future__ import annotations
 
 import json
+import ssl
 import time
+import urllib.request
 from datetime import date, timedelta
 
 import pytest
@@ -490,3 +492,236 @@ def test_every_outbound_request_is_named(monkeypatch):
         rates._fetch_json("https://api.frankfurter.dev/v1/2026-01-01?base=CHF")
 
     assert seen[0].get_header("User-agent") == rates.USER_AGENT
+
+
+# ---- The outbound request, composition, floors and settings ----------
+
+
+@pytest.fixture
+def opener(monkeypatch):
+    """The app's opener, stubbed to answer by URL and record every
+    request, so the assertions are about what would have gone out."""
+    requests = []
+    answers = {"fx": lambda url: None, "nbp": lambda url: None}
+
+    class Response:
+        status = 200
+
+        def __init__(self, payload):
+            self.payload = json.dumps(payload).encode()
+
+        def read(self, _size=None):
+            return self.payload
+
+        def __enter__(self):
+            return self
+
+        def __exit__(self, *_):
+            return False
+
+    def open_(request, timeout=None):
+        requests.append(request)
+        kind = "nbp" if "nbp.pl" in request.full_url else "fx"
+        return Response(answers[kind](request.full_url))
+
+    monkeypatch.setattr(rates._opener, "open", open_)
+    rates.breaker.record_success()
+    return type("Opener", (), {"requests": requests, "answers": answers})()
+
+
+def _publish(opener, *, pln="4.2537", usd="1.0876", cena=251.37, data=PAST):
+    opener.answers["fx"] = lambda url: {
+        "amount": 1,
+        "base": url.rsplit("base=", 1)[1],
+        "date": data,
+        "rates": {"PLN": float(pln), "USD": float(usd)},
+    }
+    opener.answers["nbp"] = lambda url: [{"data": data, "cena": cena}]
+
+
+def test_the_module_constants_the_source_check_imports_are_exactly_named():
+    assert rates.FX_URL == "https://api.frankfurter.dev/v1/{date}?base={quote}"
+    assert rates.NBP_URL == "https://api.nbp.pl/api/cenyzlota/{start}/{end}?format=json"
+    assert rates.USER_AGENT == "Solvent/1.0 (self-hosted net worth tracker)"
+    assert rates.EGRESS_TIMEOUT_SECONDS == 5
+    assert rates.MAX_RESPONSE_BYTES == 1024 * 1024
+    assert {row["symbol"] for row in rates.SEEDED_SYMBOLS} >= {"CHF", "XAU-g"}
+    assert not hasattr(rates, "FX_HOST") and not hasattr(rates, "NBP_HOST")
+
+
+@pytest.mark.parametrize(
+    "symbol, quote, expected",
+    [
+        ("USD", "CHF", [rates.FX_URL.format(date=PAST, quote="CHF")]),
+        (
+            "XAU-g",
+            "PLN",
+            [
+                rates.FX_URL.format(date=PAST, quote="PLN"),
+                rates.NBP_URL.format(start="2026-07-17", end=PAST),
+            ],
+        ),
+        (
+            "XAU-g",
+            "CHF",
+            [
+                rates.FX_URL.format(date=PAST, quote="CHF"),
+                rates.NBP_URL.format(start="2026-07-17", end=PAST),
+            ],
+        ),
+    ],
+)
+def test_every_outbound_request_is_a_template_with_only_its_placeholders_filled(
+    owner, opener, symbol, quote, expected
+):
+    _publish(opener)
+    response = owner.get(
+        f"/api/rates?date={PAST}&quote={quote}&symbol={symbol}", headers=CSRF
+    )
+    assert response.status_code == 200
+    assert sorted(r.full_url for r in opener.requests) == sorted(expected)
+    for request in opener.requests:
+        assert dict(request.header_items()) == {
+            "User-agent": "Solvent/1.0 (self-hosted net worth tracker)",
+            "Accept": "application/json",
+        }
+
+
+def test_a_proposal_equals_the_pinned_composition_digit_for_digit(owner, opener):
+    from decimal import ROUND_HALF_EVEN, Decimal
+
+    _publish(opener)
+    body = owner.get(f"/api/rates?date={PAST}&quote=CHF", headers=CSRF).get_json()["rates"]
+
+    def eight(value):
+        return format(value.quantize(Decimal("0.00000001"), ROUND_HALF_EVEN).normalize(), "f")
+
+    gram = Decimal("251.37") * (Decimal(1) / Decimal("4.2537"))
+    assert body["USD"]["rate"] == "0.91945568" == eight(Decimal(1) / Decimal("1.0876"))
+    assert body["XAU-g"]["rate"] == eight(gram)
+    assert body["XAU-ozt"]["rate"] == eight(gram * Decimal("31.1034768"))
+
+
+@pytest.mark.parametrize(
+    "symbol, day, status",
+    [
+        ("USD", "1998-12-31", 400),
+        ("USD", "1999-01-04", 200),
+        ("XAU-g", "2012-12-31", 400),
+        ("XAU-g", "2013-01-02", 200),
+    ],
+)
+def test_each_class_has_its_own_floor_on_both_sides(owner, opener, symbol, day, status):
+    _publish(opener, data=day)
+    response = owner.get(
+        f"/api/rates?date={day}&quote=CHF&symbol={symbol}", headers=CSRF
+    )
+    assert response.status_code == status
+    assert bool(opener.requests) == (status == 200)
+
+
+_CONFIG_VARIABLES = {
+    "DATABASE_PATH": None,
+    "HSTS_PRELOAD": "1",
+    "HSTS_MAX_AGE": "60",
+    "TRUSTED_PROXY_HOPS": "1",
+    "LOGIN_ATTEMPTS_PER_ACCOUNT": "7",
+    "LOGIN_ACCOUNT_WINDOW_MINUTES": "7",
+    "LOGIN_LOCKOUT_THRESHOLD": "7",
+    "LOGIN_LOCKOUT_WINDOW_MINUTES": "7",
+    "LOGIN_LOCKOUT_MINUTES": "7",
+    "LOGIN_FAILURES_PER_ADDRESS": "7",
+    "LOGIN_ADDRESS_WINDOW_MINUTES": "7",
+    "LOGIN_ADDRESS_LOCK_MINUTES": "7",
+    "VERIFY_CONCURRENCY": "2",
+    "VERIFY_WAIT_SECONDS": "7",
+    "RATE_REQUESTS_PER_HOUR": "99",
+    "RATE_BREAKER_FAILURES": "3",
+    "RATE_BREAKER_COOLOFF_MINUTES": "3",
+    "EXPORTS_PER_USER_HOUR": "3",
+}
+_PROXY_VARIABLES = {"http_proxy", "https_proxy", "no_proxy", "all_proxy", "ftp_proxy"}
+
+
+class _RecordingEnviron(dict):
+    """Records each name the app's own code reads. A whole-environment
+    iteration by anything but urllib, which reads the `*_proxy` names
+    that way, is recorded as `*`."""
+
+    reads: set
+
+    def _caller(self):
+        import sys
+
+        frame = sys._getframe(3)
+        while frame.f_globals["__name__"] in ("os", "collections.abc", "_collections_abc"):
+            frame = frame.f_back
+        return frame.f_globals["__name__"]
+
+    def _note(self, name):
+        if self._caller().startswith("solvent"):
+            self.reads.add(name)
+
+    def get(self, name, default=None):
+        self._note(name)
+        return super().get(name, default)
+
+    def __getitem__(self, name):
+        self._note(name)
+        return super().__getitem__(name)
+
+    def __contains__(self, name):
+        self._note(name)
+        return super().__contains__(name)
+
+    def __iter__(self):
+        self._note("*")
+        return super().__iter__()
+
+    def items(self):
+        self._note("*")
+        return super().items()
+
+    def keys(self):
+        self._note("*")
+        return super().keys()
+
+
+def test_the_only_environment_the_app_reads_is_its_configuration_and_none_of_it_names_a_provider(
+    tmp_path, monkeypatch, opener
+):
+    import os
+
+    environ = _RecordingEnviron(os.environ)
+    environ.reads = set()
+    for name, value in _CONFIG_VARIABLES.items():
+        environ[name] = value or str(tmp_path / "env.db")
+    for name in _PROXY_VARIABLES:
+        environ[name] = "http://proxy.invalid:3128"
+    environ["SECRET_KEY"] = "test-only-secret-key-do-not-use-in-prod"
+    monkeypatch.setattr(os, "environ", environ)
+
+    from solvent import create_app
+
+    app = create_app({"TESTING": True})
+    client, _ = register(app, "owner")
+    _publish(opener)
+    assert client.get(f"/api/rates?date={PAST}&quote=CHF", headers=CSRF).status_code == 200
+
+    # LOGIN_REQUESTS_PER_IP_HOUR is read only to refuse it (app-shell.md,
+    # Configuration).
+    named = set(_CONFIG_VARIABLES) | {"SECRET_KEY", "LOGIN_REQUESTS_PER_IP_HOUR"}
+    assert environ.reads <= named | _PROXY_VARIABLES
+    assert {"SECRET_KEY", *_CONFIG_VARIABLES} <= environ.reads
+    assert sorted(r.full_url for r in opener.requests) == sorted(
+        [
+            rates.FX_URL.format(date=PAST, quote="CHF"),
+            rates.NBP_URL.format(start="2026-07-17", end=PAST),
+        ]
+    )
+    # The opener's context verifies the certificate against the
+    # provider's own name, and no setting changed that.
+    https = [h for h in rates._opener.handlers if isinstance(h, urllib.request.HTTPSHandler)]
+    assert [(h._context.verify_mode, h._context.check_hostname) for h in https] == [
+        (ssl.CERT_REQUIRED, True)
+    ]
