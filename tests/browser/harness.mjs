@@ -252,14 +252,16 @@ export const inDatabase = (needles) => {
   const bytes = readFileSync(process.env.DATABASE_PATH);
   return needles.filter((needle) => bytes.includes(Buffer.from(needle, 'utf8')));
 };
-export const vaultValue = (body) =>
-  page.eval(`(async () => {
+// `read` is a function of the page's vault and then `args`, which reach
+// it as data. Its source is the only code text built here.
+export const vaultValue = (read, ...args) =>
+  page.call(`async (...args) => {
     const v = (await import('/static/js/session.js')).currentVault();
-    return JSON.stringify(${body});
-  })()`).then(JSON.parse);
-export const payloadOf = (id) => vaultValue(`v.holdings.get('${id}') ? v.holdings.get('${id}').payload : null`);
+    return JSON.stringify((${read})(v, ...args));
+  }`, ...args).then(JSON.parse);
+export const payloadOf = (id) => vaultValue((v, at) => (v.holdings.get(at) ? v.holdings.get(at).payload : null), id);
 export const idNamed = (name) =>
-  vaultValue(`[...v.holdings.values()].filter(h => h.payload.name === ${JSON.stringify(name)}).map(h => h.recordId)`);
+  vaultValue((v, wanted) => [...v.holdings.values()].filter((h) => h.payload.name === wanted).map((h) => h.recordId), name);
 // The model read afresh from the store, and the screen redrawn from
 // it, without a derivation.
 export const reloadModel = async (hash = '#/') => {
@@ -268,22 +270,22 @@ export const reloadModel = async (hash = '#/') => {
     location.hash = '#/reloading';
   })()`);
   await page.frames();
-  await page.eval(`location.hash = ${JSON.stringify(hash)}`);
+  await page.call((next) => { location.hash = next; }, hash);
   await page.frames();
 };
 export const openHolding = async (id) => {
-  await page.eval(`location.hash = '#/holding/${id}'`);
+  await page.call((at) => { location.hash = `#/holding/${at}`; }, id);
   await page.waitUntil("document.querySelector('.detail-header')", { label: 'a holding screen' });
   await page.frames();
 };
 export const inDialog = (label) =>
-  page.eval(`[...document.querySelectorAll('.dialog button')].find(b => b.textContent === ${JSON.stringify(label)}).click()`);
+  page.call((name) => [...document.querySelectorAll('.dialog button')].find((b) => b.textContent === name).click(), label);
 export const choose = (selector, value) =>
-  page.eval(`(() => {
-    const node = document.querySelector(${JSON.stringify(selector)});
-    node.value = ${JSON.stringify(value)};
+  page.call((query, next) => {
+    const node = document.querySelector(query);
+    node.value = next;
     node.dispatchEvent(new Event('change', { bubbles: true }));
-  })()`);
+  }, selector, value);
 export const writesSeen = () => page.eval('window.__writes.splice(0)');
 export const recordReads = () =>
   page.eval("performance.getEntriesByType('resource').filter(e => e.name.includes('/api/records?type=')).length");
@@ -328,18 +330,18 @@ export const landing = async (act) => {
 // as `username`, which for a vault owner must hold the unlocked vault.
 export const WEAK_MEMORY = 32768;
 export async function makeStale(session, username, password) {
-  await session.eval(`(async () => {
+  await session.call(async (secret, memory) => {
     const api = await import('/static/js/api.js');
     const c = await import('/static/js/crypto.js');
     const s = await import('/static/js/session.js');
     const kdf = JSON.parse(document.getElementById('kdf-envelope').textContent);
     const salt = c.b64encode(c.randomBytes(16));
-    const keys = await c.deriveKeys(${JSON.stringify(password)}, salt, { ...kdf, m: ${WEAK_MEMORY} });
+    const keys = await c.deriveKeys(secret, salt, { ...kdf, m: memory });
     const body = { salt, kdf, authKey: keys.authKey };
     const vault = s.currentVault();
     if (vault) Object.assign(body, await c.wrapDek(vault.dek, keys.masterKey));
     await api.post('/api/auth/upgrade-kdf', body);
-  })()`);
+  }, password, WEAK_MEMORY);
   sql(
     `UPDATE credentials SET params = json_set(params, '$.kdf.m', ?)
      WHERE principal_id = (SELECT id FROM principals WHERE username = ?)`,
@@ -352,34 +354,34 @@ export async function makeStale(session, username, password) {
 // typed only where the card asks for it.
 export const signInOn = async (session, password, username = null) => {
   await session.waitUntil("document.querySelector('#unlock-password')", { label: 'the sign-in card' });
-  await session.eval(`(() => {
+  await session.call((secret, name) => {
     const set = (selector, value) => {
       const node = document.querySelector(selector);
       node.value = value;
       node.dispatchEvent(new Event('input', { bubbles: true }));
     };
-    if (${JSON.stringify(username)} && document.querySelector('#unlock-username')) {
-      set('#unlock-username', ${JSON.stringify(username)});
+    if (name && document.querySelector('#unlock-username')) {
+      set('#unlock-username', name);
     }
-    set('#unlock-password', ${JSON.stringify(password)});
+    set('#unlock-password', secret);
     document.querySelector('button[type=submit]').click();
-  })()`);
+  }, password, username);
 };
 
 // The password alone, on a card that knows the username.
 export const enterPasswordOn = async (session, password) => {
   await session.waitUntil("document.querySelector('#unlock-password')", { label: 'the password card' });
-  await session.eval(`(() => {
+  await session.call((secret) => {
     const node = document.querySelector('#unlock-password');
-    node.value = ${JSON.stringify(password)};
+    node.value = secret;
     node.dispatchEvent(new Event('input', { bubbles: true }));
     document.querySelector('button[type=submit]').click();
-  })()`);
+  }, password);
 };
 
 export const text = () => page.eval('document.body.innerText');
 export const labels = (selector) =>
-  page.eval(`[...document.querySelectorAll(${JSON.stringify(selector)})].map(n => n.textContent.trim())`);
+  page.call((query) => [...document.querySelectorAll(query)].map((n) => n.textContent.trim()), selector);
 export const click = async (label) => {
   await page.waitUntil(
     (name) => [...document.querySelectorAll('button, a')].some((b) => b.textContent.trim() === name),
@@ -409,14 +411,14 @@ export const enterPassword = async (password) => {
 // back under a freshly generated DEK, through the module the transfer
 // screen runs. Returns what a fresh unlock reads back.
 export const importOwnExport = () =>
-  page.eval(`(async () => {
+  page.call(async (password) => {
     const api = await import('/static/js/api.js');
     const c = await import('/static/js/crypto.js');
     const s = await import('/static/js/session.js');
     const t = await import('/static/js/transfer.js');
     const file = t.checkFile(await (await fetch('/api/export', { headers: { 'X-Solvent-Request': '1' } })).json());
 
-    const { fileDek } = await t.openFile(file, ${JSON.stringify(VAULT_PASSWORD)});
+    const { fileDek } = await t.openFile(file, password);
     // Re-key: a freshly generated DEK, never the file's.
     const { dek: newDek, records: rekeyed } = await t.rekey(fileDek, file.records);
     const wrapper = await s.wrapForMaster(newDek);
@@ -434,21 +436,21 @@ export const importOwnExport = () =>
       rekeyed: fileRaw !== newRaw,
       kinds: [...new Set(file.records.map(r => r.recordType))].sort(),
     });
-  })()`);
+  }, VAULT_PASSWORD);
 
 // Records the client's own rules would never write, encrypted with the
 // page's own crypto under the unlocked vault's DEK and PUT straight to
 // the record API. Each is { type, payload, accountId?, recordId?,
 // version? }; the ids come back in order.
 export const plant = (records) =>
-  page.eval(`(async () => {
+  page.call(async (planted) => {
     const api = await import('/static/js/api.js');
     const c = await import('/static/js/crypto.js');
     const s = await import('/static/js/session.js');
     const { SCHEMA_VERSION } = await import('/static/js/model.js');
     const dek = s.currentVault().dek;
     const ids = [];
-    for (const r of ${JSON.stringify(records)}) {
+    for (const r of planted) {
       const slot = {
         recordId: r.recordId || c.uuid4(), recordType: r.type, accountId: r.accountId ?? null,
         schemaVersion: SCHEMA_VERSION, version: r.version || 1,
@@ -461,7 +463,7 @@ export const plant = (records) =>
       ids.push(slot.recordId);
     }
     return ids;
-  })()`);
+  }, records);
 
 // A clock the test can move, installed before any page script runs.
 // Every timer still fires on its own in real time; `advance` moves the
@@ -527,17 +529,17 @@ export const reachable = async (needles) => {
 // sign-in must reach the vault without one, because the keys live in
 // the document's memory and a new document has none (login.md, Rules;
 // register.md, Flow).
-export const markDocument = (session, name) => session.eval(`window.__sitting = ${JSON.stringify(name)}`);
+export const markDocument = (session, name) => session.call((sitting) => { window.__sitting = sitting; }, name);
 
 // Whether `session` is in the vault, in the document marked `name`:
 // the keys in memory, no card asking for a password, and the chrome a
 // vault owner has.
 export const sitting = async (session, name) =>
-  JSON.parse(await session.eval(`(async () => {
+  JSON.parse(await session.call(async (marked) => {
     const s = await import('/static/js/session.js');
     const bar = document.querySelector('.topbar');
     return JSON.stringify({
-      sameDocument: window.__sitting === ${JSON.stringify(name)},
+      sameDocument: window.__sitting === marked,
       keys: s.currentVault() !== null,
       card: Boolean(document.querySelector('#unlock-password')),
       path: location.pathname,
@@ -549,7 +551,7 @@ export const sitting = async (session, name) =>
       passwordFields: document.querySelectorAll('input[type=password]').length,
       title: document.title,
     });
-  })()`));
+  }, name));
 
 // What chrome a person can see, by what is rendered and not by what is
 // in the DOM: a bar with `hidden` is present and not drawn. Outside the

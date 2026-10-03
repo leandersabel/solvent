@@ -35,11 +35,11 @@ await run(async () => {
   // ---- Dates and numbers -------------------------------------------------
 
   const setSelect = async (id, value) => {
-    await page.eval(`(() => {
-      const node = document.getElementById('${id}');
-      node.value = ${JSON.stringify(value)};
+    await page.call((selectId, next) => {
+      const node = document.getElementById(selectId);
+      node.value = next;
       node.dispatchEvent(new Event('change', { bubbles: true }));
-    })()`);
+    }, id, value);
   };
   await setSelect('format-locale', 'de-CH');
   await setSelect('format-group', 'apostrophe');
@@ -83,11 +83,11 @@ await run(async () => {
   // Decimals on money = None: a holding in a currency loses its cents
   // (8300.50 is a tie and rounds to the even franc), one in another unit
   // shows exactly the digits stored (12.125 ounces must not read 12.12).
-  const nativeFigure = (name) => page.eval(`(() => {
+  const nativeFigure = (name) => page.call((holding) => {
     const row = [...document.querySelectorAll('.data-table tbody tr')]
-      .find((r) => r.querySelector('.row-name')?.textContent === ${JSON.stringify(name)});
+      .find((r) => r.querySelector('.row-name')?.textContent === holding);
     return row.querySelector('.cell-native').textContent;
-  })()`);
+  }, name);
   const dollars = await nativeFigure('UBS dollar account');
   const gold = await nativeFigure('Gold bars');
   check('a dollar holding on the dashboard reads without cents', dollars === 'USD 8’300', dollars);
@@ -96,7 +96,7 @@ await run(async () => {
     ['UBS dollar account', 'USD 8’300', '8’300'],
     ['Gold bars', '12.125 ozt', '12.125'],
   ]) {
-    await page.eval(`[...document.querySelectorAll('.data-table tbody .row-name')].find((b) => b.textContent === ${JSON.stringify(name)}).click()`);
+    await page.call((holding) => [...document.querySelectorAll('.data-table tbody .row-name')].find((b) => b.textContent === holding).click(), name);
     await page.waitUntil("location.hash.startsWith('#/holding/') && document.querySelector('.card .data-table tbody tr td.numeric')", { label: `${name} page` });
     const header = await page.eval("document.querySelector('.hero-figure').textContent");
     const first = await page.eval("document.querySelector('.card .data-table tbody tr td.numeric').textContent");
@@ -107,10 +107,10 @@ await run(async () => {
     // changes only the note writes the stored string character for
     // character, not the prefill read again.
     const stored = name === 'Gold bars' ? '12.125' : '8300.50';
-    const valuesOf = () => page.eval(`(async () => {
+    const valuesOf = () => page.call(async (figure) => {
       const v = (await import('/static/js/session.js')).currentVault();
-      return JSON.stringify([...v.snapshots.values()].flat().filter((x) => x.payload.value === ${JSON.stringify(stored)}).map((x) => x.payload.value));
-    })()`);
+      return JSON.stringify([...v.snapshots.values()].flat().filter((x) => x.payload.value === figure).map((x) => x.payload.value));
+    }, stored);
     await page.eval("[...document.querySelectorAll('.card .data-table tbody tr')][0].querySelectorAll('button.btn-inline').forEach((b) => b.textContent === 'Edit' && b.click())");
     await page.waitUntil("document.querySelector('#snapshot-value')", { label: `${name} edit dialog` });
     const prefill = await page.eval("document.querySelector('#snapshot-value').value");
@@ -247,15 +247,15 @@ await run(async () => {
   await page.eval("document.querySelector('.danger-zone .btn-destructive').click()");
   await page.waitUntil("document.querySelector('.dialog input')", { label: 'the deletion dialog' });
   const deleteState = (password, typed) =>
-    page.eval(`(() => {
+    page.call((secret, username) => {
       const dialog = document.querySelector('.dialog');
       const [pw, name] = dialog.querySelectorAll('input');
-      pw.value = ${JSON.stringify(password)};
+      pw.value = secret;
       pw.dispatchEvent(new Event('input', { bubbles: true }));
-      name.value = ${JSON.stringify(typed)};
+      name.value = username;
       name.dispatchEvent(new Event('input', { bubbles: true }));
       return dialog.querySelector('.btn-destructive').disabled;
-    })()`);
+    }, password, typed);
   const gates = [
     await deleteState('', 'leander'),
     await deleteState('something', 'Leander'),
@@ -463,7 +463,7 @@ await run(async () => {
     const minted = { token: mintInvite('vault-owner') };
     const other = leaving.session;
     await other.goto(`${BASE}/register?invite=${minted.token}`);
-    await other.eval(`(() => {
+    await other.call((secret) => {
       const set = (selector, value, index = 0) => {
         const node = document.querySelectorAll(selector)[index];
         node.value = value;
@@ -471,13 +471,13 @@ await run(async () => {
         node.dispatchEvent(new Event('change', { bubbles: true }));
       };
       set('input[type=text]', 'leaving');
-      set('input[type=password]', ${JSON.stringify(LEAVING_PASSWORD)}, 0);
-      set('input[type=password]', ${JSON.stringify(LEAVING_PASSWORD)}, 1);
+      set('input[type=password]', secret, 0);
+      set('input[type=password]', secret, 1);
       set('select', 'CHF');
       const box = document.querySelector('input[type=checkbox]');
       box.checked = true;
       box.dispatchEvent(new Event('change', { bubbles: true }));
-    })()`);
+    }, LEAVING_PASSWORD);
     await other.waitUntil("!document.querySelector('button[type=submit]').disabled", { label: 'the registration button' });
     await markDocument(other, 'leaving');
     await other.eval("document.querySelector('button[type=submit]').click()");
@@ -497,7 +497,7 @@ await run(async () => {
     check('the vault to delete is at old parameters', JSON.parse(leavingRow.params).kdf.m === WEAK_MEMORY);
 
     const fillDelete = () =>
-      other.eval(`(() => {
+      other.call((secret) => {
         if (!document.querySelector('.dialog')) {
           const zone = document.querySelector('.danger-zone');
           zone.open = true;
@@ -505,12 +505,12 @@ await run(async () => {
         }
         const dialog = document.querySelector('.dialog');
         const [pw, name] = dialog.querySelectorAll('input');
-        pw.value = ${JSON.stringify(LEAVING_PASSWORD)};
+        pw.value = secret;
         pw.dispatchEvent(new Event('input', { bubbles: true }));
         name.value = 'leaving';
         name.dispatchEvent(new Event('input', { bubbles: true }));
         dialog.querySelector('.btn-destructive').click();
-      })()`);
+      }, LEAVING_PASSWORD);
     const releaseDelete = await intercept(other, '*/api/auth/account', (request) =>
       request.method === 'DELETE' ? { status: 500 } : null,
     );

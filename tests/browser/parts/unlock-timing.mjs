@@ -50,22 +50,22 @@ await run(async () => {
       };
     })()`);
     const signIn = (username) =>
-      clean.eval(`(async () => {
+      clean.call(async (name, password) => {
         const set = (selector, value) => {
           const node = document.querySelector(selector);
           node.value = value;
           node.dispatchEvent(new Event('input', { bubbles: true }));
         };
         const before = window.__waits.length;
-        set('#unlock-username', ${JSON.stringify(username)});
-        set('#unlock-password', ${JSON.stringify(VAULT_PASSWORD)});
+        set('#unlock-username', name);
+        set('#unlock-password', password);
         const button = document.querySelector('button[type=submit]');
         button.click();
         while (window.__waits.length === before || button.disabled) {
           await new Promise((r) => setTimeout(r, 25));
         }
         return window.__waits[before];
-      })()`);
+      }, username, VAULT_PASSWORD);
 
     const cases = { 'vault owner': 'leander', administrator: 'ops.leander', unknown: 'nobody-at-all' };
     const waits = Object.fromEntries(Object.keys(cases).map((name) => [name, []]));

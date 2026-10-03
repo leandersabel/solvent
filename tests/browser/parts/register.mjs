@@ -128,21 +128,21 @@ await run(async () => {
     const traffic = watched[watched.length - 1].requests;
     await registrant.goto(`${BASE}/register?invite=${registrantInvite}`);
     const fillRegistration = (name = 'registrant') =>
-      registrant.eval(`(() => {
+      registrant.call((username, password) => {
         const set = (selector, value, index = 0) => {
           const node = document.querySelectorAll(selector)[index];
           node.value = value;
           node.dispatchEvent(new Event('input', { bubbles: true }));
           node.dispatchEvent(new Event('change', { bubbles: true }));
         };
-        set('input[type=text]', ${JSON.stringify(name)});
-        set('input[type=password]', ${JSON.stringify(REGISTRANT_PASSWORD)}, 0);
-        set('input[type=password]', ${JSON.stringify(REGISTRANT_PASSWORD)}, 1);
+        set('input[type=text]', username);
+        set('input[type=password]', password, 0);
+        set('input[type=password]', password, 1);
         set('select', 'CHF');
         const box = document.querySelector('input[type=checkbox]');
         box.checked = true;
         box.dispatchEvent(new Event('change', { bubbles: true }));
-      })()`);
+      }, name, REGISTRANT_PASSWORD);
     await fillRegistration();
     await buttonUnlocked(registrant);
     await markDocument(registrant, 'registrant');
@@ -222,7 +222,7 @@ await run(async () => {
     await release2();
 
     release2 = await registerUntilUnread('registrant.idle');
-    await registrant.eval(`window.testClock.advance(${16 * MINUTE})`);
+    await registrant.call((ms) => window.testClock.advance(ms), 16 * MINUTE);
     await registrant.waitUntil("document.querySelector('#unlock-password')", { label: 'the idle lock of the unread vault' });
     const idled = await sitting(registrant, 'registrant.idle');
     check(

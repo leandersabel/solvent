@@ -81,18 +81,18 @@ await run(async () => {
       return send(path, init);
     };
   })()`);
-  const renameField = "document.querySelector('.card-head input')";
   const renameButton = (label) =>
-    page.eval(
-      `[...document.querySelectorAll('.card-head button')].find(b => b.textContent === ${JSON.stringify(label)}).click()`,
+    page.call(
+      (name) => [...document.querySelectorAll('.card-head button')].find(b => b.textContent === name).click(),
+      label,
     );
   await renameButton('Edit');
   await setValue('.card-head input', 'Liquid assets');
-  await page.eval(`${renameField}.blur(); document.body.click()`);
+  await page.call(() => { document.querySelector('.card-head input').blur(); document.body.click(); });
   await page.idle();
   check(
     'clicking away from a rename writes nothing and leaves it open',
-    (await page.eval('window.__puts')) === 0 && !(await page.eval(`Boolean(${renameField}.closest('[hidden]'))`)),
+    (await page.eval('window.__puts')) === 0 && !(await page.call(() => Boolean(document.querySelector('.card-head input').closest('[hidden]')))),
   );
   await setValue('.card-head input', '   ');
   await renameButton('Save');
@@ -100,7 +100,7 @@ await run(async () => {
   check(
     'a blank rename is refused and keeps what was typed',
     (await page.eval('window.__puts')) === 0 &&
-      (await page.eval(`${renameField}.value`)) === '   ' &&
+      (await page.call(() => document.querySelector('.card-head input').value)) === '   ' &&
       (await text()).includes('A name cannot be blank.'),
   );
   await setValue('.card-head input', 'Liquid assets');
@@ -180,28 +180,28 @@ await run(async () => {
   // Holdings filed under the values, which is the holding form's write
   // and not this screen's.
   const [liquidity] = await dims();
-  await page.eval(`(async () => {
+  await page.call(async (dimensionId) => {
     const s = await import('/static/js/session.js');
     const writes = await import('/static/js/writes.js');
     const v = s.currentVault();
-    const d = v.dimensions.find((x) => x.id === ${JSON.stringify(liquidity.id)});
+    const d = v.dimensions.find((x) => x.id === dimensionId);
     const valueOf = (label) => d.values.find((x) => x.label === label).id;
     const filing = { 'Cantonal account': 'Cash', 'UBS dollar account': 'Investments', 'Gold bars': 'Investments', Mortgage: 'Retirement' };
     for (const h of v.activeHoldings()) {
       await writes.saveHolding(v, h, { ...h.payload, dims: { ...h.payload.dims, [d.id]: valueOf(filing[h.payload.name]) } });
     }
-  })()`);
+  }, liquidity.id);
   const holdingsBefore = accountRecords();
 
   writeCounts['reorder a value'] = await writesOf('the reorder', () => inRow('Cash', 'Move down'));
   const reordered = await liveValues();
   await page.eval("location.hash = '#/'");
   await page.waitUntil("document.querySelector('.chart-controls select')", { label: 'the dashboard to group' });
-  await page.eval(`(() => {
+  await page.call((dimensionId) => {
     const select = document.querySelector('.chart-controls select');
-    select.value = ${JSON.stringify(liquidity.id)};
+    select.value = dimensionId;
     select.dispatchEvent(new Event('change', { bubbles: true }));
-  })()`);
+  }, liquidity.id);
   await page.frames();
   const bandOrder = await labels('.legend-name');
   check(
@@ -246,9 +246,8 @@ await run(async () => {
 
   // The next id the page mints is made to collide with one the profile
   // already holds, which the uniqueness check has to catch.
-  await page.eval(`(() => {
+  await page.call((taken) => {
     const real = crypto.getRandomValues.bind(crypto);
-    const taken = ${JSON.stringify(liquidity.id)};
     let armed = true;
     crypto.getRandomValues = (array) => {
       if (armed && array.length === 8) {
@@ -258,7 +257,7 @@ await run(async () => {
       }
       return real(array);
     };
-  })()`);
+  }, liquidity.id);
   writeCounts['create a flag'] = await writesOf('the flag', async () => {
     await click('+ Create a dimension');
     await inDialog(['Emergency fund'], 'Create a flag');
@@ -401,16 +400,16 @@ await run(async () => {
 
   // Another tab writes the profile first, with the dimension renamed.
   const relabelElsewhere = (label) =>
-    page.eval(`(async () => {
+    page.call(async (dimensionId, next) => {
       const v = (await import('/static/js/session.js')).currentVault();
       const api = await import('/static/js/api.js');
       const c = await import('/static/js/crypto.js');
       const { SCHEMA_VERSION } = await import('/static/js/model.js');
       const record = v.profileRecord;
-      const payload = { ...v.profile, dimensions: v.dimensions.map((d) => (d.id === ${JSON.stringify(liquidity.id)} ? { ...d, label: ${JSON.stringify(label)} } : d)) };
+      const payload = { ...v.profile, dimensions: v.dimensions.map((d) => (d.id === dimensionId ? { ...d, label: next } : d)) };
       const slot = { recordId: record.recordId, recordType: 'profile', accountId: null, schemaVersion: SCHEMA_VERSION, version: record.version + 1 };
       await api.put('/api/records/' + slot.recordId, { recordType: 'profile', accountId: null, schemaVersion: slot.schemaVersion, version: slot.version, ...(await c.encryptRecord(v.dek, slot, payload)) });
-    })()`);
+    }, liquidity.id, label);
   const otherTab = 'Liquidity, from another tab';
   await relabelElsewhere(otherTab);
   expectedFailures.add('/api/records/');

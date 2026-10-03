@@ -182,7 +182,7 @@ await run(async () => {
           return { x: box.x + box.width / 2, y: box.y + box.height / 2 };
         })()`);
         await who.session.mouseClick(at.x, at.y);
-        await who.session.waitUntil(`location.pathname === '${to}'`, { timeout: 30000, label: `Go to Solvent for ${name}` });
+        await who.session.waitUntil((path) => location.pathname === path, { args: [to], timeout: 30000, label: `Go to Solvent for ${name}` });
         check(`Go to Solvent leads ${name} to ${to}`, true);
       }
     } finally {

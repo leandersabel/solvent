@@ -328,14 +328,14 @@ await run(async () => {
     // One submission, what the card does at once, and what it shows
     // once it has an answer.
     const attempt = (username, password) =>
-      card.eval(`(async () => {
+      card.call(async (name, secret) => {
         const set = (selector, value) => {
           const node = document.querySelector(selector);
           node.value = value;
           node.dispatchEvent(new Event('input', { bubbles: true }));
         };
-        set('#unlock-username', ${JSON.stringify(username)});
-        set('#unlock-password', ${JSON.stringify(password)});
+        set('#unlock-username', name);
+        set('#unlock-password', secret);
         const form = document.querySelector('form');
         const button = form.querySelector('button[type=submit]');
         const error = form.querySelector('.field-error');
@@ -352,7 +352,7 @@ await run(async () => {
           above: Boolean(error.compareDocumentPosition(document.querySelector('#unlock-password')) & Node.DOCUMENT_POSITION_FOLLOWING),
           form: form.innerHTML,
         });
-      })()`).then(JSON.parse);
+      }, username, password).then(JSON.parse);
 
     const failures = {
       'a vault owner': await attempt('leander', 'not the password at all'),

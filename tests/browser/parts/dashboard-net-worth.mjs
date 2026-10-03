@@ -152,7 +152,7 @@ await run(async () => {
     titleBefore !== titleNow && nextOnPast === false &&
       (await ev("document.querySelector('.dialog .date-title').textContent")) === titleNow &&
       (await ev("document.querySelector('.dialog [aria-label=\"Next month\"]').disabled")) === true &&
-      (await ev("[...document.querySelectorAll('.dialog .date-day')].filter(b => b.dataset.date > " + JSON.stringify(T) + ").every(b => b.disabled)")),
+      (await rec.call((today) => [...document.querySelectorAll('.dialog .date-day')].filter(b => b.dataset.date > today).every(b => b.disabled), T)),
   );
   traffic.length = 0;
   await realClick(`.dialog .date-day[data-date="${T}"]`);
@@ -225,12 +225,12 @@ await run(async () => {
     svg.dispatchEvent(new PointerEvent('pointermove', { clientX: box.right - 10, clientY: box.top + 20, bubbles: true }));
   })()`);
   await rec.frames();
-  const literal = await ev(`JSON.stringify({
-    row: [...document.querySelectorAll('.holdings-table .row-name')].some(n => n.textContent === ${JSON.stringify(script)}),
-    legend: [...document.querySelectorAll('.legend-name')].some(n => n.textContent === ${JSON.stringify(script)}),
-    tooltip: document.querySelector('.chart-readout').textContent.includes(${JSON.stringify(script)}),
-    chip: [...document.querySelectorAll('.holdings-table .chip')].some(n => n.textContent === 'Liquidity: ' + ${JSON.stringify(script)}),
-  })`).then(JSON.parse);
+  const literal = await rec.call((markup) => ({
+    row: [...document.querySelectorAll('.holdings-table .row-name')].some(n => n.textContent === markup),
+    legend: [...document.querySelectorAll('.legend-name')].some(n => n.textContent === markup),
+    tooltip: document.querySelector('.chart-readout').textContent.includes(markup),
+    chip: [...document.querySelectorAll('.holdings-table .chip')].some(n => n.textContent === 'Liquidity: ' + markup),
+  }), script);
   check(
     'net-worth-view: a holding and a dimension value named as a script read as literal text in the table, the legend and the tooltip',
     literal.row && literal.legend && literal.tooltip && literal.chip &&
@@ -240,13 +240,13 @@ await run(async () => {
 
   // Hover, the keyboard and a drag across the plot.
   const pointer = (type, across) =>
-    ev(`(() => {
+    rec.call((name, fraction) => {
       const svg = document.querySelector('svg.trend');
       const box = svg.getBoundingClientRect();
-      svg.dispatchEvent(new PointerEvent(${JSON.stringify(type)}, {
-        clientX: box.left + box.width * ${across}, clientY: box.top + 40, button: 0, bubbles: true,
+      svg.dispatchEvent(new PointerEvent(name, {
+        clientX: box.left + box.width * fraction, clientY: box.top + 40, button: 0, bubbles: true,
       }));
-    })()`);
+    }, type, across);
   await go('#/');
   const total = await ev("document.querySelector('.hero-amount').textContent");
   await pointer('pointermove', 0.5);
@@ -270,9 +270,9 @@ await run(async () => {
   // ---- Reading a date: every calendar day in the range is readable ----
   // The recorder's history has snapshots on four dates, 200 days apart
   // at most, and nothing between.
-  const { first, last } = await model('{ first: dayNumber(v.recordingDates()[0]), last: dayNumber(v.chartLastDate()) }');
+  const { first, last } = await model(({ v, dayNumber }) => ({ first: dayNumber(v.recordingDates()[0]), last: dayNumber(v.chartLastDate()) }));
   const rangeDays = last - first;
-  const marks = await model('v.quantityDates()');
+  const marks = await model(({ v }) => v.quantityDates());
   const plot = JSON.parse(await ev(`JSON.stringify((() => {
     const svg = document.querySelector('svg.trend');
     const box = svg.getBoundingClientRect();
@@ -282,12 +282,12 @@ await run(async () => {
   // Day k of the range sits at x0 + k * (x1 - x0) / n across the plot.
   const xOf = (k) => plot.left + (plot.x0 + (k * (plot.x1 - plot.x0)) / rangeDays) * plot.scale;
   const pointAt = (type, k) =>
-    ev(`(() => {
+    rec.call((name, clientX) => {
       const svg = document.querySelector('svg.trend');
-      svg.dispatchEvent(new PointerEvent(${JSON.stringify(type)}, {
-        clientX: ${xOf(k)}, clientY: svg.getBoundingClientRect().top + 40, button: 0, bubbles: true,
+      svg.dispatchEvent(new PointerEvent(name, {
+        clientX, clientY: svg.getBoundingClientRect().top + 40, button: 0, bubbles: true,
       }));
-    })()`);
+    }, type, xOf(k));
   const reading = () =>
     ev(`JSON.stringify({
       at: document.querySelector('.hero-at').textContent,
@@ -299,12 +299,12 @@ await run(async () => {
   // What the value model says for day k, formatted the way the screen writes it.
   const modelAt = async (k, dimensionId = null) => ({
     date: await format('longDate', isoOf(first + k)),
-    ...(await model(`(() => {
-      const dimension = v.activeDimensions().find(d => d.id === ${JSON.stringify(dimensionId)}) || null;
-      const bands = v.valuesAt(dimension, ${first + k});
+    ...(await model(({ v }, id, day) => {
+      const dimension = v.activeDimensions().find(d => d.id === id) || null;
+      const bands = v.valuesAt(dimension, day);
       const net = bands.reduce((sum, band) => sum + band.value, 0n);
       return { rows: bands.map(b => b.label + v.format.money(b.value)), net: 'Net' + v.format.money(net), hero: v.format.whole(net) };
-    })()`)),
+    }, dimensionId, first + k)),
   });
   const sameAs = (got, want) =>
     got.date === want.date && got.at === `on ${want.date}` && got.net === want.net && got.hero === want.hero &&
@@ -312,7 +312,7 @@ await run(async () => {
 
   // Days nothing was recorded on, between the recorded ones.
   const unrecorded = [dayOf(ago(150)) - first, dayOf(ago(55)) - first];
-  const recordedDays = await model('v.recordingDates()');
+  const recordedDays = await model(({ v }) => v.recordingDates());
   const hovers = [];
   for (const k of unrecorded) {
     await pointAt('pointermove', k);
@@ -326,24 +326,24 @@ await run(async () => {
   );
 
   // One pixel column at a time across the plot.
-  const walk = JSON.parse(await ev(`(async () => {
+  const walk = JSON.parse(await rec.call(async (range, firstDay, plotShape) => {
     const { currentVault } = await import('/static/js/session.js');
     const { isoFromDay } = await import('/static/js/model.js');
     const v = currentVault();
     const svg = document.querySelector('svg.trend');
     const days = new Map();
-    for (let k = 0; k <= ${rangeDays}; k++) days.set(v.format.longDate(isoFromDay(${first} + k)), k);
-    const columns = Math.floor((${plot.x1} - ${plot.x0}) * ${plot.scale});
+    for (let k = 0; k <= range; k++) days.set(v.format.longDate(isoFromDay(firstDay + k)), k);
+    const columns = Math.floor((plotShape.x1 - plotShape.x0) * plotShape.scale);
     const read = [];
     for (let c = 0; c <= columns; c++) {
       svg.dispatchEvent(new PointerEvent('pointermove', {
-        clientX: ${plot.left} + ${plot.x0} * ${plot.scale} + c, clientY: svg.getBoundingClientRect().top + 40, bubbles: true,
+        clientX: plotShape.left + plotShape.x0 * plotShape.scale + c, clientY: svg.getBoundingClientRect().top + 40, bubbles: true,
       }));
       read.push(days.get(document.querySelector('.readout-date').textContent));
     }
     svg.dispatchEvent(new PointerEvent('pointerleave', { bubbles: true }));
     return JSON.stringify({ read, columns });
-  })()`));
+  }, rangeDays, first, plot));
   check(
     'net-worth-view: the pointer walked one pixel column at a time never reads backward, starts at the first day, ends at the last, and reads every day where the plot is wide enough',
     walk.read.every((k, i) => k !== undefined && (i === 0 || k >= walk.read[i - 1])) && walk.read[0] === 0 && walk.read.at(-1) === rangeDays &&
@@ -360,17 +360,18 @@ await run(async () => {
   };
   // The gutter exists only on a wide chart.
   const spots = [
-    ...(plot.x0 > 20 ? [`${plot.left + (plot.x0 - 20) * plot.scale}, box.top + 40`] : []),
-    `${xOf(unrecorded[0])}, box.bottom - 10`,
+    ...(plot.x0 > 20 ? [{ x: plot.left + (plot.x0 - 20) * plot.scale, fromTop: 40 }] : []),
+    { x: xOf(unrecorded[0]), fromBottom: 10 },
   ];
   for (const spot of spots) {
     const showed = await insideHero();
-    await ev(`(() => {
+    await rec.call((at) => {
       const svg = document.querySelector('svg.trend');
       const box = svg.getBoundingClientRect();
-      const [clientX, clientY] = [${spot}];
+      const clientX = at.x;
+      const clientY = at.fromTop === undefined ? box.bottom - at.fromBottom : box.top + at.fromTop;
       svg.dispatchEvent(new PointerEvent('pointermove', { clientX, clientY, bubbles: true }));
-    })()`);
+    }, spot);
     offPlot.push({
       showed,
       crosshair: await ev("document.querySelector('.crosshair').getAttribute('visibility')"),
@@ -403,11 +404,11 @@ await run(async () => {
 
   // The keyboard, in a zone whose clocks changed inside the range.
   await rec.send('Emulation.setTimezoneOverride', { timezoneId: 'Australia/Sydney' });
-  const crossed = await ev(`(() => {
+  const crossed = await rec.call((range, firstDay) => {
     const offsets = new Set();
-    for (let k = 0; k <= ${rangeDays}; k++) offsets.add(new Date((${first} + k) * 86400000).getTimezoneOffset());
+    for (let k = 0; k <= range; k++) offsets.add(new Date((firstDay + k) * 86400000).getTimezoneOffset());
     return offsets.size > 1;
-  })()`);
+  }, rangeDays, first);
   const key = async (name, shift = false) => {
     await rec.key(name, { shift });
     await rec.frames();
@@ -427,18 +428,18 @@ await run(async () => {
   await key('ArrowRight');
   const stayedEnd = await shown();
   // The same days by the pointer, in the page, day by day.
-  const pointed = JSON.parse(await ev(`(() => {
+  const pointed = JSON.parse(await rec.call((range, plotShape) => {
     const svg = document.querySelector('svg.trend');
     const out = [];
-    for (let k = 0; k <= ${rangeDays}; k++) {
+    for (let k = 0; k <= range; k++) {
       svg.dispatchEvent(new PointerEvent('pointermove', {
-        clientX: ${plot.left} + (${plot.x0} + k * (${plot.x1} - ${plot.x0}) / ${rangeDays}) * ${plot.scale}, clientY: svg.getBoundingClientRect().top + 40, bubbles: true,
+        clientX: plotShape.left + (plotShape.x0 + k * (plotShape.x1 - plotShape.x0) / range) * plotShape.scale, clientY: svg.getBoundingClientRect().top + 40, bubbles: true,
       }));
       out.push(document.querySelector('.hero-at').textContent + '|' + document.querySelector('.chart-readout').textContent);
     }
     svg.dispatchEvent(new PointerEvent('pointerleave', { bubbles: true }));
     return JSON.stringify(out);
-  })()`));
+  }, rangeDays, plot));
   const everyDate = [];
   for (let k = 0; k <= rangeDays; k++) everyDate.push(`on ${await format('longDate', isoOf(first + k))}`);
   check(
@@ -529,10 +530,10 @@ await run(async () => {
   const markedClick = await ev('location.hash');
   await go('#/');
   await rec.frames();
-  await ev(`(() => {
-    const tick = [...document.querySelectorAll('.entry-mark')].find(t => t.querySelector('title').textContent.startsWith(${JSON.stringify(await format('longDate', D10))}));
+  await rec.call((label) => {
+    const tick = [...document.querySelectorAll('.entry-mark')].find(t => t.querySelector('title').textContent.startsWith(label));
     tick.dispatchEvent(new MouseEvent('click', { bubbles: true }));
-  })()`);
+  }, await format('longDate', D10));
   await rec.frames();
   const tickClick = await ev('location.hash');
   check(
@@ -565,14 +566,14 @@ await run(async () => {
       })`)),
       want: {
         since: `from ${await format('longDate', isoOf(first + lo))} to ${await format('longDate', isoOf(first + hi))}`,
-        ...(await model(`(() => {
+        ...(await model(({ v }, earlyDay, lateDay) => {
           const dimension = v.activeDimensions().find(d => d.id === 'liq');
-          const early = v.valuesAt(dimension, ${first + lo});
-          const late = v.valuesAt(dimension, ${first + hi});
+          const early = v.valuesAt(dimension, earlyDay);
+          const late = v.valuesAt(dimension, lateDay);
           const total = (bands) => bands.reduce((sum, band) => sum + band.value, 0n);
           const sign = (n) => (n > 0n ? '+' : '') + v.format.whole(n);
           return { delta: v.mainCurrency + ' ' + sign(total(late) - total(early)), deltas: late.map((band, i) => sign(band.value - early[i].value)) };
-        })()`)),
+        }, first + lo, first + hi)),
       },
     });
   }
@@ -600,17 +601,17 @@ await run(async () => {
   await go('#/');
   const warning = await ev("document.querySelector('.banner-critical span').textContent");
   const listed = await ev("[...document.querySelectorAll('.unreadable-list li')].map(n => n.textContent)");
-  const priced = await model(`{
-    shown: decimal.format(v.priceAt('USD', dayNumber('${between}'))),
-    expected: decimal.format(decimal.interpolate(dayNumber('${between}'), dayNumber('${D2}'), decimal.parse('0.92'),
-      dayNumber('${D10}'), decimal.parse('${proposalsFor(D10).USD.rate}'))),
-  }`);
+  const priced = await model(({ v, decimal, dayNumber }, day, earlier, later, laterRate) => ({
+    shown: decimal.format(v.priceAt('USD', dayNumber(day))),
+    expected: decimal.format(decimal.interpolate(dayNumber(day), dayNumber(earlier), decimal.parse('0.92'),
+      dayNumber(later), decimal.parse(laterRate))),
+  }), between, D2, D10, proposalsFor(D10).USD.rate);
   check(
     'net-worth-view: one unreadable record is named in the warning, and its symbol prices from the neighboring entries',
     warning === '1 record could not be read.' && listed.includes(corrupt) && priced.shown === priced.expected,
     JSON.stringify({ warning, listed, priced }),
   );
-  await unwatched(() => ev(`(async () => { await (await import('/static/js/api.js')).del('/api/records/${corrupt}'); })()`));
+  await unwatched(() => rec.call(async (id) => { await (await import('/static/js/api.js')).del(`/api/records/${id}`); }, corrupt));
   await reread();
 
   // The provider revises what it published. Nothing was recorded, so

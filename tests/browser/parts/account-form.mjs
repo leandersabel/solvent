@@ -29,8 +29,8 @@ await run(async () => {
     })()`));
     await setValue('#holding-name', name);
     const option = `#holding-unit-list [data-symbol="${unit}"]`;
-    await page.waitUntil(`document.querySelector('${option}')`, { label: `the ${unit} option` });
-    await page.eval(`document.querySelector('${option}').click()`);
+    await page.waitUntil((query) => document.querySelector(query), { args: [option], label: `the ${unit} option` });
+    await page.call((query) => document.querySelector(query).click(), option);
     await page.eval("document.querySelector('.dialog button[type=submit]').click()");
     await page.waitUntil('!document.querySelector(".dialog")', { label: `${name} to save` });
     await page.idle();
@@ -71,7 +71,7 @@ await run(async () => {
 
     // A second value on the existing dimension and a second dimension,
     // written to the profile as the dimensions screen would.
-    const profile = await vaultValue('{ recordId: v.profileRecord.recordId, version: v.profileRecord.version, profile: v.profile }');
+    const profile = await vaultValue((v) => ({ recordId: v.profileRecord.recordId, version: v.profileRecord.version, profile: v.profile }));
     const liquid = profile.profile.dimensions.find((d) => d.label === 'Liquid assets');
     await plant([{
       type: 'profile',
@@ -169,13 +169,13 @@ await run(async () => {
     await inDialog('Add');
     await page.waitUntil("[...document.querySelectorAll('.dialog select[aria-label=\"Region\"] option')].some(o => o.textContent === 'Offshore' && o.selected)", { label: 'the new value, selected' });
     await page.eval("[...document.querySelectorAll('.dialog button')].find(b => b.textContent === '+ New dimension').click()");
-    await page.eval(`(() => {
+    await page.call((axisLabel, bandLabel) => {
       const inputs = document.querySelectorAll('.dialog .new-dimension input');
-      inputs[0].value = ${JSON.stringify(AXIS)};
-      inputs[1].value = ${JSON.stringify(BAND)};
-    })()`);
+      inputs[0].value = axisLabel;
+      inputs[1].value = bandLabel;
+    }, AXIS, BAND);
     await inDialog('Add');
-    await page.waitUntil(`[...document.querySelectorAll('.dialog .checkbox')].some(l => l.textContent === ${JSON.stringify(AXIS)} && l.querySelector('input').checked)`, { label: 'the new dimension, set' });
+    await page.waitUntil((axisLabel) => [...document.querySelectorAll('.dialog .checkbox')].some((l) => l.textContent === axisLabel && l.querySelector('input').checked), { args: [AXIS], label: 'the new dimension, set' });
     await choose('.dialog select[aria-label="Liquid assets"]', 'retire01');
     const readsBeforeSave = await recordReads();
     await page.eval("document.querySelector('.dialog button[type=submit]').click()");
@@ -187,8 +187,8 @@ await run(async () => {
 
     const [probeId] = await idNamed(NAME);
     const saved = await payloadOf(probeId);
-    const axis = await vaultValue(`v.dimensions.find(d => d.label === ${JSON.stringify(AXIS)})`);
-    const offshore = await vaultValue("v.dimensions.find(d => d.id === 'region01').values.find(x => x.label === 'Offshore').id");
+    const axis = await vaultValue((v, value) => v.dimensions.find(d => d.label === value), AXIS);
+    const offshore = await vaultValue((v) => v.dimensions.find(d => d.id === 'region01').values.find(x => x.label === 'Offshore').id);
     check(
       'creating a holding stores exactly one account record',
       sql(`SELECT record_id FROM records ${OWN} AND record_type = 'account'`).length === accountsBefore + 1 && Boolean(rowOf(probeId)),
@@ -270,10 +270,10 @@ await run(async () => {
     check('with no values, one sentence and the primary action', (await text()).includes('No snapshots yet. Record what this holding is worth.'));
     await click('Record a value');
     await page.waitUntil("document.querySelector('#snapshot-value')", { label: 'the value form' });
-    const pastDay = await page.eval(`(async () => {
+    const pastDay = await page.call(async (day) => {
       const v = (await import('/static/js/session.js')).currentVault();
-      return v.format.date('${BACKDATE}');
-    })()`);
+      return v.format.date(day);
+    }, BACKDATE);
     await setValue('#snapshot-date', pastDay);
     await setValue('#snapshot-value', '5000');
     await page.eval("document.querySelector('.dialog textarea').value = 'kept in the safe'; document.querySelector('.dialog textarea').dispatchEvent(new Event('input', { bubbles: true }))");
@@ -350,7 +350,7 @@ await run(async () => {
     // is redone against it.
     await click('Edit');
     await page.waitUntil("document.querySelector('#holding-name')", { label: 'the editor before the conflict' });
-    const current = await vaultValue(`{ version: v.holdings.get('${probeId}').version, payload: v.holdings.get('${probeId}').payload }`);
+    const current = await vaultValue((v, id) => ({ version: v.holdings.get(id).version, payload: v.holdings.get(id).payload }), probeId);
     provoked.push(`/api/records/${probeId}`);
     await plant([{ type: 'account', recordId: probeId, version: current.version + 1, payload: { ...current.payload, name: 'Changed in another tab' } }]);
     await page.eval("document.querySelectorAll('#app details').forEach(d => (d.open = true))");
@@ -389,14 +389,14 @@ await run(async () => {
       chart.dispatchEvent(new PointerEvent('pointermove', { clientX: box.right - 30, clientY: box.top + box.height / 2, bubbles: true }));
     })()`);
     await page.frames();
-    const places = JSON.parse(await page.eval(`JSON.stringify({
-      row: [...document.querySelectorAll('.holdings-table .row-name')].some(b => b.textContent === ${JSON.stringify(NAME)}),
+    const places = JSON.parse(await page.call((holding) => JSON.stringify({
+      row: [...document.querySelectorAll('.holdings-table .row-name')].some(b => b.textContent === holding),
       legend: [...document.querySelectorAll('.legend-name')].map(n => n.textContent),
       grouping: [...document.querySelectorAll('.chart-controls select option')].map(o => o.textContent),
       heading: document.querySelector('.chart-card .section-heading').textContent,
       readout: document.querySelector('.chart-readout').textContent,
       chips: [...document.querySelectorAll('.holdings-table .chip')].map(c => c.textContent),
-    })`));
+    }), NAME));
     check(
       'markup in a name, a note and a label is literal in the list, the legend, the heading and the tooltip',
       places.row && places.legend.includes(BAND) && places.grouping.includes(AXIS) &&
@@ -417,18 +417,25 @@ await run(async () => {
     await page.eval(`document.querySelector('.link-row[href="/settings/dimensions"]').click()`);
     await page.waitUntil("document.body.innerText.includes('Region')", { label: 'the dimensions screen' });
     await page.frames();
-    const card = (label) =>
-      `[...document.querySelectorAll('section.card')].find(c => c.querySelector('.card-head .strong')?.textContent === ${JSON.stringify(label)})`;
-    const inCard = (label, button, within = '') =>
-      page.eval(`[...${card(label)}.querySelectorAll('${within} button')].find(b => b.textContent === ${JSON.stringify(button)}).click()`);
-    await page.eval(`${card('Region')}.querySelector('.card-head .btn-inline').click()`);
-    await page.eval(`(() => {
-      const input = ${card('Region')}.querySelector('.card-head input');
+    // A dimension's card is found by its label, in one place, which the
+    // dimensions screen's own document keeps for the checks below.
+    await page.call(() => {
+      window.cardOf = (label) => [...document.querySelectorAll('section.card')]
+        .find((c) => c.querySelector('.card-head .strong')?.textContent === label);
+    });
+    // A button on a dimension's card, both named as data.
+    const inCard = (label, button) =>
+      page.call((wanted, name) => [...window.cardOf(wanted).querySelectorAll('button')]
+        .find((b) => b.textContent === name).click(), label, button);
+    await page.call(() => window.cardOf('Region').querySelector('.card-head .btn-inline').click());
+    await page.call(() => {
+      const input = window.cardOf('Region').querySelector('.card-head input');
       input.value = 'Area';
       input.dispatchEvent(new Event('input', { bubbles: true }));
-    })()`);
-    await page.eval(`[...${card('Region')}.querySelectorAll('.card-head button')].find(b => b.textContent === 'Save').click()`);
-    await page.waitUntil(`${card('Area')}`, { label: 'the renamed dimension' });
+    });
+    await page.call(() => [...window.cardOf('Region').querySelectorAll('.card-head button')]
+      .find((b) => b.textContent === 'Save').click());
+    await page.waitUntil((label) => window.cardOf(label), { args: ['Area'], label: 'the renamed dimension' });
     await page.idle();
     check(
       "renaming a dimension's label writes the profile alone and leaves every account record byte-identical",
@@ -437,10 +444,12 @@ await run(async () => {
 
     // An archived value reads as Unassigned, and restoring it brings the
     // assignment back, with no account record written either way.
-    await landing(() => page.eval(`[...[...${card('Area')}.querySelectorAll('li.value-row')].find(r => r.querySelector('.strong').textContent === 'Home').querySelectorAll(':scope > button')].find(b => b.textContent === 'Archive').click()`));
-    const bandWhileArchived = await vaultValue(`v.bandOf(v.holdings.get('${probeId}'), v.dimensions.find(d => d.id === 'region01')).label`);
+    await landing(() => page.call(() => [...[...window.cardOf('Area').querySelectorAll('li.value-row')]
+      .find(r => r.querySelector('.strong').textContent === 'Home').querySelectorAll(':scope > button')]
+      .find(b => b.textContent === 'Archive').click()));
+    const bandWhileArchived = await vaultValue((v, id) => v.bandOf(v.holdings.get(id), v.dimensions.find(d => d.id === 'region01')).label, probeId);
     await landing(() => inCard('Area', 'Restore'));
-    const bandRestored = await vaultValue(`v.bandOf(v.holdings.get('${probeId}'), v.dimensions.find(d => d.id === 'region01')).label`);
+    const bandRestored = await vaultValue((v, id) => v.bandOf(v.holdings.get(id), v.dimensions.find(d => d.id === 'region01')).label, probeId);
     check(
       'a holding whose value is archived reads Unassigned, and restoring it restores the assignment with no account write',
       bandWhileArchived === 'Unassigned' && bandRestored === 'Home' && accountRows() === accountsAtRename &&
@@ -478,7 +487,7 @@ await run(async () => {
     await page.waitUntil("document.querySelector('.link-row[href=\"/settings/dimensions\"]')", { label: 'settings again' });
     await page.eval(`document.querySelector('.link-row[href="/settings/dimensions"]').click()`);
     await page.waitUntil("document.body.innerText.includes('Area')", { label: 'the dimensions screen again' });
-    await landing(() => page.eval(`[...document.querySelectorAll('.settings-row')].find(r => r.querySelector('span').textContent === ${JSON.stringify(AXIS)}).querySelector('button').click()`));
+    await landing(() => page.call((label) => [...document.querySelectorAll('.settings-row')].find(r => r.querySelector('span').textContent === label).querySelector('button').click(), AXIS));
     await openHolding(probeId);
     check(
       'restoring the dimension restores the assignment without writing an account record',
@@ -496,12 +505,12 @@ await run(async () => {
     })`));
     await page.eval("document.querySelector('.dialog input[value=delete]').click()");
     await page.frames();
-    const permanently = "[...document.querySelectorAll('.dialog button')].find(b => b.textContent === 'Delete permanently')";
+    const permanently = () => [...document.querySelectorAll('.dialog button')].find(b => b.textContent === 'Delete permanently').disabled;
     const deleteCopy = (await text()).includes('This also deletes 1 recorded values. Your past net worth figures will change.');
     await setValue('#delete-name', 'Not the name');
-    const wrongName = await page.eval(`${permanently}.disabled`);
+    const wrongName = await page.call(permanently);
     await setValue('#delete-name', NAME);
-    const rightName = await page.eval(`${permanently}.disabled`);
+    const rightName = await page.call(permanently);
     check(
       'Delete on a holding with values offers archive, preselected, and permanent delete behind the typed name',
       offered.archive && offered.both === 2 && deleteCopy && wrongName && !rightName,

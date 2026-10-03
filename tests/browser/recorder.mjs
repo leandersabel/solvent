@@ -104,15 +104,15 @@ export async function startRecorder() {
   // The page has finished what it was doing, its requests included.
   const quiet = () => rec.idle();
   const set = (selector, value, index = 0) =>
-    ev(`(() => {
-      const node = document.querySelectorAll(${JSON.stringify(selector)})[${index}];
-      node.value = ${JSON.stringify(value)};
+    rec.call((query, at, next) => {
+      const node = document.querySelectorAll(query)[at];
+      node.value = next;
       node.dispatchEvent(new Event('input', { bubbles: true }));
       node.dispatchEvent(new Event('change', { bubbles: true }));
-    })()`);
+    }, selector, index, value);
   const press = async (label, scope = '') => {
-    await ev(`[...document.querySelectorAll(${JSON.stringify(`${scope} button, ${scope} a`)})]
-      .find(b => b.textContent.trim() === ${JSON.stringify(label)}).click()`);
+    await rec.call((query, name) => [...document.querySelectorAll(query)]
+      .find(b => b.textContent.trim() === name).click(), `${scope} button, ${scope} a`, label);
     await quiet();
   };
   // What a person does, through the protocol. element.click() ignores
@@ -120,14 +120,14 @@ export async function startRecorder() {
   // every check made with it. A real mouse event lands on whatever is
   // painted at the point, which is the only way to test "can be pressed".
   const centerOf = (selector, label = null) =>
-    ev(`(() => {
-      const nodes = [...document.querySelectorAll(${JSON.stringify(selector)})];
-      const node = ${label === null ? 'nodes[0]' : `nodes.find(n => n.textContent.trim() === ${JSON.stringify(label)})`};
+    rec.call((query, name) => {
+      const nodes = [...document.querySelectorAll(query)];
+      const node = name === null ? nodes[0] : nodes.find(n => n.textContent.trim() === name);
       if (!node) return null;
       node.scrollIntoView({ block: 'center' });
       const r = node.getBoundingClientRect();
       return { x: r.left + r.width / 2, y: r.top + r.height / 2 };
-    })()`);
+    }, selector, label);
   const realClickAt = async ({ x, y }) => {
     await rec.send('Input.dispatchMouseEvent', { type: 'mouseMoved', x, y });
     await rec.send('Input.dispatchMouseEvent', { type: 'mousePressed', x, y, button: 'left', clickCount: 1 });
@@ -142,15 +142,15 @@ export async function startRecorder() {
   // The element painted at a control's own centre is that control (or
   // part of it), so nothing covers it.
   const uncovered = (selector, label = null) =>
-    ev(`(() => {
-      const nodes = [...document.querySelectorAll(${JSON.stringify(selector)})];
-      const node = ${label === null ? 'nodes[0]' : `nodes.find(n => n.textContent.trim() === ${JSON.stringify(label)})`};
+    rec.call((query, name) => {
+      const nodes = [...document.querySelectorAll(query)];
+      const node = name === null ? nodes[0] : nodes.find(n => n.textContent.trim() === name);
       if (!node) return false;
       node.scrollIntoView({ block: 'center' });
       const r = node.getBoundingClientRect();
       const hit = document.elementFromPoint(r.left + r.width / 2, r.top + r.height / 2);
       return Boolean(hit) && node.contains(hit);
-    })()`);
+    }, selector, label);
   const realKey = async (key, code, keyCode) => {
     for (const type of ['rawKeyDown', 'keyUp']) {
       await rec.send('Input.dispatchKeyEvent', { type, key, code, windowsVirtualKeyCode: keyCode });
@@ -163,18 +163,18 @@ export async function startRecorder() {
     await quiet();
     muted = true;
     try {
-      return JSON.parse(await ev(`(async () => {
+      return JSON.parse(await rec.call(async (recordType) => {
         const api = await import('/static/js/api.js');
         const c = await import('/static/js/crypto.js');
         const dek = (await import('/static/js/session.js')).currentVault().dek;
         const out = [];
-        for (const r of await api.get('/api/records?type=${type}')) {
+        for (const r of await api.get(`/api/records?type=${recordType}`)) {
           let payload = null;
           try { payload = await c.decryptRecord(dek, r); } catch {}
           out.push({ ...r, payload });
         }
         return JSON.stringify(out);
-      })()`));
+      }, type));
     } finally {
       muted = false;
     }
@@ -189,13 +189,13 @@ export async function startRecorder() {
     await quiet();
     muted = true;
     try {
-      return await ev(`(async () => {
+      return await rec.call(async (planted) => {
         const api = await import('/static/js/api.js');
         const c = await import('/static/js/crypto.js');
         const { SCHEMA_VERSION } = await import('/static/js/model.js');
         const dek = (await import('/static/js/session.js')).currentVault().dek;
         const ids = [];
-        for (const r of ${JSON.stringify(list)}) {
+        for (const r of planted) {
           const slot = {
             recordId: r.recordId || c.uuid4(), recordType: r.type, accountId: r.accountId ?? null,
             schemaVersion: SCHEMA_VERSION, version: r.version || 1,
@@ -209,7 +209,7 @@ export async function startRecorder() {
           ids.push(slot.recordId);
         }
         return ids;
-      })()`);
+      }, list);
     } finally {
       muted = false;
     }
@@ -226,19 +226,21 @@ export async function startRecorder() {
   // A hash the page already shows is left through the dashboard, so
   // the screen is drawn afresh from the model.
   const go = async (hash) => {
-    if ((await ev('location.hash')) === hash) await ev(`location.hash = '#/unassigned/none'`);
-    await ev(`location.hash = ${JSON.stringify(hash)}`);
+    if ((await ev('location.hash')) === hash) await ev("location.hash = '#/unassigned/none'");
+    await rec.call((next) => { location.hash = next; }, hash);
     await quiet();
   };
   const format = (method, iso) =>
-    ev(`(async () => (await import('/static/js/session.js')).currentVault().format.${method}('${iso}'))()`);
-  const model = (body) =>
-    ev(`(async () => {
+    rec.call(async (name, day) => (await import('/static/js/session.js')).currentVault().format[name](day), method, iso);
+  // `read` is a function of `{ v, decimal, dayNumber }` and then `args`,
+  // which reach it as data. Its source is the only code text built here.
+  const model = (read, ...args) =>
+    rec.call(`async (...args) => {
       const v = (await import('/static/js/session.js')).currentVault();
       const decimal = await import('/static/js/decimal.js');
       const { dayNumber } = await import('/static/js/model.js');
-      return JSON.stringify(${body});
-    })()`).then(JSON.parse);
+      return JSON.stringify((${read})({ v, decimal, dayNumber }, ...args));
+    }`, ...args).then(JSON.parse);
 
   // The sweep's rows and rate lines.
   // A row is found by its holding's name, which reaches the page as data.
@@ -271,29 +273,29 @@ export async function startRecorder() {
         keeps: r.querySelectorAll('.sweep-pair button').length,
       };
     }, name);
-  const line = (unit) => `document.querySelector('.rate-line[data-unit="${unit}"]')`;
+  const line = (unit) => `.rate-line[data-unit="${unit}"]`;
   const lineState = (unit) =>
-    ev(`JSON.stringify((() => { const l = ${line(unit)}; return l && {
+    rec.call((query) => { const l = document.querySelector(query); return l && {
       value: l.querySelector('input') ? l.querySelector('input').value : null,
       chip: l.querySelector('.chip').textContent,
       says: l.querySelector(':scope > .hint').textContent,
       error: l.querySelector('.field-error').hidden ? '' : l.querySelector('.field-error').textContent,
       lookup: Boolean(l.querySelector('.btn-inline:not([hidden])')),
-    }; })())`).then(JSON.parse);
+    }; }, line(unit));
   const typeLine = (unit, value) =>
-    ev(`(() => {
-      const field = ${line(unit)}.querySelector('input');
-      field.value = ${JSON.stringify(value)};
+    rec.call((query, next) => {
+      const field = document.querySelector(query).querySelector('input');
+      field.value = next;
       field.dispatchEvent(new Event('input', { bubbles: true }));
-    })()`);
+    }, line(unit), value);
   const figure = (shown) => Number(String(shown).replace(/[^\d.-]/g, ''));
 
   // Measured on boxes, not class names: every piece of a line inside
   // its block, none overlapping another, nothing scrolled past its box.
   // `stacked` is whether the field sits beneath the unit's name.
   const layout = (scope) =>
-    ev(`JSON.stringify((() => {
-      const root = document.querySelector(${JSON.stringify(scope)});
+    rec.call((query) => {
+      const root = document.querySelector(query);
       const box = root.getBoundingClientRect();
       const problems = [];
       const lines = [...root.querySelectorAll('.rate-line')];
@@ -332,22 +334,22 @@ export async function startRecorder() {
         if (n.scrollWidth > n.clientWidth + 0.5 && getComputedStyle(n).overflowX !== 'visible') problems.push('scrolls sideways: ' + n.className);
       }
       return { width: Math.round(box.width), problems, seen };
-    })())`).then(JSON.parse);
+    }, scope);
   const viewport = (width) =>
     rec.send('Emulation.setDeviceMetricsOverride', { width, height: 900, deviceScaleFactor: 1, mobile: false });
 
   // The dashboard's table.
   const tableRow = (name) =>
-    ev(`JSON.stringify((() => {
+    rec.call((holding) => {
       const r = [...document.querySelectorAll('.holdings-table tbody tr')]
-        .find(tr => tr.querySelector('.row-name').textContent === ${JSON.stringify(name)});
+        .find(tr => tr.querySelector('.row-name').textContent === holding);
       return r ? { converted: r.querySelector('.cell-converted').textContent, asOf: r.querySelector('.cell-asof').textContent, text: r.textContent } : null;
-    })())`).then(JSON.parse);
+    }, name);
   const group = (title) =>
-    ev(`JSON.stringify((() => {
-      const g = [...document.querySelectorAll('.table-group')].find(g => g.querySelector('.group-heading').textContent === ${JSON.stringify(title)});
+    rec.call((heading) => {
+      const g = [...document.querySelectorAll('.table-group')].find(g => g.querySelector('.group-heading').textContent === heading);
       return g ? [...g.querySelectorAll('.link-button')].map(b => b.textContent) : [];
-    })())`).then(JSON.parse);
+    }, title);
   const hero = () => ev("document.querySelector('.hero-figure').textContent");
   const home = async () => {
     await ev(`document.querySelector('.topbar nav a[href="#/"]').click()`);
@@ -359,13 +361,13 @@ export async function startRecorder() {
   const pickerDay = (iso) => `.dialog .date-day[data-date="${iso}"]`;
   const newRecording = async (iso, { wait = true } = {}) => {
     await press('New recording');
-    for (let step = 0; step < 400 && !(await ev(`Boolean(document.querySelector('${pickerDay(iso)}'))`)); step += 1) {
+    for (let step = 0; step < 400 && !(await rec.call((query) => Boolean(document.querySelector(query)), pickerDay(iso))); step += 1) {
       await ev(`document.querySelector('.dialog [aria-label="Previous month"]').click()`);
     }
-    const day = JSON.parse(await ev(`(() => {
-      const d = document.querySelector('${pickerDay(iso)}');
-      return JSON.stringify({ name: d.getAttribute('aria-label'), dotted: d.classList.contains('has-recording') });
-    })()`));
+    const day = await rec.call((query) => {
+      const d = document.querySelector(query);
+      return { name: d.getAttribute('aria-label'), dotted: d.classList.contains('has-recording') };
+    }, pickerDay(iso));
     if (wait) await realClick(pickerDay(iso));
     else {
       // Without waiting for the network to go quiet, for a step that
@@ -458,7 +460,7 @@ export async function startRecorder() {
       snap('Brokerage', D2, '2100'),
       price('USD', D2, '0.92', 'proposed'),
     ]);
-    const profile = await model('{ recordId: v.profileRecord.recordId, version: v.profileRecord.version, payload: v.profile }');
+    const profile = await model(({ v }) => ({ recordId: v.profileRecord.recordId, version: v.profileRecord.version, payload: v.profile }));
     await plantHere([{
       type: 'profile',
       recordId: profile.recordId,

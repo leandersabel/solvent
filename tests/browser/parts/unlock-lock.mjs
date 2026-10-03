@@ -65,7 +65,7 @@ await run(async () => {
       const shown = await text();
       return {
         dialogs: await page.eval("document.querySelectorAll('.dialog, .scrim').length"),
-        figure: await page.eval(`[...document.querySelectorAll('input, textarea')].filter((f) => f.value === ${JSON.stringify(FIGURE)}).length`),
+        figure: await page.call((typed) => [...document.querySelectorAll('input, textarea')].filter((f) => f.value === typed).length, FIGURE),
         plaintext: occurring(probes, (probe) => html.includes(probe) || shown.includes(probe)),
         password: await page.eval("Boolean(document.querySelector('#unlock-password'))"),
       };
@@ -185,14 +185,15 @@ await run(async () => {
     // What the dialog offers, leaving out what a closed disclosure hides.
     const DIALOG_CONTROLS = '.dialog button, .dialog input, .dialog select, .dialog textarea, .dialog summary, .dialog [href]';
     const where = () =>
-      page.eval(`(() => {
+      page.call((controls) => {
         const lock = document.querySelector('.btn-lock');
-        const list = [...document.querySelectorAll(${JSON.stringify(DIALOG_CONTROLS)})].filter((n) => !n.disabled && n.checkVisibility());
+        const list = [...document.querySelectorAll(controls)].filter((n) => !n.disabled && n.checkVisibility());
         const at = document.activeElement;
         return at === lock ? 'lock' : list.includes(at) ? 'dialog' + list.indexOf(at) : 'outside';
-      })()`);
-    const cycleSize = 1 + await page.eval(
-      `[...document.querySelectorAll(${JSON.stringify(DIALOG_CONTROLS)})].filter((n) => !n.disabled && n.checkVisibility()).length`,
+      }, DIALOG_CONTROLS);
+    const cycleSize = 1 + await page.call(
+      (controls) => [...document.querySelectorAll(controls)].filter((n) => !n.disabled && n.checkVisibility()).length,
+      DIALOG_CONTROLS,
     );
     const visited = {};
     for (const shift of [false, true]) {

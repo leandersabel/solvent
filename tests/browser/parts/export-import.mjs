@@ -62,14 +62,16 @@ await run(async () => {
     const { join } = await import('node:path');
     const vaultRows = () => JSON.stringify(sql(`SELECT records.* FROM records ${OWN} ORDER BY record_id`));
     const apiCalls = (part) =>
-      page.eval(`performance.getEntriesByType('resource').filter(e => e.name.includes(${JSON.stringify(part)})).length`);
-    const inPage = (body) =>
-      page.eval(`(async () => {
+      page.call((name) => performance.getEntriesByType('resource').filter(e => e.name.includes(name)).length, part);
+    // `read` is an async function of `{ v, c, t }` and then `args`, which
+    // reach it as data. Its source is the only code text built here.
+    const inPage = (read, ...args) =>
+      page.call(`async (...args) => {
         const v = (await import('/static/js/session.js')).currentVault();
         const c = await import('/static/js/crypto.js');
         const t = await import('/static/js/transfer.js');
-        return JSON.stringify(await (async () => { ${body} })());
-      })()`).then(JSON.parse);
+        return JSON.stringify(await (${read})({ v, c, t }, ...args));
+      }`, ...args).then(JSON.parse);
     const unlockAt = async (address, ready) => {
       await page.goto(`${BASE}${address}`);
       await enterPassword(VAULT_PASSWORD);
@@ -113,7 +115,7 @@ await run(async () => {
     const importError = () => page.eval("document.querySelector('#import-card .field-error').hidden ? '' : document.querySelector('#import-card .field-error').textContent");
     // Everything the vault decrypts to, keyed by record id.
     const decrypted = () =>
-      inPage(`
+      inPage(async ({ v, c }) => {
         const api = await import('/static/js/api.js');
         const out = {};
         for (const type of ['profile', 'account', 'snapshot', 'rate']) {
@@ -122,14 +124,14 @@ await run(async () => {
           }
         }
         return Object.fromEntries(Object.entries(out).sort());
-      `);
+      });
     // The chart and the total in both pricing modes, as drawn.
     const picture = async () => {
       await page.eval("location.hash = '#/'");
       await page.waitUntil("document.querySelector('svg.trend')", { label: 'the dashboard to draw' });
       await page.frames();
       const mode = async (label) => {
-        await page.eval(`[...document.querySelectorAll('.switch-option')].find(b => b.textContent.includes(${JSON.stringify(label)})).click()`);
+        await page.call((name) => [...document.querySelectorAll('.switch-option')].find(b => b.textContent.includes(name)).click(), label);
         await page.frames();
         return page.eval("document.querySelector('svg.trend').outerHTML + '|' + document.querySelector('.hero-figure').textContent");
       };
@@ -186,14 +188,14 @@ await run(async () => {
 
     // Every plaintext the vault holds, looked for in the file's bytes:
     // outside the encoded fields, and inside them once decoded.
-    const needles = await inPage(`
+    const needles = await inPage(({ v }) => {
       const out = new Set([v.mainCurrency]);
       for (const h of v.holdings.values()) [h.payload.name, h.payload.note, h.payload.unit].forEach((x) => x && out.add(x));
       for (const d of v.dimensions) { out.add(d.label); d.values.forEach((x) => out.add(x.label)); }
       for (const list of v.snapshots.values()) for (const s of list) { out.add(s.payload.date); if (s.payload.value.length >= 4) out.add(s.payload.value); }
       for (const list of v.rates.values()) for (const r of list) { out.add(r.payload.symbol); out.add(r.payload.date); if (r.payload.rate.length >= 4) out.add(r.payload.rate); }
       return [...out];
-    `);
+    });
     // Encoded fields, random ids and the export's own timestamp carry no
     // vault content, so they are blanked before the plain scan.
     const opaque = /"(salt|wrappedDek|dekNonce|nonce|ciphertext|recordId|accountId|exportedAt)":\s*"([^"]*)"/g;
@@ -413,14 +415,13 @@ await run(async () => {
       credentialAfter.params === credentialBefore.params && credentialAfter.verifier === credentialBefore.verifier &&
         credentialAfter.wrapped_dek !== credentialBefore.wrapped_dek && credentialAfter.dek_nonce !== credentialBefore.dek_nonce,
     );
-    const keys = await inPage(`
+    const keys = await inPage(async ({ v, c, t }, params, password, wrapped, nonce, fileText) => {
       const raw = async (key) => c.b64encode(new Uint8Array(await crypto.subtle.exportKey('raw', key)));
-      const params = ${credentialAfter.params};
-      const master = (await c.deriveKeys(${JSON.stringify(VAULT_PASSWORD)}, params.salt, params.kdf)).masterKey;
-      const stored = await c.unwrapDek(${JSON.stringify(credentialAfter.wrapped_dek)}, ${JSON.stringify(credentialAfter.dek_nonce)}, master);
-      const file = (await t.openFile(${exportedText}, ${JSON.stringify(VAULT_PASSWORD)})).fileDek;
+      const master = (await c.deriveKeys(password, params.salt, params.kdf)).masterKey;
+      const stored = await c.unwrapDek(wrapped, nonce, master);
+      const file = (await t.openFile(fileText, password)).fileDek;
       return { stored: await raw(stored), file: await raw(file), memory: await raw(v.dek) };
-    `);
+    }, JSON.parse(credentialAfter.params), VAULT_PASSWORD, credentialAfter.wrapped_dek, credentialAfter.dek_nonce, exported);
     check(
       "after an import the stored wrapper unwraps to a key that is not the file's, and it is the one in use",
       keys.stored !== keys.file && keys.stored === keys.memory,
@@ -432,17 +433,16 @@ await run(async () => {
     check('the chart and the total in both pricing modes come back identical', (await picture()) === drawnBefore);
 
     await unlockAt('/dashboard', "document.querySelector('svg.trend')");
-    const reread = await inPage('return { unreadable: v.unreadable.length, records: v.holdings.size }');
+    const reread = await inPage(({ v }) => ({ unreadable: v.unreadable.length, records: v.holdings.size }));
     check(
       'after an import the unchanged password signs in and every record reads',
       reread.unreadable === 0 && reread.records === kinds.account,
       JSON.stringify(reread),
     );
-    const stillOpens = await inPage(`
-      const file = ${exportedText};
-      const { fileDek } = await t.openFile(file, ${JSON.stringify(VAULT_PASSWORD)});
+    const stillOpens = await inPage(async ({ t }, file, password) => {
+      const { fileDek } = await t.openFile(file, password);
       return (await t.decryptAll(fileDek, file.records)).length === file.records.length;
-    `);
+    }, exported, VAULT_PASSWORD);
     check('the exported file still opens with its own password after the vault was re-keyed', stillOpens);
 
     // -- A vault transfer, from a second owner -----------------------------------
@@ -453,14 +453,14 @@ await run(async () => {
       await second.send('Page.enable');
       await second.send('Runtime.enable');
       const fill = (fields) =>
-        second.eval(`(() => {
-          for (const [selector, value, index] of ${JSON.stringify(fields)}) {
+        second.call((entries) => {
+          for (const [selector, value, index] of entries) {
             const node = document.querySelectorAll(selector)[index || 0];
             if (node.type === 'checkbox') node.checked = value;
             else node.value = value;
             node.dispatchEvent(new Event(node.tagName === 'SELECT' || node.type === 'checkbox' ? 'change' : 'input', { bubbles: true }));
           }
-        })()`);
+        }, fields);
       const invite = mintInvite('vault-owner');
       await second.goto(`${BASE}/register?invite=${invite}`);
       await fill([
@@ -507,19 +507,19 @@ await run(async () => {
       );
 
       const plantSecond = (records) =>
-        second.eval(`(async () => {
+        second.call(async (planted) => {
           const api = await import('/static/js/api.js');
           const c = await import('/static/js/crypto.js');
           const dek = (await import('/static/js/session.js')).currentVault().dek;
           const ids = [];
-          for (const r of ${JSON.stringify(records)}) {
+          for (const r of planted) {
             const slot = { recordId: c.uuid4(), recordType: r.type, accountId: r.accountId ?? null, schemaVersion: 1, version: 1 };
             const { recordId, ...body } = slot;
             await api.put('/api/records/' + recordId, { ...body, ...(await c.encryptRecord(dek, slot, r.payload)) });
             ids.push(slot.recordId);
           }
           return ids;
-        })()`);
+        }, records);
       const [transferred] = await plantSecond([{
         type: 'account',
         payload: { name: 'Transfer probe', unit: 'EUR', dims: {}, note: null, archivedAt: null, createdAt: '2026-01-01T00:00:00Z' },
@@ -548,7 +548,7 @@ await run(async () => {
       await setValue('#import-erase', 'ERASE');
       await replaceVault();
       await page.waitUntil("document.body.innerText.includes('Your vault was replaced from the file')", { timeout: 90000, label: 'the transfer to land' });
-      const transferredVault = await inPage('return { names: [...v.holdings.values()].map(h => h.payload.name), unreadable: v.unreadable.length, currency: v.mainCurrency }');
+      const transferredVault = await inPage(({ v }) => ({ names: [...v.holdings.values()].map(h => h.payload.name), unreadable: v.unreadable.length, currency: v.mainCurrency }));
       check(
         'a vault exported by a different user imports, and every record decrypts',
         transferredVault.names.join(',') === 'Transfer probe' && transferredVault.unreadable === 0 && transferredVault.currency === 'EUR' &&
@@ -565,7 +565,7 @@ await run(async () => {
           'VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)',
         mine, row.record_id, row.record_type, row.account_id, row.schema_version, row.version, row.nonce, row.ciphertext, row.updated_at,
       );
-      const injected = await inPage(`await v.load(); return v.unreadable.includes(${JSON.stringify(later)});`);
+      const injected = await inPage(async ({ v }, id) => { await v.load(); return v.unreadable.includes(id); }, later);
       check("a record the source wrote after the export, inserted into this vault's rows, fails to decrypt", injected);
       sql("DELETE FROM records WHERE record_id = ? AND principal_id = (SELECT id FROM principals WHERE username = 'leander')", later);
 
@@ -621,11 +621,11 @@ await run(async () => {
     const saveDateStyle = async (value) => {
       await page.eval("location.hash = '#/settings'");
       await page.waitUntil("document.getElementById('format-dates')", { label: 'the dates setting' });
-      await page.eval(`(() => {
+      await page.call((style) => {
         const node = document.getElementById('format-dates');
-        node.value = ${JSON.stringify(value)};
+        node.value = style;
         node.dispatchEvent(new Event('change', { bubbles: true }));
-      })()`);
+      }, value);
       await page.eval("[...document.querySelectorAll('.card')].find(c => c.textContent.includes('Dates and numbers')).querySelector('.btn-primary').click()");
       await page.waitUntil(async (style) => (await import('/static/js/session.js')).currentVault().profile.dateStyle === style, { args: [value], label: 'the date style to be saved' });
       await page.idle();
@@ -649,7 +649,7 @@ await run(async () => {
       asOfYmd.join(' | '),
     );
 
-    await page.eval(`location.hash = '#/holding/${probeHolding}'`);
+    await page.call((id) => { location.hash = `#/holding/${id}`; }, probeHolding);
     await page.waitUntil("document.querySelector('.hero-age')", { label: 'the holding page' });
     await page.frames();
     const heroAges = await labels('.hero-age');
@@ -666,12 +666,12 @@ await run(async () => {
     const recordedDay = [...snapshotDates].sort()[0];
     await page.eval("[...document.querySelectorAll('button')].find(b => b.textContent.trim() === 'New recording').click()");
     await page.waitUntil("document.querySelector('.dialog .date-day')", { label: 'the date picker' });
-    await page.eval(`(() => {
-      for (let i = 0; i < 600 && !document.querySelector('.dialog .date-day[data-date="${recordedDay}"]'); i += 1) {
+    await page.call((day) => {
+      for (let i = 0; i < 600 && !document.querySelector(`.dialog .date-day[data-date="${day}"]`); i += 1) {
         document.querySelector('.dialog [aria-label="Previous month"]').click();
       }
-    })()`);
-    const pickerName = await page.eval(`document.querySelector('.dialog .date-day[data-date="${recordedDay}"]').getAttribute('aria-label')`);
+    }, recordedDay);
+    const pickerName = await page.call((day) => document.querySelector(`.dialog .date-day[data-date="${day}"]`).getAttribute('aria-label'), recordedDay);
     check(
       "with year-first saved, the date picker's marked day names itself as YYYY-MM-DD",
       pickerName === `${recordedDay}, has a recording`,

@@ -17,11 +17,11 @@ await run(async () => {
   await page.waitUntil("document.querySelector('#snapshot-date')", { label: 'the value form' });
   // Typed in the reader's own format, which is what the field accepts:
   // writing an ISO date into it would test a control nobody uses.
-  const asWritten = await page.eval(`(async () => {
+  const asWritten = await page.call(async (day) => {
     const f = await import('/static/js/format.js');
     const s = await import('/static/js/session.js');
-    return f.formatter(s.currentVault().profile).date('${BACKDATE}');
-  })()`);
+    return f.formatter(s.currentVault().profile).date(day);
+  }, BACKDATE);
   check('the date field shows the reader\'s own format', asWritten !== BACKDATE, asWritten);
   await setValue('#snapshot-date', asWritten);
   await setValue('#snapshot-value', '11000.00');
@@ -151,7 +151,7 @@ await run(async () => {
   traffic.length = 0;
   await openForm('Current account');
   await set('#snapshot-date', await format('date', D11));
-  await rec.waitUntil(`${line('USD')} && ${line('USD')}.querySelector('input').value !== ''`, { label: 'the form proposals' });
+  await rec.waitUntil((query) => { const l = document.querySelector(query); return l && l.querySelector('input').value !== ''; }, { args: [line('USD')], label: 'the form proposals' });
   const formLine = await ev("document.querySelector('.prices-line').textContent");
   const formBody = await ev("document.querySelector('.dialog .prices-body').textContent");
   await set('#snapshot-value', '31415.92');
@@ -222,7 +222,7 @@ await run(async () => {
   // has had real input by now, so it is focused and the date field
   // really does blur, which draws the prices again.
   await ev('document.activeElement.blur()');
-  await rec.waitUntil(`${line('USD')} && ${line('USD')}.querySelector('input').value !== ''`, { label: 'the form proposals to change' });
+  await rec.waitUntil((query) => { const l = document.querySelector(query); return l && l.querySelector('input').value !== ''; }, { args: [line('USD')], label: 'the form proposals to change' });
   await typeLine('USD', '0.7777');
   await set('#snapshot-value', '5400');
   await formSave();
@@ -241,7 +241,7 @@ await run(async () => {
   faults.push((r) => (r.method === 'PUT' && bodyOf(r).recordType === 'rate' ? 500 : null));
   await openForm('Savings');
   await set('#snapshot-date', await format('date', DS));
-  await rec.waitUntil(`${line('USD')} && ${line('USD')}.querySelector('input').value !== ''`, { label: 'the form proposals to fail' });
+  await rec.waitUntil((query) => { const l = document.querySelector(query); return l && l.querySelector('input').value !== ''; }, { args: [line('USD')], label: 'the form proposals to fail' });
   await set('#snapshot-value', '5500');
   await formSave();
   faults.length = 0;
@@ -266,9 +266,9 @@ await run(async () => {
   await quiet();
   traffic.length = 0;
   await set('#snapshot-date', await format('date', DF));
-  await rec.waitUntil(`${line('XAU-ozt')} && ${line('XAU-ozt')}.querySelector('input') && ${line('XAU-ozt')}.querySelector('input').value !== ''`, { label: 'the missing gold price proposed' });
+  await rec.waitUntil((query) => { const l = document.querySelector(query); return l && l.querySelector('input') && l.querySelector('input').value !== ''; }, { args: [line('XAU-ozt')], label: 'the missing gold price proposed' });
   const fillingLine = await ev("document.querySelector('.prices-line').textContent");
-  const usdTypable = await ev(`Boolean(${line('USD')}.querySelector('input'))`);
+  const usdTypable = await rec.call((query) => Boolean(document.querySelector(query).querySelector('input')), line('USD'));
   await set('#snapshot-value', '100');
   await formSave();
   const atDP = on(await stored('rate'), DF);
@@ -290,7 +290,7 @@ await run(async () => {
   const prices = async () => {
     await openForm('Dollar cash');
     await set('#snapshot-date', await format('date', DW));
-    await rec.waitUntil(`${line('USD')} && ${line('USD')}.querySelector('input').value !== ''`, { label: 'the form proposals for the layout' });
+    await rec.waitUntil((query) => { const l = document.querySelector(query); return l && l.querySelector('input').value !== ''; }, { args: [line('USD')], label: 'the form proposals for the layout' });
     await ev("document.querySelectorAll('.dialog details').forEach(d => (d.open = true))");
   };
   const widths = {};
@@ -334,8 +334,8 @@ await run(async () => {
   traffic.length = 0;
   await go(`#/holding/${id['Current account']}`);
   const longD11 = await format('longDate', D11);
-  await ev(`[...document.querySelectorAll('.card .data-table tbody tr')].find(r => r.cells[0].textContent.startsWith(${JSON.stringify(longD11)}))
-    .querySelectorAll('button').forEach(b => { if (b.textContent === 'Edit') b.click(); })`);
+  await rec.call((day) => [...document.querySelectorAll('.card .data-table tbody tr')].find(r => r.cells[0].textContent.startsWith(day))
+    .querySelectorAll('button').forEach(b => { if (b.textContent === 'Edit') b.click(); }), longD11);
   await rec.waitUntil("document.querySelector('#snapshot-value')", { label: 'the edit form' });
   await set('#snapshot-value', '27000');
   await set('.dialog textarea', 'from the statement');
@@ -355,8 +355,8 @@ await run(async () => {
   const savingsRow = async (iso, button) => {
     await go(`#/holding/${id.Savings}`);
     const label = await format('longDate', iso);
-    await ev(`[...document.querySelectorAll('.card .data-table tbody tr')].find(r => r.cells[0].textContent.startsWith(${JSON.stringify(label)}))
-      .querySelectorAll('button').forEach(b => { if (b.textContent === ${JSON.stringify(button)}) b.click(); })`);
+    await rec.call((day, name) => [...document.querySelectorAll('.card .data-table tbody tr')].find(r => r.cells[0].textContent.startsWith(day))
+      .querySelectorAll('button').forEach(b => { if (b.textContent === name) b.click(); }), label, button);
     await rec.waitUntil("document.querySelector('.dialog')", { label: 'the dialog' });
     await quiet();
   };
