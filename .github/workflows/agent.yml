@@ -241,8 +241,15 @@ jobs:
         run: |
           [ "$(gh issue view "$ISSUE" --json state --jq .state)" = OPEN ] || exit 0
           # No hook or credential the agent left takes part in the push.
-          git() { command git -c core.hooksPath=/dev/null -c credential.helper= "$@"; }
+          git() {
+            command git -c core.hooksPath=/dev/null -c credential.helper= \
+              -c user.name='claude[bot]' -c user.email='209825114+claude[bot]@users.noreply.github.com' "$@"
+          }
           remote="https://x-access-token:$GH_TOKEN@github.com/$GH_REPO.git"
+          git fetch -q "$remote" master
+          master=$(git rev-parse FETCH_HEAD)
+          # A copy of the work, kept with the run whatever happens below.
+          git bundle create "$RUNNER_TEMP/unpushed.bundle" --branches='claude/*' --not "$master" || true
           due=
           for kind in spec issue; do
             branch="claude/$kind-$ISSUE"
@@ -250,7 +257,12 @@ jobs:
             merged=$(gh pr list --head "$branch" --state merged --json number --jq '.[].number')
             if here=$(git rev-parse -q --verify "refs/heads/$branch^{commit}") &&
               [ "$here" != "$there" ] && [ -z "$merged" ]; then
-              git push --force "$remote" "$here:refs/heads/claude/saved/$kind-$ISSUE"
+              # Onto today's master, so the push changes no workflow file,
+              # which the job's token may not write.
+              tree="$RUNNER_TEMP/save-$kind"
+              git worktree add -q --detach "$tree" "$here"
+              git -C "$tree" rebase -q "$master"
+              git -C "$tree" push --force "$remote" "HEAD:refs/heads/claude/saved/$kind-$ISSUE"
               due=1
             elif [ -n "$there" ] &&
               [ -z "$(gh pr list --head "$branch" --state all --json number --jq '.[].number')" ]; then
@@ -262,6 +274,13 @@ jobs:
             gh workflow run agent.yml --ref master -f issue="$ISSUE" -f resume=true
             echo "resumed=true" >> "$GITHUB_OUTPUT"
           fi
+      - if: always()
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+        with:
+          name: unpushed
+          path: ${{ runner.temp }}/unpushed.bundle
+          if-no-files-found: ignore
+          retention-days: 14
       # The loop never stops in silence: a run that leaves its issue in
       # none of the states under CLAUDE.md, The loop, Issue state labels
       # it stuck (CLAUDE.md, The loop, When something fails).
