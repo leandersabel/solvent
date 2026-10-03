@@ -136,9 +136,20 @@ you are returned to where you were.
   given belongs to a user account or an administrator account.
 - **Too many attempts.** Try again in a few minutes, said the same way
   whether or not the account exists. Attempts are slowed and then
-  locked out for a few minutes. Whoever runs the instance sets the exact
-  numbers, because an install reachable only from the home network and
-  one facing the internet need different limits.
+  locked out for a few minutes. Trying again during the lock does not
+  make it longer, so a lock always ends a few minutes after it began.
+  The lock shuts out every username, administrators included, from the
+  connection the guesses came from, because otherwise someone could try
+  a few passwords on every name on your instance. Whoever runs the
+  instance sets the exact numbers, because an install reachable only
+  from the home network and one facing the internet need different
+  limits.
+
+  To know which connection to lock, Solvent remembers a connection that
+  failed to sign in, as a scrambled trace. Nobody can read the address
+  back from it without the server's secret key, and it is deleted after
+  about a quarter of an hour. Solvent keeps no IP address readable and
+  records no devices.
 - **The browser cannot do the encryption Solvent needs.** A hard stop
   with a plain explanation. No fallback is offered, because none
   exists.
@@ -180,6 +191,13 @@ that could lock somebody out would be worse than no upgrade.
   admin area, however they are submitted.
 - Being locked out after too many attempts looks the same whether or
   not the account exists.
+- A lock ends a few minutes after it began, however often you try again
+  during it.
+- A lock covers every username tried from the same connection,
+  administrators included. A name nobody has tried yet is shut out too
+  until the lock ends.
+- No IP address can be read anywhere Solvent keeps anything, its own
+  server log included.
 - A vault opens on a phone and on a tablet, not only on a computer.
   Unlocking there takes a little under two seconds rather than a
   fraction of one, and for the whole of that the screen shows it is

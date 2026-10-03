@@ -134,7 +134,8 @@ export files line under a hairline rule at the foot of the card.
   signed out 12 hours after signing in, however busy you have been."
 - **Open sessions**, listed by when each started and when it was last
   used, with the current one marked. One line volunteering the
-  absence: "Solvent records no IP addresses and no devices." Saying so
+  absence: "Solvent keeps no IP address readable and records no
+  devices." Saying so
   is the point. Somebody who has used any other product assumes they
   are kept.
 - **Sign out**, and **Sign out everywhere**, which ends this session
@@ -236,8 +237,11 @@ tradeoff moves beneath its select. The sample strip wraps, with
 - **No password recovery of any kind.** Changing a password needs the
   current one.
 - **No IP addresses, no device names, and no sign-in history beyond the
-  open sessions.** None of it is recorded anywhere, which is why the
-  screen says so rather than leaving a blank column.
+  open sessions.** None of it is kept readable anywhere, which is why
+  the screen says so rather than leaving a blank column. The only trace
+  of a connection is the scrambled one a failed sign-in leaves for the
+  lock, and it never reaches this screen (`product/login.md`, When it
+  goes wrong).
 - **No "sign out everywhere except this one".** The only operation that
   keeps this session alive is changing the password, which does it as
   part of the same act.

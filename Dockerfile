@@ -33,10 +33,17 @@ EXPOSE 8000
 # directory, and /dev/shm is the one tmpfs a read-only container always
 # has. --no-control-socket: the control socket would be the second such
 # path, under $HOME, and nothing here drives gunicorn over it.
+# --access-logformat: no peer address, user agent or referrer, and the
+# path without its query, so no invite token reaches the log
+# (architecture.md, Storage & data handling).
+# --log-level error: gunicorn logs a request it cannot parse, with the
+# peer's address, at WARNING (architecture.md, Storage & data handling).
 CMD ["gunicorn", \
      "--bind", "0.0.0.0:8000", \
      "--workers", "2", \
      "--worker-tmp-dir", "/dev/shm", \
      "--no-control-socket", \
      "--access-logfile", "-", \
+     "--access-logformat", "%(t)s \"%(m)s %(U)s\" %(s)s %(b)s %(M)s", \
+     "--log-level", "error", \
      "app:app"]

@@ -387,8 +387,8 @@ def test_exceeding_the_account_limit_locks_it_the_same_way_for_a_stranger(app, l
         # Alerting is a structured log line with a stable name, the
         # account and the window.
         events = [r.getMessage() for r in caplog.records if r.getMessage().startswith("auth.lockout ")]
-        assert "auth.lockout account=owner window_minutes=15" in events
-        assert "auth.lockout account=nobody-at-all window_minutes=15" in events
+        assert 'auth.lockout scope=username username="owner" lock_minutes=15' in events
+        assert 'auth.lockout scope=username username="nobody-at-all" lock_minutes=15' in events
 
 
 def test_a_login_cookie_carries_its_flags_and_no_key_material(app):
@@ -935,7 +935,7 @@ def test_a_verification_that_waits_past_the_bound_is_throttled(app):
     assert client.post("/api/auth/login", json=login, headers=CSRF).status_code == 200
 
     # The same answer the rate limiter gives.
-    app.config.update(LOGIN_REQUESTS_PER_IP_HOUR=0)
+    app.config.update(LOGIN_ATTEMPTS_PER_ACCOUNT=0)
     limited = client.post("/api/auth/login", json=login, headers=CSRF)
     assert answers(waited) == answers(limited)
 

@@ -101,11 +101,14 @@ def salt():
     ratelimit.guard_auth(username)
 
     row = _principal_by_username(username)
-    if row is not None:
-        credential = credential_for(row["id"])
-        if credential is not None:
-            params = json.loads(credential["params"])
-            return jsonify({"salt": params["salt"], "kdf": params["kdf"]})
+    # The credential lookup runs for an unknown username too, against no
+    # id: the limiter no longer writes a row on every salt fetch, so the
+    # one query a known username costs extra would otherwise be the
+    # largest difference left in the response time.
+    credential = credential_for(row["id"] if row is not None else "")
+    if credential is not None:
+        params = json.loads(credential["params"])
+        return jsonify({"salt": params["salt"], "kdf": params["kdf"]})
 
     return jsonify(
         {"salt": crypto.decoy_salt(username), "kdf": DEFAULT_KDF_ENVELOPE}

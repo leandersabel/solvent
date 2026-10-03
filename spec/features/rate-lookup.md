@@ -495,7 +495,9 @@ host's network are reachable:
   registration's main-currency picker (`register.md`) with no restart.
 - No log line, response body, or error page contains the provider API
   key.
-- Exceeding the per-user rate limit returns Too Many Requests.
+- Exceeding the per-user rate limit returns Too Many Requests and
+  writes no `attempts` row, so the limit lifts an hour after the
+  oldest lookup it let through, however often the client retried.
 - A future date is rejected with Bad Request.
 - `GET /api/rates/symbols` returns exactly the symbols the server will
   accept at `/api/rates` — asserted by querying every returned symbol

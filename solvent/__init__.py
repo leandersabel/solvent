@@ -10,6 +10,7 @@ from __future__ import annotations
 import dataclasses
 
 import flask
+from werkzeug.middleware.proxy_fix import ProxyFix
 from werkzeug.routing import Map
 
 from . import (
@@ -22,6 +23,7 @@ from . import (
     headers,
     pages,
     rates,
+    ratelimit,
     records,
     register,
     shell,
@@ -78,6 +80,19 @@ def create_app(config_overrides: dict | None = None) -> flask.Flask:
     db.init_app(app)
     db.init_db(app)
 
+    ratelimit.init_app(app)
+    if app.config["TRUSTED_PROXY_HOPS"]:
+        # Only the client address is read from a header: the cookie is
+        # Secure and HSTS is sent whatever the scheme, so scheme, host,
+        # port and prefix stay what the connection says.
+        app.wsgi_app = ProxyFix(
+            app.wsgi_app,
+            x_for=app.config["TRUSTED_PROXY_HOPS"],
+            x_proto=0,
+            x_host=0,
+            x_port=0,
+            x_prefix=0,
+        )
     headers.init_app(app)
     guard.init_app(app)
     errors.init_app(app)

@@ -272,10 +272,25 @@ move `last_login_at`, which no expiry reads.
   with the same error. It indicates corruption or tampering, not a typo.
   Nothing is logged: the unwrap happens in the browser after the login
   already answered OK, so the server never sees it fail.
-- **Rate limiting**: per-account and per-IP on both `/api/auth/salt` and
-  `/api/auth/login`, then a lockout with operator alerting
-  (architecture.md, Rate limiting). Lockout responses must not reveal
-  whether the account exists.
+- **Rate limiting**: per username and per client address, on both
+  `/api/auth/salt` and `/api/auth/login`, checked before the salt
+  lookup or the verification (architecture.md, Rate limiting). A
+  refusal is Too Many Requests, identical for every username and
+  kind.
+- **A correct password during a lock** → Too Many Requests. No
+  verification runs, so nothing distinguishes it from a wrong one.
+- **Retrying during a lock or a throttle**, on either endpoint → Too
+  Many Requests, and no `attempts` row is written, so the lock still
+  ends its configured length after the failure that tripped it.
+- **An administrator signing in from an address another username's
+  guesses locked** → Too Many Requests until the lock ends, then
+  signed in.
+- **A successful sign-in from an address with failures** → its
+  username's failures are deleted and the address's stay.
+- **The concurrency cap's wait runs out** → Too Many Requests, and no
+  row is written: no verification ran, so nothing failed.
+- **A vault owner whose credential verifies but who has no wrapper** →
+  Unauthorized, counted as no failure, because the password was right.
 - **Already-authenticated caller hits `/login`** → redirect to the
   root path, which resolves by kind (app-shell.md, The two surfaces).
   For a vault owner, keys are still only in memory, so if they were
@@ -381,8 +396,63 @@ move `last_login_at`, which no expiry reads.
   clock stubbed.
 - A wrong Auth Key, a rate-limited attempt and a locked-out attempt
   each leave `last_login_at` unchanged.
-- Exceeding the per-account attempt limit locks the account and returns
-  the same response shape for a nonexistent account.
+- Exceeding the per-username throttle, and separately the per-username
+  lock threshold, refuses that username with Too Many Requests on both
+  endpoints, byte-identical to the refusal for a nonexistent username
+  pushed over the same limit.
+- With the per-username limits set out of reach and the clock stubbed,
+  the configured number of failed sign-ins from one address, spread
+  over unknown usernames, locks the address. The next salt fetch and
+  sign-in for an administrator's username, a vault owner's and an
+  unknown one each answer Too Many Requests, byte-identical, and a
+  different address signs the administrator in.
+- **The lock ends on time despite retries.** With the clock stubbed,
+  trip an address lock, then retry from that address every minute
+  until the lock's end: a salt fetch, a wrong Auth Key and the
+  administrator's correct Auth Key, each Too Many Requests. The
+  `attempts` row count after the retries equals the count before them.
+  At the lock's configured length plus one second after the tripping
+  failure, the administrator's correct Auth Key signs in. The same
+  holds for a per-username lock.
+- A request refused by any limit, on either endpoint, leaves the
+  `attempts` table row for row as it was. So does a salt fetch that
+  answers OK, a Bad Request, and a sign-in the concurrency cap turned
+  away.
+- A wrong Auth Key, for a real or an unknown username, writes one
+  `failure` row in the username's bucket and one in the address's. A
+  correct Auth Key deletes the username's `login:` and `login-lock:`
+  rows and leaves the address's.
+- The failure that trips a per-username lock writes exactly one
+  `login-lock:` row, and the one that trips an address lock exactly one
+  `address-lock:` row, each in the same transaction as the failure's
+  own rows. A failure that trips neither writes neither.
+- **The username lock lasts its full length however its failures are
+  spread.** At the default limits, with the per-address limits set out
+  of reach and the clock stubbed: 10 wrong Auth Keys at 0:00, 9 at
+  15:01 and the 20th at 59:00. The username's correct Auth Key gets Too
+  Many Requests at 60:01, after the 0:00 failures left the lock window,
+  and at 74:00, and signs in at 74:01.
+- **No plaintext address is stored.** After failed sign-ins from
+  `203.0.113.7` and from `2001:db8:1:2::5` (set as the WSGI
+  `REMOTE_ADDR`), no value in any table contains either address or the
+  `/64` network, the database file's bytes contain none of them, and
+  no captured log line does. Each `address:` bucket's key equals the
+  value the test computes from architecture.md, Rate limiting, with the
+  test's `SECRET_KEY`, and changes when `SECRET_KEY` does.
+- The HKDF function returns RFC 5869 Test Case 1's OKM.
+- Failures from `2001:db8:1:2::5` and `2001:db8:1:2::6` share one
+  address key, `2001:db8:1:3::5` has another, `::ffff:203.0.113.7`
+  shares `203.0.113.7`'s, and two unparseable addresses share one.
+- With `TRUSTED_PROXY_HOPS` 0, failures from one peer carrying a
+  different `X-Forwarded-For` each time lock that peer, and the first
+  such request logs `config.proxy_header_ignored` once. With it 1,
+  two peers' requests whose last `X-Forwarded-For` entries differ
+  count apart, and a client-written entry left of the proxy's changes
+  nothing.
+- Tripping a lock logs exactly one `auth.lockout` line, and the
+  requests it refuses log none. The address line contains no address
+  and no address key. A username containing a newline and a quote is
+  logged as one line holding its JSON string.
 - `/api/auth/login` with an unknown username takes statistically
   indistinguishable time from one with a known username and a wrong Auth
   Key — asserted with the decoy-hash verification in place, since

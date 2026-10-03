@@ -39,7 +39,7 @@ def unthrottled(app):
     because a lockout mid-sample would time a 429 instead."""
     ceiling = 10**9
     app.config.update(
-        LOGIN_REQUESTS_PER_IP_HOUR=ceiling,
+        LOGIN_FAILURES_PER_ADDRESS=ceiling,
         LOGIN_ATTEMPTS_PER_ACCOUNT=ceiling,
         LOGIN_LOCKOUT_THRESHOLD=ceiling,
     )

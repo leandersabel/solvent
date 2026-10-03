@@ -32,7 +32,10 @@ class Config:
     login_lockout_threshold: int
     login_lockout_window_minutes: int
     login_lockout_minutes: int
-    login_requests_per_ip_hour: int
+    login_failures_per_address: int
+    login_address_window_minutes: int
+    login_address_lock_minutes: int
+    trusted_proxy_hops: int
     verify_concurrency: int
     verify_wait_seconds: int
     rate_requests_per_hour: int
@@ -76,17 +79,20 @@ def _flag(env: "dict[str, str]", name: str) -> bool:
     return env.get(name, "false").strip().lower() in _TRUTHY
 
 
-def _number(env: "dict[str, str]", name: str, default: int) -> int:
+def _number(env: "dict[str, str]", name: str, default: int, minimum: int = 1) -> int:
     raw = env.get(name)
     if raw is None or not raw.strip():
         return default
     try:
-        return int(raw)
+        value = int(raw)
     except ValueError:
+        value = None
+    if value is None or value < minimum:
         raise ConfigurationError(
-            f"{name} must be a whole number. Fix it in the deployment's "
-            "environment before starting the app."
-        ) from None
+            f"{name} must be a whole number of at least {minimum}. Fix it "
+            "in the deployment's environment before starting the app."
+        )
+    return value
 
 
 def load_config(env: "dict[str, str] | None" = None) -> Config:
@@ -106,11 +112,19 @@ def load_config(env: "dict[str, str] | None" = None) -> Config:
             "starting the app."
         )
 
+    if "LOGIN_REQUESTS_PER_IP_HOUR" in env:
+        raise ConfigurationError(
+            "LOGIN_REQUESTS_PER_IP_HOUR no longer sets a limit, and ignoring "
+            "it would leave a limit you rely on missing. Remove it, and set "
+            "LOGIN_FAILURES_PER_ADDRESS, LOGIN_ADDRESS_WINDOW_MINUTES and "
+            "LOGIN_ADDRESS_LOCK_MINUTES instead."
+        )
+
     return Config(
         secret_key=secret_key,
         database_path=env.get("DATABASE_PATH", "instance/solvent.db"),
         hsts_preload=_flag(env, "HSTS_PRELOAD"),
-        hsts_max_age=_number(env, "HSTS_MAX_AGE", _DEFAULT_HSTS_MAX_AGE),
+        hsts_max_age=_number(env, "HSTS_MAX_AGE", _DEFAULT_HSTS_MAX_AGE, minimum=0),
         # architecture.md, Rate limiting: per account, 10 attempts per 15
         # minutes, then a 15-minute lockout once 20 fail within an hour.
         login_attempts_per_account=_number(env, "LOGIN_ATTEMPTS_PER_ACCOUNT", 10),
@@ -118,9 +132,15 @@ def load_config(env: "dict[str, str] | None" = None) -> Config:
         login_lockout_threshold=_number(env, "LOGIN_LOCKOUT_THRESHOLD", 20),
         login_lockout_window_minutes=_number(env, "LOGIN_LOCKOUT_WINDOW_MINUTES", 60),
         login_lockout_minutes=_number(env, "LOGIN_LOCKOUT_MINUTES", 15),
-        # Per IP, across salt and login together, because splitting the
-        # budget lets an attacker spend twice.
-        login_requests_per_ip_hour=_number(env, "LOGIN_REQUESTS_PER_IP_HOUR", 60),
+        # Per client address: 30 failed sign-ins within 15 minutes lock
+        # it for 15 minutes.
+        login_failures_per_address=_number(env, "LOGIN_FAILURES_PER_ADDRESS", 30),
+        login_address_window_minutes=_number(env, "LOGIN_ADDRESS_WINDOW_MINUTES", 15),
+        login_address_lock_minutes=_number(env, "LOGIN_ADDRESS_LOCK_MINUTES", 15),
+        # architecture.md, Network & transport: how many proxies append
+        # to X-Forwarded-For. Too low locks everyone behind the proxy out
+        # together, too high lets a client pick its own address.
+        trusted_proxy_hops=_number(env, "TRUSTED_PROXY_HOPS", 0, minimum=0),
         # architecture.md, Concurrency cap: 4 parallel verifications, so
         # peak Argon2id memory stays near 256 MiB.
         verify_concurrency=_number(env, "VERIFY_CONCURRENCY", 4),

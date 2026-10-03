@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from datetime import datetime
+from datetime import datetime, timedelta, timezone
 
 import pytest
 
@@ -54,6 +54,29 @@ def frozen_clock(monkeypatch):
             return now.astimezone(tz)
 
     monkeypatch.setattr("solvent.db.datetime", Frozen)
+
+
+@pytest.fixture
+def clock(monkeypatch):
+    """The server clock, stopped until a test moves it. Everything
+    stamped through `solvent.db` and every window the limiters read
+    follow it."""
+
+    class Clock:
+        now = datetime.now(timezone.utc).replace(microsecond=0)
+
+        def advance(self, seconds):
+            self.now += timedelta(seconds=seconds)
+
+    stopped = Clock()
+
+    class Stopped(datetime):
+        @classmethod
+        def now(cls, tz=None):
+            return stopped.now.astimezone(tz)
+
+    monkeypatch.setattr("solvent.db.datetime", Stopped)
+    return stopped
 
 
 @pytest.fixture(autouse=True)

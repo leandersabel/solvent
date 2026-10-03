@@ -102,6 +102,17 @@ def decoy_salt(normalized_username: str) -> str:
     return base64.b64encode(digest).decode("ascii")
 
 
+def hkdf_sha256(ikm: bytes, salt: bytes, info: bytes, length: int) -> bytes:
+    """RFC 5869 in its two steps, from the standard library: one use
+    does not earn a dependency."""
+    prk = hmac.new(salt or bytes(hashlib.sha256().digest_size), ikm, hashlib.sha256).digest()
+    okm = block = b""
+    for counter in range(1, -(-length // hashlib.sha256().digest_size) + 1):
+        block = hmac.new(prk, block + info + bytes([counter]), hashlib.sha256).digest()
+        okm += block
+    return okm[:length]
+
+
 def hash_invite_token(token: str) -> str:
     """SHA-256. The token is 256 bits of `secrets.token_urlsafe`, so a
     slow KDF buys nothing, and lookup is by hash in constant time."""
