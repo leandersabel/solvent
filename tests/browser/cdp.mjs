@@ -247,6 +247,10 @@ export class Session {
       Tab: { code: 'Tab', windowsVirtualKeyCode: 9 },
       Enter: { code: 'Enter', windowsVirtualKeyCode: 13, text: '\r' },
       Escape: { code: 'Escape', windowsVirtualKeyCode: 27 },
+      ArrowLeft: { code: 'ArrowLeft', windowsVirtualKeyCode: 37 },
+      ArrowRight: { code: 'ArrowRight', windowsVirtualKeyCode: 39 },
+      Home: { code: 'Home', windowsVirtualKeyCode: 36 },
+      End: { code: 'End', windowsVirtualKeyCode: 35 },
     };
     const { text, ...rest } = keys[name];
     const modifiers = shift ? 8 : 0;

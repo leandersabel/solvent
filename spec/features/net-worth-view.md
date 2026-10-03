@@ -308,6 +308,48 @@ smooth chart is indistinguishable from a bad snapshot.
   bands against total liabilities — because a share of a signed net
   figure is meaningless when the net approaches zero.
 
+### Reading a date
+
+**Every calendar day from the range's first day to its last is a date
+the chart reads.** The crosshair, its tooltip, the hero under the
+crosshair, both ends of a selection and the keyboard each resolve to
+one such day and read it through the value model (Values between
+entries), on the side at it (Archived holdings). None of them reads the
+drawing's samples or its downsampled points, which exist to draw the
+line. The line at a day between two samples may sit off the model by
+the sub-pixel bound above. The figure shown is the model's.
+
+- **Days are evenly spaced.** In a range of days 0 to n, day k sits at
+  `x0 + k × (x1 − x0) / n` across the plot. A range of one day reads
+  that day at every x.
+- **The pointer reads the nearest day:**
+  `k = round((x − x0) × n / (x1 − x0))`, clamped to the range, a half
+  rounding to the later day. Every x on the plot reads exactly one day.
+  Where the plot has at least as many pixels as the range has days,
+  every day is read at some x. Where it has fewer, a pixel spans
+  several days, and the keyboard reaches the ones between.
+- **A selection's ends are the days under the press and the release**,
+  by the same rule, ordered earlier first whichever way the drag ran.
+  The change across it is the later day's value minus the earlier
+  day's, for the total and for every band. A press and release on the
+  same day is a click.
+- **The keyboard reaches every day.** One key steps the crosshair a
+  single day, and another moves it to the previous or next date
+  carrying a snapshot. `ui/dashboard.md` owns the keys. Each key's readout is the
+  tooltip's text, exposed to assistive technology, so a day the data
+  table does not list is readable without the pointer.
+- **Day arithmetic is on calendar dates, never on timestamps.** A day
+  is a `YYYY-MM-DD` and the next day is that date plus one, so a
+  daylight-saving change or the reader's time zone cannot skip or
+  repeat a day.
+- **A click opens a recording only on a date carrying a snapshot**,
+  the dates the entry marks sit on. A click or Enter there opens that
+  date's recording (`record-snapshot.md`). On any other day it opens
+  nothing. The tick under the axis is a click target of its own for
+  its date (`ui/design-system.md`, The estimated marker), so a
+  recording stays reachable by pointer where a day is narrower than a
+  pixel.
+
 ## Inputs / outputs
 
 - In: ciphertext records fetched from the API, decrypted with the
@@ -354,9 +396,9 @@ smooth chart is indistinguishable from a bad snapshot.
     and tooltip paths end in `innerHTML`, and in an app where XSS means
     Master Key capture that is not a configuration problem. Chart.js and
     uPlot pass the CSP tests cleanly and are both MIT.
-- The chart is **keyboard reachable and has a data-table fallback**. A
-  static `aria-label` on the SVG is not sufficient for the primary
-  screen of the app.
+- The chart is **keyboard reachable** (Reading a date) **and has a
+  data-table fallback**. A static `aria-label` on the SVG is not
+  sufficient for the primary screen of the app.
 - Formatting follows the reader's settings (account-settings.md, Dates
   and numbers).
 
@@ -399,7 +441,7 @@ smooth chart is indistinguishable from a bad snapshot.
   (architecture.md, Data integrity) and must never be swallowed
   silently or crash the whole view.
 - **A very large history** → the chart downsamples for display; totals
-  are always computed on the full data.
+  and every reading at a date are always computed on the full data.
 
 ## Acceptance criteria
 
@@ -455,6 +497,30 @@ smooth chart is indistinguishable from a bad snapshot.
 - The chart loads with its entry marks showing, with nothing turned on
   and no stored preference consulted. Just the line removes them and
   changes nothing else about the drawing.
+- With recordings on 15 January, 10 April and 30 June 2026 and nothing
+  between, the pointer at the x of 5 February 2026 reads 5 February,
+  and at the x of 3 June reads 3 June. The tooltip and the hero show
+  the value model's bands and total for that day, exactly, in decimal,
+  and neither day is a drawing sample.
+- On that chart, a drag from 3 June back to 5 February selects 5
+  February to 3 June. The hero shows the total at 3 June minus the
+  total at 5 February, and each legend entry its band's value at 3 June
+  minus its value at 5 February, exactly, in decimal.
+- Moving the pointer across the plot one pixel column at a time reads
+  days that never go backward, starting at the range's first day and
+  ending at its last. On a range with no more days than the plot has
+  pixel columns, every day of the range is read.
+- From the range's first day, stepping the crosshair one day at a time
+  reads every day of the range once, in order, ending at its last, with
+  the same readout the pointer gives on each. This holds across a
+  daylight-saving change in the reader's time zone. The key that moves
+  between recorded dates lands on every date carrying a snapshot and on
+  no other.
+- A click or Enter on a day carrying no snapshot opens nothing. On a
+  day carrying one, and on that day's tick, it opens that date's
+  recording.
+- With a history long enough to downsample, the readout at a day whose
+  sample the downsampling dropped equals the value model at that day.
 - Switching the pricing mode changes the total, the list of holdings
   and the breakdown, and changes no chart point. Asserted over every
   sample of every band, not only the right hand edge.

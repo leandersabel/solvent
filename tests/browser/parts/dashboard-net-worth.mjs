@@ -265,37 +265,326 @@ await run(async () => {
       (await ev("document.querySelector('.hero-amount').textContent")) === total,
     JSON.stringify(hovered),
   );
+  await rec.frames();
+
+  // ---- Reading a date: every calendar day in the range is readable ----
+  // The recorder's history has snapshots on four dates, 200 days apart
+  // at most, and nothing between.
+  const { first, last } = await model('{ first: dayNumber(v.recordingDates()[0]), last: dayNumber(v.chartLastDate()) }');
+  const rangeDays = last - first;
+  const marks = await model('v.quantityDates()');
+  const plot = JSON.parse(await ev(`JSON.stringify((() => {
+    const svg = document.querySelector('svg.trend');
+    const box = svg.getBoundingClientRect();
+    const zero = svg.querySelector('.zero-line');
+    return { left: box.left, top: box.top, scale: box.width / svg.viewBox.baseVal.width, x0: Number(zero.getAttribute('x1')), x1: Number(zero.getAttribute('x2')) };
+  })())`));
+  // Day k of the range sits at x0 + k * (x1 - x0) / n across the plot.
+  const xOf = (k) => plot.left + (plot.x0 + (k * (plot.x1 - plot.x0)) / rangeDays) * plot.scale;
+  const pointAt = (type, k) =>
+    ev(`(() => {
+      const svg = document.querySelector('svg.trend');
+      svg.dispatchEvent(new PointerEvent(${JSON.stringify(type)}, {
+        clientX: ${xOf(k)}, clientY: svg.getBoundingClientRect().top + 40, button: 0, bubbles: true,
+      }));
+    })()`);
+  const reading = () =>
+    ev(`JSON.stringify({
+      at: document.querySelector('.hero-at').textContent,
+      date: document.querySelector('.readout-date')?.textContent,
+      rows: [...document.querySelectorAll('.chart-readout .readout-row:not(.readout-net)')].map(p => p.textContent),
+      net: document.querySelector('.readout-net')?.textContent,
+      hero: document.querySelector('.hero-amount').textContent,
+    })`).then(JSON.parse);
+  // What the value model says for day k, formatted the way the screen writes it.
+  const modelAt = async (k, dimensionId = null) => ({
+    date: await format('longDate', isoOf(first + k)),
+    ...(await model(`(() => {
+      const dimension = v.activeDimensions().find(d => d.id === ${JSON.stringify(dimensionId)}) || null;
+      const bands = v.valuesAt(dimension, ${first + k});
+      const net = bands.reduce((sum, band) => sum + band.value, 0n);
+      return { rows: bands.map(b => b.label + v.format.money(b.value)), net: 'Net' + v.format.money(net), hero: v.format.whole(net) };
+    })()`)),
+  });
+  const sameAs = (got, want) =>
+    got.date === want.date && got.at === `on ${want.date}` && got.net === want.net && got.hero === want.hero &&
+    JSON.stringify(got.rows) === JSON.stringify(want.rows);
+
+  // Days nothing was recorded on, between the recorded ones.
+  const unrecorded = [dayOf(ago(150)) - first, dayOf(ago(55)) - first];
+  const recordedDays = await model('v.recordingDates()');
+  const hovers = [];
+  for (const k of unrecorded) {
+    await pointAt('pointermove', k);
+    hovers.push({ k, got: await reading(), want: await modelAt(k) });
+  }
+  await pointAt('pointerleave', 0);
+  check(
+    'net-worth-view: hovering a day between recorded dates reads that day, with the value model\'s bands and total',
+    unrecorded.every((k) => !recordedDays.includes(isoOf(first + k))) && hovers.every(({ got, want }) => sameAs(got, want)),
+    JSON.stringify(hovers),
+  );
+
+  // One pixel column at a time across the plot.
+  const walk = JSON.parse(await ev(`(async () => {
+    const { currentVault } = await import('/static/js/session.js');
+    const { isoFromDay } = await import('/static/js/model.js');
+    const v = currentVault();
+    const svg = document.querySelector('svg.trend');
+    const days = new Map();
+    for (let k = 0; k <= ${rangeDays}; k++) days.set(v.format.longDate(isoFromDay(${first} + k)), k);
+    const columns = Math.floor((${plot.x1} - ${plot.x0}) * ${plot.scale});
+    const read = [];
+    for (let c = 0; c <= columns; c++) {
+      svg.dispatchEvent(new PointerEvent('pointermove', {
+        clientX: ${plot.left} + ${plot.x0} * ${plot.scale} + c, clientY: svg.getBoundingClientRect().top + 40, bubbles: true,
+      }));
+      read.push(days.get(document.querySelector('.readout-date').textContent));
+    }
+    svg.dispatchEvent(new PointerEvent('pointerleave', { bubbles: true }));
+    return JSON.stringify({ read, columns });
+  })()`));
+  check(
+    'net-worth-view: the pointer walked one pixel column at a time never reads backward, starts at the first day, ends at the last, and reads every day where the plot is wide enough',
+    walk.read.every((k, i) => k !== undefined && (i === 0 || k >= walk.read[i - 1])) && walk.read[0] === 0 && walk.read.at(-1) === rangeDays &&
+      (walk.columns < rangeDays || new Set(walk.read).size === rangeDays + 1),
+    JSON.stringify({ columns: walk.columns, days: rangeDays, distinct: new Set(walk.read).size }),
+  );
+
+  // Off the plot, in the value gutter and in the axis strip, there is no
+  // crosshair, no readout, and the hero is back to the total.
+  const offPlot = [];
+  const insideHero = async () => {
+    await pointAt('pointermove', unrecorded[0]);
+    return (await reading()).hero !== total;
+  };
+  // The gutter exists only on a wide chart.
+  const spots = [
+    ...(plot.x0 > 20 ? [`${plot.left + (plot.x0 - 20) * plot.scale}, box.top + 40`] : []),
+    `${xOf(unrecorded[0])}, box.bottom - 10`,
+  ];
+  for (const spot of spots) {
+    const showed = await insideHero();
+    await ev(`(() => {
+      const svg = document.querySelector('svg.trend');
+      const box = svg.getBoundingClientRect();
+      const [clientX, clientY] = [${spot}];
+      svg.dispatchEvent(new PointerEvent('pointermove', { clientX, clientY, bubbles: true }));
+    })()`);
+    offPlot.push({
+      showed,
+      crosshair: await ev("document.querySelector('.crosshair').getAttribute('visibility')"),
+      readout: await ev("document.querySelector('.chart-readout').hidden"),
+      at: await ev("document.querySelector('.hero-at').hidden"),
+      hero: await ev("document.querySelector('.hero-amount').textContent"),
+    });
+  }
+  await pointAt('pointerleave', 0);
+  check(
+    'net-worth-view: with the pointer in the value gutter or the axis strip the crosshair, the readout and the hero\'s date are gone',
+    offPlot.length > 0 && offPlot.every((o) => o.showed && o.crosshair === 'hidden' && o.readout && o.at && o.hero === total),
+    JSON.stringify(offPlot),
+  );
+
+  // A tap: the finger comes up and leaves before the focus arrives, and
+  // the crosshair stays on the day it touched.
+  await rec.send('Emulation.setTouchEmulationEnabled', { enabled: true });
+  const tapY = await ev("(() => { const s = document.querySelector('svg.trend'); s.scrollIntoView({ block: 'center' }); return s.getBoundingClientRect().top + 40; })()");
+  await rec.tap(xOf(unrecorded[0]), tapY);
+  await rec.frames();
+  const tapped = await reading();
+  await rec.send('Emulation.setTouchEmulationEnabled', { enabled: false });
+  await ev("document.querySelector('svg.trend').blur()");
+  check(
+    'net-worth-view: a tap on a day leaves the crosshair on that day, not the last one',
+    sameAs(tapped, await modelAt(unrecorded[0])),
+    JSON.stringify(tapped),
+  );
+
+  // The keyboard, in a zone whose clocks changed inside the range.
+  await rec.send('Emulation.setTimezoneOverride', { timezoneId: 'Australia/Sydney' });
+  const crossed = await ev(`(() => {
+    const offsets = new Set();
+    for (let k = 0; k <= ${rangeDays}; k++) offsets.add(new Date((${first} + k) * 86400000).getTimezoneOffset());
+    return offsets.size > 1;
+  })()`);
+  const key = async (name, shift = false) => {
+    await rec.key(name, { shift });
+    await rec.frames();
+  };
+  const shown = () => ev("document.querySelector('.hero-at').textContent + '|' + document.querySelector('.chart-readout').textContent");
   await ev("document.querySelector('svg.trend').focus()");
-  await ev("document.querySelector('svg.trend').dispatchEvent(new KeyboardEvent('keydown', { key: 'ArrowLeft', bubbles: true }))");
-  const stepped = await ev("document.querySelector('.hero-at').textContent");
+  const onFocus = await reading();
+  await key('Home');
+  const atHome = await reading();
+  await key('ArrowLeft');
+  const stayedHome = await reading();
+  const stepped = [await shown()];
+  for (let k = 1; k <= rangeDays; k++) {
+    await key('ArrowRight');
+    stepped.push(await shown());
+  }
+  await key('ArrowRight');
+  const stayedEnd = await shown();
+  // The same days by the pointer, in the page, day by day.
+  const pointed = JSON.parse(await ev(`(() => {
+    const svg = document.querySelector('svg.trend');
+    const out = [];
+    for (let k = 0; k <= ${rangeDays}; k++) {
+      svg.dispatchEvent(new PointerEvent('pointermove', {
+        clientX: ${plot.left} + (${plot.x0} + k * (${plot.x1} - ${plot.x0}) / ${rangeDays}) * ${plot.scale}, clientY: svg.getBoundingClientRect().top + 40, bubbles: true,
+      }));
+      out.push(document.querySelector('.hero-at').textContent + '|' + document.querySelector('.chart-readout').textContent);
+    }
+    svg.dispatchEvent(new PointerEvent('pointerleave', { bubbles: true }));
+    return JSON.stringify(out);
+  })()`));
+  const everyDate = [];
+  for (let k = 0; k <= rangeDays; k++) everyDate.push(`on ${await format('longDate', isoOf(first + k))}`);
+  check(
+    'net-worth-view: focus puts the crosshair on the last day, Home and End reach the ends, and no key moves it past either',
+    sameAs(onFocus, await modelAt(rangeDays)) && sameAs(atHome, await modelAt(0)) && sameAs(stayedHome, await modelAt(0)) &&
+      stayedEnd === stepped.at(-1),
+    JSON.stringify({ onFocus, atHome, stayedHome }),
+  );
+  check(
+    'net-worth-view: Right from the first day reads every day once and in order across a daylight-saving change, and each reading is the one the pointer gives',
+    crossed && stepped.every((text, k) => text.startsWith(everyDate[k] + '|') && text === pointed[k]),
+    JSON.stringify({ crossed, wrong: stepped.map((t, k) => (t === pointed[k] && t.startsWith(everyDate[k] + '|') ? null : k)).filter((k) => k !== null).slice(0, 5) }),
+  );
+  const dateNow = () => ev("document.querySelector('.readout-date').textContent");
+  const markDates = [];
+  for (const iso of marks) markDates.push(await format('longDate', iso));
+  await key('Home');
+  const forward = [];
+  for (let n = 0; n < marks.length + 2; n++) {
+    await key('ArrowRight', true);
+    forward.push(await dateNow());
+  }
+  const backward = [];
+  for (let n = 0; n < marks.length + 2; n++) {
+    await key('ArrowLeft', true);
+    backward.push(await dateNow());
+  }
+  const startDate = await format('longDate', isoOf(first));
+  const endDate = await format('longDate', isoOf(last));
+  // From the first day the next marked date is the first mark after it,
+  // and no jump goes further than the last or the first.
+  const after = markDates.filter((d) => d !== startDate);
+  const before = markDates.filter((d) => d !== endDate).reverse();
+  check(
+    'net-worth-view: Shift+Right and Shift+Left land on every date carrying a snapshot and on no other, and stay where no marked date lies ahead',
+    JSON.stringify(forward.slice(0, after.length)) === JSON.stringify(after) && forward.slice(after.length).every((d) => d === after.at(-1)) &&
+      JSON.stringify(backward.slice(0, before.length)) === JSON.stringify(before) && backward.slice(before.length).every((d) => d === before.at(-1)),
+    JSON.stringify({ markDates, forward, backward }),
+  );
+  await key('Home');
+  await key('ArrowRight');
+  await key('Enter');
+  const unmarkedEnter = await ev('location.hash');
+  await key('Home');
+  await key('ArrowRight', true);
+  await key('Enter');
+  const markedEnter = await ev('location.hash');
+  check(
+    'net-worth-view: Enter on a day carrying no snapshot opens nothing, and on a marked date opens its recording',
+    unmarkedEnter === '#/' && markedEnter === `#/recording/${marks.find((iso) => iso > isoOf(first))}`,
+    `${unmarkedEnter} then ${markedEnter}`,
+  );
+  await rec.send('Emulation.setTimezoneOverride', { timezoneId: '' });
+
+  await go('#/');
+  await rec.frames();
+  await ev("document.querySelector('svg.trend').focus()");
+  await ev("document.querySelector('svg.trend').blur()");
+  check(
+    'net-worth-view: focus leaving the chart takes the crosshair away and the hero back',
+    (await ev("document.querySelector('.crosshair').getAttribute('visibility')")) === 'hidden' &&
+      (await ev("document.querySelector('.hero-at').hidden")) === true,
+  );
+  await ev("document.querySelector('svg.trend').focus()");
+  await ev("document.querySelector('svg.trend').dispatchEvent(new KeyboardEvent('keydown', { key: 'ArrowLeft', shiftKey: true, bubbles: true }))");
+  const jumped = await ev("document.querySelector('.hero-at').textContent");
   await ev("document.querySelector('svg.trend').dispatchEvent(new KeyboardEvent('keydown', { key: 'Enter', bubbles: true }))");
   await rec.frames();
   const opened = await ev('location.hash');
   check(
-    'net-worth-view: the arrow keys step between recorded dates and Enter opens that recording',
-    opened.startsWith('#/recording/') && stepped === `on ${await format('longDate', opened.split('/').pop())}`,
-    `${stepped} then ${opened}`,
+    'net-worth-view: Shift+Left steps to the previous recorded date and Enter opens that recording',
+    opened.startsWith('#/recording/') && jumped === `on ${await format('longDate', opened.split('/').pop())}`,
+    `${jumped} then ${opened}`,
+  );
+
+  // A real click on the plot: nothing on a day with no snapshot, the
+  // recording on one that has.
+  await go('#/');
+  await rec.frames();
+  const clickAt = async (k) => {
+    const y = await ev("(() => { const s = document.querySelector('svg.trend'); s.scrollIntoView({ block: 'center' }); return s.getBoundingClientRect().top + 40; })()");
+    await rec.mouseClick(xOf(k), y);
+    await rec.frames();
+  };
+  await clickAt(unrecorded[0]);
+  const plainClick = await ev('location.hash');
+  await clickAt(dayOf(D10) - first);
+  const markedClick = await ev('location.hash');
+  await go('#/');
+  await rec.frames();
+  await ev(`(() => {
+    const tick = [...document.querySelectorAll('.entry-mark')].find(t => t.querySelector('title').textContent.startsWith(${JSON.stringify(await format('longDate', D10))}));
+    tick.dispatchEvent(new MouseEvent('click', { bubbles: true }));
+  })()`);
+  await rec.frames();
+  const tickClick = await ev('location.hash');
+  check(
+    'net-worth-view: a click on a day carrying no snapshot opens nothing, and on a snapshot day and on its tick opens that date\'s recording',
+    plainClick === '#/' && markedClick === `#/recording/${D10}` && tickClick === `#/recording/${D10}`,
+    JSON.stringify({ plainClick, markedClick, tickClick }),
   );
   await go('#/');
   await ev(`(() => { const s = document.querySelector('.chart-card select'); s.value = 'liq'; s.dispatchEvent(new Event('change', { bubbles: true })); })()`);
   await rec.frames();
-  await pointer('pointerdown', 0.3);
-  await pointer('pointermove', 0.8);
-  await pointer('pointerup', 0.8);
-  await rec.frames();
-  const span = await ev(`JSON.stringify({
-    since: document.querySelector('.hero-since').textContent,
-    rect: document.querySelectorAll('svg.trend rect.selection:not([visibility])').length,
-    deltas: [...document.querySelectorAll('.legend-delta')].map(n => n.textContent),
-    bands: document.querySelectorAll('.legend-entry').length,
-  })`).then(JSON.parse);
-  await pointer('pointerdown', 0.5);
-  await pointer('pointerup', 0.5);
+  // Both ends are the days under the press and the release, ordered
+  // earlier first whichever way the drag ran.
+  const [ka, kb] = unrecorded;
+  const dragged = [];
+  for (const [from, to] of [[ka, kb], [kb, ka]]) {
+    await pointAt('pointerdown', from);
+    await pointAt('pointermove', to);
+    await pointAt('pointerup', to);
+    await rec.frames();
+    const lo = Math.min(from, to);
+    const hi = Math.max(from, to);
+    dragged.push({
+      from,
+      got: JSON.parse(await ev(`JSON.stringify({
+        since: document.querySelector('.hero-since').textContent,
+        delta: document.querySelector('.hero-delta').textContent,
+        rect: document.querySelectorAll('svg.trend rect.selection:not([visibility])').length,
+        deltas: [...document.querySelectorAll('.legend-delta')].map(n => n.textContent),
+        bands: document.querySelectorAll('.legend-entry').length,
+      })`)),
+      want: {
+        since: `from ${await format('longDate', isoOf(first + lo))} to ${await format('longDate', isoOf(first + hi))}`,
+        ...(await model(`(() => {
+          const dimension = v.activeDimensions().find(d => d.id === 'liq');
+          const early = v.valuesAt(dimension, ${first + lo});
+          const late = v.valuesAt(dimension, ${first + hi});
+          const total = (bands) => bands.reduce((sum, band) => sum + band.value, 0n);
+          const sign = (n) => (n > 0n ? '+' : '') + v.format.whole(n);
+          return { delta: v.mainCurrency + ' ' + sign(total(late) - total(early)), deltas: late.map((band, i) => sign(band.value - early[i].value)) };
+        })()`)),
+      },
+    });
+  }
+  await pointAt('pointerdown', kb);
+  await pointAt('pointerup', kb);
   await rec.frames();
   check(
-    'net-worth-view: a drag selects a span, the hero reads the change across it and each band its own',
-    span.since.startsWith('from ') && span.rect === 1 && span.deltas.length === span.bands && span.bands > 1,
-    JSON.stringify(span),
+    'net-worth-view: a drag in either direction selects the two days under it, earlier first, and the hero and every legend entry read the later day minus the earlier',
+    dragged.every(({ got, want }) =>
+      got.since === want.since && got.delta.startsWith(want.delta) && got.rect === 1 && got.bands > 1 &&
+      JSON.stringify(got.deltas) === JSON.stringify(want.deltas)),
+    JSON.stringify(dragged),
   );
   check(
     'net-worth-view: a plain click clears the selected span',
@@ -389,14 +678,14 @@ await run(async () => {
     shapeBefore[0].startsWith(await format('date', D1)) && shapeBefore[0] === shapeAfter[0] &&
       (await hero()) !== totalBefore && !(await tableRow('Fund 4')),
   );
-  await pointer('pointermove', 0.999);
+  await pointAt('pointermove', rangeDays);
   check(
     'net-worth-view: the archive is annotated on the chart, and the tooltip at its date names the holding',
     (await ev("[...document.querySelectorAll('.archive-annotation title')].some(t => t.textContent === 'Fund 4 archived')")) &&
       (await ev("document.querySelector('.chart-readout').textContent")).includes('Fund 4 archived'),
     await ev("document.querySelector('.chart-readout').textContent"),
   );
-  await pointer('pointerleave', 0.999);
+  await pointAt('pointerleave', rangeDays);
   await archive('Fund 3');
   const closing = on(await stored('snapshot'), T).find((s) => s.accountId === id['Fund 3']);
   await go(`#/holding/${id['Fund 3']}`);

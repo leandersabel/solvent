@@ -101,6 +101,17 @@ export function stack(bands, percentage = false, phase = null) {
   return { layers, net };
 }
 
+/** The day under a pointer at `x`: day k of a range of days 0 to n sits
+ *  at x0 + k * (x1 - x0) / n, so the nearest is round((x - x0) * n /
+ *  (x1 - x0)), a half going to the later day and the ends clamped. A
+ *  range of one day reads that day at every x (net-worth-view.md,
+ *  Reading a date). */
+export function dayAt(x, x0, x1, firstDay, lastDay) {
+  const n = lastDay - firstDay;
+  if (n === 0) return firstDay;
+  return firstDay + Math.min(n, Math.max(0, Math.round(((x - x0) * n) / (x1 - x0))));
+}
+
 /** Draw one stacked area chart.
  *
  *  Asset parts stack up from zero at 85% opacity, liability parts
@@ -260,9 +271,9 @@ function drawChart({
   if (selection) {
     const [from, to] = selection;
     root.append(svg('rect', {
-      x: x(days[from]),
+      x: x(from),
       y: pad.top,
-      width: Math.max(1, x(days[to]) - x(days[from])),
+      width: Math.max(1, x(to) - x(from)),
       height: plotHeight,
       class: 'selection',
     }));
@@ -271,89 +282,125 @@ function drawChart({
   const dragging = svg('rect', { y: pad.top, height: plotHeight, class: 'selection', visibility: 'hidden' });
   root.append(dragging, crosshair);
 
-  // Hover, drag and the keyboard all move one crosshair. `onHover`
-  // hears the index under it and where it sits across the plot, and
-  // null when it leaves.
+  // Hover, drag and the keyboard all move one crosshair, and each moves
+  // it by the calendar day: the drawing's samples are not the dates the
+  // chart reads. `onHover` hears the day under it and where it sits
+  // across the plot, and null when it leaves.
+  const marked = marks.map(dayNumber).filter((day) => day >= firstDay && day <= lastDay);
   let current = null;
-  const point = (index) => {
-    current = index;
-    if (index === null) {
+  const point = (day) => {
+    current = day;
+    if (day === null) {
       crosshair.setAttribute('visibility', 'hidden');
       if (onHover) onHover(null);
       return;
     }
-    const at = x(days[index]);
+    const at = x(day);
     crosshair.setAttribute('x1', at);
     crosshair.setAttribute('x2', at);
     crosshair.setAttribute('visibility', 'visible');
-    if (onHover) onHover(index, at / width);
+    if (onHover) onHover(day, at / width);
   };
-  const nearest = (event) => {
+  // Where an event sits in the drawing's own units, and whether that
+  // is on the plot rather than in a gutter, a margin or the axis strip.
+  const place = (event) => {
     const box = root.getBoundingClientRect();
     const scale = box.width / width;
-    const ratio = (event.clientX - box.left - pad.left * scale) / (plotWidth * scale);
-    const day = Math.round(firstDay + ratio * spanDays);
-    let found = 0;
-    days.forEach((candidate, index) => {
-      if (Math.abs(candidate - day) < Math.abs(days[found] - day)) found = index;
-    });
-    return found;
+    const at = (event.clientX - box.left) / scale;
+    const down = (event.clientY - box.top) / scale;
+    return {
+      day: dayAt(at, pad.left, width - pad.right, firstDay, lastDay),
+      // Half a pixel of slack, so an edge column and float noise stay on.
+      onPlot: at >= pad.left - 0.5 && at <= width - pad.right + 0.5 && down <= plotBottom,
+    };
   };
+  const dayUnder = (event) => place(event).day;
 
-  // A drag selects the span between two dates, and a plain click
-  // clears it.
+  // A drag selects the span between two days. A click, a press and
+  // release on one day, opens that day's recording when it carries a
+  // snapshot and otherwise clears a selection.
   let anchor = null;
+  // Set by a press and cleared once the chart has taken or lost focus,
+  // because a tap fires pointerup and pointerleave before the focus.
+  let pressed = false;
   root.addEventListener('pointerdown', (event) => {
+    pressed = true;
     if (event.button !== 0 || event.target.classList.contains('entry-mark')) return;
-    anchor = nearest(event);
+    const { day, onPlot } = place(event);
+    if (!onPlot) return;
+    anchor = day;
+    // A touch has no hover to put the crosshair there first.
+    point(day);
   });
   root.addEventListener('pointermove', (event) => {
-    const index = nearest(event);
-    point(index);
-    if (anchor === null || index === anchor) return;
-    const [from, to] = [Math.min(anchor, index), Math.max(anchor, index)];
-    dragging.setAttribute('x', x(days[from]));
-    dragging.setAttribute('width', Math.max(1, x(days[to]) - x(days[from])));
+    const { day, onPlot } = place(event);
+    // Off the plot the crosshair goes, unless a drag is under way.
+    if (!onPlot && anchor === null) {
+      point(null);
+      return;
+    }
+    point(day);
+    if (anchor === null || day === anchor) return;
+    const [from, to] = [Math.min(anchor, day), Math.max(anchor, day)];
+    dragging.setAttribute('x', x(from));
+    dragging.setAttribute('width', Math.max(1, x(to) - x(from)));
     dragging.setAttribute('visibility', 'visible');
   });
   root.addEventListener('pointerup', (event) => {
     if (anchor === null) return;
-    const index = nearest(event);
-    const span = index === anchor ? null : [Math.min(anchor, index), Math.max(anchor, index)];
+    const day = dayUnder(event);
+    const from = anchor;
     anchor = null;
     dragging.setAttribute('visibility', 'hidden');
-    if (onSelect && (span || selection)) onSelect(span);
+    if (day !== from) {
+      if (onSelect) onSelect([Math.min(from, day), Math.max(from, day)]);
+    } else if (marked.includes(day) && onPickDate) {
+      onPickDate(isoFromDay(day));
+    } else if (onSelect && selection) {
+      onSelect(null);
+    }
   });
-  root.addEventListener('pointerleave', () => {
+  root.addEventListener('pointerleave', (event) => {
     anchor = null;
     dragging.setAttribute('visibility', 'hidden');
-    point(null);
+    // A finger lifts off with a leave of its own, and the day it
+    // touched stays read.
+    if (event.pointerType !== 'touch') point(null);
   });
 
-  // The keyboard steps between recorded dates, and Enter opens the one
-  // under the crosshair.
-  const recorded = days
-    .map((day, index) => (marks.includes(isoFromDay(day)) ? index : null))
-    .filter((index) => index !== null);
+  // Focus by keyboard puts the crosshair on the last day. A press with
+  // the pointer focuses the chart too, and leaves the crosshair under
+  // the pointer.
+  root.addEventListener('focus', () => {
+    if (!pressed) point(lastDay);
+    pressed = false;
+  });
+  root.addEventListener('blur', () => {
+    pressed = false;
+    point(null);
+  });
   root.addEventListener('keydown', (event) => {
+    pressed = false;
+    const from = current === null ? lastDay : current;
+    let next;
     if (event.key === 'ArrowLeft' || event.key === 'ArrowRight') {
-      event.preventDefault();
-      if (!recorded.length) return;
       const forward = event.key === 'ArrowRight';
-      const next = current === null
-        ? recorded[recorded.length - 1]
-        : forward
-          ? recorded.find((index) => index > current)
-          : [...recorded].reverse().find((index) => index < current);
-      if (next !== undefined) point(next);
+      if (!event.shiftKey) next = from + (forward ? 1 : -1);
+      else next = forward ? marked.find((day) => day > from) : marked.findLast((day) => day < from);
+    } else if (event.key === 'Home') {
+      next = firstDay;
+    } else if (event.key === 'End') {
+      next = lastDay;
+    } else if (event.key === 'Enter') {
+      if (current !== null && marked.includes(current) && onPickDate) onPickDate(isoFromDay(current));
+      return;
+    } else {
+      if (event.key === 'Escape') point(null);
       return;
     }
-    if (event.key === 'Enter' && current !== null && recorded.includes(current) && onPickDate) {
-      onPickDate(isoFromDay(days[current]));
-    }
-    if (event.key === 'Escape') point(null);
+    event.preventDefault();
+    if (next !== undefined && next !== current) point(Math.min(lastDay, Math.max(firstDay, next)));
   });
-  root.addEventListener('blur', () => point(null));
 
   return root;
 }

@@ -540,9 +540,8 @@ export class Vault {
    *  price. The chart draws the step from `before` to the day's value at
    *  that day's x. */
   series(dimension, fromDay, toDay) {
-    const holdings = [...this.holdings.values()];
     const sampleDays = new Set([fromDay, toDay]);
-    for (const holding of holdings) {
+    for (const holding of this.holdings.values()) {
       for (const snapshot of this.usableSnapshots(holding.recordId)) {
         sampleDays.add(dayNumber(snapshot.payload.date));
       }
@@ -556,10 +555,21 @@ export class Vault {
     const days = [...sampleDays]
       .filter((day) => day >= fromDay && day <= toDay)
       .sort((a, b) => a - b);
+    return { days, bands: this._bandsAt(dimension, days) };
+  }
 
+  /** Each band's value on one calendar day, the side at it: what the
+   *  tooltip, the hero under the crosshair and a selection's change
+   *  read. Any day is readable, sample or not, from the same model the
+   *  drawing is built on (net-worth-view.md, Reading a date). */
+  valuesAt(dimension, day) {
+    return this._bandsAt(dimension, [day]).map(({ id, label, points }) => ({ id, label, value: points[0] }));
+  }
+
+  _bandsAt(dimension, days) {
     const bands = new Map();
     const sides = () => ({ assets: days.map(() => decimal.ZERO), liabilities: days.map(() => decimal.ZERO) });
-    for (const holding of holdings) {
+    for (const holding of this.holdings.values()) {
       const band = this.bandOf(holding, dimension);
       if (!bands.has(band.id)) {
         bands.set(band.id, { ...band, points: days.map(() => decimal.ZERO), ...sides(), before: sides() });
@@ -584,8 +594,7 @@ export class Vault {
         ({ assets, liabilities })[side][index] += value;
       });
     }
-
-    return { days, bands: orderBands(bands, dimension) };
+    return orderBands(bands, dimension);
   }
 }
 

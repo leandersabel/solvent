@@ -1448,6 +1448,91 @@ await check('net-worth-view: every chart sample is the sum of its holdings, and 
   });
 });
 
+await check('net-worth-view: the value model reads every calendar day, matches the drawing on each sample, and puts the archive on the side at it', () => {
+  const vault = model({
+    dimensions: [{ id: 'd', label: 'D', values: [{ id: 'a', label: 'A' }, { id: 'b', label: 'B' }] }],
+    holdings: [
+      { name: 'Flat', unit: 'CHF', dims: { d: 'a' } },
+      { name: 'Mortgage', unit: 'CHF', dims: { d: 'a' } },
+      { name: 'Dollars', unit: 'USD', dims: { d: 'b' } },
+      { name: 'Old', unit: 'CHF', archivedAt: '2026-04-01' },
+    ],
+    figures: [
+      ['Flat', '2026-01-15', '1150000'],
+      ['Mortgage', '2026-01-15', '-780000'],
+      ['Mortgage', '2026-06-30', '-760000.33'],
+      ['Dollars', '2026-04-10', '1000.07'],
+      ['Old', '2026-01-15', '50'],
+      ['Old', '2026-04-01', '0'],
+    ],
+    prices: [
+      ['USD', '2026-01-15', '0.91'],
+      ['USD', '2026-06-30', '0.87'],
+    ],
+  });
+  for (const dimension of [null, vault.dimensions[0]]) {
+    const { days, bands } = vault.series(dimension, day('2026-01-15'), day('2026-06-30'));
+    // The range's every day, drawing sample or not.
+    for (let d = day('2026-01-15'); d <= day('2026-06-30'); d += 1) {
+      const read = vault.valuesAt(dimension, d);
+      assert.deepEqual(read.map((b) => b.id), bands.map((b) => b.id));
+      let expected = 0n;
+      for (const holding of vault.holdings.values()) {
+        const quantity = vault.quantityAt(holding.recordId, d);
+        if (quantity === null || (holding.payload.archivedAt && d >= day(holding.payload.archivedAt))) continue;
+        expected += decimal.multiply(quantity, vault.priceAt(holding.payload.unit, d));
+      }
+      assert.equal(read.reduce((sum, b) => sum + b.value, 0n), expected, isoFromDay(d));
+      const at = days.indexOf(d);
+      if (at >= 0) bands.forEach((band, i) => assert.equal(read[i].value, band.points[at]));
+    }
+  }
+  // 5 February and 3 June are samples of nothing, and read by the model.
+  const { days } = vault.series(null, day('2026-01-15'), day('2026-06-30'));
+  assert.ok(!days.includes(day('2026-02-05')) && !days.includes(day('2026-06-03')));
+  // The archive date reads the side at it: Old, alone in Unassigned, is
+  // gone on its archive date and still there the day before.
+  const unassigned = (iso) => vault.valuesAt(vault.dimensions[0], day(iso)).find((b) => b.id === 'unassigned').value;
+  assert.equal(unassigned('2026-04-01'), 0n);
+  assert.ok(unassigned('2026-03-31') > 0n);
+});
+
+await check('net-worth-view: the pointer rounds to the nearest day, a half to the later one, and clamps at both ends', async () => {
+  const { dayAt } = await load('chart.js');
+  // Days 0 to 4 across x 10 to 50: a day every 10.
+  const at = (x) => dayAt(x, 10, 50, 100, 104);
+  assert.deepEqual([10, 14, 15, 16, 25, 35, 49, 50].map(at), [100, 100, 101, 101, 102, 103, 104, 104]);
+  assert.equal(at(-20), 100);
+  assert.equal(at(900), 104);
+  // One column at a time: never backward, first to last, and every day read.
+  const read = Array.from({ length: 41 }, (_, c) => at(10 + c));
+  assert.deepEqual(read, [...read].sort((a, b) => a - b));
+  assert.equal(read[0], 100);
+  assert.equal(read.at(-1), 104);
+  assert.equal(new Set(read).size, 5);
+  // A range of one day reads that day at every x.
+  assert.deepEqual([0, 10, 33, 50, 99].map((x) => dayAt(x, 10, 50, 7, 7)), [7, 7, 7, 7, 7]);
+});
+
+await check('net-worth-view: stepping a day is calendar arithmetic and skips or repeats none across a clock change in any zone', () => {
+  const zone = process.env.TZ;
+  try {
+    for (const tz of ['Europe/Zurich', 'America/New_York', 'Australia/Sydney', 'Pacific/Apia']) {
+      process.env.TZ = tz;
+      const seen = [];
+      for (let d = day('2024-12-25'); d <= day('2026-01-05'); d += 1) seen.push(isoFromDay(d));
+      assert.equal(new Set(seen).size, seen.length, tz);
+      seen.forEach((iso, i) => {
+        assert.equal(day(iso), day('2024-12-25') + i, tz);
+        if (i) assert.equal(new Date(Date.parse(iso) - Date.parse(seen[i - 1])).getTime(), 86400000, tz);
+      });
+    }
+  } finally {
+    if (zone === undefined) delete process.env.TZ;
+    else process.env.TZ = zone;
+  }
+});
+
 await check('net-worth-view: each holding falls in exactly one band, and an archived or unknown value is Unassigned', () => {
   const dimension = {
     id: 'd',

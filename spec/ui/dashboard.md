@@ -125,16 +125,24 @@ row's right end. The "View as table" disclosure closes the card.
 
 **Interaction:**
 
-- **Hover** moves a dotted crosshair and a tooltip pinned to the top of
-  the plot: date, every visible band with its value, then the net total
-  on a separated row. Value first, date second — the value is what the
-  user came for. The hero figure follows the cursor.
-- **Drag** selects a span between two arbitrary dates. The band stays
-  after release, the hero shows the change across exactly those two
-  points, and **each legend entry gains its own delta for the span** —
-  this is how "what did my retirement do between 2019 and 2024" gets
-  answered. A plain click clears it; changing range or dimension clears
-  it.
+- **The crosshair addresses every calendar day in the range**, recorded
+  or not. A day is the unit the chart reads in: the pointer, a drag end
+  and a key press each resolve to one day, and the readout is that
+  day's own value, never the nearest drawn point (`net-worth-view.md`,
+  Reading a date).
+- **Hover** puts a dotted crosshair on the day under the pointer,
+  anywhere in the plot, and a tooltip pinned to the top of the plot:
+  date, every visible band with its value, then the net total on a
+  separated row. Value first, date second — the value is what the user
+  came for. The hero figure follows the crosshair. Leaving the plot
+  takes the crosshair away and returns the hero to what it shows
+  without one.
+- **Drag** selects a span between any two days, each end on the day
+  under the pointer. The band stays after release, the hero shows the
+  change across exactly those two days, and **each legend entry gains
+  its own delta for the span** — this is how "what did my retirement do
+  between 2019 and 2024" gets answered. A plain click clears it;
+  changing range or dimension clears it.
 - **Legend** entries toggle a band. Hovering one highlights it and dims
   the rest. With a band hidden, a line under the chart states that the
   total covers only the visible bands.
@@ -142,20 +150,32 @@ row's right end. The "View as table" disclosure closes the card.
   (`design-system.md`). The bands themselves are never restyled. A
   stretch running between two marks is drawn rather than recorded, and
   that is the whole of what the marks say.
-- **Clicking a marked date opens that date's recording**
-  (`recording-detail.md`), which is the route from a shape that looks
-  wrong to the evening that produced it. Only marked dates are click
-  targets. A date carrying prices and no figures bends the bands and
-  takes no tick, because a tick means a quantity was recorded, and it
-  is reached through the date picker instead.
+- **Clicking with the crosshair on a marked date opens that date's
+  recording** (`recording-detail.md`), which is the route from a shape
+  that looks wrong to the evening that produced it. On any other day a
+  click opens nothing. A date carrying prices and no figures bends the
+  bands and takes no tick, because a tick means a quantity was
+  recorded, and it is reached through the date picker instead.
 - **Archive annotations**: a marker at each `archivedAt` with the
   holding named in the tooltip.
 - Single band ("Total") → **no legend box**; the section heading names
   it.
-- **Keyboard**: the chart is focusable, arrow keys step the crosshair
-  between recorded dates, Enter on one opens its recording, and a "View
-  as table" disclosure exposes the same series as a real table. Nothing
-  the chart offers is reachable only by pointer.
+- **Keyboard**: the chart is focusable, and focus puts the crosshair on
+  the range's last day. Each move announces the tooltip's readout, and
+  the hero follows as it does under the pointer.
+  - **Left / Right** step the crosshair back or forward one day.
+  - **Shift+Left / Shift+Right** jump to the previous or next marked
+    date, whether or not "Just the line" has hidden the marks.
+  - **Home / End** jump to the range's first or last day.
+  - **Enter** on a marked date opens its recording, and on any other
+    day does nothing.
+  - No key moves the crosshair past either end of the range, and a jump
+    with no marked date in its direction leaves it where it is.
+  - Focus leaving the chart takes the crosshair away, as the pointer
+    leaving the plot does.
+
+  A "View as table" disclosure exposes the same series as a real table.
+  Nothing the chart offers is reachable only by pointer.
 - Chart colors, band order and mark specs come from
   `design-system.md`.
 - **No control here issues a network request** — range, dimension, mode,
