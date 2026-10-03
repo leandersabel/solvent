@@ -20,7 +20,7 @@ image the nightly publishes is the one every shard tested.
 |---|---|
 | The stand-in, its request list and failure modes, the known prices | `rate-lookup`, `record-snapshot`, `net-worth-view`, `manage-accounts` |
 | The source check | `rate-lookup` |
-| Prepared vaults, expected totals | `net-worth-view`, `record-snapshot`, `manage-accounts`, `account-settings` |
+| Prepared vaults, expected totals | `net-worth-view`, `record-snapshot`, `manage-accounts`, `account-settings`, `login` |
 | Prepared backup files | `export-import` |
 | The older vault and the aged session | `login`, `account-settings` |
 | The expired invite and the harness administrator | `register`, `admin-invites` |
@@ -316,6 +316,7 @@ one out.
 | `same-date-pair` | two snapshots of one holding at one date |
 | `older-vault` | a vault whose credential's KDF envelope has `m = 32768`, below the server default, and is otherwise the default |
 | `empty-vault` | a vault owner with no holdings |
+| `idle-lock-out-of-range` | a vault owner used for nothing else, whose profile record carries `idleLockMinutes: 0`, which the app reads as five minutes, the nearest offered period (account-settings.md, Session and lock). It stands alone because each unlock spends a sign-in and its lock would interrupt any other check on the vault |
 | `aged-session` | `qa`'s browser starts holding a session of a prepared vault owner, issued 12 hours 5 minutes before `patch.py` ran and last active 1 minute before it |
 | `expired-invite` | a vault-owner invite that expired one day before `patch.py` ran |
 | `current-backup` | tonight's export of the `long-history` vault |
@@ -324,8 +325,10 @@ one out.
 
 Neither the damaged record nor the pair is its holding's latest
 quantity, and neither sits on a holding's archive date, so every
-expected total has exactly one correct value. Every other quantity and
-rate in the plan is one the app's own screens could write.
+expected total has exactly one correct value. The stored idle period of
+`idle-lock-out-of-range` is one the Idle lock select does not offer,
+written through `saveProfile` all the same. Every other quantity, rate
+and setting in the plan is one the app's own screens could write.
 
 ### `prices.py prepare`
 
@@ -613,7 +616,10 @@ On failure it prints `docker logs` of `solvent` and `standin`.
   above. After `patch.py` runs on that instance's database, each
   vault's dashboard shows the manifest's `display` total under both
   pricing modes, the damaged record is reported unreadable, and the
-  aged session's cookie is refused as no session.
+  aged session's cookie is refused as no session. The
+  `idle-lock-out-of-range` vault's profile record, decrypted, holds
+  `idleLockMinutes: 0`, and its Settings screen shows an idle lock of
+  five minutes.
 - `patch.py` changes exactly the rows its file names, in `sessions`,
   `invites` and `credentials`, and every other table is byte-identical
   in a dump afterwards. A patch naming an unknown username or label,

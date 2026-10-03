@@ -15,7 +15,7 @@
     {"file": "spec/features/admin-invites.md", "sections": ["Invite lifecycle", "Endpoints", "Bootstrap: the first administrator, and the locked-out one"], "role": "the administrator invite minted through the CLI and --force, the invites made through POST /api/admin/invites, and the status the expired one carries"},
     {"file": "spec/features/register.md", "sections": ["Flow", "What registration writes", "Rules"], "role": "what /register?invite= does, so fixtures.mjs registers as the page does"},
     {"file": "spec/features/login.md", "sections": ["Stale-KDF upgrade", "The session a sign-in issues", "Rules"], "role": "/api/auth/upgrade-kdf for the older vault, and the session's absolute 12-hour expiry the aged session is dated past"},
-    {"file": "spec/features/account-settings.md", "sections": ["The profile record", "Session and lock"], "role": "saveProfile's record and the session the aged cookie belongs to"},
+    {"file": "spec/features/account-settings.md", "sections": ["The profile record", "Session and lock"], "role": "saveProfile's record, the idleLockMinutes the idle-lock-out-of-range vault stores and how the app reads an out-of-range one, and the session the aged cookie belongs to"},
     {"file": "spec/features/app-shell.md", "sections": ["Configuration", "Database", "Acceptance criteria"], "role": "SECRET_KEY, the writable volume and the tables patch.py touches, and the Dockerfile and .dockerignore criteria that keep tools out of the image"}
   ],
   "dependsOn": ["app-shell", "record-api", "rate-lookup", "admin-invites", "register", "login", "account-settings", "manage-accounts", "record-rate", "record-snapshot", "net-worth-view", "export-import"],
@@ -104,7 +104,7 @@
       "checkRuns": {"value": "once a night against the real sources, in the build job, on the default bridge network. Exits 1 when any source is changed and 0 otherwise. Its no-answer lines are the note in the run's summary", "cite": "spec/features/nightly-harness.md#the-source-checks"},
       "probeRuns": {"value": "per shard against the stand-in, on nightly with trust/ mounted as in the app. Exits 0 only when both sources are ok and a TCP connection to 1.1.1.1:443 does not open within 3 seconds, which proves the trust store, the aliases and the missing route out together", "cite": "spec/features/nightly-harness.md#the-source-checks"}
     },
-    "coverageNames": {"value": ["household", "long-history", "many-dimension-values", "rate-edited-long-ago", "no-source-unit", "own-unit", "archived-holding", "other-main-currency", "damaged-record", "same-date-pair", "older-vault", "empty-vault", "aged-session", "expired-invite", "current-backup", "older-backup", "harness-admin"], "cite": "spec/features/nightly-harness.md#the-plan", "condition": "each must be covered by at least one prepared item, a test fails a plan that leaves one out, and prepare exits 1 naming it. What each item must be is stated in the plan table there"},
+    "coverageNames": {"value": ["household", "long-history", "many-dimension-values", "rate-edited-long-ago", "no-source-unit", "own-unit", "archived-holding", "other-main-currency", "damaged-record", "same-date-pair", "older-vault", "empty-vault", "idle-lock-out-of-range", "aged-session", "expired-invite", "current-backup", "older-backup", "harness-admin"], "cite": "spec/features/nightly-harness.md#the-plan", "condition": "each must be covered by at least one prepared item, a test fails a plan that leaves one out, and prepare exits 1 naming it. What each item must be is stated in the plan table there"},
     "coverageDefinitions": {"value": {
       "long-history": "every month end from before 2013-01-02 through the last month end before today, holding the main currency, USD, XAU-g and a debt. Gold dates before 2013-01-02 carry a price typed by hand",
       "many-dimension-values": "a dimension with at least five values, each held by at least one holding",
@@ -115,12 +115,13 @@
       "other-main-currency": "a vault whose main currency is EUR",
       "damaged-record": "a snapshot encrypted under the AAD of another record_id, so it fails authentication",
       "older-vault": "the credential's KDF envelope has m = 32768 and is otherwise the default",
+      "idle-lock-out-of-range": "a vault owner used for nothing else, whose profile record carries idleLockMinutes: 0, written through saveProfile although the Idle lock select does not offer it. The app reads it as five minutes",
       "aged-session": "issued 12 hours 5 minutes before patch.py ran and last active 1 minute before it",
       "expired-invite": "a vault-owner invite that expired one day before patch.py ran",
       "current-backup": "tonight's export of the long-history vault",
       "older-backup": "fixtures/backup-format-1.json"
     }, "cite": "spec/features/nightly-harness.md#the-plan"},
-    "planUniqueness": {"value": "neither the damaged record nor the pair is its holding's latest quantity, and neither sits on a holding's archive date, so every expected total has exactly one correct value. Every other quantity and rate in the plan is one the app's own screens could write", "cite": "spec/features/nightly-harness.md#the-plan"},
+    "planUniqueness": {"value": "neither the damaged record nor the pair is its holding's latest quantity, and neither sits on a holding's archive date, so every expected total has exactly one correct value. Every other quantity, rate and setting in the plan is one the app's own screens could write, idle-lock-out-of-range's idleLockMinutes: 0 alone excepted", "cite": "spec/features/nightly-harness.md#the-plan"},
     "prepare": {
       "command": {"value": "python3 tools/nightly/prices.py prepare <plan> <out>, expanding the plan against the current UTC date", "cite": "spec/features/nightly-harness.md#pricespy-prepare"},
       "outputs": {"value": {"<out>/script.json": "per account, in order, every write the generator makes, with concrete dates, values and, for each proposed rate, the proposal from known_table", "<out>/expected.json": "per vault, and for each backup file, the expected figures under both pricing modes"}, "cite": "spec/features/nightly-harness.md#pricespy-prepare"},
@@ -215,6 +216,7 @@
       "a plan missing each coverage name in turn, a plan whose damaged record is its holding's latest quantity, and a plan whose pair is, for prepare's refusals",
       "a hand-computed vault covering an archived holding, an unpriced one, a main-currency one, a debt and an edited rate, for expected.json under both pricing modes",
       "a fresh instance of the app and a headless Chrome, for fixtures.mjs and then patch.py on that instance's database, with a request log that shows no call to /api/rates",
+      "the idle-lock-out-of-range vault opened in a headless Chrome after fixtures.mjs, its profile record decrypted and its Settings screen read",
       "a dump of every table before and after patch.py, a patch naming an unknown username, an unknown label, and a kdfMemory of 65536",
       "backup-format-1.json with its plan and expected files, committed",
       "a stand-in docker first on PATH, recording its argument list, for server_log, app_stop and app_start",
@@ -235,6 +237,7 @@
       "fixtures.mjs must be shown to write no record by its own crypto, which a request log cannot show. Assert the writes come through the served modules and that the damaged record and the pair alone use plant",
       "no request to /api/rates in the run, asserted from the request log, since a lookup would spend the limit and reach the stand-in",
       "after patch.py each vault's dashboard must show the manifest's display total under both pricing modes in a real browser, the damaged record must be reported unreadable, and the aged cookie must be refused as no session. Matching the rows alone passes data the screens cannot read",
+      "the idle-lock-out-of-range vault's decrypted profile record must hold idleLockMinutes: 0 and its Settings screen must show five minutes. A plan that stores 5, or a screen read that skips the stored value, passes a check of the screen alone",
       "patch.py must be shown to change exactly the rows it names by dumping every table before and after and diffing every other table byte for byte, and to change nothing on an unknown key or a kdfMemory of 65536. A test of the updated rows alone misses a statement that reaches a table it should not",
       "mcp.py must be shown to run docker with exactly the argument lists in the criteria, through a stand-in docker, and to refuse an extra argument, a wrong enum value and a malformed date without running anything. A schema that merely declares additionalProperties: false passes while the handler still reads the argument",
       "the environment criterion must read /proc/<pid>/environ of the running server with the two tokens set in its parent. Reading os.environ from inside the process passes when a wrapper strips it after the fact",

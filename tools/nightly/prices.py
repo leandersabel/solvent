@@ -255,7 +255,7 @@ COVERAGE = [
     "household", "long-history", "many-dimension-values", "rate-edited-long-ago",
     "no-source-unit", "own-unit", "archived-holding", "other-main-currency",
     "damaged-record", "same-date-pair", "older-vault", "empty-vault",
-    "aged-session", "expired-invite", "current-backup", "older-backup",
+    "idle-lock-out-of-range", "aged-session", "expired-invite", "current-backup", "older-backup",
     "harness-admin",
 ]
 

@@ -442,6 +442,38 @@
    "steps": []
   },
   {
+   "username": "idle.owner",
+   "password": "quartz ember tamarind sloop",
+   "kind": "vault_owner",
+   "mainCurrency": "CHF",
+   "covers": [
+    "idle-lock-out-of-range"
+   ],
+   "about": "A vault whose stored idle lock is 0 minutes, which the Idle lock select does not offer. Used for nothing else, because each unlock spends a sign-in and its lock would interrupt another check.",
+   "profile": {
+    "groupSeparator": "none",
+    "idleLockMinutes": 0
+   },
+   "holdings": [
+    {
+     "name": "Savings",
+     "unit": "CHF"
+    }
+   ],
+   "steps": [
+    {
+     "recording": {
+      "date": {
+       "daysAgo": 30
+      },
+      "figures": {
+       "Savings": "3000.00"
+      }
+     }
+    }
+   ]
+  },
+  {
    "username": "old.owner",
    "password": "basalt meadow cricket opal",
    "kind": "vault_owner",

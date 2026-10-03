@@ -627,6 +627,17 @@ def test_the_plan_covers_what_the_spec_names_and_its_unreadable_record_is_never_
     assert covered >= set(prices.COVERAGE)
 
 
+def test_the_out_of_range_idle_lock_is_written_as_zero_by_one_vault_that_covers_nothing_else(tmp_path):
+    accounts = full_plan()["accounts"]
+    covering = [a for a in accounts if "idle-lock-out-of-range" in a.get("covers", [])]
+    assert [a["covers"] for a in covering] == [["idle-lock-out-of-range"]]
+    assert covering[0]["profile"]["idleLockMinutes"] == 0
+    assert [a["username"] for a in accounts if "idleLockMinutes" in a.get("profile", {})] == [covering[0]["username"]]
+    script, _ = prices.prepare(full_plan(), date.today(), FIXTURES)
+    ops = next(a for a in script["accounts"] if a["username"] == covering[0]["username"])["ops"]
+    assert ops[0] == {"op": "profile", "patch": covering[0]["profile"]}
+
+
 def test_the_older_backup_and_its_plan_and_figures_are_committed():
     backup = json.loads((FIXTURES / "backup-format-1.json").read_text())
     assert backup["formatVersion"] == 1
