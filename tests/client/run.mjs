@@ -1172,7 +1172,7 @@ await check('net-worth-view: archiving leaves every earlier point and drops the 
   const archived = model(spec('2026-03-01'));
   const shut = curve(archived, '2026-01-01', '2026-04-01');
   const changed = moved(open, shut);
-  // The closing figure is zero, so the band has already run down to it.
+  // The zero archiving writes is the last figure, so the band has already run down to it.
   assert.deepEqual(changed, []);
   const skipped = model({ ...spec('2026-02-01'), figures: spec().figures.slice(0, 2) });
   const skippedCurve = curve(skipped, '2026-01-01', '2026-04-01');
@@ -1242,7 +1242,7 @@ await check('net-worth-view: grouped by a dimension, the later holding\'s band s
   assert.deepEqual(at(before.layers, 'p').lower[1], at(main.layers, 'p').lower[1]);
 });
 
-await check('net-worth-view: a band archived with no closing snapshot is on the side just before archivedAt and off the value at it', async () => {
+await check('net-worth-view: a holding archived without a zero at D is on the side just before archivedAt and off the value at it', async () => {
   const vault = model({
     holdings: [
       { name: 'Kept', unit: 'CHF' },
@@ -1262,7 +1262,7 @@ await check('net-worth-view: a band archived with no closing snapshot is on the 
   assert.equal(decimal.format(bands[0].points[index + 1]), '100');
 });
 
-await check('net-worth-view: with a closing snapshot the side just before archivedAt carries the closing value, not the day before\'s quantity', () => {
+await check('net-worth-view: a holding archived without a zero at D, with a non-zero figure at D, steps from that figure', () => {
   const vault = model({
     holdings: [{ name: 'Closed', unit: 'CHF', archivedAt: '2026-02-01' }],
     figures: [
@@ -1276,7 +1276,39 @@ await check('net-worth-view: with a closing snapshot the side just before archiv
   assert.equal(decimal.format(bands[0].before.assets[index]), '10');
 });
 
-await check('net-worth-view: archived on the newest recorded date with the closing value skipped, the chart edge and every reading equal the total', async () => {
+await check('net-worth-view: the archive\'s zero runs the band down to nothing with no edge at D', async () => {
+  const vault = model({
+    holdings: [{ name: 'Closed', unit: 'CHF', archivedAt: '2026-01-31' }],
+    figures: [
+      ['Closed', '2026-01-01', '100'],
+      ['Closed', '2026-01-31', '0'],
+    ],
+  });
+  const shown = curve(vault, '2026-01-01', '2026-01-31');
+  assert.equal(decimal.format(shown.get('2026-01-16')), '50');
+  const { days, bands } = vault.series(null, day('2026-01-01'), day('2026-01-31'));
+  const index = days.indexOf(day('2026-01-31'));
+  assert.equal(bands[0].points[index], 0n);
+  // The side just before D is zero, so the step is no edge.
+  assert.equal(await justBefore(bands, index), 0);
+});
+
+await check('net-worth-view: an unarchived holding whose zero sits at D contributes zero from D and interpolates up to its next figure', () => {
+  const vault = model({
+    holdings: [{ name: 'Back', unit: 'CHF' }],
+    figures: [
+      ['Back', '2026-01-01', '100'],
+      ['Back', '2026-01-11', '0'],
+      ['Back', '2026-01-21', '50'],
+    ],
+  });
+  const shown = curve(vault, '2026-01-01', '2026-01-21');
+  assert.equal(decimal.format(shown.get('2026-01-11')), '0');
+  assert.equal(decimal.format(shown.get('2026-01-16')), '25');
+  assert.equal(decimal.format(vault.totals().net), '50');
+});
+
+await check('net-worth-view: archived on the newest recorded date, the chart edge and every reading equal the total', async () => {
   const vault = model({
     holdings: [
       { name: 'Kept', unit: 'CHF' },
@@ -1286,6 +1318,7 @@ await check('net-worth-view: archived on the newest recorded date with the closi
       ['Kept', '2026-09-15', '1000'],
       ['Kept', '2026-10-01', '1000'],
       ['Gold', '2026-09-15', '2'],
+      ['Gold', '2026-10-01', '0'],
     ],
     prices: [['XAU-ozt', '2026-09-15', '2000']],
   });
@@ -1296,11 +1329,12 @@ await check('net-worth-view: archived on the newest recorded date with the closi
   assert.equal(decimal.format(edge), '1000');
   // The change over the range reads the same last point.
   assert.equal(decimal.format(edge - bands[0].points[0]), '-4000');
-  // The drop is drawn at that date: 5000 just before it, 1000 at it.
-  assert.equal(await justBefore(bands, days.length - 1), 5000);
+  // The zero is the side just before the date, so the line runs down
+  // into it: 1000 just before it and at it, with no drop at the date.
+  assert.equal(await justBefore(bands, days.length - 1), 1000);
 });
 
-await check('net-worth-view: archived after the newest recording, the chart extends to the archive date and its edge is the total', () => {
+await check('net-worth-view: archived after the newest recording, the chart extends to the archive date through its zero and its edge is the total', () => {
   const vault = model({
     holdings: [
       { name: 'Kept', unit: 'CHF' },
@@ -1309,6 +1343,7 @@ await check('net-worth-view: archived after the newest recording, the chart exte
     figures: [
       ['Kept', '2026-09-15', '1000'],
       ['Gold', '2026-09-15', '2'],
+      ['Gold', '2026-10-05', '0'],
     ],
     prices: [['XAU-ozt', '2026-09-15', '2000']],
   });
@@ -1319,7 +1354,7 @@ await check('net-worth-view: archived after the newest recording, the chart exte
   assert.equal(decimal.format(vault.totals('latest').net), '1000');
 });
 
-await check('net-worth-view: a price entry at the archive date moves the side just before it and leaves the value at it unchanged', async () => {
+await check('net-worth-view: without a zero at D, a price entry at the archive date moves the side just before it and leaves the value at it unchanged', async () => {
   const at = (rate) => {
     const vault = model({
       holdings: [{ name: 'Gold', unit: 'XAU-ozt', archivedAt: '2026-10-01' }],
@@ -1335,6 +1370,17 @@ await check('net-worth-view: a price entry at the archive date moves the side ju
   // The quantity is carried forward and D's own price values it.
   assert.equal(await low.before, 4200);
   assert.equal(await high.before, 4800);
+});
+
+await check('net-worth-view: with the zero at D, a price entry at the archive date leaves the holding at zero on both sides', async () => {
+  const vault = model({
+    holdings: [{ name: 'Gold', unit: 'XAU-ozt', archivedAt: '2026-10-01' }],
+    figures: [['Gold', '2026-09-15', '2'], ['Gold', '2026-10-01', '0']],
+    prices: [['XAU-ozt', '2026-09-15', '2000'], ['XAU-ozt', '2026-10-01', '2400']],
+  });
+  const { days, bands } = vault.series(null, day('2026-09-15'), day('2026-10-01'));
+  assert.equal(bands[0].points.at(-1), 0n);
+  assert.equal(await justBefore(bands, days.length - 1), 0);
 });
 
 await check('net-worth-view: a holding first valued and archived on the same date is on neither side of its step', async () => {
@@ -1769,6 +1815,315 @@ await check('record-rate: a Conflict reloads the whole type and overwrites nothi
   assert.deepEqual(server.rows.get(stale.recordId), stored);
   await writes.reloadType(vault, 'rate');
   assert.equal(vault.entriesFor('USD')[0].payload.rate, '0.99');
+});
+
+// ---- Archiving: the zero, the prices, the flag ------------------------
+//
+// spec/features/manage-accounts.md, Archiving and Acceptance criteria.
+
+const D = '2026-08-15';
+const kinds = (server) => server.log.map((r) => `${r.method} ${r.body ? r.body.recordType : r.path}${r.query && r.query.type ? ` ${r.query.type}` : ''}`);
+const snapshotRows = (server) =>
+  JSON.stringify([...server.rows.values()].filter((r) => r.recordType === 'snapshot').sort((a, b) => (a.recordId < b.recordId ? -1 : 1)));
+const archiveWorld = (extra = {}) => ({
+  holdings: [['Dollars', 'USD'], ['Gold', 'XAU-ozt'], ['Francs', 'CHF']],
+  figures: [['Dollars', '2026-07-31', '120.50'], ['Gold', '2026-07-31', '2'], ...(extra.figures || [])],
+  prices: extra.prices || [],
+});
+const accountPuts = (server) => server.writesIn().filter((r) => r.body && r.body.recordType === 'account');
+
+await check('manage-accounts: archiving a date holding nothing writes the zero, then the missing prices with this unit among them, then the flag', async () => {
+  const server = recordServer(() => PROPOSALS);
+  const vault = await storedVault(server, archiveWorld());
+  const earlier = snapshotRows(server);
+  const holding = vault.holdings.get(vault.ids.Dollars);
+  const result = await writes.archiveHolding(vault, holding, D);
+  assert.deepEqual(result, { status: 'archived', unpriced: [] });
+  // One reload of both types, before the first create, and never again.
+  assert.deepEqual(kinds(server).slice(0, 3), ['GET /api/records snapshot', 'GET /api/records rate', 'PUT snapshot']);
+  assert.equal(server.log.filter((r) => r.method === 'GET' && r.query.type).length, 2);
+  assert.deepEqual(
+    kinds(server).filter((k) => k.startsWith('PUT') || k.includes('/api/rates')),
+    ['PUT snapshot', 'GET /api/rates', 'PUT rate', 'PUT rate', 'PUT account'],
+  );
+  const zero = vault.snapshotsFor(vault.ids.Dollars).find((x) => x.payload.date === D);
+  assert.deepEqual(zero.payload, { date: D, value: '0', note: null });
+  assert.equal(zero.version, 1);
+  assert.deepEqual(ratesAt(vault, D).map((e) => e.payload.symbol).sort(), ['USD', 'XAU-ozt']);
+  const put = accountPuts(server);
+  assert.equal(put.length, 1);
+  assert.equal(put[0].body.version, 2);
+  assert.equal(vault.holdings.get(vault.ids.Dollars).payload.archivedAt, D);
+  // Every figure before D is as it was, and none is deleted.
+  const now = JSON.parse(snapshotRows(server)).filter((r) => r.recordId !== zero.recordId);
+  assert.equal(JSON.stringify(now), earlier);
+  assert.equal(server.writesIn().some((r) => r.method === 'DELETE'), false);
+});
+
+await check('manage-accounts: archiving onto a date whose prices are complete asks the proxy nothing and rewrites no price', async () => {
+  const server = recordServer(() => PROPOSALS);
+  const vault = await storedVault(
+    server,
+    archiveWorld({ prices: [['USD', D, '0.9'], ['XAU-ozt', D, '2700']], figures: [['Francs', D, '5']] }),
+  );
+  const rates = JSON.stringify([...server.rows.values()].filter((r) => r.recordType === 'rate'));
+  await writes.archiveHolding(vault, vault.holdings.get(vault.ids.Dollars), D);
+  assert.equal(server.log.some((r) => r.path === '/api/rates'), false);
+  assert.equal(server.writesIn().filter((r) => r.body.recordType === 'rate').length, 0);
+  assert.equal(JSON.stringify([...server.rows.values()].filter((r) => r.recordType === 'rate')), rates);
+  // The recording at D belongs to the Francs figure: joining it is no refusal.
+  assert.equal(vault.holdings.get(vault.ids.Dollars).payload.archivedAt, D);
+});
+
+await check('manage-accounts: a non-zero figure at D is replaced in place, and a zero in any form is left byte-identical', async () => {
+  const server = recordServer(() => PROPOSALS);
+  const vault = await storedVault(server, archiveWorld({ figures: [['Dollars', D, '300.5']] }));
+  const before = vault.snapshotsFor(vault.ids.Dollars).find((x) => x.payload.date === D);
+  const stored = { ...server.rows.get(before.recordId) };
+  await writes.archiveHolding(vault, vault.holdings.get(vault.ids.Dollars), D);
+  const after = server.rows.get(before.recordId);
+  assert.equal(after.version, stored.version + 1);
+  assert.notEqual(after.nonce, stored.nonce);
+  assert.equal(vault.snapshotsFor(vault.ids.Dollars).filter((x) => x.payload.date === D).length, 1);
+  assert.deepEqual(vault.snapshotsFor(vault.ids.Dollars).find((x) => x.payload.date === D).payload, { date: D, value: '0', note: null });
+
+  const kept = recordServer(() => PROPOSALS);
+  const other = await storedVault(kept, archiveWorld({ figures: [['Dollars', D, '0.00']], prices: [['USD', D, '0.9'], ['XAU-ozt', D, '2700']] }));
+  const zero = other.snapshotsFor(other.ids.Dollars).find((x) => x.payload.date === D);
+  const row = { ...kept.rows.get(zero.recordId) };
+  await writes.archiveHolding(other, other.holdings.get(other.ids.Dollars), D);
+  assert.deepEqual(kept.rows.get(zero.recordId), row);
+  // Nothing created, so no reload: one account write and nothing else.
+  assert.deepEqual(kinds(kept), ['PUT account']);
+});
+
+await check('manage-accounts: a replaced figure that changed elsewhere is a Conflict, surfaced and never retried', async () => {
+  const server = recordServer(() => PROPOSALS);
+  const vault = await storedVault(server, archiveWorld({ figures: [['Dollars', D, '300.5']] }));
+  const other = new Vault(vault.dek);
+  await other.load();
+  const theirs = other.snapshotsFor(vault.ids.Dollars).find((x) => x.payload.date === D);
+  await writes.saveSnapshot(other, vault.ids.Dollars, theirs, { ...theirs.payload, value: '9' });
+  server.reset();
+  const result = await writes.archiveHolding(vault, vault.holdings.get(vault.ids.Dollars), D);
+  assert.equal(result.status, 'conflict');
+  assert.equal(server.writesIn().length, 1);
+  assert.equal(vault.holdings.get(vault.ids.Dollars).payload.archivedAt, null);
+});
+
+await check('manage-accounts: the flag failing leaves the zero and prices, and archiving again writes only the flag', async () => {
+  const server = recordServer(() => PROPOSALS);
+  const vault = await storedVault(server, archiveWorld());
+  let fail = true;
+  server.faults.push((r) => (fail && r.method === 'PUT' && r.body.recordType === 'account' ? 500 : null));
+  const first = await writes.archiveHolding(vault, vault.holdings.get(vault.ids.Dollars), D);
+  assert.equal(first.status, 'flagFailed');
+  assert.equal(vault.holdings.get(vault.ids.Dollars).payload.archivedAt, null);
+  assert.equal(vault.snapshotsFor(vault.ids.Dollars).filter((x) => x.payload.date === D).length, 1);
+  assert.equal(ratesAt(vault, D).length, 2);
+  assert.equal(vault.activeHoldings().some((h) => h.recordId === vault.ids.Dollars), true);
+  server.reset();
+  fail = false;
+  const again = await writes.archiveHolding(vault, vault.holdings.get(vault.ids.Dollars), D);
+  assert.equal(again.status, 'archived');
+  assert.deepEqual(kinds(server), ['PUT account']);
+});
+
+await check('manage-accounts: the zero failing writes no price and no flag', async () => {
+  const server = recordServer(() => PROPOSALS);
+  const vault = await storedVault(server, archiveWorld());
+  server.faults.push((r) => (r.method === 'PUT' && r.body.recordType === 'snapshot' ? 500 : null));
+  const result = await writes.archiveHolding(vault, vault.holdings.get(vault.ids.Dollars), D);
+  assert.equal(result.status, 'zeroFailed');
+  assert.equal(server.log.some((r) => r.path === '/api/rates'), false);
+  assert.equal(server.log.some((r) => r.method === 'PUT' && r.body.recordType !== 'snapshot'), false);
+  assert.equal(vault.holdings.get(vault.ids.Dollars).payload.archivedAt, null);
+});
+
+await check('manage-accounts: a price failing does not stop the archive, and the retry after a failed flag writes only that unit', async () => {
+  const server = recordServer(() => PROPOSALS);
+  const vault = await storedVault(server, archiveWorld());
+  let failRate = true;
+  let failFlag = true;
+  server.faults.push((r) => {
+    if (r.method !== 'PUT') return null;
+    if (failRate && r.body.recordType === 'rate' && ratesAt(vault, D).length === 1) return 500;
+    return failFlag && r.body.recordType === 'account' ? 500 : null;
+  });
+  // The first rate written lands and the second fails.
+  const first = await writes.archiveHolding(vault, vault.holdings.get(vault.ids.Dollars), D);
+  assert.equal(first.status, 'flagFailed');
+  assert.equal(first.unpriced.length, 1);
+  const missing = first.unpriced[0];
+  assert.equal(ratesAt(vault, D).length, 1);
+  server.reset();
+  failRate = false;
+  failFlag = false;
+  const again = await writes.archiveHolding(vault, vault.holdings.get(vault.ids.Dollars), D);
+  assert.deepEqual(again, { status: 'archived', unpriced: [] });
+  const writesNow = server.writesIn().map((r) => `${r.body.recordType}`);
+  assert.deepEqual(writesNow, ['rate', 'account']);
+  assert.equal(ratesAt(vault, D).some((e) => e.payload.symbol === missing), true);
+  // The second attempt reloads once, before its first create.
+  assert.equal(server.log.filter((r) => r.method === 'GET' && r.query.type).length, 2);
+});
+
+await check('manage-accounts: an archived holding is not archived again, and nothing is written', async () => {
+  const server = recordServer(() => PROPOSALS);
+  const vault = await storedVault(server, archiveWorld({ figures: [['Dollars', '2026-08-01', '0']] }));
+  const holding = vault.holdings.get(vault.ids.Dollars);
+  await writes.saveHolding(vault, holding, { ...holding.payload, archivedAt: '2026-08-01' });
+  const rows = JSON.stringify([...server.rows.values()]);
+  server.reset();
+  assert.deepEqual(await writes.archiveHolding(vault, vault.holdings.get(vault.ids.Dollars), D), { status: 'alreadyArchived' });
+  assert.equal(server.log.length, 0);
+  assert.equal(JSON.stringify([...server.rows.values()]), rows);
+  assert.equal(vault.holdings.get(vault.ids.Dollars).payload.archivedAt, '2026-08-01');
+});
+
+await check('manage-accounts: a Conflict on the flag reloads the account record, and archiving again finishes against it', async () => {
+  const server = recordServer(() => PROPOSALS);
+  const vault = await storedVault(server, archiveWorld());
+  const other = new Vault(vault.dek);
+  await other.load();
+  const theirs = other.holdings.get(vault.ids.Dollars);
+  await writes.saveHolding(other, theirs, { ...theirs.payload, name: 'Renamed elsewhere' });
+  server.reset();
+  const first = await writes.archiveHolding(vault, vault.holdings.get(vault.ids.Dollars), D);
+  assert.equal(first.status, 'flagConflict');
+  const reloaded = vault.holdings.get(vault.ids.Dollars);
+  assert.equal(reloaded.payload.name, 'Renamed elsewhere');
+  assert.equal(reloaded.version, 2);
+  assert.equal(reloaded.payload.archivedAt, null);
+  server.reset();
+  const again = await writes.archiveHolding(vault, reloaded, D);
+  assert.equal(again.status, 'archived');
+  assert.deepEqual(kinds(server), ['PUT account']);
+  assert.equal(accountPuts(server)[0].body.version, 3);
+  assert.equal(vault.holdings.get(vault.ids.Dollars).payload.name, 'Renamed elsewhere');
+});
+
+await check('manage-accounts: a flag that failed names the units whose price did not save, a Conflict included', async () => {
+  const { flagFailedCopy } = await load('view-holding-form.js');
+  for (const status of ['flagFailed', 'flagConflict']) {
+    assert.ok(flagFailedCopy(status, '3 October 2026', ['USD', 'XAU-ozt']).endsWith(' The prices for USD and XAU-ozt did not save.'), status);
+    assert.ok(!flagFailedCopy(status, '3 October 2026', []).includes('prices'), status);
+  }
+  assert.ok(flagFailedCopy('flagConflict', 'D', []).startsWith('This holding was changed in another tab.'));
+
+  // The writes layer hands the units over with the Conflict.
+  const server = recordServer(() => PROPOSALS);
+  const vault = await storedVault(server, archiveWorld());
+  const other = new Vault(vault.dek);
+  await other.load();
+  const theirs = other.holdings.get(vault.ids.Dollars);
+  await writes.saveHolding(other, theirs, { ...theirs.payload, name: 'Renamed elsewhere' });
+  server.faults.push((r) => (r.method === 'PUT' && r.body.recordType === 'rate' ? 500 : null));
+  const result = await writes.archiveHolding(vault, vault.holdings.get(vault.ids.Dollars), D);
+  assert.equal(result.status, 'flagConflict');
+  assert.deepEqual([...result.unpriced].sort(), ['USD', 'XAU-ozt']);
+});
+
+await check('manage-accounts: with the proxy answering 503 the archive still goes through', async () => {
+  const server = recordServer(() => 503);
+  const vault = await storedVault(server, archiveWorld());
+  const result = await writes.archiveHolding(vault, vault.holdings.get(vault.ids.Dollars), D);
+  assert.deepEqual(result, { status: 'archived', unpriced: [] });
+  assert.equal(ratesAt(vault, D).length, 0);
+});
+
+await check('manage-accounts: the reload refuses only when this holding\'s own slot at D was taken since', async () => {
+  const server = recordServer(() => PROPOSALS);
+  const vault = await storedVault(server, archiveWorld());
+  const rival = new Vault(vault.dek);
+  await rival.load();
+  // Another session records only another holding at D: the zero joins it.
+  await writes.saveSnapshot(rival, vault.ids.Francs, null, { date: D, value: '1', note: null });
+  server.reset();
+  assert.equal((await writes.archiveHolding(vault, vault.holdings.get(vault.ids.Dollars), D)).status, 'archived');
+
+  const second = recordServer(() => PROPOSALS);
+  const mine = await storedVault(second, archiveWorld());
+  const taker = new Vault(mine.dek);
+  await taker.load();
+  await writes.saveSnapshot(taker, mine.ids.Dollars, null, { date: D, value: '7', note: null });
+  second.reset();
+  assert.deepEqual(await writes.archiveHolding(mine, mine.holdings.get(mine.ids.Dollars), D), { status: 'refused' });
+  assert.equal(second.writesIn().length, 0);
+  // The model now shows what D holds.
+  assert.equal(mine.snapshotsFor(mine.ids.Dollars).find((x) => x.payload.date === D).payload.value, '7');
+});
+
+await check('manage-accounts: a holding with no snapshots archives to a zero at version 1, and reads zero once unarchived', async () => {
+  const server = recordServer(() => PROPOSALS);
+  const vault = await storedVault(server, { holdings: [['Empty', 'USD']] });
+  await writes.archiveHolding(vault, vault.holdings.get(vault.ids.Empty), D);
+  const [zero] = vault.snapshotsFor(vault.ids.Empty);
+  assert.equal(zero.version, 1);
+  assert.deepEqual(zero.payload, { date: D, value: '0', note: null });
+  server.reset();
+  const archived = vault.holdings.get(vault.ids.Empty);
+  await writes.saveHolding(vault, archived, { ...archived.payload, archivedAt: null });
+  assert.deepEqual(kinds(server), ['PUT account']);
+  assert.equal(vault.valueOf(vault.holdings.get(vault.ids.Empty)).state, 'valued');
+  assert.equal(vault.valueOf(vault.holdings.get(vault.ids.Empty)).stored, '0');
+});
+
+await check('manage-accounts: the archive\'s zero is read off the holding, and deleting the recording at D keeps it', async () => {
+  const server = recordServer(() => PROPOSALS);
+  const vault = await storedVault(server, archiveWorld({ figures: [['Francs', D, '5']] }));
+  await writes.archiveHolding(vault, vault.holdings.get(vault.ids.Dollars), D);
+  const holding = vault.holdings.get(vault.ids.Dollars);
+  const zero = vault.snapshotsFor(vault.ids.Dollars).find((x) => x.payload.date === D);
+  const bytes = { ...server.rows.get(zero.recordId) };
+  assert.equal(vault.isArchiveZero(holding, zero), true);
+  // Not the archive's: another holding's zero, or a non-zero figure at D.
+  assert.equal(vault.isArchiveZero(vault.holdings.get(vault.ids.Francs), { payload: { date: D, value: '0' } }), false);
+  assert.equal(vault.isArchiveZero(holding, { payload: { date: D, value: '1' } }), false);
+  assert.equal(vault.isArchiveZero(holding, { payload: { date: '2026-07-31', value: '0' } }), false);
+  server.reset();
+  assert.deepEqual(await writes.deleteRecording(vault, D), []);
+  assert.deepEqual(server.rows.get(zero.recordId), bytes);
+  assert.equal(vault.holdsRecording(D), true);
+  assert.deepEqual(vault.recording(D).figures.map((f) => f.snapshot.recordId), [zero.recordId]);
+  assert.equal(vault.recording(D).prices.length, 0);
+  // Unarchived, the zero is a figure like any other.
+  const archived = vault.holdings.get(vault.ids.Dollars);
+  await writes.saveHolding(vault, archived, { ...archived.payload, archivedAt: null });
+  assert.equal(vault.isArchiveZero(vault.holdings.get(vault.ids.Dollars), zero), false);
+});
+
+await check('manage-accounts: loading a holding archived without a zero at D writes nothing', async () => {
+  const server = recordServer();
+  const vault = await storedVault(server, archiveWorld());
+  const gone = vault.holdings.get(vault.ids.Dollars);
+  await writes.saveHolding(vault, gone, { ...gone.payload, archivedAt: D });
+  const rows = JSON.stringify([...server.rows.values()]);
+  server.reset();
+  const fresh = new Vault(vault.dek);
+  await fresh.load();
+  assert.equal(server.writesIn().length, 0);
+  assert.equal(JSON.stringify([...server.rows.values()]), rows);
+});
+
+await check('record-rate: the confirmation does not count a holding at zero that day, the archive\'s zero included', () => {
+  const vault = model({
+    holdings: [
+      { name: 'A', unit: 'USD' },
+      { name: 'Archived at zero', unit: 'USD', archivedAt: '2026-07-31' },
+      { name: 'Archived without', unit: 'USD', archivedAt: '2026-07-31' },
+      { name: 'Back at zero', unit: 'USD' },
+    ],
+    figures: [
+      ['A', '2026-06-30', '100'],
+      ['Archived at zero', '2026-06-30', '10'],
+      ['Archived at zero', '2026-07-31', '0.00'],
+      ['Archived without', '2026-06-30', '10'],
+      ['Back at zero', '2026-07-31', '0'],
+    ],
+  });
+  const copy = views.rateChangeCopy(vault, '2026-07-31', [{ unit: 'USD' }]);
+  assert.ok(copy[0].includes('moves 2 holdings measured in USD'), copy[0]);
 });
 
 await check('record-rate: the confirmation names each unit, how many holdings move, and a unit\'s only price', () => {

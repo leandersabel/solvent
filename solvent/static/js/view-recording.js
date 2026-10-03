@@ -57,11 +57,14 @@ export function recordingView(vault, date, { onUpdate, onOpenHolding, onDeleted,
       ]),
       el('div', { class: 'form-actions' }, [
         el('button', { class: 'btn-primary', text: 'Update', onclick: () => onUpdate(date) }),
-        el('button', {
-          class: 'btn-destructive',
-          text: 'Delete',
-          onclick: () => confirmDelete(vault, date, onDeleted, draw),
-        }),
+        // Nothing to remove where the date holds only archives' zeros.
+        !prices.length && figures.every((f) => vault.isArchiveZero(f.holding, f.snapshot))
+          ? null
+          : el('button', {
+              class: 'btn-destructive',
+              text: 'Delete',
+              onclick: () => confirmDelete(vault, date, onDeleted, draw),
+            }),
       ]),
     );
   };
@@ -148,16 +151,18 @@ function named(vault, entries) {
  *  and there is no way back. */
 function confirmDelete(vault, date, onDeleted, redraw) {
   const { figures, prices } = vault.recording(date);
+  const kept = figures.filter((f) => vault.isArchiveZero(f.holding, f.snapshot));
   const units = [...new Set(prices.map((entry) => entry.payload.symbol))];
   const affected = units.reduce((sum, unit) => sum + holdingsIn(vault, unit, date), 0);
 
-  const body = [
-    el('p', {
-      text: figures.length
-        ? 'Every figure recorded that day goes, and so does every price captured with it.'
-        : 'It holds no figures, and the prices captured that day go with it.',
-    }),
-  ];
+  let first = 'Every figure recorded that day goes, and so does every price captured with it.';
+  if (!figures.length) first = 'It holds no figures, and the prices captured that day go with it.';
+  else if (kept.length === figures.length) first = 'Only the prices captured that day go.';
+  const body = [el('p', { text: first })];
+  if (kept.length) {
+    const names = kept.map((f) => f.holding.payload.name).join(', ');
+    body.push(el('p', { text: `The zero recorded when you archived ${names} stays, and so does this recording, holding it.` }));
+  }
   if (units.length) {
     body.push(
       el('p', {
@@ -177,9 +182,10 @@ function confirmDelete(vault, date, onDeleted, redraw) {
         text: 'Delete the recording',
         onclick: async () => {
           close();
-          const before = figures.length + prices.length;
+          const before = figures.length - kept.length + prices.length;
           const remaining = await writes.deleteRecording(vault, date);
-          if (!remaining.length) return onDeleted();
+          // The date stays a recording where an archive's zero keeps it.
+          if (!remaining.length) return vault.holdsRecording(date) ? redraw() : onDeleted();
           // Nothing is rolled back and nothing marks the date as half
           // deleted. The screen shows what is actually left, names it,
           // and offers Delete again.

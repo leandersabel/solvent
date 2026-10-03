@@ -4,6 +4,7 @@ import * as decimal from './decimal.js';
 import * as writes from './writes.js';
 import { dialog, el, mount, resumable, today } from './dom.js';
 import { dateField } from './datepicker.js';
+import { dayNumber, isoFromDay } from './model.js';
 import { rateBlock, rateChangeCopy } from './view-sweep.js';
 
 /** One holding, one date: the small form for an odd date or a
@@ -102,9 +103,13 @@ export function snapshotDialog(vault, holding, existing, onSaved, onOpenRecordin
         ? ''
         : vault.mainMoney(decimal.multiply(quantity, price));
   };
+  // An archived holding's entry moves only to a date before its archive
+  // date: onto it the move would displace the archive's zero, and after
+  // it the entry would be a figure after the archive.
+  const archivedAt = holding.payload.archivedAt;
   const date = dateField(vault.format, {
     id: 'snapshot-date',
-    max: today(),
+    max: archivedAt ? isoFromDay(dayNumber(archivedAt) - 1) : today(),
     value: existing ? existing.payload.date : today(),
     onChange: () => {
       describePrices();

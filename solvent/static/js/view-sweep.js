@@ -8,6 +8,7 @@
 import * as decimal from './decimal.js';
 import * as writes from './writes.js';
 import { ageInWords, dialog, el, mount } from './dom.js';
+import { dayNumber } from './model.js';
 
 // One sitting per date, kept across redraws of the same screen and
 // dropped whenever a route starts a sweep afresh.
@@ -56,7 +57,11 @@ export function sweepView(vault, date, actions = {}) {
     });
   };
 
-  const holdings = vault.activeHoldings();
+  // An archived holding has a row only where the recording already
+  // holds a figure for it: it takes no new one.
+  const holdings = [...vault.holdings.values()].filter(
+    (h) => !h.payload.archivedAt || vault.snapshotsFor(h.recordId).some((s) => s.payload.date === date),
+  );
   if (!holdings.length) {
     return el('section', { class: 'screen sweep' }, [
       heading(vault, date),
@@ -167,8 +172,13 @@ function sweepRow(vault, holding, date, { sit, block, refused, ensurePrices, onT
   const savedNote = el('p', { class: 'row-saved', hidden: true, role: 'status' });
   const pair = el('div', { class: 'sweep-pair', hidden: true });
   const control = el('button', { class: 'btn-secondary' });
+  const fieldColumn = el('div', { class: 'quantity-field' }, [field, suffix]);
+  // The archive's zero shows as text: it is read-only until the
+  // holding is unarchived.
+  const zeroText = el('span', { class: 'archive-zero', hidden: true });
   const input = el('div', { class: 'sweep-input' }, [
-    el('div', { class: 'quantity-field' }, [field, suffix]),
+    fieldColumn,
+    zeroText,
     converted,
     message,
     savedNote,
@@ -217,6 +227,20 @@ function sweepRow(vault, holding, date, { sit, block, refused, ensurePrices, onT
       return;
     }
     const [stored] = entries;
+    const locked = Boolean(stored) && vault.isArchiveZero(holding, stored);
+    fieldColumn.hidden = locked;
+    zeroText.hidden = !locked;
+    control.hidden = locked;
+    if (locked) {
+      zeroText.textContent = vault.amount(stored.payload.value, holding.payload.unit);
+      status.textContent = 'Archived at zero on this date.';
+      status.classList.add('is-recorded');
+      age.textContent = '';
+      converted.textContent = '';
+      return;
+    }
+    // An archived holding whose figure here is gone takes no new one.
+    if (row.element) row.element.hidden = Boolean(holding.payload.archivedAt) && !stored;
     const carried = carriedInto();
     const reference = stored || carried;
     if (stored) {
@@ -743,16 +767,17 @@ export function provenanceChip(payload, format) {
 
 /** How many holdings a change to one unit's price on `date` moves:
  *  those whose value that day actually changes, meaning holdings
- *  measured in the unit, not archived before the date, and holding a
- *  figure at or before it (ui/update-values.md, Changing or clearing a
+ *  measured in the unit, not archived before the date, holding a
+ *  figure at or before it, and whose quantity on it is not zero, the
+ *  archive's zero included (ui/update-values.md, Changing or clearing a
  *  rate says what it moves). */
 export function holdingsIn(vault, unit, date) {
-  return [...vault.holdings.values()].filter(
-    (h) =>
-      h.payload.unit === unit &&
-      !(h.payload.archivedAt && h.payload.archivedAt.slice(0, 10) < date) &&
-      vault.usableSnapshots(h.recordId).some((s) => s.payload.date <= date),
-  ).length;
+  const day = dayNumber(date);
+  return [...vault.holdings.values()].filter((h) => {
+    if (h.payload.unit !== unit || (h.payload.archivedAt && h.payload.archivedAt.slice(0, 10) < date)) return false;
+    const quantity = vault.quantityAt(h.recordId, day);
+    return quantity !== null && quantity !== decimal.ZERO;
+  }).length;
 }
 
 /** The confirmation for a save of rate lines: one per save, naming each

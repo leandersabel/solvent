@@ -322,13 +322,16 @@ export async function saveRateLines(vault, sit, plan) {
   return { refused: false, saved, failed };
 }
 
-/** Every record bearing one date, quantities first and rates after.
- *  A partial delete leaves a recording, not a broken one: nothing is
+/** Every record bearing one date, quantities first and rates after,
+ *  except the zero of a holding archived on it, which stays and keeps
+ *  the date a recording (record-snapshot.md, Deleting a recording). A
+ *  partial delete leaves a recording, not a broken one: nothing is
  *  rolled back and nothing marks the date as half deleted. */
 export async function deleteRecording(vault, date) {
   const { figures, prices } = vault.recording(date);
   const remaining = [];
-  for (const entry of [...figures.map((f) => f.snapshot), ...prices]) {
+  const going = figures.filter((f) => !vault.isArchiveZero(f.holding, f.snapshot)).map((f) => f.snapshot);
+  for (const entry of [...going, ...prices]) {
     try {
       await deleteRecord(vault, entry);
     } catch {
@@ -336,6 +339,74 @@ export async function deleteRecording(vault, date) {
     }
   }
   return remaining;
+}
+
+/** Archiving a holding on `date` (manage-accounts.md, Archiving,
+ *  Writes), in the order that leaves a true state after every step:
+ *  the zero, that date's missing prices while the holding is still
+ *  active so its unit is among them, and the flag last.
+ *
+ *  The pre-create reload runs once, before the first create, and the
+ *  model then holds what it returned. An archive that creates nothing
+ *  runs none. Only this holding's own slot at `date` being taken
+ *  refuses: other holdings' records there are the recording the zero
+ *  joins, and a rate slot taken since is one the refresh leaves alone.
+ *
+ *  An archived holding is not archived again: that would write a second
+ *  zero and move `archivedAt`, which makes the old zero editable.
+ *
+ *  Resolves to `status` 'archived', 'flagFailed', 'flagConflict',
+ *  'refused', 'conflict', 'zeroFailed' or 'alreadyArchived', and for the
+ *  first two the units whose price did not land. A flag that met a
+ *  Conflict leaves the account record reloaded from the store. */
+export async function archiveHolding(vault, holding, date) {
+  if (vault.holdings.get(holding.recordId).payload.archivedAt) return { status: 'alreadyArchived' };
+  const stored = () => vault.snapshotsFor(holding.recordId).find((s) => s.payload.date === date);
+  let reloaded = false;
+  const reload = async () => {
+    if (reloaded) return;
+    const fresh = await reloadCreateTypes(vault);
+    reloaded = true;
+    vault.replaceType('snapshot', fresh.snapshot);
+    vault.replaceType('rate', fresh.rate);
+  };
+
+  const zero = stored();
+  try {
+    if (!zero) {
+      await reload();
+      if (stored()) return { status: 'refused' };
+      await saveSnapshot(vault, holding.recordId, null, { date, value: '0', note: null });
+    } else if (decimal.parse(zero.payload.value) !== decimal.ZERO) {
+      await saveSnapshot(vault, holding.recordId, zero, { ...zero.payload, value: '0' });
+    }
+  } catch (failure) {
+    return { status: failure.status === 409 ? 'conflict' : 'zeroFailed' };
+  }
+
+  const proposals = needsLookup(vault, date) ? await fetchProposals(vault, date) : {};
+  const wanted = () => vault.missingUnits(date).filter((unit) => proposals[unit]);
+  let unpriced = [];
+  if (wanted().length) {
+    try {
+      await reload();
+      unpriced = (await refreshPrices(vault, date, proposals)).failed;
+    } catch {
+      unpriced = wanted();
+    }
+  }
+
+  try {
+    const current = vault.holdings.get(holding.recordId);
+    await saveHolding(vault, current, { ...current.payload, archivedAt: date });
+  } catch (failure) {
+    if (failure.status !== 409) return { status: 'flagFailed', unpriced };
+    // Never a merge: the record another tab wrote is read back, and the
+    // archive is offered again against it.
+    await reloadRecord(vault, vault.holdings.get(holding.recordId)).catch(() => {});
+    return { status: 'flagConflict', unpriced };
+  }
+  return { status: 'archived', unpriced };
 }
 
 export async function purgeHolding(vault, holding) {
