@@ -230,8 +230,8 @@ export async function startRecorder() {
     await rec.call((next) => { location.hash = next; }, hash);
     await quiet();
   };
-  const format = (method, iso) =>
-    rec.call(async (name, day) => (await import('/static/js/session.js')).currentVault().format[name](day), method, iso);
+  const format = (method, iso, ...rest) =>
+    rec.call(async (name, day, ...more) => (await import('/static/js/session.js')).currentVault().format[name](day, ...more), method, iso, ...rest);
   // `read` is a function of `{ v, decimal, dayNumber }` and then `args`,
   // which reach it as data. Its source is the only code text built here.
   const model = (read, ...args) =>

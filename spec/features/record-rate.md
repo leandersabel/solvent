@@ -493,9 +493,15 @@ to win silently.
   entry for that symbol and the previous entry stays the latest.
 - Editing a price entry from a second tab with a stale `version`
   returns Conflict and overwrites nothing.
-- Opening a recording of any age issues no request to `/api/rates` and
-  writes no record, asserted over the whole flow including the request
-  the provider has since revised its figure for.
+- Opening a recording of any age, including one with an empty rate
+  line, issues no request to `/api/rates` and writes no record,
+  asserted over the whole flow including the request the provider has
+  since revised its figure for.
+- On a reopened recording, Look it up is offered on a line with no
+  entry at the date whose symbol has a rate source, and on no other
+  line. Pressing it issues exactly one request to `/api/rates`, for
+  that date, shows the answer as a proposal carrying its `rateAsOf`,
+  and writes nothing until the rate-lines save.
 - Adding a value for a holding skipped at a past date leaves every rate
   entry at that date byte-identical, and writes an entry only for a
   symbol that had none.

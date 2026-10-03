@@ -357,6 +357,23 @@ await run(async () => {
     goldGap.value === '' && goldGap.says === 'No rate was recorded for XAU-ozt on this date.' && goldGap.lookup,
     JSON.stringify(goldGap),
   );
+  const held = await lineState('USD');
+  const unsourced = [await lineState('XAG-ozt'), await lineState('m2'), await lineState('PAINT')];
+  check(
+    'record-rate: Look it up is offered on no line that holds an entry, nor on one whose symbol has no rate source',
+    held.value !== '' && !held.lookup && unsourced.every((l) => l && !l.lookup),
+    JSON.stringify({ held, unsourced }),
+  );
+  const asksBefore = rateAsks().length;
+  await rec.call((query) => document.querySelector(query).querySelector('.btn-inline').click(), line('XAU-ozt'));
+  await quiet();
+  const goldAsked = await lineState('XAU-ozt');
+  check(
+    'record-rate: Look it up shows the answer as a proposal with its day, asks once for the reopened date, and writes nothing',
+    rateAsks().length === asksBefore + 1 && new URL(rateAsks().at(-1).url).searchParams.get('date') === D2 && writesSent().length === 0 &&
+      figure(goldAsked.value) === Number(proposalsFor(D2)['XAU-ozt'].rate) && goldAsked.chip === `Market rate as of ${await format('dayMonth', proposalsFor(D2)['XAU-ozt'].asOf, 'short')}`,
+    JSON.stringify({ goldAsked, url: rateAsks().at(-1).url, writes: writesSent().length }),
+  );
 
   traffic.length = 0;
   await typeRow('Current account', '1111');
@@ -553,6 +570,11 @@ await run(async () => {
     'record-rate: Look it up is what asks, and what comes back is labeled like any proposal',
     asksOnOpen === 0 && rateAsks().length === 1 && figure(lookedUp.value) === Number(proposalsFor(D1).USD.rate) && lookedUp.chip === 'Market rate',
     JSON.stringify(lookedUp),
+  );
+  check(
+    'record-rate: Look it up asks for the line\'s own date, and writes nothing until the rate lines are saved',
+    new URL(rateAsks()[0].url).searchParams.get('date') === D1 && writesSent().length === 0,
+    `${rateAsks()[0].url}, ${writesSent().length} writes`,
   );
   await press('Save the rate lines');
   await press('Save the prices', '.dialog');

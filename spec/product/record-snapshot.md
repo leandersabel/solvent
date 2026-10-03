@@ -306,19 +306,20 @@ rather than a proposal.
   rate for that unit, which moves the same holdings and is announced
   the same way.
 - A unit that went in empty, because the source did not answer that
-  day, is the one thing the screen goes and asks about. It arrives
-  filled in if the source answers now, labeled with the day it is
-  actually for like any proposal, and you can take it, change it, or
-  leave the line empty. A rate that is already there is never looked
-  up again, because it may be one you chose.
+  day, says no rate was recorded for it and offers **Look it up**.
+  Opening the recording fetches nothing. Pressing Look it up asks the
+  source for that date, and what comes back is labeled with the day it
+  is actually for, like any proposal, for you to take, change or leave
+  empty. Recording a figure at that date fills the line too. A rate
+  that is already there is never looked up again, because it may be
+  one you chose.
 
 A rate line on a reopened recording saves by itself. On a new sweep
 the rates ride in with the first row you record, because until then
 there is nothing for them to belong to. On a recording that already
 exists there is, so filling in the rate that was missing is a
 complete act and needs no holding touched alongside it. Press Update,
-touch nothing and leave, and nothing is written, the proposal on the
-empty line included.
+touch nothing and leave, and nothing is written.
 
 #### Starting one and editing one are different acts
 
@@ -467,8 +468,7 @@ worth around that date will change.
   touched is not, on the same sweep.
 - Opening the sweep, acting on nothing and closing it writes nothing
   at all, rates included. That holds whether the date held nothing at
-  all or already held a recording, and a rate the screen proposed for
-  an empty line is not written either.
+  all or already held a recording.
 - Backfilling a figure dated in March writes March's rates, not
   today's.
 - A unit only you can price keeps the figure and the date you last set
@@ -505,17 +505,22 @@ worth around that date will change.
 - A rate you changed still says, a year later, that you changed it,
   and still shows what was proposed, whether you changed it the
   evening it was written or four years afterwards.
-- Reopening a recording asks the source about no unit it already holds
-  a rate for. A rate you overrode a year ago is still yours when you
-  open that date again.
-- A unit left with no rate because nothing came back arrives filled in
-  when you reopen that date and the source answers, as a proposal you
-  can change or leave.
+- Opening a recording, to look at it or to edit it, contacts no price
+  source. A rate you overrode a year ago is still yours when you open
+  that date again.
+- A unit left with no rate because nothing came back says so on the
+  reopened recording and offers Look it up. A line that holds a rate
+  never offers it.
+- Pressing Look it up on an empty rate line fills it in when the source
+  answers, labeled with the day the figure is for, as a proposal you
+  can take, change or leave empty.
+- Recording a figure at a date fills every empty rate line on it for a
+  unit somebody publishes, when the source answers.
 - A rate filled in on a reopened recording is saved on its own, with
   no holding row touched.
 - Adding a figure to a date that already carries rates uses those
-  rates. Nothing is looked up and no holding measured in those units
-  moves.
+  rates. None of them is looked up again, and no holding measured in
+  those units moves.
 - On the form for one holding and one date, the opened line of prices
   shows every unit's full name, its price and the whole of where that
   price came from, at any window width. Nothing on it overlaps or is
