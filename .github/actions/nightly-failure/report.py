@@ -1,10 +1,8 @@
 """Leaves an issue for a failed night (CLAUDE.md, The loop, Nightly and
-stable): files what QA could not, then, unless open rated problems
-already say why, a `bug` named after the cause, or a comment on the
-open one. Each new issue starts the loop at once. Needs `gh` signed in
-to the repository.
+stable): unless open rated problems already say why, a `bug` named
+after the cause, or a comment on the open one. A new issue starts the
+loop at once. Needs `gh` signed in to the repository.
 """
-import glob
 import json
 import os
 import re
@@ -13,13 +11,12 @@ import subprocess
 STEPS = json.loads(os.environ["STEPS"])
 TODAY = os.environ["TODAY"]
 RUN = os.environ["RUN"]
-RATINGS = {f"severity: {rating}" for rating in ("low", "medium", "high", "critical")}
 # The nightly's steps in order, by id, and what it means when one fails.
 CAUSES = {
     "suite": "the test suite failed",
     "app": "the image did not build or start",
     "qa": "QA did not finish",
-    "qa-done": "QA did not finish or could not file what it found",
+    "qa-done": "QA did not finish",
     "gate": "the release check could not run",
     "publish": "publishing failed",
 }
@@ -36,16 +33,6 @@ def create(title, body, labels):
     url = gh("issue", "create", "--title", title, "--body-file", "-", *flags, body=body)
     gh("workflow", "run", "agent.yml", "--ref", "master", "-f", f"issue={url.rsplit('/', 1)[1]}")
 
-
-# QA's own words, so only its title and body pass, as data, with the
-# labels it may set.
-for path in sorted(glob.glob("qa-unfiled/*.json")):
-    with open(path) as file:
-        issue = json.load(file)
-    labels = [label for label in issue.get("labels", []) if label in RATINGS | {"bug", "qa", "accepted"}]
-    for label in RATINGS.intersection(labels):
-        subprocess.run(["gh", "label", "create", label], capture_output=True)
-    create(str(issue["title"]), str(issue["body"]), labels)
 
 failed = next((step for step in CAUSES if STEPS.get(step, {}).get("outcome") in ("failure", "cancelled")), None)
 cause = CAUSES.get(failed, "the run failed before its tests")

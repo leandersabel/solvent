@@ -1,0 +1,11 @@
+name: QA file
+description: Files what nightly QA recorded and could not file itself.
+runs:
+  using: composite
+  steps:
+    - run: python3 "$GITHUB_ACTION_PATH/file.py"
+      shell: bash
+      env:
+        # This action runs with the workflow's token, whose issues start
+        # no workflow by themselves.
+        DISPATCH: "1"
