@@ -138,9 +138,10 @@ doing nothing accepts and writes it.
 - **Which symbols.** The distinct `unit` of every **active** holding,
   minus any unit equal to the profile's `mainCurrency`, whose rate is
   `"1"` by definition and is stored nowhere and requested from nobody.
-  An archived holding's symbol is not refreshed, except in the archive
-  flow's own closing snapshot (`manage-accounts.md`), which is a
-  recording action taken while the holding is still active.
+  An archived holding's symbol is not refreshed. **Archiving is
+  recording**: its zero refreshes the archive date like any quantity,
+  written while the holding is still active, so its unit is among the
+  symbols (`manage-accounts.md`, Archiving).
 - **At most one refresh per recording date.** The entries for a date
   are ensured once for the whole sitting, not once per row, so a
   fifteen-row sweep writes one set of prices and issues one rate

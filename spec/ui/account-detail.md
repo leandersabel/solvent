@@ -34,7 +34,9 @@ holding's row on the dashboard.
     price's date is stated beside the converted figure, plainly, and
     never as a per-row column, because it is the same for every figure
     on this screen and nobody can act on it.
-- A holding with no snapshots shows "Not yet valued", not 0.
+- A holding with no snapshots shows "Not yet valued", not 0. An
+  unarchived holding whose last figure is the archive's zero shows 0,
+  because that zero is a figure like any other.
 - A holding whose unit has no price at all shows **"Not priced"** in
   place of the converted figure, with that as the stated reason, and it
   is excluded from the total rather than counted at its bare quantity
@@ -44,9 +46,8 @@ holding's row on the dashboard.
   **Unarchive**, **Delete**. The archive and delete dialogs are
   specified in `account-form.md` and launched from here.
 - An archived holding shows an "Archived" chip and its `archivedAt`
-  date, and offers no "Record a value". The one exception is the
-  closing snapshot the archive flow itself writes
-  (`record-snapshot.md`).
+  date, and offers no "Record a value", because it takes no new figure
+  at any date (`manage-accounts.md`, While archived).
 
 ### The holding's own list of values
 
@@ -75,6 +76,12 @@ main currency · (row actions).
   a control that solves nothing.
 - Row actions: **Edit** (reopens `snapshot-entry.md` pre-filled, which
   is also where the entry's date is moved) and **Delete**.
+- **While the holding is archived, the archive's zero has neither.**
+  Its row shows the date link and the figures and no row action, since
+  the zero is read-only until the holding is unarchived
+  (`manage-accounts.md`, While archived). Every other row keeps both,
+  and Edit moves its date only to one before the archive date
+  (`snapshot-entry.md`).
 
 ### Deleting a snapshot
 

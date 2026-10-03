@@ -115,9 +115,14 @@ the holding's detail screen (`account-detail.md`). Form max-width
 The unit control is **disabled** on a holding with ≥1 snapshot, with an
 inline explanation rather than a silent lock:
 
-> The unit cannot change once you have recorded a value here. Your
-> figures are counted in this unit, and the prices that value them
-> belong to it. Archive this holding and create a new one instead.
+> The unit cannot change once a value is recorded here, including the
+> zero an archive records. Your figures are counted in this unit, and
+> the prices that value them belong to it. Archive this holding and
+> create a new one instead.
+
+The archive's zero is a recorded figure, so a holding archived and
+unarchived with no other value keeps its unit locked
+(`manage-accounts.md`, Archiving, Writes).
 
 Disabled and still readable, never removed: the unit is one of the facts
 somebody opens this form to check. Name, note and filing stay editable
@@ -134,60 +139,54 @@ dialog entirely and is deleted outright.
 
 ### Archive
 
-Default. Copy: "Keeps every value you recorded. Your past net worth
-stays accurate. You can undo this."
+Default. The **archive date** is the day the archive is made, shown in
+the copy rather than chosen, because a holding stops counting from the
+moment it is stopped:
 
-The dialog names the **archive date**, the day the archive is made. It
-is shown rather than chosen: a holding stops counting from the moment
-you stop it.
+> Records zero for this holding on 3 October 2026 and takes it out of
+> your total. Every value you recorded before then stays as it is. You
+> can undo this.
 
-- A **closing value** field dated the archive date, prefilled `0`,
-  editable, with a "Skip" link. Copy: "What was it worth when you closed
-  it?"
-- Where that date **already holds a value for this holding**, the field
-  prefills with the stored figure instead of `0`, and saving updates
-  that record in place (`manage-accounts.md`, Edge cases). The dialog
-  gets no private path around one value per holding per date.
-  - **The replace prompt does not fire here.** It exists to catch
-    somebody writing at a date they did not know was taken, and the
-    stored figure is in the field they are looking at
-    (`record-snapshot.md`, Same holding, same date). The dialog's own
-    confirm is the confirmation.
-- Skipping states its cost: "Without this, your chart drops by the last
-  figure recorded here, with nothing recorded on that date to explain
-  it." The date still carries the archive annotation, which is why the
-  copy says nothing was recorded rather than nothing is known, and why
-  the drop is never read as a bad entry.
-- This is the expected path, and the copy reads as an ordinary question
-  rather than a warning. The value it captures is what lets the chart
-  run into the close instead of falling off a cliff
-  (`net-worth-view.md`, Archived holdings).
+The zero is what archiving means, so the dialog asks for nothing: no
+value field, and no way to archive without the zero
+(`manage-accounts.md`, Archiving).
 
-**A closing value is a recording.** It joins the recording for the
-archive date and writes that date's prices for every unit that needs
-one, this holding's unit included, because the holding is still active
-at the moment it is written (`record-rate.md`, The refresh). Where that
-date already holds a recording, **its prices stand** and not one of them
-is rewritten.
+- Where the archive date **holds a non-zero figure for this holding**,
+  one more line says the zero replaces it, naming the stored figure in
+  the holding's unit:
 
-**The order of the writes is load-bearing**, and the dialog performs
-them in this order:
+  > This replaces the 12 450.00 USD recorded for 3 October 2026.
 
-1. The closing value, as an ordinary recording at the archive date.
-2. That date's price entries, over the units of the holdings as they
-   stand at this moment, this holding still among them.
-3. The `account` record's archive flag, last.
+  The line sits above the confirm and is the consent, so the replace
+  prompt does not also fire (`record-snapshot.md`, Same holding, same
+  date).
+- Where that date **already holds a zero** for this holding, in any
+  form, there is no such line, because nothing is replaced.
 
-The flag goes last because the refresh covers active holdings only.
-Setting it first would drop this holding's unit out of the set and
-archive a position at a price nobody captured.
+The same confirmation opens from the holding's own **Archive** action
+(`account-detail.md`). A holding with no values reaches it only there,
+since Delete skips the dialog for it, and archiving gives it the zero
+as its only figure.
 
-**The dialog does not own the closing value once it is written.**
-Changing or clearing it later happens where every other figure is
-changed, in the recording for that date (`recording-detail.md`,
-`record-snapshot.md`). Clearing it there leaves the archive annotation
-exactly where it is, and the chart drops on that date the way it does
-when the value was skipped here.
+**The zero is a recording.** It joins the recording at the archive
+date, or starts one there, and writes that date's prices for every
+unit that needs one, this holding's unit included, because the holding
+is still active when the prices are written (`record-rate.md`, The
+refresh). Prices the date already holds stand, and not one of them is
+rewritten. A unit with no proposal gets no entry, and nothing in the
+dialog asks for one.
+
+The dialog writes in the order `manage-accounts.md`, Archiving, Writes
+sets, which also gives the reasons:
+
+1. The zero at the archive date, unless that date already holds one.
+2. That date's missing price entries.
+3. The `account` record's archive flag.
+
+**The zero is read-only while the holding is archived.** It offers no
+edit, clear or delete on the holding's screen or in the recording for
+its date (`account-detail.md`, `update-values.md`). Unarchiving is what
+makes it editable again.
 
 ### Delete permanently
 
@@ -212,8 +211,9 @@ a second arrangement.
 - The unit select is a full-height list with a text filter, and never a
   control that needs hover to reveal what an option means: "rate
   entered by hand" sits in the option row itself.
-- In the archive dialog the closing value field is reachable without
-  the confirm button leaving the screen.
+- In the archive dialog the line naming a replaced figure is on screen
+  together with the confirm button, because that line is what the
+  confirm consents to.
 
 ## States
 
@@ -232,17 +232,45 @@ a second arrangement.
 - **Error, Conflict stale version**: "This holding was changed in
   another tab." The panel reloads the current record.
 - **Error, save failed**: the form keeps every value.
-- **Error, the closing value did not save**: nothing is archived and
-  the holding is untouched. The dialog stays open with the figure still
-  in the field and says exactly that. This is what the write order buys.
-- **Error, the closing value saved but the prices did not**: the figure is
-  recorded and the archive goes through. The message names the units
-  whose prices were not written, and nothing is rolled back
-  (`record-rate.md`, The write path).
-- **Error, the closing value saved but the archive flag did not**: the
-  figure stays recorded at that date and the holding is still active.
-  Say both halves and offer the archive again, which now prefills with
-  the figure stored there.
+- **Error, the zero did not save**: no price and no flag is written,
+  and the holding is untouched. The dialog stays open:
+
+  > The zero for 3 October 2026 did not save, so nothing was archived.
+
+- **Error, Conflict on the replacement**: another window changed the
+  figure at the archive date. Nothing is retried. The dialog reloads
+  that record and states the replacement again with the figure now
+  stored, under:
+
+  > This figure was changed in another window.
+
+- **Error, the archive refused after the reload**: another window
+  recorded this holding at the archive date, and nothing was written.
+  The dialog reopens on what that date now holds, replacement line
+  included where the figure is not zero, under:
+
+  > 3 October 2026 now holds a figure for this holding, recorded in
+  > another window. Nothing was archived.
+
+- **Error, the zero saved but a price did not**: the archive goes
+  through, because a price write never fails a quantity write
+  (`record-rate.md`, The write path). Nothing is rolled back, and the
+  message names the units:
+
+  > Archived. The prices for USD and XAU-ozt on 3 October 2026 did not
+  > save. Add them in the recording for that date.
+
+  The units are computed, not written into the copy, and the recording
+  is a link (`recording-detail.md`).
+- **Error, the zero saved but the archive flag did not**: the zero and
+  the prices written stay at the archive date, and the holding stays
+  active, counting as zero. The message says both halves, and the
+  archive is offered again. The retry finds the zero, writes only the
+  prices still missing, then the flag.
+
+  > Zero is recorded for 3 October 2026, but the holding was not
+  > archived. It is still in your total, at zero.
+
 - **Populated**: the saved holding appears in the table immediately
   from local state, with no refetch.
 
@@ -262,6 +290,11 @@ a second arrangement.
   so nor ranks by it (`net-worth-view.md`).
 - **No prompt to file the holding.** An unfiled holding is a complete
   holding.
+- **No value field and no rate lines in the archive dialog.** The zero
+  is the only figure an archive writes, so there is nothing to ask. Its
+  prices are the date's proposals, written without a typed figure, and
+  a price is changed in the recording for its date (`recording-detail.md`),
+  where the holdings it moves are on screen.
 - **No note in the archive dialog that a unit stops being refreshed**
   when the last active holding measured in it is archived
   (`record-rate.md`, The refresh). Nothing breaks and nothing is lost:
@@ -278,7 +311,9 @@ a second arrangement.
   an id that does not exist.
 - Unarchiving is available from the archived rows and from the
   holding's detail screen: one action, no dialog, restoring the holding
-  to active lists and the current total. Its unit rejoins the set that the next
+  to active lists and the current total. It returns at zero, because the
+  archive's zero is its last figure, until a new figure is recorded, and
+  the zero becomes editable. Its unit rejoins the set that the next
   recording refreshes (`record-rate.md`, The refresh).
 - Names, notes and dimension labels are decrypted user text and render
   through `x-text` or `textContent` only (`design-system.md`,

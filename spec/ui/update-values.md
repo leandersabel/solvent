@@ -59,7 +59,9 @@ Standard app shell (`design-system.md`, App shell), content max-width
 900px.
 
 Top to bottom: the date as the heading, one row per active holding,
-then the rate block. Archived holdings do not appear.
+then the rate block. Archived holdings do not appear, except on a
+reopened recording where one holds a figure at that date (Archived
+holdings on a reopened recording).
 
 The date is the screen heading, with a section label above it. The
 rows share one Card, divided by hairline rules. The rate block follows
@@ -132,6 +134,18 @@ resolving.
   and a button asserting it for fifteen holdings at once makes that a
   lie. A holding nobody looked up needs no action at all, so there is
   nothing for such a button to do.
+
+### Archived holdings on a reopened recording
+
+An archived holding takes no new figure, so it has a row only where the
+recording already holds one for it, and that row is always in the
+recorded state. Its figure is edited or cleared like any other
+(`record-snapshot.md`, Clearing a figure).
+
+**The archive's zero has no control.** Its row shows the zero as text
+in the field column, the control column stays empty, and the row's
+sentence reads "Archived at zero on this date." The zero is read-only
+until the holding is unarchived (`manage-accounts.md`, While archived).
 
 ### Age, in plain language
 
@@ -254,9 +268,11 @@ so, and where the entry is that unit's only one it says that too:
 
 **The count is of holdings whose value on that date actually
 changes**: holdings measured in that unit, not archived before the
-date, and holding a figure at or before it. A holding archived earlier
-or first valued later is worth nothing that day whatever the price, so
-counting it would overstate what the change moves.
+date, holding a figure at or before it, and whose quantity on that date
+is not zero. A holding archived earlier, first valued later, or at zero
+that day, the archive's zero included, is worth nothing that day
+whatever the price, so counting it would overstate what the change
+moves (`net-worth-view.md`, Archived holdings).
 
 Editing a filled line flips its provenance the moment it changes, to
 "Edited from 0.9312", naming the figure that was replaced

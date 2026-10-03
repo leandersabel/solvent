@@ -399,7 +399,8 @@ go with it, so every holding measured in those units moves on that
 date and not only the holdings that had a figure, and there is no way
 back. Deleted, the date is gone from every holding's list and from
 every unit's prices, and the chart runs across it as though the
-sitting had never happened.
+sitting had never happened. The one exception is an archived holding's
+zero, which stays and keeps the date a recording (`manage-accounts.md`).
 
 #### Moving an entry to another date
 
@@ -532,7 +533,8 @@ worth around that date will change.
   cannot be undone.
 - A deleted recording leaves no trace. Its date is gone from every
   holding's list and from every unit's prices, and the chart runs
-  across it.
+  across it. An archived holding's zero on that date stays
+  (`manage-accounts.md`).
 - The main screen carries a New recording button, and it opens a date
   picker set to today.
 - The picker marks every date that already holds a recording, empty

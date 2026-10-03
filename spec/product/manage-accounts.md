@@ -82,29 +82,30 @@ is a complete vault.
 Selling the flat is not the same act as deciding the flat should never
 have been in the list, so the app asks which one you mean.
 
-**Archive** is the normal answer and comes preselected. The holding
-leaves your active list and your current total, it takes no new values,
-and every value you ever recorded for it stays. Your net worth for last
-year does not move. You can undo it.
+**Archive** is the normal answer and comes preselected. It records zero
+for the holding on the day you archive it. The holding leaves your
+active list and your current total and takes no new values. Every figure
+you recorded for it before that day stays exactly as it was. You can
+undo it.
 
-The same dialog offers to record a closing value on the archive date,
-editable: what it was worth when you closed it. It starts at zero,
-unless the holding already has a value on that date, in which case it
-starts at that value and saving it replaces that value. There is no
-separate question about replacing, because the field already shows
-what is there. Zero is right for a position that simply ended and wrong
-for one you sold at a figure, so the field is never saved without you
-looking at it. This is the expected path rather than a nicety. With
-it, the chart runs down into the closing figure like any other
-recorded value. Skip it and
-the chart still drops on that date, with nothing recorded to explain
-why, so the app says that in the dialog rather than letting you find out
-in a chart six months later. Either way the date is annotated as an
-archive, so the drop is never mistaken for a bad entry. Accepting the
-closing value records something, so it joins the recording for the
-archive date and refreshes the rates like any other recording does.
-Where that date already holds a recording, the rates it holds stand
-(`record-snapshot.md`).
+The zero is what archiving means, so the dialog asks for no closing
+value. When the holding already has a figure for that day, the dialog
+says the zero replaces it. The zero is recorded like any other figure:
+it joins the recording for that date and refreshes the rates as any
+recording does, and where that date already holds a recording, the
+rates it holds stand (`record-snapshot.md`).
+
+While a holding is archived, you cannot change or remove its zero. To
+change it, undo the archive. Earlier figures can still be corrected,
+but none can be moved onto the archive date or past it, because that
+would put a figure where the zero is or after the holding closed. Deleting the recording for the archive date takes everything
+else recorded that day and keeps the archived holding's zero, so the
+date stays a recording, and the confirmation says so.
+
+The chart runs from the holding's last recorded figure down to zero on
+the archive date, as it does between any two figures, and the date is
+annotated as an archive (`net-worth-view.md`). Your net worth on the
+days between can change, as it does for any new figure.
 
 **Delete permanently** is the secondary answer, and it removes the holding
 and every value ever recorded against it. You type the holding's name to
@@ -114,8 +115,13 @@ will change, because the history is what is going away.
 A holding with no recorded values skips the dialog and is simply
 deleted. There is nothing to lose.
 
-Unarchiving is one action with no dialog. The holding rejoins the list
-and the current total.
+Unarchiving undoes an archive in one action with no dialog. The holding
+rejoins the list and the current total and takes values again. Its
+history stays as it is, the archive's zero included, so it counts as
+zero until you record a new figure.
+
+A holding archived without a zero on its archive date keeps its history
+as it is. Unarchiving it and archiving it again gives it one.
 
 ## What must be true
 
@@ -132,21 +138,32 @@ and the current total.
   appears at once, and changes nothing about any holding.
 - A holding you never filed under a dimension shows as "Unassigned" for
   that dimension, which reads as a normal state and not as an error.
-- Archiving a holding leaves every net worth figure before the archive
-  date exactly as it was, and removes the holding from today's total.
-- A closing value recorded onto a date that already has a recording
-  joins it and moves no rate, so no other holding shifts on that date.
-- Clearing a closing value later leaves the archive annotation where
-  it is, and the chart drops on that date exactly as it does when the
-  value was skipped in the dialog.
+- Archiving a holding records zero for it on the archive date and
+  removes it from today's total. Every figure you recorded before that
+  date stays exactly as it was.
+- Archiving never asks what the holding was worth.
+- Archiving a holding that already has a figure on the archive date
+  says, before it goes through, that the zero replaces it.
+- Archiving onto a date with no recording starts one and refreshes the
+  rates for that date, like any recording. Archiving onto a date that
+  already has a recording joins it, and the rates it holds stand.
+- While a holding is archived, its zero on the archive date cannot be
+  changed or removed, from the holding's page or from that date's
+  recording. Unarchiving makes it changeable again.
+- While a holding is archived, the app offers no way to record a new
+  value for it, on any date.
+- While a holding is archived, its earlier figures can still be
+  corrected or deleted, but none can be moved onto the archive date or
+  past it.
+- Deleting the recording on an archived holding's archive date removes
+  everything else recorded that day and keeps the holding's zero. The
+  date stays a recording, and the confirmation says the zero stays.
 - Archiving the last holding measured in a unit stops that unit being
   refreshed when you record. Its rates so far stay and unarchiving
   resumes them.
-- Archiving with the closing value accepted makes the chart run into
-  that figure. Archiving with it skipped still works, and the chart
-  drops on that date with an archive annotation.
 - Unarchiving puts the holding back in the list and back in the total,
-  with all its history.
+  with all its history, the archive's zero included. It reads zero until
+  you record a new figure, and you can record one.
 - Deleting permanently takes the holding and all its values together.
   There is no state where half of it is gone.
 - A holding belonging to another household member can never be reached

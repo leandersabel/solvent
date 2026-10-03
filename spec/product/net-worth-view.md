@@ -178,10 +178,11 @@ the day it happened and you get one.
 
 A holding contributes nothing to dates before its first recorded value.
 Entering ten years of an old holding's history does not make a cliff at
-the left edge of the chart. An archived holding contributes nothing
-after its archive date, and that date is annotated with the holding's
-name, because an unexplained vertical drop in an otherwise smooth chart
-is indistinguishable from a bad entry.
+the left edge of the chart. An archived holding runs down to the zero
+recorded on its archive date and contributes nothing after it
+(`manage-accounts.md`). That date is annotated with the holding's name,
+because a band running out to nothing otherwise looks the same as a
+holding that lost its value or a bad entry.
 
 ### The list of holdings
 
@@ -274,8 +275,10 @@ the section needs no small print.
   time.
 - A negative holding reduces the total and appears on the liabilities
   side.
-- Archiving a holding leaves every point before the archive date
-  untouched, removes it from today's total, and annotates that date.
+- An archived holding's band runs from its last recorded figure down to
+  zero at the archive date, as between any two figures, and that date
+  carries an annotation with the holding's name. The holding is not in
+  today's total.
 - Changing the range, the grouping, the mode or which bands are visible
   never contacts the network and never waits.
 - The chart can be driven from the keyboard, and the same numbers are

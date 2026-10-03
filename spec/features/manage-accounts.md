@@ -114,27 +114,11 @@ in the encrypted profile record (`account-settings.md`).
 Deleting a holding that has snapshots is a user decision at delete
 time, not a fixed policy, because both options are legitimate:
 
-- **Archive** (default, preselected). Sets `archivedAt` and re-writes
-  the `account` record. The holding disappears from active lists and
-  can take no new snapshots, but every snapshot stays. Historical net
-  worth remains truthful. Reversible — an archived holding can be
-  unarchived.
-
-  The dialog also offers a **closing snapshot** dated `archivedAt`,
-  prefilled with `0` and editable — the closing value if the position
-  was liquidated at a figure, `0` if it simply ended. This is the
-  expected path, not a nicety: with it, the holding's band reaches its
-  closing value as recorded data, and the trend chart interpolates into
-  that value like any other snapshot. On either path the holding counts
-  on chart dates before `archivedAt` and on none from it on
-  (`net-worth-view.md`, Archived holdings). It is a
-  recording action like any other, so it refreshes prices at
-  `archivedAt`, the unit of the holding being archived included, since
-  that holding is still active at that moment. The user may skip it,
-  and then the band drops by the last known value on `archivedAt` with
-  nothing recorded to explain it, an artifact of a flag rather than data
-  the user entered. Either way the date carries an archive annotation,
-  so the drop is never mistaken for a bad snapshot.
+- **Archive** (default, preselected). Writes the holding's zero on the
+  day the archive is made, then sets `archivedAt` (Archiving). The
+  holding leaves active lists and the current total and takes no new
+  snapshots. Every snapshot before that day stays as it was.
+  Reversible.
 - **Delete permanently.** Removes the `account` record and cascades to
   every snapshot carrying that `account_id`. **It deletes no price
   entry.** A price belongs to a symbol, another holding may be measured
@@ -152,6 +136,146 @@ the set atomically without the client enumerating ids. That is also the
 whole reach of the cascade: no other record type carries an
 `account_id`, so nothing else can be swept up by it. Endpoint:
 `DELETE /api/accounts/<account_id>?mode=purge`.
+
+## Archiving
+
+D is the day the archive is made. The dialog shows it and does not
+offer a choice.
+
+**The zero is what archiving means.** The person choosing to archive
+gives it, so it is a figure they gave (requirements.md, Recording
+values). There is no closing value to edit and no way to archive
+without the zero: a closed position is worth nothing, and a band ending
+at any other figure drops at D with nothing recorded to explain it.
+
+The zero is an ordinary `snapshot`, `{ "date": D, "value": "0",
+"note": null }`, with the holding's plaintext `account_id`. Nothing in
+it marks it as the archive's. **The archive's zero is the zero-valued
+snapshot at a holding's `archivedAt` while `archivedAt` is set**, so
+the record shape, export and import learn nothing new.
+
+### Writes
+
+**The zero is a recording.** It joins the recording at D, or starts one,
+and refreshes D's prices like any recorded quantity (`record-rate.md`,
+The refresh).
+
+Before its first create, the archive runs the pre-create reload of
+`type=snapshot` and `type=rate`, once, and decides every step below
+from what the reload returned (`record-snapshot.md`, Creating and
+reopening are distinct acts, which names the archive's narrower
+refusal). An archive that creates nothing runs no reload.
+
+In this order:
+
+1. **The zero at D**, by what D holds for this holding:
+   - **Nothing** → a create at a fresh UUIDv4 and `version: 1`. The
+     archive is refused only when the reload finds this holding's slot
+     at D taken. Other holdings' records at D are the recording the
+     zero joins, not a collision. A refused archive writes nothing, and
+     the dialog reopens on what D now holds.
+   - **A non-zero figure** → the dialog states, before its confirm,
+     that the zero replaces that figure, named in the holding's unit.
+     On confirm the record is updated in place: same `record_id`,
+     `version` + 1, fresh nonce, `value` `"0"`, `note` kept. The
+     dialog's statement is the consent, so the replace prompt does not
+     also fire (`record-snapshot.md`, Same holding, same date).
+   - **A zero**, in any canonical form (`"0"`, `"0.00"`) → nothing is
+     written and the dialog states no replacement, because nothing is
+     replaced. This is the retry path after a failed flag write, and a
+     stored `"0.00"` keeps the digits it was typed with.
+2. **D's price entries**, ensured over the units of the active holdings
+   as they stand at this moment, this holding still among them. Ensured
+   means created only where D has no entry for a symbol: a date that
+   already holds a recording keeps every rate it holds, and a retry
+   rewrites none it already wrote. A date whose prices are complete
+   issues no request to `/api/rates`, and a unit the proxy returns no
+   proposal for gets no entry (The refresh, per symbol).
+3. **The `account` record**, with `archivedAt: D`, at `version` + 1.
+
+A holding with no snapshots archives the same way, so the zero is its
+only figure. It appears on no chart date (`net-worth-view.md`, Edge
+cases), and unarchived it reads zero like any other holding. **The zero
+is a recorded figure, so from then on its unit is fixed** (Rules),
+archived or not.
+
+**The order is load-bearing.**
+
+- **The zero before the prices** is the write path's own order
+  (`record-rate.md`, The write path): prices written with the quantity
+  then failing would move every holding in those units for a figure
+  that is not there.
+- **The prices before the flag**, because the refresh covers active
+  holdings only. Setting the flag first would drop this holding's unit
+  out of the set, and D would go unpriced for every other holding
+  measured in it.
+- **The flag last**, because each earlier step alone leaves a true
+  state. With the zero written and the flag failed, the holding is
+  active and worth zero at D, and archiving again finds the zero,
+  writes only the prices still missing, and writes the flag. Flag first with the zero
+  failing would leave an archived holding stepping off its last figure,
+  unable to take the snapshot that would repair it.
+
+Failures:
+
+- **The zero did not save** → no price and no `account` write. The
+  holding is untouched and the dialog stays open saying so.
+- **Conflict on the replacement** → surfaced, never retried. The dialog
+  reloads that record and states the replacement again with the figure
+  now stored.
+- **A price did not save** → the archive still goes through, because a
+  price write cannot fail a quantity write (`record-rate.md`, The write
+  path). The message names the units whose prices were not written, and
+  nothing is rolled back.
+- **The flag did not save** → the zero and the prices written stay at D
+  and the holding stays active at zero. Both halves are stated, and the
+  archive is offered again.
+
+### While archived
+
+- **No new snapshot**, at any date (`record-snapshot.md`, Edge cases).
+- **The archive's zero is read-only.** It cannot be edited, cleared or
+  deleted, from the holding's page or from the recording for D. An
+  archived value has no reason to be anything but zero, and unarchiving
+  is how it becomes editable.
+- **An entry's date moves only to a date before D.** Onto D it would
+  displace the zero (`record-snapshot.md`, Moving the date onto an
+  occupied date), and after D it would be a new figure after the
+  archive.
+- **Every other snapshot stays editable and deletable** as any snapshot
+  is (`record-snapshot.md`, Editing an existing snapshot), including a
+  non-zero figure at D. Edited to zero, that figure becomes the
+  archive's zero.
+- **Deleting the recording at D keeps the zero.** Every other record at
+  D goes as usual, and the date stays a recording holding the zero. The
+  confirmation says the archive's zero stays. Refusing the delete would
+  leave unarchive, delete and archive again as the only route, and
+  archiving again dates the archive to that day, moving D.
+- **Purge still takes the zero** with every other snapshot. Read-only
+  guards the zero against edits, not against deleting the holding.
+
+All of this is client-enforced by construction, like the unit rule
+(Rules): the server sees neither a date nor `archivedAt`. A session
+whose model predates the archive can still write a figure for the
+holding at D or later. No such figure reaches a total, because the
+chart counts an archived holding on no date from D on and draws
+whatever D holds as the step (`net-worth-view.md`, Archived holdings).
+
+### Unarchiving
+
+Clears `archivedAt` at `version` + 1 and writes nothing else. The zero
+stays a figure like any other, so the holding rejoins active lists and
+the current total at zero until a new figure is recorded, and the zero
+becomes editable. Its unit rejoins the set the next recording refreshes
+(`record-rate.md`, The refresh).
+
+### A holding archived without a zero at D
+
+A holding archived on D whose figure at D is not zero, or which has no
+figure at D, keeps its history as it is. Nothing migrates it, because
+writing a zero into that history would be a figure nobody gave. The
+chart draws its step at D (`net-worth-view.md`, Archived holdings).
+Unarchiving it and archiving it again writes the zero at the new D.
 
 ## Rules
 
@@ -194,19 +318,12 @@ whole reach of the cascade: no other record type carries an
   offers canonical symbols before it offers free text.
 - **A holding whose native unit is the user's main currency** → the rate
   is fixed at 1 and the rate field is hidden when recording snapshots.
-- **Archiving a holding that already has a snapshot on the archive
-  date** → the closing-snapshot field follows the ordinary upsert rule
-  (`record-snapshot.md`): it prefills with the existing value rather
-  than `0`, and saving replaces that record in place. The archive
-  dialog does not get a private path around one-snapshot-per-date.
-  **No replace prompt fires here**: the field is showing the stored
-  figure, so it fails the prompt's own condition (`record-snapshot.md`,
-  Same holding, same date). The dialog's own confirm is the
-  confirmation.
 - **Archiving a holding that is the last active one** → allowed; the
-  net worth view shows its empty state.
-- **Unarchiving** → clears `archivedAt`; the holding rejoins active
-  lists and the current total.
+  net worth view shows its all-archived state, total "—" with the
+  history still drawn (`net-worth-view.md`, Edge cases).
+- **Archiving the last active holding measured in a unit** → that unit
+  stops being refreshed and keeps its entries (`record-rate.md`, Edge
+  cases).
 - **Concurrent edit from two tabs** → the second `PUT` fails with
   Conflict on the version check; the UI reloads and asks the user to
   redo the edit.
@@ -232,20 +349,66 @@ whole reach of the cascade: no other record type carries an
   not modify the stored record.
 - Deleting a holding that has snapshots shows a dialog offering both
   archive and permanent delete, with archive preselected.
-- **Archive**: the `account` record gains `archivedAt`, no snapshot record
-  is deleted, and the trend chart for dates before the archive is
-  unchanged.
-- Archiving onto a date that already holds a snapshot for that holding
-  prefills the field with the stored figure, shows no replace prompt,
-  and leaves exactly one snapshot for that (holding, date) at
-  `version` + 1.
-- Archiving with the offered closing snapshot accepted writes one
-  snapshot dated `archivedAt`; the holding's band runs into that value
-  and ends there, instead of dropping by the last known value.
-- Archiving with the closing snapshot skipped still archives; the drop
-  at `archivedAt` is unexplained, and that is the user's choice. Both
-  paths annotate the date as an archive, and on both the chart's value
-  at `archivedAt` leaves the holding out.
+- **Archive** on a D holding no records writes, in this order: one
+  `snapshot` with that `account_id`, `date` D, `value` `"0"`, `note`
+  `null` and `version: 1`; one `rate` entry at D for every unit of the
+  active holdings other than the main currency, this holding's unit
+  included, for which the proxy returned a proposal; then the
+  `account` record with `archivedAt` D at `version` + 1. Every other
+  snapshot of the holding is byte-identical afterwards and none is
+  deleted.
+- Archiving onto a D that already holds a rate entry for every unit
+  issues no request to `/api/rates`, writes no `rate` record, and
+  leaves every rate entry at D byte-identical.
+- The archive dialog offers no value field and no way to archive
+  without the zero.
+- The archive runs one reload of `type=snapshot` and `type=rate` before
+  its first create, and none when it creates nothing.
+- Archiving onto a D where the holding has a non-zero snapshot names
+  that figure as replaced before the confirm, shows no replace prompt,
+  and leaves exactly one snapshot for that (holding, D): same
+  `record_id`, `version` + 1, a different nonce, `value` `"0"`, the
+  `note` unchanged.
+- Archiving onto a D where the holding's snapshot is `"0.00"` states no
+  replacement, writes no snapshot, and leaves that record
+  byte-identical.
+- With the `account` write stubbed to fail, the zero and the rate
+  entries stay at D, the holding stays active and counts at zero.
+  Archiving again issues no snapshot write, no `rate` write and exactly
+  one `account` `PUT`.
+- With one rate write stubbed to fail, the archive goes through, the
+  message names that unit, and archiving is not rolled back. With the
+  flag also failed, archiving again writes that unit's entry, rewrites
+  no other, and writes the flag.
+- With the zero's write stubbed to fail, no `rate` and no `account`
+  write is issued and the holding is byte-identical.
+- With the rate proxy stubbed to 503, the archive still goes through.
+- After archiving a holding with no snapshots and unarchiving it,
+  changing its unit is refused.
+- With a second session having recorded this holding at D after the
+  first read its model, the first session's archive is refused after
+  the reload and writes nothing. A second session that recorded only
+  other holdings at D does not refuse it.
+- Archiving a holding with no snapshots writes its zero at D at
+  `version: 1`, then the `account` record. Unarchived, it reads zero,
+  not "not yet valued".
+- While archived, the holding offers no way to record a figure at any
+  date. Its zero at D offers no edit, clear or delete on the holding's
+  page or in the recording for D. An earlier entry's date cannot be
+  moved to D or later, and an earlier entry's value can still be
+  edited.
+- Deleting the recording at D deletes every other record bearing D and
+  leaves the archive's zero byte-identical. The recording still opens,
+  holding the zero.
+- Purging an archived holding deletes its zero with every other
+  snapshot.
+- Unarchiving writes only the `account` record, with `archivedAt`
+  `null`, and leaves the zero byte-identical. The holding rejoins the
+  active list and the total at zero, a figure can be recorded for it,
+  and the zero can be edited.
+- A holding archived on D with no snapshot at D, or a non-zero one,
+  gains no snapshot on unlock, on any read or on any write elsewhere.
+  Unarchiving and archiving it again writes the zero at the new D.
 - A holding saved with a dimension set to one value and then re-saved
   with another carries exactly one entry for that dimension id
   afterwards — true by construction of the map, so the test guards the
@@ -266,8 +429,6 @@ whole reach of the cascade: no other record type carries an
   Recording across holdings in several symbols issues one whole-table
   request for the recording date (`rate-lookup.md`, The client never
   names a symbol).
-- Unarchiving restores the holding to active lists and to the current
-  total.
 - The dimension list offered in the UI is derived client-side from the
   decrypted profile; no request returns dimensions, labels, or values.
 - Renaming a dimension's label writes exactly one record — the profile —
