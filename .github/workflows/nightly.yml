@@ -78,6 +78,7 @@ jobs:
 
       - if: steps.decide.outputs.go == 'true'
         id: qa
+        timeout-minutes: 140
         uses: anthropics/claude-code-action@fd1c128679612beff4ca259c78021c506e8aa7a7 # v1.0.237
         env:
           CLAUDE_CODE_DISABLE_BACKGROUND_TASKS: "1"
@@ -102,10 +103,30 @@ jobs:
       - if: always() && steps.decide.outputs.go == 'true'
         run: git checkout -q HEAD -- .github/actions
 
-      # QA finished and filed everything it found.
+      # QA's token can expire during a long walk, so a fresh run files
+      # what it recorded, as claude[bot].
+      - if: always() && steps.decide.outputs.go == 'true' && hashFiles('qa-unfiled/*.json') != ''
+        timeout-minutes: 10
+        continue-on-error: true
+        uses: anthropics/claude-code-action@fd1c128679612beff4ca259c78021c506e8aa7a7 # v1.0.237
+        with:
+          claude_code_oauth_token: ${{ secrets.CLAUDE_CODE_OAUTH_TOKEN }}
+          prompt: Run `python3 .github/actions/qa-file/file.py` once and report its output.
+          allowed_bots: claude,github-actions,dependabot
+          bot_id: "209825114"
+          claude_args: |
+            --model claude-opus-5-5
+            --allowedTools "Bash(python3 .github/actions/qa-file/file.py)"
+
+      # What that run could not file, the workflow files before the
+      # night is judged.
+      - if: always() && steps.decide.outputs.go == 'true'
+        uses: ./.github/actions/qa-file
+
+      # QA finished.
       - if: steps.decide.outputs.go == 'true'
         id: qa-done
-        run: '[ -f qa-done.txt ] && [ ! -d qa-unfiled ]'
+        run: '[ -f qa-done.txt ]'
 
       - if: steps.decide.outputs.go == 'true'
         id: gate
