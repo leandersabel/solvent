@@ -5,7 +5,7 @@
 // looked up from it, at any age. Every figure comes from the model.
 import * as decimal from './decimal.js';
 import * as writes from './writes.js';
-import { ageInWords, dialog, el, icon, trackEdits } from './dom.js';
+import { ageInWords, dialog, el, icon, priceDateLine, trackEdits } from './dom.js';
 import { snapshotDialog } from './view-forms.js';
 import { archiveHoldingDialog, deleteHoldingDialog, holdingForm } from './view-holding-form.js';
 
@@ -188,7 +188,7 @@ function chipsFor(vault, holding) {
  *  A failed delete is reported on the row it was asked of. */
 function historyRow(vault, holding, snapshot, flagged, { onOpenRecording, onChanged }) {
   const quantity = decimal.parse(snapshot.payload.value);
-  const price = vault.priceOn(holding.payload.unit, snapshot.payload.date);
+  const price = vault.priceAtDate(holding.payload.unit, snapshot.payload.date);
   const duplicate = flagged.has(snapshot.payload.date);
   const failed = el('p', { class: 'field-error', hidden: true, role: 'alert' });
   const noteRow = snapshot.payload.note
@@ -227,12 +227,9 @@ function historyRow(vault, holding, snapshot, flagged, { onOpenRecording, onChan
         : null,
     ]),
     el('td', { class: 'numeric', text: vault.figure(snapshot.payload.value, holding.payload.unit) }),
-    el('td', {
-      class: 'numeric',
-      text: price
-        ? vault.format.money(decimal.multiply(quantity, price.rate))
-        : 'not priced',
-    }),
+    el('td', { class: 'numeric' }, price
+      ? [vault.format.money(decimal.multiply(quantity, price.rate)), priceDateLine(vault, price.date, snapshot.payload.date)]
+      : 'not priced'),
     el('td', {}, vault.isArchiveZero(holding, snapshot) ? [] : [
       duplicate
         ? el('button', {

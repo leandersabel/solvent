@@ -5,7 +5,7 @@ import * as writes from './writes.js';
 import { dialog, el, mount, resumable, today } from './dom.js';
 import { dateField } from './datepicker.js';
 import { dayNumber, isoFromDay } from './model.js';
-import { rateBlock, rateChangeCopy } from './view-sweep.js';
+import { describeConverted as showConverted, rateBlock, rateChangeCopy } from './view-sweep.js';
 
 /** One holding, one date: the small form for an odd date or a
  *  backfill. There is no rate field on it, because a price belongs to
@@ -20,20 +20,31 @@ export function snapshotDialog(vault, holding, existing, onSaved, onOpenRecordin
     id: 'snapshot-value',
   });
   const note = el('textarea', { rows: '2', text: existing ? existing.payload.note || '' : '' });
+  const unit = holding.payload.unit;
   const converted = el('p', { class: 'hint' });
   const error = el('p', { class: 'field-error', hidden: true });
   const pricesLine = el('p', { class: 'hint prices-line' });
   const pricesBody = el('div', { class: 'prices-body' });
   let block = null;
   let sit = null;
+  // Set once a move whose prices did not save has been reported: Save
+  // waits for the next change.
+  let spent = false;
+  const changed = () => {
+    spent = false;
+    submit.disabled = false;
+  };
 
   // An empty date opens to its proposals, fetched for that date, and
   // its lines are the ones the save writes. A figure added at a date
   // already priced fills in only the units that date is missing, as the
   // sweep does (record-rate.md, The refresh), and looks up nothing when
-  // none is. Every edit of an existing entry, and a figure replacing
-  // this holding's own at that date, changes a figure, which ensures no
-  // price: those read the stored prices and look nothing up.
+  // none is. Moving an existing entry to another date is the same act
+  // as adding it there. Every other edit of an existing entry, and a
+  // figure replacing this holding's own at that date, changes a figure,
+  // which ensures no price: those read the stored prices and look
+  // nothing up.
+  const moving = () => Boolean(existing) && date.value !== existing.payload.date;
   const describePrices = () => {
     const on = date.value;
     if (!on) {
@@ -43,18 +54,20 @@ export function snapshotDialog(vault, holding, existing, onSaved, onOpenRecordin
       return;
     }
     const occupied = vault.holdsRecording(on);
-    const adding = !existing && !vault.snapshotsFor(holding.recordId).some((s) => s.payload.date === on);
-    const filling = occupied && adding && vault.missingUnits(on).length > 0;
-    const joining = existing || occupied;
-    sit = existing || (occupied && !filling) ? null : writes.sitting(vault, on);
+    const staying = Boolean(existing) && !moving();
+    const adding = moving() || (!existing && !vault.snapshotsFor(holding.recordId).some((s) => s.payload.date === on));
+    const filling = occupied && adding && vault.missingUnits(on, unit).length > 0;
+    const joining = staying || occupied;
+    sit = staying || (occupied && !filling) ? null : writes.sitting(vault, on);
     block = rateBlock(vault, on, {
       sit,
-      readOnly: Boolean(joining) && !filling,
+      readOnly: joining && !filling,
       fillMissing: filling,
+      also: unit,
       onChange: describeConverted,
     });
-    const main = holding.payload.unit === vault.mainCurrency;
-    if (existing) {
+    const main = unit === vault.mainCurrency;
+    if (staying) {
       pricesLine.textContent = `The prices stored for ${vault.format.longDate(on)}. Editing this entry changes none of them.`;
     } else if (occupied) {
       const joins = vault.recording(on).prices.length
@@ -79,7 +92,7 @@ export function snapshotDialog(vault, holding, existing, onSaved, onOpenRecordin
           })
         : null,
     ]);
-    if (sit && writes.needsLookup(vault, on)) {
+    if (sit && writes.needsLookup(vault, on, unit)) {
       sit.proposals = writes.fetchProposals(vault, on);
       block.waiting();
       const shownFor = block;
@@ -96,12 +109,8 @@ export function snapshotDialog(vault, holding, existing, onSaved, onOpenRecordin
   const typedValue = () => vault.format.readField(value.value, existing ? existing.payload.value : null);
   const describeConverted = () => {
     const stored = typedValue();
-    const quantity = stored === null ? null : decimal.parse(stored);
-    const price = block ? block.figureFor(holding.payload.unit) : null;
-    converted.textContent =
-      quantity === null || price === null || holding.payload.unit === vault.mainCurrency
-        ? ''
-        : vault.mainMoney(decimal.multiply(quantity, price));
+    if (!block || unit === vault.mainCurrency) return converted.replaceChildren();
+    showConverted(vault, converted, stored === null ? null : decimal.parse(stored), block.figureFor(unit), date.value);
   };
   // An archived holding's entry moves only to a date before its archive
   // date: onto it the move would displace the archive's zero, and after
@@ -112,11 +121,14 @@ export function snapshotDialog(vault, holding, existing, onSaved, onOpenRecordin
     max: archivedAt ? isoFromDay(dayNumber(archivedAt) - 1) : today(),
     value: existing ? existing.payload.date : today(),
     onChange: () => {
+      if (moving()) changed();
       describePrices();
       describeConverted();
     },
   });
   value.addEventListener('input', describeConverted);
+  value.addEventListener('input', changed);
+  note.addEventListener('input', changed);
 
   const fail = (text, children = []) => {
     mount(error, [text, ...children]);
@@ -173,6 +185,72 @@ export function snapshotDialog(vault, holding, existing, onSaved, onOpenRecordin
     onSaved();
   };
 
+  // A line changed here is the same act as one changed on the sweep,
+  // and says what it moves before anything goes through.
+  const confirmPrices = (changedLines, proceed) => {
+    const on = date.value;
+    const confirm = dialog({
+      heading: 'Changing a price moves the holdings measured in it',
+      body: rateChangeCopy(vault, on, changedLines.map((line) => ({ unit: line.unit, clearing: false }))).map(
+        (text) => el('p', { text }),
+      ),
+      actions: [
+        el('button', { class: 'btn-secondary', text: 'Cancel', onclick: () => confirm() }),
+        el('button', {
+          class: 'btn-primary',
+          text: 'Save',
+          onclick: () => {
+            confirm();
+            proceed();
+          },
+        }),
+      ],
+    });
+    return null;
+  };
+
+  // Saves the edit and reports what a move must still say. The prices
+  // are the lines' own, after the quantity: a proposal still in flight
+  // is waited for here, and Save never waited on it.
+  const editEntry = async (on, payload, displaced) => {
+    if (sit && sit.proposals) block.showProposals(await sit.proposals);
+    const result = await writes.editSnapshot(vault, holding, existing, payload, {
+      sit,
+      displaced,
+      choose: (priced) => block.partFor(priced),
+    });
+    if (result.refused) {
+      describePrices();
+      return refusedAt(on);
+    }
+    existing = result.moved;
+    const { failed, undeleted } = result;
+    const left = `The entry already on ${vault.format.longDate(on)} could not be deleted, so the date holds both until you keep one.`;
+    if (!failed.length) return undeleted ? finishWith(`Moved. ${left}`) : done();
+    const units = failed.length > 1 ? `${failed.slice(0, -1).join(', ')} and ${failed.at(-1)}` : failed[0];
+    const lost = `${failed.length > 1 ? 'The prices' : 'The price'} for ${units} on that date did not save.`;
+    // The entry has moved: what the dialog shows follows it, Save stays
+    // inert until something changes, and the date's own screen is where
+    // the empty lines are filled.
+    spent = true;
+    cancel.textContent = 'Done';
+    cancel.onclick = done;
+    describePrices();
+    describeConverted();
+    return fail(`Moved to ${vault.format.fullDate(on)}. ${lost}${undeleted ? ` ${left}` : ''}`, [
+      onOpenRecording
+        ? el('button', {
+            class: 'link-button',
+            text: 'Open the recording',
+            onclick: () => {
+              close();
+              onOpenRecording(on);
+            },
+          })
+        : null,
+    ]);
+  };
+
   const submit = el('button', {
     class: 'btn-primary',
     text: 'Save',
@@ -206,30 +284,23 @@ export function snapshotDialog(vault, holding, existing, onSaved, onOpenRecordin
             fail('That did not save.');
           }
         } finally {
-          submit.disabled = false;
+          submit.disabled = spent;
         }
       };
 
+      if (block && block.lines.some((line) => line.invalid())) {
+        return fail('A price on the prices line does not read as a number. Nothing was saved.');
+      }
+      const changedLines = block ? block.lines.filter((line) => line.changed()) : [];
       if (existing) {
         // An edit is an ordinary versioned write of this record, its
         // date included. Moving it onto a date the holding already
         // holds writes the move first and deletes the displaced record
         // after, so a failure leaves two entries on one date rather
         // than none: a visible fault beats silent loss.
-        const move = async () => {
-          await writes.saveSnapshot(vault, holding.recordId, existing, payload);
-          if (!atDate) return done();
-          try {
-            await writes.deleteRecord(vault, atDate);
-          } catch {
-            return finishWith(
-              `Moved. The entry already on ${vault.format.longDate(on)} could not be deleted, so the date holds both until you keep one.`,
-            );
-          }
-          return done();
-        };
-        if (atDate) return confirmMove(atDate, holding, vault, () => attempt(move));
-        return attempt(move);
+        const edit = () => attempt(() => editEntry(on, payload, atDate));
+        const priced = () => (changedLines.length ? confirmPrices(changedLines, edit) : edit());
+        return atDate ? confirmMove(atDate, holding, vault, priced) : priced();
       }
       if (atDate) {
         // The date here is chosen blind, so the stored figure is put
@@ -241,31 +312,8 @@ export function snapshotDialog(vault, holding, existing, onSaved, onOpenRecordin
           }),
         );
       }
-      if (block && block.lines.some((line) => line.invalid())) {
-        return fail('A price on the prices line does not read as a number. Nothing was saved.');
-      }
-      const changedLines = block ? block.lines.filter((line) => line.changed()) : [];
-      if (!changedLines.length) return attempt(() => create(on, stored));
-      // A line changed here is the same act as one changed on the
-      // sweep, and says what it moves before anything goes through.
-      const confirm = dialog({
-        heading: 'Changing a price moves the holdings measured in it',
-        body: rateChangeCopy(vault, on, changedLines.map((line) => ({ unit: line.unit, clearing: false }))).map(
-          (text) => el('p', { text }),
-        ),
-        actions: [
-          el('button', { class: 'btn-secondary', text: 'Cancel', onclick: () => confirm() }),
-          el('button', {
-            class: 'btn-primary',
-            text: 'Save',
-            onclick: () => {
-              confirm();
-              attempt(() => create(on, stored));
-            },
-          }),
-        ],
-      });
-      return null;
+      const createEntry = () => attempt(() => create(on, stored));
+      return changedLines.length ? confirmPrices(changedLines, createEntry) : createEntry();
     },
   });
   const cancel = el('button', { class: 'btn-secondary', text: 'Cancel', onclick: () => close() });

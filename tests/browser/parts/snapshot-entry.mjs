@@ -89,7 +89,7 @@ await run(async () => {
   await r.home();
   const {
     rec, dayOf, isoOf, T, ago, D1, D5, D8,
-    D9, D10, D11, proxy, traffic, faults, writesSent, rateAsks,
+    D9, D10, D11, proxy, traffic, faults, writesSent, rateAsks, typeReads,
     bodyOf, ev, quiet, set, press, stored, on, bytes,
     plantHere, reread, go, format, line, lineState, typeLine, figure,
     home, id, layout, snap, price, viewport,
@@ -330,24 +330,94 @@ await run(async () => {
   );
   await home();
 
+  const editRow = async (iso) => {
+    await go(`#/holding/${id['Current account']}`);
+    const label = await format('longDate', iso);
+    await rec.call((day) => [...document.querySelectorAll('.card .data-table tbody tr')].find(r => r.cells[0].textContent.startsWith(day))
+      .querySelectorAll('button').forEach(b => { if (b.textContent === 'Edit') b.click(); }), label);
+    await rec.waitUntil("document.querySelector('#snapshot-value')", { label: 'the edit form' });
+    await quiet();
+  };
   const ratesBeforeEdit = (await stored('rate')).length;
   traffic.length = 0;
-  await go(`#/holding/${id['Current account']}`);
-  const longD11 = await format('longDate', D11);
-  await rec.call((day) => [...document.querySelectorAll('.card .data-table tbody tr')].find(r => r.cells[0].textContent.startsWith(day))
-    .querySelectorAll('button').forEach(b => { if (b.textContent === 'Edit') b.click(); }), longD11);
-  await rec.waitUntil("document.querySelector('#snapshot-value')", { label: 'the edit form' });
+  await editRow(D11);
   await set('#snapshot-value', '27000');
   await set('.dialog textarea', 'from the statement');
-  await set('#snapshot-date', await format('date', isoOf(dayOf(D11) - 1)));
   await formSave();
-  const moved = on(await stored('snapshot'), isoOf(dayOf(D11) - 1)).find((s) => s.accountId === id['Current account']);
+  const edited = on(await stored('snapshot'), D11).find((s) => s.accountId === id['Current account']);
   check(
-    'record-snapshot: editing a figure\'s value, note and date asks the proxy nothing and writes no price',
-    rateAsks().length === 0 && (await stored('rate')).length === ratesBeforeEdit && moved && moved.recordId === firstEntry.recordId &&
+    'record-snapshot: editing a figure\'s value and note asks the proxy nothing, writes no price and runs no reload',
+    rateAsks().length === 0 && (await stored('rate')).length === ratesBeforeEdit && edited && edited.recordId === firstEntry.recordId &&
+      edited.payload.value === '27000' && typeReads('snapshot').length === 0 && typeReads('rate').length === 0 &&
       writesSent().every((r) => r.method === 'PUT' && bodyOf(r).recordType === 'snapshot'),
     traffic.map((r) => `${r.method} ${r.url}`).join(' | '),
   );
+
+  // Moving it to a date holding no recording records it there: that
+  // date is priced, its own unit included, and the date it left is not.
+  const DMOVE = isoOf(dayOf(D11) - 1);
+  const leftPrices = bytes(on(await stored('rate'), D11));
+  traffic.length = 0;
+  await editRow(D11);
+  await set('#snapshot-date', await format('date', DMOVE));
+  await quiet();
+  await formSave();
+  const movedTo = on(await stored('snapshot'), DMOVE).find((s) => s.accountId === id['Current account']);
+  const movedPrices = on(await stored('rate'), DMOVE);
+  check(
+    'record-snapshot: moving a figure to an empty date asks once for that date, then writes the snapshot, the prices and nothing else',
+    rateAsks().length === 1 && rateAsks()[0].url.includes(`date=${DMOVE}`) && movedTo && movedTo.recordId === firstEntry.recordId &&
+      movedPrices.map((r) => r.payload.symbol).sort().join(',') === 'USD,XAU-ozt' &&
+      movedPrices.every((r) => r.payload.rateSource === 'proposed') &&
+      bytes(on(await stored('rate'), D11)) === leftPrices &&
+      writesSent().map((r) => `${r.method} ${bodyOf(r) ? bodyOf(r).recordType : ''}`).join(',') === 'PUT snapshot,PUT rate,PUT rate' &&
+      typeReads('snapshot').length === 1 && typeReads('rate').length === 1,
+    traffic.map((r) => `${r.method} ${r.url}`).join(' | '),
+  );
+
+  // Back onto a date whose prices are complete: nothing is asked and
+  // no stored price is written.
+  traffic.length = 0;
+  await editRow(DMOVE);
+  await set('#snapshot-date', await format('date', D11));
+  await quiet();
+  await formSave();
+  check(
+    'record-snapshot: moving a figure to a date whose prices are complete asks the proxy nothing and writes no price',
+    rateAsks().length === 0 && on(await stored('snapshot'), D11).some((s) => s.recordId === firstEntry.recordId) &&
+      writesSent().every((r) => r.method === 'PUT' && bodyOf(r).recordType === 'snapshot'),
+    traffic.map((r) => `${r.method} ${r.url}`).join(' | '),
+  );
+
+  // A move whose prices do not save has still moved: the dialog stays
+  // on it, names the units, and offers the date's own screen.
+  const DX = ago(48);
+  faults.push((r) => (r.method === 'PUT' && bodyOf(r).recordType === 'rate' ? 500 : null));
+  traffic.length = 0;
+  await editRow(D11);
+  await set('#snapshot-date', await format('date', DX));
+  await quiet();
+  await formSave();
+  faults.length = 0;
+  const lostPrices = await formError();
+  const lostState = await ev(`({
+    save: [...document.querySelectorAll('.dialog button')].find(b => b.textContent === 'Save').disabled,
+    open: [...document.querySelectorAll('.dialog .field-error button')].map(b => b.textContent).join(),
+  })`);
+  check(
+    'record-snapshot: a move whose prices do not save has moved, names every unit, leaves Save inert and offers the recording',
+    lostPrices.startsWith(`Moved to ${await format('fullDate', DX)}. The prices for USD and XAU-ozt on that date did not save.`) &&
+      lostState.save && lostState.open === 'Open the recording' &&
+      on(await stored('snapshot'), DX).some((s) => s.recordId === firstEntry.recordId) && on(await stored('rate'), DX).length === 0 &&
+      writesSent().filter((r) => r.method === 'DELETE').length === 0,
+    `${lostPrices} | ${JSON.stringify(lostState)}`,
+  );
+  await set('#snapshot-value', '27001');
+  check(
+    'record-snapshot: Save is live again once something changes after a move whose prices did not save',
+    !(await ev("[...document.querySelectorAll('.dialog button')].find(b => b.textContent === 'Save').disabled")),
+  );
+  await closeDialogs();
 
   // Savings holds figures at the first recording, the refused one, the
   // backdate and No Content's date. Moving two of them onto the
@@ -383,8 +453,8 @@ await run(async () => {
   const order = writesSent().map((r) => r.method);
   snapshotsNow = await stored('snapshot');
   check(
-    'record-snapshot: a move writes before it deletes, so a failed delete leaves both records',
-    order.join(',') === 'PUT,DELETE' && savingsAt(D10).length === 2,
+    'record-snapshot: a move writes the snapshot, then the prices, then deletes, so a failed delete leaves both records',
+    order[0] === 'PUT' && order.at(-1) === 'DELETE' && order.filter((m) => m === 'DELETE').length === 1 && savingsAt(D10).length === 2,
     order.join(','),
   );
   await closeDialogs();

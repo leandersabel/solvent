@@ -326,8 +326,8 @@ await run(async () => {
   const silverRow = await tableRow('Silver coins');
   check(
     'record-rate: a price only its owner sets keeps its own date on screen after a recording',
-    silverRow.asOf.includes(`priced ${await format('longDate', D1)}`),
-    silverRow.asOf,
+    silverRow.converted.endsWith(`priced ${await format('longDate', D1)}`) && !silverRow.asOf.includes('priced'),
+    `${silverRow.converted} | ${silverRow.asOf}`,
   );
   const fund5 = await tableRow('Fund 5');
   check(

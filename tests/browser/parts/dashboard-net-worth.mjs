@@ -178,6 +178,18 @@ await run(async () => {
     bars: await ev("[...document.querySelectorAll('.bar-amount')].map(b => b.textContent).join('|')"),
     chart: await ev("document.querySelector('svg.trend').innerHTML"),
   };
+  const priceDateOf = (name) =>
+    rec.call((holding) => {
+      const row = [...document.querySelectorAll('.holdings-table tbody tr')].find((tr) => tr.querySelector('.row-name').textContent === holding);
+      const line = row.querySelector('.cell-converted .price-date');
+      return line ? line.textContent : '';
+    }, name);
+  const D1Written = `priced ${await format('longDate', D1)}`;
+  check(
+    'net-worth-view: on latest rates a price older than the rate date is dated beneath the figure, and one at the rate date is not',
+    (await priceDateOf('Silver coins')) === D1Written && (await priceDateOf('Dollar cash')) === '' && (await priceDateOf('Current account')) === '',
+    `${await priceDateOf('Silver coins')} | ${await priceDateOf('Dollar cash')}`,
+  );
   await ev("[...document.querySelectorAll('.switch-option')].find(b => b.textContent.includes('as of each figure')).click()");
   await rec.frames();
   const modeAfter = {
@@ -186,6 +198,11 @@ await run(async () => {
     bars: await ev("[...document.querySelectorAll('.bar-amount')].map(b => b.textContent).join('|')"),
     chart: await ev("document.querySelector('svg.trend').innerHTML"),
   };
+  check(
+    'net-worth-view: on rates as of each figure a price older than the row\'s own date is dated beneath the figure, and one at that date is not',
+    (await priceDateOf('Silver coins')) === D1Written && (await priceDateOf('Dollar cash')) === '' && (await priceDateOf('Gold bars')) === '',
+    `${await priceDateOf('Silver coins')} | ${await priceDateOf('Dollar cash')} | ${await priceDateOf('Gold bars')}`,
+  );
   check(
     'net-worth-view: the pricing mode moves the total, the table and the breakdown, and no chart point',
     modeAfter.hero !== modeBefore.hero && modeAfter.brokerage !== modeBefore.brokerage && modeAfter.bars !== modeBefore.bars &&

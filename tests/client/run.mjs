@@ -1749,6 +1749,103 @@ await check('record-rate: with no proposal, or no source at all, a previous entr
   assert.equal(writes.ratePart({ figure: money('11000'), carried: vault.carriedRate('m2', '2026-07-31') }), null);
 });
 
+const recordTrace = (server) =>
+  server.log
+    .filter((r) => r.path.startsWith('/api/records'))
+    .map((r) => (r.method === 'GET' ? `GET ${r.query.type}` : r.method === 'PUT' ? `PUT ${r.body.recordType}` : r.method));
+
+await check('record-rate: the price at a date is the exact day for a sourced unit and the newest estimate at or before it for an owner-priced one', async () => {
+  const vault = await storedVault(recordServer(), {
+    holdings: [['Dollars', 'USD'], ['Silver', 'XAG-ozt'], ['Flat', 'm2'], ['Francs', 'CHF']],
+    prices: [
+      ['USD', '2010-01-05', '1.0287'],
+      ['XAG-ozt', '2024-01-15', '25'],
+      ['m2', '2024-01-15', '10000'],
+    ],
+  });
+  // A rate source: that day or not priced, however old the entry before it.
+  assert.equal(decimal.format(vault.priceAtDate('USD', '2010-01-05').rate), '1.0287');
+  assert.equal(vault.priceAtDate('USD', '2026-04-10'), null);
+  assert.equal(vault.priceAtDate('USD', '2009-12-31'), null);
+  // No rate source: the owner's estimate stands, and says how old it is.
+  for (const unit of ['XAG-ozt', 'm2']) {
+    const aged = vault.priceAtDate(unit, '2026-04-10');
+    assert.equal(aged.date, '2024-01-15');
+    assert.equal(vault.priceAtDate(unit, '2024-01-15').date, '2024-01-15');
+    assert.equal(vault.priceAtDate(unit, '2023-12-31'), null);
+  }
+  assert.deepEqual(vault.priceAtDate('CHF', '2026-04-10'), { rate: decimal.ONE, date: null });
+  // A flagged pair is no entry at its date.
+  await writes.saveRate(vault, null, writes.rateEntry(vault, 'USD', '2010-01-05', writes.ratePart({ figure: money('1.1') })));
+  assert.equal(vault.priceAtDate('USD', '2010-01-05'), null);
+});
+
+await check('record-snapshot: a date move writes the snapshot, then the new date\'s prices, then the displaced record\'s delete', async () => {
+  const server = recordServer(() => PROPOSALS);
+  const vault = await storedVault(server, {
+    holdings: [['Dollars', 'USD'], ['Gold', 'XAU-ozt']],
+    figures: [['Dollars', '2010-01-05', '100'], ['Dollars', '2026-04-10', '7']],
+    prices: [['USD', '2010-01-05', '1.0287', 'proposed']],
+  });
+  const [moving, displaced] = vault.snapshotsFor(vault.ids.Dollars);
+  const holding = vault.holdings.get(vault.ids.Dollars);
+  const sit = writes.sitting(vault, '2026-04-10');
+  const before = JSON.stringify(ratesAt(vault, '2010-01-05').map((e) => e.payload));
+  const proposals = await writes.fetchProposals(vault, '2026-04-10');
+  server.reset();
+  let ratePuts = 0;
+  server.faults.push((r) => (r.method === 'PUT' && r.body.recordType === 'rate' && (ratePuts += 1) === 1 ? 500 : null));
+  const result = await writes.editSnapshot(vault, holding, moving, { date: '2026-04-10', value: '100', note: null }, { sit, displaced, proposals });
+  // The reload that claims the date, the quantity, every rate (the one
+  // that failed included), and the deletion after the last of them.
+  assert.deepEqual(recordTrace(server), ['GET snapshot', 'GET rate', 'PUT snapshot', 'PUT rate', 'PUT rate', 'DELETE']);
+  assert.equal(result.failed.length, 1);
+  assert.equal(result.undeleted, false);
+  assert.equal(ratesAt(vault, '2026-04-10').length, 1);
+  assert.equal(JSON.stringify(ratesAt(vault, '2010-01-05').map((e) => e.payload)), before);
+  assert.equal(vault.snapshotsFor(vault.ids.Dollars).length, 1);
+  assert.equal(result.moved.recordId, moving.recordId);
+});
+
+await check('record-snapshot: a move onto a date whose prices are complete asks for nothing and writes no price, and an edit in place claims nothing', async () => {
+  const server = recordServer(() => PROPOSALS);
+  const vault = await storedVault(server, {
+    holdings: [['Dollars', 'USD']],
+    figures: [['Dollars', '2010-01-05', '100']],
+    prices: [['USD', '2026-04-10', '0.9', 'proposed']],
+  });
+  const [entry] = vault.snapshotsFor(vault.ids.Dollars);
+  const holding = vault.holdings.get(vault.ids.Dollars);
+  assert.equal(writes.needsLookup(vault, '2026-04-10'), false);
+  const moved = await writes.editSnapshot(vault, holding, entry, { date: '2026-04-10', value: '100', note: null }, {});
+  assert.deepEqual(server.writesIn().map((r) => r.body.recordType), ['snapshot']);
+  assert.equal(server.log.some((r) => r.path === '/api/rates'), false);
+  server.reset();
+  await writes.editSnapshot(vault, holding, moved.moved, { date: '2026-04-10', value: '101', note: 'again' }, {});
+  assert.deepEqual(recordTrace(server), ['PUT snapshot']);
+});
+
+await check('record-snapshot: a move whose displaced record cannot be deleted still gets its prices, and an archived holding\'s unit is priced at the new date', async () => {
+  const server = recordServer(() => PROPOSALS);
+  const vault = await storedVault(server, {
+    holdings: [['Francs', 'CHF'], ['Dollars', 'USD']],
+    figures: [['Dollars', '2010-01-05', '100'], ['Dollars', '2026-04-10', '7'], ['Francs', '2026-04-11', '1']],
+  });
+  const holding = vault.holdings.get(vault.ids.Dollars);
+  await writes.saveHolding(vault, holding, { ...holding.payload, archivedAt: '2026-04-11' });
+  // The archived holding's unit is no longer among the active ones.
+  assert.deepEqual(vault.unitsToRefresh(), []);
+  assert.deepEqual(vault.unitsToRefresh('USD'), ['USD']);
+  const [moving, displaced] = vault.snapshotsFor(vault.ids.Dollars);
+  const sit = writes.sitting(vault, '2026-04-10');
+  const proposals = await writes.fetchProposals(vault, '2026-04-10');
+  server.faults.push((r) => (r.method === 'DELETE' ? 500 : null));
+  const result = await writes.editSnapshot(vault, vault.holdings.get(vault.ids.Dollars), moving, { date: '2026-04-10', value: '100', note: null }, { sit, displaced, proposals });
+  assert.equal(result.undeleted, true);
+  assert.deepEqual(ratesAt(vault, '2026-04-10').map((e) => e.payload.symbol), ['USD']);
+  assert.equal(vault.snapshotsFor(vault.ids.Dollars).length, 2);
+});
+
 await check('record-rate: a proposal left alone is proposed, a changed one edited, and a typed one manual', () => {
   const proposal = { rate: '0.9312', asOf: '2026-07-29' };
   assert.deepEqual(writes.ratePart({ figure: money('0.9312'), proposal }), { rate: '0.9312', rateSource: 'proposed', rateAsOf: '2026-07-29', proposedRate: null });

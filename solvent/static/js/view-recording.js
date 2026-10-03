@@ -5,7 +5,7 @@
 // being opened is the one thing this screen must not be.
 import * as decimal from './decimal.js';
 import * as writes from './writes.js';
-import { dialog, el } from './dom.js';
+import { dialog, el, priceDateLine } from './dom.js';
 import { holdingsIn, provenanceChip } from './view-sweep.js';
 
 export function recordingView(vault, date, { onUpdate, onOpenHolding, onDeleted, onChanged, onPickDate }) {
@@ -74,7 +74,7 @@ export function recordingView(vault, date, { onUpdate, onOpenHolding, onDeleted,
 
 function figureRow(vault, { holding, snapshot }, onOpenHolding, onChanged) {
   const quantity = decimal.parse(snapshot.payload.value);
-  const price = vault.priceOn(holding.payload.unit, snapshot.payload.date);
+  const price = vault.priceAtDate(holding.payload.unit, snapshot.payload.date);
   const rivals = vault
     .snapshotsFor(holding.recordId)
     .filter((s) => s.payload.date === snapshot.payload.date && s.recordId !== snapshot.recordId);
@@ -90,12 +90,9 @@ function figureRow(vault, { holding, snapshot }, onOpenHolding, onChanged) {
       class: 'numeric',
       text: vault.amount(snapshot.payload.value, holding.payload.unit),
     }),
-    el('td', {
-      class: 'numeric',
-      text: price
-        ? vault.mainMoney(decimal.multiply(quantity, price.rate))
-        : 'not priced',
-    }),
+    el('td', { class: 'numeric' }, price
+      ? [vault.mainMoney(decimal.multiply(quantity, price.rate)), priceDateLine(vault, price.date, snapshot.payload.date)]
+      : 'not priced'),
     keepCell(vault, rivals, 'Two figures for this holding share this date. Keep one.', onChanged),
   ]);
 }

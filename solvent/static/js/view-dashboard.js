@@ -5,7 +5,7 @@
 // band visibility and selection all read a model already in memory.
 import * as decimal from './decimal.js';
 import { chartTable, fillFor, trendChart } from './chart.js';
-import { dialog, el, icon, mount, resumable, today } from './dom.js';
+import { dialog, el, icon, mount, priceDateLine, resumable, today } from './dom.js';
 import { dateGrid } from './datepicker.js';
 import { dayNumber, isoFromDay } from './model.js';
 import * as writes from './writes.js';
@@ -607,19 +607,15 @@ function holdingsTable(vault, state, render, actions, grouping) {
               class: holding.payload.unit === vault.mainCurrency ? 'numeric cell-native same-unit' : 'numeric cell-native',
               text: vault.amount(value.stored, holding.payload.unit),
             }),
-            el('td', { class: 'numeric cell-converted', text: vault.format.money(value.converted) }),
-            el('td', { class: 'cell-asof' }, [
-              el('span', { text: vault.format.longDate(value.asOf) }),
-              // A row priced older than the vault's newest rate
-              // carries that price's date too, because "latest rates"
-              // is not true of that row.
-              value.priceDate && newestRate && value.priceDate < newestRate
-                ? el('span', {
-                    class: 'hint',
-                    text: `priced ${vault.format.longDate(value.priceDate)}`,
-                  })
-                : null,
+            // A price older than the date the row is shown for carries
+            // its own date, because the screen's rate date is not true
+            // of that row: the rate date on latest rates, the row's
+            // own date on rates as of each figure.
+            el('td', { class: 'numeric cell-converted' }, [
+              vault.format.money(value.converted),
+              priceDateLine(vault, value.priceDate, state.mode === 'latest' ? newestRate : value.asOf),
             ]),
+            el('td', { class: 'cell-asof' }, [el('span', { text: vault.format.longDate(value.asOf) })]),
             // An archived row takes no new value, and unarchiving it is
             // one action with no dialog (account-form.md, Rules).
             el('td', { class: 'cell-action' }, [

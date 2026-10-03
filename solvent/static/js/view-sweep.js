@@ -7,7 +7,7 @@
 // own age in plain language instead.
 import * as decimal from './decimal.js';
 import * as writes from './writes.js';
-import { ageInWords, dialog, el, mount } from './dom.js';
+import { ageInWords, dialog, el, mount, priceDateLine } from './dom.js';
 import { dayNumber } from './model.js';
 
 // One sitting per date, kept across redraws of the same screen and
@@ -236,7 +236,7 @@ function sweepRow(vault, holding, date, { sit, block, refused, ensurePrices, onT
       status.textContent = 'Archived at zero on this date.';
       status.classList.add('is-recorded');
       age.textContent = '';
-      converted.textContent = '';
+      converted.replaceChildren();
       return;
     }
     // An archived holding whose figure here is gone takes no new one.
@@ -266,9 +266,8 @@ function sweepRow(vault, holding, date, { sit, block, refused, ensurePrices, onT
         : `Last figure ${vault.format.longDate(reference.payload.date)}, ${ageInWords(reference.payload.date)}.`;
     // A holding in the main currency converts to itself, so the line
     // under its field stays empty.
-    converted.textContent = holding.payload.unit === vault.mainCurrency
-      ? ''
-      : describeConverted(vault, field.value, block.figureFor(holding.payload.unit));
+    if (holding.payload.unit === vault.mainCurrency) converted.replaceChildren();
+    else describeConverted(vault, converted, vault.format.parseFigure(field.value), block.figureFor(holding.payload.unit), date);
   };
 
   /** Typed and not saved: what leaving the screen would lose. */
@@ -395,11 +394,13 @@ function sweepRow(vault, holding, date, { sit, block, refused, ensurePrices, onT
   return row;
 }
 
-function describeConverted(vault, text, price) {
-  const quantity = vault.format.parseFigure(text);
-  if (quantity === null) return '';
-  if (price === null) return 'not priced';
-  return vault.mainMoney(decimal.multiply(quantity, price));
+/** What a quantity converts to at `price` (`{ rate, date }`, or null for
+ *  not priced), for the figure shown at `on`: the converted figure, and
+ *  beneath it the date of a price older than `on`. */
+export function describeConverted(vault, node, quantity, price, on) {
+  if (quantity === null) node.replaceChildren();
+  else if (price === null) node.replaceChildren('not priced');
+  else node.replaceChildren(vault.mainMoney(decimal.multiply(quantity, price.rate)), priceDateLine(vault, price.date, on) ?? '');
 }
 
 function capitalized(text) {
@@ -414,8 +415,8 @@ function showError(node, text) {
 /** The units a date's rate block shows: every unit an active holding
  *  is measured in, and any unit already priced at that date. The main
  *  currency has no line, because there is nothing to convert. */
-function blockUnits(vault, date) {
-  const units = new Set(vault.unitsToRefresh());
+function blockUnits(vault, date, also) {
+  const units = new Set(vault.unitsToRefresh(also));
   for (const entry of vault.recording(date).prices) units.add(entry.payload.symbol);
   units.delete(vault.mainCurrency);
   return [...units].sort();
@@ -431,12 +432,12 @@ function blockUnits(vault, date) {
  *  offers a proposal for each unit it is missing, as a date with no
  *  recording does, which is what the form shows when a figure it adds
  *  fills in the date's missing prices. */
-export function rateBlock(vault, date, { sit = null, readOnly = false, fillMissing = false, onChange = () => {} } = {}) {
+export function rateBlock(vault, date, { sit = null, readOnly = false, fillMissing = false, also = null, onChange = () => {} } = {}) {
   // The wrapper is the container the lines' breakpoint measures, because
   // a container query cannot style the container itself.
   const grid = el('div', { class: 'rate-block' });
   const element = el('div', { class: 'rate-lines' }, [grid]);
-  const units = blockUnits(vault, date);
+  const units = blockUnits(vault, date, also);
   if (!units.length) {
     grid.append(
       el('p', { class: 'hint', text: 'Everything here is counted in your main currency, so there is nothing to convert.' }),
@@ -458,15 +459,14 @@ export function rateBlock(vault, date, { sit = null, readOnly = false, fillMissi
       const line = lineFor(unit);
       return line ? line.part() : null;
     },
-    /** The price a row converts at: what the line shows for this date,
-     *  or the unit's stored price at or before it. */
+    /** The price a row converts at, as `{ rate, date }`: what the line
+     *  shows for this date, or else the unit's price at this date
+     *  (record-rate.md, Reading). Null is not priced. */
     figureFor: (unit) => {
-      if (unit === vault.mainCurrency) return decimal.ONE;
       const line = lineFor(unit);
       const shown = line ? line.figure() : null;
-      if (shown !== null) return shown;
-      const price = vault.priceOn(unit, date);
-      return price ? price.rate : null;
+      if (shown !== null) return { rate: shown, date };
+      return vault.priceAtDate(unit, date);
     },
     /** A row in this unit is being recorded. A unit with no price at
      *  all asks for one, at the head of the block, and never blocks the
