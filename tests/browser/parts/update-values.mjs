@@ -97,7 +97,7 @@ await run(async () => {
     stored, on, bytes, plantHere, reread, go, format, model,
     typeRow, clickRow, pressRow, rowState, line, lineState, typeLine, figure,
     tableRow, group, hero, home, newRecording, sweepToday, script, id,
-    snap, price,
+    snap, price, layout, viewport,
   } = r;
 
   await go(`#/sweep/${T}`);
@@ -707,54 +707,6 @@ await run(async () => {
     euroLive && on(await stored('snapshot'), D9).some((s) => s.accountId === id['Euro account'] && s.payload.value === '40.50') && (await group('Not priced')).includes('Euro account'),
   );
   proxy.mode = 'answer';
-
-  // Measured on boxes, not class names: every piece of a line inside
-  // its block, none overlapping another, nothing scrolled past its box.
-  // `stacked` is whether the field sits beneath the unit's name.
-  const layout = (scope) =>
-    ev(`JSON.stringify((() => {
-      const root = document.querySelector(${JSON.stringify(scope)});
-      const box = root.getBoundingClientRect();
-      const problems = [];
-      const lines = [...root.querySelectorAll('.rate-line')];
-      const seen = [];
-      for (const l of lines) {
-        const parts = [...l.querySelectorAll('.rate-unit, .row-status, input, .chip, .btn-inline')]
-          .filter((n) => n.getClientRects().length);
-        const named = (n) => n.className.split(' ')[0] || n.tagName;
-        for (const n of parts) {
-          const r = n.getBoundingClientRect();
-          if (r.left < box.left - 0.5 || r.right > box.right + 0.5) problems.push('outside the block: ' + named(n) + ' ' + n.textContent);
-          if (n.scrollWidth > n.clientWidth + 0.5 && n.tagName !== 'INPUT') problems.push('clipped: ' + named(n) + ' ' + n.textContent);
-        }
-        for (let i = 0; i < parts.length; i++) {
-          for (let j = i + 1; j < parts.length; j++) {
-            const a = parts[i].getBoundingClientRect();
-            const b = parts[j].getBoundingClientRect();
-            if (a.left < b.right - 0.5 && b.left < a.right - 0.5 && a.top < b.bottom - 0.5 && b.top < a.bottom - 0.5) {
-              problems.push('overlap: ' + named(parts[i]) + ' and ' + named(parts[j]));
-            }
-          }
-        }
-        const unit = l.querySelector('.rate-unit').getBoundingClientRect();
-        const field = l.querySelector('input');
-        const chip = [...l.querySelectorAll('.chip')].find((c) => c.textContent);
-        seen.push({
-          unit: l.querySelector('.rate-unit').textContent,
-          one: l.querySelector('.row-status').textContent,
-          chip: chip ? chip.textContent : '',
-          stacked: field ? field.getBoundingClientRect().top >= unit.bottom - 0.5 : null,
-          chipBelow: field && chip ? chip.getBoundingClientRect().top >= field.getBoundingClientRect().bottom - 0.5 : null,
-          fieldLeft: field ? Math.round(field.getBoundingClientRect().left) : null,
-        });
-      }
-      for (let n = root; n; n = n.parentElement) {
-        if (n.scrollWidth > n.clientWidth + 0.5 && getComputedStyle(n).overflowX !== 'visible') problems.push('scrolls sideways: ' + n.className);
-      }
-      return { width: Math.round(box.width), problems, seen };
-    })())`).then(JSON.parse);
-  const viewport = (width) =>
-    rec.send('Emulation.setDeviceMetricsOverride', { width, height: 900, deviceScaleFactor: 1, mobile: false });
 
   // The sweep keeps its columns while its block is 720px wide, under
   // one window width, and stacks one pixel under.

@@ -211,7 +211,7 @@ await run(async () => {
   await ev("[...document.querySelectorAll('.switch-option')].find(b => b.textContent === 'Absolute').click()");
   await ev("document.querySelector('.legend-entry').click()");
   await ev("document.querySelector('.legend-entry').click()");
-  await rec.frames();
+  await rec.idle();
   check(
     'net-worth-view: range, dimension, scale, pricing mode, band visibility and Just the line issue no request',
     traffic.length === 0,

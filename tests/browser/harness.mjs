@@ -8,6 +8,7 @@
 // of its own, so it signs up the accounts it needs and shares nothing
 // with another part.
 import { execFileSync } from 'node:child_process';
+import { readFileSync } from 'node:fs';
 import { DatabaseSync } from 'node:sqlite';
 import { launch as launchChrome, Session } from './cdp.mjs';
 
@@ -239,6 +240,83 @@ export const answering = async (match, status, body) => {
     await fetchOff(page);
     page.handlers = page.handlers.filter((h) => h !== handler);
   }
+};
+
+// The holding screens' shared helpers: the database as an operator reads it,
+// the vault model in the page, and the writes the page sends.
+export const accountRows = () =>
+  JSON.stringify(sql(`SELECT records.* FROM records ${OWN} AND record_type = 'account' ORDER BY record_id`));
+export const rowOf = (id) => sql(`SELECT records.* FROM records ${OWN} AND record_id = ?`, id)[0];
+// The database file's own bytes, which is where plaintext would sit.
+export const inDatabase = (needles) => {
+  const bytes = readFileSync(process.env.DATABASE_PATH);
+  return needles.filter((needle) => bytes.includes(Buffer.from(needle, 'utf8')));
+};
+export const vaultValue = (body) =>
+  page.eval(`(async () => {
+    const v = (await import('/static/js/session.js')).currentVault();
+    return JSON.stringify(${body});
+  })()`).then(JSON.parse);
+export const payloadOf = (id) => vaultValue(`v.holdings.get('${id}') ? v.holdings.get('${id}').payload : null`);
+export const idNamed = (name) =>
+  vaultValue(`[...v.holdings.values()].filter(h => h.payload.name === ${JSON.stringify(name)}).map(h => h.recordId)`);
+// The model read afresh from the store, and the screen redrawn from
+// it, without a derivation.
+export const reloadModel = async (hash = '#/') => {
+  await page.eval(`(async () => {
+    await (await import('/static/js/session.js')).currentVault().load();
+    location.hash = '#/reloading';
+  })()`);
+  await page.frames();
+  await page.eval(`location.hash = ${JSON.stringify(hash)}`);
+  await page.frames();
+};
+export const openHolding = async (id) => {
+  await page.eval(`location.hash = '#/holding/${id}'`);
+  await page.waitUntil("document.querySelector('.detail-header')", { label: 'a holding screen' });
+  await page.frames();
+};
+export const inDialog = (label) =>
+  page.eval(`[...document.querySelectorAll('.dialog button')].find(b => b.textContent === ${JSON.stringify(label)}).click()`);
+export const choose = (selector, value) =>
+  page.eval(`(() => {
+    const node = document.querySelector(${JSON.stringify(selector)});
+    node.value = ${JSON.stringify(value)};
+    node.dispatchEvent(new Event('change', { bubbles: true }));
+  })()`);
+export const writesSeen = () => page.eval('window.__writes.splice(0)');
+export const recordReads = () =>
+  page.eval("performance.getEntriesByType('resource').filter(e => e.name.includes('/api/records?type=')).length");
+// Every request matching `refuse` answered with Server Error while
+// `body` runs, the way a failed write looks to the page.
+export const failing = (refuse, body) =>
+  answering((request) => {
+    if (!refuse(request)) return false;
+    provoked.push(new URL(request.url).pathname);
+    return true;
+  }, 500, body);
+export const writing = (type, method = 'PUT') => (request) =>
+  request.method === method && (!type || (request.postData || '').includes(`"recordType":"${type}"`));
+
+// Every PUT the page sends, by record type, in order.
+export const recordWrites = () =>
+  page.eval(`(() => {
+    const send = window.fetch;
+    window.__writes = [];
+    window.fetch = (path, init) => {
+      if (init && init.method === 'PUT') window.__writes.push(JSON.parse(init.body).recordType);
+      return send(path, init);
+    };
+    window.__alerted = false;
+    window.alert = () => { window.__alerted = true; };
+  })()`);
+
+// Runs `act` and waits for the write it starts to land.
+export const landing = async (act) => {
+  const before = await page.eval('window.__writes.length');
+  await act();
+  await page.waitUntil((n) => window.__writes.length > n, { args: [before], label: 'the write to be sent' });
+  await page.idle();
 };
 
 // An account at a KDF envelope below the server default, the state of

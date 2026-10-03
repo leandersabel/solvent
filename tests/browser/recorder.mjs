@@ -34,9 +34,6 @@ export async function startRecorder() {
   const D10 = ago(10);
   const D11 = ago(40);
 
-  // What the proxy answers. Each date's figures differ from its
-  // neighbors', so the two pricing modes and every stretch between
-  // entries read differently.
   // What the page's rate proxy answers: its figures, nothing, or an outage; or a held
   // answer, released by calling what `holdRates` returns.
   const proxy = { mode: 'answer', gate: null };
@@ -45,6 +42,9 @@ export async function startRecorder() {
     proxy.gate = new Promise((resolve) => { release = resolve; });
     return () => { proxy.gate = null; release(); };
   };
+  // What the proxy answers. Each date's figures differ from its
+  // neighbors', so the two pricing modes and every stretch between
+  // entries read differently.
   const proposalsFor = (date) => {
     const d = dayOf(date);
     const revised = proxy.mode === 'revised' ? 0.5 : 0;
@@ -155,7 +155,7 @@ export async function startRecorder() {
     for (const type of ['rawKeyDown', 'keyUp']) {
       await rec.send('Input.dispatchKeyEvent', { type, key, code, windowsVirtualKeyCode: keyCode });
     }
-    await rec.frames();
+    await quiet();
   };
   // The vault as the page's own crypto reads it back from the server,
   // each record with its bytes and its decrypted payload.
@@ -287,6 +287,54 @@ export async function startRecorder() {
       field.dispatchEvent(new Event('input', { bubbles: true }));
     })()`);
   const figure = (shown) => Number(String(shown).replace(/[^\d.-]/g, ''));
+
+  // Measured on boxes, not class names: every piece of a line inside
+  // its block, none overlapping another, nothing scrolled past its box.
+  // `stacked` is whether the field sits beneath the unit's name.
+  const layout = (scope) =>
+    ev(`JSON.stringify((() => {
+      const root = document.querySelector(${JSON.stringify(scope)});
+      const box = root.getBoundingClientRect();
+      const problems = [];
+      const lines = [...root.querySelectorAll('.rate-line')];
+      const seen = [];
+      for (const l of lines) {
+        const parts = [...l.querySelectorAll('.rate-unit, .row-status, input, .chip, .btn-inline')]
+          .filter((n) => n.getClientRects().length);
+        const named = (n) => n.className.split(' ')[0] || n.tagName;
+        for (const n of parts) {
+          const r = n.getBoundingClientRect();
+          if (r.left < box.left - 0.5 || r.right > box.right + 0.5) problems.push('outside the block: ' + named(n) + ' ' + n.textContent);
+          if (n.scrollWidth > n.clientWidth + 0.5 && n.tagName !== 'INPUT') problems.push('clipped: ' + named(n) + ' ' + n.textContent);
+        }
+        for (let i = 0; i < parts.length; i++) {
+          for (let j = i + 1; j < parts.length; j++) {
+            const a = parts[i].getBoundingClientRect();
+            const b = parts[j].getBoundingClientRect();
+            if (a.left < b.right - 0.5 && b.left < a.right - 0.5 && a.top < b.bottom - 0.5 && b.top < a.bottom - 0.5) {
+              problems.push('overlap: ' + named(parts[i]) + ' and ' + named(parts[j]));
+            }
+          }
+        }
+        const unit = l.querySelector('.rate-unit').getBoundingClientRect();
+        const field = l.querySelector('input');
+        const chip = [...l.querySelectorAll('.chip')].find((c) => c.textContent);
+        seen.push({
+          unit: l.querySelector('.rate-unit').textContent,
+          one: l.querySelector('.row-status').textContent,
+          chip: chip ? chip.textContent : '',
+          stacked: field ? field.getBoundingClientRect().top >= unit.bottom - 0.5 : null,
+          chipBelow: field && chip ? chip.getBoundingClientRect().top >= field.getBoundingClientRect().bottom - 0.5 : null,
+          fieldLeft: field ? Math.round(field.getBoundingClientRect().left) : null,
+        });
+      }
+      for (let n = root; n; n = n.parentElement) {
+        if (n.scrollWidth > n.clientWidth + 0.5 && getComputedStyle(n).overflowX !== 'visible') problems.push('scrolls sideways: ' + n.className);
+      }
+      return { width: Math.round(box.width), problems, seen };
+    })())`).then(JSON.parse);
+  const viewport = (width) =>
+    rec.send('Emulation.setDeviceMetricsOverride', { width, height: 900, deviceScaleFactor: 1, mobile: false });
 
   // The dashboard's table.
   const tableRow = (name) =>
@@ -431,7 +479,6 @@ export async function startRecorder() {
 
   return {
     rec,
-    DAY,
     dayOf,
     isoOf,
     T,
@@ -460,8 +507,6 @@ export async function startRecorder() {
     quiet,
     set,
     press,
-    centerOf,
-    realClickAt,
     realClick,
     uncovered,
     realKey,
@@ -481,11 +526,12 @@ export async function startRecorder() {
     lineState,
     typeLine,
     figure,
+    layout,
+    viewport,
     tableRow,
     group,
     hero,
     home,
-    pickerDay,
     newRecording,
     sweepToday,
     script,

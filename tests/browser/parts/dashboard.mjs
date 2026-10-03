@@ -41,7 +41,7 @@ await run(async () => {
 
   const before = await page.eval("performance.getEntriesByType('resource').length");
   await page.eval("[...document.querySelectorAll('.range-buttons button')].find(b => b.textContent === 'All').click()");
-  await page.frames();
+  await page.idle();
   check(
     'no chart control issues a request',
     (await page.eval("performance.getEntriesByType('resource').length")) === before,

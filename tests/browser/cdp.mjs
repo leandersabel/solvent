@@ -257,8 +257,8 @@ export class Session {
   // `n` animation frames, which is when a layout or a render the page
   // was just asked for has been drawn.
   frames(n = 2) {
-    return this.eval(`new Promise((done) => {
-      let left = ${Number(n)};
+    return this.call((count) => new Promise((done) => {
+      let left = count;
       const next = () => {
         if (--left <= 0) return done(true);
         frame(next);
@@ -272,7 +272,7 @@ export class Session {
         setTimeout(once, 100);
       };
       frame(next);
-    })`);
+    }), n);
   }
 
   // Starts counting what the page does, for `idle`. Applies to every

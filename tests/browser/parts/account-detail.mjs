@@ -4,10 +4,10 @@
 // Templates: dashboard.html. Modules: view-holding.js, view-forms.js,
 // writes.js, model.js, view-dashboard.js, chart.js, decimal.js.
 import {
-  BACKDATE, OWN, answering, check, click, labels, page, plant, provoked, recording, run, setProfile, setValue, sql,
-  story, text, unlockDashboard, vaultOwner,
+  BACKDATE, check, choose, click, failing, idNamed, inDialog, labels, landing, openHolding, OWN, page, plant,
+  provoked, recording, recordWrites, reloadModel, rowOf, run, setProfile, setValue, sql, story, text,
+  unlockDashboard, vaultOwner, vaultValue, writesSeen, writing,
 } from '../harness.mjs';
-import { readFileSync } from 'node:fs';
 
 await run(async () => {
   await vaultOwner();
@@ -225,80 +225,7 @@ await run(async () => {
 
 
   {
-    const accountRows = () =>
-      JSON.stringify(sql(`SELECT records.* FROM records ${OWN} AND record_type = 'account' ORDER BY record_id`));
-    const rowOf = (id) => sql(`SELECT records.* FROM records ${OWN} AND record_id = ?`, id)[0];
-    // The database file's own bytes, which is where plaintext would sit.
-    const inDatabase = (needles) => {
-      const bytes = readFileSync(process.env.DATABASE_PATH);
-      return needles.filter((needle) => bytes.includes(Buffer.from(needle, 'utf8')));
-    };
-    const vaultValue = (body) =>
-      page.eval(`(async () => {
-        const v = (await import('/static/js/session.js')).currentVault();
-        return JSON.stringify(${body});
-      })()`).then(JSON.parse);
-    const payloadOf = (id) => vaultValue(`v.holdings.get('${id}') ? v.holdings.get('${id}').payload : null`);
-    const idNamed = (name) =>
-      vaultValue(`[...v.holdings.values()].filter(h => h.payload.name === ${JSON.stringify(name)}).map(h => h.recordId)`);
-    // The model read afresh from the store, and the screen redrawn from
-    // it, without a derivation.
-    const reloadModel = async (hash = '#/') => {
-      await page.eval(`(async () => {
-        await (await import('/static/js/session.js')).currentVault().load();
-        location.hash = '#/reloading';
-      })()`);
-      await page.frames();
-      await page.eval(`location.hash = ${JSON.stringify(hash)}`);
-      await page.frames();
-    };
-    const openHolding = async (id) => {
-      await page.eval(`location.hash = '#/holding/${id}'`);
-      await page.waitUntil("document.querySelector('.detail-header')", { label: 'a holding screen' });
-      await page.frames();
-    };
-    const inDialog = (label) =>
-      page.eval(`[...document.querySelectorAll('.dialog button')].find(b => b.textContent === ${JSON.stringify(label)}).click()`);
-    const choose = (selector, value) =>
-      page.eval(`(() => {
-        const node = document.querySelector(${JSON.stringify(selector)});
-        node.value = ${JSON.stringify(value)};
-        node.dispatchEvent(new Event('change', { bubbles: true }));
-      })()`);
-    const writesSeen = () => page.eval('window.__writes.splice(0)');
-    const recordReads = () =>
-      page.eval("performance.getEntriesByType('resource').filter(e => e.name.includes('/api/records?type=')).length");
-    // Every request matching `refuse` answered with Server Error while
-    // `body` runs, the way a failed write looks to the page.
-    const failing = (refuse, body) =>
-      answering((request) => {
-        if (!refuse(request)) return false;
-        provoked.push(new URL(request.url).pathname);
-        return true;
-      }, 500, body);
-    const writing = (type, method = 'PUT') => (request) =>
-      request.method === method && (!type || (request.postData || '').includes(`"recordType":"${type}"`));
-
-    // Every PUT the page sends, by record type, in order.
-    const recordWrites = () =>
-      page.eval(`(() => {
-        const send = window.fetch;
-        window.__writes = [];
-        window.fetch = (path, init) => {
-          if (init && init.method === 'PUT') window.__writes.push(JSON.parse(init.body).recordType);
-          return send(path, init);
-        };
-        window.__alerted = false;
-        window.alert = () => { window.__alerted = true; };
-      })()`);
     await recordWrites();
-    // Runs `act` and waits for the write it starts to land.
-    const landing = async (act) => {
-      const before = await page.eval('window.__writes.length');
-      await act();
-      await page.waitUntil(`window.__writes.length > ${before}`, { label: 'the write to be sent' });
-      await page.idle();
-    };
 
     // What creating a holding with markup in every string leaves, which
     // the form's own part makes through the form.
@@ -512,7 +439,7 @@ await run(async () => {
     await setValue('#snapshot-date', dateText);
     await writesSeen();
     await inDialog('Save');
-    await page.frames();
+    await page.idle();
     check(
       "an archived holding's earlier entry cannot be moved onto the archive date",
       Boolean(await page.eval("document.querySelector('.dialog')")) && (await writesSeen()).length === 0 &&

@@ -89,7 +89,7 @@ await run(async () => {
   await renameButton('Edit');
   await setValue('.card-head input', 'Liquid assets');
   await page.eval(`${renameField}.blur(); document.body.click()`);
-  await page.frames();
+  await page.idle();
   check(
     'clicking away from a rename writes nothing and leaves it open',
     (await page.eval('window.__puts')) === 0 && !(await page.eval(`Boolean(${renameField}.closest('[hidden]'))`)),
@@ -129,7 +129,7 @@ await run(async () => {
     const before = await page.eval('window.__puts');
     await act();
     // The write is sent, the screen is done with it, and nothing else follows.
-    await page.holds(`window.__puts > ${before}`, { timeout: 10000 });
+    await page.holds((n) => window.__puts > n, { args: [before], timeout: 10000, label: 'the write to be sent' });
     await page.waitUntil(settled, { label });
     await page.idle();
     return (await page.eval('window.__puts')) - before;
