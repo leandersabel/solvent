@@ -30,8 +30,9 @@ matches what was contracted and specified.
    author will not. `verify.focus` names the criteria a passing test
    can fake: write your own for every one. `verify.fixtures` names the
    artifacts they assume.
-2. Run both your tests and the engineer's. Read what the engineer's
-   tests assert rather than trusting a green run.
+2. Run your tests and the engineer's tests for the change, chosen as
+   `.claude/agents/engineer.md` says, never the full suite. Read what
+   the engineer's tests assert rather than trusting a green run.
 3. Check every claim you intend to report. A finding you have not
    reproduced is a guess, and a wrong finding costs more than a missed
    one.

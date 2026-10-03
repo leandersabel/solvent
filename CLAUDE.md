@@ -241,7 +241,8 @@ the client does.
   first, where it falls short, and the contracts recompiled. Then
   `engineer` implements the contract, for a
   `bug` starting with a test that fails on the reported behavior. The
-  suite passes, browser tests included. `reviewer` reviews the change
+  tests the change touches pass, and the full suite runs once, in the
+  pull request's `test` check. `reviewer` reviews the change
   against the contract, and its findings go back to `engineer` for a
   bounded number of rounds.
 - The pull request's title is English and says what changes for users.

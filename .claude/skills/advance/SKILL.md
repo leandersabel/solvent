@@ -92,7 +92,7 @@ for criteria it could not check stays unrated.
      counting attempts since the pull request opened or the client last
      wrote on it. Past the third attempt, go to Stuck instead.
    - It conflicts with `master`: rebase it onto `origin/master`,
-     resolve, run the suite, and push.
+     resolve, run the tests on both sides of the conflict, and push.
    - The client wrote since: answer it on the issue (the change ships
      in the next nightly after the merge), or take a correction from it
      into the branch.
@@ -218,7 +218,8 @@ closing `<details>` block.
    work: rebase it onto `origin/master` and start `work` from it. It is
    finished when it holds all the issue asks for (the spec where it fell
    short, the code the contract asks for, and for a `bug` the test that
-   fails on the reported behavior) and the suite passes: go to step 6.
+   fails on the reported behavior) and the tests it touches pass: go to
+   step 6.
    Otherwise continue at step 3 from it. With no leftover branch, start
    `work` from `origin/master`.
 3. The spec meets the requirements first: where it falls short,
@@ -231,7 +232,9 @@ closing `<details>` block.
    writes a test that fails on the reported behavior, then the fix. For
    `maintenance`, it changes the code without changing behavior. A fix
    never skips, loosens or deletes an existing test.
-4. `python -m pytest -q` passes, browser tests included.
+4. The tests the change touches pass, chosen as
+   `.claude/agents/engineer.md` says. The full suite is the `test`
+   check's.
 5. `reviewer` reviews the change against the contract. Its findings go
    back to `engineer`, for at most three rounds.
 6. Commit in the voice of `git log`, listing any reviewer findings

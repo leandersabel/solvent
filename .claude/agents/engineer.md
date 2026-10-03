@@ -51,6 +51,22 @@ could not cover. The compiler ticks `spec/status.md`, not you.
 - Write tests alongside the code, not after. The list at
   `verify.criteria` defines done. If you cannot test one, say so
   instead of marking it complete.
+- Run only the tests the change touches, never the full suite, which
+  runs once, in the pull request's `test` check. The tests a change
+  touches:
+  - every test file the change adds or edits;
+  - `tests/test_<feature>.py` and the `tests/test_review_*` files for
+    each feature whose contract changed;
+  - every `tests/test_*.py` that imports or names a touched module;
+  - when templates, static JS or CSS, vendored files, `tests/browser/`
+    or `tests/client/` change, the browser tests for them:
+    `test_browser.py` for screens and flows, `test_register_browser.py`
+    for registration, `test_client.py` for the client crypto layer,
+    `test_chrome.py` for the app shell, and all four when unclear;
+  - `test_headers.py` and `test_guard.py` when middleware, the content
+    security policy or routing changes;
+  - when `conftest.py`, `helpers.py` or `tests/fixtures/` change, the
+    tests that use the touched fixture, helper or file.
 - Stay inside the current contract's scope. Do not refactor unrelated
   features while implementing one.
 - Never edit `spec/product/*.md`, `spec/architecture.md`,
