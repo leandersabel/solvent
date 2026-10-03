@@ -311,8 +311,10 @@ found and even when QA saw it once.
 - Every finding becomes a `bug` issue by `claude[bot]` labeled `qa`,
   `accepted` and its rating, which the loop takes up at once, or a
   comment on the open one it repeats. A finding QA saw once says so in
-  its title. Each feature with criteria QA could not check gets an
-  issue saying which and why, the same way. A finding QA could not
+  its title. A criterion on a feature's "What must be true" list that
+  QA could not check counts as checked when a test in the passing
+  suite asserts it. Each feature with criteria left gets an issue
+  saying which and why, the same way. A finding QA could not
   file, the workflow files.
 - A night passes when the suite, the image and QA finish, and nothing
   holds back the version: no open problem rated high or critical

@@ -28,12 +28,17 @@ with `gh`, and you write as `claude[bot]`.
    `qa` could not reproduce it, and the body gives the steps, what the
    product spec expects with a pointer to the criterion, and what
    happened.
-4. **File what could not be checked.** Each feature with criteria `qa`
-   could not check gets an issue titled `QA could not check <feature>`,
-   labeled `bug`, `qa` and `accepted` without a rating, whose body
-   lists each criterion and why. If one is open, comment
-   `Still not checkable in the <date> build.` with the criteria that
-   changed since.
+4. **File what could not be checked.** Only a criterion on the
+   feature's "What must be true" list in `spec/product/<feature>.md`
+   counts, and nothing else `qa` names is filed. For each one `qa`
+   could not check, look in `tests/` yourself for a test that asserts
+   it. The suite passed on this commit before `qa` ran, so a criterion
+   such a test asserts counts as checked. Each feature with criteria
+   left gets an issue titled `QA could not check <feature>`, labeled
+   `bug`, `qa` and `accepted` without a rating, whose body lists each
+   criterion, why `qa` could not check it, and that no test asserts it.
+   If one is open, comment `Still not checkable in the <date> build.`
+   with the criteria that changed since.
 5. **Keep what could not be filed.** When filing fails, write the issue
    to `qa-unfiled/<n>.json` as `{"title": ..., "body": ..., "labels":
    [...]}`, and go on. The workflow files it.
