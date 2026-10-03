@@ -344,10 +344,20 @@ found and even when QA saw it once.
 
 - `needs-answer` means a decision waits on the client. `stuck` means
   the loop gave up, and its comment says why. Both @mention the client.
-- A run that crashes, times out or hits the usage limit labels its
-  issue `stuck`, in a step that runs even when the agent does not
-  finish. Any comment by the client starts the next run, which
-  continues from what is on GitHub.
+- Work a run has finished reaches GitHub, even when the run outlasts
+  its GitHub token, which lasts an hour. Unfinished work never reaches
+  an issue's branch, so a branch on GitHub holds finished work or
+  nothing. Work the agent could not push, a workflow step saves on
+  `claude/saved/<kind>-<issue>` with the job's own token, and one fresh
+  run pushes it as `claude[bot]` and opens the pull request.
+- A pull request that closes an issue holds all the work the issue
+  asked for, never only its spec.
+- The loop never stops in silence. A run that leaves its issue open, in
+  none of the states under Issue state other than New, and hands no
+  work to a fresh run, labels the issue `stuck`, in a step that runs
+  even when the agent does not finish. That includes a run that
+  crashes, times out or hits the usage limit. Any comment by the client
+  starts the next run, which continues from what is on GitHub.
 - A failing check on an implementation pull request starts a run that
   fixes it on the same branch. When it still fails after a bounded
   number of attempts, or reviewer findings remain, the pull request
@@ -372,6 +382,7 @@ found and even when QA saw it once.
 | New | started, no comment from `claude[bot]` yet |
 | Waiting on the client | `needs-answer` or `stuck` |
 | Requirements in review | an open requirements pull request links it |
+| Left to the client | its requirements pull request closed without a merge, and the client has not commented since |
 | Queued | `queued` |
 | Being implemented | `implementing`, and an open pull request closes it |
 | Done | closed by the merged pull request, shipped in the next nightly |

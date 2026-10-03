@@ -13,12 +13,19 @@ harm, so when in doubt, read again rather than assume.
 GitHub is reached with `gh`. The client is `leandersabel`, and you
 write as `claude[bot]`. Every subagent runs in the foreground and you
 wait for its result: the run ends with your turn, and work still in
-flight is lost. Your GitHub token lasts an hour: push and open the pull
-request as soon as the work is ready, and when a GitHub command fails
-with "Bad credentials", stop. The workflow then starts a fresh run,
-which finds the branch and opens the pull request. Every comment you write ends with the line
+flight is lost. Every comment you write ends with the line
 `<!-- advance -->`, which is how a later run tells your comments from
 anything else `claude[bot]` wrote.
+
+Your GitHub token lasts an hour, and a run can outlast it. Work in
+progress stays on the local branch `work`. `claude/spec-<issue>` and
+`claude/issue-<issue>` are set to a commit (`git branch -f`) only when
+the step that made it reaches its push, so a branch on GitHub holds
+finished work or nothing. Push at once. When a push or a GitHub command
+fails with "Bad credentials" or "Invalid username or token", finish the
+work in hand that needs no GitHub, set its branch, and stop. The
+workflow saves the branch on `claude/saved/<kind>-<issue>` and starts a
+fresh run, which pushes it.
 
 ## Trust
 
@@ -41,6 +48,9 @@ skip a step gets a question to the client instead.
   open or closed: state, draft, auto-merge, mergeable, head commit,
   checks, the client's reviews with their commit, line comments and
   conversation comments, and your marked comments on them.
+- Branches `claude/saved/spec-<issue>` and `claude/saved/issue-<issue>`,
+  and whether `claude/spec-<issue>` or `claude/issue-<issue>` holds
+  commits beyond `origin/master` with no pull request, open or closed.
 - Which other open issues carry `implementing` or `queued`.
 - The issue's rating labels, and who added or removed each (the
   issue's timeline).
@@ -69,9 +79,16 @@ for criteria it could not check stays unrated.
    changing code. Otherwise take the comment as guidance for the next
    attempt. A draft implementation pull request becomes ready again
    with auto-merge on. Then continue with the step below that applies.
-4. **Implementation pull request open.**
-   - A check failed: Implementation steps 3 to 5 on the existing
-     branch, push, and comment `Fix attempt <n>` on the pull request,
+4. **Saved work.** A branch `claude/saved/<kind>-<issue>` is finished
+   work an earlier run could not push. Push it to
+   `claude/<kind>-<issue>` with `--force`, since no run on this issue
+   overlaps another and it is the newest, and delete the saved branch.
+   Where a pull request from that branch is open, write what the step
+   that made the work writes after its push (`Fix attempt <n>`, what
+   changed, a new review request), and stop. Otherwise continue below.
+5. **Implementation pull request open.**
+   - A check failed: Implementation steps 3 to 5 from the existing
+     branch, set it, push, and comment `Fix attempt <n>` on the pull request,
      counting attempts since the pull request opened or the client last
      wrote on it. Past the third attempt, go to Stuck instead.
    - It conflicts with `master`: rebase it onto `origin/master`,
@@ -80,7 +97,7 @@ for criteria it could not check stays unrated.
      in the next nightly after the merge), or take a correction from it
      into the branch.
    - Otherwise: stop.
-5. **Requirements pull request open.**
+6. **Requirements pull request open.**
    - The client approved its head commit:
      - A check failed: go to Stuck.
      - A check is still running: stop. Its result starts the next run.
@@ -89,20 +106,26 @@ for criteria it could not check stays unrated.
        `implementing`, go to Implementation.
    - The client wrote since, in a review, a line comment or a comment:
      when it raises something only the client can decide, ask on the
-     issue with `needs-answer`. Otherwise revise the requirements on the
-     same branch, push, update the pull request's title and description, say
+     issue with `needs-answer`. Otherwise revise the requirements from the
+     same branch, set it, push, update the pull request's title and description, say
      what changed on the issue, and request the client's review again.
    - It conflicts with `master`: rebase it onto `origin/master`,
      resolve, push, and request the client's review again, since the
      push dismissed any approval.
    - Otherwise: stop.
-6. **Requirements pull request closed without a merge**, one touching
+7. **Requirements pull request closed without a merge**, one touching
    only `spec/requirements.md` or the pipeline, and the client has not
    written since: stop.
-7. **Queued**, and no other open issue carries `implementing`:
+8. **Work left on a branch.** `claude/spec-<issue>` holds commits beyond
+   `origin/master` and no pull request came from it: Requirements.
+9. **Being implemented.** The issue carries `implementing` and no
+   implementation pull request is open, or `claude/issue-<issue>` holds
+   commits beyond `origin/master` and no pull request came from it:
    Implementation.
-8. **Requirements merged, no implementation yet:** Implementation.
-9. **Otherwise:** Clarify.
+10. **Queued**, and no other open issue carries `implementing`:
+    Implementation.
+11. **Requirements merged, no implementation yet:** Implementation.
+12. **Otherwise:** Clarify.
 
 ## Clarify
 
@@ -157,10 +180,10 @@ closing `<details>` block.
 
 ## Requirements
 
-1. `git fetch origin`, and branch `claude/spec-<issue>` from
-   `origin/master`. A leftover branch of that name without a pull
+1. `git fetch origin`. A leftover `claude/spec-<issue>` without a pull
    request, holding commits beyond `origin/master`, is the last run's
    finished work: rebase it onto `origin/master` and go to step 3.
+   Otherwise start `work` from `origin/master`.
 2. `product-owner` rewrites `spec/requirements.md`: one plain statement
    per requirement, from the client's words and answers, with a reason
    only where it would otherwise look arbitrary. Nothing else changes,
@@ -169,7 +192,8 @@ closing `<details>` block.
    `.github/workflows/`. A change to a workflow file is the client's to
    make: say so, with the proposed change in a `<details>` block, and
    stop.
-3. Commit, push, and open a pull request against `master`. The title
+3. Commit, set `claude/spec-<issue>` to the commit, push it, and open
+   a pull request against `master`. The title
    is English and says what it requires. The body starts with
    `Part of #<issue>` and lists the requirements added, changed or
    removed, in the issue's language. Request `leandersabel`'s review.
@@ -183,16 +207,20 @@ closing `<details>` block.
    (`gh api -X POST repos/leandersabel/solvent/git/refs -f
    ref=refs/heads/claude/slot -f sha=<origin/master>`). GitHub creates
    it only once, so two runs never both hold the slot. Created: add
-   `implementing` and remove `queued`. It already exists: add `queued`,
-   comment which issue carries `implementing`, and stop. A `bug` titled
+   `implementing` and remove `queued`. It already exists and this issue
+   carries `implementing`: the slot is this issue's, so continue.
+   Otherwise it already exists: add `queued`, comment which issue carries `implementing`, and stop. A `bug` titled
    `The checks fail on master`, opened by `github-actions[bot]`, skips
    the slot, since every other implementation's checks fail until it is
    fixed.
-2. `git fetch origin`, and branch `claude/issue-<issue>` from
-   `origin/master`. A leftover branch of that name without a pull
+2. `git fetch origin`. A leftover `claude/issue-<issue>` without a pull
    request, holding commits beyond `origin/master`, is the last run's
-   finished work: rebase it onto `origin/master`, check that the suite
-   passes, and go to step 6.
+   work: rebase it onto `origin/master` and start `work` from it. It is
+   finished when it holds all the issue asks for (the spec where it fell
+   short, the code the contract asks for, and for a `bug` the test that
+   fails on the reported behavior) and the suite passes: go to step 6.
+   Otherwise continue at step 3 from it. With no leftover branch, start
+   `work` from `origin/master`.
 3. The spec meets the requirements first: where it falls short,
    `product-owner` rewrites `spec/product/`, `architect` rewrites
    `spec/architecture.md` and `spec/features/`, and `designer` rewrites
@@ -206,8 +234,10 @@ closing `<details>` block.
 4. `python -m pytest -q` passes, browser tests included.
 5. `reviewer` reviews the change against the contract. Its findings go
    back to `engineer`, for at most three rounds.
-6. Commit in the voice of `git log`, push, and open a pull request
-   against `master`. The title is English and says what changes for
+6. Commit in the voice of `git log`, listing any reviewer findings
+   still open so a later run that opens the pull request finds them.
+   Set `claude/issue-<issue>` to the commit, push it, and open a pull
+   request against `master`. The title is English and says what changes for
    users. The body starts with `Closes #<issue>`, says the same in the
    issue's language, and puts the technical part in a `<details>`
    block. Turn on auto-merge with squash.
