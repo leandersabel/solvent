@@ -206,6 +206,18 @@ export class Vault {
     return [...this.holdings.values()].filter((h) => !h.payload.archivedAt);
   }
 
+  /** The archive's zero: the zero-valued snapshot at an archived
+   *  holding's `archivedAt`, in any canonical form of zero. Nothing in
+   *  the record marks it, so it is read off the holding
+   *  (manage-accounts.md, Archiving). */
+  isArchiveZero(holding, snapshot) {
+    return (
+      Boolean(holding && holding.payload.archivedAt) &&
+      snapshot.payload.date === holding.payload.archivedAt &&
+      decimal.parse(snapshot.payload.value) === decimal.ZERO
+    );
+  }
+
   /** The distinct units the next recording refreshes: every active
    *  holding's unit, minus the main currency, whose rate is 1 by
    *  definition and is stored nowhere (record-rate.md, The refresh). */

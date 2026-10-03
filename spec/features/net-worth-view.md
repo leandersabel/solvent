@@ -238,6 +238,19 @@ A holding archived on date D counts on **every chart date before D and
 on none from D on**, so its value at D is part of no total. The chart
 at D then agrees with the current total, which leaves the holding out.
 
+Archiving writes the holding's zero at D (`manage-accounts.md`,
+Archiving), so the band **interpolates into zero** as it does between
+any two snapshots. The run-down lies between two entry marks like any
+other inferred stretch, so the chart already says it was drawn rather
+than recorded. A person who wound a position down on one specific day
+records a figure on that day and gets the sharp edge honestly.
+
+The zero is the holding's new last snapshot, and the archive's refresh
+may add price entries at D (`record-rate.md`, The refresh). Each moves
+exactly what a new last entry moves (Values between entries): the
+dates after the previous entry in its own series, and nothing before
+it.
+
 The archive is a **step at D**. A day where a band starts or ends is
 drawn as a vertical edge at that day's x, from the band's value just
 before the day to its value at it. The first day of the range has no
@@ -247,40 +260,36 @@ side before it.
   present at it, which is the no-zero-backfill rule (Values between
   entries) drawn as an edge.
 - A holding **archived on D** is present just before D, at D's
-  quantity and D's price, and absent at D.
+  quantity and D's price, and absent at D. With the zero at D that side
+  is zero, so the step is no edge at all.
 - **The value at a date is the side at it.** The tooltip, the data
   table, the hero under the crosshair and the change over a range all
   read that side. The side just before shapes the drawing only.
 
-D's price still values the side just before the step, so a price
-entry at D moves a holding archived on D, and the confirmation for a
-rate change on D counts it (`ui/update-values.md`, Changing or clearing
-a rate says what it moves).
+**A holding archived without a zero at D keeps a real step**
+(`manage-accounts.md`, A holding archived without a zero at D). It
+falls from D's figure, or from the last quantity carried forward when
+D has none, with nothing recorded to explain the drop.
 
-The archive flow's closing snapshot at D (`manage-accounts.md`) is the
-expected path. The band **interpolates into it** like any other
-snapshot rather than holding flat, and the step at D falls from the
-closing value, which is no edge at all when the position ended at 0.
+D's price values the side just before the step, so a price entry at D
+moves a holding archived on D only where that side is non-zero. Only
+then does the confirmation for a rate change on D count it
+(`ui/update-values.md`, Changing or clearing a rate says what it
+moves).
 
-That interpolated run-down lies between two entry marks like any other
-inferred stretch, so the chart already says it was drawn rather than
-recorded. A user who wound a position down on one specific day can
-record an intermediate snapshot and get the sharp edge honestly.
-When the closing snapshot is skipped, the step at D falls from the last
-known quantity carried forward, and the UI marks the point as an
-archive, not a valuation.
-
-Either way the drop carries an **annotation** on the x-axis and a
-tooltip line naming the holding, because an unexplained vertical edge in
-an otherwise smooth chart is indistinguishable from a bad snapshot.
+Every archive date carries an **annotation** on the x-axis and a
+tooltip line naming the holding, with or without a zero. A band running
+out to nothing otherwise looks the same as a holding that lost its
+value or a bad entry, and an unexplained vertical edge in an otherwise
+smooth chart is indistinguishable from a bad snapshot.
 
 ### Ranges and modes
 
 - Ranges: 1M, 6M, 1Y, All. Default: 1Y, or All if history is shorter.
 - **The chart's last day is the newest date carrying a snapshot, a
   price entry or an `archivedAt`**, and every range counts back from
-  it. An archive made on a day with no recording still falls inside
-  the chart, which the right hand edge below depends on.
+  it. An archive whose D carries no snapshot still falls inside the
+  chart, which the right hand edge below depends on.
 - **Pricing mode is not a chart control.** Every chart point is already
   drawn at the prices of its own date, so switching it moves no pixel.
   On latest rates the chart's right hand edge **is** the total: the
@@ -457,21 +466,32 @@ an otherwise smooth chart is indistinguishable from a bad snapshot.
 - Two holdings whose histories start years apart produce a chart where
   the later holding's first snapshot raises only its own band — summing
   before interpolating would instead bend the whole series.
-- Archiving a holding on D removes it from the current total, leaves
-  every chart point before D unchanged, and removes it from the value at
-  D and at every later date, with an archive annotation at D. The side
-  just before D still carries it, at D's quantity and D's price.
-- A holding archived on the newest recorded date, closing snapshot
-  skipped, leaves the chart's last point, the data table's last row and
-  the end of the change over the range each equal to the total on
-  latest rates, exactly, in decimal, and the chart draws the drop at
-  that date.
-- A holding archived on a date after the newest recording, closing
-  snapshot skipped, extends the chart to the archive date, and the
-  point there equals the total on latest rates.
+- Archiving a holding on D removes it from the current total and from
+  the value at D and at every later date, with an archive annotation at
+  D. Every chart point up to and including the latest entry before D of
+  each series the archive wrote to is unchanged.
+- A holding measured in the main currency with a snapshot of 100 on 1
+  January 2026, archived on 31 January 2026, reads 50 on 16 January
+  2026, and the chart draws no vertical edge at 31 January: the side
+  just before it is zero.
+- A holding archived on the newest recorded date leaves the chart's
+  last point, the data table's last row and the end of the change over
+  the range each equal to the total on latest rates, exactly, in
+  decimal.
+- A holding archived on a date after the newest recording extends the
+  chart to the archive date through its zero, and the point there
+  equals the total on latest rates.
 - Changing the price at D of the unit a holding archived on D is
-  measured in moves the side just before D's step, and leaves the
-  value at D unchanged when that holding is the only one in the unit.
+  measured in leaves that holding's contribution at D and just before D
+  at zero, and the confirmation does not count it.
+- A holding archived on D with no snapshot at D, loaded from a fixture,
+  steps at D from its last quantity carried forward at D's price, with
+  the annotation at D. One archived with a non-zero snapshot at D steps
+  from that figure, and changing D's price moves the side just before
+  the step and is counted by the confirmation. Loading either writes
+  nothing.
+- An unarchived holding whose zero sits at D contributes zero from D
+  until its next snapshot and interpolates up to that snapshot.
 - For every date in the chart, the sum of the visible bands equals the
   net-worth line at that date, in decimal.
 - A holding appears in exactly one band of the selected dimension, and

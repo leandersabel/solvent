@@ -4,6 +4,7 @@
 // Names, notes, labels and unit text are decrypted or server-supplied
 // strings and reach the page through `textContent` only.
 import * as api from './api.js';
+import * as decimal from './decimal.js';
 import * as writes from './writes.js';
 import { dialog, el, resumable, today } from './dom.js';
 import { newId } from './view-dimensions.js';
@@ -142,7 +143,7 @@ function unitPicker(vault, current, locked) {
       search.value = describe(value);
       list.hidden = true;
       commitment.textContent =
-        'The unit cannot change once you have recorded a value here. Your figures are counted in this unit, and the prices that value them belong to it. Archive this holding and create a new one instead.';
+        'The unit cannot change once a value is recorded here, including the zero an archive records. Your figures are counted in this unit, and the prices that value them belong to it. Archive this holding and create a new one instead.';
       return;
     }
     if (!table) return;
@@ -543,46 +544,49 @@ export function holdingForm(vault, existing, onSaved, { onCancel = null, onConfl
 
 /** Deleting a holding is the user's choice between two real options,
  *  archive preselected. A holding with no snapshots skips the dialog
- *  and is deleted outright. `then` names where a dialog reopened after
- *  a lock goes when it is done, `onDone` being gone with the old
- *  screen by then. `said` is a line the dialog opens with. */
-export function deleteHoldingDialog(vault, holding, onDone, then = 'reload', said = null) {
-  const snapshots = vault.snapshotsFor(holding.recordId);
-  if (!snapshots.length) {
-    writes.purgeHolding(vault, holding).then(onDone, () => {
-      deleteFailed(holding);
-    });
+ *  and is deleted outright. */
+export function deleteHoldingDialog(vault, holding, onDone, then = 'reload', said = null, openRecording = null) {
+  if (vault.snapshotsFor(holding.recordId).length) {
+    archiveHoldingDialog(vault, holding, onDone, then, said, openRecording);
     return;
   }
+  writes.purgeHolding(vault, holding).then(onDone, () => {
+    deleteFailed(holding);
+  });
+}
 
+/** What the dialog says when the zero is recorded and the flag is not:
+ *  both halves, the units whose price did not save, and for a Conflict
+ *  the reason the record was read back. */
+export function flagFailedCopy(status, on, unpriced) {
+  const lead =
+    status === 'flagConflict'
+      ? `This holding was changed in another tab. Zero is recorded for ${on}, but the holding was not archived.`
+      : `Zero is recorded for ${on}, but the holding was not archived. It is still in your total, at zero.`;
+  return unpriced.length ? `${lead} The prices for ${unitList(unpriced)} did not save.` : lead;
+}
+
+function unitList(units) {
+  return units.length > 1 ? `${units.slice(0, -1).join(', ')} and ${units.at(-1)}` : units[0];
+}
+
+/** The archive or delete decision, which a holding's own Archive
+ *  action opens even when it has no snapshots. `then` names where a
+ *  dialog reopened after a lock goes when it is done, `onDone` being
+ *  gone with the old screen by then. `said` is a line the dialog opens
+ *  with. */
+export function archiveHoldingDialog(vault, holding, onDone, then = 'reload', said = null, openRecording = null) {
+  const snapshots = vault.snapshotsFor(holding.recordId);
+  // An archived holding offers permanent delete alone: archiving it
+  // again would write a second zero and move its archive date.
+  const archived = Boolean(holding.payload.archivedAt);
   const archiveDate = today();
+  const on = vault.format.longDate(archiveDate);
   const atDate = snapshots.find((s) => s.payload.date === archiveDate);
-  // The field shows the stored figure where the date already holds one,
-  // and saving replaces that record in place. No replace prompt: the
-  // figure the prompt would name is the one in the field.
-  const closing = el('input', {
-    type: 'text',
-    inputmode: 'decimal',
-    id: 'closing-value',
-    value: vault.format.quantity(atDate ? atDate.payload.value : '0'),
-  });
-  let skipped = false;
-  const skipNote = el('p', {
-    class: 'hint',
-    hidden: true,
-    text: 'Without this, your chart drops by the last figure recorded here, with nothing recorded on that date to explain it.',
-  });
-  const skip = el('button', {
-    type: 'button',
-    class: 'link-button',
-    text: 'Skip',
-    onclick: () => {
-      skipped = !skipped;
-      closing.disabled = skipped;
-      skipNote.hidden = !skipped;
-      skip.textContent = skipped ? 'Record a closing value after all' : 'Skip';
-    },
-  });
+  // A figure at the date that is not zero is what the zero replaces,
+  // and saying so above the confirm is the consent: no replace prompt
+  // fires. A zero there is kept as it is and replaces nothing.
+  const replaced = atDate && decimal.parse(atDate.payload.value) !== decimal.ZERO ? atDate : null;
 
   const typed = el('input', { type: 'text', id: 'delete-name', placeholder: holding.payload.name });
   const error = el('p', { class: 'field-error', hidden: true, role: 'alert' });
@@ -593,24 +597,23 @@ export function deleteHoldingDialog(vault, holding, onDone, then = 'reload', sai
       el('input', { type: 'radio', name: 'holding-delete-choice', value, checked }),
       el('span', { text: label }),
     ]);
-  const choices = el('div', { class: 'choice-group', role: 'radiogroup', 'aria-label': 'What to do' }, [
-    choice('archive', 'Archive', true),
-    choice('delete', 'Delete permanently', false),
+  const choices = el('div', { class: 'choice-group', role: 'radiogroup', 'aria-label': 'What to do', hidden: archived }, [
+    choice('archive', 'Archive', !archived),
+    choice('delete', 'Delete permanently', archived),
   ]);
 
-  const archiveSection = el('div', { class: 'choice-section' }, [
+  const archiveSection = el('div', { class: 'choice-section', hidden: archived }, [
     el('p', {
-      text: 'Archive keeps every value you recorded. Your past net worth stays accurate. You can undo this.',
+      text: `Records zero for this holding on ${on} and takes it out of your total. Every value you recorded before then stays as it is. You can undo this.`,
     }),
-    el('p', { class: 'hint', text: `Archive date: ${vault.format.longDate(archiveDate)}` }),
-    el('div', { class: 'field' }, [
-      el('label', { for: 'closing-value', text: 'What was it worth when you closed it?' }),
-      closing,
-      skip,
-      skipNote,
-    ]),
+    replaced
+      ? el('p', {
+          class: 'archive-replaces',
+          text: `This replaces the ${vault.format.quantity(replaced.payload.value)} ${holding.payload.unit} recorded for ${on}.`,
+        })
+      : null,
   ]);
-  const deleteSection = el('div', { class: 'choice-section', hidden: true }, [
+  const deleteSection = el('div', { class: 'choice-section', hidden: !archived }, [
     el('p', {
       text: `This also deletes ${snapshots.length} recorded values. Your past net worth figures will change.`,
     }),
@@ -624,7 +627,7 @@ export function deleteHoldingDialog(vault, holding, onDone, then = 'reload', sai
     class: 'btn-destructive',
     text: 'Delete permanently',
     disabled: true,
-    hidden: true,
+    hidden: !archived,
     onclick: async () => {
       error.hidden = true;
       try {
@@ -641,66 +644,52 @@ export function deleteHoldingDialog(vault, holding, onDone, then = 'reload', sai
     permanently.disabled = typed.value !== holding.payload.name;
   });
 
+  // The dialog again on what the model now holds, under a line saying
+  // why.
+  const reopen = (text) => {
+    close();
+    archiveHoldingDialog(vault, vault.holdings.get(holding.recordId), onDone, then, text, openRecording);
+  };
+  const named = unitList;
+
   const archive = el('button', {
     class: 'btn-primary',
     text: 'Archive',
+    hidden: archived,
     onclick: async () => {
       error.hidden = true;
-      let quantity = null;
-      if (!skipped) {
-        quantity = vault.format.readField(closing.value, atDate ? atDate.payload.value : '0');
-        if (quantity === null) {
-          error.textContent = 'Enter the closing value as a number, or skip it.';
-          error.hidden = false;
-          return;
-        }
-      }
       archive.disabled = true;
-      // The order is load-bearing: the closing value, then that date's
-      // prices over the holdings as they stand with this one still
-      // among them, and the archive flag last. The refresh covers
-      // active holdings only, so setting the flag first would archive
-      // a position at a price nobody captured.
-      let unpriced = [];
-      if (quantity !== null) {
-        try {
-          await writes.saveSnapshot(vault, holding.recordId, atDate || null, {
-            date: archiveDate,
-            value: quantity,
-            note: atDate ? atDate.payload.note : null,
-          });
-        } catch {
-          error.textContent =
-            'The closing value did not save, so nothing was archived and the holding is untouched. The figure is still in the field.';
-          error.hidden = false;
-          archive.disabled = false;
-          return;
-        }
-        const proposals = await writes.fetchProposals(vault, archiveDate);
-        unpriced = (await writes.refreshPrices(vault, archiveDate, proposals)).failed;
+      const { status, unpriced } = await writes.archiveHolding(vault, holding, archiveDate);
+      if (status === 'zeroFailed') {
+        error.textContent = `The zero for ${on} did not save, so nothing was archived.`;
+        error.hidden = false;
+        archive.disabled = false;
+        return;
       }
-      try {
-        const current = vault.holdings.get(holding.recordId);
-        await writes.saveHolding(vault, current, { ...current.payload, archivedAt: archiveDate });
-      } catch {
-        close();
-        // Both halves, and the archive offered again, prefilled now
-        // with the figure stored at that date.
-        deleteHoldingDialog(
-          vault,
-          vault.holdings.get(holding.recordId),
-          onDone,
-          then,
-          quantity === null
-            ? 'The holding was not archived and is still active.'
-            : `The closing value is recorded for ${vault.format.longDate(archiveDate)}, but the holding was not archived and is still active. Archive it again to finish.`,
-        );
+      if (status === 'conflict') {
+        await writes.reloadType(vault, 'snapshot').catch(() => {});
+        reopen('This figure was changed in another window.');
+        return;
+      }
+      if (status === 'alreadyArchived') {
+        reopen('This holding is already archived.');
+        return;
+      }
+
+      if (status === 'refused') {
+        reopen(`${on} now holds a figure for this holding, recorded in another window. Nothing was archived.`);
+        return;
+      }
+      if (status === 'flagFailed' || status === 'flagConflict') {
+        // Both halves, and the archive offered again: the retry finds
+        // the zero and writes only what is still missing.
+        reopen(flagFailedCopy(status, on, unpriced));
         return;
       }
       if (unpriced.length) {
-        // The figure is recorded and the archive went through. Nothing
+        // The zero is recorded and the archive went through. Nothing
         // is rolled back, and the units left without a price are named.
-        done(`Archived. The prices for ${unpriced.join(', ')} were not written for ${vault.format.longDate(archiveDate)}. Add them on that date's recording.`);
+        done(`Archived. The prices for ${named(unpriced)} on ${on} did not save. Add them in the recording for that date.`);
         return;
       }
       close();
@@ -709,7 +698,19 @@ export function deleteHoldingDialog(vault, holding, onDone, then = 'reload', sai
   });
 
   const done = (text) => {
-    panel.replaceChildren(el('p', { role: 'status', text }));
+    panel.replaceChildren(
+      el('p', { role: 'status', text }),
+      openRecording
+        ? el('button', {
+            class: 'link-button',
+            text: 'Open the recording',
+            onclick: () => {
+              close();
+              openRecording(archiveDate);
+            },
+          })
+        : null,
+    );
     archive.parentElement.replaceChildren(
       el('button', {
         class: 'btn-primary',
@@ -733,7 +734,7 @@ export function deleteHoldingDialog(vault, holding, onDone, then = 'reload', sai
 
   const panel = el('div', { class: 'choice-body' }, [opening, choices, archiveSection, deleteSection, error]);
   const close = dialog({
-    heading: `Archive or delete ${holding.payload.name}?`,
+    heading: archived ? `Delete ${holding.payload.name}?` : `Archive or delete ${holding.payload.name}?`,
     resume: resumable(reopenDeleteHolding, holding.recordId, then),
     body: [panel],
     actions: [
@@ -754,5 +755,5 @@ function deleteFailed(holding) {
 
 function reopenDeleteHolding(context, holdingId, then) {
   const holding = context.vault.holdings.get(holdingId);
-  if (holding) deleteHoldingDialog(context.vault, holding, context[then], then);
+  if (holding) archiveHoldingDialog(context.vault, holding, context[then], then, null, context.openRecording);
 }

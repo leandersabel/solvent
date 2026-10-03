@@ -95,9 +95,9 @@ brute-force which dates a user holds data for.
 This is the path where the date is chosen blind. **The prompt fires
 only where the stored figure is not already displayed in the field
 being edited.** It therefore does not fire in a reopened recording
-(Reopening and editing a recording), nor in the archive dialog's
-closing-snapshot field, which prefills with the stored figure and
-carries a confirm of its own (`manage-accounts.md`).
+(Reopening and editing a recording), nor in the archive dialog, which
+names the figure its zero replaces before its own confirm
+(`manage-accounts.md`, Archiving).
 
 ## Confirming a previous value
 
@@ -268,6 +268,14 @@ decryption warning rather than silently shaping the list.
   person is looking at a screen that no longer describes the vault, and
   writing half of it against a date they have not seen is worse than
   writing none of it.
+- **The archive is the one narrower case** (`manage-accounts.md`,
+  Archiving). It runs the same reload of both types, and is refused
+  only when the archived holding's own slot at the date is taken. A date
+  recorded elsewhere is the recording its zero joins, and a rate slot
+  taken since is one its refresh leaves alone, since the refresh writes
+  only where the date has no entry. The archive dialog shows one
+  holding's figure at that date, which is all the reload has to keep
+  true.
 - **What they typed is lost, and that is accepted.** There is no draft
   buffer, no merge, and no re-apply against the reloaded date. The
   screen reloads to the recording as it now stands and the figures are
@@ -306,6 +314,8 @@ go.
 - **A `DELETE` answering Not Found counts as done.** The record is
   gone, which is what was asked, and another session having got there
   first is not a failure the person can act on.
+- **An archive's zero cannot be cleared** while its holding is archived
+  (`manage-accounts.md`, While archived).
 
 ### Deleting a recording
 
@@ -327,9 +337,12 @@ fields.
   normally, and the screen names what is left and offers the action
   again. Nothing is rolled back, and nothing marks the date as
   half-deleted.
-- **The date is free afterwards** and is recorded again as though it
-  never had been (Creating and reopening are distinct acts). This is
+- **The date is free afterwards**, unless an archive's zero keeps it
+  (below), and is recorded again as though it never had been (Creating and reopening are distinct acts). This is
   the only way a date becomes free.
+- **An archive's zero stays.** The zero of a holding archived on that
+  date is not deleted, and the date remains a recording holding it
+  (`manage-accounts.md`, While archived).
 - **It moves the chart further than clearing values does.** Removing
   the date's rate entries reprices every holding measured in those
   symbols across the stretches those entries anchored, which is every
@@ -340,7 +353,9 @@ fields.
 
 Value, note, and **date** are all editable (`ui/account-detail.md` is
 where a past snapshot is found). Editing is an ordinary versioned write,
-except when the date moves onto a date the holding already holds.
+except when the date moves onto a date the holding already holds. An
+archived holding's entries are limited further (`manage-accounts.md`,
+While archived).
 
 **No edit here touches a price.** Correcting a typo in a value, or
 moving an entry from 30 July to 31 July, changes which price the holding
@@ -419,7 +434,8 @@ a quiet wrong number.
   deferred in architecture.md (Data integrity) — do not write a test
   asserting rollback is detected today.
 - **Deleting a snapshot** → allowed, single confirm, from the holding's
-  page or by clearing its figure in the recording for its date.
+  page or by clearing its figure in the recording for its date, except
+  an archive's zero (`manage-accounts.md`, While archived).
   Deleting the only snapshot for a holding leaves the holding with no
   current value, and it is excluded from the total rather than counted
   as zero. No price entry is deleted with it: a price belongs to a
@@ -437,10 +453,10 @@ a quiet wrong number.
   negative balances; net worth is a signed sum.
 - **Non-numeric or malformed value** → inline validation, no
   submission.
-- **Snapshot recorded against an archived holding** → blocked; archived
-  holdings take no new snapshots. The one exception is the **closing
-  snapshot written as part of archiving** (manage-accounts.md), dated
-  `archivedAt` and written in the same flow that sets it.
+- **Snapshot recorded against an archived holding** → blocked, at any
+  date; archived holdings take no new snapshots. The archive's own zero
+  is no exception, because it is written while the holding is still
+  active, before `archivedAt` is set (`manage-accounts.md`, Archiving).
 
 ## Acceptance criteria
 
@@ -477,8 +493,8 @@ a quiet wrong number.
   written, and the holding is listed as not priced. Asserted for a
   free-text unit and for a symbol whose lookup returned nothing.
 - A future-dated snapshot is rejected.
-- Attempting to record against an archived holding is blocked, except
-  for the closing snapshot written by the archive flow itself.
+- Attempting to record against an archived holding is blocked at every
+  entry point and every date.
 - Editing a snapshot from a second tab with a stale `version` returns
   Conflict and does not overwrite.
 - Editing a snapshot's value, note, or date issues no request to

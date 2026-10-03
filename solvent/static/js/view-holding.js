@@ -7,7 +7,7 @@ import * as decimal from './decimal.js';
 import * as writes from './writes.js';
 import { ageInWords, dialog, el, icon, trackEdits } from './dom.js';
 import { snapshotDialog } from './view-forms.js';
-import { deleteHoldingDialog, holdingForm } from './view-holding-form.js';
+import { archiveHoldingDialog, deleteHoldingDialog, holdingForm } from './view-holding-form.js';
 
 // A Conflict on saving the editor reloads the record and redraws the
 // screen, and the reopened editor says why it is showing other values.
@@ -116,12 +116,12 @@ export function holdingView(vault, accountId, { editing = false, onOpenRecording
       : el('button', {
           class: 'btn-secondary',
           text: 'Archive',
-          onclick: () => deleteHoldingDialog(vault, holding, onChanged),
+          onclick: () => archiveHoldingDialog(vault, holding, onChanged, 'reload', null, onOpenRecording),
         }),
     el('button', {
       class: 'btn-destructive',
       text: 'Delete',
-      onclick: () => deleteHoldingDialog(vault, holding, onGone, 'home'),
+      onclick: () => deleteHoldingDialog(vault, holding, onGone, 'home', null, onOpenRecording),
     }),
   ]);
 
@@ -233,7 +233,7 @@ function historyRow(vault, holding, snapshot, flagged, { onOpenRecording, onChan
         ? vault.format.money(decimal.multiply(quantity, price.rate))
         : 'not priced',
     }),
-    el('td', {}, [
+    el('td', {}, vault.isArchiveZero(holding, snapshot) ? [] : [
       duplicate
         ? el('button', {
             class: 'btn-inline',

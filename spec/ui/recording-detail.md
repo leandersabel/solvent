@@ -57,6 +57,9 @@ Typography, sets it.
   in place of the converted figure, rather than showing the bare
   quantity as though the unit were the main currency
   (`net-worth-view.md`).
+- **An archive's zero is listed like any other figure.** While its
+  holding is archived it is read-only, and Update offers no control for
+  it (`update-values.md`).
 - **Holdings left silent that day are not here.** The screen shows what
   the date holds, and a holding with no figure on it holds nothing
   here. Nothing counts or names them, and filling one in is an edit,
@@ -118,10 +121,26 @@ there is no way back.
 > with it. 9 holdings measured in USD and XAU-ozt move on that date,
 > including ones you recorded nothing for. This cannot be undone.
 
-The holding count and the units are computed, not written into the
-copy, and the sentence naming them is dropped where the date carries no
-prices at all. For an empty recording the first sentence reads "It
-holds no figures, and the prices captured that day go with it."
+Where the date holds the zero of a holding archived on it, that zero
+stays (`record-snapshot.md`, Deleting a recording), and the
+confirmation adds:
+
+> The zero recorded when you archived Savings account stays, and so
+> does this recording, holding it.
+
+The holding count, the units and the archived holdings' names are
+computed, not written into the copy, and the sentence naming units is
+dropped where the date carries no prices at all. The first sentence
+follows what the date holds:
+
+- **No figures**: "It holds no figures, and the prices captured that
+  day go with it."
+- **Archives' zeros and nothing else among its figures**, as an archive
+  that started the recording leaves it: "Only the prices captured that
+  day go." The zero sentence above follows.
+
+A date holding archives' zeros and no prices offers no Delete, because
+there is nothing it could remove.
 
 Filled critical on the confirm button, inside the dialog
 (`design-system.md`, Components). No ladder and no typed word to
@@ -129,7 +148,9 @@ repeat.
 
 Afterwards the date is gone from every holding's list and from every
 unit's prices, the chart runs across it as though the sitting had never
-happened, and the date is free to be recorded again.
+happened, and the date is free to be recorded again. The exception is a
+date that keeps an archive's zero: it stays in that holding's list and
+remains a recording holding the zero, and this screen reloads to it.
 
 ## States
 

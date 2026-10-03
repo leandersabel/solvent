@@ -90,6 +90,12 @@ The same modal, pre-filled with the stored value, date and note.
   screen.
 - The prices line reads, unfolded or not, as the date's stored prices,
   read only.
+- **An archived holding's entry moves only to a date before its archive
+  date.** The date picker offers nothing from the archive date on: onto
+  it the move would displace the archive's zero, and after it the entry
+  would be a figure after the archive (`manage-accounts.md`, While
+  archived). Value and note stay editable. The archive's zero itself
+  never opens here (`account-detail.md`).
 
 ## States
 
@@ -127,8 +133,8 @@ The same modal, pre-filled with the stored value, date and note.
 - **Error, validation**: the quantity field's own rules
   (`design-system.md`, Components), and a future date refused inline.
 - **Error, archived holding**: the entry point does not exist for
-  archived holdings. The only exception is the closing value written by
-  the archive flow (`account-form.md`).
+  archived holdings, at any date (`manage-accounts.md`, While
+  archived).
 - **Populated**: saved; the modal closes and the dashboard updates from
   local state with no refetch.
 
