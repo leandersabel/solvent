@@ -73,9 +73,11 @@ files and holds what is true system-wide. The same subject at two altitudes is t
 duplication.
 
 Some features have no product file, because the client never asked for
-them and nothing about them is visible from outside: the record store
-and the client-side crypto layer. The architect creates those and names
-which product features need them.
+them and nothing about them is visible from outside: the record store,
+the client-side crypto layer and the nightly harness. The architect
+creates those and names which product features need them. The nightly
+harness is pipeline tooling, never in the image (The loop, Nightly and
+stable).
 
 A feature the client cannot see is not the same as a feature with no
 screen. The app shell has no screen of its own, but the chrome it
@@ -301,13 +303,32 @@ found and even when QA saw it once.
 ### Nightly and stable
 
 - Every night that code on `master` changed since the last version,
-  `.github/workflows/nightly.yml` builds the image, starts it hardened,
-  runs the suite against that commit, and runs `qa` against the running
-  app in headless Chrome through the Playwright MCP server. `qa` walks
-  the full acceptance list of every feature touched by an issue closed
-  since the last version, and a smoke path through the rest. The
-  client can start the same run by hand. Claude in Chrome is not used
-  here, because it needs a desktop browser.
+  `.github/workflows/nightly.yml` builds the image, runs the suite
+  against that commit, starts the image hardened on a network with no
+  route out, and runs `qa` against the running app in headless Chrome
+  through the Playwright MCP server. `qa` walks the full acceptance
+  list of every feature touched by an issue closed since the last
+  version, and a smoke path through the rest. The client can start the
+  same run by hand. Claude in Chrome is not used here, because it needs
+  a desktop browser.
+- On that network the nightly harness runs a stand-in that answers as
+  the price sources, under their real names. The app trusts it through
+  a certificate authority made for the run and handed in at start,
+  never built in.
+- The app starts on prepared vaults and backup files, made with the
+  app's own browser code, with whatever a promise needs time for dated
+  back.
+- Before the app starts, a step without a model makes one real lookup
+  to each price source. A source that answers in a changed shape fails
+  the night before QA. One that does not answer is noted in the run's
+  summary, and the night goes on.
+- `qa` reaches the server only through the harness tools: the server
+  log, the stand-in's request list and failure modes, and stopping and
+  starting the app. It has no other access to the machine.
+- The image the nightly publishes is the one it tested. Nothing of the
+  harness is in it, and Solvent has no setting naming a price source or
+  a certificate authority, so nothing built for testing can redirect an
+  installation's lookups.
 - Every finding becomes a `bug` issue by `claude[bot]` labeled `qa`,
   `accepted` and its rating, which the loop takes up at once, or a
   comment on the open one it repeats. A finding QA saw once says so in
@@ -317,11 +338,12 @@ found and even when QA saw it once.
   a long walk never outlasts the token. What that run could not file,
   the workflow files the same way, as `github-actions[bot]`, before the
   night is judged.
-- A night passes when the suite, the image and QA finish, and nothing
-  holds back the version: no open problem rated high or critical
-  (Severity), no such issue closed by anyone but the client without its
-  fix in the version, and no runtime Dependabot alert rated high or
-  critical. That check is the workflow's, never a model's.
+- A night passes when the suite, the image, the harness and QA finish,
+  no price source answers in a changed shape, and nothing holds back
+  the version: no open problem rated high or critical (Severity), no
+  such issue closed by anyone but the client without its fix in the
+  version, and no runtime Dependabot alert rated high or critical. That
+  check is the workflow's, never a model's.
 - A failed night always leaves an issue the loop takes up: the open
   problems that held it back, or else a `bug` by `github-actions[bot]`
   titled `The nightly failed: <cause>`, or a comment on the open one
@@ -354,7 +376,11 @@ found and even when QA saw it once.
   `claude/saved/<kind>-<issue>` with the job's own token, and one fresh
   run pushes it as `claude[bot]` and opens the pull request.
 - A pull request that closes an issue holds all the work the issue
-  asked for, never only its spec.
+  asked for, never only its spec. A workflow file is the exception,
+  because only the client can change it (Who acts, and where state
+  lives): the pull request and its comment on the issue carry the exact
+  change, ready for the client's own pull request, which closes any
+  issue that only the workflow change covers.
 - The loop never stops in silence. A run that leaves its issue open, in
   none of the states under Issue state other than New, and hands no
   work to a fresh run, labels the issue `stuck`, in a step that runs

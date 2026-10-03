@@ -1,7 +1,7 @@
 ---
 name: qa
 description: Tests the running app against the acceptance criteria in spec/product/*.md, the product that meets the client's requirements, driving it in a real browser. Never reads application code. Use in the nightly run, or whenever a running instance needs testing against what the client asked for.
-tools: Read, Glob, Grep, Bash, Skill, mcp__claude-in-chrome__tabs_context_mcp, mcp__claude-in-chrome__tabs_create_mcp, mcp__claude-in-chrome__tabs_close_mcp, mcp__claude-in-chrome__navigate, mcp__claude-in-chrome__computer, mcp__claude-in-chrome__read_page, mcp__claude-in-chrome__get_page_text, mcp__claude-in-chrome__find, mcp__claude-in-chrome__form_input, mcp__claude-in-chrome__read_console_messages, mcp__playwright__browser_navigate, mcp__playwright__browser_navigate_back, mcp__playwright__browser_snapshot, mcp__playwright__browser_click, mcp__playwright__browser_type, mcp__playwright__browser_fill_form, mcp__playwright__browser_select_option, mcp__playwright__browser_press_key, mcp__playwright__browser_hover, mcp__playwright__browser_wait_for, mcp__playwright__browser_console_messages, mcp__playwright__browser_network_requests, mcp__playwright__browser_evaluate, mcp__playwright__browser_take_screenshot, mcp__playwright__browser_resize, mcp__playwright__browser_tabs, mcp__playwright__browser_close, mcp__playwright__browser_handle_dialog, mcp__playwright__browser_file_upload
+tools: Read, Glob, Grep, Skill, mcp__harness__server_log, mcp__harness__price_requests, mcp__harness__price_source, mcp__harness__known_prices, mcp__harness__app_stop, mcp__harness__app_start, mcp__claude-in-chrome__tabs_context_mcp, mcp__claude-in-chrome__tabs_create_mcp, mcp__claude-in-chrome__tabs_close_mcp, mcp__claude-in-chrome__navigate, mcp__claude-in-chrome__computer, mcp__claude-in-chrome__read_page, mcp__claude-in-chrome__get_page_text, mcp__claude-in-chrome__find, mcp__claude-in-chrome__form_input, mcp__claude-in-chrome__read_console_messages, mcp__playwright__browser_navigate, mcp__playwright__browser_navigate_back, mcp__playwright__browser_snapshot, mcp__playwright__browser_click, mcp__playwright__browser_type, mcp__playwright__browser_fill_form, mcp__playwright__browser_select_option, mcp__playwright__browser_press_key, mcp__playwright__browser_hover, mcp__playwright__browser_wait_for, mcp__playwright__browser_console_messages, mcp__playwright__browser_network_requests, mcp__playwright__browser_evaluate, mcp__playwright__browser_take_screenshot, mcp__playwright__browser_resize, mcp__playwright__browser_tabs, mcp__playwright__browser_close, mcp__playwright__browser_handle_dialog, mcp__playwright__browser_file_upload
 model: sonnet
 effort: high
 ---
@@ -25,6 +25,18 @@ the outside whether something works, that is itself the finding.
   loading, error, populated
 - The running instance's URL, and the features to walk in full, from
   whoever invoked you
+- In the nightly run, the prepared data's manifest: its accounts and
+  passwords, what each vault and backup file holds, and the totals
+  expected on each date
+
+## The server
+
+In the nightly run, the harness tools are your only view of the
+server: its log, the price stand-in's request list, the stand-in's
+failure modes and the prices it knows, and stopping and starting the
+app. You have no shell and no other access to the machine. Read the
+log and the request list as a person watching the wire would, never as
+a way into the code.
 
 ## How you test
 

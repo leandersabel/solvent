@@ -1,13 +1,14 @@
 ---
 name: nightly-qa
-description: Test tonight's build against the client's acceptance lists and record what fails for the workflow to file. Run by .github/workflows/nightly.yml with the app's address, a first-administrator invite path and the last version's tag.
+description: Test tonight's build against the client's acceptance lists and record what fails for the workflow to file. Run by .github/workflows/nightly.yml with the app's address, a first-administrator invite path, the last version's tag and the prepared data's manifest.
 ---
 
 # Nightly QA
 
-The arguments are `<url> <invite path> <last tag>`. `CLAUDE.md`, The
-loop, Nightly and stable, is the contract this keeps. GitHub is read
-with `gh`, and you write nothing to it: you record what fails in
+The arguments are `<url> <invite path> <last tag> [<manifest>]`, where
+`<manifest>` is the path of the prepared data's manifest. `CLAUDE.md`,
+The loop, Nightly and stable, is the contract this keeps. GitHub is
+read with `gh`, and you write nothing to it: you record what fails in
 `qa-unfiled/`, and the workflow files it after the walk.
 
 1. **Choose what to walk in full.** A feature is walked in full when
@@ -19,8 +20,33 @@ with `gh`, and you write nothing to it: you record what fails in
    open issues labeled `qa`, so you recognise a repeat.
 3. **Run `qa`** in the foreground, and wait for its report. Hand it the address, the invite path (opening it
    creates the first administrator, from whom it invites whatever
-   accounts it needs), and the features to walk in full. It walks every
-   other feature's main path once.
+   accounts it needs), the features to walk in full, and the manifest.
+   It walks every other feature's main path once.
+
+   With a manifest, `qa` starts from the prepared data instead of
+   building its own. It may read the manifest and the data files in
+   `tools/nightly/fixtures/`, never the code beside them. With the
+   harness tools it checks, among the rest:
+
+   - that no amount is ever in a lookup the stand-in receives;
+   - that asking for the same price twice reaches the source once;
+   - the hourly ceiling, sending many lookups from the page with
+     `browser_evaluate`;
+   - the wording for a source that is down against one that has no
+     such price, with `price_source` set to fail and then to recover.
+     After a recovery the app keeps skipping the source for five
+     minutes, unless `qa` restarts it with `app_stop` and `app_start`;
+   - that archiving a holding stops its refresh, and unarchiving
+     resumes it;
+   - that reopening a recording asks about no unit that already has a
+     rate;
+   - totals under "rates as of each figure", against `known_prices`
+     and the manifest's expected totals;
+   - that an invite link never appears in the server log;
+   - how the app reads while Solvent is stopped.
+
+   Without a manifest, `qa` builds its data by hand and lists what that
+   leaves it unable to check.
 4. **Record each finding** in `qa-unfiled/<n>.json`, numbered from 1,
    as `{"title": ..., "body": ..., "labels": [...], "repeats": null}`.
    It is in English: the title says what is wrong for a user, ending in
