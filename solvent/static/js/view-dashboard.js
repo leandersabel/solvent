@@ -36,7 +36,7 @@ export function dashboardView(vault, actions, { unassignedOf = null } = {}) {
     showArchived: false,
     hidden: new Set(),
     unassignedOnly: Boolean(known),
-    // A span dragged across the chart, as two indices into its days.
+    // A span dragged across the chart, as its earlier and later day.
     selection: null,
   };
 
@@ -56,7 +56,7 @@ export function dashboardView(vault, actions, { unassignedOf = null } = {}) {
     mount(root, [
       vault.unreadable.length ? decryptionBanner(vault) : null,
       duplicateBanner(vault, actions),
-      hero(vault, state, render, actions, history),
+      hero(vault, state, render, actions, history, dimension),
       history ? chartSection(vault, state, render, dimension, actions, history) : null,
       dimension ? breakdown(vault, dimension, state) : null,
       holdingsTable(vault, state, render, actions, dimension),
@@ -122,7 +122,7 @@ function duplicateBanner(vault, actions) {
   );
 }
 
-function hero(vault, state, render, actions, history) {
+function hero(vault, state, render, actions, history, dimension) {
   const totals = vault.totals(state.mode);
   const rateDate = vault.newestRateDate();
 
@@ -138,7 +138,7 @@ function hero(vault, state, render, actions, history) {
     el('div', { class: 'hero-main' }, [
       el('p', { class: 'eyebrow', text: 'Net worth' }),
       figure,
-      history ? heroChange(vault, history, state.range, state.selection) : null,
+      history ? heroChange(vault, history, state.range, state.selection, dimension) : null,
       el('p', { class: 'hero-at', hidden: true }),
     ]),
     el('div', { class: 'hero-parts' }, [
@@ -184,14 +184,14 @@ function heroPart(label, figure) {
   ]);
 }
 
-/** The change over the chart's selected range, from its first point to
- *  its last. The arrow carries the sign as well as the color does. A
- *  year or more back is named by its month, a shorter range by its
- *  day. */
-function heroChange(vault, { days, bands }, range, selection = null) {
+/** The change over the chart's selected range, or across a selected
+ *  span, read at its two days from the value model. The arrow carries
+ *  the sign as well as the color does. A year or more back is named by
+ *  its month, a shorter range by its day. */
+function heroChange(vault, { days }, range, selection, dimension) {
   if (days.length < 2) return null;
-  const netAt = (index) => bands.reduce((sum, band) => sum + band.points[index], 0n);
-  const [from, to] = selection || [0, days.length - 1];
+  const netAt = (day) => vault.valuesAt(dimension, day).reduce((sum, band) => sum + band.value, 0n);
+  const [from, to] = selection || [days[0], days[days.length - 1]];
   const start = netAt(from);
   const change = netAt(to) - start;
   const sign = change > 0n ? '+' : '';
@@ -209,7 +209,7 @@ function heroChange(vault, { days, bands }, range, selection = null) {
     el('span', {
       class: 'hero-since',
       text: selection
-        ? `from ${vault.format.longDate(isoFromDay(days[from]))} to ${vault.format.longDate(isoFromDay(days[to]))}`
+        ? `from ${vault.format.longDate(isoFromDay(from))} to ${vault.format.longDate(isoFromDay(to))}`
         : `since ${(range === '1Y' || range === 'All' ? vault.format.monthYear : vault.format.longDate)(isoFromDay(days[0]))}`,
     }),
   ]);
@@ -358,24 +358,24 @@ function chartSection(vault, state, render, dimension, actions, { days, bands })
           state.selection = span;
           render();
         },
-        onHover: (index, across) => {
+        onHover: (day, across) => {
           const heroAt = document.querySelector('.dashboard .hero-at');
           const heroAmount = document.querySelector('.dashboard .hero-amount');
-          if (index === null) {
+          if (day === null) {
             readout.hidden = true;
             if (heroAt) heroAt.hidden = true;
             if (heroAmount) heroAmount.textContent = heroAmount.dataset.total;
             return;
           }
-          const shown = bands.filter((band) => !state.hidden.has(band.id));
-          const net = shown.reduce((sum, band) => sum + band.points[index], 0n);
-          const date = vault.format.longDate(isoFromDay(days[index]));
+          const shown = vault.valuesAt(dimension, day).filter((band) => !state.hidden.has(band.id));
+          const net = shown.reduce((sum, band) => sum + band.value, 0n);
+          const date = vault.format.longDate(isoFromDay(day));
           readout.replaceChildren(
             el('p', { class: 'readout-date', text: date }),
             ...shown.map((band) =>
               el('p', { class: 'readout-row' }, [
                 el('span', { text: band.label }),
-                el('span', { class: 'numeric', text: vault.format.money(band.points[index]) }),
+                el('span', { class: 'numeric', text: vault.format.money(band.value) }),
               ]),
             ),
             el('p', { class: 'readout-row readout-net' }, [
@@ -385,7 +385,7 @@ function chartSection(vault, state, render, dimension, actions, { days, bands })
             // A drop at an archive is named, so it never reads as a bad
             // figure.
             ...annotations
-              .filter((a) => a.date === isoFromDay(days[index]))
+              .filter((a) => a.date === isoFromDay(day))
               .map((a) => el('p', { class: 'readout-archive', text: `${a.label} archived` })),
           );
           readout.style.setProperty('--at', String(across));
@@ -404,7 +404,7 @@ function chartSection(vault, state, render, dimension, actions, { days, bands })
     state.hidden.size
       ? el('p', { class: 'hint hidden-bands', text: 'The total drawn here covers only the visible bands.' })
       : null,
-    legend(vault, bands, state, render),
+    legend(vault, bands, state, render, dimension),
     state.selection
       ? el('p', { class: 'hint' }, [
           'A span is selected. ',
@@ -452,10 +452,14 @@ function groupBySelect(vault, state, render) {
  *  Each entry is a button that hides or shows its band. Hovering or
  *  focusing one highlights its band and dims the rest, by class alone,
  *  so nothing is redrawn. */
-function legend(vault, bands, state, render) {
+function legend(vault, bands, state, render, dimension) {
   const marksShown = !state.justTheLine;
   if (bands.length < 2 && !marksShown) return null;
   const last = bands.length ? bands[0].points.length - 1 : 0;
+  // Each band's value at the two days of a selected span.
+  const [early, late] = state.selection
+    ? state.selection.map((day) => new Map(vault.valuesAt(dimension, day).map((band) => [band.id, band.value])))
+    : [];
   const highlight = (entry, id) => {
     const chart = entry.closest('.chart-card').querySelector('svg.trend');
     if (!chart) return;
@@ -491,7 +495,7 @@ function legend(vault, bands, state, render) {
               el('span', { class: 'legend-value', text: vault.format.whole(band.points[last]) }),
               // Each band's own change across a selected span.
               state.selection
-                ? el('span', { class: 'legend-delta', text: signed(vault, band.points[state.selection[1]] - band.points[state.selection[0]]) })
+                ? el('span', { class: 'legend-delta', text: signed(vault, late.get(band.id) - early.get(band.id)) })
                 : null,
             ]);
             return entry;
