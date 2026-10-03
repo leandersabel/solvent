@@ -9,7 +9,7 @@ inputs:
     required: true
   needs:
     description: The final job's needs context, as JSON
-    required: true
+    default: "{}"
 runs:
   using: composite
   steps:
