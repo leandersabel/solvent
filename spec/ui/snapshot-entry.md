@@ -31,7 +31,11 @@ The same modal, pre-filled, is what edits an existing entry
 - **Value**, the quantity field (`design-system.md`, Components), the
   largest thing on the form. Its live result converts at the price for
   **the date on the form**, which is the date's own price where one
-  exists and the proposal for that date otherwise (`record-rate.md`).
+  exists and the proposal for that date otherwise. With neither, it is
+  the price at that date (`record-rate.md`, Reading): "not priced" for
+  a unit with a rate source, and for a unit with none its newest
+  earlier price, with the price date line beneath the converted figure
+  (`design-system.md`, Components).
 - **Note** — optional, collapsed behind "Add a note".
 - **The prices line**, folded, below. See next section.
 - Primary "Save".
@@ -80,16 +84,21 @@ is 416px, below the 720px they need to keep the sweep's columns
 
 The same modal, pre-filled with the stored value, date and note.
 
-- **No edit here touches a price.** Changing the value, the note, or
-  the date issues no price request and writes no price record. Moving
-  an entry from 30 July to 31 July changes which price values it, only
-  because a price is looked up by date, and the prices themselves are
-  untouched (`record-snapshot.md`).
+- **Changing the value or the note touches no price.** It issues no
+  price request and writes no price record, and the prices line reads,
+  unfolded or not, as the date's stored prices, read only.
+- **Changing the date records the figure at its new date**
+  (`record-snapshot.md`, Editing an existing snapshot). The prices line
+  follows the date the moment it changes, in the same states as for a
+  new figure (The prices line): proposals fetched for a date holding no
+  recording, the missing lines filled for a date holding some, and the
+  stored prices read only where nothing is missing. Picking the entry's
+  own date again shows its stored prices and fetches nothing.
+- **A move rewrites no stored price.** The date the entry leaves keeps
+  every one of its prices, and a price already at the new date stands.
 - Correcting a price is a different act, done in the recording for its
   date (`recording-detail.md`), where the holdings it moves are on the
   screen.
-- The prices line reads, unfolded or not, as the date's stored prices,
-  read only.
 - **An archived holding's entry moves only to a date before its archive
   date.** The date picker offers nothing from the archive date on: onto
   it the move would displace the archive's zero, and after it the entry
@@ -110,6 +119,18 @@ The same modal, pre-filled with the stored value, date and note.
 - **Error, prices did not save**: the entry is saved and the message
   says the prices were not updated, naming any unit the person typed
   themselves. The entry is never rolled back for it.
+- **Error, a move whose prices did not save**: the entry has moved, and
+  the dialog stays open on it with the message above Save, critical
+  with its icon, naming every unit whose price did not save:
+
+  > Moved to 10 April 2026. The prices for USD and XAU-ozt on that date
+  > did not save.
+
+  One button, **Open the recording**, goes to that date's own screen
+  (`recording-detail.md`), where the empty lines are filled after
+  Update. Save is inert until something changes. The units are
+  computed, not written into the copy, and a single unit reads "The
+  price for USD on that date did not save."
 - **Error, duplicate date, entering**: on save, a confirm rather than a
   rejection: "You already recorded 12 450.00 USD for 31 July. Replace
   it?", naming the previously recorded value in the holding's native

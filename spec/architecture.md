@@ -66,9 +66,9 @@ encrypted client-side. The server sees ciphertext, not these fields.
     A price needs no gathering, so it is written by default.
   - **A recording is a date, not a stored thing**: a client-side
     grouping of records by their own `date` field (record-snapshot.md).
-- Updates are sparse by design. Today's total, and the total at any past
-  date, is each holding's last recorded quantity at the latest price for
-  its unit on or before that date.
+- Updates are sparse by design. Which price values a figure is
+  record-rate.md, Reading, and how the total and the chart pair a
+  holding's quantity with a price between entries is net-worth-view.md.
 
 ### Accounts on this instance
 

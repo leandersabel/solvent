@@ -34,6 +34,13 @@ The two are joined at the moment a figure is shown. What a holding is
 worth on a date is the quantity on that date at the rate on that date,
 and either side can have moved since you last looked.
 
+A date with no rate for the unit never borrows another day's as though
+it were its own. A figure in a unit somebody publishes reads "not
+priced" there until that date has a rate. A figure in a unit only you
+can price is valued at the last price you set before that date, with
+that price's date beside it, because your estimate of the flat holds
+until you change it.
+
 Nothing is ever recalculated behind you. What your dollars were worth
 in 2019 is what 2019's rate says, whatever the dollar does tomorrow,
 and no later recording touches it. A chart that changes its own past
@@ -407,10 +414,13 @@ zero, which stays and keeps the date a recording (`manage-accounts.md`).
 
 An entry can also be moved to another date, from the holding's page.
 That is the answer to a mistyped day rather than a wrong figure, and it
-moves the entry onto the rate of the day you meant, which is the point
-of the correction. The entry leaves the recording it was in and joins
-the one on its new date, or starts one there if that day holds nothing
-yet.
+puts the entry on the prices of the day you meant, which is the point
+of the correction. Moving is recording the figure on its new date. The
+entry leaves the recording it was in and joins the one on its new
+date, or starts one there if that day holds nothing yet, and the rates
+are written or stand exactly as they would for a figure recorded there.
+A source that does not answer never stops the move. The entry saves,
+and reads "not priced" until that date has a rate.
 
 Deleting a single value asks once, naming what will happen: your net
 worth around that date will change.
@@ -449,6 +459,22 @@ worth around that date will change.
   both entries flagged and asks you which to keep, and the chart leaves
   that date out until you answer, rather than picking one and putting a
   number you never chose into your history.
+- Moving an entry onto a date with no recording starts one, which
+  holds that date's prices for every unit somebody publishes, the same
+  as recording a new figure there. The entry is valued at those prices,
+  never at the prices of the date it left.
+- Moving an entry onto a date that already holds a recording uses that
+  recording's prices, and fills an empty line for a unit somebody
+  publishes when the source answers.
+- A move whose source does not answer still saves. The entry reads "not
+  priced" on that date's recording and on the holding's page until that
+  date has a rate.
+- No figure is shown converted at another day's price as though it
+  were that day's. On a recording's screen and in a holding's list of
+  values, a figure in a unit somebody publishes with no rate on its
+  date reads "not priced", and a figure in a unit you price yourself
+  shows the date of the price it is valued at whenever that price was
+  set on an earlier day.
 - A row you did not act on produces no entry. Leave eleven of fifteen
   rows alone, finish the sweep, and those eleven holdings hold exactly
   the values they held before you opened it, even though the rates they

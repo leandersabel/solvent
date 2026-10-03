@@ -10,7 +10,7 @@ years ago.
 
 Exercises: `spec/features/record-snapshot.md` (A recording is a date,
 Reopening and editing a recording, Deleting a recording) and
-`spec/features/record-rate.md` (Editing a captured rate).
+`spec/features/record-rate.md` (Reading, Editing a captured rate).
 
 ## Getting here
 
@@ -46,17 +46,23 @@ on one day are one recording, because the date is the identity.
 ### The figures
 
 One line each: the holding, the figure in that holding's own unit, and
-the same figure in the main currency at the price captured that day.
-Both figures form columns, and each shows as `design-system.md`,
-Typography, sets it.
+the same figure in the main currency at the price at this date
+(`record-rate.md`, Reading). Both figures form columns, and each shows
+as `design-system.md`, Typography, sets it.
 
 - **The holding's name is the link**, opening that holding
   (`account-detail.md`), because "which holding was that" is the
   question this screen provokes.
-- A figure whose unit holds no price at this date reads **not priced**
-  in place of the converted figure, rather than showing the bare
-  quantity as though the unit were the main currency
-  (`net-worth-view.md`).
+- **A figure in a unit with a rate source** converts at that unit's
+  price at this date and no other. With none here it reads **not
+  priced** in place of the converted figure. It never converts at
+  another day's price, and never shows the bare quantity as though the
+  unit were the main currency (`net-worth-view.md`).
+- **A figure in a unit with no rate source** converts at that unit's
+  newest price at or before this date. Where that price is from an
+  earlier day, the price date line sits beneath the converted figure,
+  "priced 15 Jan 2024" (`design-system.md`, Components). With no price
+  at or before this date it reads **not priced**.
 - **An archive's zero is listed like any other figure.** While its
   holding is archived it is read-only, and Update offers no control for
   it (`update-values.md`).
