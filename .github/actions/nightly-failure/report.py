@@ -9,14 +9,18 @@ import re
 import subprocess
 
 STEPS = json.loads(os.environ["STEPS"])
+# The earlier jobs, each with its failed steps' ids as output `failed`.
+NEEDS = json.loads(os.environ["NEEDS"])
 TODAY = os.environ["TODAY"]
 RUN = os.environ["RUN"]
 # The nightly's steps in order, by id, and what it means when one fails.
 CAUSES = {
     "suite": "the test suite failed",
     "sources": "a real price source answers in a changed shape",
-    "harness": "the harness did not start",
     "app": "the image did not build or start",
+    "plan": "QA could not plan its walk",
+    "image": "the image QA got is not the one built",
+    "harness": "the harness did not start",
     "qa": "QA did not finish",
     "qa-done": "QA did not finish",
     "gate": "the release check could not run",
@@ -36,7 +40,10 @@ def create(title, body, labels):
     gh("workflow", "run", "agent.yml", "--ref", "master", "-f", f"issue={url.rsplit('/', 1)[1]}")
 
 
-failed = next((step for step in CAUSES if STEPS.get(step, {}).get("outcome") in ("failure", "cancelled")), None)
+failed = {step for step, result in STEPS.items() if result.get("outcome") in ("failure", "cancelled")}
+for job in NEEDS.values():
+    failed.update(job.get("outputs", {}).get("failed", "").split())
+failed = next((step for step in CAUSES if step in failed), None)
 cause = CAUSES.get(failed, "the run failed before its tests")
 detail = ""
 if failed == "gate" and os.path.exists("release-blocked.txt"):

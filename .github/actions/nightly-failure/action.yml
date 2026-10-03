@@ -5,7 +5,10 @@ inputs:
     description: The night's date
     required: true
   steps:
-    description: The nightly job's steps context, as JSON
+    description: The final job's steps context, as JSON
+    required: true
+  needs:
+    description: The final job's needs context, as JSON
     required: true
 runs:
   using: composite
@@ -19,4 +22,5 @@ runs:
       env:
         TODAY: ${{ inputs.today }}
         STEPS: ${{ inputs.steps }}
+        NEEDS: ${{ inputs.needs }}
         RUN: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
