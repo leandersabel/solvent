@@ -282,9 +282,12 @@ await run(async () => {
   // Day k of the range sits at x0 + k * (x1 - x0) / n across the plot.
   const xOf = (k) => plot.left + (plot.x0 + (k * (plot.x1 - plot.x0)) / rangeDays) * plot.scale;
   const pointAt = (type, k) =>
-    ev(`document.querySelector('svg.trend').dispatchEvent(new PointerEvent(${JSON.stringify(type)}, {
-      clientX: ${xOf(k)}, clientY: ${plot.top + 40}, button: 0, bubbles: true,
-    }))`);
+    ev(`(() => {
+      const svg = document.querySelector('svg.trend');
+      svg.dispatchEvent(new PointerEvent(${JSON.stringify(type)}, {
+        clientX: ${xOf(k)}, clientY: svg.getBoundingClientRect().top + 40, button: 0, bubbles: true,
+      }));
+    })()`);
   const reading = () =>
     ev(`JSON.stringify({
       at: document.querySelector('.hero-at').textContent,
@@ -332,9 +335,9 @@ await run(async () => {
     for (let k = 0; k <= ${rangeDays}; k++) days.set(v.format.longDate(isoFromDay(${first} + k)), k);
     const columns = Math.floor((${plot.x1} - ${plot.x0}) * ${plot.scale});
     const read = [];
-    for (let c = -5; c <= columns + 5; c++) {
+    for (let c = 0; c <= columns; c++) {
       svg.dispatchEvent(new PointerEvent('pointermove', {
-        clientX: ${plot.left} + ${plot.x0} * ${plot.scale} + c, clientY: ${plot.top + 40}, bubbles: true,
+        clientX: ${plot.left} + ${plot.x0} * ${plot.scale} + c, clientY: svg.getBoundingClientRect().top + 40, bubbles: true,
       }));
       read.push(days.get(document.querySelector('.readout-date').textContent));
     }
@@ -346,6 +349,56 @@ await run(async () => {
     walk.read.every((k, i) => k !== undefined && (i === 0 || k >= walk.read[i - 1])) && walk.read[0] === 0 && walk.read.at(-1) === rangeDays &&
       (walk.columns < rangeDays || new Set(walk.read).size === rangeDays + 1),
     JSON.stringify({ columns: walk.columns, days: rangeDays, distinct: new Set(walk.read).size }),
+  );
+
+  // Off the plot, in the value gutter and in the axis strip, there is no
+  // crosshair, no readout, and the hero is back to the total.
+  const offPlot = [];
+  const insideHero = async () => {
+    await pointAt('pointermove', unrecorded[0]);
+    return (await reading()).hero !== total;
+  };
+  // The gutter exists only on a wide chart.
+  const spots = [
+    ...(plot.x0 > 20 ? [`${plot.left + (plot.x0 - 20) * plot.scale}, box.top + 40`] : []),
+    `${xOf(unrecorded[0])}, box.bottom - 10`,
+  ];
+  for (const spot of spots) {
+    const showed = await insideHero();
+    await ev(`(() => {
+      const svg = document.querySelector('svg.trend');
+      const box = svg.getBoundingClientRect();
+      const [clientX, clientY] = [${spot}];
+      svg.dispatchEvent(new PointerEvent('pointermove', { clientX, clientY, bubbles: true }));
+    })()`);
+    offPlot.push({
+      showed,
+      crosshair: await ev("document.querySelector('.crosshair').getAttribute('visibility')"),
+      readout: await ev("document.querySelector('.chart-readout').hidden"),
+      at: await ev("document.querySelector('.hero-at').hidden"),
+      hero: await ev("document.querySelector('.hero-amount').textContent"),
+    });
+  }
+  await pointAt('pointerleave', 0);
+  check(
+    'net-worth-view: with the pointer in the value gutter or the axis strip the crosshair, the readout and the hero\'s date are gone',
+    offPlot.length > 0 && offPlot.every((o) => o.showed && o.crosshair === 'hidden' && o.readout && o.at && o.hero === total),
+    JSON.stringify(offPlot),
+  );
+
+  // A tap: the finger comes up and leaves before the focus arrives, and
+  // the crosshair stays on the day it touched.
+  await rec.send('Emulation.setTouchEmulationEnabled', { enabled: true });
+  const tapY = await ev("(() => { const s = document.querySelector('svg.trend'); s.scrollIntoView({ block: 'center' }); return s.getBoundingClientRect().top + 40; })()");
+  await rec.tap(xOf(unrecorded[0]), tapY);
+  await rec.frames();
+  const tapped = await reading();
+  await rec.send('Emulation.setTouchEmulationEnabled', { enabled: false });
+  await ev("document.querySelector('svg.trend').blur()");
+  check(
+    'net-worth-view: a tap on a day leaves the crosshair on that day, not the last one',
+    sameAs(tapped, await modelAt(unrecorded[0])),
+    JSON.stringify(tapped),
   );
 
   // The keyboard, in a zone whose clocks changed inside the range.
@@ -379,7 +432,7 @@ await run(async () => {
     const out = [];
     for (let k = 0; k <= ${rangeDays}; k++) {
       svg.dispatchEvent(new PointerEvent('pointermove', {
-        clientX: ${plot.left} + (${plot.x0} + k * (${plot.x1} - ${plot.x0}) / ${rangeDays}) * ${plot.scale}, clientY: ${plot.top + 40}, bubbles: true,
+        clientX: ${plot.left} + (${plot.x0} + k * (${plot.x1} - ${plot.x0}) / ${rangeDays}) * ${plot.scale}, clientY: svg.getBoundingClientRect().top + 40, bubbles: true,
       }));
       out.push(document.querySelector('.hero-at').textContent + '|' + document.querySelector('.chart-readout').textContent);
     }
@@ -625,14 +678,14 @@ await run(async () => {
     shapeBefore[0].startsWith(await format('date', D1)) && shapeBefore[0] === shapeAfter[0] &&
       (await hero()) !== totalBefore && !(await tableRow('Fund 4')),
   );
-  await pointer('pointermove', 0.999);
+  await pointAt('pointermove', rangeDays);
   check(
     'net-worth-view: the archive is annotated on the chart, and the tooltip at its date names the holding',
     (await ev("[...document.querySelectorAll('.archive-annotation title')].some(t => t.textContent === 'Fund 4 archived')")) &&
       (await ev("document.querySelector('.chart-readout').textContent")).includes('Fund 4 archived'),
     await ev("document.querySelector('.chart-readout').textContent"),
   );
-  await pointer('pointerleave', 0.999);
+  await pointAt('pointerleave', rangeDays);
   await archive('Fund 3');
   const closing = on(await stored('snapshot'), T).find((s) => s.accountId === id['Fund 3']);
   await go(`#/holding/${id['Fund 3']}`);

@@ -301,23 +301,44 @@ function drawChart({
     crosshair.setAttribute('visibility', 'visible');
     if (onHover) onHover(day, at / width);
   };
-  const dayUnder = (event) => {
+  // Where an event sits in the drawing's own units, and whether that
+  // is on the plot rather than in a gutter, a margin or the axis strip.
+  const place = (event) => {
     const box = root.getBoundingClientRect();
-    return dayAt((event.clientX - box.left) / (box.width / width), pad.left, width - pad.right, firstDay, lastDay);
+    const scale = box.width / width;
+    const at = (event.clientX - box.left) / scale;
+    const down = (event.clientY - box.top) / scale;
+    return {
+      day: dayAt(at, pad.left, width - pad.right, firstDay, lastDay),
+      // Half a pixel of slack, so an edge column and float noise stay on.
+      onPlot: at >= pad.left - 0.5 && at <= width - pad.right + 0.5 && down <= plotBottom,
+    };
   };
+  const dayUnder = (event) => place(event).day;
 
   // A drag selects the span between two days. A click, a press and
   // release on one day, opens that day's recording when it carries a
   // snapshot and otherwise clears a selection.
   let anchor = null;
+  // Set by a press and cleared once the chart has taken or lost focus,
+  // because a tap fires pointerup and pointerleave before the focus.
   let pressed = false;
   root.addEventListener('pointerdown', (event) => {
     pressed = true;
     if (event.button !== 0 || event.target.classList.contains('entry-mark')) return;
-    anchor = dayUnder(event);
+    const { day, onPlot } = place(event);
+    if (!onPlot) return;
+    anchor = day;
+    // A touch has no hover to put the crosshair there first.
+    point(day);
   });
   root.addEventListener('pointermove', (event) => {
-    const day = dayUnder(event);
+    const { day, onPlot } = place(event);
+    // Off the plot the crosshair goes, unless a drag is under way.
+    if (!onPlot && anchor === null) {
+      point(null);
+      return;
+    }
     point(day);
     if (anchor === null || day === anchor) return;
     const [from, to] = [Math.min(anchor, day), Math.max(anchor, day)];
@@ -326,7 +347,6 @@ function drawChart({
     dragging.setAttribute('visibility', 'visible');
   });
   root.addEventListener('pointerup', (event) => {
-    pressed = false;
     if (anchor === null) return;
     const day = dayUnder(event);
     const from = anchor;
@@ -340,11 +360,12 @@ function drawChart({
       onSelect(null);
     }
   });
-  root.addEventListener('pointerleave', () => {
-    pressed = false;
+  root.addEventListener('pointerleave', (event) => {
     anchor = null;
     dragging.setAttribute('visibility', 'hidden');
-    point(null);
+    // A finger lifts off with a leave of its own, and the day it
+    // touched stays read.
+    if (event.pointerType !== 'touch') point(null);
   });
 
   // Focus by keyboard puts the crosshair on the last day. A press with
@@ -354,8 +375,12 @@ function drawChart({
     if (!pressed) point(lastDay);
     pressed = false;
   });
-  root.addEventListener('blur', () => point(null));
+  root.addEventListener('blur', () => {
+    pressed = false;
+    point(null);
+  });
   root.addEventListener('keydown', (event) => {
+    pressed = false;
     const from = current === null ? lastDay : current;
     let next;
     if (event.key === 'ArrowLeft' || event.key === 'ArrowRight') {
