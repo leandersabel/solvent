@@ -32,13 +32,13 @@ await run(async () => {
   );
 
   const recordRow = async (index, value) => {
-    await page.eval(`(() => {
-      const row = document.querySelectorAll('.sweep-row')[${index}];
+    await page.call((at, next) => {
+      const row = document.querySelectorAll('.sweep-row')[at];
       const field = row.querySelector('input');
-      field.value = ${JSON.stringify(value)};
+      field.value = next;
       field.dispatchEvent(new Event('input', { bubbles: true }));
       row.querySelector('button').click();
-    })()`);
+    }, index, value);
     await page.idle();
   };
   await recordRow(0, '12450.00');
@@ -116,11 +116,11 @@ await run(async () => {
   // ---- record-rate: a new sweep, and the franc holding it exists for ----
 
   const before = { brokerage: await tableRow('Brokerage'), gold: await tableRow('Gold bars') };
-  const counts = () => model(`[${JSON.stringify(id.Brokerage)}, ${JSON.stringify(id['Gold bars'])}].map(a => v.snapshotsFor(a).length)`);
+  const counts = () => model(({ v }, ...ids) => ids.map(a => v.snapshotsFor(a).length), id.Brokerage, id['Gold bars']);
   const snapshotCounts = await counts();
   traffic.length = 0;
   await sweepToday();
-  await rec.waitUntil(`${line('USD')}.querySelector('input').value !== ''`, { label: 'the proposals on arrival' });
+  await rec.waitUntil((query) => document.querySelector(query).querySelector('input').value !== '', { args: [line('USD')], label: 'the proposals on arrival' });
   await quiet();
   const usd = await lineState('USD');
   const gold = await lineState('XAU-ozt');
@@ -156,8 +156,8 @@ await run(async () => {
   // field in line with the others'.
   await rec.send('Emulation.setDeviceMetricsOverride', { width: 1280, height: 900, deviceScaleFactor: 1, mobile: false });
   await rec.frames();
-  const askedBox = JSON.parse(await ev(`JSON.stringify((() => {
-    const l = ${line('PAINT')};
+  const askedBox = JSON.parse(await rec.call((query) => JSON.stringify((() => {
+    const l = document.querySelector(query);
     const card = l.parentElement.getBoundingClientRect();
     const r = l.getBoundingClientRect();
     const lefts = [...document.querySelectorAll('.rate-line input')].map((i) => Math.round(i.getBoundingClientRect().left));
@@ -167,7 +167,7 @@ await run(async () => {
       lefts,
       width: Math.round(l.querySelector('input').getBoundingClientRect().width),
     };
-  })())`));
+  })()), line('PAINT')));
   await rec.send('Emulation.clearDeviceMetricsOverride');
   check(
     'record-rate: the line asking for a price sits inside the block, its field in line with the others and in the field column',
@@ -215,11 +215,11 @@ await run(async () => {
   traffic.length = 0;
   const releaseRates = holdRates();
   const emptyDay = await newRecording(D10, { wait: false });
-  await rec.waitUntil(`${line('USD')} && ${line('USD')}.querySelector('.skeleton:not([hidden])')`, { label: 'the rate lines to wait for their proposals' });
-  const resolving = await ev(`JSON.stringify({
-    skeleton: Boolean(${line('USD')}.querySelector('.skeleton:not([hidden])')),
+  await rec.waitUntil((query) => { const l = document.querySelector(query); return l && l.querySelector('.skeleton:not([hidden])'); }, { args: [line('USD')], label: 'the rate lines to wait for their proposals' });
+  const resolving = await rec.call((query) => ({
+    skeleton: Boolean(document.querySelector(query).querySelector('.skeleton:not([hidden])')),
     usable: [...document.querySelectorAll('.sweep-row input')].every(i => !i.disabled),
-  })`).then(JSON.parse);
+  }), line('USD'));
   releaseRates();
   await quiet();
   check(
@@ -232,7 +232,7 @@ await run(async () => {
     !emptyDay.marked && !emptyDay.dotted && emptyDay.name === null && (await ev('location.hash')) === `#/sweep/${D10}`,
     JSON.stringify(emptyDay),
   );
-  await rec.waitUntil(`${line('USD')}.querySelector('input').value !== ''`, { label: 'the proposals for the backdate' });
+  await rec.waitUntil((query) => document.querySelector(query).querySelector('input').value !== '', { args: [line('USD')], label: 'the proposals for the backdate' });
   check('record-snapshot: the sweep carries a row for each of the fifteen holdings', (await ev("document.querySelectorAll('.sweep-row').length")) === 15);
   await typeLine('XAU-ozt', '2711.13');
   const flipped = await lineState('XAU-ozt');
@@ -287,7 +287,7 @@ await run(async () => {
       edited.rateAsOf === proposalsFor(D10)['XAU-ozt'].asOf,
     JSON.stringify(edited),
   );
-  const latestUsd = await model("v.latestPrice('USD').date");
+  const latestUsd = await model(({ v }) => v.latestPrice('USD').date);
   check('record-rate: a backdated recording leaves the later entry the latest', latestUsd === T, latestUsd);
   check(
     'record-rate: a free-text unit and a lookup-off symbol get no entry from a recording',
@@ -393,8 +393,8 @@ await run(async () => {
   );
 
   const usdFigures = () =>
-    model(`v.recording('${D2}').figures.filter(f => f.holding.payload.unit === 'USD')
-      .map(f => decimal.format(decimal.multiply(decimal.parse(f.snapshot.payload.value), v.priceOn('USD', '${D2}').rate)))`);
+    model(({ v, decimal }, day) => v.recording(day).figures.filter(f => f.holding.payload.unit === 'USD')
+      .map(f => decimal.format(decimal.multiply(decimal.parse(f.snapshot.payload.value), v.priceOn('USD', day).rate))), D2);
   const usdBefore = await usdFigures();
   await typeLine('USD', '0.93');
   check('record-rate: editing a stored proposal flips its chip to the figure it replaced', (await lineState('USD')).chip === 'Edited from 0.92');
@@ -519,7 +519,7 @@ await run(async () => {
   );
   check(
     'record-snapshot: the prices of an emptied recording still price the dates around it',
-    await model(`v.usableEntries('USD').some(e => e.payload.date === '${D2}')`),
+    await model(({ v }, day) => v.usableEntries('USD').some(e => e.payload.date === day), D2),
   );
 
   await press('Update');
@@ -546,7 +546,7 @@ await run(async () => {
   await rec.waitUntil("document.querySelector('.sweep-row')", { label: 'the sweep' });
   await quiet();
   const asksOnOpen = rateAsks().length;
-  await ev(`${line('USD')}.querySelector('.btn-inline').click()`);
+  await rec.call((query) => document.querySelector(query).querySelector('.btn-inline').click(), line('USD'));
   await quiet();
   const lookedUp = await lineState('USD');
   check(
@@ -565,8 +565,10 @@ await run(async () => {
   await go(`#/recording/${DP}`);
   await press('Update');
   const pairRow = await rowState('Savings');
-  const pairLine = await ev(`JSON.stringify({ flagged: ${line('USD')}.classList.contains('flagged'),
-    keeps: [...${line('USD')}.querySelectorAll('.rate-pair button')].length, says: ${line('USD')}.querySelector(':scope > .hint').textContent })`).then(JSON.parse);
+  const pairLine = await rec.call((query) => {
+    const l = document.querySelector(query);
+    return { flagged: l.classList.contains('flagged'), keeps: [...l.querySelectorAll('.rate-pair button')].length, says: l.querySelector(':scope > .hint').textContent };
+  }, line('USD'));
   check(
     'record-snapshot: the sweep shows two figures on one date flagged, each with Keep this one, and picks neither',
     pairRow.state === 'Two figures share this date.' && pairRow.keeps === 2,
@@ -579,7 +581,7 @@ await run(async () => {
   );
   await clickRow('Savings', '.sweep-pair button');
   await quiet();
-  await ev(`${line('USD')}.querySelector('.rate-pair button').click()`);
+  await rec.call((query) => document.querySelector(query).querySelector('.rate-pair button').click(), line('USD'));
   await quiet();
   check(
     'record-snapshot: keeping one of a pair on the sweep leaves exactly one of each',
@@ -699,7 +701,7 @@ await run(async () => {
   );
   check(
     'record-rate: with No Content from the proxy, no price is written and the previous entry stays the latest',
-    noContent.length === 0 && (await model("v.latestPrice('USD').date")) === T,
+    noContent.length === 0 && (await model(({ v }) => v.latestPrice('USD').date)) === T,
   );
   await home();
   check(
@@ -716,7 +718,7 @@ await run(async () => {
   const columns = await layout('.rate-lines');
   const narrowed = {};
   for (const width of [719, 720]) {
-    await ev(`document.querySelector('.rate-lines').style.width = '${width}px'`);
+    await rec.call((pixels) => { document.querySelector('.rate-lines').style.width = `${pixels}px`; }, width);
     narrowed[width] = await layout('.rate-lines');
   }
   await ev("document.querySelector('.rate-lines').style.width = ''");

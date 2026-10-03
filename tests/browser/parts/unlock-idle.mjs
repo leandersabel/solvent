@@ -18,7 +18,13 @@ await run(async () => {
   // through the protocol is the activity, so the reset is the one a
   // person's keystroke triggers.
   await page.send('Page.addScriptToEvaluateOnNewDocument', { source: CLOCK });
-  const advance = (ms) => page.eval(`window.testClock.advance(${ms})`);
+  const advance = (ms) => page.call((milliseconds) => window.testClock.advance(milliseconds), ms);
+  // The two settings cards the checks work on, each found once. `onCard`
+  // runs `act` on one in the page, where the finder's source travels with
+  // it and the values reach `act` as arguments.
+  const idleSelect = () => [...document.querySelectorAll('.card')].find(c => c.textContent.includes('Session and lock')).querySelector('select');
+  const passwordCard = () => [...document.querySelectorAll('.card')].find(c => c.querySelector('input[autocomplete=new-password]'));
+  const onCard = (find, act, ...args) => page.call(`(...args) => (${act})((${find})(), ...args)`, ...args);
   const activity = async () => {
     for (const type of ['keyDown', 'keyUp']) {
       await page.send('Input.dispatchKeyEvent', { type, key: 'Shift', code: 'ShiftLeft', windowsVirtualKeyCode: 16 });
@@ -86,17 +92,15 @@ await run(async () => {
 
   // A period chosen on the settings screen.
   await page.eval(`document.querySelector('.topbar nav a[href="#/settings"]').click()`);
-  const idleSelect = "[...document.querySelectorAll('.card')].find(c => c.textContent.includes('Session and lock')).querySelector('select')";
   await page.waitUntil(idleSelect, { label: 'the session card' });
   await page.idle();
   // The keystroke that chose it is the last activity there is, so the
   // new period has to count from the save rather than wait for more.
   await activity();
-  await page.eval(`(() => {
-    const select = ${idleSelect};
+  await onCard(idleSelect, (select) => {
     select.value = '5';
     select.dispatchEvent(new Event('change', { bubbles: true }));
-  })()`);
+  });
   await page.idle();
   await advance(5 * MINUTE - MARGIN);
   const chosenEarly = await locked();
@@ -163,7 +167,7 @@ await run(async () => {
     await page.eval(`document.querySelector('.topbar nav a[href="#/settings"]').click()`);
     await page.waitUntil("document.body.innerText.includes('Session and lock')", { label: `settings with ${stored} stored` });
     await page.idle();
-    const shown = await page.eval(`${idleSelect}.value`);
+    const shown = await onCard(idleSelect, (select) => select.value);
     const clamped = await lockPeriod(minutes);
     check(
       `a stored idle lock of ${stored} locks at ${minutes} minutes and the select shows ${minutes}`,
@@ -243,11 +247,11 @@ await run(async () => {
   await page.waitUntil("document.querySelector('.sweep-row input')", { label: 'the sweep rows' });
   await page.idle();
   const typeRow = (index, value) =>
-    page.eval(`(() => {
-      const field = document.querySelectorAll('.sweep-row input')[${index}];
-      field.value = ${JSON.stringify(value)};
+    page.call((at, next) => {
+      const field = document.querySelectorAll('.sweep-row input')[at];
+      field.value = next;
       field.dispatchEvent(new Event('input', { bubbles: true }));
-    })()`);
+    }, index, value);
   await typeRow(0, '4321.09');
   await typeRow(1, '98.7654');
   const sweepAt = await page.eval('location.hash');
@@ -269,11 +273,10 @@ await run(async () => {
   await page.eval(`document.querySelector('.topbar nav a[href="#/settings"]').click()`);
   await page.waitUntil("document.querySelector('input[autocomplete=current-password]')", { label: 'the password card' });
   await page.idle();
-  const passwordCard = "[...document.querySelectorAll('.card')].find(c => c.querySelector('input[autocomplete=new-password]'))";
   // Made up inside the page, so no script source the test sent carries
   // them and the heap search below finds only what the page kept.
-  const typedValues = JSON.parse(await page.eval(`(() => {
-    const fields = ${passwordCard}.querySelectorAll('input');
+  const typedValues = JSON.parse(await onCard(passwordCard, (card) => {
+    const fields = card.querySelectorAll('input');
     const type = (field) => {
       field.value = 'pw-' + crypto.randomUUID();
       field.dispatchEvent(new Event('input', { bubbles: true }));
@@ -283,8 +286,8 @@ await run(async () => {
     fields[1].closest('.password-field').querySelector('button').click();
     typed.push(type(fields[1]));
     return JSON.stringify(typed);
-  })()`));
-  const shownType = await page.eval(`${passwordCard}.querySelectorAll('input')[1].type`);
+  }));
+  const shownType = await onCard(passwordCard, (card) => card.querySelectorAll('input')[1].type);
   await idleLock();
   // Only counts leave these checks, so a failure never prints a password.
   const kept = await reachable(typedValues);
@@ -294,7 +297,7 @@ await run(async () => {
     `${kept} kept, the second field was ${shownType}`,
   );
   await unlockInPlace('the vault after unlocking over the password card');
-  const filled = await page.eval(`[...${passwordCard}.querySelectorAll('input')].filter(f => f.value !== '').length`);
+  const filled = await onCard(passwordCard, (card) => [...card.querySelectorAll('input')].filter(f => f.value !== '').length);
   check('no password field is refilled after unlocking', filled === 0, `${filled} filled`);
   check('no password field is refilled after unlocking', filled === 0, `${filled} filled`);
 });

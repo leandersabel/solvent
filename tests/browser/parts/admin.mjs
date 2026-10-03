@@ -100,7 +100,7 @@ await run(async () => {
   await admin.send('Page.addScriptToEvaluateOnNewDocument', { source: CLOCK });
   await admin.goto(`${BASE}/admin`);
   await admin.waitUntil("document.querySelector('#app .section-switcher')", { label: 'the admin area to render' });
-  await admin.eval(`window.testClock.advance(${61 * MINUTE})`);
+  await admin.call((ms) => window.testClock.advance(ms), 61 * MINUTE);
   await admin.frames();
   check(
     'an administrator session is unaffected by any idle period',

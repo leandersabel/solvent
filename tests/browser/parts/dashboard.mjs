@@ -122,19 +122,17 @@ await run(async () => {
   await plant([{ ...price('PROBE-E', '2020-01-11', '1.60'), recordId: planted[4], version: 2 }]);
   await unlockDashboard('the dashboard over the planted pairs');
 
-  const moneyOf = (value) =>
-    `(await import('/static/js/session.js')).currentVault().format.money((await import('/static/js/decimal.js')).parse('${value}'))`;
   // The chart's own table, read at one date, beside the figure that
   // date should carry.
   const chartAt = (date, expected) =>
-    page.eval(`(async () => {
+    page.call(async (day, figure) => {
       const v = (await import('/static/js/session.js')).currentVault();
       [...document.querySelectorAll('.range-buttons button')].find(b => b.textContent === 'All').click();
       await new Promise((r) => requestAnimationFrame(() => requestAnimationFrame(r)));
       const row = [...document.querySelectorAll('details table tbody tr')]
-        .find(r => r.cells[0].textContent === v.format.date('${date}'));
-      return JSON.stringify({ shown: row ? row.cells[1].textContent : null, expected: ${moneyOf(expected)} });
-    })()`).then(JSON.parse);
+        .find(r => r.cells[0].textContent === v.format.date(day));
+      return JSON.stringify({ shown: row ? row.cells[1].textContent : null, expected: v.format.money((await import('/static/js/decimal.js')).parse(figure)) });
+    }, date, expected).then(JSON.parse);
   const banner = () => labels('.banner-critical button');
   // What the screens make of the planted pairs, for comparing one
   // client's reading with another's.
@@ -181,15 +179,15 @@ await run(async () => {
     (await banner()).some((line) => line.includes('Probe francs') && line.startsWith('Two entries on')),
     (await banner()).join(' | '),
   );
-  const identicalLeft = await page.eval(`(async () => {
+  const identicalLeft = await page.call(async (ids) => {
     const api = await import('/static/js/api.js');
     const rows = await api.get('/api/records?type=rate');
-    return rows.filter(r => ${JSON.stringify(identical)}.includes(r.recordId)).length;
-  })()`);
+    return rows.filter(r => ids.includes(r.recordId)).length;
+  }, identical);
   check('a byte-identical pair of prices leaves exactly one record', identicalLeft === 1, `${identicalLeft} left`);
   const inOrder = await picture();
 
-  await page.eval(`location.hash = '#/holding/${francs}'`);
+  await page.call((id) => { location.hash = `#/holding/${id}`; }, francs);
   await page.waitUntil("document.querySelector('.card .data-table')", { label: "the probe holding's screen" });
   await page.frames();
   const history = JSON.parse(await page.eval(`JSON.stringify([...document.querySelectorAll('.card .data-table tbody tr')]
@@ -202,12 +200,12 @@ await run(async () => {
   );
 
   const flaggedOnRecording = async (date, symbolOrName) => {
-    await page.eval(`location.hash = '#/recording/${date}'`);
+    await page.call((day) => { location.hash = `#/recording/${day}`; }, date);
     await page.waitUntil("document.querySelector('.screen-heading')", { label: `the recording for ${date}` });
     await page.frames();
-    return JSON.parse(await page.eval(`JSON.stringify([...document.querySelectorAll('.data-table tbody tr')]
-      .filter(r => r.cells[0].textContent === ${JSON.stringify(symbolOrName)})
-      .map(r => ({ flagged: r.classList.contains('flagged'), keep: r.textContent.includes('Keep this one') })))`));
+    return JSON.parse(await page.call((wanted) => JSON.stringify([...document.querySelectorAll('.data-table tbody tr')]
+      .filter(r => r.cells[0].textContent === wanted)
+      .map(r => ({ flagged: r.classList.contains('flagged'), keep: r.textContent.includes('Keep this one') }))), symbolOrName));
   };
   const prices = await flaggedOnRecording('2020-01-11', 'PROBE-E');
   check(
@@ -298,9 +296,9 @@ await run(async () => {
     line.points.filter(([x]) => x === first[0]).length === 1 && others.at(-1)[1] === line.end,
     JSON.stringify([first, others.at(-1), line.end]),
   );
-  await page.eval(`(async () => {
+  await page.call(async (ids) => {
     const api = await import('/static/js/api.js');
-    for (const id of ${JSON.stringify([...ramp, checking, flat])}) await api.del('/api/records/' + id);
-  })()`);
+    for (const id of ids) await api.del('/api/records/' + id);
+  }, [...ramp, checking, flat]);
   await unlockDashboard('the dashboard after the ramp probes');
 });

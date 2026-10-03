@@ -50,12 +50,12 @@ await run(async () => {
   const archivingId = (await page.eval('location.hash')).split('/')[2];
   const archiveDay = await page.eval('new Date().toISOString().slice(0, 10)');
   const snapshotState = () =>
-    page.eval(`(async () => {
+    page.call(async (holdingId, day) => {
       const api = await import('/static/js/api.js');
       const decimal = await import('/static/js/decimal.js');
       const v = (await import('/static/js/session.js')).currentVault();
       const rows = await api.get('/api/records?type=snapshot');
-      const here = v.snapshotsFor('${archivingId}').filter((s) => s.payload.date === '${archiveDay}');
+      const here = v.snapshotsFor(holdingId).filter((s) => s.payload.date === day);
       return JSON.stringify({
         stored: rows.length,
         here: here.map((s) => ({
@@ -67,22 +67,22 @@ await run(async () => {
           figure: String(decimal.parse(s.payload.value)),
         })),
       });
-    })()`).then(JSON.parse);
+    }, archivingId, archiveDay).then(JSON.parse);
   // The chart's own table, every row but the archive date's.
   const chartOffArchiveDay = async () => {
     await page.eval("location.hash = '#/'");
     await page.waitUntil("document.querySelector('.chart-card details table')", { label: 'the chart table' });
     await page.eval("[...document.querySelectorAll('.range-buttons button')].find(b => b.textContent === 'All').click()");
     await page.frames();
-    return page.eval(`(async () => {
+    return page.call(async (archived) => {
       const v = (await import('/static/js/session.js')).currentVault();
-      const day = v.format.date('${archiveDay}');
+      const day = v.format.date(archived);
       return JSON.stringify([...document.querySelectorAll('.chart-card details table tbody tr')]
         .filter((r) => r.cells[0].textContent !== day).map((r) => r.textContent));
-    })()`);
+    }, archiveDay);
   };
   const chartBeforeArchive = await chartOffArchiveDay();
-  await page.eval(`location.hash = '#/holding/${archivingId}'`);
+  await page.call((id) => { location.hash = `#/holding/${id}`; }, archivingId);
   await page.waitUntil("document.querySelector('.detail-header')", { label: 'the holding to archive' });
   await page.frames();
   const beforeArchive = await snapshotState();
@@ -94,7 +94,7 @@ await run(async () => {
   check('archive is offered before deleting', (await text()).includes('You can undo this'));
   check(
     'the archive dialog says it records zero on the day it is made',
-    (await text()).includes(`Records zero for this holding on ${await page.eval(`(async () => (await import('/static/js/session.js')).currentVault().format.longDate('${archiveDay}'))()`)}`),
+    (await text()).includes(`Records zero for this holding on ${await page.call(async (day) => (await import('/static/js/session.js')).currentVault().format.longDate(day), archiveDay)}`),
   );
   check(
     'the archive dialog offers no value field and no way to archive without the zero',
@@ -113,10 +113,10 @@ await run(async () => {
       return choice.checked && button.hidden && !document.querySelector('.dialog input[value=delete]').checked;
     })()`),
   );
-  const named = await page.eval(`(async () => {
+  const named = await page.call(async (value) => {
     const v = (await import('/static/js/session.js')).currentVault();
-    return v.format.quantity('${beforeArchive.here[0]?.value}');
-  })()`);
+    return v.format.quantity(value);
+  }, beforeArchive.here[0]?.value);
   check(
     'an occupied archive date names the figure the zero replaces, above the confirm',
     beforeArchive.here.length === 1 && (await text()).includes(`This replaces the ${named} `),
@@ -151,22 +151,22 @@ await run(async () => {
     `${JSON.stringify(beforeArchive.here)} then ${JSON.stringify(afterArchive.here)}`,
   );
   check('archiving deletes no snapshot', afterArchive.stored === beforeArchive.stored, `${beforeArchive.stored} then ${afterArchive.stored}`);
-  const archivedRecord = await page.eval(`(async () => {
+  const archivedRecord = await page.call(async (id) => {
     const v = (await import('/static/js/session.js')).currentVault();
-    return v.holdings.get('${archivingId}').payload.archivedAt;
-  })()`);
+    return v.holdings.get(id).payload.archivedAt;
+  }, archivingId);
   check('the account record gains archivedAt', archivedRecord === archiveDay, archivedRecord);
   check('an archived holding carries its chip', (await text()).includes('Archived'));
   check('it offers Unarchive rather than Archive', (await labels('.form-actions button')).includes('Unarchive'));
   check('an archived holding takes no new value', !(await labels('.form-actions button')).includes('Record a value'));
   check(
     "the archive's zero offers no edit, clear or delete on the holding's page",
-    await page.eval(`(async () => {
+    await page.call(async (day) => {
       const v = (await import('/static/js/session.js')).currentVault();
       const row = [...document.querySelectorAll('.card .data-table tbody tr')]
-        .find((r) => r.cells[0] && r.cells[0].textContent.includes(v.format.longDate('${archiveDay}')));
+        .find((r) => r.cells[0] && r.cells[0].textContent.includes(v.format.longDate(day)));
       return Boolean(row) && row.querySelectorAll('.btn-inline').length === 0 && row.cells[1].textContent.length > 0;
-    })()`),
+    }, archiveDay),
   );
 
   const chartAfterArchive = await chartOffArchiveDay();
@@ -192,7 +192,7 @@ await run(async () => {
   await page.waitUntil("document.querySelector('.chart-card details table')", { label: 'the chart after a skipped archive' });
   await page.eval("[...document.querySelectorAll('.range-buttons button')].find(b => b.textContent === 'All').click()");
   await page.frames();
-  const skippedArchive = await page.eval(`(async () => {
+  const skippedArchive = await page.call(async (holdingId) => {
     const v = (await import('/static/js/session.js')).currentVault();
     const { dayNumber } = await import('/static/js/model.js');
     const total = v.totals('latest').net;
@@ -207,14 +207,14 @@ await run(async () => {
       change: document.querySelector('.hero-delta').textContent.startsWith('CHF ' + (total - first > 0n ? '+' : '') + v.format.whole(total - first)),
       edgeDot: Number(document.querySelector('.net-end').getAttribute('cy')) === y,
       // The zero is recorded at the archive date, so the holding is on neither side of it.
-      zeroRecorded: v.snapshotsFor('${skippedId}').some((s) => s.payload.value === '0' && s.payload.date === v.holdings.get('${skippedId}').payload.archivedAt),
+      zeroRecorded: v.snapshotsFor(holdingId).some((s) => s.payload.value === '0' && s.payload.date === v.holdings.get(holdingId).payload.archivedAt),
     });
-  })()`).then(JSON.parse);
+  }, skippedId).then(JSON.parse);
   for (const [name, held] of Object.entries(skippedArchive)) {
     check(`archived on the newest date: ${name}`, held, JSON.stringify(skippedArchive));
   }
   // Back to active, so what follows reads the vault as it was.
-  await page.eval(`location.hash = '#/holding/${skippedId}'`);
+  await page.call((id) => { location.hash = `#/holding/${id}`; }, skippedId);
   await page.waitUntil("document.querySelector('.detail-header')", { label: 'the holding to unarchive' });
   await page.frames();
   await click('Unarchive');
@@ -255,7 +255,7 @@ await run(async () => {
       },
     }]);
     await plant([{ type: 'snapshot', accountId: probeId, payload: { date: BACKDATE, value: '5000', note: 'kept in the safe' } }]);
-    const axis = await vaultValue(`v.dimensions.find(d => d.label === ${JSON.stringify(AXIS)})`);
+    const axis = await vaultValue((v, label) => v.dimensions.find((d) => d.label === label), AXIS);
     await reloadModel();
     await writesSeen();
 
@@ -279,7 +279,7 @@ await run(async () => {
     await inDialog('Archive');
     await page.waitUntil('!document.querySelector(".dialog")', { timeout: 60000, label: 'the archive' });
     await page.idle();
-    const closing = await vaultValue(`v.snapshotsFor('${probeId}').filter(s => s.payload.date === '${today}').map(s => s.payload.value)`);
+    const closing = await vaultValue((v, id, day) => v.snapshotsFor(id).filter((s) => s.payload.date === day).map((s) => s.payload.value), probeId, today);
     check('archiving writes one zero dated the archive date', closing.join(',') === '0', closing.join(','));
 
     await openHolding(skipId);
@@ -288,7 +288,7 @@ await run(async () => {
     await inDialog('Archive');
     await page.waitUntil('!document.querySelector(".dialog")', { timeout: 60000, label: 'the second archive' });
     await page.idle();
-    const zeroed = await vaultValue(`{ archivedAt: v.holdings.get('${skipId}').payload.archivedAt, figures: v.snapshotsFor('${skipId}').map(s => s.payload.date + ':' + s.payload.value + ':' + s.version) }`);
+    const zeroed = await vaultValue((v, id) => ({ archivedAt: v.holdings.get(id).payload.archivedAt, figures: v.snapshotsFor(id).map((s) => s.payload.date + ':' + s.payload.value + ':' + s.version) }), skipId);
     check(
       'archiving a holding with an earlier figure adds the zero and leaves that figure as it was',
       zeroed.archivedAt === today && zeroed.figures.join(',') === `${BACKDATE}:700:1,${today}:0:1`,
@@ -301,24 +301,24 @@ await run(async () => {
     await page.frames();
     await page.eval("[...document.querySelectorAll('.range-buttons button')].find(b => b.textContent === 'All').click()");
     await page.frames();
-    const band = JSON.parse(await page.eval(`(async () => {
+    const band = JSON.parse(await page.call(async (bandLabel, axisId, day) => {
       const v = (await import('/static/js/session.js')).currentVault();
       const table = document.querySelector('.chart-card details table');
-      const column = [...table.querySelectorAll('thead th')].findIndex(th => th.textContent === ${JSON.stringify(BAND)});
-      const row = [...table.querySelectorAll('tbody tr')].find(r => r.cells[0].textContent === v.format.date('${today}'));
+      const column = [...table.querySelectorAll('thead th')].findIndex(th => th.textContent === bandLabel);
+      const row = [...table.querySelectorAll('tbody tr')].find(r => r.cells[0].textContent === v.format.date(day));
       const decimal = await import('/static/js/decimal.js');
       const { dayNumber } = await import('/static/js/model.js');
       // The side just before the archive date is the zero.
-      const { days, bands } = v.series(v.dimensions.find((d) => d.id === ${JSON.stringify(axis.id)}), dayNumber(v.recordingDates()[0]), dayNumber('${today}'));
-      const before = bands.find((b) => b.label === ${JSON.stringify(BAND)}).before;
-      const index = days.indexOf(dayNumber('${today}'));
+      const { days, bands } = v.series(v.dimensions.find((d) => d.id === axisId), dayNumber(v.recordingDates()[0]), dayNumber(day));
+      const before = bands.find((b) => b.label === bandLabel).before;
+      const index = days.indexOf(dayNumber(day));
       return JSON.stringify({
         shown: row && column > 0 ? row.cells[column].textContent : null,
         expected: v.format.money(decimal.ZERO),
         before: String(before.assets[index] + before.liabilities[index]),
         zero: String(decimal.ZERO),
       });
-    })()`));
+    }, BAND, axis.id, today));
     check("the band's value on the archive date leaves the archived holding out", band.shown === band.expected, JSON.stringify(band));
     check("the band's side just before the archive date is the zero: no edge", band.before === band.zero, JSON.stringify(band));
     const annotations = await page.eval("[...document.querySelectorAll('.archive-annotation title')].map(t => t.textContent)");
@@ -350,14 +350,14 @@ await run(async () => {
       "a date another window recorded for this holding refuses the archive, writes nothing, and reopens on what it now holds",
       (await text()).includes('now holds a figure for this holding, recorded in another window') &&
         (await text()).includes('This replaces the') && (await text()).includes('55') &&
-        (await writesSeen()).length === 0 && !(await vaultValue(`v.holdings.get('${raceId}').payload.archivedAt`)),
+        (await writesSeen()).length === 0 && !(await vaultValue((v, id) => v.holdings.get(id).payload.archivedAt, raceId)),
     );
     await inDialog('Archive');
     await page.waitUntil('!document.querySelector(".dialog")', { timeout: 60000, label: 'the archive after the refusal' });
     await page.idle();
     check(
       'archiving again replaces that figure in place with the zero',
-      JSON.stringify(await vaultValue(`v.snapshotsFor('${raceId}').map(s => s.payload.value + ':' + s.version)`)) === JSON.stringify(['0:2']),
+      JSON.stringify(await vaultValue((v, id) => v.snapshotsFor(id).map(s => s.payload.value + ':' + s.version), raceId)) === JSON.stringify(['0:2']),
     );
 
     // The stated figure changed in another window: the replacement is stated again.
@@ -372,7 +372,7 @@ await run(async () => {
     check(
       'a replacement that met a Conflict is not retried, and states the figure now stored',
       (await text()).includes('999') && (await writesSeen()).length === 1 &&
-        !(await vaultValue(`v.holdings.get('${conflictId}').payload.archivedAt`)),
+        !(await vaultValue((v, id) => v.holdings.get(id).payload.archivedAt, conflictId)),
     );
     await inDialog('Cancel');
     await page.waitUntil("!document.querySelector('.dialog')", { label: 'the dialog to close' });
@@ -399,7 +399,7 @@ await run(async () => {
     check(
       'a failed delete is reported on its row, and the row stays',
       (await page.eval("document.querySelector('.card .data-table .field-error:not([hidden])').closest('tr').textContent")).includes('Nothing was deleted.') &&
-        (await vaultValue(`v.snapshotsFor('${euroId}').length`)) === 1,
+        (await vaultValue((v, id) => v.snapshotsFor(id).length, euroId)) === 1,
     );
 
     await click('Archive');
@@ -411,9 +411,9 @@ await run(async () => {
     check(
       'a zero that does not save archives nothing, writes no price, and leaves the dialog open',
       Boolean(await page.eval("document.querySelector('.dialog')")) &&
-        !(await vaultValue(`v.holdings.get('${euroId}').payload.archivedAt`)) &&
-        (await vaultValue(`v.snapshotsFor('${euroId}').length`)) === 1 &&
-        (await vaultValue(`v.recording('${today}').prices.some(p => p.payload.symbol === 'EUR')`)) === false,
+        !(await vaultValue((v, id) => v.holdings.get(id).payload.archivedAt, euroId)) &&
+        (await vaultValue((v, id) => v.snapshotsFor(id).length, euroId)) === 1 &&
+        (await vaultValue((v, day) => v.recording(day).prices.some(p => p.payload.symbol === 'EUR'), today)) === false,
     );
     await failing(writing('rate'), async () => {
       await inDialog('Archive');
@@ -424,8 +424,8 @@ await run(async () => {
       'a zero whose prices do not save still archives, naming the units and linking the recording',
       priceMessage.includes('Archived. The prices for EUR') &&
         (await labels('.dialog button')).includes('Open the recording') &&
-        (await vaultValue(`v.holdings.get('${euroId}').payload.archivedAt`)) === today &&
-        (await vaultValue(`v.snapshotsFor('${euroId}').filter(s => s.payload.date === '${today}').length`)) === 1,
+        (await vaultValue((v, id) => v.holdings.get(id).payload.archivedAt, euroId)) === today &&
+        (await vaultValue((v, id, day) => v.snapshotsFor(id).filter(s => s.payload.date === day).length, euroId, today)) === 1,
       priceMessage.slice(0, 400),
     );
     await inDialog('Close');
@@ -435,7 +435,7 @@ await run(async () => {
     // date picker offers nothing from the archive date on.
     await page.eval("[...document.querySelectorAll('.card .data-table button')].find(b => b.textContent === 'Edit').click()");
     await page.waitUntil("document.querySelector('#snapshot-value')", { label: "an archived holding's earlier entry" });
-    const dateText = await page.eval(`(async () => (await import('/static/js/session.js')).currentVault().format.date('${today}'))()`);
+    const dateText = await page.call(async (day) => (await import('/static/js/session.js')).currentVault().format.date(day), today);
     await setValue('#snapshot-date', dateText);
     await writesSeen();
     await inDialog('Save');
@@ -443,16 +443,16 @@ await run(async () => {
     check(
       "an archived holding's earlier entry cannot be moved onto the archive date",
       Boolean(await page.eval("document.querySelector('.dialog')")) && (await writesSeen()).length === 0 &&
-        (await vaultValue(`v.snapshotsFor('${euroId}').map(s => s.payload.date).sort().join(',')`)) === `${BACKDATE},${today}`,
+        (await vaultValue((v, id) => v.snapshotsFor(id).map(s => s.payload.date).sort().join(','), euroId)) === `${BACKDATE},${today}`,
     );
-    const earlierText = await page.eval(`(async () => (await import('/static/js/session.js')).currentVault().format.date('${BACKDATE}'))()`);
+    const earlierText = await page.call(async (day) => (await import('/static/js/session.js')).currentVault().format.date(day), BACKDATE);
     await setValue('#snapshot-date', earlierText);
     await setValue('#snapshot-value', '110');
     await inDialog('Save');
     await page.waitUntil('!document.querySelector(".dialog")', { timeout: 60000, label: 'the earlier entry to save' });
     check(
       "an archived holding's earlier value can still be edited",
-      JSON.stringify(await vaultValue(`v.snapshotsFor('${euroId}').filter(s => s.payload.date === '${BACKDATE}').map(s => s.payload.value + ':' + s.version)`)) === JSON.stringify(['110:2']),
+      JSON.stringify(await vaultValue((v, id, day) => v.snapshotsFor(id).filter(s => s.payload.date === day).map(s => s.payload.value + ':' + s.version), euroId, BACKDATE)) === JSON.stringify(['110:2']),
     );
 
     await openHolding(poundId);
@@ -465,9 +465,9 @@ await run(async () => {
     check(
       'a zero saved without the archive flag says both halves, keeps the holding active at zero, and offers the archive again',
       (await text()).includes('It is still in your total, at zero.') &&
-        !(await vaultValue(`v.holdings.get('${poundId}').payload.archivedAt`)) &&
-        (await vaultValue(`v.valueOf(v.holdings.get('${poundId}')).stored`)) === '0' &&
-        (await vaultValue(`v.activeHoldings().some(h => h.recordId === '${poundId}')`)) &&
+        !(await vaultValue((v, id) => v.holdings.get(id).payload.archivedAt, poundId)) &&
+        (await vaultValue((v, id) => v.valueOf(v.holdings.get(id)).stored, poundId)) === '0' &&
+        (await vaultValue((v, id) => v.activeHoldings().some(h => h.recordId === id), poundId)) &&
         (await labels('.dialog button')).includes('Archive'),
     );
     await writesSeen();
@@ -477,8 +477,8 @@ await run(async () => {
     check(
       'the archive offered again writes only the flag, with one zero at the date',
       JSON.stringify(await writesSeen()) === JSON.stringify(['account']) &&
-        (await vaultValue(`v.holdings.get('${poundId}').payload.archivedAt`)) === today &&
-        (await vaultValue(`v.snapshotsFor('${poundId}').filter(s => s.payload.date === '${today}').length`)) === 1,
+        (await vaultValue((v, id) => v.holdings.get(id).payload.archivedAt, poundId)) === today &&
+        (await vaultValue((v, id, day) => v.snapshotsFor(id).filter(s => s.payload.date === day).length, poundId, today)) === 1,
     );
 
     // The account record changed in another tab while the dialog was open: the
@@ -499,17 +499,17 @@ await run(async () => {
     check(
       'a Conflict on the archive flag says the holding changed in another tab, reloads it, and keeps the zero',
       (await text()).includes('Archive or delete Probe tab renamed?') &&
-        (await vaultValue(`v.holdings.get('${tabId}').version`)) === 2 &&
-        !(await vaultValue(`v.holdings.get('${tabId}').payload.archivedAt`)) &&
-        (await vaultValue(`v.snapshotsFor('${tabId}').filter(s => s.payload.date === '${today}').length`)) === 1,
+        (await vaultValue((v, id) => v.holdings.get(id).version, tabId)) === 2 &&
+        !(await vaultValue((v, id) => v.holdings.get(id).payload.archivedAt, tabId)) &&
+        (await vaultValue((v, id, day) => v.snapshotsFor(id).filter(s => s.payload.date === day).length, tabId, today)) === 1,
     );
     await inDialog('Archive');
     await page.waitUntil('!document.querySelector(".dialog")', { timeout: 60000, label: 'the archive after the conflict' });
     await page.idle();
     check(
       'archiving again after that Conflict archives against the reloaded record',
-      (await vaultValue(`v.holdings.get('${tabId}').payload.archivedAt`)) === today &&
-        (await vaultValue(`v.holdings.get('${tabId}').version`)) === 3,
+      (await vaultValue((v, id) => v.holdings.get(id).payload.archivedAt, tabId)) === today &&
+        (await vaultValue((v, id) => v.holdings.get(id).version, tabId)) === 3,
     );
 
     // -- The zero is read-only; deleting its recording keeps it; purge takes it -----
@@ -548,15 +548,15 @@ await run(async () => {
       zeroRow() === zeroKept && (await page.eval('location.hash')) === `#/recording/${zeroDay}` &&
         (await page.eval("document.querySelector('.recording tbody').textContent")).includes('Probe zeroed') &&
         !(await page.eval("document.querySelector('.recording tbody').textContent")).includes('Probe sitting') &&
-        (await vaultValue(`v.recording('${zeroDay}').prices.length`)) === 0 &&
+        (await vaultValue((v, day) => v.recording(day).prices.length, zeroDay)) === 0 &&
         !(await labels('.form-actions button')).includes('Delete'),
     );
 
     await click('Update');
     await page.waitUntil("document.querySelector('.sweep-row')", { label: 'the sweep at the archive date' });
     await page.idle();
-    const sweepRow = JSON.parse(await page.eval(`JSON.stringify((() => {
-      const row = document.querySelector('.sweep-row[data-holding="${zeroedId}"]');
+    const sweepRow = JSON.parse(await page.call((id) => JSON.stringify((() => {
+      const row = document.querySelector(`.sweep-row[data-holding="${id}"]`);
       const visible = (n) => !n.closest('[hidden]');
       return {
         sentence: row.querySelector('.row-status').textContent,
@@ -564,7 +564,7 @@ await run(async () => {
         buttons: [...row.querySelectorAll('button')].filter(visible).length,
         text: row.querySelector('.archive-zero').textContent,
       };
-    })())`));
+    })()), zeroedId));
     check(
       "the update row for the archive's zero is text with no control",
       sweepRow.sentence.includes('Archived at zero on this date.') && sweepRow.fields === 0 && sweepRow.buttons === 0 && sweepRow.text.length > 0,
@@ -614,8 +614,8 @@ await run(async () => {
     await page.idle();
     check(
       'a holding with no values archives to a zero at version 1 as its only figure',
-      JSON.stringify(await vaultValue(`v.snapshotsFor('${emptyId}').map(s => s.payload.date + ':' + s.payload.value + ':' + s.version)`)) === JSON.stringify([`${today}:0:1`]) &&
-        (await vaultValue(`v.holdings.get('${emptyId}').payload.archivedAt`)) === today,
+      JSON.stringify(await vaultValue((v, id) => v.snapshotsFor(id).map(s => s.payload.date + ':' + s.payload.value + ':' + s.version), emptyId)) === JSON.stringify([`${today}:0:1`]) &&
+        (await vaultValue((v, id) => v.holdings.get(id).payload.archivedAt, emptyId)) === today,
     );
     await click('Unarchive');
     await page.waitUntil("[...document.querySelectorAll('.form-actions button')].some(b => b.textContent === 'Archive')", { label: 'the empty holding active again' });
@@ -632,15 +632,17 @@ await run(async () => {
     await page.waitUntil("document.querySelector('.holdings-card')", { label: 'the dashboard to unarchive from' });
     await page.eval("[...document.querySelectorAll('.holdings-card .checkbox input')][0].click()");
     await page.frames();
-    const archivedRow = `[...document.querySelectorAll('.holdings-table tbody tr')].find(r => r.querySelector('.row-name').textContent === ${JSON.stringify(archiving)})`;
-    const rowActions = await page.eval(`[...${archivedRow}.querySelectorAll('.cell-action button')].map(b => b.textContent)`);
+    const rowActions = await page.call((name) => [...[...document.querySelectorAll('.holdings-table tbody tr')]
+      .find((r) => r.querySelector('.row-name').textContent === name).querySelectorAll('.cell-action button')]
+      .map((b) => b.textContent), archiving);
     check('an archived row offers Unarchive and no new value', rowActions.join(',') === 'Unarchive', rowActions.join(','));
     const heroBeforeUnarchive = await page.eval("document.querySelector('.hero-figure').textContent");
     const archivedId = (await idNamed(archiving))[0];
     const zeroBytes = () => JSON.stringify(sql(`SELECT records.* FROM records ${OWN} AND record_type = 'snapshot' AND records.account_id = ? ORDER BY record_id`, archivedId));
     const zeroBefore = await zeroBytes();
     await writesSeen();
-    await landing(() => page.eval(`${archivedRow}.querySelector('.cell-action button').click()`));
+    await landing(() => page.call((name) => [...document.querySelectorAll('.holdings-table tbody tr')]
+      .find((r) => r.querySelector('.row-name').textContent === name).querySelector('.cell-action button').click(), archiving));
     check(
       'unarchiving writes the account record alone and leaves every snapshot, the zero included, byte-identical',
       JSON.stringify(await writesSeen()) === JSON.stringify(['account']) && (await zeroBytes()) === zeroBefore,
