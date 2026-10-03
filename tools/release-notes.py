@@ -55,14 +55,19 @@ def main():
     if since:
         search += f" merged:>{git('log', '-1', '--format=%cI', since)}"
     merged = gh("pr", "list", "--state", "merged", "--limit", "500", "--search", search,
-                "--json", "number,title,author,headRefName")
+                "--json", "number,title,author,headRefName,closingIssuesReferences")
 
     groups = {"Changes and fixes": [], "Found by QA": [], "Maintenance": []}
     for pr in sorted(merged, key=lambda pr: pr["number"]):
         author = login(pr["author"])
         found = re.fullmatch(r"claude/issue-(\d+)", pr["headRefName"])
         if found:
-            origin, group = issue_line(int(found.group(1)))
+            # A batch closes its lead's issue and each member's: one line,
+            # the lead first, in the lead's group.
+            lead = int(found.group(1))
+            closed = sorted({issue["number"] for issue in pr["closingIssuesReferences"]} - {lead})
+            origins = [issue_line(number) for number in [lead, *closed]]
+            origin, group = "; ".join(origin for origin, _ in origins), origins[0][1]
             groups[group].append(f"- {pr['title']}. {origin}, implemented by @{author} in #{pr['number']}.")
         elif not pr["headRefName"].startswith("claude/spec-"):
             groups["Maintenance"].append(f"- {pr['title']}, by @{author} in #{pr['number']}.")
