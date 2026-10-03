@@ -1825,6 +1825,39 @@ await check('record-snapshot: a move onto a date whose prices are complete asks 
   assert.deepEqual(recordTrace(server), ['PUT snapshot']);
 });
 
+await check('record-snapshot: a move is refused whole when another session took the slot with a record the confirmation did not name', async () => {
+  const server = recordServer();
+  const vault = await storedVault(server, {
+    holdings: [['Dollars', 'USD']],
+    figures: [['Dollars', '2010-03-31', '100'], ['Dollars', '2026-04-10', '7']],
+    prices: [['USD', '2026-04-10', '0.8']],
+  });
+  const [moving, displaced] = vault.snapshotsFor(vault.ids.Dollars);
+  const other = new Vault(vault.dek);
+  await other.load();
+  await writes.saveSnapshot(other, vault.ids.Dollars, null, { date: '2026-04-10', value: '9', note: null });
+  server.reset();
+  const result = await writes.editSnapshot(vault, vault.holdings.get(vault.ids.Dollars), moving, { date: '2026-04-10', value: '100', note: null }, { displaced });
+  assert.equal(result.refused, true);
+  assert.equal(server.writesIn().length, 0);
+});
+
+await check('record-snapshot: a move is refused whole when another session recorded at its empty date', async () => {
+  const server = recordServer(() => PROPOSALS);
+  const vault = await storedVault(server, {
+    holdings: [['Dollars', 'USD'], ['Francs', 'CHF']],
+    figures: [['Dollars', '2010-03-31', '100']],
+  });
+  const sit = writes.sitting(vault, '2026-04-10');
+  const other = new Vault(vault.dek);
+  await other.load();
+  await writes.saveSnapshot(other, vault.ids.Francs, null, { date: '2026-04-10', value: '9', note: null });
+  server.reset();
+  const result = await writes.editSnapshot(vault, vault.holdings.get(vault.ids.Dollars), vault.snapshotsFor(vault.ids.Dollars)[0], { date: '2026-04-10', value: '100', note: null }, { sit });
+  assert.equal(result.refused, true);
+  assert.equal(server.writesIn().length, 0);
+});
+
 await check('record-snapshot: a move whose displaced record cannot be deleted still gets its prices, and an archived holding\'s unit is priced at the new date', async () => {
   const server = recordServer(() => PROPOSALS);
   const vault = await storedVault(server, {

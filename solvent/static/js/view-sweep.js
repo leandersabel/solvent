@@ -465,8 +465,11 @@ export function rateBlock(vault, date, { sit = null, readOnly = false, fillMissi
     figureFor: (unit) => {
       const line = lineFor(unit);
       const shown = line ? line.figure() : null;
-      if (shown !== null) return { rate: shown, date };
-      return vault.priceAtDate(unit, date);
+      if (shown === null) return vault.priceAtDate(unit, date);
+      // A line still showing the estimate carried from an earlier entry
+      // is that day's price.
+      const carried = line.prefilled && shown === decimal.parse(line.carried.payload.rate);
+      return { rate: shown, date: carried ? line.carried.payload.date : date };
     },
     /** A row in this unit is being recorded. A unit with no price at
      *  all asks for one, at the head of the block, and never blocks the

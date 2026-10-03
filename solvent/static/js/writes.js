@@ -178,19 +178,20 @@ export function sitting(vault, date) {
 
 /** Claim the date for a sitting about to create records at it, or say
  *  why it cannot. `snapshots` names the holdings and `rates` the units
- *  the write would create an entry for.
+ *  the write would create an entry for. `except` is the one record of
+ *  those holdings the write may find there, the one it deletes.
  *
  *  A date another session recorded since the sitting began, or any slot
  *  already taken, refuses the whole save before a single write. The
  *  model then takes the reloaded records, so the screen can show the
  *  recording as it now stands. */
-export async function claimDate(vault, sit, { snapshots = [], rates = [] }) {
+export async function claimDate(vault, sit, { snapshots = [], rates = [], except = null }) {
   if (sit.claimed) return null;
   const fresh = await reloadCreateTypes(vault);
   const at = (list) => list.filter((record) => record.payload.date === sit.date);
   const taken =
     (sit.dateWasEmpty && (at(fresh.snapshot).length > 0 || at(fresh.rate).length > 0)) ||
-    at(fresh.snapshot).some((r) => snapshots.includes(r.accountId)) ||
+    at(fresh.snapshot).some((r) => snapshots.includes(r.accountId) && r.recordId !== except) ||
     at(fresh.rate).some((r) => rates.includes(r.payload.symbol));
   if (taken) {
     vault.replaceType('snapshot', fresh.snapshot);
@@ -273,9 +274,11 @@ export async function editSnapshot(vault, holding, existing, payload, { sit = nu
   const on = payload.date;
   if (on !== existing.payload.date) {
     // The slot at the new date is one the move creates, unless it holds
-    // the record the person agreed to delete.
+    // the record the person agreed to delete: any other record of the
+    // holding there refuses the move.
     const refusal = await claimDate(vault, sit || sitting(vault, on), {
-      snapshots: displaced ? [] : [holding.recordId],
+      snapshots: [holding.recordId],
+      except: displaced ? displaced.recordId : null,
       rates: sit ? vault.missingUnits(on, unit) : [],
     });
     if (refusal) return { refused: true };

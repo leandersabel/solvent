@@ -485,4 +485,18 @@ await run(async () => {
   await savingsRow(D10, 'Delete');
   await press('Delete', '.dialog');
   check('record-snapshot: deleting a figure deletes no price', (await stored('rate')).length === ratesBeforeDelete);
+
+  // Silver has no rate source: its estimate from the first recording
+  // values a figure today, and the form dates it.
+  await openForm('Silver coins');
+  await set('#snapshot-value', '2');
+  await quiet();
+  const silverForm = await ev("document.querySelector('#snapshot-value').parentElement.querySelector('.hint').textContent");
+  const lineType = await ev("(() => { const s = getComputedStyle(document.querySelector('.price-date')); return s.fontSize + ' ' + s.fontWeight; })()");
+  check(
+    'record-rate: the form dates an estimate carried from an earlier day beneath the converted figure, in Label/meta type',
+    silverForm.endsWith(`priced ${await format('longDate', D1)}`) && lineType === '13px 500',
+    `${silverForm} | ${lineType}`,
+  );
+  await closeDialogs();
 });
