@@ -211,9 +211,13 @@ jobs:
           bot_id: "209825114"
           plugin_marketplaces: https://github.com/leandersabel/skald.git
           plugins: skald@skald
+          # A pipeline change writes .claude/, which Claude Code refuses
+          # in every other mode. The runner is discarded after the run,
+          # and a change under .claude/ merges only with the client's
+          # approval (CODEOWNERS).
           claude_args: |
             --model claude-opus-5-5
-            --allowedTools Bash,Read,Write,Edit,MultiEdit,Glob,Grep,Agent,Task,Skill,TodoWrite
+            --permission-mode bypassPermissions
       - if: always() && steps.claude.outputs.execution_file
         uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
         with:
