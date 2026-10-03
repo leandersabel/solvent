@@ -28,15 +28,30 @@ smoke=<features> [<manifest>]`, each list comma-separated and possibly
 empty, where `<manifest>` is the path of the prepared data's manifest.
 This shard's app is its own, and no other shard reaches it.
 
-1. **Read what is already reported.** Read the titles and bodies of the
-   open issues labeled `qa`, so you recognise a repeat.
-2. **Run `qa`** in the foreground, and wait for its report. Hand it the address, the invite path (opening it
-   creates the first administrator, from whom it invites whatever
-   accounts it needs), the features to walk in full, the features whose
-   main path it walks once, and the manifest. Each harness check below
-   belongs to the feature it tests, and is walked only by the shard
-   that has that feature. A check that stops the app or makes a source
-   fail runs last in its shard.
+1. **Read what is already reported**, once, before the first run. Read
+   the titles and bodies of the open issues labeled `qa`, so you
+   recognise a repeat.
+2. **Run `qa`** in the foreground: once for each feature walked in
+   full, then once for every smoke path together, then, when the shard
+   has any, once for the wrong-password and lockout checks of the whole
+   shard. After each report, record its findings and what it could not
+   check (steps 3 and 4) before starting the next run, so a timeout
+   loses at most the feature in hand.
+
+   Hand every run the address, what it walks and the manifest. The
+   first run gets the invite path, which creates `qa`'s administrator,
+   from whom it invites whatever accounts it needs. Every later run gets
+   the username and password the first report starts with instead. With a
+   manifest, the first run opens the dashboard before anything else,
+   because the browser starts holding the aged session the manifest's
+   `browserSession` names, and the shard's first sign-in replaces it.
+
+   Every run leaves the price sources up and the app running. Within a
+   run, a check that stops the app or makes a source fail runs last.
+   The wrong-password and lockout run is the shard's last, because an
+   address lock blocks every later sign-in for a quarter of an hour.
+   Each harness check below belongs to the feature it tests, and is
+   walked only by the shard that has that feature.
 
    With a manifest, `qa` starts from the prepared data instead of
    building its own. It may read the manifest and the data files in
@@ -58,12 +73,16 @@ This shard's app is its own, and no other shard reaches it.
    - totals under "rates as of each figure", against `known_prices`
      and the manifest's expected totals;
    - that an invite link never appears in the server log;
-   - how the app reads while Solvent is stopped.
+   - how the app reads while Solvent is stopped;
+   - the idle lock, in one wait, for `login` and `account-settings`. In
+     a shard walking both, the run for whichever comes first checks it
+     for both.
 
    Without a manifest, `qa` builds its data by hand and lists what that
    leaves it unable to check.
-3. **Record each finding** in `qa-unfiled/<n>.json`, numbered from 1,
-   as `{"title": ..., "body": ..., "labels": [...], "repeats": null}`.
+3. **Record each finding** in `qa-unfiled/<n>.json`, numbered from 1
+   and continuing across runs, as
+   `{"title": ..., "body": ..., "labels": [...], "repeats": null}`.
    It is in English: the title says what is wrong for a user, ending in
    ` (seen once)` when `qa` could not reproduce it, and the body gives
    the steps, what the product spec expects with a pointer to the
@@ -77,9 +96,11 @@ This shard's app is its own, and no other shard reaches it.
    without a rating, whose body lists each criterion and why. When one
    is open, `repeats` is its number and `comment` is
    `Still not checkable in the <date> build.` with the criteria that
-   changed since.
-5. **Finish.** Write `qa-done.txt` in the working directory last. Its
-   absence tells the workflow this shard did not finish.
+   changed since. A later run's criteria for a feature already recorded
+   join that record.
+5. **Finish.** Write `qa-done.txt` in the working directory, after the
+   last run's records and as the last thing written. Its absence tells
+   the workflow this shard did not finish.
 
 A record that repeats an issue keeps the title, body and labels a new
 one would have, so it is filed as new if that issue has closed by then.

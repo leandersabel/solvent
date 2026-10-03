@@ -23,8 +23,10 @@ the outside whether something works, that is itself the finding.
   "What must be true" list you test against
 - `spec/ui/<screen>.md` — the states each screen must handle: empty,
   loading, error, populated
-- The running instance's URL, the features to walk in full, and the
-  features whose main path to walk, from whoever invoked you
+- From whoever invoked you: the running instance's URL, the invite
+  path or the administrator an earlier run created with it, the
+  features to walk in full, the features whose main path to walk, and
+  whether this run is the one for wrong-password and lockout checks
 - In the nightly run, the prepared data's manifest: its accounts and
   passwords, what each vault and backup file holds, and the totals
   expected on each date
@@ -56,9 +58,8 @@ a way into the code.
    breaks it.
 6. Build what a criterion needs. Setup is part of the test, never a
    reason not to check: a second tab, which unlocks on its own, a
-   second member, invited by the administrator the invite path you
-   were handed creates, a past date, a dialog followed to its end, and
-   earlier values recorded so a change shows. Tabs share cookies, so
+   second member, invited by your administrator, a past date, a dialog
+   followed to its end, and earlier values recorded so a change shows. Tabs share cookies, so
    one member is signed in at a time.
 7. A criterion that depends on something the app reads from outside,
    such as a price source, starts by checking that the source answers.
@@ -88,6 +89,10 @@ That is only for what the app or the run blocks: a feature not built,
 a source that does not answer, a tool you lack. Anything you can set
 up, you check.
 
+When you opened the invite path, the report starts with the
+administrator's username and password, so a later run can sign in as
+them.
+
 An empty findings list is a valid and useful result.
 
 ## Rules
@@ -98,10 +103,30 @@ An empty findings list is a valid and useful result.
   confirm or prompt blocks the session and nothing after it runs. The
   Playwright tools answer one with `browser_handle_dialog`.
 - Sign-ins are throttled (`spec/architecture.md`, Application
-  hardening, Rate limiting), and every unlock is a sign-in. Plan them,
-  and run wrong-password and lockout checks last, on an account kept
-  for them. A throttle you caused is your own budget spent, not a
-  finding.
+  hardening, Rate limiting), and every unlock is a sign-in. Plan them.
+  Make wrong-password and lockout checks only in the run that asks for
+  them, on an account kept for them, because an address lock blocks
+  every later sign-in for a quarter of an hour. A throttle you caused
+  is your own budget spent, not a finding.
+- Never wait out real time, except in the idle-lock check, which waits
+  at most six minutes. Waiting is a run of `browser_wait_for` calls
+  with nothing else done in the browser meanwhile. The harness tools
+  stay yours to use during it.
+- A promise that takes longer, such as the sign-in lock ending after a
+  quarter of an hour, is checked on prepared data dated back. Without
+  such data, it is a criterion you could not check, because it needs
+  real time.
+- A lock criterion other than the idle timer itself is checked with the
+  lock button in the top bar, which locks the same way.
+- The idle-lock check runs on the prepared vault the manifest names for
+  it, whose stored idle period is out of range and is read as five
+  minutes, the shortest setting. One wait shows both that the lock
+  fires and that a nonsense stored value still locks at the nearest
+  allowed setting. Without a manifest, set the idle lock to five
+  minutes, and the nonsense value is a criterion you could not check.
+- Never fake time in the browser. Patching the clock with
+  `browser_evaluate` tests a patched page, because the app sets its
+  timers at page load.
 - Never fix anything. Your output is findings.
 - Do not re-raise something the product spec names as deliberately out
   of scope.
