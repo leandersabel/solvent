@@ -7,12 +7,22 @@ it is hash it and compare hashes, which is exactly what these exercise.
 from __future__ import annotations
 
 import base64
+import contextlib
 import json
+import re
 import secrets
 import sqlite3
+import subprocess
+import sys
+import time
 import uuid
+from pathlib import Path
+
+import pytest
 
 from solvent.config import DEFAULT_KDF_ENVELOPE
+
+REPO_ROOT = Path(__file__).resolve().parent.parent
 
 CSRF = {"X-Solvent-Request": "1"}
 
@@ -162,3 +172,37 @@ def put_record(client, record_id=None, **overrides):
 
 def params_of(credential_row) -> dict:
     return json.loads(credential_row["params"])
+
+
+def flask(*args, env):
+    """The app's own command line, run the way an operator's shell would."""
+    return subprocess.run(
+        [sys.executable, "-m", "flask", "--app", "app", *args],
+        cwd=REPO_ROOT, env=env, capture_output=True, text=True, timeout=120,
+    )
+
+
+@contextlib.contextmanager
+def serve(env, log_path):
+    """A real server on a throwaway database, bound to the loopback
+    address Chrome resolves `localhost` to first. It asks the system for
+    a port and reads the one it got from its own log, so servers started
+    side by side never race for one. Yields the address a browser uses."""
+    with open(log_path, "w") as log:
+        server = subprocess.Popen(
+            [sys.executable, "-m", "flask", "--app", "app", "run", "--host", "::1", "--port", "0"],
+            cwd=REPO_ROOT, env=env, stdout=log, stderr=subprocess.STDOUT,
+        )
+        try:
+            deadline = time.monotonic() + 60
+            while True:
+                found = re.search(r"Running on http://\[::1\]:(\d+)", Path(log_path).read_text())
+                if found:
+                    break
+                if server.poll() is not None or time.monotonic() > deadline:
+                    pytest.fail("the server did not come up:\n" + Path(log_path).read_text())
+                time.sleep(0.05)
+            yield f"http://localhost:{found.group(1)}"
+        finally:
+            server.terminate()
+            server.wait(timeout=10)

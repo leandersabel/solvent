@@ -98,7 +98,7 @@ const fillRest = async (vault) => {
       box.dispatchEvent(new Event('change', { bubbles: true }));
     }, 'input[type=checkbox]');
   }
-  await page.settle(300);
+  await page.waitUntil(() => document.querySelectorAll('.gauge-segment.filled').length >= 4, { label: 'the gauge scoring' });
 };
 // Enter pressed in each field of the form in turn, then how much was
 // derived and sent.
@@ -110,7 +110,7 @@ const enterEverywhere = async () => {
       await page.send('Input.dispatchKeyEvent', { type, key: 'Enter', code: 'Enter', windowsVirtualKeyCode: 13, text: type === 'keyDown' ? '\r' : undefined });
     }
   }
-  await page.settle(500);
+  await page.frames();
   return { fields, derived: await page.eval('window.__derivations'), workers: await workers(), sent: posts.length };
 };
 
@@ -179,7 +179,7 @@ try {
     posts.length = 0;
     await submit();
     await shows(expected, name);
-    await page.settle(200);
+    await page.holds(() => !document.querySelector('button[type=submit]').disabled);
     const shown = await text();
     check(`${name} shows its own message`, others(expected).every((message) => !shown.includes(message)), shown);
     check(`${name}: the message is where the spec puts it`, where === 'user' ? (await line()).startsWith(expected.slice(0, 20)) : !(await line()).startsWith('That username') && (await line()) === HINT, await line());
@@ -221,13 +221,13 @@ try {
     posts.length = 0;
     await submit();
     await shows(MEMORY(what), `not enough memory, ${which}`);
-    await page.settle(200);
+    await page.frames();
     check(`${which}: not enough memory names the moment and offers Try again`, await tryAgain());
     check(`${which}: not enough memory sent nothing, kept the fields and left the button usable`,
       posts.length === 0 && (await page.eval("document.querySelector('input[type=password]').value")) === PASSWORD && !(await disabled()));
     await tryAgain(true);
     await page.waitUntil('window.__derivations === 2', { label: 'Try again deriving again' });
-    await page.settle(200);
+    await page.frames();
     check(`${which}: Try again derives again`, (await page.eval('window.__derivations')) === 2 && posts.length === 0);
   }
 

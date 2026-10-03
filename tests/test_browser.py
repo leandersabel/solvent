@@ -2,9 +2,12 @@
 
 Every screen past the sign-in card is client-rendered from decrypted
 records over WebCrypto and WebAssembly, so a real engine is the only
-place their acceptance criteria can be checked at all. The runner is
-tests/browser/workflow.mjs; this starts a server on a throwaway
-database, mints the bootstrap invite, and reports what it found.
+place their acceptance criteria can be checked at all. One part of it
+per screen lives in tests/browser/parts/, each run as its own test
+against a server and a database of its own, so the parts share nothing
+and run at the same time, one per core. One part on its own, serially:
+
+    pytest -n 0 "tests/test_browser.py::test_the_workflows_hold_in_a_browser[unlock]"
 
 Skipped where Chrome or Node is absent, so the rest of the suite stays
 runnable anywhere.
@@ -16,9 +19,9 @@ import hashlib
 import hmac
 import json
 import os
+import secrets
 import shutil
 import sqlite3
-import socket
 import subprocess
 import sys
 import time
@@ -30,12 +33,15 @@ from argon2 import PasswordHasher, Type
 from argon2.exceptions import VerificationError
 from argon2.low_level import hash_secret_raw
 
-REPO_ROOT = Path(__file__).resolve().parent.parent
-RUNNER = REPO_ROOT / "tests" / "browser" / "workflow.mjs"
+from tests.helpers import REPO_ROOT, flask, serve
+
+BROWSER = REPO_ROOT / "tests" / "browser"
+PARTS = sorted((BROWSER / "parts").glob("*.mjs"))
+SCREENS = sorted(path.stem for path in (REPO_ROOT / "spec" / "ui").glob("*.md") if path.stem != "design-system")
 CHROME = Path(os.environ.get("CHROME", "/Applications/Google Chrome.app/Contents/MacOS/Google Chrome"))
 
-# The passwords the workflow signs in with, handed to it here so the
-# verifiers it leaves behind can be checked against them below.
+# The passwords the parts sign in with, handed to them here so the
+# verifiers they leave behind can be checked against them below.
 PASSWORDS = {
     "ops.leander": "orchard lantern quiet ribbon",
     "leander": "harbour crescent tundra oblige",
@@ -47,58 +53,46 @@ needs_browser = pytest.mark.skipif(
 )
 
 
-def free_port() -> int:
-    with socket.socket(socket.AF_INET6) as sock:
-        sock.bind(("::1", 0))
-        return sock.getsockname()[1]
+def belongs_to(part: str, screen: str) -> bool:
+    """A part is a screen's, or one aspect of it when the screen is too
+    long to run in one."""
+    return part == screen or part.startswith(screen + "-")
 
 
-@pytest.fixture(scope="module")
-def instance(tmp_path_factory):
-    """A real server on a throwaway database, bound to the loopback
-    address Chrome resolves `localhost` to first."""
-    database = tmp_path_factory.mktemp("browser") / "solvent.db"
+def test_every_screen_has_a_part_and_every_part_a_screen():
+    assert not [s for s in SCREENS if not any(belongs_to(p.stem, s) for p in PARTS)], "a screen with no part"
+    assert not [p.stem for p in PARTS if not any(belongs_to(p.stem, s) for s in SCREENS)], "a part of no screen"
+
+
+def test_no_part_pauses_for_a_fixed_time():
+    """A check waits for what it reads to happen. A pause that was long
+    enough on one machine is a flake on a slower one."""
+    pauses = [
+        str(path.relative_to(REPO_ROOT))
+        for path in BROWSER.rglob("*.mjs")
+        if ".settle(" in path.read_text()
+    ]
+    assert not pauses, pauses
+
+
+@pytest.fixture
+def instance(tmp_path):
+    """A real server and a database of its own for one part, with the
+    bootstrap invite minted the way an operator's shell would."""
     env = dict(
         os.environ,
-        SECRET_KEY="browser-test-key",
-        DATABASE_PATH=str(database),
+        # A key for this server alone.
+        SECRET_KEY=secrets.token_hex(32),
+        DATABASE_PATH=str(tmp_path / "solvent.db"),
         # The sampled wrong passwords all fail from one address. The
         # limiter still runs on every request.
         LOGIN_FAILURES_PER_ADDRESS="100000",
     )
-    port = free_port()
-
-    minted = subprocess.run(
-        [sys.executable, "-m", "flask", "--app", "app", "create-invite",
-         "--kind", "administrator", "--expires-days", "1"],
-        cwd=REPO_ROOT, env=env, capture_output=True, text=True, timeout=120,
-    )
+    minted = flask("create-invite", "--kind", "administrator", "--expires-days", "1", env=env)
     assert minted.returncode == 0, minted.stderr
     invite = minted.stdout.strip().split("invite=")[-1]
-
-    server = subprocess.Popen(
-        [sys.executable, "-m", "flask", "--app", "app", "run",
-         "--host", "::1", "--port", str(port)],
-        # Nothing reads the request log, and a pipe nobody drains stalls
-        # the server once its buffer fills.
-        cwd=REPO_ROOT, env=env, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL,
-    )
-    base = f"http://localhost:{port}"
-    for _ in range(80):
-        try:
-            with socket.create_connection(("::1", port), timeout=0.5):
-                break
-        except OSError:
-            time.sleep(0.25)
-    else:
-        server.kill()
-        pytest.fail("the server did not come up")
-
-    try:
+    with serve(env, tmp_path / "server.log") as base:
         yield base, invite, env
-    finally:
-        server.terminate()
-        server.wait(timeout=10)
 
 
 @pytest.mark.skipif(shutil.which("node") is None, reason="needs Node")
@@ -112,7 +106,7 @@ def test_a_chrome_that_dies_at_launch_fails_fast_with_its_stderr(tmp_path):
     started = time.monotonic()
     result = subprocess.run(
         ["node", "--input-type=module", "-e",
-         f"const {{ launch }} = await import({json.dumps((REPO_ROOT / 'tests' / 'browser' / 'cdp.mjs').as_uri())});"
+         f"const {{ launch }} = await import({json.dumps((BROWSER / 'cdp.mjs').as_uri())});"
          "try { await launch(); } catch (error) { console.error(error.message); process.exit(3); }"],
         cwd=REPO_ROOT,
         env=dict(os.environ, CHROME=str(stub)),
@@ -127,10 +121,11 @@ def test_a_chrome_that_dies_at_launch_fails_fast_with_its_stderr(tmp_path):
 
 
 @needs_browser
-def test_the_workflows_hold_in_a_browser(instance):
+@pytest.mark.parametrize("part", PARTS, ids=lambda part: part.stem)
+def test_the_workflows_hold_in_a_browser(instance, part):
     base, invite, env = instance
     result = subprocess.run(
-        ["node", str(RUNNER)],
+        ["node", str(part)],
         cwd=REPO_ROOT,
         env=dict(
             env,
@@ -148,7 +143,7 @@ def test_the_workflows_hold_in_a_browser(instance):
         ),
         capture_output=True,
         text=True,
-        timeout=900,
+        timeout=600,
     )
     print(result.stdout)
     assert result.returncode == 0, result.stdout + result.stderr
@@ -157,7 +152,8 @@ def test_the_workflows_hold_in_a_browser(instance):
     # Auth Key from the same HKDF split a vault owner's is, and not over
     # the raw Argon2id output. Both would sign in, so only deriving both
     # here, independently of the client, and asking which one the
-    # stored hash accepts tells them apart.
+    # stored hash accepts tells them apart. Checked for the accounts
+    # this part made.
     conn = sqlite3.connect(env["DATABASE_PATH"])
     try:
         stored = {
@@ -170,6 +166,8 @@ def test_the_workflows_hold_in_a_browser(instance):
     finally:
         conn.close()
     for username, password in PASSWORDS.items():
+        if username not in stored:
+            continue
         params, verifier = stored[username]
         raw, auth_key = derive(password, json.loads(params))
         assert verifies(verifier, auth_key), username

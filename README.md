@@ -37,11 +37,18 @@ an invite and invites need an administrator:
 It prints a path to open in the browser. From there an administrator
 invites everybody else.
 
-Tests: `.venv/bin/python -m pytest`. The suite covers the server, the
-client-side rules that two implementations would drift on, and the
-workflows end to end in a real browser. The last two need Node, and
-the browser tests also need Chrome. Each is skipped where what it needs
-is absent.
+Tests: `.venv/bin/python -m pytest`, which runs on every core. The
+suite covers the server, the client-side rules that two implementations
+would drift on, and the workflows end to end in a real browser. The last
+two need Node, and the browser tests also need Chrome. Each is skipped
+where what it needs is absent.
+
+The browser tests are one part per screen under `tests/browser/parts/`,
+each on a server of its own. One part alone, serially:
+
+```
+.venv/bin/python -m pytest -n 0 "tests/test_browser.py::test_the_workflows_hold_in_a_browser[unlock]"
+```
 
 ## Build it
 
