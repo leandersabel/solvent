@@ -1280,8 +1280,8 @@ Editing an existing entry).
     Test: `tests/browser/parts/update-values.mjs`,
     `tests/browser/parts/update-values-review.mjs`.
 36. Pressing Look it up fills the line when the source answers, labeled
-    with the day it is for, as a proposal to take, change or leave. Test:
-    `tests/browser/parts/update-values.mjs`.
+    with the day it is for, and saves it. Test:
+    `tests/browser/parts/update-values-review.mjs`.
 37. (blind) A price filled in on a reopened recording saves on its own,
     with no holding row touched: pressing Look it up writes the answer
     for every empty published line it covers, as `proposed`, with no

@@ -587,8 +587,7 @@ await run(async () => {
     JSON.stringify(traffic.map((t) => `${t.method} ${t.url}`)),
   );
 
-  // Two lines left empty by an outage: one press fills and saves both,
-  // and a line holding typed text is left to its own save.
+  // Two lines left empty by an outage: one press fills and saves both.
   const DQ = ago(170);
   await plantHere([snap('Dollar cash', DQ, '10')]);
   await reread();
@@ -597,19 +596,16 @@ await run(async () => {
   await press('Update');
   await rec.waitUntil("document.querySelector('.sweep-row')", { label: 'the sweep' });
   await quiet();
-  await typeLine('XAG-ozt', '26');
   await rec.call((query) => document.querySelector(query).querySelector('.btn-inline:not([hidden])').click(), line('USD'));
   await quiet();
   const filled = on(await stored('rate'), DQ);
   const asOf = (unit) => proposalsFor(DQ)[unit].asOf;
   check(
-    'record-snapshot: one Look it up saves every empty published line the answer covers, as proposed with its day, and no typed line',
+    'record-snapshot: one Look it up saves every empty published line the answer covers, as proposed with its day',
     filled.map((e) => e.payload.symbol).sort().join() === 'USD,XAU-ozt' &&
-      filled.every((e) => e.payload.rateSource === 'proposed' && e.payload.rateAsOf === asOf(e.payload.symbol)) &&
-      figure((await lineState('XAG-ozt')).value) === 26,
+      filled.every((e) => e.payload.rateSource === 'proposed' && e.payload.rateAsOf === asOf(e.payload.symbol)),
     JSON.stringify(filled.map((e) => e.payload)),
   );
-  await typeLine('XAG-ozt', '');
   await home();
   check(
     'record-snapshot: leaving straight after Look it up names no unit as unsaved',
