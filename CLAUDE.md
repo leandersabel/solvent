@@ -275,18 +275,20 @@ takes it up at once.
 
 - One ruleset on `master`: pull requests only, squash merges only, no
   force push or deletion. The `test`, `image` and `dependencies` checks
-  are required. Nobody bypasses it.
-- GitHub requires no approval, because the client is the only code
-  owner and cannot approve a pull request of their own. The loop holds
-  the gate instead: it merges a requirements pull request only at a
-  head commit the client approved, and an implementation never touches
-  the client's files. `CODEOWNERS` asks `@leandersabel` to review
+  are required. No approval is required except the code owner's, and a
+  push dismisses an earlier approval.
+- `CODEOWNERS` makes `@leandersabel` the reviewer of
   `spec/requirements.md`, `spec/design/`, `.claude/`, `CLAUDE.md`,
-  `SECURITY.md` and `.github/` outside `.github/workflows/`.
+  `SECURITY.md` and `.github/` outside `.github/workflows/`. So the
+  client approves every requirement, and no agent changes the pipeline
+  that gates it.
+- Only the client bypasses the ruleset, and only on a pull request,
+  because nobody can approve a pull request of their own.
 - A pull request need not be up to date with `master`, because one
   implementation runs at a time and a requirements pull request touches
   no code. The nightly run tests `master` as a whole before any version.
-- Dependabot's updates pass the same gate and merge when green. A
+- Dependabot's updates pass the same gate and merge when green, except
+  one touching a file the client owns, which waits for their approval. A
   release is proposed only once it has aged: a week for a major or
   minor release and for an action, a few days for a patch or a base
   image. A compromised release is usually caught and pulled within
