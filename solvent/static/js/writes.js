@@ -184,10 +184,9 @@ export function sitting(vault, date) {
  *  outlive an archive made elsewhere (manage-accounts.md, While
  *  archived). An archived holding takes no new figure, and a move
  *  `onto` a date only before its archive. Resolves to null, or to
- *  `{ holding, closed }` with `closed` 'archived' or 'deleted' after the
- *  model takes the vault as it now stands. */
+ *  'archived' or 'deleted' after the model takes the vault as it now
+ *  stands. */
 async function holdingClosed(vault, id, onto) {
-  const name = vault.holdings.get(id).payload.name;
   vault.replaceType('account', await decryptAll(vault, await api.get('/api/records?type=account')));
   const fresh = vault.holdings.get(id);
   const archivedAt = fresh && fresh.payload.archivedAt;
@@ -196,7 +195,7 @@ async function holdingClosed(vault, id, onto) {
   const recent = await reloadCreateTypes(vault);
   vault.replaceType('snapshot', recent.snapshot);
   vault.replaceType('rate', recent.rate);
-  return { holding: name, closed };
+  return closed;
 }
 
 /** Claim the date for a sitting about to create records at it, or say
@@ -215,13 +214,13 @@ async function holdingClosed(vault, id, onto) {
  *  itself, and says `emptied` so the screen can tell it from a date
  *  another session recorded. Before any of that, every holding in
  *  `snapshots` is read afresh on every call, claimed or not, and one
- *  archived or deleted elsewhere refuses with its name and `closed`
+ *  archived or deleted elsewhere refuses with `closed`
  *  (`holdingClosed`). `move` judges an archive against the new date of
  *  a move. */
 export async function claimDate(vault, sit, { snapshots = [], rates = [], except = null, held = false, move = false }) {
   for (const id of snapshots) {
-    const shut = await holdingClosed(vault, id, move ? sit.date : null);
-    if (shut) return { refused: true, date: sit.date, ...shut };
+    const closed = await holdingClosed(vault, id, move ? sit.date : null);
+    if (closed) return { refused: true, date: sit.date, closed };
   }
   if (sit.claimed && !held) return null;
   const fresh = await reloadCreateTypes(vault);

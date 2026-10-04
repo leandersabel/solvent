@@ -181,7 +181,7 @@ export function sweepView(vault, date, actions = {}) {
         row.element.remove();
         block.refresh();
         syncSave();
-        say(closedCopy(refusal, 'saved'), { critical: true });
+        say(closedCopy(row.holding, refusal, 'saved'), { critical: true });
       },
       ensurePrices,
       onSaved: syncSave,
@@ -252,7 +252,7 @@ function sweepRow(vault, holding, date, { sit, block, refused, closed, ensurePri
     savedNote,
   ]);
 
-  const row = { name: holding.payload.name };
+  const row = { name: holding.payload.name, holding };
 
   /** Put the field back to what the vault holds for this row. */
   const reset = (row.reset = () => {
@@ -320,7 +320,8 @@ function sweepRow(vault, holding, date, { sit, block, refused, closed, ensurePri
       return;
     }
     // An archived holding whose figure here is gone takes no new one.
-    if (row.element) row.element.hidden = Boolean(holding.payload.archivedAt) && !stored;
+    const gone = Boolean(holding.payload.archivedAt) && !stored;
+    if (row.element) row.element.hidden = gone;
     const carried = carriedInto();
     const reference = stored || carried;
     if (stored) {
@@ -333,7 +334,7 @@ function sweepRow(vault, holding, date, { sit, block, refused, closed, ensurePri
       control.textContent = untouched ? 'Confirm' : 'Record';
       // Nothing to confirm where the holding was never valued: the
       // field is the only control until something is typed in it.
-      control.disabled = !carried && !field.value.trim();
+      control.disabled = gone || (!carried && !field.value.trim());
     }
     // The two row states differ in wording and in ink weight, never in
     // color alone. A changed figure puts the brass on the row's control.
@@ -480,8 +481,8 @@ function sweepRow(vault, holding, date, { sit, block, refused, closed, ensurePri
 /** A holding archived or deleted in another window since this one read
  *  it: what was typed is not written (record-snapshot.md, Update values
  *  and Snapshot entry, States). */
-export function closedCopy({ holding, closed }, act) {
-  return `${holding} was ${closed} in another window. Nothing was ${act}.`;
+export function closedCopy(holding, { closed }, act) {
+  return `${holding.payload.name} was ${closed} in another window. Nothing was ${act}.`;
 }
 
 /** What a quantity converts to at `price` (`{ rate, date }`, or null for

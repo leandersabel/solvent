@@ -168,7 +168,7 @@ export function snapshotDialog(vault, holding, existing, onSaved, onOpenRecordin
       rates: sit ? vault.missingUnits(on) : [],
     });
     if (refusal) {
-      if (refusal.closed) return finishWith(closedCopy(refusal, 'saved'));
+      if (refusal.closed) return finishWith(closedCopy(holding, refusal, 'saved'));
       describePrices();
       return refusedAt(on);
     }
@@ -226,7 +226,7 @@ export function snapshotDialog(vault, holding, existing, onSaved, onOpenRecordin
       choose: (priced) => block.partFor(priced),
     });
     if (result.refused) {
-      if (result.closed) return finishWith(closedCopy(result, 'moved'));
+      if (result.closed) return finishWith(closedCopy(holding, result, 'moved'));
       describePrices();
       return refusedAt(on);
     }
