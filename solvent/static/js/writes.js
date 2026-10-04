@@ -184,15 +184,18 @@ export function sitting(vault, date) {
  *  A date another session recorded since the sitting began, or any slot
  *  already taken, refuses the whole save before a single write. The
  *  model then takes the reloaded records, so the screen can show the
- *  recording as it now stands. */
-export async function claimDate(vault, sit, { snapshots = [], rates = [], except = null }) {
+ *  recording as it now stands. `held` refuses a date the reload finds
+ *  holding no record, for a write that must not make the recording
+ *  itself. */
+export async function claimDate(vault, sit, { snapshots = [], rates = [], except = null, held = false }) {
   if (sit.claimed) return null;
   const fresh = await reloadCreateTypes(vault);
   const at = (list) => list.filter((record) => record.payload.date === sit.date);
   const taken =
     (sit.dateWasEmpty && (at(fresh.snapshot).length > 0 || at(fresh.rate).length > 0)) ||
     at(fresh.snapshot).some((r) => snapshots.includes(r.accountId) && r.recordId !== except) ||
-    at(fresh.rate).some((r) => rates.includes(r.payload.symbol));
+    at(fresh.rate).some((r) => rates.includes(r.payload.symbol)) ||
+    (held && at(fresh.snapshot).length === 0 && at(fresh.rate).length === 0);
   if (taken) {
     vault.replaceType('snapshot', fresh.snapshot);
     vault.replaceType('rate', fresh.rate);
@@ -341,7 +344,7 @@ export async function saveRateLines(vault, sit, plan) {
   // A save that only changes and clears what is there claims nothing:
   // the version rule on each record is the check that catches another
   // session on exactly those records.
-  if (creates.length && (await claimDate(vault, sit, { rates: creates }))) {
+  if (creates.length && (await claimDate(vault, sit, { rates: creates, held: true }))) {
     // Refused whole, before a single write. The person is looking at
     // a screen that no longer describes the vault.
     return { refused: true, date: sit.date, saved: [], failed: [] };

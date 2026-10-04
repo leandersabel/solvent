@@ -798,6 +798,27 @@ await run(async () => {
   check('record-rate: from the first row recorded the rate-lines save is offered', await saveOffered());
   await home();
 
+  // A row's save that meets a Conflict because another window deleted
+  // the date's only record leaves a date holding nothing, and with it
+  // the rate-lines save.
+  const DG = ago(45);
+  const [lone] = await plantHere([snap('Current account', DG, '10')]);
+  await reread();
+  await go(`#/recording/${DG}`);
+  await press('Update');
+  await typeLine('PAINT', '3.5');
+  const offeredBefore = await saveOffered();
+  await rec.call(async (recordId) => (await import('/static/js/api.js')).del(`/api/records/${recordId}`), lone);
+  await typeRow('Current account', '11');
+  await pressRow('Current account');
+  check(
+    'record-rate: the rate-lines save goes when a Conflict leaves the date holding no record',
+    offeredBefore && !(await saveOffered()) && figure((await lineState('PAINT')).value) === 3.5 &&
+      (await rowState('Current account')).error === 'This figure was changed in another window.',
+    `${offeredBefore} ${await saveOffered()}`,
+  );
+  await home();
+
   // The sweep keeps its columns while its block is 720px wide, under
   // one window width, and stacks one pixel under.
   await viewport(1280);

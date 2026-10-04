@@ -312,6 +312,7 @@ function sweepRow(vault, holding, date, { sit, block, refused, ensurePrices, onS
       // stored now, and the person redoes the edit against it.
       await writes.reloadType(vault, 'snapshot').catch(() => {});
       reset();
+      onSaved();
       showError(message, 'This figure was changed in another window.');
       return;
     }

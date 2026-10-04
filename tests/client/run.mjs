@@ -2174,6 +2174,28 @@ await check('record-rate: the rate-lines save at a date holding no recording iss
   assert.equal(server.writesIn().length, 1);
 });
 
+await check('record-rate: a rate-lines save at a date another session emptied since the sitting began creates nothing', async () => {
+  const server = recordServer();
+  const vault = await storedVault(server, {
+    holdings: [['Francs', 'CHF'], ['Dollars', 'USD'], ['Gold', 'XAU-ozt']],
+    figures: [['Francs', '2026-07-31', '5']],
+    prices: [['USD', '2026-07-31', '0.9']],
+  });
+  const sit = writes.sitting(vault, '2026-07-31');
+  assert.equal(sit.dateWasEmpty, false);
+  const other = new Vault(vault.dek);
+  await other.load();
+  assert.deepEqual(await writes.deleteRecording(other, '2026-07-31'), []);
+  server.reset();
+  const typed = { rate: '2700', rateSource: 'manual', rateAsOf: null, proposedRate: null };
+  const result = await writes.saveRateLines(vault, sit, { rates: [{ existing: null, payload: writes.rateEntry(vault, 'XAU-ozt', '2026-07-31', typed) }] });
+  assert.equal(result.refused, true);
+  assert.equal(server.writesIn().length, 0);
+  assert.equal([...server.rows.values()].filter((r) => r.recordType === 'rate').length, 0);
+  // The model now shows the date as it stands.
+  assert.equal(vault.holdsRecording('2026-07-31'), false);
+});
+
 await check('record-snapshot: a delete answering Not Found during a save counts as saved', async () => {
   const server = recordServer();
   const vault = await storedVault(server, { holdings: [['Dollars', 'USD']], prices: [['USD', '2026-07-31', '0.9']] });
