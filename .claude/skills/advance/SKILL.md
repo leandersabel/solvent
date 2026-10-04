@@ -214,21 +214,23 @@ comments propose, they never decide.
    price source that did not answer, does not hold.
 5. Where behavior or acceptance criteria change, update the feature
    page, as `CLAUDE.md` says the spec is written. Of the spec, change
-   only that page, and `spec/architecture.md` only when a cross-cutting
-   rule changes.
+   only that page, `spec/design-system.md` when the fix needs it, and
+   `spec/architecture.md` only when a cross-cutting rule changes.
 6. Fix it (Rules). Run the tests the change touches (Tests), commit in
    the voice of `git log`, and push.
 7. Hand `reviewer` the issue, the branch, and the feature pages and
    criteria the change touches, never the diff. Fix its findings on the
    change, commit its tests with the change, push, and hand it the
-   fixes, for at most two rounds. Findings on the change still open
-   after that are filed (File a finding), each with its failing
-   reviewer test in the body rather than in this commit, and so are
-   those outside the change.
+   fixes, for at most two rounds. Its findings outside the change are
+   filed (File a finding).
 8. Open a pull request against `master`. The title is English and says
    what changes for users. The body starts with `Closes #<issue>`, says
    the same in the issue's language, and puts the technical part in a
-   `<details>` block. Turn on auto-merge with squash.
+   `<details>` block. Turn on auto-merge with squash. When a finding on
+   the change is still open after the second round, its failing
+   reviewer test is committed too, and the pull request opens as a
+   draft without auto-merge, listing the open findings. Then go to
+   Stuck.
 9. Comment on the issue with the link. When the issue also needs a
    change to a workflow file, the pull request's body and this comment
    carry it in a `<details>` block, ready for the client's own pull
@@ -288,10 +290,9 @@ starts a run that picks up from there.
 ## File a finding
 
 Every step files the problems found outside the work in hand
-(`CLAUDE.md`, The loop, Findings): `reviewer`'s findings left open
-after two rounds and under Outside the task, and what you notice
-yourself. Any other problem the work in hand causes, or this issue
-covers, stays in that work.
+(`CLAUDE.md`, The loop, Findings): `reviewer`'s findings under Outside
+the task, and what you notice yourself. A problem the work in hand
+causes, or this issue covers, stays in that work.
 
 1. Read the open issues by `leandersabel`, `claude[bot]` and
    `github-actions[bot]`. One that already reports the problem gets

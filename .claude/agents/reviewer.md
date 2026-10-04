@@ -31,7 +31,7 @@ pages and acceptance criteria the change touches. Then:
    "(blind)" and every criterion the change touches, in
    `tests/test_review_<feature>.py`, or in the screen's browser part
    where only a browser can tell. They are committed with the change,
-   except one that still fails when the run files its finding.
+   failing or not.
 2. Then read the diff and the implementer's tests, and what those tests
    assert rather than trusting a green run.
 3. Run your tests and the change's, chosen as

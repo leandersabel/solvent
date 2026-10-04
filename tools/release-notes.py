@@ -62,8 +62,8 @@ def main():
         author = login(pr["author"])
         found = re.fullmatch(r"claude/issue-(\d+)", pr["headRefName"])
         if found:
-            # A batch closes its lead's issue and each member's: one line,
-            # the lead first, in the lead's group.
+            # One line for every issue the pull request closes, its
+            # branch's issue first, in that issue's group.
             lead = int(found.group(1))
             closed = sorted({issue["number"] for issue in pr["closingIssuesReferences"]} - {lead})
             origins = [issue_line(number) for number in [lead, *closed]]

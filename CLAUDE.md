@@ -246,8 +246,9 @@ to where they asked, labeled `bug` or `change` and `accepted`.
   that waits on the client holds neither a place in line nor the slot.
 - One run implements one issue, on `claude/issue-<issue>`. It
   reproduces the report, updates the issue's feature page where
-  behavior or acceptance criteria change (and `spec/architecture.md`
-  only where a cross-cutting rule does), writes a test that fails on
+  behavior or acceptance criteria change (`spec/design-system.md` when
+  the fix needs it, and `spec/architecture.md` only where a
+  cross-cutting rule changes), writes a test that fails on
   the reported behavior, fixes it, and runs only the tests the change
   touches. A report that does not reproduce goes to the client as a
   question.
@@ -255,12 +256,14 @@ to where they asked, labeled `bug` or `change` and `accepted`.
   criteria and the security rules in `spec/architecture.md` before it
   reads the implementation: one for every criterion marked "(blind)"
   and every criterion the change touches. They are committed with the
-  change. At most two rounds of fixes follow, and findings still open
-  are filed.
+  change. At most two rounds of fixes follow. A finding on the change
+  still open after that blocks it: its failing test is committed, the
+  pull request stays a draft without auto-merge, and the issue is
+  `stuck`. Findings outside the change are filed.
 - The pull request's title is English and says what changes for users.
   Its body starts with `Closes #<issue>` and says the same in the
-  issue's language. Auto-merge is on from the start, and the full suite
-  runs once, in its `test` check.
+  issue's language. Auto-merge is on from the start unless a finding
+  blocks it, and the full suite runs once, in its `test` check.
 - An implementation never changes `spec/requirements.md` or the
   pipeline. When a requirement has to change, the issue goes back to
   clarifying.
@@ -318,8 +321,7 @@ found.
 - Every problem an agent or a workflow finds is an issue of its own,
   never only a remark in a comment or a pull request.
 - A problem the work in hand causes, or its issue covers, is part of
-  that work, except a `reviewer` finding still open after two rounds of
-  fixes. Any other is filed by `claude[bot]` as a rated `bug`, or as
+  that work. Any other is filed by `claude[bot]` as a rated `bug`, or as
   `maintenance` when nothing the client sees changes, with `accepted`,
   `queued`, where it was found, and its reproduction: the steps, or a
   failing test. Without one it is not filed. An agent never files a
