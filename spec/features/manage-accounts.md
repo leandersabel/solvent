@@ -881,4 +881,5 @@ Unarchiving and archiving it again writes the zero at the new D.
 60. A name or unit refused on Save stops being refused, with
     `aria-invalid` gone, the moment the field holds one that fits,
     before Save is pressed again. Test:
-    `tests/browser/parts/account-form.mjs`.
+    `tests/browser/parts/account-form.mjs`,
+    `tests/browser/parts/account-form-review-refusals.mjs`.
