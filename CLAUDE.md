@@ -184,11 +184,13 @@ The client is `leandersabel`. No agent edits an issue body.
   Writing section.
 - An issue starts the loop when `accepted` is added, or at once when
   `github-actions[bot]` opened it. Adding a label takes triage access
-  to the repository, no form sets `accepted`, and no agent adds it
-  except the QA run, to its own findings.
+  to the repository, and no form sets `accepted`. An agent adds it only
+  to an issue it opens, as it opens it: a finding (Findings) or a
+  request split off another issue (Clarify).
 - The loop reads an issue's body, the comments by `leandersabel` and
-  its own comments. Nothing else on the issue is read, whatever it
-  says. On an accepted issue it reads the body as it stood when
+  its own comments, and for a request split off another issue, the
+  comments by `leandersabel` there. Nothing else on the issue is read,
+  whatever it says. On an accepted issue it reads the body as it stood when
   `accepted` was added, and asks the client when it has been edited
   since.
 
@@ -216,6 +218,11 @@ each with a comment saying so. Every decision a request leaves open for
 the client is asked as a question, never settled in the spec on their
 behalf. No agent closes an issue. A merged pull request or
 the client does.
+
+An issue holding several requests keeps the first. The loop files each
+of the rest as an issue of its own, in the client's words with a link
+to where they asked, labeled `bug` or `change` and `accepted`, and
+takes it up at once.
 
 ### Requirements
 
@@ -294,7 +301,7 @@ rating:
 - `severity: low`: something looks or reads wrong, but nothing is lost
   or blocked.
 
-QA rates its own findings. A code scanning issue takes its alert's
+An agent rates its own findings. A code scanning issue takes its alert's
 security rating, or medium for an error and low otherwise. The loop
 rates every other problem the next time it runs on it. A rating the
 client set stands, and the client can change any. Only a rating label
@@ -305,6 +312,31 @@ rating.
 
 A problem rated high or critical holds back a version, however it was
 found.
+
+### Findings
+
+- Every problem an agent finds is an issue of its own, never only a
+  remark in a comment, a pull request or a reading.
+- A problem the work in hand causes, or its issue covers, is part of
+  that work. Any other is filed by `claude[bot]` as a rated `bug`, or as
+  `maintenance` when nothing the client sees changes, with `accepted`
+  and where it was found, and the loop takes it up at once. An agent
+  never files a `change`, because a requirement is only ever the
+  client's request.
+- A finding made while working on an issue is written in that issue's
+  language.
+- What an open issue by `leandersabel`, `claude[bot]` or
+  `github-actions[bot]` already reports is filed nowhere. When the
+  finding rates it higher, that issue takes the higher rating instead.
+  Only an open issue counts as reporting it, so what should stop being
+  reported is taken out of the spec or made checkable, never
+  suppressed.
+- A finding rated high or critical holds back the version from the
+  moment it is filed (Severity).
+- A run on an issue files a bounded number of findings. Past that, the
+  issue is `stuck` and its comment lists the rest, because a flood of
+  findings more likely means the run misread something than that
+  Solvent broke that widely.
 
 ### Nightly and stable
 
@@ -331,7 +363,8 @@ found.
 - Before any instance starts, a step without a model makes one real lookup
   to each price source. A source that answers in a changed shape fails
   the night before QA. One that does not answer is noted in the run's
-  summary, and the night goes on.
+  summary, and the night goes on. It is no finding, because the outage
+  is the source's, not a flaw in Solvent.
 - `qa` reaches its shard's server only through the harness tools: the server
   log, the stand-in's request list and failure modes, and stopping and
   starting the app. It has no other access to the machine.
@@ -339,13 +372,9 @@ found.
   harness is in it, and Solvent has no setting naming a price source or
   a certificate authority, so nothing built for testing can redirect an
   installation's lookups.
-- Every finding becomes a `bug` issue by `claude[bot]` labeled `qa`,
-  `accepted` and its rating, which the loop takes up at once. Each
-  feature with criteria QA could not check gets an issue saying which
-  and why, the same way. What an open issue already reports, and has
-  not moved, is filed nowhere. Only an open issue counts as reporting
-  it, so what should stop being reported is taken out of the spec or
-  made checkable, never suppressed. QA only records them during
+- Every finding becomes a `bug` issue as Findings says, labeled `qa` as
+  well. Each feature with criteria QA could not check gets an issue
+  saying which and why, the same way. QA only records them during
   the walk. Once every shard has finished, a short run merges what the
   shards recorded, and another files it with a fresh token, so a long
   walk never outlasts the token. What that run could not file,
@@ -372,10 +401,11 @@ found.
   hold back that nightly, promotion is refused and the release turns
   back into a pre-release.
 - Release notes are assembled from the merged pull requests' titles,
-  without a model, grouped into changes and fixes, fixes found by QA,
-  and maintenance. Each line names who asked, who approved the spec
-  and who implemented it. A batch is one line naming who asked for each
-  fix in it.
+  without a model, grouped into changes and fixes, fixes for what
+  agents found, and maintenance. Each line names who asked, who
+  approved the spec and who implemented it. A request split off another
+  issue is the client's, who asked for it there. A batch is one line
+  naming who asked for each fix in it.
 - Deploying is the client's. Watching the repository's releases
   notifies the client of every version.
 

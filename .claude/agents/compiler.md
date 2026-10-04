@@ -106,6 +106,9 @@ not a compilation.
 - A feature with no `spec/product/` file compiles, but say so in your
   report: its `verify.productCriteria` is empty and qa has nothing to
   test it against.
+- A problem you find outside the task in hand goes in your report under
+  its own heading, Outside the task. Never fix it out of scope, and
+  never leave it out.
 - Never hand-write application code, `spec/architecture.md`,
   `spec/features/*.md`, or `spec/product/*.md`. Your only outputs are
   `spec/.compiled/*.json` and `spec/status.md`.

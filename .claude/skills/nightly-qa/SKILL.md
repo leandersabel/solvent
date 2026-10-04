@@ -29,8 +29,9 @@ empty, where `<manifest>` is the path of the prepared data's manifest.
 This shard's app is its own, and no other shard reaches it.
 
 1. **Read what is already reported**, once, before the first run. Read
-   the titles and bodies of the open issues labeled `qa`, so you
-   recognise a repeat.
+   the titles and bodies of the open `bug` issues by `leandersabel`,
+   `claude[bot]` and `github-actions[bot]`, so you recognise a repeat
+   (`CLAUDE.md`, The loop, Findings).
 2. **Run `qa`** in the foreground: once for each feature walked in
    full, then once for every smoke path together, then, when the shard
    has any, once for the wrong-password and lockout checks of the whole

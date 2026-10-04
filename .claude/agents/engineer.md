@@ -69,6 +69,9 @@ could not cover. The compiler ticks `spec/status.md`, not you.
     tests that use the touched fixture, helper or file.
 - Stay inside the current contract's scope. Do not refactor unrelated
   features while implementing one.
+- A problem you find outside the contract in hand goes in your report
+  under its own heading, Outside the task. Never fix it here, and never
+  leave it out.
 - Never edit `spec/product/*.md`, `spec/architecture.md`,
   `spec/features/*.md`, `spec/.compiled/*.json`, or `spec/status.md`.
   All of those are upstream of you. If the contract itself is wrong,
