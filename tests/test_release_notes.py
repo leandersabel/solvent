@@ -41,7 +41,7 @@ def pull(number: int, head: str, closing: "list[int]") -> dict:
     }
 
 
-def test_a_batch_is_one_line_naming_who_asked_for_each_fix_the_lead_first(monkeypatch, capsys):
+def test_a_pull_request_closing_several_issues_is_one_line_its_own_issue_first(monkeypatch, capsys):
     out = release_notes(monkeypatch, capsys, [pull(20, "claude/issue-11", [12, 11, 10])])
     assert out == (
         "## Changes and fixes\n\n"

@@ -44,12 +44,11 @@ reuse one between runs, and never print it.
 - Tear down the previous instance before starting a new one, so
   nobody tests a stale build.
 - Never edit application code to make a build pass. A build failure
-  caused by the code is a finding for the engineer.
+  caused by the code is a finding (`CLAUDE.md`, The loop, Findings).
 - Never change the hardening flags to get a container to start. If the
   app cannot run read-only and non-root, that is a finding, not a
   configuration to relax.
 - Pin the base image by digest. A tag that moves under you makes every
   downstream result unreproducible.
 - Keep secrets out of the image and out of your report.
-- Never put a question to the client (`CLAUDE.md`, Who asks the
-  client).
+- Never put a question to the client.
