@@ -634,6 +634,21 @@ await check('a thousands separator never collides with the decimal point', async
   assert.equal(shape.money(1234567890000000000n), '1.234.567,89');
 });
 
+await check('a thousands mark equal to the language\u2019s decimal point gives way to the language\u2019s own', async () => {
+  const { formatter } = await load('format.js');
+  const million = 1234567890000000000n;
+  // The point is always the language's. Swapping it to make room would
+  // turn 1,234,567.89 into 1.234.567,89 and flip which input a field takes.
+  const english = formatter({ locale: 'en-US', groupSeparator: 'period' });
+  assert.equal(english.money(million), '1,234,567.89');
+  assert.equal(english.parseQuantity('12.5'), '12.5');
+  assert.equal(english.parseQuantity('12,5'), null);
+  const german = formatter({ locale: 'de-DE', groupSeparator: 'comma' });
+  assert.equal(german.money(million), '1.234.567,89');
+  assert.equal(german.parseQuantity('12,5'), '12.5');
+  assert.equal(german.parseQuantity('12.5'), null);
+});
+
 await check('percent writes a percentage grouped, pointed and half-even at the places asked, whatever Decimals says', async () => {
   const { formatter } = await load('format.js');
   const p = (text) => decimal.parse(text);
@@ -763,6 +778,8 @@ await check('a field shows a figure grouped and reads it back exactly', async ()
     { locale: 'de-DE' },
     { locale: 'fr-CH' },
     { locale: 'en-US', groupSeparator: 'none' },
+    { locale: 'en-US', groupSeparator: 'period' },
+    { locale: 'de-DE', groupSeparator: 'comma' },
   ]) {
     const shape = formatter(settings);
     for (const stored of ['48210.35', '-780000', '1150000.5', '0.000000000001', '12.5', '0']) {
@@ -1684,8 +1701,8 @@ await check('net-worth-view: value ticks over the sweep are exact, whole, counte
     }
   }
   assert.ok(totals.size > 100);
-  for (const [group, point] of [[',', '.'], ['.', ',']]) {
-    const shape = formatter({ locale: 'en-US', groupSeparator: group === ',' ? 'comma' : 'period' });
+  for (const [locale, group, point] of [['en-US', ',', '.'], ['de-DE', '.', ',']]) {
+    const shape = formatter({ locale, groupSeparator: group === ',' ? 'comma' : 'period' });
     assert.equal(shape.point, point);
     for (const total of totals) {
       for (const signed of [total, -total]) {

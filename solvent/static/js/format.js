@@ -85,10 +85,12 @@ export function formatter(profile) {
   const fromLocale = localeParts(locale);
 
   const chosen = GROUPS.find((g) => g.value === settings.groupSeparator);
-  const group = chosen && chosen.value !== 'locale' ? chosen.separator : fromLocale.group;
-  // A separator that is also the decimal point would make 1.234
-  // ambiguous, so the locale's own pairing wins over the override.
-  const point = group === fromLocale.point ? otherPoint(fromLocale.point) : fromLocale.point;
+  const picked = chosen && chosen.value !== 'locale' ? chosen.separator : fromLocale.group;
+  // The point is always the language's. A mark that is also that point
+  // would make 1.234 ambiguous, so the language's own group mark stands
+  // in for it.
+  const point = fromLocale.point;
+  const group = picked === point ? fromLocale.group : picked;
 
   const places = settings.moneyPlaces === '0' || settings.moneyPlaces === '2'
     ? Number(settings.moneyPlaces)
@@ -244,10 +246,6 @@ function readDecimal(typed, group, point) {
   if ((!digits && !fraction) || (fraction ?? '').length > decimal.SCALE) return null;
   const canonical = (digits.replace(/^0+(?=\d)/, '') || '0') + (fraction ? '.' + fraction : '');
   return negative && /[1-9]/.test(canonical) ? '-' + canonical : canonical;
-}
-
-function otherPoint(point) {
-  return point === '.' ? ',' : '.';
 }
 
 function writeDate(iso, order, sep) {

@@ -57,6 +57,10 @@ be set against it, because a language is a coarse guess at taste. A
 Swiss reader may want an apostrophe between thousands and no
 centimes, and no language says that.
 
+The decimal point is always your language's. A thousands mark that is
+also your language's decimal point is not applied, because 1.234 would
+then mean two things. Your language's own pairing of marks stands.
+
 A sample line shows the choice before it is saved.
 
 The settings live in the vault, so they follow you to any browser you
@@ -199,6 +203,9 @@ single total.
   sitting.
 - Dates and figures on every screen are written the way the settings
   say, the calendar you pick a date from included.
+- A thousands mark that is also your language's decimal point is not
+  applied. In English (US) with a period chosen for thousands, figures
+  read CHF 1,234,567.89, and a value field takes 12.5 and refuses 12,5.
 - A date typed the way the settings write it is accepted. A date that
   does not exist is refused rather than quietly moved.
 - Changing any of the date or number settings and changing it back

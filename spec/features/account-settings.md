@@ -101,16 +101,15 @@ formatter answers:
   text, shown digit for digit from its decimal string
   (`record-snapshot.md`, Record shape): never rounded, never padded,
   with the group mark in force between groups of three in the integer
-  part and the configured decimal point. `"12.125"` reads `12.125`,
+  part and the locale's decimal point. `"12.125"` reads `12.125`,
   `"12.50"` reads `12.50` and `"80"` reads `80`. It does not follow
   `moneyPlaces`, because rounding 12.125 ounces of gold misstates the
   holding and padding 80 m² to `80.00` claims a precision nobody
   measured. It formats a stored string and nothing computed, so there
   is nothing to round. A negative value is signed as money is.
-- **parseQuantity** — the reverse, for a field. The configured decimal
+- **parseQuantity** — the reverse, for a field. The locale's decimal
   point is the point, and so is `.` wherever `.` is not the group mark
-  in force, because a keyboard does not always offer the configured
-  one. The group mark in force is accepted only between groups of three
+  in force, because a keyboard does not always offer the locale's one. The group mark in force is accepted only between groups of three
   digits in the integer part, and anywhere else the input is malformed
   rather than the mark being dropped, because reading `12.5` as 125
   under a period group mark is a silent tenfold error. It returns the
@@ -155,9 +154,12 @@ written with `toFixed`, `toLocaleString`, `Intl.NumberFormat`,
 
 Defaults come from `Intl` for the chosen locale, read at run time
 rather than tabulated, so there is no second and staler copy of what
-the engine already knows. A `groupSeparator` equal to that locale's
-decimal point is not applied, because `1.234` would then mean two
-things; the locale's own pairing stands.
+the engine already knows. The decimal point is always the locale's,
+because no setting chooses it. A `groupSeparator` equal to that point
+is not applied, because `1.234` would then mean two things: the
+locale's own group mark is in force instead. The point is never
+swapped to make room for the chosen mark, because that would change
+how every figure reads and which input a field accepts.
 
 **A field that edits a stored figure prefills it through `quantity`,
 whatever the unit**, money included, because a prefill at
@@ -463,6 +465,11 @@ from an administrator removing an account (admin-invites.md).
 - Under that profile `parseQuantity` reads `1’234,50` as `"1234.50"`
   and `12.5` as `"12.5"`. With locale `de-DE` and `groupSeparator`
   `period` it reads `1.234,5` as `"1234.5"` and refuses `12.5`.
+- With locale `en-US` and `groupSeparator` `period`, `money` writes
+  1234567.89 as `1,234,567.89`, and `parseQuantity` reads `12.5` as
+  `"12.5"` and refuses `12,5`. With locale `de-DE` and
+  `groupSeparator` `comma`, `money` writes 1234567.89 as
+  `1.234.567,89`.
 - With locale `de-DE` and `groupSeparator` `period`, `percent` at one
   place writes 136794.6 as `136.794,6%` under `moneyPlaces` `0` and
   `2` alike. It writes 0.25 as `0,2%`, 0.35 as `0,4%`, −0.25 as
