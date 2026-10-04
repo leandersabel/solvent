@@ -1898,6 +1898,54 @@ select {
     text-align: right;
     margin-top: 4px;
   }
+
+  /* A holding's values as a list, headings included: the date, its
+     note toggle and any flag on the first line, the two figures beneath
+     it, each wrapping whole to a line of its own when they do not fit
+     side by side, and the row's actions beneath them. */
+  .values-table,
+  .values-table thead,
+  .values-table tbody,
+  .values-table .note-row,
+  .values-table .note-row td { display: block; }
+
+  .values-table tr:not(.note-row) {
+    display: flex;
+    flex-wrap: wrap;
+    column-gap: 16px;
+    padding: 10px 0;
+    border-bottom: 1px solid var(--hairline);
+  }
+
+  .values-table thead tr { padding-top: 0; border-bottom-color: var(--rule); }
+  .values-table tbody tr:last-child { border-bottom: 0; }
+  .values-table tr.flagged { border-left: 3px solid var(--status-critical); padding-left: 12px; }
+
+  .values-table td,
+  .values-table th {
+    display: block;
+    padding: 0;
+    border: 0;
+  }
+
+  .values-table .note-row td { padding: 0 0 10px; }
+  .values-table tr.flagged td:first-child { border-left: 0; padding-left: 0; }
+  .values-table :is(td, th):first-child { flex-basis: 100%; }
+  .values-table :is(td, th):nth-child(2) { white-space: nowrap; }
+  .values-table :is(td, th):nth-child(3) { margin-left: auto; white-space: nowrap; }
+  .values-table th:last-child { display: none; }
+  .values-table tr:not(.note-row) > td:last-child { flex-basis: 100%; display: flex; flex-wrap: wrap; column-gap: 16px; }
+  .values-table tr:not(.note-row) > td:last-child:empty { display: none; }
+  .values-table tr:not(.note-row) > td:last-child .field-error { flex-basis: 100%; }
+
+  .values-table .link-button { white-space: nowrap; }
+  .values-table .flag-note { margin-bottom: 4px; }
+
+  .values-table .link-button,
+  .values-table .btn-inline,
+  .values-table .btn-icon { min-height: 44px; }
+
+  .values-table .btn-icon { min-width: 44px; justify-content: center; }
 }
 
 /* ---- At phone width ---- */

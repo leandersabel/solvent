@@ -138,7 +138,7 @@ export function holdingView(vault, accountId, { editing = false, onOpenRecording
     el('section', { class: 'card' }, [
       el('h2', { class: 'section-heading', text: 'Values' }),
       history.length
-        ? el('table', { class: 'data-table' }, [
+        ? el('table', { class: 'data-table values-table' }, [
             el('thead', {}, [
               el('tr', {}, [
                 el('th', { text: 'Date' }),

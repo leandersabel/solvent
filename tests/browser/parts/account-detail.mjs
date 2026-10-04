@@ -781,6 +781,56 @@ await run(async () => {
       back.includes(archiving) && heroNow === heroBeforeUnarchive,
       `${back.join(',')}: ${heroNow} against ${heroBeforeUnarchive}`,
     );
+    // -- On a phone ----------------------------------------------------------------
+
+    // app-shell.md, On a phone, and manage-accounts.md, Account detail, At
+    // phone width: with the widest rows the list can hold, a long figure
+    // with a note and two entries sharing a date, nothing pans sideways,
+    // no box scrolls sideways, every control lies on the screen where a
+    // tap at its center lands on it, and no date wraps.
+    const goldId = (await idNamed('Gold bars'))[0];
+    await page.call(async (id, day) => {
+      const writes = await import('/static/js/writes.js');
+      const v = (await import('/static/js/session.js')).currentVault();
+      await writes.saveSnapshot(v, id, null, { date: day, value: '1234567.125', note: 'Counted at the bank vault' });
+      await writes.saveSnapshot(v, id, null, { date: day, value: '1234567.250', note: null });
+    }, goldId, BACKDATE);
+    await openHolding(goldId);
+    await page.waitUntil("document.querySelectorAll('.values-table tbody tr.flagged').length === 2", { label: 'the gold with its widest rows' });
+    for (const width of [320, 375, 601, 901]) {
+      await page.send('Emulation.setDeviceMetricsOverride', { width, height: 800, deviceScaleFactor: 2, mobile: false });
+      await page.send('Emulation.setTouchEmulationEnabled', { enabled: width < 600 });
+      await page.eval("document.querySelectorAll('.note-toggle[aria-expanded=\"false\"]').forEach((b) => b.click())");
+      await page.frames();
+      const fit = await page.eval(`(() => {
+        const problems = [];
+        const doc = document.documentElement;
+        if (doc.scrollWidth > doc.clientWidth) problems.push('the page pans: ' + doc.scrollWidth);
+        for (const n of document.querySelectorAll('#app *')) {
+          if (getComputedStyle(n).overflowX !== 'visible' && n.scrollWidth > n.clientWidth + 0.5) problems.push('scrolls sideways: ' + n.className);
+        }
+        for (const n of document.querySelectorAll('#app button, #app a')) {
+          n.scrollIntoView({ block: 'center', behavior: 'instant' });
+          const r = n.getBoundingClientRect();
+          if (!r.width) continue;
+          const name = n.textContent || n.getAttribute('aria-label');
+          if (r.left < -0.5 || r.right > innerWidth + 0.5) problems.push('off the screen: ' + name);
+          else if (!n.contains(document.elementFromPoint((r.left + r.right) / 2, (r.top + r.bottom) / 2))) problems.push('covered: ' + name);
+          if (innerWidth < 600 && n.closest('.values-table') && r.height < 44) problems.push('under 44px: ' + name);
+        }
+        for (const n of document.querySelectorAll('.values-table tbody .link-button')) {
+          const range = document.createRange();
+          range.selectNodeContents(n);
+          if (new Set([...range.getClientRects()].map((r) => Math.round(r.top))).size > 1) problems.push('the date wraps: ' + n.textContent);
+        }
+        return problems;
+      })()`);
+      check(`at ${width}px the holding's values fit the screen, each control tappable, no date wrapped`, fit.length === 0, fit.join(' | '));
+    }
+    await page.send('Emulation.setTouchEmulationEnabled', { enabled: false });
+    await page.send('Emulation.clearDeviceMetricsOverride');
+    await page.frames();
+
     // -- What the page asked the server for ---------------------------------------
 
     const requested = JSON.parse(await page.eval(`JSON.stringify(performance.getEntriesByType('resource')
