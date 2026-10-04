@@ -98,21 +98,21 @@ This shard's app is its own, and no other shard reaches it.
 3. **Record each finding** in `qa-unfiled/<n>.json`, numbered from 1
    and continuing across runs, as
    `{"title": ..., "body": ..., "labels": [...], "repeats": null}`.
-   It is in English: the title says what is wrong for a user, ending in
-   ` (seen once)` when `qa` could not reproduce it, and the body gives
-   the steps, what the product spec expects with a pointer to the
-   criterion, and what happened. The labels are `bug`, `qa`, `accepted`
-   and the finding's rating (`CLAUDE.md`, The loop, Severity). When an
-   open `qa` issue reports the same thing, `repeats` is its number and
-   `comment` is `Still failing in the <date> build.`
+   It is in English: the title says what is wrong for a user, and the
+   body gives the steps, what the product spec expects with a pointer
+   to the criterion, and what happened. The labels are `bug`, `qa`,
+   `accepted` and the finding's rating (`CLAUDE.md`, The loop,
+   Severity). A finding an open issue reports gets a record only when
+   its rating is higher than that issue's, with `repeats` its number
+   and `comment` saying the new rating and why.
 4. **Record what could not be checked.** Each feature with criteria
    `qa` could not check gets a record the same way, titled
    `QA could not check <feature>`, labeled `bug`, `qa` and `accepted`
-   without a rating, whose body lists each criterion and why. When one
-   is open, `repeats` is its number and `comment` is
-   `Still not checkable in the <date> build.` with the criteria that
-   changed since. A later run's criteria for a feature already recorded
-   join that record.
+   without a rating, whose body lists each criterion and why. When an
+   open one for the feature lists the same criteria, there is no
+   record. When it lists others, `repeats` is its number and `comment`
+   names the criteria that joined or left. A later run's criteria for a
+   feature already recorded join that record.
 5. **Finish.** Write `qa-done.txt` in the working directory, after the
    last run's records and as the last thing written. Its absence tells
    the workflow this shard did not finish.
