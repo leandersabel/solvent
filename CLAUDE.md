@@ -342,9 +342,10 @@ found.
 - Every finding becomes a `bug` issue by `claude[bot]` labeled `qa`,
   `accepted` and its rating, which the loop takes up at once. Each
   feature with criteria QA could not check gets an issue saying which
-  and why, the same way. What is already reported and has not moved is
-  filed nowhere, and the client closing it as not planned holds. QA
-  only records them during
+  and why, the same way. What an open issue already reports, and has
+  not moved, is filed nowhere. Only an open issue counts as reporting
+  it, so what should stop being reported is taken out of the spec or
+  made checkable, never suppressed. QA only records them during
   the walk. Once every shard has finished, a short run merges what the
   shards recorded, and another files it with a fresh token, so a long
   walk never outlasts the token. What that run could not file,
