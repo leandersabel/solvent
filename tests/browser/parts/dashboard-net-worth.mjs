@@ -229,6 +229,12 @@ await run(async () => {
     });
   })()`).then(JSON.parse);
   await viewport(1280);
+  // The chart redraws for the new width from a resize observer, on a
+  // frame of its own, so the pricing mode check waits for it.
+  await rec.waitUntil(
+    "Number(document.querySelector('svg.trend').getAttribute('width')) === Math.floor(document.querySelector('.chart-frame').clientWidth)",
+    { label: "the chart drawn at the card's width" },
+  );
   check(
     'net-worth-view: at 390px the data table scrolls inside the card and the page does not scroll sideways',
     phoneTable.page <= 0 && phoneTable.inside === 'auto',
