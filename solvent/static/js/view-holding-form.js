@@ -296,11 +296,13 @@ function unitPicker(vault, current, locked) {
   return {
     element: el('div', { class: 'field unit-field' }, [
       el('label', { for: 'holding-unit', text: 'Measured in' }),
-      error,
       search,
       list,
       chosen,
       freeText,
+      // Every refusal is of the typed unit or of none chosen, so its line
+      // sits under the free-text field.
+      error,
       freeNote,
       listed,
       notice,
@@ -507,8 +509,8 @@ export function holdingForm(vault, existing, onSaved, { onCancel = null, onConfl
     notice ? el('p', { class: 'field-error', role: 'alert', text: notice }) : null,
     el('div', { class: 'field' }, [
       el('label', { for: 'holding-name', text: 'Name' }),
-      nameError,
       name,
+      nameError,
     ]),
     unit.element,
     dimensionBlock(vault, dims),
