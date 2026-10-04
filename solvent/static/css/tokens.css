@@ -1183,6 +1183,7 @@ th.numeric {
 .holdings-table .cell-converted { white-space: nowrap; }
 
 .holdings-table .cell-action { text-align: right; }
+.holdings-table tbody tr { cursor: pointer; }
 
 .filter-line {
   display: flex;
@@ -1873,6 +1874,25 @@ select {
   .holdings-table .cell-asof { grid-column: 3; }
   .holdings-table .cell-native:not(.same-unit) ~ .cell-asof::before { content: "\00a0\00b7\00a0"; }
   .holdings-table .cell-native.same-unit { display: none; }
+  .holdings-table .cell-native ~ .cell-asof:empty::before { content: none; }
+
+  /* A unit with no price: the quantity leads and "not priced" sits
+     beneath it. */
+  .holdings-table tr.unpriced .cell-native {
+    grid-column: 2 / span 2;
+    grid-row: 1;
+    font-size: inherit;
+    font-weight: 500;
+    color: inherit;
+  }
+
+  .holdings-table tr.unpriced .cell-converted {
+    grid-column: 2;
+    grid-row: 2;
+    font-size: 12px;
+    font-weight: 400;
+    color: var(--ink-secondary);
+  }
 
   .holdings-table .cell-action {
     grid-column: 2 / span 2;

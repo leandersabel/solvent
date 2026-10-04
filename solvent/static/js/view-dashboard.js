@@ -518,22 +518,33 @@ function signed(vault, value) {
   return `${value > 0n ? '+' : ''}${vault.format.whole(value)}`;
 }
 
-function holdingsTable(vault, state, render, actions, grouping) {
-  const dimensions = vault.activeDimensions();
+/** The holdings the table lists. Archived comes first: an archived
+ *  holding is a row whatever its figures, because being archived is why
+ *  it is out of the total. Only active holdings reach the two groups
+ *  that say why a holding is missing from it. */
+export function holdingGroups(vault, state, grouping) {
   const rows = [];
   const unvalued = [];
   const unpriced = [];
-  const newestRate = vault.newestRateDate();
   const filtering = state.unassignedOnly && grouping;
 
   for (const holding of vault.holdings.values()) {
-    if (holding.payload.archivedAt && !state.showArchived) continue;
+    const archived = holding.payload.archivedAt;
+    if (archived && !state.showArchived) continue;
     if (filtering && vault.bandOf(holding, grouping).id !== 'unassigned') continue;
     const value = vault.valueOf(holding, state.mode);
-    if (value.state === 'unvalued') unvalued.push(holding);
-    else if (value.state === 'unpriced') unpriced.push({ holding, value });
-    else rows.push({ holding, value });
+    if (archived || value.state === 'valued') rows.push({ holding, value });
+    else if (value.state === 'unvalued') unvalued.push(holding);
+    else unpriced.push({ holding, value });
   }
+  return { rows, unpriced, unvalued };
+}
+
+function holdingsTable(vault, state, render, actions, grouping) {
+  const dimensions = vault.activeDimensions();
+  const { rows, unpriced, unvalued } = holdingGroups(vault, state, grouping);
+  const newestRate = vault.newestRateDate();
+  const filtering = state.unassignedOnly && grouping;
 
   const header = el('tr', {}, [
     el('th', { text: 'Name' }),
@@ -577,7 +588,14 @@ function holdingsTable(vault, state, render, actions, grouping) {
         'tbody',
         {},
         rows.map(({ holding, value }) =>
-          el('tr', { class: holding.payload.archivedAt ? 'dimmed' : null }, [
+          el('tr', {
+            class: [holding.payload.archivedAt && 'dimmed', value.state === 'unpriced' && 'unpriced'].filter(Boolean).join(' ') || null,
+            // The whole row opens the holding, which is how a phone,
+            // with no row action, reaches Record a value or Unarchive.
+            onclick: (event) => {
+              if (!event.target.closest('button')) actions.openHolding(holding.recordId);
+            },
+          }, [
             el('td', { class: 'cell-name' }, [
               el('button', {
                 class: 'link-button row-name',
@@ -607,18 +625,21 @@ function holdingsTable(vault, state, render, actions, grouping) {
             // At phone width the native figure is dropped where it
             // would only repeat the converted one.
             el('td', {
-              class: holding.payload.unit === vault.mainCurrency ? 'numeric cell-native same-unit' : 'numeric cell-native',
-              text: vault.amount(value.stored, holding.payload.unit),
+              class: holding.payload.unit === vault.mainCurrency && value.state !== 'unvalued' ? 'numeric cell-native same-unit' : 'numeric cell-native',
+              text: value.state === 'unvalued' ? 'not yet valued' : vault.amount(value.stored, holding.payload.unit),
             }),
             // A price older than the date the row is shown for carries
             // its own date, because the screen's rate date is not true
             // of that row: the rate date on latest rates, the row's
-            // own date on rates as of each figure.
-            el('td', { class: 'numeric cell-converted' }, [
-              vault.format.money(value.converted),
-              priceDateLine(vault, value.priceDate, state.mode === 'latest' ? newestRate : value.asOf),
-            ]),
-            el('td', { class: 'cell-asof' }, [el('span', { text: vault.format.longDate(value.asOf) })]),
+            // own date on rates as of each figure. An archived row can
+            // hold no price or no figure at all.
+            el('td', { class: 'numeric cell-converted' }, value.state === 'valued'
+              ? [
+                  vault.format.money(value.converted),
+                  priceDateLine(vault, value.priceDate, state.mode === 'latest' ? newestRate : value.asOf),
+                ]
+              : value.state === 'unpriced' ? ['not priced'] : []),
+            el('td', { class: 'cell-asof' }, value.state === 'unvalued' ? [] : [el('span', { text: vault.format.longDate(value.asOf) })]),
             // An archived row takes no new value, and unarchiving it is
             // one action with no dialog (account-form.md, Rules).
             el('td', { class: 'cell-action' }, [

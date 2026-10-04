@@ -50,7 +50,7 @@ Each default lives with the rule it tunes:
 | `LOGIN_LOCKOUT_THRESHOLD`, `LOGIN_LOCKOUT_WINDOW_MINUTES`, `LOGIN_LOCKOUT_MINUTES` | the per-username lock |
 | `LOGIN_FAILURES_PER_ADDRESS`, `LOGIN_ADDRESS_WINDOW_MINUTES`, `LOGIN_ADDRESS_LOCK_MINUTES` | the per-address lock |
 | `VERIFY_CONCURRENCY`, `VERIFY_WAIT_SECONDS` | the concurrency cap (architecture.md, Application hardening) |
-| `RATE_REQUESTS_PER_HOUR`, `RATE_BREAKER_FAILURES`, `RATE_BREAKER_COOLOFF_MINUTES` | the rate lookup's limit and breaker (rate-lookup.md) |
+| `RATE_REQUESTS_PER_HOUR`, `RATE_BREAKER_FAILURES`, `RATE_BREAKER_COOLOFF_MINUTES` | the rate lookup's limit, and the failure count and cool-off of each provider's breaker (rate-lookup.md) |
 | `EXPORTS_PER_USER_HOUR` | the export limit (export-import.md) |
 
 - **A limit, a window, a lock, a wait or a concurrency is a whole

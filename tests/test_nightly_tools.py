@@ -469,7 +469,6 @@ def from_standin(monkeypatch):
         return AppResponse(body)
 
     monkeypatch.setattr(rates._opener, "open", open_)
-    rates.breaker.record_success()
 
 
 def test_known_table_is_what_the_app_answers_for_the_whole_table(owner, from_standin):
@@ -494,6 +493,8 @@ def hand_vault():
         "Closed": {"unit": "CHF", "archived": True},
         "Flat": {"unit": "m²", "archived": False},
         "Empty": {"unit": "CHF", "archived": False},
+        "Old flat": {"unit": "m²", "archived": True},
+        "Shut": {"unit": "CHF", "archived": True},
     }
     snapshots = {
         "Cash": [("2026-01-31", Decimal("100.005")), ("2026-02-28", Decimal("200.125"))],
@@ -502,6 +503,7 @@ def hand_vault():
         "Old gold": [("2019-03-29", Decimal("2"))],
         "Closed": [("2026-01-31", Decimal("5")), ("2026-02-01", Decimal("0"))],
         "Flat": [("2026-02-28", Decimal("90"))],
+        "Old flat": [("2026-02-28", Decimal("40"))],
     }
     # USD: an edited figure on the date of the gold's quantity.
     series = {"USD": [("2019-03-29", Decimal("0.9")), ("2026-01-31", Decimal("0.85")), ("2026-02-28", Decimal("0.875"))],
@@ -519,7 +521,17 @@ def test_expected_figures_match_a_hand_computed_vault_under_both_modes():
         "Mortgage": {"exact": "-1000", "display": "-1000.00"},
         "Old gold": {"exact": "100.24691356", "display": "100.25"},
     }
-    assert latest["excluded"] == {"Closed": "archived", "Flat": "no price", "Empty": "no quantity"}
+    # An archived holding is listed as archived whether or not it is also
+    # unpriced ("Old flat") or has no quantity ("Shut").
+    excluded = {
+        "Closed": "archived",
+        "Flat": "no price",
+        "Empty": "no quantity",
+        "Old flat": "archived",
+        "Shut": "archived",
+    }
+    assert latest["excluded"] == excluded
+    assert recorded["excluded"] == excluded
     assert latest["total"] == {"exact": "-672.94058644", "display": "-673"}
     assert latest["assets"] == {"exact": "327.05941356", "display": "327"}
     assert latest["debts"] == {"exact": "-1000", "display": "-1000"}

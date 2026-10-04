@@ -80,6 +80,19 @@ def clock(monkeypatch):
 
 
 @pytest.fixture(autouse=True)
+def closed_breakers():
+    """The provider breakers live in process memory, so one test's
+    outage must not open them for the next."""
+    import solvent.rates as rates
+
+    for breaker in rates.breakers.values():
+        breaker.record_success()
+    yield
+    for breaker in rates.breakers.values():
+        breaker.record_success()
+
+
+@pytest.fixture(autouse=True)
 def cheap_argon2(monkeypatch):
     """Server-side Argon2id at 64 MiB is defense in depth, not the work
     factor, and paying it in every test would cost minutes. The shape

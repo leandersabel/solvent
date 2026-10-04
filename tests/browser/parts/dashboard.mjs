@@ -4,7 +4,7 @@
 // Templates: dashboard.html. Modules: view-dashboard.js, chart.js, model.js,
 // format.js, decimal.js.
 import {
-  check, fetchOff, fetchOn, holdings, importOwnExport, isRateAsk, labels, page, plant, recording, reloadModel, run, setProfile,
+  BASE, VAULT_PASSWORD, check, enterPassword, fetchOff, fetchOn, holdings, importOwnExport, isRateAsk, labels, page, plant, recording, reloadModel, run, setProfile,
   story, text, unlockDashboard, vaultOwner,
 } from '../harness.mjs';
 
@@ -301,6 +301,231 @@ await run(async () => {
     for (const id of ids) await api.del('/api/records/' + id);
   }, [...ramp, checking, flat]);
   await unlockDashboard('the dashboard after the ramp probes');
+
+  // ---- An archived holding is a row, whatever its figures ----------------
+  //
+  // Everything sits in 2018, before any other figure in the vault.
+  const archivedHolding = (name, unit) => {
+    const { payload } = holding(name, unit);
+    return { type: 'account', payload: { ...payload, archivedAt: '2018-06-01' } };
+  };
+  const [oldCellar, , cellar] = await plant([
+    archivedHolding('Archive cellar', 'PROBE-BOTTLES'),
+    archivedHolding('Archive empty', 'CHF'),
+    holding('Active cellar', 'PROBE-BOTTLES'),
+  ]);
+  await plant([
+    figure(oldCellar, '2018-01-01', '12'),
+    figure(cellar, '2018-01-01', '7'),
+  ]);
+  await unlockDashboard('the dashboard over archived probes');
+  // What a row shows, read from the engine: the cells that are on the
+  // screen, the text colour set against ink-secondary, and the opacity
+  // every ancestor multiplies in.
+  const archiveCard = () =>
+    page.eval(`(() => {
+      const card = document.querySelector('.holdings-card');
+      const group = (title) => [...card.querySelectorAll('.table-group')].find(g => g.textContent.includes(title));
+      const names = (node) => node ? [...node.querySelectorAll('.link-button')].map(b => b.textContent) : [];
+      const probe = document.createElement('span');
+      probe.style.color = 'var(--ink-secondary)';
+      document.body.append(probe);
+      const secondary = getComputedStyle(probe).color;
+      probe.remove();
+      const opacity = (node) => { let o = 1; for (; node; node = node.parentElement) o *= Number(getComputedStyle(node).opacity); return o; };
+      return JSON.stringify({
+        text: card.textContent,
+        total: document.querySelector('.hero-figure').textContent,
+        chart: Boolean(document.querySelector('svg.trend')),
+        rows: [...card.querySelectorAll('.holdings-table tbody tr')].map(r => {
+          const cells = [...r.querySelectorAll('.cell-native, .cell-converted, .cell-asof')];
+          const asof = r.querySelector('.cell-asof');
+          return {
+            name: r.querySelector('.row-name').textContent,
+            chip: Boolean(r.querySelector('.chip-archived')),
+            buttons: [...r.querySelectorAll('.cell-action button')].map(b => b.textContent),
+            shownButtons: [...r.querySelectorAll('button:not(.row-name)')].filter(b => b.getClientRects().length).map(b => b.textContent),
+            tops: [r.querySelector('.cell-native'), r.querySelector('.cell-converted')].map(c => c.getBoundingClientRect().top),
+            // Somewhere on the row that is no control: the quantity's
+            // cell, or the row's right end where that cell is hidden.
+            edge: (() => {
+              const cell = r.querySelector('.cell-native').getBoundingClientRect();
+              const row = r.getBoundingClientRect();
+              return cell.width ? { x: cell.left + cell.width / 2, y: cell.top + cell.height / 2 } : { x: row.right - 6, y: row.top + row.height / 2 };
+            })(),
+            actionShown: getComputedStyle(r.querySelector('.cell-action')).display !== 'none',
+            figures: [r.querySelector('.cell-native').textContent, r.querySelector('.cell-converted').textContent, asof.textContent],
+            visible: cells.filter(c => getComputedStyle(c).display !== 'none').map(c => c.textContent.trim()).filter(Boolean),
+            separator: getComputedStyle(asof, '::before').content,
+            secondary: getComputedStyle(r.querySelector('.row-name')).color === secondary,
+            opaque: [r, r.querySelector('.row-name'), r.querySelector('.chip-archived')].every(n => !n || opacity(n) === 1),
+          };
+        }),
+        notPriced: names(group('Not priced')),
+        notValued: names(group('Not yet valued')),
+      });
+    })()`).then(JSON.parse);
+  const toggleArchived = async () => {
+    await page.eval("document.querySelector('.holdings-card .checkbox input').click()");
+    await page.frames();
+  };
+  const pickMode = async (label) => {
+    await page.call((wanted) => [...document.querySelectorAll('.switch-option')].find(b => b.textContent.includes(wanted)).click(), label);
+    await page.frames();
+  };
+  const atWidth = async (width) => {
+    await page.send('Emulation.setDeviceMetricsOverride', { width, height: 900, deviceScaleFactor: 1, mobile: false });
+    await page.idle();
+  };
+  const archivedRow = (shown, name) => shown.rows.find((r) => r.name === name);
+  // The row's right side holds no as-of date: nothing in the as-of
+  // cell, and no separator drawn in front of it.
+  const noAsOf = (row) => row.figures[2] === '' && row.separator === 'none';
+
+  for (const width of [1280, 390]) {
+    await atWidth(width);
+    for (const mode of ['Latest rates', 'as of each figure']) {
+      await pickMode(mode);
+      const where = `${mode} at ${width}px`;
+      await toggleArchived();
+      const shown = await archiveCard();
+      const cellarRow = archivedRow(shown, 'Archive cellar');
+      const emptyRow = archivedRow(shown, 'Archive empty');
+      check(
+        `net-worth-view: an archived holding in a unit with no price is a table row with the Archived chip and Unarchive, reading its quantity and "not priced" (${where})`,
+        cellarRow?.chip === true && cellarRow.buttons.join() === 'Unarchive' &&
+          cellarRow.figures[0].includes('12') && cellarRow.figures[1] === 'not priced' &&
+          cellarRow.visible.includes(cellarRow.figures[0]) && cellarRow.visible.includes('not priced'),
+        JSON.stringify(cellarRow),
+      );
+      check(
+        `net-worth-view: an archived holding with no readable snapshot is a table row reading "not yet valued", with In main currency and As of empty (${where})`,
+        emptyRow?.chip === true && emptyRow.buttons.join() === 'Unarchive' &&
+          emptyRow.figures.join('|') === 'not yet valued||' && emptyRow.separator === 'none' &&
+          emptyRow.visible.join('|') === 'not yet valued',
+        JSON.stringify(emptyRow),
+      );
+      // The quantity leads and "not priced" sits beneath it at phone
+      // width; on one line each at desktop width.
+      check(
+        `net-worth-view: an archived holding in a unit with no price reads its quantity, then "not priced" (${where})`,
+        width === 390 ? cellarRow?.tops[0] < cellarRow?.tops[1] : cellarRow?.tops[0] === cellarRow?.tops[1],
+        JSON.stringify(cellarRow?.tops),
+      );
+      // A row action is Unarchive or Record a value at desktop width
+      // and nothing at phone width, where the row's tap opens the holding.
+      check(
+        width === 390
+          ? `net-worth-view: no row, archived or active, shows a row action (${where})`
+          : `net-worth-view: Unarchive stays visible on an archived row (${where})`,
+        width === 390
+          ? shown.rows.length > 1 && shown.rows.every((r) => r.shownButtons.length === 0)
+          : cellarRow?.shownButtons.join() === 'Unarchive' && emptyRow?.shownButtons.join() === 'Unarchive',
+        JSON.stringify(shown.rows.map((r) => [r.name, r.shownButtons])),
+      );
+      check(
+        `net-worth-view: archived rows keep their text in ink-secondary and never at reduced opacity (${where})`,
+        cellarRow?.secondary === true && cellarRow.opaque === true && emptyRow?.secondary === true && emptyRow.opaque === true,
+        JSON.stringify([cellarRow?.secondary, cellarRow?.opaque, emptyRow?.secondary, emptyRow?.opaque]),
+      );
+      check(
+        `net-worth-view: neither group names an archived holding, and an active holding in the same unit stays under Not priced (${where})`,
+        shown.notPriced.includes('Active cellar') && !shown.notPriced.includes('Archive cellar') &&
+          !shown.notValued.includes('Archive empty') && !shown.notValued.includes('Archive cellar'),
+        JSON.stringify([shown.notPriced, shown.notValued]),
+      );
+      await toggleArchived();
+      const hidden = await archiveCard();
+      check(
+        `net-worth-view: with Show archived off, archived holdings appear nowhere in the holdings card (${where})`,
+        !hidden.text.includes('Archive cellar') && !hidden.text.includes('Archive empty') && hidden.notPriced.includes('Active cellar'),
+        JSON.stringify(hidden.notPriced),
+      );
+    }
+    await pickMode('Latest rates');
+  }
+  await page.send('Emulation.clearDeviceMetricsOverride');
+
+  // A press on a row, off its name, opens the holding's screen, which
+  // offers Unarchive for an archived holding and Record a value for an
+  // active one.
+  for (const [width, phone] of [[390, true], [1280, false]]) {
+    await atWidth(width);
+    await page.send('Emulation.setTouchEmulationEnabled', { enabled: phone });
+    for (const [kind, archived, offered] of [
+      ['an archived', true, 'Unarchive'],
+      ['an active', false, 'Record a value'],
+    ]) {
+      await reloadModel();
+      if (!(await page.eval("document.querySelector('.holdings-card .checkbox input').checked"))) await toggleArchived();
+      // A press lands only on what is in the viewport.
+      const named = (await archiveCard()).rows.find((r) => r.chip === archived)?.name;
+      await page.call((wanted) => [...document.querySelectorAll('.holdings-table .row-name')].find((b) => b.textContent === wanted)?.scrollIntoView({ block: 'center' }), named);
+      await page.frames();
+      const row = (await archiveCard()).rows.find((r) => r.name === named);
+      let opened = false;
+      if (row) {
+        await (phone ? page.tap(row.edge.x, row.edge.y) : page.mouseClick(row.edge.x, row.edge.y));
+        opened = await page.waitUntil("location.hash.startsWith('#/holding/')", { timeout: 10000, label: 'the holding screen' }).then(() => true, () => false);
+      }
+      if (opened) await page.waitUntil("document.querySelector('.form-actions button')", { label: 'the holding screen' });
+      const offers = opened ? await labels('.form-actions button') : [];
+      check(
+        `net-worth-view: pressing ${kind} row opens the holding's screen, offering ${offered} (${width}px)`,
+        opened && offers.includes(offered),
+        JSON.stringify([row?.name, opened, offers]),
+      );
+    }
+  }
+  await page.send('Emulation.setTouchEmulationEnabled', { enabled: false });
+  await page.send('Emulation.clearDeviceMetricsOverride');
+  await reloadModel();
+  if (await page.eval("document.querySelector('.holdings-card .checkbox input').checked")) await toggleArchived();
+
+  // Holdings and no snapshot at all: every active holding is under Not
+  // yet valued and the total is a dash. Each archived one is a row
+  // reading "not yet valued" behind the toggle, and nowhere without it.
+  await page.call(async () => {
+    const api = await import('/static/js/api.js');
+    for (const type of ['snapshot', 'rate']) {
+      for (const row of await api.get('/api/records?type=' + type)) await api.del('/api/records/' + row.recordId);
+    }
+  });
+  await reloadModel();
+  await page.goto(`${BASE}/dashboard`);
+  await enterPassword(VAULT_PASSWORD);
+  await page.waitUntil("document.querySelector('.holdings-card')", { timeout: 90000, label: 'the dashboard with no snapshots' });
+  await page.idle();
+  for (const width of [1280, 390]) {
+    await atWidth(width);
+    for (const mode of ['Latest rates', 'as of each figure']) {
+      await pickMode(mode);
+      const where = `${mode} at ${width}px`;
+      const without = await archiveCard();
+      await toggleArchived();
+      const withArchived = await archiveCard();
+      await toggleArchived();
+      const archivedNames = ['Archive cellar', 'Archive empty'];
+      check(
+        `net-worth-view: with holdings and no snapshots, the total is a dash with no chart, and active holdings sit under Not yet valued (${where})`,
+        without.total === '—' && !without.chart && without.notValued.includes('Active cellar') &&
+          archivedNames.every((name) => !without.notValued.includes(name)) && without.notPriced.length === 0,
+        JSON.stringify(without),
+      );
+      check(
+        `net-worth-view: with holdings and no snapshots, each archived holding is an archived row reading "not yet valued" behind Show archived, and nowhere without it (${where})`,
+        archivedNames.every((name) => !without.text.includes(name)) &&
+          archivedNames.every((name) => {
+            const row = archivedRow(withArchived, name);
+            return row?.chip === true && row.visible.join('|') === 'not yet valued' && row.figures[1] === '' && noAsOf(row);
+          }) &&
+          archivedNames.every((name) => !withArchived.notValued.includes(name)),
+        JSON.stringify(withArchived.rows),
+      );
+    }
+    await pickMode('Latest rates');
+  }
+  await page.send('Emulation.clearDeviceMetricsOverride');
 
   // ---- One recording, drawn whole ----------------------------------------
   //

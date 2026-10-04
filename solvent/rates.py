@@ -15,14 +15,16 @@ reachable.
 from __future__ import annotations
 
 import json
+import logging
 import re
 import threading
 import time
 import urllib.error
 import urllib.request
+from concurrent.futures import ThreadPoolExecutor
 from datetime import date, datetime, timedelta, timezone
 from decimal import Decimal, InvalidOperation
-from typing import Literal, Optional
+from typing import Literal, NamedTuple, Optional
 
 from flask import Blueprint, abort, current_app, g, jsonify, request
 from pydantic import Field
@@ -161,9 +163,9 @@ def _request(url: str) -> urllib.request.Request:
 
 
 class _Breaker:
-    """Opens after N consecutive provider failures and serves No
-    Content directly for the cool-off instead of retrying per
-    request."""
+    """Opens after N consecutive failures of one provider and fails its
+    requests without sending them for the cool-off, instead of retrying
+    per request."""
 
     def __init__(self) -> None:
         self.lock = threading.Lock()
@@ -192,17 +194,38 @@ class _Breaker:
             self.opened_at = None
 
 
-breaker = _Breaker()
+# One per provider: a shared one would let an outage of either silence
+# the other, and the other's successes keep resetting the count.
+breakers = {"frankfurter": _Breaker(), "nbp": _Breaker()}
 
 
-def _fetch_json(url: str) -> "object | None":
+class _Egress(NamedTuple):
+    """What an outbound request needs from the request that asked, as
+    values: the worker threads that send it have no Flask context."""
+
+    deadline: float
+    cooloff: timedelta
+    failures: int
+    log: logging.Logger
+
+
+def _egress() -> _Egress:
+    """One deadline for the whole proxy request, shared by every
+    provider it asks."""
     config = current_app.config
-    if breaker.is_open(timedelta(minutes=config["RATE_BREAKER_COOLOFF_MINUTES"])):
+    return _Egress(
+        time.monotonic() + EGRESS_TIMEOUT_SECONDS,
+        timedelta(minutes=config["RATE_BREAKER_COOLOFF_MINUTES"]),
+        config["RATE_BREAKER_FAILURES"],
+        current_app.logger,
+    )
+
+
+def _fetch_json(provider: str, url: str, egress: _Egress) -> "object | None":
+    breaker = breakers[provider]
+    if breaker.is_open(egress.cooloff):
         return None
-    # One deadline for the whole proxy request: gold makes several calls
-    # in series, and each is given only what is left of it.
-    deadline = g.get("rate_deadline", time.monotonic() + EGRESS_TIMEOUT_SECONDS)
-    remaining = deadline - time.monotonic()
+    remaining = egress.deadline - time.monotonic()
     if remaining <= 0:
         return None
     try:
@@ -213,8 +236,8 @@ def _fetch_json(url: str) -> "object | None":
     except Exception as error:
         # Logged with the target and the failure, never with the
         # requesting user beyond what the access log already holds.
-        current_app.logger.warning("rates.provider url=%s error=%s", url, error)
-        breaker.record_failure(config["RATE_BREAKER_FAILURES"])
+        egress.log.warning("rates.provider url=%s error=%s", url, error)
+        breaker.record_failure(egress.failures)
         return None
     breaker.record_success()
     return payload
@@ -230,7 +253,9 @@ def _positive(value: object) -> "Decimal | None":
     return number if number > 0 else None
 
 
-def _fx_table(on: date, quote: str) -> "dict[str, tuple[Decimal, str]] | None":
+def _fx_table(
+    on: date, quote: str, egress: _Egress
+) -> "dict[str, tuple[Decimal, str]] | None":
     """Every currency's price in `quote`, from one outbound request.
 
     Frankfurter quotes a base against many symbols, so asking with
@@ -238,7 +263,9 @@ def _fx_table(on: date, quote: str) -> "dict[str, tuple[Decimal, str]] | None":
     the provider does not publish resolves to its prior close, which is
     what the `date` field in the response carries.
     """
-    payload = _fetch_json(FX_URL.format(date=on.isoformat(), quote=quote))
+    payload = _fetch_json(
+        "frankfurter", FX_URL.format(date=on.isoformat(), quote=quote), egress
+    )
     if not isinstance(payload, dict):
         return None
     as_of = payload.get("date")
@@ -258,7 +285,7 @@ def _fx_table(on: date, quote: str) -> "dict[str, tuple[Decimal, str]] | None":
     return table
 
 
-def _gold_pln(on: date) -> "tuple[Decimal, str] | None":
+def _gold_pln(on: date, egress: _Egress) -> "tuple[Decimal, str] | None":
     """PLN per gram of fine gold, at the last published day on or
     before `on`.
 
@@ -267,7 +294,7 @@ def _gold_pln(on: date) -> "tuple[Decimal, str] | None":
     prior-close rule in one request.
     """
     start = (on - _PRIOR_CLOSE_WINDOW).isoformat()
-    payload = _fetch_json(NBP_URL.format(start=start, end=on.isoformat()))
+    payload = _fetch_json("nbp", NBP_URL.format(start=start, end=on.isoformat()), egress)
     if not isinstance(payload, list) or not payload:
         return None
     last = payload[-1]
@@ -337,7 +364,7 @@ def _resolve(symbols: list, quote: str, on: date) -> "dict[str, dict]":
     for a single symbol.
     """
     wanted = [row for row in symbols if row["lookup"]]
-    g.rate_deadline = time.monotonic() + EGRESS_TIMEOUT_SECONDS
+    egress = _egress()
 
     on_str = on.isoformat()
     resolved: "dict[str, dict]" = {}
@@ -366,16 +393,27 @@ def _resolve(symbols: list, quote: str, on: date) -> "dict[str, dict]":
     if not pending:
         return resolved
 
-    fx = None
-    tables: "dict[str, dict | None]" = {}
-    if any(row["kind"] == "currency" for row in pending) or any(
-        row["symbol"].startswith("XAU-") for row in pending
-    ):
-        fx = tables[on_str] = _fx_table(on, quote)
-
-    gold_pln = None
-    if any(row["symbol"].startswith("XAU-") for row in pending):
-        gold_pln = _gold_pln(on)
+    # Outbound requests run on worker threads that touch neither the
+    # database nor Flask; caching and composing stay on this thread.
+    # The table and NBP's query go out at once, so a provider that hangs
+    # cannot use up the deadline before the other is asked. The quote leg
+    # needs NBP's asOf, so it waits for NBP, and reuses the table already
+    # going out when asOf is the requested date.
+    gold_pending = any(row["symbol"].startswith("XAU-") for row in pending)
+    with ThreadPoolExecutor(max_workers=3) as pool:
+        futures = {}
+        if any(row["kind"] == "currency" for row in pending):
+            futures[on_str] = pool.submit(_fx_table, on, quote, egress)
+        gold_pln = None
+        if gold_pending:
+            gold_pln = pool.submit(_gold_pln, on, egress).result()
+            if gold_pln is not None and quote != "PLN" and gold_pln[1] not in futures:
+                as_of = gold_pln[1]
+                futures[as_of] = pool.submit(
+                    _fx_table, date.fromisoformat(as_of), quote, egress
+                )
+        tables = {day: future.result() for day, future in futures.items()}
+    fx = tables.get(on_str)
 
     for row in pending:
         symbol = row["symbol"]
@@ -417,13 +455,11 @@ def _quote_leg(
     requested one: pairing a rate with FX from a different day
     misprices it. Either leg failing yields no proposal, because a
     half-composed rate is never returned. `tables` holds the FX tables
-    already fetched, by date, so a date is fetched once per request.
+    fetched for this request, by date.
     """
     if quote == "PLN":
         return pln, "nbp"
-    if as_of not in tables:
-        tables[as_of] = _fx_table(date.fromisoformat(as_of), quote)
-    leg = tables[as_of]
+    leg = tables.get(as_of)
     if not leg or "PLN" not in leg:
         return None
     return pln * leg["PLN"][0], "nbp+frankfurter"

@@ -8,15 +8,19 @@ never made.
 from __future__ import annotations
 
 import json
+import socket
 import ssl
+import threading
 import time
+import urllib.error
 import urllib.request
-from datetime import date, timedelta
+from datetime import date, datetime, timedelta, timezone
 
 import pytest
+from flask import has_app_context
 
 import solvent.rates as rates
-from tests.helpers import CSRF, mint_invite, register, rows
+from tests.helpers import CSRF, connect, mint_invite, register, rows
 
 
 @pytest.fixture
@@ -25,7 +29,7 @@ def provider(monkeypatch):
     calls = []
     answers = {}
 
-    def fetch(url):
+    def fetch(_provider, url, _egress):
         calls.append(url)
         for fragment, payload in answers.items():
             if fragment in url:
@@ -33,8 +37,42 @@ def provider(monkeypatch):
         return None
 
     monkeypatch.setattr(rates, "_fetch_json", fetch)
-    rates.breaker.record_success()
     return type("Provider", (), {"calls": calls, "answers": answers})()
+
+
+@pytest.fixture
+def hang_open(monkeypatch):
+    """The app's own opener sent to a loopback server that accepts the
+    connection and sends nothing, so the wait ends at the app's own
+    socket timeout. Returns a replacement for `_opener.open` that
+    reaches that server in place of the URL it was given."""
+    real_open = rates._opener.open
+    listener = socket.create_server(("127.0.0.1", 0))
+    listener.settimeout(0.05)
+    port = listener.getsockname()[1]
+    held = []
+    stop = threading.Event()
+
+    def accept():
+        while not stop.is_set():
+            try:
+                held.append(listener.accept()[0])
+            except (TimeoutError, OSError):
+                pass
+
+    acceptor = threading.Thread(target=accept)
+    acceptor.start()
+
+    def open_(request, timeout=None):
+        silent = urllib.request.Request(f"http://127.0.0.1:{port}/", headers=request.headers)
+        return real_open(silent, timeout=timeout)
+
+    yield open_
+    stop.set()
+    acceptor.join()
+    listener.close()
+    for connection in held:
+        connection.close()
 
 
 def fx(on: str, table: dict) -> dict:
@@ -270,7 +308,6 @@ def test_the_circuit_breaker_opens_and_closes(app, owner, monkeypatch):
         raise OSError("provider down")
 
     monkeypatch.setattr(rates._opener, "open", failing)
-    rates.breaker.record_success()
 
     for _ in range(4):
         owner.get(f"/api/rates?date={PAST}&quote=CHF&symbol=USD", headers=CSRF)
@@ -278,25 +315,19 @@ def test_the_circuit_breaker_opens_and_closes(app, owner, monkeypatch):
     owner.get(f"/api/rates?date={PAST}&quote=CHF&symbol=USD", headers=CSRF)
     assert len(attempts) == opened
 
-    rates.breaker.record_success()
+    rates.breakers["frankfurter"].record_success()
     owner.get(f"/api/rates?date={PAST}&quote=CHF&symbol=USD", headers=CSRF)
     assert len(attempts) > opened
 
 
 def test_a_whole_table_request_holding_gold_stays_within_one_egress_timeout(
-    owner, monkeypatch
+    owner, monkeypatch, hang_open
 ):
     """The deadline is per proxy request, not per outbound call: gold
     makes several in series, and a provider that hangs must not stack
     their timeouts."""
     monkeypatch.setattr(rates, "EGRESS_TIMEOUT_SECONDS", 0.4)
-
-    def hang(request, timeout=None):
-        time.sleep(timeout)
-        raise TimeoutError("provider hangs")
-
-    monkeypatch.setattr(rates._opener, "open", hang)
-    rates.breaker.record_success()
+    monkeypatch.setattr(rates._opener, "open", hang_open)
 
     started = time.monotonic()
     response = owner.get(f"/api/rates?date={PAST}&quote=CHF", headers=CSRF)
@@ -487,9 +518,12 @@ def test_every_outbound_request_is_named(monkeypatch):
 
     scratch = Flask(__name__)
     scratch.config.update(RATE_BREAKER_COOLOFF_MINUTES=5, RATE_BREAKER_FAILURES=5)
-    rates.breaker.record_success()
     with scratch.app_context():
-        rates._fetch_json("https://api.frankfurter.dev/v1/2026-01-01?base=CHF")
+        rates._fetch_json(
+            "frankfurter",
+            "https://api.frankfurter.dev/v1/2026-01-01?base=CHF",
+            rates._egress(),
+        )
 
     assert seen[0].get_header("User-agent") == rates.USER_AGENT
 
@@ -525,7 +559,6 @@ def opener(monkeypatch):
         return Response(answers[kind](request.full_url))
 
     monkeypatch.setattr(rates._opener, "open", open_)
-    rates.breaker.record_success()
     return type("Opener", (), {"requests": requests, "answers": answers})()
 
 
@@ -556,10 +589,7 @@ def test_the_module_constants_the_source_check_imports_are_exactly_named():
         (
             "XAU-g",
             "PLN",
-            [
-                rates.FX_URL.format(date=PAST, quote="PLN"),
-                rates.NBP_URL.format(start="2026-07-17", end=PAST),
-            ],
+            [rates.NBP_URL.format(start="2026-07-17", end=PAST)],
         ),
         (
             "XAU-g",
@@ -725,3 +755,313 @@ def test_the_only_environment_the_app_reads_is_its_configuration_and_none_of_it_
     assert [(h._context.verify_mode, h._context.check_hostname) for h in https] == [
         (ssl.CERT_REQUIRED, True)
     ]
+
+
+# ---- One breaker per provider ------------------------------------------
+
+FAILURE_KINDS = ["connect", "timeout", "non-200", "non-json"]
+
+
+@pytest.fixture
+def providers(monkeypatch, hang_open):
+    """The app's opener, with Frankfurter and NBP each healthy or failing
+    in one of the ways a breaker counts. `requests` records the provider
+    of every request that went out, `lag_days` makes NBP publish that
+    many days before the date asked. A provider in `hang` is reached on a
+    loopback server that sends nothing, so the app's own timeout ends
+    the wait, and one in `delay` answers that many
+    seconds late. `sent` holds each request's provider, send time and
+    whether it ran off the request's thread without a Flask context."""
+
+    main = threading.current_thread()
+
+    class Response:
+        def __init__(self, body, status=200):
+            self.body, self.status = body, status
+
+        def read(self, _size=None):
+            return self.body
+
+        def __enter__(self):
+            return self
+
+        def __exit__(self, *_):
+            return False
+
+    state = type(
+        "Providers",
+        (),
+        {"requests": [], "fail": {}, "lag_days": 0, "hang": set(), "delay": {}, "sent": []},
+    )()
+
+    def open_(request, timeout=None):
+        url = request.full_url
+        provider = "nbp" if "nbp.pl" in url else "frankfurter"
+        state.requests.append(provider)
+        isolated = threading.current_thread() is not main and not has_app_context()
+        state.sent.append((provider, time.monotonic(), isolated))
+        if provider in state.hang:
+            return hang_open(request, timeout)
+        time.sleep(state.delay.get(provider, 0))
+        kind = state.fail.get(provider)
+        if kind == "connect":
+            raise ConnectionRefusedError("refused")
+        if kind == "timeout":
+            raise TimeoutError("timed out")
+        if kind == "non-200":
+            return Response(b"{}", status=503)
+        if kind == "non-json":
+            return Response(b"<html>")
+        if provider == "nbp":
+            end = date.fromisoformat(url.split("?")[0].rsplit("/", 1)[1])
+            published = (end - timedelta(days=state.lag_days)).isoformat()
+            return Response(json.dumps([{"data": published, "cena": 251.37}]).encode())
+        body = {
+            "base": url.rsplit("base=", 1)[1],
+            "date": url.split("/v1/")[1][:10],
+            "rates": {"PLN": 4.2537, "USD": 1.0876},
+        }
+        return Response(json.dumps(body).encode())
+
+    monkeypatch.setattr(rates._opener, "open", open_)
+    return state
+
+
+def _day(offset: int) -> str:
+    """A different date per request, so no cache entry answers in place
+    of a provider."""
+    return (date.fromisoformat(PAST) - timedelta(days=offset)).isoformat()
+
+
+@pytest.mark.parametrize("kind", FAILURE_KINDS)
+def test_frankfurter_failing_opens_its_breaker_while_nbp_keeps_answering(
+    app, owner, providers, kind
+):
+    """Each request is for a new date, quoted in PLN, so gold needs no
+    Frankfurter leg. NBP's successes between Frankfurter's failures must
+    not reset Frankfurter's count."""
+    app.config["RATE_BREAKER_FAILURES"] = 3
+    providers.fail["frankfurter"] = kind
+
+    for offset in range(6):
+        response = owner.get(f"/api/rates?date={_day(offset)}&quote=PLN", headers=CSRF)
+        assert response.status_code == 200
+        assert set(response.get_json()["rates"]) == {"XAU-g", "XAU-ozt"}
+
+    assert providers.requests.count("frankfurter") == 3
+    assert providers.requests.count("nbp") == 6
+
+
+@pytest.mark.parametrize("kind", FAILURE_KINDS)
+def test_nbp_failing_past_the_count_stops_only_the_gold_symbols(app, owner, providers, kind):
+    app.config["RATE_BREAKER_FAILURES"] = 3
+    providers.fail["nbp"] = kind
+
+    for offset in range(6):
+        response = owner.get(f"/api/rates?date={_day(offset)}&quote=CHF", headers=CSRF)
+        assert response.status_code == 200
+        symbols = set(response.get_json()["rates"])
+        assert {"USD", "PLN"} <= symbols
+        assert not symbols & {"XAU-g", "XAU-ozt"}
+
+    assert providers.requests.count("frankfurter") == 6
+    assert providers.requests.count("nbp") == 3
+
+
+def test_a_failing_fx_leg_of_gold_counts_against_frankfurter_not_nbp(app, owner, providers):
+    """NBP publishes the day before each date asked, so every gold
+    request needs a Frankfurter request, for the day NBP published:
+    the currency leg."""
+    app.config["RATE_BREAKER_FAILURES"] = 3
+    providers.fail["frankfurter"] = "non-200"
+    providers.lag_days = 1
+
+    for offset in range(4):
+        url = f"/api/rates?date={_day(offset)}&quote=CHF&symbol=XAU-g"
+        assert owner.get(url, headers=CSRF).status_code == 204
+
+    # One failure per request, so the third opens the breaker and the
+    # leg of the fourth is not sent.
+    assert providers.requests.count("frankfurter") == 3
+    assert providers.requests.count("nbp") == 4
+    assert rates.breakers["nbp"].failures == 0
+    assert rates.breakers["frankfurter"].opened_at is not None
+
+
+@pytest.fixture
+def server_clock(monkeypatch):
+    """The clock the breakers read, stopped until a test moves it."""
+    now = [datetime.now(timezone.utc)]
+
+    class Stopped(datetime):
+        @classmethod
+        def now(cls, tz=None):
+            return now[0].astimezone(tz)
+
+    monkeypatch.setattr(rates, "datetime", Stopped)
+    return lambda seconds: now.__setitem__(0, now[0] + timedelta(seconds=seconds))
+
+
+@pytest.mark.parametrize("down, other", [("frankfurter", "nbp"), ("nbp", "frankfurter")])
+def test_each_provider_is_asked_again_after_its_own_cooloff(
+    app, owner, providers, server_clock, down, other
+):
+    app.config["RATE_BREAKER_FAILURES"] = 2
+    app.config["RATE_BREAKER_COOLOFF_MINUTES"] = 5
+    providers.fail[down] = "connect"
+
+    def lookup(offset):
+        before = list(providers.requests)
+        owner.get(f"/api/rates?date={_day(offset)}&quote=CHF", headers=CSRF)
+        # The two providers are asked at once, so their order is not fixed.
+        return sorted(providers.requests[len(before):])
+
+    assert lookup(0) == ["frankfurter", "nbp"]
+    assert lookup(1) == ["frankfurter", "nbp"]
+    assert lookup(2) == [other]
+    server_clock(5 * 60 - 1)
+    assert lookup(3) == [other]
+    server_clock(1)
+    # The count starts again from zero, so it takes two more failures.
+    assert lookup(4) == ["frankfurter", "nbp"]
+    assert lookup(5) == ["frankfurter", "nbp"]
+    assert lookup(6) == [other]
+
+
+# ---- Both providers share one deadline, and are asked at once ----------
+
+HANG_BOUND = 1
+
+
+@pytest.fixture
+def short_timeout(monkeypatch):
+    monkeypatch.setattr(rates, "EGRESS_TIMEOUT_SECONDS", 0.5)
+    return 0.5
+
+
+def _timed(owner, url):
+    started = time.monotonic()
+    response = owner.get(url, headers=CSRF)
+    return response, time.monotonic() - started
+
+
+def test_both_providers_hanging_gives_no_content_within_the_bound_and_both_are_asked_at_once(
+    owner, providers, short_timeout
+):
+    providers.hang = {"frankfurter", "nbp"}
+    response, elapsed = _timed(owner, f"/api/rates?date={PAST}&quote=PLN")
+
+    assert response.status_code == 204
+    assert elapsed < short_timeout + HANG_BOUND
+    first = {provider: at for provider, at, _ in reversed(providers.sent)}
+    assert set(first) == {"frankfurter", "nbp"}
+    assert abs(first["frankfurter"] - first["nbp"]) < short_timeout / 2
+
+
+def test_frankfurter_hanging_leaves_the_gold_symbols_in_a_pln_table(
+    owner, providers, short_timeout
+):
+    providers.hang = {"frankfurter"}
+    response, elapsed = _timed(owner, f"/api/rates?date={PAST}&quote=PLN")
+
+    assert response.status_code == 200
+    assert set(response.get_json()["rates"]) == {"XAU-g", "XAU-ozt"}
+    assert elapsed < short_timeout + HANG_BOUND
+
+
+def test_nbp_hanging_leaves_the_currency_rates(owner, providers, short_timeout):
+    providers.hang = {"nbp"}
+    response, elapsed = _timed(owner, f"/api/rates?date={PAST}&quote=CHF")
+
+    assert response.status_code == 200
+    symbols = set(response.get_json()["rates"])
+    assert {"USD", "PLN"} <= symbols
+    assert not symbols & {"XAU-g", "XAU-ozt"}
+    assert elapsed < short_timeout + HANG_BOUND
+
+
+def _only(app, kind):
+    """The symbol table with only `kind` left to look up, so a whole
+    table has only those symbols pending."""
+    conn = connect(app)
+    conn.execute("UPDATE symbols SET lookup = 0 WHERE kind != ?", (kind,))
+    conn.commit()
+    conn.close()
+
+
+@pytest.mark.parametrize(
+    "kind, quote, sent",
+    [
+        ("currency", "CHF", ["frankfurter"]),
+        ("metal", "PLN", ["nbp"]),
+        ("metal", "CHF", ["frankfurter", "nbp"]),
+    ],
+)
+def test_a_request_sends_only_what_its_pending_symbols_need(
+    app, owner, providers, kind, quote, sent
+):
+    _only(app, kind)
+    response = owner.get(f"/api/rates?date={PAST}&quote={quote}", headers=CSRF)
+
+    assert response.status_code == 200
+    assert sorted(providers.requests) == sent
+
+
+def test_a_gold_request_quoted_in_pln_makes_exactly_one_request_to_nbp(owner, providers):
+    owner.get(f"/api/rates?date={PAST}&quote=PLN&symbol=XAU-g", headers=CSRF)
+    assert providers.requests == ["nbp"]
+
+
+def test_the_quote_leg_reuses_the_table_in_flight_when_asof_is_the_requested_date(
+    owner, providers
+):
+    owner.get(f"/api/rates?date={PAST}&quote=CHF", headers=CSRF)
+    assert sorted(providers.requests) == ["frankfurter", "nbp"]
+
+
+def test_the_quote_leg_waits_for_nbp_and_gets_only_a_table_for_its_own_asof(
+    owner, providers
+):
+    providers.lag_days = 1
+    providers.delay = {"nbp": 0.2}
+    owner.get(f"/api/rates?date={PAST}&quote=CHF", headers=CSRF)
+
+    assert sorted(providers.requests) == ["frankfurter", "frankfurter", "nbp"]
+    nbp = next(at for provider, at, _ in providers.sent if provider == "nbp")
+    table, leg = [at for provider, at, _ in providers.sent if provider == "frankfurter"]
+    assert table < nbp + 0.1
+    assert leg >= nbp + 0.2
+
+
+def test_outbound_requests_run_on_threads_with_no_flask_context(owner, providers, monkeypatch):
+    main = threading.current_thread()
+    callers = []
+    get_db = rates.get_db
+
+    def spy():
+        callers.append(threading.current_thread())
+        return get_db()
+
+    monkeypatch.setattr(rates, "get_db", spy)
+    owner.get(f"/api/rates?date={PAST}&quote=CHF", headers=CSRF)
+
+    assert providers.sent
+    assert all(isolated for _, _, isolated in providers.sent)
+    # Caching and composing ran, and only on the request's thread.
+    assert callers
+    assert all(caller is main for caller in callers)
+
+
+def test_a_breaker_count_changed_from_many_threads_loses_no_update():
+    breaker = rates._Breaker()
+
+    def fail():
+        for _ in range(2000):
+            breaker.record_failure(10**9)
+
+    threads = [threading.Thread(target=fail) for _ in range(8)]
+    for thread in threads:
+        thread.start()
+    for thread in threads:
+        thread.join()
+    assert breaker.failures == 8 * 2000

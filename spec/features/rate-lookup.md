@@ -403,7 +403,8 @@ host's network are reachable:
 - HTTP redirects are **disabled**, not followed to a validated target.
 - Egress has a hard timeout, `EGRESS_TIMEOUT_SECONDS` = 5 for connect
   and read together across one proxy request, and a response size cap,
-  `MAX_RESPONSE_BYTES` = 1 MiB.
+  `MAX_RESPONSE_BYTES` = 1 MiB. How the providers of one request share
+  that deadline is under Rate limiting and failure.
 - `solvent.rates` exposes `FX_URL`, `NBP_URL`, `USER_AGENT`,
   `EGRESS_TIMEOUT_SECONDS`, `MAX_RESPONSE_BYTES` and `SEEDED_SYMBOLS`
   under those names, because the nightly source check imports them to
@@ -430,11 +431,49 @@ host's network are reachable:
   any size costs **one** request, because the client asks for the whole
   table once per recording date (`record-rate.md`, The refresh), so the
   limit sits far above honest use.
-- A circuit breaker opens after **5 consecutive provider failures** and
-  serves No Content directly for a **5-minute cool-off** instead of
-  retrying per request.
-- Both are operator config with those defaults (architecture.md, Rate
-  limiting).
+- **Each provider has its own circuit breaker**, keyed `frankfurter`
+  and `nbp`. A breaker opens after **5 consecutive failures** of its
+  own provider. For a **5-minute cool-off** it then fails that
+  provider's requests without sending them, instead of retrying per
+  request, so every symbol needing that provider gets no proposal.
+- A failure is an outbound request that cannot connect, times out,
+  answers anything but 200, or answers a body that is not JSON. A
+  success resets its own provider's count and touches no other
+  breaker.
+- The gold lookup's currency leg is a Frankfurter request and counts
+  against Frankfurter. So while Frankfurter is down, NBP requests still
+  go out and gold quoted in PLN still resolves, and while NBP is down,
+  every currency lookup still goes out. There is no breaker shared by
+  both providers, because one provider's outage would silence the
+  other, and the other's successes would keep resetting the count.
+- **A proxy request sends only the outbound requests its pending
+  symbols need**, a pending symbol being one neither cached nor the
+  identity case. Frankfurter's table for `date` goes out when a
+  currency symbol is pending, NBP's range query when a gold symbol is,
+  and the gold quote leg only for a gold symbol quoted in anything but
+  PLN.
+- **Frankfurter's table and NBP's range query go out at once**, and
+  the proxy request waits for both within its one
+  `EGRESS_TIMEOUT_SECONDS` deadline. Asked one after the other, a
+  provider that hangs would use up the deadline before the other was
+  asked, so its outage would silence the other provider until its
+  breaker opened. Giving each provider its own share of the deadline
+  avoids that too, but cuts the time each gets to answer, so a slow
+  provider that answers within the deadline would fail.
+- **The gold quote leg goes out once NBP has answered**, because it is
+  fetched at NBP's `asOf`, and it has only what is left of the
+  deadline. When `asOf` is the requested date and the table for `date`
+  is already going out, the leg waits for that request instead of
+  sending a second one.
+- The outbound requests run on threads of their own, each handed its
+  provider, URL and deadline as values. They touch no database
+  connection and no Flask context: caching and composing the response
+  happen on the request's thread once every outbound request has
+  returned. A breaker's count changes under a lock, because the table
+  and the quote leg can be in flight to Frankfurter at once.
+- The request limit, the failure count and the cool-off are operator
+  config with those defaults, and the failure count and cool-off apply
+  to each breaker alike (app-shell.md, Configuration).
 - Provider errors are logged with the symbol and status, never with the
   requesting user's identity beyond what the access log already holds.
 
@@ -509,11 +548,38 @@ host's network are reachable:
   with Bad Request, and no outbound request is made.
 - With the provider stubbed to reply `302` toward an internal address,
   no request to that address is made.
-- With the provider stubbed to hang, the endpoint returns No Content
-  within the configured timeout rather than holding the connection.
-- After the configured number of consecutive provider failures the
-  circuit breaker returns No Content without an outbound attempt, and
-  closes again after the cool-off.
+- With both providers stubbed to hang, a whole-table request returns
+  No Content within `EGRESS_TIMEOUT_SECONDS` plus one second, rather
+  than holding the connection. A stub that hangs accepts the connection
+  and sends nothing until after the deadline, so the client's own
+  timeout ends the wait, not a stub error.
+- With Frankfurter stubbed to hang and NBP to answer, a whole-table
+  request quoted in PLN with a currency symbol pending returns the gold
+  symbols with their rates and no currency rate, within
+  `EGRESS_TIMEOUT_SECONDS` plus one second. With NBP stubbed to hang
+  and Frankfurter to answer, the same request returns the currency
+  rates with the gold symbols absent, within the same bound.
+- A gold request quoted in PLN makes exactly one outbound request, to
+  NBP.
+- After the configured number of consecutive failures of one provider,
+  a request needing only that provider returns No Content without an
+  outbound attempt, and that provider is asked again once the cool-off
+  has passed. Asserted for each provider.
+- With Frankfurter stubbed to fail and NBP to answer, whole-table
+  requests quoted in PLN, each for a different date, open Frankfurter's
+  breaker after the configured number of Frankfurter failures. Each
+  request still sends its NBP request and returns the gold symbols with
+  their rates, and once the breaker is open no Frankfurter request goes
+  out within the cool-off.
+- NBP successes interleaved with Frankfurter failures do not reset
+  Frankfurter's count: its breaker opens on the configured Frankfurter
+  failure, not later.
+- With NBP stubbed to fail past the configured count, whole-table
+  requests, each for a different date, still each send their Frankfurter
+  request and return the currency rates, with only the gold symbols
+  absent.
+- A failing FX leg of a gold request counts against Frankfurter's
+  breaker and not NBP's.
 - An unauthenticated request returns Unauthorized and makes no outbound
   request.
 - Every `/api/admin/symbols` route returns Not Found to a vault owner

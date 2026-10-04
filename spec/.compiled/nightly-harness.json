@@ -5,7 +5,7 @@
     {"file": "spec/features/nightly-harness.md", "sections": ["all"]},
     {"file": "CLAUDE.md", "sections": ["The loop"], "role": "Nightly and stable is the requirement this feature serves: shards on a network of their own with no route out, the stand-in under the real source names, the vaults made with the app's own browser code, qa reaching the server only through harness tools, and nothing of the harness in the image"},
     {"file": "spec/architecture.md", "sections": ["Tech stack", "Vault epoch", "Status codes", "Application hardening", "Storage & data handling", "Threat model"], "role": "Tech stack, Packaging: the image holds nothing of the harness. Status codes: the stand-in's statuses are the providers' own and outside this set. Application hardening: the session, the sign-in limits each shard spends and the egress rules the stand-in is trusted under. Vault epoch: the X-Solvent-Vault header every vault request the generator sends carries"},
-    {"file": "spec/features/rate-lookup.md", "sections": ["Providers", "Seeded symbols", "SSRF and egress hardening", "Rate limiting and failure", "Edge cases"], "role": "the composition known_table must equal exactly, the seeded currency list prices.py must equal, the constants that name no setting, and the breaker that app_stop and app_start reset"},
+    {"file": "spec/features/rate-lookup.md", "sections": ["Providers", "Seeded symbols", "SSRF and egress hardening", "Rate limiting and failure", "Edge cases"], "role": "the composition known_table must equal exactly, the seeded currency list prices.py must equal, the constants that name no setting, and the per-provider breakers that app_stop and app_start reset"},
     {"file": "spec/features/net-worth-view.md", "sections": ["Current net worth", "Archived holdings"], "role": "the expected figures prepare computes independently: latest quantity times price, assets and debts, archived and unpriced holdings excluded"},
     {"file": "spec/features/record-rate.md", "sections": ["Record shape", "The refresh", "The write path", "Reading", "Editing a captured rate"], "role": "the rate records the script writes, the proposals it passes to refreshPrices, the price as recorded, and editedRatePayload"},
     {"file": "spec/features/record-snapshot.md", "sections": ["Record shape", "Same holding, same date: upsert"], "role": "the snapshot records written, and the same-date pair the plan plants"},
@@ -125,7 +125,7 @@
     "prepare": {
       "command": {"value": "python3 tools/nightly/prices.py prepare <plan> <out>, expanding the plan against the current UTC date", "cite": "spec/features/nightly-harness.md#pricespy-prepare"},
       "outputs": {"value": {"<out>/script.json": "per account, in order, every write the generator makes, with concrete dates, values and, for each proposed rate, the proposal from known_table", "<out>/expected.json": "per vault, and for each backup file, the expected figures under both pricing modes"}, "cite": "spec/features/nightly-harness.md#pricespy-prepare"},
-      "expectedFigures": {"value": "computed independently of the app in Decimal. Each active, priced holding's figure is its latest quantity times its price (the latest price, or the price as recorded), rounded half-even at scale 12, as static/js/decimal.js multiplies. The total is the sum of those at scale 12. assets sums the figures above zero and debts those below. Each is given as exact (scale 12 without trailing zeros) and display (rounded half-even to the places the vault's profile shows, no grouping, '-' for a negative). Archived holdings, holdings with no quantity and holdings with no price are listed by name under excluded, with the reason", "cite": "spec/features/nightly-harness.md#pricespy-prepare"},
+      "expectedFigures": {"value": "computed independently of the app in Decimal. Each active, priced holding's figure is its latest quantity times its price (the latest price, or the price as recorded), rounded half-even at scale 12, as static/js/decimal.js multiplies. The total is the sum of those at scale 12. assets sums the figures above zero and debts those below. Each is given as exact (scale 12 without trailing zeros) and display (rounded half-even to the places the vault's profile shows, no grouping, '-' for a negative). Archived holdings, holdings with no quantity and holdings with no price are listed by name under excluded, with the reason. An archived holding's reason is archived whatever else is true of it, an unpriced or unvalued one included", "cite": "spec/features/nightly-harness.md#pricespy-prepare", "see": "spec/features/net-worth-view.md#current-net-worth"},
       "dateReadOnce": {"value": "prepare reads the date once and writes it as the manifest's today, and the expected figures hold for that date, since no later price is written", "cite": "spec/features/nightly-harness.md#edge-cases"}
     },
     "fixtures": {
@@ -176,7 +176,7 @@
         "app_stop": {"arguments": "none", "does": "docker stop --time 10 <container>", "returns": "{\"state\": \"stopped\"}"},
         "app_start": {"arguments": "none", "does": "docker start <container>, then polls <url>/login until it answers 200, at most 60 seconds", "returns": "{\"state\": \"running\"}, or isError: true with {\"state\": \"not answering\"}"}
       }, "cite": "spec/features/nightly-harness.md#the-harness-tools"},
-      "breakerReset": {"value": "app_stop and app_start reset the app's circuit breaker, because it lives in process memory. app_start on a running container changes nothing and answers running", "cite": "spec/features/nightly-harness.md#edge-cases"}
+      "breakerReset": {"value": "app_stop and app_start reset every one of the app's circuit breakers, because the breakers live in process memory. app_start on a running container changes nothing and answers running", "cite": "spec/features/nightly-harness.md#edge-cases"}
     },
     "workflowRequirements": {
       "buildJob": {"value": "after the image is built and before any shard starts, a step with the id sources runs sources.py check in a container of tonight's image on the default network, appends its output to the step summary, and fails the job on exit 1", "cite": "spec/features/nightly-harness.md#what-the-workflow-does"},
@@ -199,7 +199,7 @@
       "sourceChanged": "the build job fails at sources, before any shard, and the failure issue names that step",
       "sourceDoesNotAnswer": "noted in the summary and the night goes on, since the stand-in answers the shards either way",
       "trustStoreMoved": "the probe fails the shard as the harness, rather than every lookup failing as a finding",
-      "breakerOpened": "the app skips that source for the cool-off after it comes back up, and app_stop then app_start resets it"
+      "breakerOpened": "the app skips that source, and only that source, for the cool-off after it comes back up, and app_stop then app_start resets every breaker"
     }, "cite": "spec/features/nightly-harness.md#edge-cases"}
   },
   "verify": {
@@ -215,7 +215,7 @@
       "sources.py's classifier fed a timeout, a refused connection, 429, 503, 301, 404, a non-JSON 200, a body over the cap, a missing PLN, a missing seeded currency, a boolean rate, an empty NBP array, a date outside the window, and the real providers' documented shapes",
       "a pair of sockets for relay.py, to compare bytes in both directions and closure",
       "a plan missing each coverage name in turn, a plan whose damaged record is its holding's latest quantity, and a plan whose pair is, for prepare's refusals",
-      "a hand-computed vault covering an archived holding, an unpriced one, a main-currency one, a debt and an edited rate, for expected.json under both pricing modes",
+      "a hand-computed vault covering an archived holding, an unpriced one, a main-currency one, a debt and an edited rate, for expected.json under both pricing modes, with one archived holding in a unit that has no price, for the excluded reason archived",
       "a fresh instance of the app and a headless Chrome, for fixtures.mjs and then patch.py on that instance's database, with a request log that shows no call to /api/rates",
       "the idle-lock-out-of-range vault opened in a headless Chrome after fixtures.mjs, its profile record decrypted and its Settings screen read",
       "a dump of every table before and after patch.py, a patch naming an unknown username, an unknown label, and a kdfMemory of 65536",
@@ -237,6 +237,7 @@
       "prepare's refusals need a plan whose damaged record or pair is its holding's latest quantity, not only a plan missing a coverage name. The first would give two correct totals and no oracle",
       "fixtures.mjs must be shown to write no record by its own crypto, which a request log cannot show. Assert the writes come through the served modules and that the damaged record and the pair alone use plant",
       "every vault request the generator sends, the plant writes and makeStale's upgrade included, must be shown to carry X-Solvent-Vault, from a request capture of a fresh run. A generator that calls a raw fetch for the damaged record or the stale upgrade gets Bad Request from the gate and fails the night as the harness",
+      "an archived holding that is also unpriced or has no quantity must be listed under excluded with the reason archived, never not priced or no quantity. The oracle gives the screen's reason, and a holding checked only when it is archived and otherwise valid passes a reason chosen by the first failing test",
       "no request to /api/rates in the run, asserted from the request log, since a lookup would spend the limit and reach the stand-in",
       "after patch.py each vault's dashboard must show the manifest's display total under both pricing modes in a real browser, the damaged record must be reported unreadable, and the aged cookie must be refused as no session. Matching the rows alone passes data the screens cannot read",
       "the idle-lock-out-of-range vault's decrypted profile record must hold idleLockMinutes: 0 and its Settings screen must show five minutes. A plan that stores 5, or a screen read that skips the stored value, passes a check of the screen alone",

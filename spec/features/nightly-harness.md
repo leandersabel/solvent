@@ -355,7 +355,9 @@ record-rate.md, Reading, computed independently of the app in
   with no grouping and `-` for a negative.
 
 Archived holdings, holdings with no quantity and holdings with no price
-are listed by name under `excluded`, with the reason.
+are listed by name under `excluded`, with the reason. An archived
+holding's reason is `archived` whatever else is true of it
+(net-worth-view.md, Current net worth, Archived comes first).
 
 ### `fixtures.mjs`
 
@@ -561,10 +563,11 @@ On failure it prints `docker logs` of `solvent` and `standin`.
   the night goes on. The stand-in answers the shards either way.
 - **The base image moves its trust store** → the probe fails the shard
   as the harness, rather than every lookup failing as a finding.
-- **`qa` sets a source down and the breaker opens** → the app skips
-  that source for the cool-off after it comes back up
-  (rate-lookup.md, Rate limiting and failure). `app_stop` and
-  `app_start` reset it, because the breaker lives in process memory.
+- **`qa` sets a source down and its breaker opens** → the app skips
+  that source, and only that source, for the cool-off after it comes
+  back up (rate-lookup.md, Rate limiting and failure). `app_stop` and
+  `app_start` reset every breaker, because the breakers live in process
+  memory.
 - **`app_start` before `app_stop`** → `docker start` on a running
   container changes nothing, and the tool answers `running`.
 - **The prepared data spans midnight UTC** → `prepare` reads the date

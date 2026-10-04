@@ -78,17 +78,26 @@ vault is whatever the last recording wrote.
   genuinely went quiet. The age of each figure is stated in plain
   language on `ui/update-values.md`, next to the control that acts on
   it.
-- **Archived holdings are excluded from the current total** — an
-  archived holding is a closed position. They remain in history before
-  their `archivedAt` date (Trend chart, Archived holdings).
-- **A holding with no snapshots contributes nothing** and is listed
-  separately as "not yet valued" rather than shown as 0. Zero is a real
-  value a user can record and means something different.
-- **A holding with a quantity and no price for its unit contributes
-  nothing either**, and is listed separately as **not priced**, with
-  that as the stated reason rather than the other one. It is never
-  counted at its bare quantity, which would silently value a holding as
-  though its unit were the main currency. The state is reached by a
+- **Archived comes first.** An archived holding is a closed position,
+  excluded from the current total, and it is **never listed as not yet
+  valued or not priced**, because it is out of the total for being
+  archived and that is the reason the screen gives. It remains in
+  history before its `archivedAt` date (Trend chart, Archived
+  holdings). Its row, shown behind "Show archived"
+  (`ui/dashboard.md`, Holdings table), carries its latest quantity and
+  converted figure like any row, with "not priced" in place of the
+  converted figure where its unit has no price in the selected mode,
+  and "not yet valued" in place of both figures where it has no
+  readable snapshot.
+- **An active holding with no snapshots contributes nothing** and is
+  listed separately as "not yet valued" rather than shown as 0. Zero is
+  a real value a user can record and means something different.
+- **An active holding with a quantity and no price for its unit
+  contributes nothing either**, and is listed separately as **not
+  priced**, with that as the stated reason rather than the other one.
+  It is never counted at its bare quantity, which would silently value
+  a holding as though its unit were the main currency. The state is
+  reached by a
   recording whose price writes all failed (`record-rate.md`, The write
   path), by a free-text unit nobody has priced yet, and by the deletion
   or the flagged duplication of a symbol's only entry.
@@ -457,7 +466,7 @@ the sub-pixel bound above. The figure shown is the model's.
 ## Edge cases
 
 - **No holdings** → empty state pointing at "Add your first holding."
-- **Holdings but no snapshots** → holdings listed as "not yet valued,"
+- **Holdings but no snapshots** → active holdings listed as "not yet valued,"
   total shown as "—" rather than 0, no chart.
 - **A history of one day**, every snapshot, price entry and archive on
   one date → under every range the chart shows a single point at the
@@ -485,7 +494,7 @@ the sub-pixel bound above. The figure shown is the model's.
   the pair drops out of that symbol's series and the neighboring
   entries interpolate across the date. The fault is named on screen and
   resolved in that date's recording (`record-rate.md`). When the pair
-  is the symbol's only entry, its holdings are listed as not priced
+  is the symbol's only entry, its active holdings are listed as not priced
   rather than counted at either figure.
 - **Decryption fails for one record** → that record is skipped, the rest
   of the view renders, and a prominent warning names how many records
@@ -524,9 +533,9 @@ the sub-pixel bound above. The figure shown is the model's.
   entries removed.
 - A symbol with two differing entries on one date prices that date from
   its neighboring entries, and the view names the fault.
-- A holding whose unit has a quantity but no price entry is listed as
-  not priced, is excluded from the total, and its quantity never appears
-  in the total unconverted.
+- An active holding whose unit has a quantity but no price entry is
+  listed as not priced, is excluded from the total, and its quantity
+  never appears in the total unconverted.
 - On rates as of each figure, a `USD` holding whose latest quantity is
   at 2026-04-10, with `USD` entries at 2010-03-31 only, counts in the
   total at the 2010-03-31 rate and its row carries 2010-03-31. A row
@@ -640,8 +649,17 @@ the sub-pixel bound above. The figure shown is the model's.
   net-worth line at that date, in decimal.
 - A holding appears in exactly one band of the selected dimension, and
   the holding count across all bands equals the total holding count.
-- A holding with no snapshots is listed as "not yet valued" and is not
-  counted as 0.
+- An active holding with no snapshots is listed as "not yet valued"
+  and is not counted as 0.
+- With "Show archived" on, in both pricing modes, an archived holding
+  in a unit with no price and an archived holding with no readable
+  snapshot each render as a row of the holdings table with the Archived
+  chip, and with Unarchive at desktop width (`spec/ui/dashboard.md`, At
+  phone width), the first reading its latest quantity and "not
+  priced", the second "not yet valued". Neither is listed under not
+  priced or not yet valued, while an active holding in the first one's
+  unit stays under not priced. With the toggle off, neither archived
+  holding appears anywhere on the dashboard.
 - A negative-balance holding reduces the net figure and appears under
   liabilities.
 - The breakdown by dimension sums to exactly the net-worth total, with
