@@ -660,7 +660,7 @@ fixture prevents.
     document, unlocked, with no password typed. Test: `tests/browser/parts/register.mjs`.
 40. (blind) While a new vault waits to be read again, the idle period
     discards the keys and shows the unlock card with a password field
-    and no username field, and a `pagehide` discards the keys. Test: `tests/browser/parts/register.mjs`.
+    and no username field a person can type in, and a `pagehide` discards the keys. Test: `tests/browser/parts/register.mjs`, `tests/browser/parts/unlock-review-username.mjs`.
 41. (blind) A `pagehide` while the retried read is in flight leaves no
     keys, no vault, nothing of the vault drawn, and the unlock card
     shown, asserted against the in-memory model and the DOM. Test: `tests/browser/parts/register.mjs`.

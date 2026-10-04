@@ -13,6 +13,9 @@ import {
 const NAME = 'Cantonal account';
 const PARTIAL = 'Cantonal ac';
 const FIGURE = '13579.24';
+// Typed into the deletion dialog. Not the whole username, which the
+// unlock card holds in a field of its own.
+const TYPED_NAME = 'leand';
 
 // The center of the first element `find` returns in the page, or null.
 const centerOf = (find, ...args) =>
@@ -163,13 +166,13 @@ await run(async () => {
   await press(button, false, 'Delete my account');
   await page.waitUntil("document.querySelector('.dialog input[type=password]')", { label: 'the deletion dialog' });
   const nameField = '.dialog input:not([type=password]):not([type=hidden]):not([type=checkbox]):not([type=radio])';
-  await type(nameField, 'leander');
+  await type(nameField, TYPED_NAME);
   await type('.dialog input[type=password]', VAULT_PASSWORD);
   check('Lock is pressable above the deletion dialog', await lock());
   const lockedDeletion = await lockedState(vaultNames);
   lockedClean('the deletion dialog', lockedDeletion);
   check('the deletion dialog\'s typed username is gone from the DOM',
-    (await page.eval("[...document.querySelectorAll('input')].filter((i) => i.value === 'leander').length")) === 0);
+    (await page.call((typed) => [...document.querySelectorAll('input')].filter((i) => i.value === typed).length, TYPED_NAME)) === 0);
   check('unlocking over the deletion dialog returns', await unlock('the vault after locking over the deletion dialog'));
   const deletion = await page.call((query) => JSON.stringify({
     open: document.querySelectorAll('.dialog, [role=dialog]').length,
@@ -179,7 +182,7 @@ await run(async () => {
     disabled: [...document.querySelectorAll('.dialog button')].find((b) => b.textContent.trim() === 'Delete my vault')?.disabled,
   }), nameField).then(JSON.parse);
   check('a destructive dialog comes back with the typed username, its password field empty and its delete disabled',
-    deletion.open === 1 && deletion.name === 'leander' && deletion.password === '' && deletion.passwords.every((v) => v === '') &&
+    deletion.open === 1 && deletion.name === TYPED_NAME && deletion.password === '' && deletion.passwords.every((v) => v === '') &&
       deletion.disabled === true,
     JSON.stringify({ ...deletion, password: deletion.password === '' ? '' : 'refilled', passwords: deletion.passwords.map((v) => (v ? 'filled' : '')) }));
   await inDialog('Cancel');
