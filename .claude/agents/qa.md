@@ -97,6 +97,13 @@ That is only for what the app or the run blocks: a feature not built,
 a source that does not answer, a tool you lack. Anything you can set
 up, you check.
 
+The app's own browser tests cover the conditions no browser in the
+nightly can be put in, each in a Chrome started in that state: a
+device with no memory to spare at that moment, a browser that cannot
+run the encryption, and a phone's speed and touch. Do not fake them,
+and do not list them as criteria you could not check. Check the
+phone-width layout and the working state with `browser_resize`.
+
 When you opened the invite path, the report starts with the
 administrator's username and password, so a later run can sign in as
 them.
