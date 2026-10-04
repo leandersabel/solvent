@@ -35,7 +35,7 @@ import { holdingView } from './view-holding.js';
 import { recordingView } from './view-recording.js';
 import { resetSweepState, sweepView, unsavedOnSweep } from './view-sweep.js';
 import { settingsView } from './view-settings.js';
-import { dimensionsView } from './view-dimensions.js';
+import { dimensionsView, resetDimensionsState } from './view-dimensions.js';
 import { transferView } from './page-transfer.js';
 
 const container = document.getElementById('app');
@@ -88,6 +88,7 @@ function dropKept() {
     : held;
   held = null;
   resetSweepState();
+  resetDimensionsState();
   return Boolean(kept && (kept.fields.length || kept.dialogs.length));
 }
 

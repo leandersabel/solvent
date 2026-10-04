@@ -148,6 +148,32 @@ def sign_in(app, username: str, auth_key: str):
     return client, response.get_json()
 
 
+def session_status(app, cookie: str) -> int:
+    """What `GET /api/sessions` answers a client holding only this
+    cookie, sending the epoch of the vault the session belongs to as a
+    page does. A cookie matching no live row gets a placeholder epoch,
+    and is refused before the epoch is read."""
+    from solvent.session import COOKIE_NAME, _signer, hash_token
+
+    epoch = "0" * 32
+    with app.app_context():
+        try:
+            token_hash = hash_token(_signer().unsign(cookie).decode())
+        except Exception:
+            token_hash = None
+        found = rows(
+            app,
+            "SELECT epoch FROM sessions JOIN vault_epochs "
+            "ON vault_epochs.principal_id = sessions.principal_id WHERE token_hash = ?",
+            (token_hash,),
+        )
+    if found:
+        epoch = found[0]["epoch"]
+    client = app.test_client()
+    client.set_cookie(COOKIE_NAME, cookie)
+    return client.get("/api/sessions", headers={**CSRF, "X-Solvent-Vault": epoch}).status_code
+
+
 def principal_id(app, username: str) -> str:
     conn = connect(app)
     try:

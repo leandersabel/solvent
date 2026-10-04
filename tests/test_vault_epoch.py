@@ -496,3 +496,22 @@ def test_an_import_between_the_gate_and_the_transaction_makes_the_write_answer_r
     response = act(second, holding)
     assert (response.status_code, response.get_json()) == (409, REPLACED)
     assert [r["record_id"] for r in rows(app, "SELECT record_id FROM records")] == [holding]
+
+
+def test_an_import_between_the_gate_and_the_export_leaves_no_attempt_row(app, two_pages, monkeypatch):
+    """The export's epoch check and its attempt are one transaction, so
+    an import landing after the gate cannot leave a row for a refused
+    export."""
+    first, second, _ = two_pages
+    real = vault_module.write_transaction
+
+    def after_an_import(*args, **kwargs):
+        monkeypatch.setattr(vault_module, "write_transaction", real)
+        restore(first)
+        return real(*args, **kwargs)
+
+    monkeypatch.setattr(vault_module, "write_transaction", after_an_import)
+    before = rows(app, "SELECT * FROM attempts")
+    response = second.get("/api/export", headers=CSRF)
+    assert (response.status_code, response.get_json()) == (409, REPLACED)
+    assert rows(app, "SELECT * FROM attempts") == before

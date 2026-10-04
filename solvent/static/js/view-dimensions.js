@@ -42,6 +42,15 @@ let pending = null;
 let failure = null;
 let announcement = '';
 
+/** The screen's write state, dropped when the vault it was drawn from
+ *  is replaced: a write that was answered `vault-replaced` never settles,
+ *  so nothing else would clear it. */
+export function resetDimensionsState() {
+  pending = null;
+  failure = null;
+  announcement = '';
+}
+
 export function dimensionsView(vault, { reload: onChanged, openUnassigned: onOpen }) {
   reload = onChanged;
   openUnassigned = onOpen;

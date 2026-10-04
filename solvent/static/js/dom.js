@@ -382,13 +382,12 @@ export function restoreFields(root, kept) {
 }
 
 /** On a lock: close every dialog without handing focus back to a
- *  screen that is about to go, and keep only the edited fields of those
- *  that can be reopened. */
+ *  screen that is about to go, and keep each that can be reopened with
+ *  its edited fields, of which there may be none. */
 export function closeDialogsForLock() {
   const kept = [];
   for (const entry of [...openDialogs]) {
-    const fields = entry.resume ? editedFields(entry.panel) : [];
-    if (fields.length) kept.push({ resume: entry.resume, fields });
+    if (entry.resume) kept.push({ resume: entry.resume, fields: editedFields(entry.panel) });
     entry.close({ refocus: false });
   }
   return kept;

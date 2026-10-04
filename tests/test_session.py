@@ -10,7 +10,7 @@ from datetime import datetime, timedelta, timezone
 
 from solvent.config import DEFAULT_KDF_ENVELOPE
 from solvent.session import COOKIE_NAME, sign_token
-from tests.helpers import CSRF, b64, connect, mint_invite, register, register_body, rows
+from tests.helpers import CSRF, b64, connect, mint_invite, register, register_body, rows, session_status
 
 
 def cookie_of(client):
@@ -168,12 +168,7 @@ def log_in(client, username, auth_key):
 
 
 def alive(cookie_holder_app, cookie) -> bool:
-    client = cookie_holder_app.test_client()
-    client.set_cookie(COOKIE_NAME, cookie)
-    # Any well-formed epoch: a live session answers Conflict to it, and a
-    # dead one answers Unauthorized, which is the difference asked for.
-    headers = {**CSRF, "X-Solvent-Vault": "0" * 32}
-    return client.get("/api/sessions", headers=headers).status_code != 401
+    return session_status(cookie_holder_app, cookie) == 200
 
 
 def age_session(app, session_id, **ago):

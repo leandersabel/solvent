@@ -17,7 +17,7 @@ from flask import Blueprint, abort, g, jsonify, request
 
 from . import ratelimit
 from .auth import credential_for
-from .db import new_epoch, read_transaction, utcnow, write_transaction
+from .db import new_epoch, utcnow, write_transaction
 from .guard import verify_epoch
 from .records import (
     MAX_BYTES_PER_USER,
@@ -81,12 +81,12 @@ def export_vault():
     reachable by navigation: the client fetches it and saves the
     response through a blob URL.
     """
-    ratelimit.guard_export(g.principal["id"], verify_epoch)
-
-    # One transaction, so an import landing mid-export cannot produce a
-    # file whose wrapper does not open its records.
-    with read_transaction() as conn:
+    # One transaction for the epoch, the attempt and every read, so an
+    # import landing mid-export cannot produce a file whose wrapper does
+    # not open its records, and a refused export leaves no attempt row.
+    with write_transaction() as conn:
         verify_epoch(conn)
+        ratelimit.admit_export(g.principal["id"])
         credential = credential_for(g.principal["id"])
         wrapper = conn.execute(
             "SELECT * FROM dek_wrappers WHERE credential_id = ?", (credential["id"],)

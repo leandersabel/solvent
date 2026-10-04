@@ -5,7 +5,7 @@ from __future__ import annotations
 from datetime import datetime, timedelta, timezone
 
 from solvent.session import COOKIE_NAME
-from tests.helpers import CSRF, b64, connect, register, register_body, rows
+from tests.helpers import CSRF, b64, connect, register, register_body, rows, session_status
 
 LOGIN = "/api/auth/login"
 
@@ -15,12 +15,7 @@ def cookie(client):
 
 
 def works(app, value):
-    c = app.test_client()
-    c.set_cookie(COOKIE_NAME, value)
-    # Any well-formed epoch: a live session answers Conflict to it, and a
-    # dead one answers Unauthorized, which is the difference asked for.
-    headers = {**CSRF, "X-Solvent-Vault": "0" * 32}
-    return c.get("/api/sessions", headers=headers).status_code != 401
+    return session_status(app, value) == 200
 
 
 def sql(app, statement, args=()):
