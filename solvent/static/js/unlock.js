@@ -133,6 +133,9 @@ function messageFor(failure) {
   if (failure instanceof SignInError && failure.message === 'throttled') {
     return 'Too many attempts. Try again in a few minutes.';
   }
+  if (failure instanceof SignInError && failure.message === 'unreachable') {
+    return 'That did not go through. Everything you typed is still here, so you can try again.';
+  }
   if (failure instanceof DerivationError) {
     return failure.outOfMemory
       ? 'This device does not have enough memory available right now. Close some other tabs and try again.'

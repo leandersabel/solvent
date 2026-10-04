@@ -12,6 +12,8 @@ import {
   text, unlockDashboard, unlockInPlace, vaultOwner, watched, within, WEAK_MEMORY,
 } from '../harness.mjs';
 
+const UNREACHED = 'That did not go through. Everything you typed is still here, so you can try again.';
+
 await run(async () => {
   await administrator();
   await vaultOwner();
@@ -244,7 +246,8 @@ await run(async () => {
 
   // login.md, Rules: a vault that could not be read is not unlocked.
   // The keys the sign-in derived are dropped with the error, and a
-  // page left afterwards holds none.
+  // page left afterwards holds none. A read that got a server error
+  // after a correct password did not go through (Unlock, States).
   const unreadBrowser = await openBrowser(`${BASE}/login`);
   const unread = unreadBrowser.session;
   try {
@@ -258,11 +261,12 @@ await run(async () => {
         keys: s.holdsKeys(), vault: s.currentVault() !== null,
         error: document.querySelector('.field-error').textContent,
         card: Boolean(document.querySelector('#unlock-password')),
+        typed: document.querySelector('#unlock-password').value !== '',
       });
     })()`));
     check(
-      'a vault that could not be read at sign-in shows the error and holds no keys',
-      !after.keys && !after.vault && after.card && after.error === 'Invalid username or password.',
+      'a vault read that did not go through at sign-in says so, keeps the password and holds no keys',
+      !after.keys && !after.vault && after.card && after.typed && after.error === UNREACHED,
       JSON.stringify(after),
     );
     await unread.eval("window.dispatchEvent(new PageTransitionEvent('pagehide', { persisted: true }))");
@@ -373,6 +377,29 @@ await run(async () => {
       ),
       JSON.stringify(Object.fromEntries(Object.entries(failures).map(([k, f]) => [k, f.error]))),
     );
+
+    // A salt lookup with no answer, then a sign-in answered with a
+    // server error, never call the password wrong, whatever the name.
+    for (const [step, pattern, answer] of [
+      ['a salt lookup with no answer', '*/api/auth/salt', { drop: true }],
+      ['a sign-in answered with a server error', '*/api/auth/login', { status: 503 }],
+    ]) {
+      const release = await intercept(card, pattern, () => answer);
+      const unreached = {};
+      for (const name of ['leander', 'ops.leander', 'nobody-at-all']) {
+        const shown = await attempt(name, 'the password typed');
+        const kept = await card.eval(
+          "[document.querySelector('#unlock-username').value, document.querySelector('#unlock-password').value].join('/')",
+        );
+        unreached[name] = { error: shown.error, above: shown.above, kept: kept === `${name}/the password typed` };
+      }
+      await release();
+      check(
+        `${step} reads as not going through and keeps both fields, for either kind and a stranger`,
+        Object.values(unreached).every((u) => u.error === UNREACHED && u.above && u.kept),
+        JSON.stringify(unreached),
+      );
+    }
 
     // Enough failures on one name to reach the account limit, at
     // whatever value it is configured to.

@@ -93,6 +93,11 @@ class ApiError extends Error {
   }
 }
 
+// No answer at all, or a server error from Solvent or a proxy in front
+// of it: the request did not go through, and nothing can be read into
+// it (login.md, Unlock, States).
+export const didNotGoThrough = (error) => (error instanceof ApiError ? error.status >= 500 : error instanceof TypeError);
+
 async function jsonOrNull(response) {
   try {
     return await response.json();
