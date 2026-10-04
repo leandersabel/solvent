@@ -983,7 +983,8 @@ rule of the chart (Archived holdings, Ranges and modes).
 43. (blind) Switching the pricing mode changes the total, the list and
     the breakdown, and no chart point, asserted over every sample of
     every band, not only the right hand edge. Test:
-    `tests/browser/parts/dashboard-net-worth.mjs`.
+    `tests/browser/parts/dashboard-net-worth.mjs`,
+    `tests/browser/parts/dashboard-review-pricing-mode.mjs`.
 44. (blind) On latest rates the right hand edge equals the total exactly.
     With a March figure and a different price this week, rates as of each
     figure gives a total that is not the edge, and nothing on screen

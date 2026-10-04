@@ -228,13 +228,15 @@ await run(async () => {
       inside: getComputedStyle(details).overflowX,
     });
   })()`).then(JSON.parse);
+  // The chart draws from a resize observer, on a frame of its own, after
+  // a resize or a re-render.
+  const chartDrawn = () =>
+    rec.waitUntil(
+      "Number(document.querySelector('svg.trend')?.getAttribute('width')) === Math.floor(document.querySelector('.chart-frame').clientWidth)",
+      { label: "the chart drawn at the card's width" },
+    );
   await viewport(1280);
-  // The chart redraws for the new width from a resize observer, on a
-  // frame of its own, so the pricing mode check waits for it.
-  await rec.waitUntil(
-    "Number(document.querySelector('svg.trend').getAttribute('width')) === Math.floor(document.querySelector('.chart-frame').clientWidth)",
-    { label: "the chart drawn at the card's width" },
-  );
+  await chartDrawn();
   check(
     'net-worth-view: at 390px the data table scrolls inside the card and the page does not scroll sideways',
     phoneTable.page <= 0 && phoneTable.inside === 'auto',
@@ -259,7 +261,7 @@ await run(async () => {
     `${await priceDateOf('Silver coins')} | ${await priceDateOf('Dollar cash')}`,
   );
   await ev("[...document.querySelectorAll('.switch-option')].find(b => b.textContent.includes('as of each figure')).click()");
-  await rec.frames();
+  await chartDrawn();
   const modeAfter = {
     hero: await hero(),
     brokerage: (await tableRow('Brokerage')).converted,
