@@ -281,6 +281,18 @@ Typography).
   entry's date is moved) and **Delete**. While the holding is archived,
   the archive's zero has neither.
 
+#### At phone width
+
+Up to 900px wide, where four columns leave a date no room, the list of
+values becomes a list, the headings laid out as each entry is. An entry
+holds its date with the note icon and any duplicate-date line first,
+then the value at the left and the main-currency figure at the right,
+then its actions on a line of their own. A date never wraps. The two
+figures share a line when they fit and otherwise each takes one,
+never broken inside a figure. A note wraps wherever it must, inside
+an address too. Every action is a 44px target, and
+nothing on the screen pans sideways.
+
 #### Deleting a snapshot
 
 A single confirm:
@@ -830,3 +842,10 @@ Unarchiving and archiving it again writes the zero at the new D.
     it. Test:
     `tests/test_vault_epoch.py::test_a_page_holding_the_replaced_key_never_reaches_the_vault`,
     `tests/test_vault_epoch.py::test_an_import_between_the_gate_and_the_transaction_makes_the_write_answer_replaced`.
+58. At 320px, 375px, 601px and 901px wide, a holding with a note, a
+    seven-digit figure and two entries sharing a date pans no screen or
+    box sideways. Every control lies on screen and takes a tap at its
+    center, each control in the list of values is at least 44px tall at
+    phone width, and no date wraps. A note holding an email address
+    pans nothing either. Test: `tests/browser/parts/account-detail.mjs`,
+    `tests/browser/parts/account-detail-review-phone.mjs`.
