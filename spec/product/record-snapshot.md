@@ -39,7 +39,9 @@ it were its own. A figure in a unit somebody publishes reads "not
 priced" there until that date has a rate. A figure in a unit only you
 can price is valued at the last price you set before that date, with
 that price's date beside it, because your estimate of the flat holds
-until you change it.
+until you change it. On a date before a unit's published prices begin,
+gold before 2013, nobody published a price for it, so on those dates it
+is a unit only you can price.
 
 Nothing is ever recalculated behind you. What your dollars were worth
 in 2019 is what 2019's rate says, whatever the dollar does tomorrow,
@@ -237,6 +239,13 @@ In the ordinary case you read it, it is right, and you finish.
   shows your last figure and the day you set it, and writes nothing
   unless you change it. Your estimate of the flat does not get newer
   because you recorded a bank balance.
+- **A published unit on a date before its published prices begin.** It
+  behaves as a unit only you can price. The line says when its
+  published prices begin and that this price is yours to set, shows
+  your last price before that date and the day you set it, and writes
+  nothing unless you change it. No source is asked about it for that
+  date, because there is nothing to ask for. Nothing failed, so the
+  line never reads like a source that did not answer.
 - **A published unit whose source did not answer.** The line says so
   and stays empty. Nothing is written for that unit, your total carries
   on at the most recent rate it has, and the line comes back filled in
@@ -246,10 +255,15 @@ In the ordinary case you read it, it is right, and you finish.
   screen would reveal it. You are never asked to type a dollar rate
   in order to record a franc holding.
 
-The one time a rate is asked for rather than offered is when the unit
-has no rate at all and you are recording a quantity in it. Twelve troy
+A rate is asked for rather than offered in two cases. A unit with no
+rate at all asks when you are recording a quantity in it. Twelve troy
 ounces with no gold price is not a figure, so the app asks once, and
-after that the unit refreshes or carries forward like any other.
+after that the unit refreshes or carries forward like any other. A
+unit on a date before its published prices begin asks when it has no
+rate on or before that date, because there is no price of yours to
+start from. Being asked never stops a row recording. A line you leave
+empty writes nothing, and a figure in that unit reads "not priced"
+until you set a price.
 
 Your main currency has no line. There is nothing to convert.
 
@@ -320,6 +334,9 @@ rather than a proposal.
   empty. Recording a figure at that date fills the line too. A rate
   that is already there is never looked up again, because it may be
   one you chose.
+- A unit on a date before its published prices begin reads as it does
+  on a new sweep, and never offers Look it up, because no source has a
+  price to give for that date.
 
 A rate line on a reopened recording saves by itself. On a new sweep
 the rates ride in with the first row you record, because until then
@@ -445,6 +462,11 @@ worth around that date will change.
 - A holding with a unit you made up never triggers a lookup at all, and
   the screen says why that rate is yours to set rather than showing an
   empty line with no explanation.
+- On a date before a published unit's prices begin, gold in 2012, its
+  rate line says when published prices begin and that this price is
+  yours to set. It starts from your last price before that date, asks
+  for one when the unit has no rate on or before that date, and
+  triggers no lookup. It never reads like a source that did not answer.
 - A holding measured in your main currency never shows a rate anywhere
   in the product.
 - Recording a single figure onto a date the holding already has asks
@@ -471,8 +493,9 @@ worth around that date will change.
   date has a rate.
 - No figure is shown converted at another day's price as though it
   were that day's. On a recording's screen and in a holding's list of
-  values, a figure in a unit somebody publishes with no rate on its
-  date reads "not priced", and a figure in a unit you price yourself
+  values, a figure in a unit somebody publishes with no rate on a date
+  its published prices cover reads "not priced", and a figure in a unit
+  you price yourself, or dated before its unit's published prices begin,
   shows the date of the price it is valued at whenever that price was
   set on an earlier day.
 - A row you did not act on produces no entry. Leave eleven of fifteen
@@ -536,7 +559,8 @@ worth around that date will change.
   that date again.
 - A unit left with no rate because nothing came back says so on the
   reopened recording and offers Look it up. A line that holds a rate
-  never offers it.
+  never offers it, and neither does a line dated before its unit's
+  published prices begin.
 - Pressing Look it up on an empty rate line fills it in when the source
   answers, labeled with the day the figure is for, as a proposal you
   can take, change or leave empty.

@@ -103,10 +103,13 @@ so an independent computation in the same order reaches the same digits
 key, no daily or monthly quota; requests are rate-limited only against
 abuse, and the operators ask heavy users to cache, which this design
 already does (see Caching). The `/v1` endpoints the app calls serve the
-European Central Bank's reference rates, which begin on 1999-01-04,
-and that date is the FX floor (SSRF and egress hardening). Frankfurter
-advertises history back to 1948 from other central banks' series. It
-is not the API the app calls.
+European Central Bank's reference rates, which begin on 1999-01-04.
+Not every currency begins then: `BRL`, `CNY`, `ILS` and `INR` first
+appear on 2000-01-13. Before that date the table omits them, and a
+request with one of them as `base` answers Not Found. Each currency's
+start is its floor (The symbol table). Frankfurter advertises history
+back to 1948 from other central banks' series. It is not the API the
+app calls.
 
 - An FX symbol is the **base currency's ISO 4217 code** (`USD`, `EUR`),
   which is the holding's unit, and `quote` is the user's main currency.
@@ -172,7 +175,8 @@ a vendor, nothing to sign up for, and one host constant to unwind.
   only across weekends. That is acceptable: the proposal is advice, the
   user sees `asOf` and can override it with a better figure. Do not
   paper over it by stamping `asOf` with the requested date.
-- History begins 2013-01-02, which is the date floor for gold symbols.
+- History begins 2013-01-02, which is the `since` of both gold symbols
+  (The symbol table).
 
 Rejected: **LBMA's own JSON feeds** (`prices.lbma.org.uk`) are keyless,
 CORS-open, and carry every metal back to 1968 in USD/GBP/EUR — a perfect
@@ -236,9 +240,9 @@ that eliminates LBMA for gold.
 
 ## The symbol table
 
-`GET /api/rates/symbols` → `[{ symbol, label, kind, lookup }]`, the
-operator's configured symbol table. Session-authenticated, read-only,
-cacheable.
+`GET /api/rates/symbols` → `[{ symbol, label, kind, lookup, since }]`,
+the operator's configured symbol table. Session-authenticated,
+read-only, cacheable.
 
 It exists because **the account form's unit picker is built from it**
 (`ui/account-form.md`): a user chooses what a holding is measured in
@@ -253,6 +257,31 @@ error.
   means the symbol is valid and canonical but has no provider yet: the
   user enters the rate by hand, and `/api/rates` answers No Content, not
   Bad Request. This is a designed state, not a degraded one.
+- `since` — the symbol's floor, `YYYY-MM-DD`, or `null` for a symbol
+  with no provider adapter. It does not follow `lookup`, because the
+  floor is the provider's fact, and a main currency whose `lookup` is
+  off still bounds every rate quoted into it.
+
+**A symbol's floor is the first date its provider publishes it**: the
+provider's own history start, 1999-01-04 for Frankfurter and 2013-01-02
+for NBP, raised for a currency whose series begins later (Providers,
+FX). A symbol with no provider adapter has no floor. The floor is a
+server-side constant derived from the adapter registry, like
+`hasAdapter`, never stored on the row and never set through any route.
+It holds whatever the row's `lookup`. A currency an administrator adds
+takes Frankfurter's 1999-01-04, because the server knows no later start
+for it. `GET /api/admin/symbols` carries no `since`: no administrator
+decision turns on it, since `lookup` is refused only for want of an
+adapter.
+
+**A rate source applies to a date only on or after the later of the
+symbol's floor and the quote's.** The quote's counts because
+Frankfurter answers Not Found for a `base` before its start, which
+would count against its breaker (Rate limiting and failure). Before
+that date nobody published a price, so no provider is asked for it,
+and the client treats the symbol as one its owner prices at that date
+(`record-rate.md`, Reading). This is a designed state like
+`lookup: false`, never an outage.
 
 The table is platform configuration, not user data: identical for
 every account and revealing nothing about who holds what. **Maintaining
@@ -394,12 +423,14 @@ host's network are reachable:
   "A known ISO 4217 code" is the looser check and the wrong one: ISO
   4217 contains codes the FX provider cannot quote into, and `quote` is
   the user's main currency on every request the vault ever makes.
-- `date` must parse as a calendar date, not be in the future, and not
-  precede the floor configured **for that symbol** — 2013-01-02 for
-  gold, 1999-01-04 for a currency, each provider's own history start.
-  A date before the floor is a Bad Request and reaches no provider. A
-  single global floor would either reject valid FX dates or wave
-  through gold dates the provider has no data for.
+- `date` must parse as a calendar date and not be in the future. For a
+  symbol with a provider adapter, whatever its `lookup`, it must not
+  precede the later of the symbol's floor and the quote's (The symbol
+  table). A date before it
+  is a Bad Request and reaches no provider. A single global floor would
+  either reject valid FX dates or wave through gold dates the provider
+  has no data for. The whole-table form leaves out every symbol whose
+  floor the date precedes, and asks no provider for it.
 - HTTP redirects are **disabled**, not followed to a validated target.
 - Egress has a hard timeout, `EGRESS_TIMEOUT_SECONDS` = 5 for connect
   and read together across one proxy request, and a response size cap,
@@ -501,15 +532,20 @@ host's network are reachable:
   symbol is an administrator action, not a user one
   (`admin-invites.md`).
 - **Symbol in the table with `lookup: false`** (`XAG-ozt` and the rest)
-  → No Content, no outbound request, no error log. The client should not
+  → No Content, no outbound request, no error log. A symbol with no
+  provider adapter has no floor, so that holds at every date. One with
+  an adapter and `lookup` turned off answers Bad Request before its
+  floor, like any symbol with that floor. The client should not
   have asked — it holds the table — but the server must answer this way
   regardless, so that turning a symbol's lookup on later is a config
   change and nothing more.
 - **Gold, non-PLN quote, FX leg fails** → No Content. Never return the
   PLN figure labelled with the requested quote.
-- **Gold date before 2013-01-02** → Bad Request, per the per-symbol
-  floor, not a No Content — the request is out of range, not merely
-  unanswerable.
+- **A date before the symbol's or the quote's floor**, gold before
+  2013-01-02 → Bad Request, not No Content — the request is out of
+  range, not merely unanswerable. In the whole-table form the symbol is
+  absent from the map, and when every symbol is, the answer is No
+  Content with no outbound request.
 - **Weekend, holiday, or pre-listing date** → return the most recent
   prior close with `asOf` set to that earlier date, and the client shows
   "rate as of 29 Jul" so the user can see the lag. If no prior close
@@ -633,6 +669,25 @@ host's network are reachable:
   rate carrying a PLN figure under another currency's label is ever
   returned.
 - A gold request dated 2012-12-31 returns Bad Request.
+- `GET /api/rates/symbols` carries `since` on every row: `1999-01-04`
+  for `USD`, `2000-01-13` for `BRL`, `2013-01-02` for `XAU-g` and
+  `XAU-ozt`, and `null` for `XAG-ozt`. A currency whose `lookup` an
+  administrator turned off keeps its date.
+- For every row but `EUR` with a `since`, a single-symbol request
+  quoted in `EUR` dated the day before it returns Bad Request with no
+  outbound request. One dated `since` itself sends its outbound request
+  when the row's `lookup` is on, and answers No Content with none when
+  it is off. Asserted over the whole table, so `since` and the server's
+  floor cannot drift.
+- `XAG-ozt` dated 2012-12-31 and 1998-12-31 answers No Content with no
+  outbound request.
+- A whole-table request dated 2012-12-31 quoted in `CHF` sends
+  Frankfurter's request and no NBP request, and returns the currencies
+  with both gold symbols absent.
+- A whole-table request dated 1999-06-30 quoted in `CHF` returns `USD`
+  with `BRL`, `CNY`, `ILS` and `INR` absent. Quoted in `BRL`, it sends
+  no outbound request, answers No Content, and leaves Frankfurter's
+  failure count where it was.
 - `symbol=CHF&quote=CHF` returns `rate: "1"` with no outbound request.
 - Every outbound request is `FX_URL` or `NBP_URL` with only its
   placeholders filled, carrying exactly the two pinned headers,

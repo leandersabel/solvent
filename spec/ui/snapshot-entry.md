@@ -36,8 +36,8 @@ The same modal, pre-filled, is what edits an existing entry
   **the date on the form**, which is the date's own price where one
   exists and the proposal for that date otherwise. With neither, it is
   the price at that date (`record-rate.md`, Reading): "not priced" for
-  a unit with a rate source, and for a unit with none its newest
-  earlier price, with the price date line beneath the converted figure
+  a unit with a rate source at that date, and for a unit with none
+  there its newest earlier price, with the price date line beneath the converted figure
   (`design-system.md`, Components).
 - **Note** — optional, collapsed behind "Add a note".
 - **The prices line**, folded, below. See next section.

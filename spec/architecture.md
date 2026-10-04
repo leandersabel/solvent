@@ -47,7 +47,8 @@ encrypted client-side. The server sees ciphertext, not these fields.
   something with no market price (`m²`), and it **doubles as the
   holding's rate symbol**, so a holding can never be measured in one
   unit and priced in another. A unit with no rate source is priced by
-  hand.
+  hand, and so is a published unit at a date before its source's prices
+  begin (record-rate.md, Reading).
 - **Quantities and prices are two separate timelines.** A holding's own
   history holds only the quantities its owner recorded. The prices that
   turn those quantities into the main currency are their own series,

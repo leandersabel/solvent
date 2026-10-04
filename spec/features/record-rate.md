@@ -162,8 +162,9 @@ doing nothing accepts and writes it.
   stands, changing a rate, or clearing a figure is not recording a
   quantity and ensures nothing.
 - **A rate request is issued only when a symbol the date needs has no
-  entry at it.** A date whose prices are complete asks the proxy
-  nothing, which is why opening an old recording is silent
+  entry at it and has a rate source at that date** (Reading). A date
+  whose prices are complete, or whose only missing symbols have no
+  rate source there, asks the proxy nothing, which is why opening an old recording is silent
   (`record-snapshot.md`, Reopening and editing a recording). Somebody
   who wants a missing line filled without recording any quantity asks
   for it on that line, and that action, not the act of opening, is what
@@ -177,9 +178,10 @@ doing nothing accepts and writes it.
     latest. Degraded, not wrong. The date holds no entry for the
     symbol, so a figure at it reads not priced (Reading) until one is
     written there.
-  - **No rate source at all** (free text, or a `lookup: false` symbol)
-    and a previous entry exists, so **nothing is written unless the
-    person edits it**. The previous entry stays the latest, at its own
+  - **No rate source at that date** (free text, a `lookup: false`
+    symbol, or a date before the symbol's `since`, Reading) and a
+    previous entry exists, so **nothing is written unless the person
+    edits it**. The previous entry stays the latest, at its own
     date, and the age of the person's estimate stays visible on screen
     ("estimated 14 months ago", `ui/update-values.md`). Re-dating an
     unreviewed estimate to the recording date would launder a guess
@@ -238,7 +240,11 @@ and the order is the whole of the guarantee.
     always one the person emptied (`product/record-snapshot.md`,
     Clearing one out, and deleting one).
   - **A rate-lines save that creates an entry learns of a recording
-    deleted elsewhere from its pre-create reload.** When the reloaded
+    deleted elsewhere from its pre-create reload**, which it runs on
+    every such save, even at a date the sitting already claimed
+    (`record-snapshot.md`, Creating and reopening are distinct acts).
+    The model in memory still holds the records the sitting wrote, so
+    it cannot tell a deleted date from a held one. When the reloaded
     date holds no snapshot and no rate, the save is refused whole before
     any write, the model takes the reloaded records, and every typed
     price stays on screen for the first quantity to carry
@@ -290,9 +296,10 @@ request under its own version check, and nothing spans two of them.
 - **The rate-lines save** writes every changed line together, after one
   confirmation naming what each moves (`ui/update-values.md`, Changing
   or clearing a rate says what it moves). Its order is fixed:
-  0. If any line creates an entry, the pre-create reload. Any slot
-     taken, or the date found holding nothing (The write path), refuses
-     the whole save before a single write.
+  0. If any line creates an entry, the pre-create reload, whether or
+     not the sitting has claimed the date. Any slot taken, or the date
+     found holding nothing (The write path), refuses the whole save
+     before a single write.
   1. Rate writes, creates and updates alike.
   2. Deletions, for the lines cleared.
 
@@ -374,24 +381,43 @@ other way:
 
 - **The latest price** for a symbol is the entry with the greatest
   `date`, never the most recently written.
+- **A symbol has a rate source at a date** when its row in the
+  operator's symbol table carries `lookup: true` and the date is on or
+  after the later of the row's `since` and the main currency's row's
+  `since` (`rate-lookup.md`, The symbol table). Free text, a
+  `lookup: false` symbol, and any symbol at a date before that have
+  none. The main currency is always a `kind: currency` row
+  (`register.md`), and its `since` is set whatever its `lookup`. A
+  main currency retired since registration is absent from the client's
+  table and bounds nothing there. The server still applies its floor,
+  so on dates before 1999-01-04, or 2000-01-13 for the currencies
+  that start then, its lines read as a source that did not answer.
+  That is accepted, because retiring a currency vaults keep their
+  totals in is an administrator's act, told what it means
+  (`rate-lookup.md`, Maintaining the table). This one test decides the price at a date, whether a recording
+  asks the proxy about the symbol (The refresh), and whether its line
+  offers Look it up. The client computes it from the table it already
+  holds, with no request.
 - **The price at a date** values a figure shown at its own date: a
   recording's figures (`ui/recording-detail.md`), a holding's own list
   of values (`ui/account-detail.md`), and the converted figure on the
   sweep and the single-holding form wherever the unit's rate line for
   that date holds no figure. Which entry it takes turns on whether the
-  symbol has a rate source, a row of the operator's symbol table with
-  `lookup: true` (`rate-lookup.md`):
+  symbol has a rate source at that date:
   - **With a rate source**, the entry at exactly that date and no
     other. Without one, the figure is **not priced** at that date. A
     published price exists for that day and simply was not captured,
     so an earlier entry would show a 2026 dollar figure at a 2010 rate
     with nothing on screen to say so.
-  - **Without a rate source** (free text, or `lookup: false`), the
-    entry with the greatest `date` at or before that date, because the
-    owner's estimate stands until they change it (The refresh). When
-    that entry's `date` is earlier than the figure's, **the figure
-    carries the entry's date**, so the age of the estimate is never
-    hidden. With no entry at or before the date, not priced.
+  - **Without a rate source**, the entry with the greatest `date` at or
+    before that date, because the owner's estimate stands until they
+    change it (The refresh). When that entry's `date` is earlier than
+    the figure's, **the figure carries the entry's date**, so the age
+    of the estimate is never hidden. With no entry at or before the
+    date, not priced. Before a symbol's `since` nobody published a
+    price, so its own entries are estimates like the flat's: a 2012
+    gold figure takes the person's last gold price at or before it,
+    with that price's date, rather than reading not priced.
   - A flagged pair (Two entries on one date) is no entry at its date.
 - **The price as recorded** for a holding is the entry with the
   greatest `date` at or before the date of that holding's latest
@@ -479,6 +505,15 @@ to win silently.
   and says so. Recording a quantity at that date fills it, and somebody
   who only wants the line filled asks for the lookup on the line
   itself.
+- **A date before a symbol's `since`**, gold in 2012. The symbol has no
+  rate source there (Reading), so its line behaves as a free-text
+  unit's: it starts from the newest entry before the date, writes
+  nothing unless changed, and writes a typed figure as `manual`. No
+  request asks about it, a reopened recording offers no Look it up on
+  it, and its line never carries the wording of a source that did not
+  answer. With no entry at or before the date, the line asks for a
+  price when a quantity in that unit is recorded (The refresh). The
+  line's wording is `ui/update-values.md`'s.
 - **A symbol whose only holdings are archived** is not refreshed, and
   its existing entries stay. Historical points still price correctly.
 - **A holding is created in a symbol nobody holds yet.** Its first
@@ -548,8 +583,9 @@ to win silently.
   byte-identical in every field leave exactly one record afterwards.
 - A symbol with no rate source and an existing entry writes no new
   entry on a recording, and the holding's price age on screen grows.
-  Asserted for free text and for a `lookup: false` symbol, since the
-  second one looks listed.
+  Asserted for free text, for a `lookup: false` symbol, since it looks
+  listed, and for `XAU-g` at 2012-12-31, since it has a source on
+  later dates.
 - With the proxy stubbed to No Content, a recording writes no price
   entry for that symbol and the previous entry stays the latest.
 - Editing a price entry from a second tab with a stale `version`
@@ -559,8 +595,9 @@ to win silently.
   asserted over the whole flow including the request the provider has
   since revised its figure for.
 - On a reopened recording, Look it up is offered on a line with no
-  entry at the date whose symbol has a rate source, and on no other
-  line. Pressing it issues exactly one request to `/api/rates`, for
+  entry at the date whose symbol has a rate source at that date, and on
+  no other line. An `XAU-g` line with no entry at 2012-12-31 does not
+  offer it. Pressing it issues exactly one request to `/api/rates`, for
   that date, shows the answer as a proposal carrying its `rateAsOf`,
   and writes nothing until the rate-lines save.
 - Adding a value for a holding skipped at a past date leaves every rate
@@ -574,6 +611,22 @@ to win silently.
   at 2026-04-10 is that entry and carries 2024-01-15, at 2024-01-15 it
   carries no date, and at 2024-01-14 it is none. Asserted for a
   `lookup: false` symbol as well.
+- With `XAU-g` entries at 2011-06-30, typed, and 2013-01-02 only, the
+  price at a date for `XAU-g` at 2012-12-31 is the 2011-06-30 entry and
+  carries 2011-06-30, at 2011-06-29 it is none, and at 2013-01-03 it is
+  none. A `XAU-g` figure at 2012-12-31 reads at that price, with that
+  date, on its recording and in its holding's list of values.
+- With the main currency `BRL`, `USD` has a rate source at 2000-01-13
+  and none at 2000-01-12, and a `USD` figure at 2000-01-12 takes the
+  newest `USD` entry at or before it.
+- A sweep at 2012-12-31 whose only unit without an entry there is
+  `XAU-g` issues no request to `/api/rates`. Its `XAU-g` line shows the
+  newest entry before that date, never the wording of a source that
+  did not answer, and recording a row writes no `XAU-g` entry unless
+  the line was changed, in which case it writes one as `manual`.
+- With no `XAU-g` entry at or before 2012-12-31, recording an `XAU-g`
+  row on that sweep makes the line ask for a price, and the `snapshot`
+  is written whether or not one is given.
 - The main currency prices at `"1"` at any date, carrying no date.
 - A flagged pair at a date gives a symbol with a rate source no price
   at that date.
@@ -596,6 +649,10 @@ to win silently.
   issues its reload and no `PUT` or `DELETE`. Every typed price stays
   on its line, no rate-lines save control shows, and the Callout saying
   another window deleted the recording shows under the date heading.
+- With a sweep open on a recording, a rate-lines save that created a
+  price, and a second session then deleting every record at that date,
+  a second rate-lines save that creates a price issues its reload and
+  no `PUT` or `DELETE`, and the vault holds no record at that date.
 - A rate-lines save changing two rates and clearing a third issues both
   rate `PUT`s before the `DELETE`.
 - With the second rate `PUT` of that save stubbed to fail, the first
@@ -604,6 +661,13 @@ to win silently.
 - Editing a `proposed` entry's rate stores `edited`, keeps `rateAsOf`,
   and stores the replaced figure as `proposedRate`. Editing an `edited`
   one a second time leaves `proposedRate` at the original proposal.
+- With locale `de-DE` and `groupSeparator` `apostrophe`, an `edited`
+  entry whose `proposedRate` is `"1234.56789"` reads `Edited from
+  1’234,567890` on its rate line and in its recording's price column,
+  and one whose `proposedRate` is `"0.12345678"` reads `Edited from
+  0,12345678`. A figure typed over a proposal of `"1234.56789"`, before
+  any save, reads `Edited from 1’234,567890` on its line, and so does a
+  stored `proposed` entry at that rate once its line is changed.
 - Editing one entry changes the converted figure of every holding
   measured in that symbol at that date, and the confirmation names how
   many holdings that is.

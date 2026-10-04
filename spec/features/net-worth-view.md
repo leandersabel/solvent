@@ -17,9 +17,9 @@ the server has nothing to template here, because it has no plaintext.
    grouped by `symbol` and sorted by date (`record-rate.md`).
 3. Compute totals and series locally. Subsequent writes update this
    model directly, with no refetch on every save. The one refetch in
-   the write path is the reload before the first record a sitting
-   creates at a date (`record-snapshot.md`, Creating and reopening are distinct
-   acts), which is what a stale model cannot substitute for.
+   the write path is the pre-create reload (`record-snapshot.md`,
+   Creating and reopening are distinct acts), which is what a stale
+   model cannot substitute for.
 
 For the expected data volume (a household, manual snapshots, years of
 history) one fetch per session is the right call, and it is why there

@@ -131,7 +131,7 @@ export function sweepView(vault, date, actions = {}) {
     sit.refreshed = true;
     const missing = vault.missingUnits(date);
     if (!missing.length) return;
-    const unanswered = missing.some((unit) => vault.quotable(unit) && !block.lineFor(unit)?.typed);
+    const unanswered = missing.some((unit) => vault.quotable(unit, date) && !block.lineFor(unit)?.typed);
     if (!sit.proposals && unanswered) sit.proposals = writes.fetchProposals(vault, date);
     if (sit.proposals) block.showProposals(await sit.proposals);
     const { failed } = await writes.refreshPrices(vault, date, {}, (unit) => block.partFor(unit));
@@ -532,7 +532,11 @@ function rateLine(vault, unit, date, { sit, readOnly: blockReadOnly, fillMissing
   const { format } = vault;
   const readOnly = blockReadOnly || (fillMissing && vault.entriesFor(unit).some((e) => e.payload.date === date));
   const described = vault.unitOf(unit);
-  const quotable = vault.quotable(unit);
+  const quotable = vault.quotable(unit, date);
+  // Published, but not yet at this date: nothing failed and nobody is
+  // asked, so the line reads as one only its owner can price.
+  const publishedFrom = vault.publishedFrom(unit);
+  const early = !quotable && Boolean(publishedFrom);
   const field = el('input', {
     type: 'text',
     inputmode: 'decimal',
@@ -631,6 +635,9 @@ function rateLine(vault, unit, date, { sit, readOnly: blockReadOnly, fillMissing
       : `Nobody publishes a price for ${unit}. This one is yours to set.`;
   };
 
+  const earlyCopy = (yours = true) =>
+    `Published prices for ${unit} begin on ${format.fullDate(publishedFrom)}.${yours ? ' This one is yours to set.' : ''}`;
+
   /** Chip and wording for what the field holds now. Never touches the
    *  field itself, so typing is never overwritten. */
   line.describe = () => {
@@ -652,7 +659,7 @@ function rateLine(vault, unit, date, { sit, readOnly: blockReadOnly, fillMissing
       // changes. The proposed badge is never silently kept.
       provenance.textContent =
         figure !== null && figure !== parsed(stored.rate) && original !== null
-          ? `Edited from ${original}`
+          ? editedFrom(original, format)
           : provenanceChip(stored, format);
       explanation.textContent = !readOnly && !line.value() ? 'Cleared. Saving removes this price.' : '';
       return;
@@ -667,7 +674,7 @@ function rateLine(vault, unit, date, { sit, readOnly: blockReadOnly, fillMissing
         figure === parsed(line.proposal.rate)
           ? provenanceChip({ rateSource: 'proposed', rateAsOf: line.proposal.asOf, date }, format)
           : figure !== null
-            ? `Edited from ${line.proposal.rate}`
+            ? editedFrom(line.proposal.rate, format)
             : '';
       explanation.textContent = '';
       return;
@@ -675,6 +682,14 @@ function rateLine(vault, unit, date, { sit, readOnly: blockReadOnly, fillMissing
     provenance.textContent = line.changed() ? 'Typed by you' : '';
     if (readOnly) {
       explanation.textContent = `No price for ${unit} at this date.`;
+      return;
+    }
+    if (early) {
+      explanation.textContent = line.carried
+        ? `Set on ${format.fullDate(line.carried.payload.date)}. ${earlyCopy()}`
+        : line.asked
+          ? `What was 1 ${unit} worth in ${vault.mainCurrency} on ${format.fullDate(date)}? ${earlyCopy(false)} The figure records either way, and until a price exists the holding is listed as not priced.`
+          : earlyCopy();
       return;
     }
     if (!quotable) {
@@ -820,9 +835,15 @@ function rateLine(vault, unit, date, { sit, readOnly: blockReadOnly, fillMissing
   return line;
 }
 
+/** The note naming the figure an edit replaced, written as a rate is
+ *  everywhere: every digit kept, at least six places. */
+function editedFrom(rate, format) {
+  return `Edited from ${format.editable(decimal.parse(rate), 6)}`;
+}
+
 export function provenanceChip(payload, format) {
   if (payload.rateSource === 'manual') return 'Typed by you';
-  if (payload.rateSource === 'edited') return `Edited from ${payload.proposedRate}`;
+  if (payload.rateSource === 'edited') return editedFrom(payload.proposedRate, format);
   return payload.rateAsOf && payload.rateAsOf !== payload.date
     ? `Market rate as of ${format.dayMonth(payload.rateAsOf, 'short')}`
     : 'Market rate';

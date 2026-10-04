@@ -239,12 +239,25 @@ export class Vault {
     );
   }
 
-  /** Whether the proxy can propose a price for this unit at all. A
-   *  free-text unit, or a symbol with lookup off, has no rate source,
-   *  so nothing is ever requested for it. */
-  quotable(unit) {
+  /** The first date a published price exists for this unit in the main
+   *  currency: the later of its `since` and the main currency's, which
+   *  Frankfurter's Not Found before its start makes the quote's too.
+   *  Null for a unit with no rate source at any date, and '' for one
+   *  whose table row carries no date (record-rate.md, Reading). */
+  publishedFrom(unit) {
     const row = this.symbols.get(unit);
-    return Boolean(row && row.lookup);
+    if (!row || !row.lookup) return null;
+    const main = this.symbols.get(this.mainCurrency);
+    return [row.since, main && main.since].filter(Boolean).sort().pop() || '';
+  }
+
+  /** Whether the proxy can propose a price for this unit at `date`. A
+   *  free-text unit, a symbol with lookup off, or a date before the
+   *  unit's published prices begin has no rate source, so nothing is
+   *  ever requested for it. */
+  quotable(unit, date) {
+    const from = this.publishedFrom(unit);
+    return from !== null && date >= from;
   }
 
   /** The unit's last usable entry before `date`: the figure a line with
@@ -333,7 +346,7 @@ export class Vault {
    *  is. */
   priceAtDate(unit, on) {
     if (unit === this.mainCurrency) return { rate: decimal.ONE, date: null };
-    if (!this.quotable(unit)) return this.priceOn(unit, on);
+    if (!this.quotable(unit, on)) return this.priceOn(unit, on);
     const found = this.usableEntries(unit).find((entry) => entry.payload.date === on);
     return found ? { rate: decimal.parse(found.payload.rate), date: on } : null;
   }

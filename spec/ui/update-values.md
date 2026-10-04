@@ -83,12 +83,15 @@ unit: whatever figure the line holds, proposed, stored or typed. Where
 the line holds none, it is the price at this date (`record-rate.md`,
 Reading):
 
-- **A unit with a rate source** reads **not priced** in place of the
-  converted figure, never a conversion at the unit's last rate.
-- **A unit with no rate source** converts at its newest earlier price,
-  with the price date line beneath the converted figure, "priced 15
-  Jan 2024" (`design-system.md`, Components). With no price at or
-  before this date it reads **not priced**.
+- **A unit with a rate source at this date** reads **not priced** in
+  place of the converted figure, never a conversion at the unit's last
+  rate.
+- **A unit with no rate source at this date**, one only its owner
+  prices or one dated before its published prices begin, converts at
+  its newest earlier price, with the price date line beneath the
+  converted figure, "priced 15 Jan 2024" (`design-system.md`,
+  Components). With no price at or before this date it reads **not
+  priced**.
 
 **Every row states in words whether this date already holds a figure
 for it.** That sentence, not the contents of the field, is what tells a
@@ -226,10 +229,31 @@ Line states:
   sentence follows its age, "Estimated 14 months ago. Nobody publishes
   a price for m2. This one is yours to set.", and with none it follows
   "No price for m2 yet."
+- **A unit somebody publishes, on a date before its published prices
+  begin**, gold in 2012. It has no rate source at this date
+  (`record-rate.md`, Reading), so it is a unit only its owner can price
+  and behaves as one: it starts from the last price at or before this
+  date, writes nothing unless it is changed, and a figure typed into it
+  is "Typed by you". No source is asked about it, so it never shows the
+  resolving skeleton, and it never borrows the outage wording, because
+  nothing failed. The copy names the date published prices begin,
+  which is the later of the unit's first published date and the main
+  currency's (`record-rate.md`, Reading), written as Settings sets
+  dates (`settings.md`, Dates and numbers) and always with its year:
+  "Published prices for XAU-g begin on 2 January 2013. This one is
+  yours to set." Where the price it starts from is from an earlier day,
+  the sentence follows that price's date: "Set on 30 June 2011.
+  Published prices for XAU-g begin on 2 January 2013. This one is yours
+  to set." With no price at or before this date there is nothing to
+  start from, and the line asks as a unit with no rate at all does
+  (below), in its own words: "What was 1 XAU-g worth in CHF on 31
+  December 2012? Published prices for XAU-g begin on 2 January 2013.
+  The figure records either way, and until a price exists the holding
+  is listed as not priced." The unit, the dates and the main currency
+  are computed, not written into the copy.
 - **A unit with no rate at all, where this sitting is recording a
-  quantity in it.** The one time a price is asked for rather than
-  offered, because twelve troy ounces with no gold price is not a
-  figure. The line moves to the head of the block and asks for the
+  quantity in it.** A price is asked for rather than offered, because
+  twelve troy ounces with no gold price is not a figure. The line moves to the head of the block and asks for the
   number: "What is 1 PAINT worth in CHF? Nothing prices PAINT yet. The
   figure records either way, and until a price exists the holding is
   listed as not priced." **It never blocks the row.** The quantity
@@ -256,13 +280,19 @@ changes unsaved).
   the figure there may be one the person chose, and a provider that has
   since revised its published figure must not reach a stored entry by
   way of somebody looking at it (`record-rate.md`).
-- **A line that went in empty** says so, "No rate was recorded for
-  XAU-ozt on this date.", and **carries its own Look it up action**,
-  since the outage that emptied it is the reason for coming back.
+- **A line that went in empty, for a unit with a rate source at this
+  date,** says so, "No rate was recorded for XAU-ozt on this date.",
+  and **carries its own Look it up action**, since the outage that
+  emptied it is the reason for coming back.
   Opening the recording fetches nothing. Pressing that action is what
   issues the request, and what comes back is labeled with the day it
   is actually for like any proposal, to be taken, changed or left
   empty.
+- **A line with no entry here, dated before its unit's published
+  prices begin,** reads as it does on a new sweep (The rates, at the
+  foot of the sweep) and **offers no Look it up**, because no source
+  has a price for that date. It never reads as a line the outage
+  emptied.
 - **A rate line on a reopened recording saves by itself**, through the
   lines' own save (The rates, at the foot of the sweep). Filling in the
   rate that was missing is a complete act and needs no holding touched
@@ -297,7 +327,7 @@ whatever the price, so counting it would overstate what the change
 moves (`net-worth-view.md`, Archived holdings).
 
 Editing a filled line flips its provenance the moment it changes, to
-"Edited from 0.9312", naming the figure that was replaced
+"Edited from 0.931200", naming the figure that was replaced
 (`recording-detail.md`). The proposed badge is never silently kept.
 
 ## At phone width

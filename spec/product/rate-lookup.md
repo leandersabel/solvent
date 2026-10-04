@@ -72,8 +72,10 @@ meet one.
   offered is for the unit that holding is kept in, so a figure is never
   out by the factor between the two.
 - **A thing with no price source reads as a thing with no price source,
-  and an outage reads as an outage.** They are never worded the same
-  way. Silver having no source yet is normal, and must not look broken.
+  a date before a source's prices begin reads as one, and an outage
+  reads as an outage.** No two are worded the same way. Silver having no
+  source yet, and gold having no published price in 2012, are normal
+  and must not look broken.
 - **Asking twice costs once.** Several holdings in the same currency,
   the same unit reached twice in one sweep, or two people in the
   household updating on the same day, produce one lookup.
@@ -118,7 +120,10 @@ weekdays included. The app shows the day it is for rather than hiding
 the lag, and overriding it is one edit.
 
 Prices reach back as far as each source published. Gold does not reach
-before 2013, so older gold entries take a price you type.
+before 2013, so older gold entries take a price you type. On a date
+before a source's prices begin, gold or a currency is priced by you,
+like your flat, and the app says so rather than reporting a failed
+lookup (`record-snapshot.md`).
 
 If a source stops or changes, there is nobody to call and prices get
 typed by hand until the app is changed. Silver, platinum and palladium

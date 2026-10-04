@@ -266,8 +266,8 @@ currency · As of · (row action).
     - **Latest rates**: a price dated before the rate date in the
       control's label.
     - **Rates as of each figure**: a price dated before the row's own
-      As of date. A unit with a rate source reaches it where the row's
-      quantity date has no price.
+      As of date. A unit with a rate source at that date reaches it
+      only where that date has no price.
 
     Most often it is a holding nobody publishes a price for, whose
     price moves only when its owner revisits it.

@@ -249,9 +249,10 @@ await run(async () => {
   check('record-snapshot: the sweep carries a row for each of the fifteen holdings', (await ev("document.querySelectorAll('.sweep-row').length")) === 15);
   await typeLine('XAU-ozt', '2711.13');
   const flipped = await lineState('XAU-ozt');
+  const asRate = (rate) => model(({ v, decimal }, text) => v.format.editable(decimal.parse(text), 6), rate);
   check(
     'record-rate: editing a proposed line flips its provenance the moment it changes',
-    flipped.chip === `Edited from ${proposalsFor(D10)['XAU-ozt'].rate}`,
+    flipped.chip === `Edited from ${await asRate(proposalsFor(D10)['XAU-ozt'].rate)}`,
     flipped.chip,
   );
   // A row prefilled from "12.5" offers Confirm, Record once edited and
@@ -427,7 +428,7 @@ await run(async () => {
       .map(f => decimal.format(decimal.multiply(decimal.parse(f.snapshot.payload.value), v.priceOn('USD', day).rate))), D2);
   const usdBefore = await usdFigures();
   await typeLine('USD', '0.93');
-  check('record-rate: editing a stored proposal flips its chip to the figure it replaced', (await lineState('USD')).chip === 'Edited from 0.92');
+  check('record-rate: editing a stored proposal flips its chip to the figure it replaced', (await lineState('USD')).chip === 'Edited from 0.920000');
   await press('Save the rate lines');
   const confirmation = await ev("document.querySelector('.dialog').textContent");
   await press('Save the prices', '.dialog');
@@ -862,6 +863,45 @@ await run(async () => {
       refilled.find((p) => p.symbol === 'PAINT')?.rate === '3.5' && refilled.find((p) => p.symbol === 'PAINT').rateSource === 'manual' &&
       refilled.find((p) => p.symbol === 'USD')?.rateSource === 'proposed',
     JSON.stringify(refilled),
+  );
+  await home();
+
+  // ---- record-rate: a published unit before its published prices begin -
+
+  proxy.mode = 'answer';
+  const EARLY = '2012-12-31';
+  const begins = await format('fullDate', '2013-01-02');
+  traffic.length = 0;
+  await go(`#/sweep/${EARLY}`);
+  const early = await lineState('XAU-ozt');
+  const earlyUsd = await lineState('USD');
+  check(
+    'record-rate: gold before its published prices begin says so and is the owner\'s to price, never an outage',
+    early.value === '' && early.says === `Published prices for XAU-ozt begin on ${begins}. This one is yours to set.` && !early.lookup &&
+      earlyUsd.value !== '',
+    JSON.stringify({ early, earlyUsd }),
+  );
+  check(
+    'record-rate: the sweep asks the proxy once, for the date, and takes nothing from it for gold',
+    rateAsks().length === 1 && new URL(rateAsks()[0].url).searchParams.get('date') === EARLY,
+    traffic.map((r) => r.url).join(' | '),
+  );
+  await typeRow('Gold bars', '2');
+  await pressRow('Gold bars');
+  const earlyAsked = await lineState('XAU-ozt');
+  check(
+    'record-rate: recording gold before its published prices asks for a price in the line\'s own words and writes none',
+    earlyAsked.says === `What was 1 XAU-ozt worth in CHF on ${await format('fullDate', EARLY)}? Published prices for XAU-ozt begin on ${begins}. The figure records either way, and until a price exists the holding is listed as not priced.` &&
+      on(await stored('snapshot'), EARLY).length === 1 && !on(await stored('rate'), EARLY).some((r) => r.payload.symbol === 'XAU-ozt'),
+    JSON.stringify(earlyAsked),
+  );
+  traffic.length = 0;
+  await go(`#/sweep/${EARLY}`);
+  const earlyReopened = await lineState('XAU-ozt');
+  check(
+    'record-rate: a reopened recording offers no Look it up on gold before its published prices and asks the proxy nothing',
+    !earlyReopened.lookup && earlyReopened.says.startsWith('Published prices for XAU-ozt begin on') && rateAsks().length === 0,
+    JSON.stringify(earlyReopened),
   );
   await home();
 

@@ -264,11 +264,25 @@ decryption warning rather than silently shaping the list.
   record at the date is a create, and it brings the reload with it, as
   does moving an entry onto another date (Editing an existing
   snapshot).
-- **The reload runs once per sitting, not once per row.** After it, the
-  date belongs to this session: another session's attempt to create a
-  recording there is refused by its own reload, so the rows that follow
-  need no further check. A fifteen-row sweep costs one extra `GET`, not
-  fifteen.
+- **A row's create reloads once per sitting, not once per row.** After
+  the first reload, the date belongs to this session against creates:
+  another session's attempt to create a recording there is refused by
+  its own reload, so the rows that follow need no further check. A
+  fifteen-row sweep costs one extra pair of `GET`s, not fifteen.
+- **The rate-lines save reloads on every save that creates an entry,
+  claimed date or not** (`record-rate.md`, Saving an edited recording).
+  Nothing refuses another session's deletion of the date, so a claim
+  says nothing about whether the date still holds a recording. A row's
+  create needs no such check, because a quantity makes a recording
+  legitimately. A typed price alone never may, and only a fresh reload
+  shows the date emptied. The cost is one pair of `GET`s per rate-lines
+  save that creates, not per line, and that save comes once per
+  confirmation.
+- **A reload after the claim judges the slots and nothing else.** The
+  records the session wrote itself are at the date, so finding the date
+  recorded does not refuse it. It refuses a slot the save would create
+  that is already taken, and, for the rate-lines save, a date holding
+  no record at all.
 - **A save is refused whole** when the reload finds the date recorded
   elsewhere, or finds any slot the save would create already taken.
   Nothing is written, not even into slots that are still free. The
@@ -388,7 +402,10 @@ added at that date on the single-holding form:
   the entry reads not priced at its new date (`record-rate.md`,
   Reading), on the recording and on the holding's page, until that date
   has an entry. It never borrows the price of the date it left or of
-  any earlier one.
+  any earlier one. A new date before the symbol's `since` is the
+  exception `record-rate.md`, Reading, makes for a symbol with no rate
+  source there: no request asks about the symbol, and the entry takes
+  the newest price at or before its new date, with that price's date.
 - **The dialog shows the new date's prices as soon as the date
   changes**, the same folded line the form shows for a new figure:
   proposals fetched for an empty date, the missing lines filled for a
@@ -485,8 +502,9 @@ one (`manage-accounts.md`, While archived).
 
 - **No price is available for the unit**, because the provider is down,
   rate-limited or has no data for that date, because the unit is free
-  text nobody has priced, or because the person left the rate line
-  empty → **the quantity saves regardless**. **Nothing in the price half
+  text nobody has priced, because the date precedes the unit's `since`
+  and nothing was typed at or before it, or because the person left the
+  rate line empty → **the quantity saves regardless**. **Nothing in the price half
   ever blocks a quantity**, in any form: no disabled save, no required
   rate field, no warning to dismiss first. The price half degrades on
   its own terms (`record-rate.md`, The refresh),
@@ -565,7 +583,8 @@ one (`manage-accounts.md`, While archived).
 - A quantity in a unit with no price entry at all, and none typed,
   saves: the save control is live throughout, one `snapshot` record is
   written, and the holding is listed as not priced. Asserted for a
-  free-text unit and for a symbol whose lookup returned nothing.
+  free-text unit, for a symbol whose lookup returned nothing, and for
+  `XAU-g` at 2012-12-31, before its `since`.
 - A typed future date is refused on the date field's own line with the
   future-date reason, the input carries `aria-invalid="true"` and an
   `aria-describedby` naming that line, and Save issues no `PUT` and
@@ -592,6 +611,12 @@ one (`manage-accounts.md`, While archived).
   moves, no `USD` entry is written, and the figure reads not priced on
   the 2026-04-10 recording and in the holding's list of values, never
   at the 2010-03-31 rate.
+- Moving an `XAU-g` snapshot to 2012-06-29, a date holding no records,
+  in a vault whose only other unit is the main currency, issues no
+  request to `/api/rates` and writes no `rate` entry. With an `XAU-g`
+  entry at 2011-06-30, the figure then converts at that entry and
+  carries 2011-06-30 on that date's recording and in the holding's list
+  of values. With none at or before 2012-06-29, it reads not priced.
 - Moving a snapshot onto a date whose prices are complete issues no
   request to `/api/rates` and leaves every `rate` entry at that date
   byte-identical. Onto a date missing one symbol, it writes that
@@ -655,6 +680,9 @@ one (`manage-accounts.md`, While archived).
   recording and for one holding added inside a reopened one.
 - A fifteen-row sweep at a new date issues exactly one extra type
   reload, before the first row is written, and none after it.
+- On a sweep at a new date, after the first row is recorded, a
+  rate-lines save that creates a price issues one type reload and
+  writes that price.
 - Editing inside a reopened recording never shows the replace prompt,
   while the single-holding form at an occupied date still does.
 - Asking for a new recording and picking a date that already holds
