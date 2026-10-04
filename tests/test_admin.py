@@ -8,7 +8,7 @@ import sys
 from pathlib import Path
 
 from solvent.guard import ADMINISTRATION, surface_of
-from tests.helpers import CSRF, b64, connect, mint_invite, register, rows
+from tests.helpers import CSRF, b64, connect, mint_invite, put_record, register, rows
 from tests.test_guard import fingerprint
 
 REPO_ROOT = Path(__file__).resolve().parent.parent
@@ -96,12 +96,24 @@ def test_expired_is_derived_and_not_stored(app, admin):
     assert stored["status"] == "pending"
 
 
-def test_the_account_list_carries_no_record_count_for_an_administrator(app, admin):
+def test_the_account_list_carries_no_item_count_for_an_administrator(app, admin):
     register(app, "sarah")
     listed = {row["username"]: row for row in admin.get("/api/admin/accounts", headers=CSRF).get_json()}
-    assert "recordCount" not in listed["root"]
-    assert listed["sarah"]["recordCount"] == 1
+    assert set(listed["root"]) == {"username", "kind", "createdAt", "lastLoginAt"}
+    assert set(listed["sarah"]) == {"username", "kind", "createdAt", "lastLoginAt", "itemCount"}
+    assert listed["sarah"]["itemCount"] == 0
     assert listed["root"]["lastLoginAt"] == listed["root"]["createdAt"]
+
+
+def test_items_count_what_the_owner_added_and_no_profile(app, admin):
+    sarah, _ = register(app, "sarah")
+    account_id, _ = put_record(sarah)
+    put_record(sarah, record_type="snapshot", accountId=account_id)
+    put_record(sarah, record_type="rate")
+    _, response = put_record(sarah, record_type="profile")
+    assert response.status_code == 200
+    listed = {row["username"]: row for row in admin.get("/api/admin/accounts", headers=CSRF).get_json()}
+    assert listed["sarah"]["itemCount"] == 3
 
 
 def test_no_admin_route_returns_a_credential_field_a_wrapper_or_a_ciphertext(app, admin):

@@ -136,15 +136,17 @@ def list_accounts():
     """Both kinds, because an administrator needs to see the other
     administrators to know whether they are the last one.
 
-    `recordCount` is absent for an administrator rather than zero: zero
-    and "has no vault" are different statements, and a zero invites the
-    reader to think the vault is empty when the point is that there is
-    none.
+    `itemCount` counts what the owner added, so every `profile` record is
+    left out: registration writes one, and a vault nobody used reads 0.
+    It is absent for an administrator rather than zero: zero and "has no
+    vault" are different statements, and a zero invites the reader to
+    think the vault is empty when the point is that there is none.
     """
     rows = get_db().execute(
         "SELECT principals.*, "
         "  (SELECT COUNT(*) FROM records "
-        "   WHERE records.principal_id = principals.id) AS record_count "
+        "   WHERE records.principal_id = principals.id "
+        "   AND records.record_type != 'profile') AS item_count "
         "FROM principals ORDER BY principals.username"
     ).fetchall()
     accounts = []
@@ -156,7 +158,7 @@ def list_accounts():
             "lastLoginAt": row["last_login_at"],
         }
         if row["kind"] == "vault_owner":
-            account["recordCount"] = row["record_count"]
+            account["itemCount"] = row["item_count"]
         accounts.append(account)
     return jsonify(accounts)
 
