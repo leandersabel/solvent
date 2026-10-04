@@ -28,6 +28,13 @@ await run(async () => {
   await page.idle();
   await page.eval("document.querySelectorAll('.dialog details').forEach(d => (d.open = true))");
   await page.frames();
+  const tabular = (selector) => page.eval(`(() => {
+    const nodes = [...document.querySelectorAll(${JSON.stringify(selector)})];
+    return nodes.length > 0 && nodes.every((n) => getComputedStyle(n).fontVariantNumeric === 'tabular-nums');
+  })()`);
+  check('the form\'s value field has tabular digits', await tabular('#snapshot-value'));
+  check('the form\'s converted line has tabular digits', await tabular('#snapshot-value ~ .hint'));
+  check('the form\'s rate fields have tabular digits', await tabular('.dialog .rate-line input'));
   check(
     'the prices line says what the save writes',
     (await text()).includes('will be recorded with this'),

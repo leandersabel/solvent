@@ -21,7 +21,7 @@ export function snapshotDialog(vault, holding, existing, onSaved, onOpenRecordin
   });
   const note = el('textarea', { rows: '2', text: existing ? existing.payload.note || '' : '' });
   const unit = holding.payload.unit;
-  const converted = el('p', { class: 'hint' });
+  const converted = el('p', { class: 'hint numeric' });
   const error = el('p', { class: 'field-error', hidden: true });
   const pricesLine = el('p', { class: 'hint prices-line' });
   const pricesBody = el('div', { class: 'prices-body' });

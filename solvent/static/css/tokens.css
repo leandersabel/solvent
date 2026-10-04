@@ -458,6 +458,9 @@ textarea {
   color: var(--ink-primary);
 }
 
+/* After the base block: its `font` shorthand resets the figures. */
+input[inputmode="decimal"] { font-variant-numeric: tabular-nums; }
+
 input[type="file"] {
   width: 100%;
   font: inherit;
