@@ -187,8 +187,10 @@ One table, every account, both kinds. Columns: **Username**, **Kind**,
   changed nowhere.
 - **Last signed in** always shows a date, because creating an account is
   its first sign-in (How it works, Endpoints).
-- **Items** is how many things the owner added to the vault: holdings,
-  recordings and prices. A vault nobody has added anything to reads 0.
+- **Items** is how many things the owner added to the vault: one for
+  each holding, one for each holding in each recording, and one for each
+  price. The vault's own settings are not counted, so a vault nobody has
+  added anything to reads 0.
   For an administrator it
   reads an ink-muted **No vault**, never a zero, because a zero invites
   the reader to think a vault sits there empty. Ink-muted is allowed

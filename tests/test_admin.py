@@ -99,7 +99,8 @@ def test_expired_is_derived_and_not_stored(app, admin):
 def test_the_account_list_carries_no_item_count_for_an_administrator(app, admin):
     register(app, "sarah")
     listed = {row["username"]: row for row in admin.get("/api/admin/accounts", headers=CSRF).get_json()}
-    assert "itemCount" not in listed["root"]
+    assert set(listed["root"]) == {"username", "kind", "createdAt", "lastLoginAt"}
+    assert set(listed["sarah"]) == {"username", "kind", "createdAt", "lastLoginAt", "itemCount"}
     assert listed["sarah"]["itemCount"] == 0
     assert listed["root"]["lastLoginAt"] == listed["root"]["createdAt"]
 
