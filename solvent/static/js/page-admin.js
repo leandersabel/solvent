@@ -56,7 +56,11 @@ function render() {
 
 function invites(body) {
   const list = el('div', {}, [el('p', { class: 'hint', text: 'Loading…' })]);
-  mount(body, [createInvite(() => loadInvites(list)), list]);
+  const outstanding = el('section', { class: 'card' }, [
+    el('h2', { class: 'section-heading', text: 'Outstanding invites' }),
+    list,
+  ]);
+  mount(body, [createInvite(() => loadInvites(list)), outstanding]);
   loadInvites(list);
 }
 
