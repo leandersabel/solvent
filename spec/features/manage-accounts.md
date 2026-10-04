@@ -201,8 +201,11 @@ because none does.
 
 - **Loading**: the form opens at once from the in-memory model. Only the
   unit select waits on the symbol table, as a skeleton.
-- **Error, validation**: inline per field. A name and a unit, picked or
-  typed, are required. Nothing else is.
+- **Error, validation**: inline per field, on its message line
+  (design-system.md, Components, Input). A name and a unit, picked or
+  typed, are required. Nothing else is. A refusal follows the field as
+  it stands: it goes the moment the field fits, before Save, and a unit
+  that still does not fit shows why it does not now.
 - **Error, the symbol table cannot be fetched**: the control degrades to
   free text with a retry: "The unit list could not be loaded. Try
   again, or type a unit." Saving is not blocked, and the notice names
@@ -875,3 +878,7 @@ Unarchiving and archiving it again writes the zero at the new D.
     archive's zero, that it deletes 1 recorded value and past figures
     stay as they are. Test: `tests/browser/parts/account-detail.mjs`,
     `tests/browser/parts/account-detail-review-delete.mjs`.
+60. A name or unit refused on Save stops being refused, with
+    `aria-invalid` gone, the moment the field holds one that fits,
+    before Save is pressed again. Test:
+    `tests/browser/parts/account-form.mjs`.

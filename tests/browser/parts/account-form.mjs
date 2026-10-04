@@ -159,15 +159,36 @@ await run(async () => {
     await page.eval("document.querySelector('.dialog button[type=submit]').click()");
     await page.holds("document.body.innerText.includes('Give the holding a name.')");
     check('a missing name is refused inline and writes nothing', (await text()).includes('Give the holding a name.') && (await writesSeen()).length === 0);
+    check(
+      'the refused name is marked invalid and names its message line',
+      await page.eval("(() => { const n = document.querySelector('#holding-name'); return n.getAttribute('aria-invalid') === 'true' && !document.getElementById(n.getAttribute('aria-describedby')).hidden; })()"),
+    );
     await setValue('#holding-name', NAME);
+    await page.frames();
+    check(
+      'typing a name clears its refusal before Save',
+      await page.eval("!document.body.innerText.includes('Give the holding a name.') && !document.querySelector('#holding-name').hasAttribute('aria-invalid')"),
+    );
     await page.eval("document.querySelector('#holding-unit-list .unit-other').click()");
+    await page.eval("document.querySelector('.dialog button[type=submit]').click()");
+    await page.holds("document.body.innerText.includes('Choose a unit, or type one under Something else.')");
+    check('an empty unit is refused inline and writes nothing', (await writesSeen()).length === 0);
     await setValue('#holding-unit-other', 'usd');
     await page.frames();
+    check(
+      'a typed unit that still does not fit turns the refusal to what is wrong now',
+      await page.eval("!document.body.innerText.includes('Choose a unit, or type one') && document.body.innerText.includes('Use it from there') && document.querySelector('#holding-unit-other').getAttribute('aria-invalid') === 'true'"),
+    );
     check('typed text matching a listed symbol offers that symbol', (await text()).includes('USD is on the list'));
     await page.eval("document.querySelector('.dialog button[type=submit]').click()");
     await page.holds("document.body.innerText.includes('Use it from there')");
     check('and that free text is not accepted', (await writesSeen()).length === 0 && (await text()).includes('Use it from there'));
     await page.eval("document.querySelector('#holding-unit-list [data-symbol=\"CHF\"]').click()");
+    await page.frames();
+    check(
+      'picking a listed unit clears the refusal before Save',
+      await page.eval("!document.body.innerText.includes('Use it from there') && !document.querySelector('#holding-unit').hasAttribute('aria-invalid')"),
+    );
 
     await page.eval("document.querySelectorAll('.dialog details').forEach(d => (d.open = true))");
     await setValue('.dialog textarea', NOTE);
