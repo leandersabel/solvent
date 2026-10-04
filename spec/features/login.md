@@ -812,4 +812,5 @@ reason, and then learns at sign-in.
     `autocomplete="username"` and the known username, before the
     password field, and no username field a person can type in. With
     another name written into it, unlocking still signs in as the known
-    username. Test: `tests/browser/parts/unlock.mjs`.
+    username. Test: `tests/browser/parts/unlock.mjs`,
+    `tests/browser/parts/unlock-review-username.mjs`.
