@@ -731,7 +731,8 @@ reason, and then learns at sign-in.
     The Archive or delete dialog comes back with Delete permanently
     chosen and the typed name, its confirm enabled only by the whole
     name. Test: `tests/browser/parts/unlock-lock.mjs`,
-    `tests/browser/parts/unlock-idle.mjs`.
+    `tests/browser/parts/unlock-idle.mjs`,
+    `tests/browser/parts/unlock-review-dialogs.mjs`.
 57. Lock locks at once with no confirmation, keeps the server session,
     and unlocking needs only the password. Test:
     `tests/browser/parts/unlock.mjs`.
