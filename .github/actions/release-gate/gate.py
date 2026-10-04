@@ -15,20 +15,28 @@ COMMIT = os.environ["COMMIT"]
 RATERS = {OWNER, "claude", "github-actions"}
 BLOCKING = {"severity: high", "severity: critical"}
 
-QUERY = """
+# GitHub returns timelines nested in an issue list incomplete, so each
+# issue's timeline is read with a query of its own.
+ISSUES = """
 query($owner: String!, $name: String!, $states: [IssueState!], $since: DateTime, $after: String) {
   repository(owner: $owner, name: $name) {
-    issues(states: $states, filterBy: {since: $since}, first: 50, after: $after) {
+    issues(states: $states, filterBy: {since: $since}, first: 100, after: $after) {
       pageInfo { hasNextPage endCursor }
-      nodes {
-        number
-        timelineItems(itemTypes: [LABELED_EVENT, UNLABELED_EVENT, CLOSED_EVENT], last: 100) {
-          nodes {
-            __typename
-            ... on LabeledEvent { actor { login } label { name } }
-            ... on UnlabeledEvent { actor { login } label { name } }
-            ... on ClosedEvent { actor { login } closer { ... on PullRequest { mergeCommit { oid } } } }
-          }
+      nodes { number }
+    }
+  }
+}"""
+TIMELINE = """
+query($owner: String!, $name: String!, $number: Int!, $after: String) {
+  repository(owner: $owner, name: $name) {
+    issue(number: $number) {
+      timelineItems(itemTypes: [LABELED_EVENT, UNLABELED_EVENT, CLOSED_EVENT], first: 100, after: $after) {
+        pageInfo { hasNextPage endCursor }
+        nodes {
+          __typename
+          ... on LabeledEvent { actor { login } label { name } }
+          ... on UnlabeledEvent { actor { login } label { name } }
+          ... on ClosedEvent { actor { login } closer { ... on PullRequest { mergeCommit { oid } } } }
         }
       }
     }
@@ -40,19 +48,26 @@ def run(*args):
     return subprocess.run(args, check=True, capture_output=True, text=True).stdout
 
 
-def issues(state, since=""):
-    variables = {"query": QUERY, "owner": OWNER, "name": NAME, "states": state, "since": since}
+def pages(query, path, **variables):
+    """The nodes of every page of the connection at `path`, in order."""
+    variables.update(query=query, owner=OWNER, name=NAME)
     while True:
         args = ["gh", "api", "graphql"]
         for key, value in variables.items():
             if value:
-                args += ["-f", f"{key}={value}"]
-        page = json.loads(run(*args))["data"]["repository"]["issues"]
-        for issue in page["nodes"]:
-            yield issue["number"], issue["timelineItems"]["nodes"]
+                args += ["-F" if isinstance(value, int) else "-f", f"{key}={value}"]
+        page = json.loads(run(*args))["data"]["repository"]
+        for key in path:
+            page = page[key]
+        yield from page["nodes"]
         if not page["pageInfo"]["hasNextPage"]:
             return
         variables["after"] = page["pageInfo"]["endCursor"]
+
+
+def issues(state, since=""):
+    for issue in pages(ISSUES, ["issues"], states=state, since=since):
+        yield issue["number"], list(pages(TIMELINE, ["issue", "timelineItems"], number=issue["number"]))
 
 
 def actor(event):
@@ -71,32 +86,44 @@ def rated_high(events):
     return bool(held & BLOCKING)
 
 
-def fixed(events):
+def closed(events):
+    """The issue's last closing, or None when its timeline holds none."""
+    return next((event for event in reversed(events) if event["__typename"] == "ClosedEvent"), None)
+
+
+def fixed(closing):
     """Closed by the client, or by a merged pull request the version holds."""
-    closed = [event for event in events if event["__typename"] == "ClosedEvent"][-1]
-    if actor(closed) == OWNER:
+    if actor(closing) == OWNER:
         return True
-    merge = ((closed["closer"] or {}).get("mergeCommit") or {}).get("oid")
+    merge = ((closing["closer"] or {}).get("mergeCommit") or {}).get("oid")
     return bool(merge) and subprocess.run(["git", "merge-base", "--is-ancestor", merge, COMMIT]).returncode == 0
 
 
-since = os.environ["SINCE"] and run("git", "log", "-1", "--format=%cI", os.environ["SINCE"]).strip()
-blocked = [f"- #{number}" for number, events in issues("OPEN") if rated_high(events)]
-blocked += [
-    f"- #{number} was closed without its fix in this version"
-    for number, events in issues("CLOSED", since)
-    if rated_high(events) and not fixed(events)
-]
-alerts = json.loads(run(
-    "gh", "api", "--paginate", "--slurp",
-    f"repos/{OWNER}/{NAME}/dependabot/alerts?state=open&scope=runtime&severity=high,critical&per_page=100",
-))
-blocked += [
-    f"- Dependabot alert {alert['number']}: {alert['security_advisory']['summary']}"
-    for page in alerts for alert in page
-]
+def main():
+    since = os.environ["SINCE"] and run("git", "log", "-1", "--format=%cI", os.environ["SINCE"]).strip()
+    blocked = [f"- #{number}" for number, events in issues("OPEN") if rated_high(events)]
+    for number, events in issues("CLOSED", since):
+        if not rated_high(events):
+            continue
+        closing = closed(events)
+        if closing is None:
+            blocked.append(f"- #{number} was closed, but its closing could not be read")
+        elif not fixed(closing):
+            blocked.append(f"- #{number} was closed without its fix in this version")
+    alerts = json.loads(run(
+        "gh", "api", "--paginate", "--slurp",
+        f"repos/{OWNER}/{NAME}/dependabot/alerts?state=open&scope=runtime&severity=high,critical&per_page=100",
+    ))
+    blocked += [
+        f"- Dependabot alert {alert['number']}: {alert['security_advisory']['summary']}"
+        for page in alerts for alert in page
+    ]
 
-if blocked:
-    with open("release-blocked.txt", "w") as out:
-        out.write("\n".join(blocked) + "\n")
-    sys.exit("Held back by:\n" + "\n".join(blocked))
+    if blocked:
+        with open("release-blocked.txt", "w") as out:
+            out.write("\n".join(blocked) + "\n")
+        sys.exit("Held back by:\n" + "\n".join(blocked))
+
+
+if __name__ == "__main__":
+    main()
