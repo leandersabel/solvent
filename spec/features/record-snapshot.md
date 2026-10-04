@@ -509,10 +509,11 @@ one (`manage-accounts.md`, While archived).
   current value, and it is excluded from the total rather than counted
   as zero. No price entry is deleted with it: a price belongs to a
   symbol, not to the holding that happened to prompt it.
-- **A recording with no quantities**, whether they were cleared or
-  never entered, keeps its rate entries, is still a recording, reopens
-  like any other, and keeps pricing the dates around it (Clearing a
-  figure).
+- **A recording with no quantities**, because the person cleared,
+  deleted or moved away every one, keeps its rate entries, is still a
+  recording, reopens like any other, and keeps pricing the dates around
+  it (Clearing a figure). A typed price alone never makes one
+  (`record-rate.md`, The write path).
 - **A recording deleted outright** → every snapshot and every rate
   entry at that date goes, the recording appears in no list, and the
   date is available to be recorded again as though it never had been.

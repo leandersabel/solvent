@@ -217,10 +217,29 @@ and the order is the whole of the guarantee.
   then failing is the bad case: the total moves, because every holding
   in those symbols reprices, while the number the person went and
   looked up is gone. The expensive half goes first.
-- **A price the person edited without recording any quantity is written
-  on its own.** Editing a price is an act in its own right, so it does
-  not wait for a quantity that is never coming, and it writes only that
-  symbol's entry rather than triggering the refresh.
+- **A price the person typed is written only at a date that holds a
+  recording.**
+  - **At a date holding a record**, the rate-lines save writes it with
+    no quantity alongside and triggers no refresh (Saving an edited
+    recording). The refresh waits on a quantity because it writes
+    figures nobody asked for. A typed price is the person's own act, and
+    the recording is there for it to belong to.
+  - **At a date holding none**, nothing is written until the first
+    quantity is. That quantity's success writes the refresh and every
+    typed price with it, each typed figure in its proposal's place with
+    the `rateSource` Record shape gives it, so the date gets all its
+    prices in one go. From then on the date holds a recording, and the
+    rate-lines save is offered as on a reopened one, however the sweep
+    was entered.
+  - **The sweep offers no rate-lines save at a date holding no record**,
+    and the client's rate-lines write refuses at such a date, checked
+    against the model in memory, before any request. A typed price alone
+    therefore never creates a recording, and an empty recording is
+    always one the person emptied (`product/record-snapshot.md`,
+    Clearing one out, and deleting one).
+  - **Leaving first writes nothing.** The screen landed on names each
+    unit whose typed price was left (`ui/update-values.md`, States,
+    Closing with changes unsaved).
 
 Against the optimistic-concurrency rule in `record-api.md`:
 
@@ -272,12 +291,8 @@ request under its own version check, and nothing spans two of them.
   A phase's requests may be issued together, and the next phase begins
   when every request in the previous one has answered.
 
-- **A rate the person typed does not wait on a quantity.** The gate
-  holding the refresh behind a successful quantity write exists because
-  the refresh writes figures nobody asked for. An entry typed into a
-  rate line is the person's own act, so the rate-lines save needs no
-  holding touched alongside it. A refreshed entry is still gated,
-  exactly as above.
+- **The rate-lines save needs no holding touched alongside it**, and
+  runs only at a date that holds a record (The write path).
 - **Deletions run last**, after every write in the save has been
   attempted, so a save that fails partway has destroyed nothing and the
   person still holds every price the screen offered to remove.
@@ -445,9 +460,10 @@ to win silently.
 - **A recording is reopened and only a quantity is changed.** No rate
   record is written, no `version` moves, and no request reaches the
   proxy. The date keeps the prices it was recorded at.
-- **A date whose only records are rates**, because every quantity at
-  it was cleared or none was ever entered, is still a recording and
-  still reopens. Nothing tidies it away, the entries keep pricing the
+- **A date whose only records are rates**, because the person cleared,
+  deleted or moved away every quantity at it, is still a recording and
+  still reopens. No other act makes one, since a typed price waits for
+  a quantity (The write path). Nothing tidies it away, the entries keep pricing the
   dates around them, and the only thing that removes them is deleting
   the recording (`record-snapshot.md`, Deleting a recording).
 - **A symbol the recording date never priced**, because the provider
@@ -556,6 +572,17 @@ to win silently.
 - The price as recorded for a `USD` holding whose latest quantity is at
   2026-04-10, with `USD` entries at 2010-03-31 only, is the 2010-03-31
   entry.
+- On a sweep at a date holding no record, typing a price on a rate line
+  shows no rate-lines save control. Typing it, and then leaving the
+  sweep with no row recorded, issue no `PUT` and no `DELETE`, and the
+  screen landed on names that unit as left unsaved.
+- On that sweep, with `USD` proposed and a price typed on a free-text
+  unit's line, recording the first row writes its `snapshot` first,
+  then a `rate` entry for the free-text unit carrying the typed `rate`
+  as `manual` and a `USD` entry as `proposed`, both at the sweep's
+  date. The rate-lines save control shows from then on.
+- The client's rate-lines write, called at a date holding no record,
+  issues no request and writes nothing.
 - A rate-lines save changing two rates and clearing a third issues both
   rate `PUT`s before the `DELETE`.
 - With the second rate `PUT` of that save stubbed to fail, the first
