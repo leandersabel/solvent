@@ -8,6 +8,7 @@ never made.
 from __future__ import annotations
 
 import json
+import socket
 import ssl
 import threading
 import time
@@ -37,6 +38,41 @@ def provider(monkeypatch):
 
     monkeypatch.setattr(rates, "_fetch_json", fetch)
     return type("Provider", (), {"calls": calls, "answers": answers})()
+
+
+@pytest.fixture
+def hang_open(monkeypatch):
+    """The app's own opener sent to a loopback server that accepts the
+    connection and sends nothing, so the wait ends at the app's own
+    socket timeout. Returns a replacement for `_opener.open` that
+    reaches that server in place of the URL it was given."""
+    real_open = rates._opener.open
+    listener = socket.create_server(("127.0.0.1", 0))
+    listener.settimeout(0.05)
+    port = listener.getsockname()[1]
+    held = []
+    stop = threading.Event()
+
+    def accept():
+        while not stop.is_set():
+            try:
+                held.append(listener.accept()[0])
+            except (TimeoutError, OSError):
+                pass
+
+    acceptor = threading.Thread(target=accept)
+    acceptor.start()
+
+    def open_(request, timeout=None):
+        silent = urllib.request.Request(f"http://127.0.0.1:{port}/", headers=request.headers)
+        return real_open(silent, timeout=timeout)
+
+    yield open_
+    stop.set()
+    acceptor.join()
+    listener.close()
+    for connection in held:
+        connection.close()
 
 
 def fx(on: str, table: dict) -> dict:
@@ -285,18 +321,13 @@ def test_the_circuit_breaker_opens_and_closes(app, owner, monkeypatch):
 
 
 def test_a_whole_table_request_holding_gold_stays_within_one_egress_timeout(
-    owner, monkeypatch
+    owner, monkeypatch, hang_open
 ):
     """The deadline is per proxy request, not per outbound call: gold
     makes several in series, and a provider that hangs must not stack
     their timeouts."""
     monkeypatch.setattr(rates, "EGRESS_TIMEOUT_SECONDS", 0.4)
-
-    def hang(request, timeout=None):
-        time.sleep(timeout)
-        raise TimeoutError("provider hangs")
-
-    monkeypatch.setattr(rates._opener, "open", hang)
+    monkeypatch.setattr(rates._opener, "open", hang_open)
 
     started = time.monotonic()
     response = owner.get(f"/api/rates?date={PAST}&quote=CHF", headers=CSRF)
@@ -732,13 +763,13 @@ FAILURE_KINDS = ["connect", "timeout", "non-200", "non-json"]
 
 
 @pytest.fixture
-def providers(monkeypatch):
+def providers(monkeypatch, hang_open):
     """The app's opener, with Frankfurter and NBP each healthy or failing
     in one of the ways a breaker counts. `requests` records the provider
     of every request that went out, `lag_days` makes NBP publish that
-    many days before the date asked. A provider in `hang` waits out the
-    timeout it was given and then times out, as a client does against a
-    server that sends nothing, and one in `delay` answers that many
+    many days before the date asked. A provider in `hang` is reached on a
+    loopback server that sends nothing, so the app's own timeout ends
+    the wait, and one in `delay` answers that many
     seconds late. `sent` holds each request's provider, send time and
     whether it ran off the request's thread without a Flask context."""
 
@@ -770,8 +801,7 @@ def providers(monkeypatch):
         isolated = threading.current_thread() is not main and not has_app_context()
         state.sent.append((provider, time.monotonic(), isolated))
         if provider in state.hang:
-            time.sleep(timeout)
-            raise TimeoutError("timed out")
+            return hang_open(request, timeout)
         time.sleep(state.delay.get(provider, 0))
         kind = state.fail.get(provider)
         if kind == "connect":
@@ -1003,10 +1033,23 @@ def test_the_quote_leg_waits_for_nbp_and_gets_only_a_table_for_its_own_asof(
     assert leg >= nbp + 0.2
 
 
-def test_outbound_requests_run_on_threads_with_no_flask_context(owner, providers):
+def test_outbound_requests_run_on_threads_with_no_flask_context(owner, providers, monkeypatch):
+    main = threading.current_thread()
+    callers = []
+    get_db = rates.get_db
+
+    def spy():
+        callers.append(threading.current_thread())
+        return get_db()
+
+    monkeypatch.setattr(rates, "get_db", spy)
     owner.get(f"/api/rates?date={PAST}&quote=CHF", headers=CSRF)
+
     assert providers.sent
     assert all(isolated for _, _, isolated in providers.sent)
+    # Caching and composing ran, and only on the request's thread.
+    assert callers
+    assert all(caller is main for caller in callers)
 
 
 def test_a_breaker_count_changed_from_many_threads_loses_no_update():
