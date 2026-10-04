@@ -14,9 +14,9 @@ record after they all finish.
 ## Plan
 
 The arguments are `plan <last tag>`. A feature is a file in
-`spec/product/`, named without `.md`. It is walked in full when its
-`spec/product/` or `spec/features/` file changed since the last tag, or
-when an issue closed since then names it. Read the closed issues'
+`spec/features/`, named without `.md`. It is walked in full when its
+page changed since the last tag, or when an issue closed since then
+names it. Read the closed issues'
 titles and bodies for that, and nothing else about them. Write the
 features to walk in full to `qa-full.txt`, one name per line, and
 nothing else.
@@ -29,9 +29,9 @@ empty, where `<manifest>` is the path of the prepared data's manifest.
 This shard's app is its own, and no other shard reaches it.
 
 1. **Read what is already reported**, once, before the first run. Read
-   the titles and bodies of the open `bug` issues by `leandersabel`,
-   `claude[bot]` and `github-actions[bot]`, so you recognise a repeat
-   (`CLAUDE.md`, The loop, Findings).
+   the titles and bodies of the open `bug` and `qa` issues by
+   `leandersabel`, `claude[bot]` and `github-actions[bot]`, so you
+   recognize a repeat (`CLAUDE.md`, The loop, Findings).
 2. **Run `qa`** in the foreground: once for each feature walked in
    full, then once for every smoke path together, then, when the shard
    has any, once for the wrong-password and lockout checks of the whole
@@ -59,35 +59,35 @@ This shard's app is its own, and no other shard reaches it.
    `tools/nightly/fixtures/`, never the code beside them. With the
    harness tools it checks, among the rest:
 
-   - that no amount is ever in a lookup the stand-in receives;
-   - that asking for the same price twice reaches the source once;
+   - that no amount is ever in a lookup the stand-in receives
+   - that asking for the same price twice reaches the source once
    - the hourly ceiling, sending many lookups from the page with
-     `browser_evaluate`;
+     `browser_evaluate`
    - the wording for a source that is down against one that has no
      such price, with `price_source` set to fail and then to recover.
      After a recovery the app keeps skipping the source for five
-     minutes, unless `qa` restarts it with `app_stop` and `app_start`;
+     minutes, unless `qa` restarts it with `app_stop` and `app_start`
    - that archiving a holding stops its refresh, and unarchiving
-     resumes it;
+     resumes it
    - that reopening a recording asks about no unit that already has a
-     rate;
+     rate
    - totals under "rates as of each figure", against `known_prices`
-     and the manifest's expected totals;
-   - that an invite link never appears in the server log;
-   - how the app reads while Solvent is stopped;
+     and the manifest's expected totals
+   - that an invite link never appears in the server log
+   - how the app reads while Solvent is stopped
    - the idle lock, in one wait, for `login` and `account-settings`. In
      a shard walking both, the run for whichever comes first checks it
-     for both;
+     for both
    - for `account-settings`, that a password change brings a weakly
      protected vault up to current strength. On the older vault the
      manifest reserves for it, used for nothing else, `qa` signs in with
      the upgrade held back by a route on `/api/auth/upgrade-kdf`,
      removes the route, reads the stored strength from
      `POST /api/auth/salt` with `browser_evaluate`, changes the
-     password, reads it again, and signs in fresh with the new password;
+     password, reads it again, and signs in fresh with the new password
    - for `account-settings`, that signing out, signing out everywhere
      and deleting the vault end the right sessions, with one session in
-     each browser;
+     each browser
    - for `account-settings`, that open sessions lists only your own,
      signed in as a prepared owner while the other prepared owners still
      hold the live sessions the manifest's `live-sessions` coverage
@@ -97,19 +97,20 @@ This shard's app is its own, and no other shard reaches it.
    check. Without a manifest, `qa` builds its data by hand and lists what that
    leaves it unable to check.
 3. **Record each finding** in `qa-unfiled/<n>.json`, numbered from 1
-   and continuing across runs, as
-   `{"title": ..., "body": ..., "labels": [...], "repeats": null}`.
-   It is in English: the title says what is wrong for a user, and the
-   body gives the steps, what the product spec expects with a pointer
-   to the criterion, and what happened. The labels are `bug`, `qa`,
-   `accepted` and the finding's rating (`CLAUDE.md`, The loop,
-   Severity). A finding an open issue reports gets a record only when
-   its rating is higher than that issue's, with `repeats` its number
-   and `comment` saying the new rating and why.
+   and continuing across runs, as `{"title": ..., "body": ...,
+   "steps": [...], "labels": [...], "repeats": null}`. It is in
+   English: the title says what is wrong for a user, the body what the
+   feature page expects with a pointer to the criterion and what
+   happened, and `steps` each step that reproduces it, in order. A
+   finding without steps is not filed. The labels are `bug` and the
+   finding's rating (`CLAUDE.md`, The loop, Severity). A finding an
+   open issue reports gets a record only when its rating is higher than
+   that issue's, with `repeats` its number and `comment` saying the new
+   rating and why.
 4. **Record what could not be checked.** Each feature with criteria
    `qa` could not check gets a record the same way, titled
-   `QA could not check <feature>`, labeled `bug`, `qa` and `accepted`
-   without a rating, whose body lists each criterion and why. When an
+   `QA could not check <feature>`, labeled `maintenance` without a
+   rating or steps, whose body lists each criterion and why. When an
    open one for the feature lists the same criteria, there is no
    record. When it lists others, `repeats` is its number and `comment`
    names the criteria that joined or left. A later run's criteria for a
@@ -118,8 +119,8 @@ This shard's app is its own, and no other shard reaches it.
    last run's records and as the last thing written. Its absence tells
    the workflow this shard did not finish.
 
-A record that repeats an issue keeps the title, body and labels a new
-one would have, so it is filed as new if that issue has closed by then.
+A record that repeats an issue keeps everything a new one would have,
+so it is filed as new if that issue has closed by then.
 
 ## Merge
 
@@ -127,7 +128,7 @@ The argument is `merge <directory>`, holding each shard's
 `qa-unfiled/` in a directory of its own. Read every record, and write
 them to `qa-unfiled/<n>.json` in the working directory, numbered from
 1. Records from different shards that report the same thing become
-one, with the highest rating, the steps from each, and the `repeats` of
+one, with the highest rating, the `steps` of one and the `repeats` of
 any. Change nothing else in a record. Read nothing but the records.
 
 Never fix anything, and never touch a pull request.

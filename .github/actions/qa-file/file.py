@@ -1,11 +1,12 @@
 """Files what nightly QA recorded in qa-unfiled/ (CLAUDE.md, The loop,
 Nightly and stable): a comment on the open `qa` issue a record repeats,
-or else a new issue. A rated finding is filed in line, with `queued`
-(CLAUDE.md, The loop, Findings). Each record is deleted once filed, so a
-rerun files nothing twice. With DISPATCH set, each new issue without a
-rating starts the loop, and so does the queue, because what the
-workflow's token does starts no workflow by itself. Needs `gh` signed in
-to the repository.
+or else a new issue in line with `queued`, which no run clarifies
+(CLAUDE.md, The loop, Findings). A record titled `QA could not check
+<feature>` is filed as `maintenance`. Any other is a finding, filed as
+a `bug` only with the steps that reproduce it. Each record is deleted
+once handled, so a rerun files nothing twice. With DISPATCH set, the queue
+starts, because what the workflow's token does starts no workflow by
+itself. Needs `gh` signed in to the repository.
 """
 import glob
 import json
@@ -27,27 +28,41 @@ def open_qa(number):
     return issue["state"] == "OPEN" and "qa" in {label["name"] for label in issue["labels"]}
 
 
-# QA's own words, so only its title, body and comment pass, as data,
-# with the labels it may set.
+def rate(rated):
+    for label in rated:
+        subprocess.run(["gh", "label", "create", label], capture_output=True)
+
+
+def create(record, body, labels):
+    rate(RATINGS.intersection(labels))
+    flags = []
+    for label in labels:
+        flags += ["--label", label]
+    gh("issue", "create", "--title", str(record["title"]), "--body-file", "-", *flags, body=body)
+
+
+# QA's own words, so only its title, body, steps and comment pass, as
+# data, with the labels it may set.
 for path in sorted(glob.glob("qa-unfiled/*.json")):
     with open(path) as file:
         record = json.load(file)
+    labels = record.get("labels") if type(record.get("labels")) is list else []
+    rated = sorted(RATINGS.intersection(label for label in labels if type(label) is str))
     repeats = record.get("repeats")
+    steps = record.get("steps")
     if type(repeats) is int and open_qa(repeats):
-        gh("issue", "comment", str(repeats), "--body-file", "-", body=str(record["comment"]))
-    else:
-        labels = [label for label in record.get("labels", []) if label in RATINGS | {"bug", "qa", "accepted"}]
-        rated = RATINGS.intersection(labels)
+        # A repeat is recorded only when it rates the issue higher.
+        rate(rated)
         for label in rated:
-            subprocess.run(["gh", "label", "create", label], capture_output=True)
-        if rated:
-            labels.append("queued")
-        flags = []
-        for label in labels:
-            flags += ["--label", label]
-        url = gh("issue", "create", "--title", str(record["title"]), "--body-file", "-", *flags, body=str(record["body"]))
-        if not rated and os.environ.get("DISPATCH"):
-            gh("workflow", "run", "agent.yml", "--ref", "master", "-f", f"issue={url.rsplit('/', 1)[1]}")
+            gh("issue", "edit", str(repeats), "--add-label", label)
+        gh("issue", "comment", str(repeats), "--body-file", "-", body=str(record["comment"]))
+    elif str(record["title"]).startswith("QA could not check "):
+        create(record, str(record["body"]), ["maintenance", "qa", "accepted", "queued"])
+    elif type(steps) is list and steps and all(type(step) is str and step.strip() for step in steps):
+        listed = "\n".join(f"{n}. {step}" for n, step in enumerate(steps, 1))
+        create(record, f"{record['body']}\n\nSteps to reproduce:\n\n{listed}", ["bug", "qa", "accepted", "queued", *rated])
+    else:
+        print(f"Not filed, no steps to reproduce it: {record.get('title')}")
     os.remove(path)
 
 # A queue that could not be started is looked at again after the next

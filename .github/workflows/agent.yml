@@ -24,7 +24,7 @@ on:
         description: Issue number, `alerts` to file an issue for every open code scanning alert, or `queue` to start the first issue in line
         required: true
       resume:
-        description: Set by a run that left finished work for a fresh run to push or open
+        description: Set by a run that left work for a fresh run to continue
         type: boolean
         default: false
 
@@ -43,7 +43,6 @@ jobs:
     outputs:
       issue: ${{ steps.route.outputs.issue }}
       queue: ${{ steps.route.outputs.queue }}
-      held: ${{ steps.route.outputs.held }}
     steps:
       - id: route
         env:
@@ -55,23 +54,10 @@ jobs:
           jqe() { jq -r "$1" "$GITHUB_EVENT_PATH"; }
           from_branch() { sed -nE "s#^claude/(spec|issue)-([0-9]+)\$#\2#p" <<<"$1"; }
           dispatch() { gh workflow run agent.yml --ref master -f issue="$1"; }
-          # The issue leading the batch issue $1 belongs to, if any (advance
-          # skill, Implementation): its loop comment's marker, while both carry
-          # `implementing`.
-          lead_of() {
-            local lead
-            lead=$(gh api --paginate "repos/$GH_REPO/issues/$1/comments" |
-              jq -rs '[.[][] | select(.user.login == "claude[bot]") | .body
-                | capture("<!-- batch: (?<n>[0-9]+) -->").n] | last // empty')
-            [ -n "$lead" ] && [ "$lead" != "$1" ] || return 0
-            gh issue view "$1" --json labels --jq '.labels[].name' | grep -qx implementing || return 0
-            if gh issue view "$lead" --json state,labels --jq 'select(.state == "OPEN") | .labels[].name' \
-              | grep -qx implementing; then echo "$lead"; fi
-          }
           # Each code scanning alert on master gets an issue of its own,
-          # which starts at once (CLAUDE.md, The loop, Intake). One whose
-          # fix merged, yet a later scan still finds it, reopens once and
-          # then goes to the client.
+          # which waits in line as filed (CLAUDE.md, The loop, Findings).
+          # One whose fix merged, yet a later scan still finds it, reopens
+          # once and then goes to the client.
           file_alerts() {
             local filed n alert found number state reason fix
             filed=$(gh issue list --state all --label code-scanning --limit 1000 --json number,title,state,stateReason)
@@ -83,11 +69,10 @@ jobs:
               if [ -z "$number" ]; then
                 rating="severity: $(jq -r '.rule.security_severity_level // (if .rule.severity == "error" then "medium" else "low" end)' <<<"$alert")"
                 gh label create "$rating" >/dev/null 2>&1 || true
-                number=$(gh issue create --label code-scanning --label "$rating" \
+                gh issue create --label code-scanning --label "$rating" --label queued \
                   --title "Code scanning alert $n: $(jq -r .rule.description <<<"$alert")" \
-                  --body "$(jq -r '"\(.rule.security_severity_level // .rule.severity) severity, rule `\(.rule.id)`, in `\(.most_recent_instance.location.path)` line \(.most_recent_instance.location.start_line).\n\n> \(.most_recent_instance.message.text)\n\n\(.html_url)"' <<<"$alert")" \
-                  | sed 's#.*/##')
-                dispatch "$number"
+                  --body "$(jq -r '"\(.rule.security_severity_level // .rule.severity) severity, rule `\(.rule.id)`, in `\(.most_recent_instance.location.path)` line \(.most_recent_instance.location.start_line).\n\n> \(.most_recent_instance.message.text)\n\n\(.html_url)"' <<<"$alert")"
+                queue=true
               elif [ "$state" = CLOSED ] && [ "$reason" = COMPLETED ]; then
                 # Until master is scanned after the fix, the alert is
                 # still open on the scan before it.
@@ -101,7 +86,8 @@ jobs:
                 esac
                 if [ "$(gh api --paginate "repos/$GH_REPO/issues/$number/timeline" --jq '.[] | select(.event == "reopened") | 1' | wc -l)" -eq 0 ]; then
                   gh issue reopen "$number" --comment "The alert is still open on master after this issue's fix merged."
-                  dispatch "$number"
+                  gh issue edit "$number" --add-label queued
+                  queue=true
                 else
                   gh issue reopen "$number"
                   gh issue edit "$number" --add-label stuck
@@ -118,8 +104,7 @@ jobs:
           case "$EVENT" in
             issues)
               if [ "$(jqe .action)" = closed ]; then
-                # A closed issue gives up its place in the queue. A batch's
-                # members close one by one, so each handler clears them all.
+                # A closed issue gives up its place in line and the slot.
                 gh issue edit "$(jqe .issue.number)" --remove-label queued || true
                 for n in $(gh issue list --state closed --label implementing --json number --jq '.[].number'); do
                   gh issue edit "$n" --remove-label implementing
@@ -131,17 +116,11 @@ jobs:
                 jq -e '.issue.labels | any(.name == "queued")' "$GITHUB_EVENT_PATH" >/dev/null || issue=$(jqe .issue.number)
               elif [ "$(jqe .label.name)" = queued ] && [ "$sender" = "$OWNER" ]; then
                 queue=true
-              elif [[ "$(jqe .label.name)" =~ ^severity:\ (medium|high|critical)$ ]] &&
-                [ "$(jqe .issue.state)" = open ] &&
-                [[ " $OWNER claude[bot] github-actions[bot] " == *" $sender "* ]]; then
-                # A rating above low takes a member out of its batch.
-                issue=$(lead_of "$(jqe .issue.number)")
               fi ;;
             issue_comment)
               if [ "$sender" = "$OWNER" ] && [ "$(jqe .issue.state)" = open ]; then
                 if [ "$(jqe .issue.pull_request)" = null ]; then
-                  issue=$(lead_of "$(jqe .issue.number)")
-                  issue=${issue:-$(jqe .issue.number)}
+                  issue=$(jqe .issue.number)
                 else
                   issue=$(from_branch "$(gh pr view "$(jqe .issue.number)" --json headRefName --jq .headRefName)")
                 fi
@@ -203,23 +182,20 @@ jobs:
           # Not started (advance skill, step 1): no agent runs on an
           # issue that is closed, or that lacks `accepted` unless the
           # workflow opened it. A read that fails lets the run start,
-          # and the skill checks again. `held` says whether the issue
-          # has the implementation slot as its run starts.
-          held=
+          # and the skill checks again.
           if [ -n "$issue" ]; then
-            read -r started held < <(gh api "repos/$GH_REPO/issues/$issue" --jq '[.labels[].name] as $l
-              | "\(.state == "open" and (($l | index("accepted")) != null or .user.login == "github-actions[bot]")) \(($l | index("implementing")) != null)"' || echo true) || true
+            started=$(gh api "repos/$GH_REPO/issues/$issue" 2>/dev/null \
+              --jq '.state == "open" and (any(.labels[]; .name == "accepted") or .user.login == "github-actions[bot]")') || started=true
             [ "$started" = true ] || issue=
           fi
           echo "issue=$issue" >> "$GITHUB_OUTPUT"
           echo "queue=$queue" >> "$GITHUB_OUTPUT"
-          echo "held=$held" >> "$GITHUB_OUTPUT"
 
   advance:
     needs: route
     if: needs.route.outputs.issue != ''
     runs-on: ubuntu-latest
-    timeout-minutes: 180
+    timeout-minutes: 75
     environment: agent
     # One run per issue at a time. A later event waits, and the run it
     # starts reads the issue as it then stands.
@@ -234,7 +210,7 @@ jobs:
       id-token: write
     steps:
       # The agent pushes only as claude[bot]: no workflow token is left
-      # in git for it to fall back on once its own expires.
+      # in git for it to fall back on.
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           ref: master
@@ -243,8 +219,9 @@ jobs:
       - uses: ./.github/actions/setup
       - id: claude
         uses: anthropics/claude-code-action@fd1c128679612beff4ca259c78021c506e8aa7a7 # v1.0.237
-        # Below the job's limit, so the steps after it still run.
-        timeout-minutes: 165
+        # The run's GitHub token lasts an hour, and nothing after it
+        # can push. Below the job's limit, so the steps after it still run.
+        timeout-minutes: 60
         # A headless run ends when its own turn does, so a subagent left
         # running in the background would be cut off unfinished.
         env:
@@ -271,14 +248,11 @@ jobs:
           name: session
           path: ${{ steps.claude.outputs.execution_file }}
           retention-days: 14
-      # The agent's GitHub token lasts an hour, and a run can outlast it.
-      # The agent sets claude/<kind>-<issue> only to finished work
-      # (advance skill). What it could not push is saved here with the
-      # job's token, and one fresh run pushes it as claude[bot], so its
-      # checks run. These steps follow the agent on a runner it
-      # controlled, so they hold nothing it did not: the job's token
-      # cannot write workflows or master, and its pushes start nothing.
-      - id: save
+      # A run that stopped before its GitHub token ended pushed what it
+      # had to claude/<kind>-<issue>, with `Left to do:` in the commit
+      # message and no pull request (advance skill). One fresh run
+      # continues from it, unless the issue now waits on the client.
+      - id: continue
         if: always()
         env:
           GH_TOKEN: ${{ github.token }}
@@ -286,52 +260,23 @@ jobs:
           ISSUE: ${{ needs.route.outputs.issue }}
           RESUME: ${{ github.event.inputs.resume }}
         run: |
-          [ "$(gh issue view "$ISSUE" --json state --jq .state)" = OPEN ] || exit 0
-          # No hook or credential the agent left takes part in the push.
-          git() {
-            command git -c core.hooksPath=/dev/null -c credential.helper= \
-              -c user.name='claude[bot]' -c user.email='209825114+claude[bot]@users.noreply.github.com' "$@"
-          }
-          remote="https://x-access-token:$GH_TOKEN@github.com/$GH_REPO.git"
-          git fetch -q "$remote" master
-          master=$(git rev-parse FETCH_HEAD)
-          # A copy of the work, kept with the run whatever happens below.
-          git bundle create "$RUNNER_TEMP/unpushed.bundle" --branches='claude/*' --not "$master" || true
-          due=
+          [ "$RESUME" != true ] || exit 0
+          [ "$(gh api "repos/$GH_REPO/issues/$ISSUE" \
+            --jq '.state == "open" and all(.labels[]; .name != "needs-answer" and .name != "stuck")')" = true ] || exit 0
           for kind in spec issue; do
             branch="claude/$kind-$ISSUE"
-            there=$(git ls-remote "$remote" "refs/heads/$branch" | cut -f1)
-            merged=$(gh pr list --head "$branch" --state merged --json number --jq '.[].number')
-            if here=$(git rev-parse -q --verify "refs/heads/$branch^{commit}") &&
-              [ "$here" != "$there" ] && [ -z "$merged" ]; then
-              # Onto today's master, so the push changes no workflow file,
-              # which the job's token may not write.
-              tree="$RUNNER_TEMP/save-$kind"
-              git worktree add -q --detach "$tree" "$here"
-              git -C "$tree" rebase -q "$master"
-              git -C "$tree" push --force "$remote" "HEAD:refs/heads/claude/saved/$kind-$ISSUE"
-              due=1
-            elif [ -n "$there" ] &&
-              [ -z "$(gh pr list --head "$branch" --state all --json number --jq '.[].number')" ]; then
-              # Pushed, but the pull request never opened.
-              due=1
+            message=$(gh api "repos/$GH_REPO/commits/$branch" --jq .commit.message 2>/dev/null) || continue
+            if [[ "$message" == *"Left to do:"* ]] &&
+              [ -z "$(gh pr list --head "$branch" --state open --json number --jq '.[].number')" ]; then
+              gh workflow run agent.yml --ref master -f issue="$ISSUE" -f resume=true
+              echo "continued=true" >> "$GITHUB_OUTPUT"
+              exit 0
             fi
           done
-          if [ -n "$due" ] && [ "$RESUME" != true ]; then
-            gh workflow run agent.yml --ref master -f issue="$ISSUE" -f resume=true
-            echo "resumed=true" >> "$GITHUB_OUTPUT"
-          fi
-      - if: always()
-        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
-        with:
-          name: unpushed
-          path: ${{ runner.temp }}/unpushed.bundle
-          if-no-files-found: ignore
-          retention-days: 14
       # The loop never stops in silence: a run that leaves its issue in
-      # none of the states under CLAUDE.md, The loop, Issue state labels
+      # none of the states under CLAUDE.md, The loop, Issue state, labels
       # it stuck (CLAUDE.md, The loop, When something fails).
-      - if: always() && steps.save.outputs.resumed != 'true'
+      - if: always() && steps.continue.outputs.continued != 'true'
         env:
           GH_TOKEN: ${{ github.token }}
           GH_REPO: ${{ github.repository }}
@@ -340,19 +285,6 @@ jobs:
           FINISHED: ${{ steps.claude.outcome == 'success' }}
           RUN: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
         run: |
-          # The issue leading the batch issue $1 belongs to, if any (advance
-          # skill, Implementation): its loop comment's marker, while both carry
-          # `implementing`.
-          lead_of() {
-            local lead
-            lead=$(gh api --paginate "repos/$GH_REPO/issues/$1/comments" |
-              jq -rs '[.[][] | select(.user.login == "claude[bot]") | .body
-                | capture("<!-- batch: (?<n>[0-9]+) -->").n] | last // empty')
-            [ -n "$lead" ] && [ "$lead" != "$1" ] || return 0
-            gh issue view "$1" --json labels --jq '.labels[].name' | grep -qx implementing || return 0
-            if gh issue view "$lead" --json state,labels --jq 'select(.state == "OPEN") | .labels[].name' \
-              | grep -qx implementing; then echo "$lead"; fi
-          }
           issue=$(gh api "repos/$GH_REPO/issues/$ISSUE")
           [ "$(jq -r .state <<<"$issue")" = open ] || exit 0
           if [ "$FINISHED" = true ]; then
@@ -366,8 +298,6 @@ jobs:
             for kind in spec issue; do
               [ -z "$(gh pr list --head "claude/$kind-$ISSUE" --state open --json number --jq '.[].number')" ] || exit 0
             done
-            # A batch member waits on its lead's run.
-            [ -z "$(lead_of "$ISSUE")" ] || exit 0
             # A requirements pull request the client closed leaves the issue to them.
             closed=$(gh pr list --head "claude/spec-$ISSUE" --state closed --json closedAt,mergedAt \
               --jq 'map(select(.mergedAt == null) | .closedAt) | max // empty')
@@ -400,9 +330,8 @@ jobs:
           GH_TOKEN: ${{ github.token }}
           GH_REPO: ${{ github.repository }}
           OWNER: ${{ github.repository_owner }}
-          # The issue the agent ran on, and whether it had the slot then.
+          # The issue the agent ran on.
           ISSUE: ${{ needs.route.outputs.issue }}
-          HELD: ${{ needs.route.outputs.held }}
         run: |
           # Open issues carrying label $1, read from the issues
           # themselves, because a search can lag behind a label just set.
@@ -412,23 +341,13 @@ jobs:
           }
 
           # The slot is only for an implementation under way. An issue
-          # the agent left waiting on the client gives it up, and when a
-          # lead gave it up in this run, its batch goes back in line.
+          # the agent left waiting on the client, or stuck, gives it up.
           if [ -n "$ISSUE" ]; then
             read -r has waits < <(gh api "repos/$GH_REPO/issues/$ISSUE" --jq '[.labels[].name] as $l
-              | "\(.state == "open" and ($l | index("implementing")) != null) \(($l | index("needs-answer")) != null)"')
+              | "\(.state == "open" and ($l | index("implementing")) != null) \(($l | index("needs-answer")) != null or ($l | index("stuck")) != null)"')
             if [ "$has" = true ] && { [ "$waits" = true ] ||
               [ -n "$(gh api "repos/$GH_REPO/pulls?state=open&head=$OWNER:claude/spec-$ISSUE" --jq '.[].number')" ]; }; then
               gh issue edit "$ISSUE" --remove-label implementing
-              has=false
-            fi
-            if [ "$HELD" = true ] && [ "$has" = false ]; then
-              for n in $(open_with implementing | jq -r .number); do
-                lead=$(gh api --paginate "repos/$GH_REPO/issues/$n/comments" |
-                  jq -rs '[.[][] | select(.user.login == "claude[bot]") | .body
-                    | capture("<!-- batch: (?<n>[0-9]+) -->").n] | last // empty')
-                if [ "$lead" = "$ISSUE" ]; then gh issue edit "$n" --add-label queued --remove-label implementing; fi
-              done
             fi
           fi
 

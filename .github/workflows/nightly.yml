@@ -58,9 +58,29 @@ jobs:
           fi
           echo "go=true" >> "$GITHUB_OUTPUT"
 
+      # The suite is not run again on what it already passed on master,
+      # in the push check of the last commit that changed anything the
+      # tests read. That is everything but .claude/ and top-level docs,
+      # because tests read the spec.
+      - if: steps.decide.outputs.go == 'true'
+        id: tested
+        run: |
+          code=$(git log -1 --format=%H HEAD -- . ':(exclude).claude/' ':(exclude,glob)*.md')
+          # A read that fails runs the suite.
+          runs=$(gh api "repos/$GITHUB_REPOSITORY/actions/workflows/check.yml/runs?event=push&branch=master&head_sha=$code" \
+            --jq '.workflow_runs[].id' 2>/dev/null) || runs=
+          for run in $runs; do
+            passed=$(gh api "repos/$GITHUB_REPOSITORY/actions/runs/$run/jobs" \
+              --jq '.jobs[] | select(.name == "test" and .conclusion == "success") | .id' 2>/dev/null) || passed=
+            if [ -n "$passed" ]; then
+              echo "The suite passed on $code in its push check."
+              echo "passed=true" >> "$GITHUB_OUTPUT"
+              break
+            fi
+          done
       - if: steps.decide.outputs.go == 'true'
         uses: ./.github/actions/setup
-      - if: steps.decide.outputs.go == 'true'
+      - if: steps.decide.outputs.go == 'true' && steps.tested.outputs.passed != 'true'
         id: suite
         run: python -m pytest -q
 

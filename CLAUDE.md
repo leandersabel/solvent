@@ -155,125 +155,112 @@ The client is `leandersabel`. No agent edits an issue body.
 
 - Every decision of the client's is a GitHub action by
   `leandersabel`: opening an issue, commenting, adding `accepted`,
-  reviewing a requirements pull request, promoting a release. That is how an
-  outside reader tells the client's work from the agents'.
-- Agents write as `claude[bot]`, through the Claude GitHub App, and
-  never under the client's account. Workflow steps without a model
-  write as `github-actions[bot]`.
+  reviewing a requirements pull request, promoting a release. Agents
+  write as `claude[bot]`, through the Claude GitHub App. Workflow steps
+  without a model write as `github-actions[bot]`.
 - State is read off GitHub: issues, labels, pull requests, reviews,
   checks and releases. No file tracks it, and no comment is read as an
   approval.
-- Agents run in GitHub Actions, one short run per event.
-  `.github/workflows/agent.yml` runs the `advance` skill with the
-  issue number, and the skill reads the issue's state and takes the one
-  next step. Repeating or restarting a run does no harm.
+- `.github/workflows/agent.yml` runs the `advance` skill once per
+  event, with the issue number. The run reads the issue's state, takes
+  the one next step and does the work itself, so no agent rebuilds
+  context the run already holds. Repeating a run does no harm.
+  `reviewer` is its only subagent. `qa` walks the nightly version, and
+  `release` starts an instance outside it.
 - Changes reach `master` only as pull requests from `claude[bot]` or
   Dependabot. The client changes the pipeline through an issue like any
-  other change. Workflow files are the exception: the Claude GitHub App cannot
-  write them, so the client changes them in a pull request of their
-  own, which merges on green. A security fix is made by the client in
-  its advisory's private fork, because a loop pull request is public
-  before it merges (`SECURITY.md`).
+  other change, except a workflow file, which the Claude GitHub App
+  cannot write: the client changes it in a pull request of their own. A
+  security fix is made by the client in its advisory's private fork,
+  because a loop pull request is public before it merges
+  (`SECURITY.md`).
 - Model calls draw on the client's subscription through
-  `CLAUDE_CODE_OAUTH_TOKEN`, made with `claude setup-token`. The token
-  can only make model requests, so it reaches no claude.ai chats or
-  connectors. It lives in the `agent` environment, which hands it only
-  to workflows running on `master`.
-- An Anthropic API key is not used, because it bills per token beside
-  the subscription. Claude Code routines are not used, because they
-  write under the client's account and a comment cannot start one.
+  `CLAUDE_CODE_OAUTH_TOKEN`, made with `claude setup-token`, which can
+  only make model requests. It lives in the `agent` environment, which
+  hands it only to workflows running on `master`. An Anthropic API key
+  is not used, because it bills per token beside the subscription.
+  Claude Code routines are not used, because they write under the
+  client's account and a comment cannot start one.
 
 ### Intake
 
 - Issues are filed through the Bug and Change request forms, which set
   `bug` or `change`, in any language. Everything the loop writes on an
-  issue is in the issue's language, following the `advance` skill's
-  Writing section.
+  issue is in the issue's language.
 - An issue starts the loop when `accepted` is added, or at once when
-  `github-actions[bot]` opened it. A finding starts in line
-  (Findings). Adding a label takes triage access
-  to the repository, and no form sets `accepted`. An agent adds it only
-  to an issue it opens, as it opens it: a finding (Findings) or a
-  request split off another issue (Clarify).
+  `github-actions[bot]` opened it. Adding a label takes triage access,
+  and no form sets `accepted`. An agent adds it only to an issue it
+  opens: a finding or a request split off another issue.
 - The loop reads an issue's body, the comments by `leandersabel` and
   its own comments, and for a request split off another issue, the
-  comments by `leandersabel` there. Nothing else on the issue is read,
-  whatever it says. On an accepted issue it reads the body as it stood when
-  `accepted` was added, and asks the client when it has been edited
-  since.
+  client's comments there. Nothing else is read, whatever it says. It
+  reads the body as it stood when `accepted` was added, and asks the
+  client when it has been edited since.
 
 ### Clarify
 
-Each run on a new issue, or on a reply from the client, ends in one of:
+A client's issue gets one run, which reads it and the feature pages it
+touches once and ends in one of:
 
-- Unclear: questions to the client, the `needs-answer` label and an
-  @mention. The client's reply starts the next run.
-- `bug`, Solvent falls short of the requirements, or of
-  `spec/product/` where no requirement covers it, in the code, the
-  spec or both: the comment says what the requirement is and what
-  Solvent does, and the issue waits in line (Implementation).
-- `change`, the requirements change: the comment says what changes for
-  the client, and the requirements pull request opens.
-- `maintenance`, nothing the client sees changes, in the code or the
-  agent-owned spec: the comment says what changes and why, and the
-  issue waits in line.
-- Already met, a duplicate, or doubtful: the reasoning, and a question
-  to the client.
+- Unclear: questions, `needs-answer` and an @mention. The client's
+  reply starts the next run.
+- `bug`, Solvent falls short of a requirement or a feature page, or
+  `maintenance`, nothing the client sees changes: one short comment
+  saying what is wrong or what changes, and the issue waits in line.
+- `change`, the requirements change: the run opens the requirements
+  pull request.
+- Already met, a duplicate, or doubtful: the reasoning, and a question.
 
-A `bug` where a requirement is what is wrong is relabeled `change`,
-and a `change` the requirements already ask for is relabeled `bug`,
-each with a comment saying so. Every decision a request leaves open for
-the client is asked as a question, never settled in the spec on their
-behalf. No agent closes an issue. A merged pull request or
-the client does.
+Only the run on an issue asks the client, in the client's terms, on
+that issue. A `bug` where a requirement is what is wrong becomes a
+`change`, and the reverse, with a comment saying so. A decision the
+client never made is asked, never settled on their behalf. No agent
+closes an issue. A merged pull request or the client does.
 
 An issue holding several requests keeps the first. The loop files each
 of the rest as an issue of its own, in the client's words with a link
-to where they asked, labeled `bug` or `change` and `accepted`, and
-takes it up at once.
+to where they asked, labeled `bug` or `change` and `accepted`.
 
 ### Requirements
 
 - A `change` becomes a pull request from `claude/spec-<issue>` that
   touches only `spec/requirements.md`, or for a pipeline change only
-  the pipeline, and links the issue. It closes the issue only when it
-  is a pipeline change that leaves nothing to implement and no workflow
-  file to change. Its description is the requirements it adds, changes
-  or removes, in the issue's language.
-- Approving merges it, and what is left to implement waits in line.
-  Requesting changes gets a revision on the same pull request. Closing
-  it stops the loop and leaves the issue to the client.
+  the pipeline. Its description lists the requirements it adds,
+  changes or removes. It closes the issue only when it is a pipeline
+  change that leaves nothing to implement and no workflow file to
+  change.
+- The client's approval at its head commit merges it, and what is left
+  to implement waits in line. Requesting changes gets a revision.
+  Closing it leaves the issue to the client.
 
 ### Implementation
 
-- An issue is ready when its requirements pull request merges, when
-  clarifying finds a `bug` or `maintenance` with nothing to ask, or
-  when an agent files it as a finding (Findings). A ready issue waits
-  in line with `queued`. One implementation runs at a time, and its
-  issue carries `implementing`.
-- The workflow hands out the slot, never an agent, in a step without a
-  model that runs one at a time. When no open issue carries
-  `implementing`, the first in line gets it and its run starts:
-  critical problems first, then high ones, then the rest, each lowest
-  number first (Severity). An issue that waits on the client holds
-  neither a place in line nor the slot.
-- When a problem rated `severity: low` takes the slot, every other
-  `queued` problem rated low on the same feature or screen joins it in
-  one batch: one implementation, one branch and one pull request, each
-  `bug` with its own failing test, all carrying `implementing`. Every
-  other issue is implemented on its own.
-- On `claude/issue-<issue>`, the spec is brought to the requirements
-  first, where it falls short, and the contracts recompiled. Then
-  `engineer` implements the contract, for a
-  `bug` starting with a test that fails on the reported behavior. The
-  tests the change touches pass, and the full suite runs once, in the
-  pull request's `test` check. `reviewer` reviews the change
-  against the contract, and its findings go back to `engineer` for a
-  bounded number of rounds.
+- A ready issue waits in line with `queued`: a `bug` or `maintenance`
+  issue clarified with nothing to ask, the issue of a merged
+  requirements pull request, or a finding. One implementation runs at a
+  time, and its issue carries `implementing`.
+- Only the workflow hands out the slot, in a step without a model that
+  runs one at a time. When no open issue carries `implementing`, the
+  first in line gets it and its run starts: critical problems first,
+  then high ones, then the rest, each lowest number first. An issue
+  that waits on the client holds neither a place in line nor the slot.
+- One run implements one issue, on `claude/issue-<issue>`. It
+  reproduces the report, updates the issue's feature page where
+  behavior or acceptance criteria change (and `spec/architecture.md`
+  only where a cross-cutting rule does), writes a test that fails on
+  the reported behavior, fixes it, and runs only the tests the change
+  touches. A report that does not reproduce goes to the client as a
+  question.
+- `reviewer` writes its own tests from the feature page's acceptance
+  criteria and the security rules in `spec/architecture.md` before it
+  reads the implementation: one for every criterion marked "(blind)"
+  and every criterion the change touches. They are committed with the
+  change. At most two rounds of fixes follow, and findings still open
+  are filed.
 - The pull request's title is English and says what changes for users.
-  Its body starts with a `Closes #<issue>` line for each issue it
-  fixes and says the same in the issue's language, with the technical part collapsed. Auto-merge is on
-  from the start.
+  Its body starts with `Closes #<issue>` and says the same in the
+  issue's language. Auto-merge is on from the start, and the full suite
+  runs once, in its `test` check.
 - An implementation never changes `spec/requirements.md` or the
   pipeline. When a requirement has to change, the issue goes back to
   clarifying.
@@ -316,114 +303,94 @@ rating:
 - `severity: low`: something looks or reads wrong, but nothing is lost
   or blocked.
 
-An agent rates its own findings. A code scanning issue takes its alert's
-security rating, or medium for an error and low otherwise. The loop
-rates every other problem the next time it runs on it. A rating the
-client set stands, and the client can change any. Only a rating label
-set by `leandersabel`, `claude[bot]` or `github-actions[bot]` counts,
-so one anyone else adds or removes changes nothing, and the highest
-that counts wins. An issue for criteria QA could not check has no
-rating.
+An agent rates its own findings. A code scanning issue takes its
+alert's security rating, or medium for an error and low otherwise. The
+loop rates every other problem the next time it runs on it. A rating
+the client set stands, and the client can change any. Only a rating
+label set by `leandersabel`, `claude[bot]` or `github-actions[bot]`
+counts, and the highest that counts wins.
 
 A problem rated high or critical holds back a version, however it was
 found.
 
 ### Findings
 
-- Every problem an agent finds is an issue of its own, never only a
-  remark in a comment, a pull request or a reading.
+- Every problem an agent or a workflow finds is an issue of its own,
+  never only a remark in a comment or a pull request.
 - A problem the work in hand causes, or its issue covers, is part of
-  that work. Any other is filed by `claude[bot]` as a rated `bug`, or as
+  that work, except a `reviewer` finding still open after two rounds of
+  fixes. Any other is filed by `claude[bot]` as a rated `bug`, or as
   `maintenance` when nothing the client sees changes, with `accepted`,
-  `queued` and where it was found. An agent never files a `change`,
-  because a requirement is only ever the client's request.
-- A finding waits in line as filed, with no run of its own, because
-  whoever found it already said what is wrong. The run that implements
-  it tests the report first, and one that does not hold goes to the
-  client as a question.
-- A finding made while working on an issue is written in that issue's
-  language.
+  `queued`, where it was found, and its reproduction: the steps, or a
+  failing test. Without one it is not filed. An agent never files a
+  `change`, because a requirement is only ever the client's request.
+- A finding waits in line as filed, with no clarify run, because
+  whoever found it already said what is wrong. An issue the workflow
+  opens gets no clarify run either: its first run rates it and puts it
+  in line.
 - What an open issue by `leandersabel`, `claude[bot]` or
   `github-actions[bot]` already reports is filed nowhere. When the
   finding rates it higher, that issue takes the higher rating instead.
-  Only an open issue counts as reporting it, so what should stop being
-  reported is taken out of the spec or made checkable, never
-  suppressed.
-- A finding rated high or critical holds back the version from the
-  moment it is filed (Severity).
-- A run on an issue files a bounded number of findings. Past that, the
-  issue is `stuck` and its comment lists the rest, because a flood of
-  findings more likely means the run misread something than that
-  Solvent broke that widely.
+  What should stop being reported is taken out of the spec or made
+  checkable, never suppressed.
+- A run files a bounded number of findings. Past that, the issue is
+  `stuck`, because a flood of findings more likely means the run
+  misread something than that Solvent broke that widely.
 
 ### Nightly and stable
 
 - Every night that code on `master` changed since the last version,
   `.github/workflows/nightly.yml` builds the image once and runs the
-  suite against that commit. `qa` walks the full acceptance list of
-  every feature touched by an issue closed since the last version, and
-  a smoke path through the rest. The client can start the same run by
-  hand.
-- The walk is split into shards that run at once, so the night stays
-  short as features are added. Each shard starts its own instance of
-  the image, hardened on a network of its own with no route out, and
-  runs `qa` against it in headless Chrome through the Playwright MCP
-  server. So shards never share data, and each spends its own sign-in
-  budget at the shipped defaults. Claude in Chrome is not used here,
-  because it needs a desktop browser.
-- On that network the nightly harness runs a stand-in that answers as
-  the price sources, under their real names. The app trusts it through
-  a certificate authority made for the run and handed in at start,
-  never built in.
-- The app starts on prepared vaults and backup files, made with the
-  app's own browser code, with whatever a promise needs time for dated
-  back.
-- Before any instance starts, a step without a model makes one real lookup
-  to each price source. A source that answers in a changed shape fails
-  the night before QA. One that does not answer is noted in the run's
-  summary, and the night goes on. It is no finding, because the outage
-  is the source's, not a flaw in Solvent.
-- `qa` reaches its shard's server only through the harness tools: the server
-  log, the stand-in's request list and failure modes, and stopping and
-  starting the app. It has no other access to the machine.
+  suite against that commit, unless the push check of the last commit
+  that changed anything but `.claude/` or the top-level docs already
+  passed it. `qa` walks the full
+  acceptance list of every feature touched by an issue closed since the
+  last version, and a smoke path through the rest. The client can start
+  the same run by hand.
+- The walk is split into shards that run at once. Each shard starts its
+  own instance of tonight's image, hardened on a network with no route
+  out, beside a stand-in that answers as the price sources through a
+  certificate authority made for the run, on prepared data. `qa` drives
+  it in headless Chrome through the Playwright MCP server, and reaches
+  the server only through the harness tools
+  (`spec/features/nightly-harness.md`).
+- Before any instance starts, one real lookup goes to each price
+  source. A source that answers in a changed shape fails the night. One
+  that does not answer is noted in the summary and is no finding,
+  because the outage is the source's.
 - The image the nightly publishes is the one it tested. Nothing of the
   harness is in it, and Solvent has no setting naming a price source or
-  a certificate authority, so nothing built for testing can redirect an
-  installation's lookups.
-- Every finding becomes a `bug` issue as Findings says, labeled `qa` as
-  well. Each feature with criteria QA could not check gets an issue
-  saying which and why, which the loop clarifies at once. QA only
-  records them during the walk. Once every shard has finished, a short run merges what the
-  shards recorded, and another files it with a fresh token, so a long
-  walk never outlasts the token. What that run could not file,
-  the workflow files the same way, as `github-actions[bot]`, before the
-  night is judged.
-- A night passes when the suite, the image, the harness and every QA shard finish,
-  no price source answers in a changed shape, and nothing holds back
-  the version: no open problem rated high or critical (Severity), no
+  a certificate authority.
+- QA records what it finds during the walk. Once every shard has
+  finished, a short run merges the records and another files them with
+  a fresh token, and the workflow files what that run could not. A
+  finding becomes a `bug` labeled `qa` as Findings says, and one without
+  the steps that reproduce it is dropped. Each feature with criteria QA
+  could not check gets a `maintenance` issue in line saying which and
+  why.
+- A night passes when the suite, the image, the harness and every QA
+  shard finish, no price source answers in a changed shape, and nothing
+  holds back the version: no open problem rated high or critical, no
   such issue closed by anyone but the client without its fix in the
   version, and no runtime Dependabot alert rated high or critical. That
   check is the workflow's, never a model's.
 - A failed night always leaves an issue the loop takes up: the open
   problems that held it back, or else a `bug` by `github-actions[bot]`
   titled `The nightly failed: <cause>`, or a comment on the open one
-  with that title. It queues like any other issue.
+  with that title.
 - A passing night is a pre-release named by its date, `YYYY-MM-DD`,
   with the image on `ghcr.io/leandersabel/solvent` tagged `:<date>` and
-  `:nightly`. There is at most one version a day, and a run on a day
-  that has one refuses.
-- The client promotes a nightly by marking its release the latest
-  instead of a pre-release. That tags the same image `:stable` without
-  a rebuild, rewrites the notes to cover everything since the last
-  stable, and deletes the nightlies before it. While something would
-  hold back that nightly, promotion is refused and the release turns
-  back into a pre-release.
+  `:nightly`. There is at most one version a day.
+- The client promotes a nightly by marking its release the latest.
+  That tags the same image `:stable` without a rebuild, rewrites the
+  notes to cover everything since the last stable, and deletes the
+  nightlies before it. While something would hold back that nightly,
+  promotion is refused and the release turns back into a pre-release.
 - Release notes are assembled from the merged pull requests' titles,
   without a model, grouped into changes and fixes, fixes for what
   agents found, and maintenance. Each line names who asked, who
   approved the spec and who implemented it. A request split off another
-  issue is the client's, who asked for it there. A batch is one line
-  naming who asked for each fix in it.
+  issue is the client's, who asked for it there.
 - Deploying is the client's. Watching the repository's releases
   notifies the client of every version.
 
@@ -431,41 +398,33 @@ found.
 
 - `needs-answer` means a decision waits on the client. `stuck` means
   the loop gave up, and its comment says why. Both @mention the client.
-- Work a run has finished reaches GitHub, even when the run outlasts
-  its GitHub token, which lasts an hour. Unfinished work never reaches
-  an issue's branch, so a branch on GitHub holds finished work or
-  nothing. Work the agent could not push, a workflow step saves on
-  `claude/saved/<kind>-<issue>` with the job's own token, and one fresh
-  run pushes it as `claude[bot]` and opens the pull request.
+- A run's GitHub token lasts an hour. Past 35 minutes the run starts no
+  new step, pushes what exists to its branch with what is left in the
+  commit message, and stops, and the workflow starts one fresh run that
+  continues from it. A pull request opens only on finished work, and
+  unfinished work on a branch with an open pull request is never
+  pushed: the issue is `stuck` instead.
 - A pull request that closes an issue holds all the work the issue
-  asked for, never only its spec. A workflow file is the exception,
-  because only the client can change it (Who acts, and where state
-  lives): the pull request and its comment on the issue carry the exact
-  change, ready for the client's own pull request, which closes any
-  issue that only the workflow change covers.
+  asked for. A workflow file is the exception: the pull request and its
+  comment carry the exact change for the client's own pull request.
 - The loop never stops in silence. A run that leaves its issue open, in
   none of the states under Issue state other than New, and hands no
   work to a fresh run, labels the issue `stuck`, in a step that runs
-  even when the agent does not finish. That includes a run that
-  crashes, times out or hits the usage limit. Any comment by the client
-  starts the next run, which continues from what is on GitHub.
+  even when the agent crashes, times out or hits the usage limit. Any
+  comment by the client starts the next run.
 - A failing check on an implementation pull request starts a run that
-  fixes it on the same branch. When it still fails after a bounded
-  number of attempts, or reviewer findings remain, the pull request
-  becomes a draft without auto-merge and the issue is `stuck`.
-- A fix in a batch that cannot be finished, whose rating rises above
-  low, or that needs a requirement change leaves the batch for the
-  queue, and the rest go on. When the fix of the issue that took the
-  slot fails, the batch is `stuck`.
-- Every merge to `master` rebases the loop's open pull requests.
+  fixes it on the same branch. After a bounded number of attempts, the
+  pull request becomes a draft without auto-merge and the issue is
+  `stuck`.
+- Every merge to `master` rebases the loop's conflicting pull requests.
 - A failing check on `master` opens a `bug` issue as
-  `github-actions[bot]`, which starts at once and skips the
-  implementation queue, and that night has no QA.
+  `github-actions[bot]`, which starts at once and skips the line, and
+  that night has no QA.
 - A code scanning alert on `master` opens a `code-scanning` issue as
-  `github-actions[bot]`, which starts at once. Anyone can scan the
-  public code, so its fix is public, unlike a report under
-  `SECURITY.md`. An alert still open after its fix merged reopens the
-  issue once, and after a second fix the issue is `stuck`.
+  `github-actions[bot]` in line. Its fix is public, unlike a report
+  under `SECURITY.md`, because anyone can scan the public code. An
+  alert still open after its fix merged puts the issue back in line
+  once, and after a second fix the issue is `stuck`.
 - Disabling `agent.yml`, or removing the token from the `agent`
   environment, stops the loop.
 

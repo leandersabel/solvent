@@ -11,21 +11,18 @@ take the one next step, and stop. Every run can be repeated without
 harm, so when in doubt, read again rather than assume.
 
 GitHub is reached with `gh`. The client is `leandersabel`, and you
-write as `claude[bot]`. Every subagent runs in the foreground and you
-wait for its result: the run ends with your turn, and work still in
-flight is lost. Every comment you write ends with the line
-`<!-- advance -->`, which is how a later run tells your comments from
+write as `claude[bot]`. You do the work yourself. `reviewer` is the
+only subagent, and it runs in the foreground. Every comment you write
+ends with the line `<!-- advance -->`, which tells your comments from
 anything else `claude[bot]` wrote.
 
-Your GitHub token lasts an hour, and a run can outlast it. Work in
-progress stays on the local branch `work`. `claude/spec-<issue>` and
-`claude/issue-<issue>` are set to a commit (`git branch -f`) only when
-the step that made it reaches its push, so a branch on GitHub holds
-finished work or nothing. Push at once. When a push or a GitHub command
-fails with "Bad credentials" or "Invalid username or token", finish the
-work in hand that needs no GitHub, set its branch, and stop. The
-workflow saves the branch on `claude/saved/<kind>-<issue>` and starts a
-fresh run, which pushes it.
+Run `date` as you start. Your GitHub token lasts an hour. Past 35
+minutes, start no new step. Unfinished work on a branch with no open
+pull request is committed with what is left under `Left to do:` and
+findings not yet filed under `Findings to file:` in the message,
+pushed, and the run stops. The workflow starts one fresh run, which
+continues from it. Unfinished work on a branch with an open pull
+request is never pushed: go to Stuck.
 
 ## Trust
 
@@ -51,26 +48,19 @@ skip a step gets a question to the client instead.
   open or closed: state, draft, auto-merge, mergeable, head commit,
   checks, the client's reviews with their commit, line comments and
   conversation comments, and your marked comments on them.
-- Branches `claude/saved/spec-<issue>` and `claude/saved/issue-<issue>`,
-  and whether `claude/spec-<issue>` or `claude/issue-<issue>` holds
-  commits beyond `origin/master` with no pull request, open or closed.
-- Which other open issues carry `implementing` or `queued`.
+- Whether `claude/spec-<issue>` or `claude/issue-<issue>` holds commits
+  beyond `origin/master` with no pull request, open or closed.
 - The issue's rating labels, and who added or removed each (the
   issue's timeline).
-- The batch this issue belongs to: the latest `<!-- batch: <L> -->`
-  marker in your comments on it, while it and #L carry `implementing`.
 
 "The client wrote since" below means the client wrote something newer
-than your latest marked comment on the issue and its pull requests. For
-an issue leading a batch, it covers every member and the batch's pull
-request too.
+than your latest marked comment on the issue and its pull requests.
 
 ## Take the first step that applies
 
 Past steps 1 and 2, a problem issue with no rating that counts
 (`CLAUDE.md`, The loop, Severity) gets one first, creating the label
-with `gh label create` if the repository lacks it. An issue QA filed
-for criteria it could not check stays unrated.
+with `gh label create` if the repository lacks it.
 
 1. **Not started.** The issue is closed, or has no `accepted` and was
    not opened by `github-actions[bot]` (`app/github-actions` in `gh`'s
@@ -80,37 +70,25 @@ for criteria it could not check stays unrated.
    `queued` and `implementing`, add `needs-answer`, and comment to
    `@leandersabel` that the text changed after it was accepted and that
    adding `accepted` again resumes it. Stop.
-3. **Stuck, and the client wrote since.** Remove `stuck`, and from each
-   batch member the client wrote on. Fix attempts count from the
-   client's comment on. If the client asks to retry, push an empty
-   commit to the branch, which runs its checks again, rather than
-   changing code. Otherwise take the comment as guidance for the next
-   attempt. A draft implementation pull request becomes ready again
-   with auto-merge on. Then continue with the step below that applies.
-4. **Saved work.** A branch `claude/saved/<kind>-<issue>` is finished
-   work an earlier run could not push. Push it to
-   `claude/<kind>-<issue>` with `--force`, since no run on this issue
-   overlaps another and it is the newest, and delete the saved branch.
-   Where a pull request from that branch is open, write what the step
-   that made the work writes after its push (`Fix attempt <n>`, what
-   changed, a new review request), and stop. Otherwise continue below.
-5. **Batched under another issue.** The issue carries `implementing`
-   and belongs to the batch of another open issue #L: stop without a
-   comment. What the client writes on a member starts #L's run.
-6. **Implementation pull request open.**
-   - A check failed: Implementation steps 3 to 5 from the existing
-     branch, set it, push, and comment `Fix attempt <n>` on the pull request,
-     counting attempts since the pull request opened or the client last
-     wrote on it. Past the third attempt, go to Stuck instead. In a
-     batch, a member whose own test or fix is what fails leaves it
-     instead, and the count goes on.
+3. **Stuck, and the client wrote since.** Remove `stuck`. Fix attempts
+   count from the client's comment on. If the client asks to retry,
+   push an empty commit to the branch, which runs its checks again,
+   rather than changing code. Otherwise take the comment as guidance
+   for the next attempt. A draft implementation pull request becomes
+   ready again with auto-merge on. Then continue with the step below
+   that applies.
+4. **Implementation pull request open.**
+   - A check failed: fix it on the branch as Implementation does, push,
+     and comment `Fix attempt <n>` on the pull request, counting
+     attempts since the pull request opened or the client last wrote on
+     it. Past the third attempt, go to Stuck instead.
    - It conflicts with `master`: rebase it onto `origin/master`,
      resolve, run the tests on both sides of the conflict, and push.
    - The client wrote since: answer it on the issue (the change ships
      in the next nightly after the merge), or take a correction from it
      into the branch.
    - Otherwise: stop.
-7. **Requirements pull request open.**
+5. **Requirements pull request open.**
    - The client approved its head commit:
      - A check failed: go to Stuck.
      - A check is still running: stop. Its result starts the next run.
@@ -118,110 +96,92 @@ for criteria it could not check stays unrated.
        pull request closes the issue.
    - The client wrote since, in a review, a line comment or a comment:
      when it raises something only the client can decide, ask on the
-     issue with `needs-answer`. Otherwise revise the requirements from the
-     same branch, set it, push, update the pull request's title and description, say
-     what changed on the issue, and request the client's review again.
+     issue with `needs-answer`. Otherwise revise the requirements on the
+     same branch, push, update the pull request's title and
+     description, say what changed on the issue, and request the
+     client's review again.
    - It conflicts with `master`: rebase it onto `origin/master`,
      resolve, push, and request the client's review again, since the
      push dismissed any approval.
    - Otherwise: stop.
-8. **Requirements pull request closed without a merge**, one touching
-   only `spec/requirements.md` or the pipeline, and the client has not
-   written since: stop.
-9. **Work left on a branch.** `claude/spec-<issue>` holds commits beyond
-   `origin/master` and no pull request came from it: Requirements.
-10. **Being implemented.** The issue carries `implementing` and no
-    implementation pull request is open, or `claude/issue-<issue>` holds
-    commits beyond `origin/master` and no pull request came from it:
-    Implementation.
-11. **Queued.** The client wrote since: Clarify. Otherwise stop
-    without a comment.
-12. **Requirements merged, no implementation yet:** add `queued`.
-13. **Otherwise:** Clarify.
+6. **Requirements pull request closed without a merge**, and the client
+   has not written since: stop.
+7. **Work left on a branch.** `claude/spec-<issue>` holds commits
+   beyond `origin/master` and no pull request came from it:
+   Requirements.
+8. **Being implemented.** The issue carries `implementing` and no
+   implementation pull request is open, or `claude/issue-<issue>` holds
+   commits beyond `origin/master` and no pull request came from it:
+   Implementation.
+9. **Queued.** The client wrote since: Clarify. Otherwise stop without
+   a comment.
+10. **Requirements merged, no implementation yet:** add `queued`.
+11. **Opened by `github-actions[bot]`, with no marked comment yet:**
+    it gets no Clarify. The `bug` titled `The checks fail on master`
+    goes to Implementation, since every other implementation's checks
+    fail until it is fixed. Any other gets `queued`.
+12. **Otherwise:** Clarify.
 
 ## Clarify
 
-Subagents do not see each other. Hand each what it needs, including the
-readings before it, and tell each this is planning and no file is
-written.
+Read the issue and the feature pages in `spec/features/` it touches
+once, with `spec/requirements.md` and, where it matters,
+`spec/architecture.md`. An issue holding several requests keeps the
+first. Each of the rest that no open issue already holds, file as
+`claude[bot]`: labeled `bug` or `change` and `accepted`, titled in the
+issue's language, with a body quoting the client's words verbatim from
+text you may read (Trust), linking where they wrote them, and ending
+with `<!-- from: #<issue> -->`.
 
-1. `product-owner` gets the request, the client's writing verbatim,
-   and your earlier marked comments, including their `<details>`
-   readings. It answers which requirements in `spec/requirements.md`
-   and which features in `spec/product/` this touches, whether Solvent
-   falls short of the requirements, or of `spec/product/` where no
-   requirement covers it (`bug`, in the code, the spec or both), the
-   requirements change (`change`), the pipeline changes, or nothing the
-   client sees changes, in the code or the agent-owned spec
-   (`maintenance`),
-   what changes for the client, and every decision the request leaves
-   open for the client, as questions in its own format.
-2. `architect` gets that reading. It answers what changes in
-   `spec/architecture.md` and `spec/features/`, which code and tests
-   the work touches, and decides the technical questions itself.
-3. `designer` gets both readings, only when how anything looks
-   changes. It answers which screens in `spec/ui/` change and how.
-
-A question `architect` or `designer` has for the client goes back to
-`product-owner`, whose wording is what the client reads.
-
-An issue holding several requests keeps the first. Each of the rest
-that no open issue already holds, file as `claude[bot]`: labeled `bug`
-or `change` and `accepted`, titled in the issue's language, with a body
-quoting the client's words verbatim from text you may read (Trust),
-linking where they wrote them, and ending with `<!-- from: #<issue> -->`.
-The comment links each.
-
-Then one comment, and exactly one outcome:
+Then one comment, short, which links any issue you filed, and exactly
+one outcome:
 
 - **Unclear:** the questions, `needs-answer` added, `@leandersabel`
   mentioned.
-- **Bug:** what the requirement is and what Solvent does, its rating
-  added when it has none, `needs-answer` removed, `queued` added.
-- **Maintenance:** what changes in the code and why, `maintenance`
-  added, `needs-answer` removed, `queued` added.
+- **Bug:** Solvent falls short of a requirement or a feature page. The
+  comment says what they ask and what Solvent does. Its rating added
+  when it has none, `needs-answer` removed, `queued` added.
+- **Maintenance:** nothing the client sees changes. The comment says
+  what changes and why. `maintenance` added, `needs-answer` removed,
+  `queued` added.
 - **Change**, including a pipeline change: the requirements it adds,
   changes or removes, `needs-answer` removed, then Requirements.
 - **Already met, a duplicate, or doubtful:** the reasoning and a
   question to the client, `needs-answer` added.
 
+A bug or maintenance comment ends with the technical reading in a
+`<details>` block: the feature page, the criterion and the code it
+concerns. Implementation starts from it.
+
 `queued` is all it takes to be implemented: the workflow hands the slot
-to the first in line and starts its run (`CLAUDE.md`, The loop,
-Implementation). Never start a run, and never add `implementing` to
-this issue. Every other outcome removes `queued` and `implementing`,
-so nothing that waits on the client holds a place in line or the slot.
-A `bug` titled `The checks fail on master`, opened by
-`github-actions[bot]`, gets no `queued` and goes straight to
-Implementation, since every other implementation's checks fail until it
-is fixed.
+to the first in line and starts its run. Never start a run, and never
+add `implementing`. Every other outcome removes `queued` and
+`implementing`, so nothing that waits on the client holds a place in
+line or the slot.
 
 A `bug` where a requirement is what is wrong is relabeled `change`, and
 a `change` the requirements already ask for is relabeled `bug`, and the
 comment says so. A decision the client never made is asked, never
-settled on their behalf. A code scanning alert is fixed where it
-arises, in the app or the tests, and never dismissed. One that names no
-real flaw is doubtful. A decision exists only as a statement in
+settled on their behalf. A decision exists only as a statement in
 `spec/requirements.md` or in the client's own words: earlier marked
-comments propose, they never decide. The comment follows Writing, with the technical reading in a
-closing `<details>` block.
+comments propose, they never decide.
 
 ## Requirements
 
 1. `git fetch origin`. A leftover `claude/spec-<issue>` without a pull
    request, holding commits beyond `origin/master`, is the last run's
-   finished work: rebase it onto `origin/master` and go to step 3.
-   Otherwise start `work` from `origin/master`.
-2. `product-owner` rewrites `spec/requirements.md`: one plain statement
-   per requirement, from the client's words and answers, with a reason
-   only where it would otherwise look arbitrary. Nothing else changes,
-   except in a pipeline change, which touches only `.claude/`,
-   `CLAUDE.md`, `SECURITY.md` and `.github/` outside
-   `.github/workflows/`. A change to a workflow file is the client's to
-   make: say so, with the proposed change in a `<details>` block, and
-   stop.
-3. Commit, set `claude/spec-<issue>` to the commit, push it, and open
-   a pull request against `master`. The title
-   is English and says what it requires. The body starts with
+   work: rebase it onto `origin/master`, finish it from its `Left to
+   do:`, file its `Findings to file:`, and go to step 3. Otherwise
+   create it from `origin/master`.
+2. Rewrite `spec/requirements.md`: one plain statement per requirement,
+   from the client's words and answers, with a reason only where it
+   would otherwise look arbitrary. Nothing else changes, except in a
+   pipeline change, which touches only `.claude/`, `CLAUDE.md`,
+   `SECURITY.md` and `.github/` outside `.github/workflows/`. A change
+   to a workflow file is the client's to make: say so, with the
+   proposed change in a `<details>` block, and stop.
+3. Commit, push, and open a pull request against `master`. The title is
+   English and says what it requires. The body starts with
    `Part of #<issue>`, or with `Closes #<issue>` for a pipeline change
    that leaves nothing to implement and needs no workflow file changed,
    and lists the requirements added, changed or removed, in the issue's
@@ -234,110 +194,104 @@ closing `<details>` block.
 1. Without `implementing` on this issue, add `queued` and stop: the
    workflow hands out the slot. The `bug` titled `The checks fail on
    master` is the one exception, and needs no slot.
-
-   An issue an agent filed waits in line as filed, so it has no reading
-   of yours: its body is the reading. Test the report before anything
-   is built on it. When the spec does not ask for what it expects, or
-   for a `bug` step 3's test cannot be made to fail on what it reports,
-   the report does not hold. A member whose report does not hold leaves
-   the batch. When this issue's does not, every member leaves, then
-   remove `implementing` and go to Clarify.
-
-   This issue leads a batch when it is a `bug` or `code-scanning` issue
-   whose rating that counts is `severity: low`. Its members are the
-   open `bug` and `code-scanning` issues carrying `queued` whose rating
-   that counts is `severity: low`, that nobody but the client edited
-   after `accepted` was added, with no marked comment saying they left a
-   batch because their fix failed or a requirement has to change, and
-   that name, in their body or your reading, a file in `spec/product/`,
-   `spec/features/` or `spec/ui/` that this issue's body or reading
-   names. On each, add `implementing`, remove `queued`, and comment in
-   its language that it is fixed together with #<issue>, ending with
-   `<!-- batch: <issue> -->` before `<!-- advance -->`. Comment on this
-   issue which issues joined it.
 2. `git fetch origin`. A leftover `claude/issue-<issue>` without a pull
-   request, holding commits beyond `origin/master`, is the last run's
-   work: rebase it onto `origin/master` and start `work` from it. It is
-   finished when it holds all the issue and each batch member ask for
-   (the spec where it fell short, the code the contract asks for, and
-   for a `bug` the test that fails on the reported behavior) and the
-   tests it touches pass: go to step 6. Otherwise continue at step 3
-   from it. With no leftover branch, start
-   `work` from `origin/master`.
-3. The spec meets the requirements first: where it falls short,
-   `product-owner` rewrites `spec/product/`, `architect` rewrites
-   `spec/architecture.md` and `spec/features/`, and `designer` rewrites
-   `spec/ui/`, each to `CLAUDE.md`, Writing the spec, wherever it falls
-   short of the requirements or breaks those rules, and `compiler`
-   recompiles the contracts they touch. Then `engineer` implements the
-   compiled contract. For a `bug`, it first
-   writes a test that fails on the reported behavior, then the fix. For
-   `maintenance`, it changes the code without changing behavior. A fix
-   never skips, loosens or deletes an existing test. In a batch, the
-   members follow one at a time, lowest number first, the same way.
-   After each, the tests it touches pass, then commit, set
-   `claude/issue-<issue>` and push. No member starts after the run's
-   first 30 minutes, so review and the pull request finish within the
-   hour the run's GitHub token lasts. The ones not started leave the
-   batch.
-4. The tests the change touches pass, chosen as
-   `.claude/agents/engineer.md` says. The full suite is the `test`
-   check's.
-5. `reviewer` reviews the change against the contract. Its findings on
-   the change go back to `engineer`, for at most three rounds, and those
-   outside it are filed (File a finding). A finding still open
-   that belongs to one member's fix makes that member leave the batch.
-6. Commit in the voice of `git log`, listing any reviewer findings on
-   the change still open, and any findings to file (File a finding), so
-   a later run that opens the pull request finds them.
-   Set `claude/issue-<issue>` to the commit, push it, and open a pull
-   request against `master`. The title is English and says what changes for
-   users. The body starts with `Closes #<issue>`, then a `Closes #<n>`
-   line for each member, because GitHub closes only the first issue of
-   a `Closes #a, #b` list. It says the same in the issue's language,
-   and puts the technical part in a `<details>`
-   block. Turn on auto-merge with squash.
-7. Reviewer findings on the change still open: list them in the pull
-   request's body and go to Stuck.
-8. Comment on the issue and each member with the link. When the issue
-   also needs a change to a workflow file, the pull request's body and this comment
+   request is the last run's work: rebase it onto `origin/master`,
+   continue from its `Left to do:` and file its `Findings to file:`.
+   Otherwise create it from `origin/master`.
+3. Read the issue, your Clarify comment if there is one, the feature
+   page it concerns and the security rules in `spec/architecture.md`.
+   An issue filed as a finding has no Clarify comment: its body is the
+   reading.
+4. Reproduce the report. For a `bug` or `code-scanning` issue, write a
+   test that fails on the reported behavior. When the spec does not ask
+   for what the report expects, or no test can be made to fail on it,
+   the report does not hold: remove `implementing`, add
+   `needs-answer`, and ask the client in a comment. A code scanning
+   alert is fixed where it arises, in the app or the tests, and never
+   dismissed. An issue for criteria QA could not check makes them
+   checkable, in the nightly harness, its prepared data or the
+   criterion's wording. One whose cause lay outside Solvent, such as a
+   price source that did not answer, does not hold.
+5. Where behavior or acceptance criteria change, update the feature
+   page, as `CLAUDE.md` says the spec is written. Of the spec, change
+   only that page, and `spec/architecture.md` only when a cross-cutting
+   rule changes.
+6. Fix it (Rules). Run the tests the change touches (Tests), commit in
+   the voice of `git log`, and push.
+7. Hand `reviewer` the issue, the branch, and the feature pages and
+   criteria the change touches, never the diff. Fix its findings on the
+   change, commit its tests with the change, push, and hand it the
+   fixes, for at most two rounds. Findings on the change still open
+   after that are filed (File a finding), each with its failing
+   reviewer test in the body rather than in this commit, and so are
+   those outside the change.
+8. Open a pull request against `master`. The title is English and says
+   what changes for users. The body starts with `Closes #<issue>`, says
+   the same in the issue's language, and puts the technical part in a
+   `<details>` block. Turn on auto-merge with squash.
+9. Comment on the issue with the link. When the issue also needs a
+   change to a workflow file, the pull request's body and this comment
    carry it in a `<details>` block, ready for the client's own pull
    request, with a `Closes` line for each issue only it covers.
 
 An implementation never changes `spec/requirements.md`,
 `spec/design/`, `.github/`, `.claude/`, `CLAUDE.md` or `SECURITY.md`.
-When a requirement has to change, every member leaves the batch, then
-remove `implementing` and return to Clarify with a question or a
-`change`.
+When a requirement has to change, remove `implementing` and return to
+Clarify with a question or a `change`.
 
-### Leaving a batch
+### Rules
 
-A member leaves in this order. Remove its `Closes` line from an open
-pull request's body before any push, so auto-merge cannot close it without
-its fix. Revert its commits, set `claude/issue-<issue>` and push. Add
-`queued`, remove `implementing`, and comment on it why. One whose
-report does not hold gets `needs-answer` and the question instead of
-`queued`.
+- The server never touches plaintext financial data. A fix that would
+  need the server to decrypt anything is a design violation: go to
+  Stuck and say so.
+- Reuse existing dependencies, modules and patterns before adding a
+  library or an abstraction. Small diffs over clever ones. Stay inside
+  the issue.
+- Never skip, loosen or delete a test. Only `reviewer` changes a test it
+  wrote.
+- A security rule that is ambiguous or missing for what you build gets
+  the safest default, and the pull request's technical part names it.
 
-The issue leading the batch never leaves. When its own fix fails, go to
-Stuck. When its rating rises above low, every member leaves and it goes
-on alone. When it gives up the slot, every member leaves first. Check every rating before the pull request opens and on every
-later run on this issue.
+### Tests
+
+Run only the tests the change touches, never the full suite, which runs
+once, in the pull request's `test` check. The tests a change touches:
+
+- Every test file the change adds or edits.
+- `tests/test_<feature>.py` and the `tests/test_review_*` files for
+  each feature whose page changed.
+- Every `tests/test_*.py` that imports or names a touched module.
+- When templates, static JS or CSS, vendored files, `tests/browser/` or
+  `tests/client/` change, the browser tests for them:
+  `test_browser.py -k <part>` for each part in `tests/browser/parts/`
+  whose screen changed, and the whole file only when JS or CSS every
+  screen loads changed, `test_register_browser.py` for registration,
+  `test_client.py` for the client crypto layer, `test_chrome.py` for
+  the app shell, and all four when unclear.
+- `test_headers.py` and `test_guard.py` when middleware, the content
+  security policy or routing changes.
+- When `conftest.py`, `helpers.py` or `tests/fixtures/` change, the
+  tests that use the touched fixture, helper or file.
+
+A failing test the change does not touch may fail some of the time.
+Search the open issues for its name. With a match, rerun it once and go
+on. Without one, run it once on the base commit, and if it fails there
+too, file it (File a finding).
 
 ## Stuck
 
 An open implementation pull request becomes a draft with auto-merge
 off. Add `stuck`, comment why in the issue's language with a link to
-what failed, and mention `@leandersabel`. In a batch, this is the
-leading issue, and the comment lists the members. The client's next
-comment starts a run that picks up from there.
+what failed, and mention `@leandersabel`. The client's next comment
+starts a run that picks up from there.
 
 ## File a finding
 
 Every step files the problems found outside the work in hand
-(`CLAUDE.md`, The loop, Findings): each subagent's report under its
-Outside the task heading, and what you notice yourself. A problem the
-work in hand causes, or this issue covers, stays in that work.
+(`CLAUDE.md`, The loop, Findings): `reviewer`'s findings left open
+after two rounds and under Outside the task, and what you notice
+yourself. Any other problem the work in hand causes, or this issue
+covers, stays in that work.
 
 1. Read the open issues by `leandersabel`, `claude[bot]` and
    `github-actions[bot]`. One that already reports the problem gets
@@ -345,18 +299,15 @@ work in hand causes, or this issue covers, stays in that work.
 2. Otherwise open an issue as `claude[bot]`: `bug` with its rating,
    creating the label when missing, or `maintenance` when nothing the
    client sees changes, with `accepted` and `queued`, so it waits in
-   line as filed. Title and body follow Writing,
-   in this issue's language: what is wrong first, the technical reading
-   in a closing `<details>` block, then the line
-   `Found while working on #<issue>`.
+   line as filed. Title and body follow Writing, in this issue's
+   language: what is wrong first, then its reproduction, the steps or a
+   failing test, the technical reading in a closing `<details>` block,
+   and the line `Found while working on #<issue>`. A problem you cannot
+   reproduce is not filed.
 3. Your next comment on this issue links each.
 
 File at most five in a run. Past that, go to Stuck, and the comment
 lists the rest.
-
-A finding you cannot file because the token expired goes into the
-commit message of the work in hand, under `Findings to file:`. The run
-that pushes that commit, or opens a pull request from it, files them.
 
 ## Never
 
