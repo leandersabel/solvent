@@ -79,6 +79,12 @@ let vaultShown = false;
 let elsewhere = null;
 let sinceOpen = null;
 
+// The address the vault was last drawn at. Arriving at a sweep from
+// another screen begins a new sitting, while a redraw of the sweep on
+// screen, or its return after a lock, continues it
+// (record-snapshot.md, Update values).
+let drawnHash = null;
+
 /** Drops everything a lock keeps, from the screen as it stands or from
  *  what a lock already took, and says whether there was any. A replaced
  *  vault keeps no input, no dialog and no view. */
@@ -227,6 +233,8 @@ function draw() {
     return;
   }
   const vault = currentVault();
+  const arrived = drawnHash !== window.location.hash;
+  drawnHash = window.location.hash;
   const [, view, argument, mode] = (window.location.hash || '#/').split('/');
   // The notice is the dashboard's, and goes once the person leaves it.
   if (['settings', 'holding', 'recording', 'sweep'].includes(view)) sinceOpen = null;
@@ -282,6 +290,7 @@ function draw() {
     return;
   }
   if (view === 'sweep') {
+    if (arrived) resetSweepState();
     mount(container, sweepView(vault, argument, actions));
     return;
   }
