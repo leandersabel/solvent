@@ -808,7 +808,7 @@ fieldset {
   font-size: 13px;
   font-weight: 500;
   line-height: 18px;
-  overflow-wrap: break-word;
+  overflow-wrap: anywhere;
   max-width: 100%;
   margin: 2px 4px 2px 0;
 }
@@ -1544,7 +1544,7 @@ th.numeric {
   font-size: 14px;
 }
 
-.sessions-table th { padding-top: 0; font-size: 12px; }
+.sessions-table th { padding-top: 0; font-size: 12px; white-space: normal; }
 .sessions-table .chip { margin: 0; white-space: nowrap; }
 .sessions .hint { margin-top: 12px; }
 /* A card waiting on its own fetch skeletons alone (design-system.md,
