@@ -336,7 +336,37 @@ The regions keep their order and stack, 20px apart.
   drops out of the interpolated series rather than the chart picking a
   number nobody chose.
 - **Error — session expired mid-action**: prompt to re-unlock in place;
-  never discard unsaved input.
+  never discard unsaved input, unless the vault was replaced meanwhile
+  (Replaced since last open).
+- **Replaced since last open**: the page held the vault, the vault was
+  replaced from a file while the page was locked or signed out, and the
+  page learns it only at unlock (`spec/features/login.md`). Every input
+  and dialog kept through the lock is dropped, and unlocking lands
+  here rather than on the view the page was on, which can name a record
+  the restore removed. A page on another device that was locked before
+  the restore, or a page whose session ended for its own reason,
+  reaches this rather than `unlock.md`, Replaced elsewhere, because it
+  makes no request that could learn of the restore until it unlocks.
+  - A Callout (`design-system.md`, Components) sits at the top of the
+    content region, above the hero, at the full content width and 32px
+    above it like every other region. It is a polite live region.
+  - When kept input was dropped, it carries the critical icon and
+    reads:
+
+    > Your vault was replaced from a file since you last opened it
+    > here. What you had typed here and not saved is gone.
+
+  - When none was, it carries no icon and reads:
+
+    > Your vault was replaced from a file since you last opened it
+    > here. Nothing you had typed here was lost.
+
+  - It has no control and stays until the person leaves the dashboard.
+    It is not shown again, because it reports one event and the
+    dashboard beneath it is already the restored vault.
+  - A page that learned of the restore before unlocking says so on the
+    unlock card instead (`unlock.md`, Replaced elsewhere), and the
+    dashboard shows no callout after it.
 
 ## Rules
 

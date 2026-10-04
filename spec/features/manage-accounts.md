@@ -135,7 +135,10 @@ snapshot rows (architecture.md, Record storage API), so it can delete
 the set atomically without the client enumerating ids. That is also the
 whole reach of the cascade: no other record type carries an
 `account_id`, so nothing else can be swept up by it. Endpoint:
-`DELETE /api/accounts/<account_id>?mode=purge`.
+`DELETE /api/accounts/<account_id>?mode=purge`. It compares the vault
+epoch after `BEGIN IMMEDIATE`, because an import keeps record ids and a
+purge from a page holding the replaced DEK would otherwise delete a
+restored holding (architecture.md, Vault epoch).
 
 ## Archiving
 
@@ -430,6 +433,9 @@ Unarchiving it and archiving it again writes the zero at the new D.
 - Purge cannot delete another user's records: a `DELETE` naming an
   `account_id` belonging to a different user returns Not Found, not
   Forbidden, and deletes nothing.
+- A purge naming a restored holding, sent with the epoch from before
+  the import, answers Conflict `{"refused":"vault-replaced"}` and
+  leaves the holding and every one of its snapshots in place.
 - Attempting to change the unit of a holding with ≥1 snapshot is
   blocked client-side. The test asserts the UI refuses it — not that an
   API call is rejected, which the server cannot do.

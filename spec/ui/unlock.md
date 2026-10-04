@@ -12,15 +12,17 @@ Modes:
 - **Signing in.** No session. Username and password.
 - **Unlocking again.** A vault owner's session is still good and the
   in-memory keys are gone, discarded by the idle timer, the lock
-  button, or a page reload. The username is already known, so only the
-  password is asked for.
+  button, a page reload, or a restore made in any other tab, window or
+  device (Replaced elsewhere). The username is already known, so only
+  the password is asked for.
 
 The username decides which kind of account is being signed in to, and
 the person never says which they meant. A username belongs to exactly
 one account on the instance, so there is nothing to disambiguate.
 
-Exercises: `spec/features/login.md`, and the idle-lock half of
-`spec/features/account-settings.md`.
+Exercises: `spec/features/login.md`, the idle-lock half of
+`spec/features/account-settings.md`, and what a restore does to every
+other open page (`spec/features/export-import.md`).
 
 ## Layout
 
@@ -136,7 +138,37 @@ moment it is shown the screen does not know which it is.
 - **The session ran out mid-action**: the card appears in its
   unlocking-again shape, with the username known. Submitting it signs
   in again from cold. Nothing the person had typed into an open form is
-  thrown away, and they are returned to where they were.
+  thrown away, and they are returned to where they were, unless the
+  vault was replaced meanwhile (`dashboard.md`, Replaced since last
+  open). A restore never leads here, because it ends no session.
+- **Replaced elsewhere**: a restore in any other tab, window or device
+  replaced the vault, and this page learned it while it held the old
+  one, unlocked or locked (`spec/features/export-import.md`). A tab of
+  the same browser learns it at once, and any page learns it at its
+  next request or when it comes back into view unlocked. The page drops
+  its keys, everything decrypted and everything typed and not yet
+  saved, closes every open dialog, and shows the card in its
+  unlocking-again shape.
+  - A Callout (`design-system.md`, Components) sits at the top of the
+    card, above the username. It is a polite live region, so a screen
+    reader hears why the card appeared when nobody pressed anything.
+  - When the page dropped typed input, the callout carries the critical
+    icon and reads:
+
+    > Your vault was replaced from a file in another tab, window or
+    > device. What you had typed here and not saved is gone.
+
+  - When it dropped none, the callout carries no icon and reads:
+
+    > Your vault was replaced from a file in another tab, window or
+    > device. Nothing you had typed here was lost.
+
+  - Unlocking opens the restored vault on the dashboard, not the view
+    the page was on, because that view can name a record the restore
+    removed. The dashboard then shows no notice of its own, since this
+    card has said it.
+  - The callout stays until the card is left. A wrong password shows
+    its error above the password field as usual, beneath the callout.
 - **Populated**: not applicable. Success navigates away.
 
 ## Rules
@@ -148,6 +180,12 @@ moment it is shown the screen does not know which it is.
   discarding all decrypted state (`login.md`, Rules). Everything else
   on that view is re-read and re-decrypted, so it repopulates rather
   than reappearing.
+- **A vault replaced since the page last held it keeps nothing**: no
+  input, no view and no dialog. That holds whether the page learned it
+  before unlocking (Replaced elsewhere) or only at unlock
+  (`dashboard.md`, Replaced since last open), because input typed
+  against the old vault would be saved into the new one
+  (`product/export-import.md`, What must be true).
 - **A dialog opened to fill in or choose something comes back**,
   destructive or not, reopening over the restored view with what was
   typed in it. A password field comes back empty, because a password
@@ -174,6 +212,12 @@ moment it is shown the screen does not know which it is.
   open a vault except the password, and a dead link that implies
   recovery is worse than its absence.
 - **No second factor.** Not in this version.
+- **Nothing about the restore beyond that it happened.** Not which tab,
+  which file, or when. The page learns only that the vault changed,
+  and Solvent records no devices to name.
+- **Nothing about what typed input was lost**, only whether any was.
+  Naming it would mean keeping it, and it is dropped so that nothing
+  typed against the old vault survives.
 - **No hint of how many attempts are left.** The lockout message says
   the same thing whether or not the account exists, and a counter would
   say more than that.

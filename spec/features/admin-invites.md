@@ -148,11 +148,11 @@ Refusals).
   Nothing about vault contents beyond the count the server can already
   see.
 - `DELETE /api/admin/accounts/<username>` `{ confirmUsername }` →
-  deletes that principal's row, its credential, its wrapper, every
-  record, and every session, in one transaction. Keyed by normalized
-  username, which is what `GET /api/admin/accounts` returns and what
-  the administrator types to confirm; `confirmUsername` must equal the
-  path segment or the request is a Bad Request.
+  deletes that principal's row, its credential, its wrapper, its vault
+  epoch, every record, and every session, in one transaction. Keyed by
+  normalized username, which is what `GET /api/admin/accounts` returns
+  and what the administrator types to confirm; `confirmUsername` must
+  equal the path segment or the request is a Bad Request.
 
   On a vault owner this destroys a vault rather than opening one. On
   an administrator it destroys no data at all, so it needs no ceremony
@@ -414,9 +414,9 @@ invocation and nothing more.
   the two requests overlapping, since the serial case passes either
   way and is not the bug.
 - `DELETE /api/admin/accounts/<username>` removes that principal's
-  row, its credential, its wrapper, every record, and every session in
-  one transaction; the removed account's subsequent request returns
-  Unauthorized and their login fails.
+  row, its credential, its wrapper, its vault epoch, every record, and
+  every session in one transaction; the removed account's subsequent
+  request returns Unauthorized and their login fails.
 - A `DELETE /api/admin/accounts/<username>` whose `confirmUsername`
   does not match the path segment is a Bad Request and deletes
   nothing.

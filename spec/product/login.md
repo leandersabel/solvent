@@ -16,7 +16,8 @@ The same screen does three jobs:
 
 - **Signing in to a user account**, from cold. Username and password.
 - **Unlocking again**, when the session is still good but the vault has
-  been locked, by the idle timer, the lock button, or a page reload.
+  been locked, by the idle timer, the lock button, a page reload, or a
+  restore made elsewhere (`export-import.md`, What must be true).
   The username is already known, so only the password is asked for.
 - **Signing in to an administrator account** (`admin-invites.md`).
   Username and password, and nothing is opened, because an
@@ -105,7 +106,7 @@ administrator session is signing out.
 
 Locking is a vault owner's concern.
 
-The vault locks in three ways, and all three land back on this screen:
+The vault locks in these ways, and each lands back on this screen:
 
 - **By itself**, after a stretch of no activity. You set how long in
   settings (`account-settings.md`, which owns the period).
@@ -113,6 +114,8 @@ The vault locks in three ways, and all three land back on this screen:
   confirmation (`app-shell.md`, which owns the button).
 - **By reloading the page.** Nothing is kept anywhere on the device, so
   a refresh always means typing the password again.
+- **By a restore made elsewhere** (`export-import.md`, What must be
+  true, which owns when and where).
 
 Locking is not cosmetic. Everything readable goes: not just the key,
 but every figure, chart, name, and note that had been decrypted. The
@@ -125,7 +128,8 @@ by design.
 form keeps what is in it, so a lock in the middle of entering figures
 does not destroy the work. That is what you are about to commit, not
 vault content read back. Nothing else is exempt, and after unlocking
-you are returned to where you were.
+you are returned to where you were. A restore made elsewhere is the
+exception (`export-import.md`, What must be true).
 
 ### When it goes wrong
 

@@ -60,9 +60,11 @@ enumeration oracle login.md closes.
    sign-in issues). The account is new, so the session the request
    carried is at most another account's, and a live one is deleted and
    replaced. Starting that session is the account's first sign-in and
-   writes its `last_login_at`. A vault owner lands logged in with keys
-   already in memory.
-   An administrator lands in the admin area.
+   writes its `last_login_at`. A vault owner's answer carries
+   `vaultEpoch`, and the vault owner lands logged in with keys and
+   epoch already in memory (architecture.md, Vault epoch).
+   An administrator's answer carries no `vaultEpoch`, and they land in
+   the admin area.
 
 **The payload's shape is checked against the invite, not chosen by the
 client.** The invite row's `kind` is the discriminator, so a payload
@@ -74,9 +76,12 @@ attach a vault to an administrator account by putting them in.
 
 ## What registration writes
 
-Three tables for a vault owner, two for an administrator, and this
-feature owns all three (architecture.md, Accounts on this instance,
-and Credentials and vault key wrappers).
+An administrator gets a `principals` row and a `credentials` row. A
+vault owner also gets a `dek_wrappers` row, a `vault_epochs` row and a
+profile record. This feature owns the columns of the first three
+(architecture.md, Accounts on this instance, and Credentials and vault
+key wrappers). The epoch is architecture.md's, Vault epoch, and the
+profile record record-api.md's.
 
 - **`principals`**: identity and kind only, meaning the normalized
   username, the kind copied from the invite, and the two timestamps.
@@ -93,6 +98,8 @@ and Credentials and vault key wrappers).
   credential, taking the wrapper and its nonce. **None at all for an
   administrator**, and the schema trigger refuses one
   (`app-shell.md`, Database).
+- **`vault_epochs`**: exactly one row for a vault owner, a fresh
+  epoch, and none for an administrator, which a trigger refuses too.
 
 `kind` is not a client input either. The server copies it from the
 invite row, which an administrator set when they minted the link, and
@@ -111,9 +118,9 @@ Every AAD field is one the client chose: `account_id` empty,
 `schema_version`, `version: 1`.
 
 Registration is deliberately **one transaction, not two phases**: the
-principal row, its password credential row, its wrapper and profile
-record where they apply, and the invite's consumption commit together
-or not at all. Splitting it would mean a request that burns a
+principal row, its password credential row, its wrapper, epoch and
+profile record where they apply, and the invite's consumption commit
+together or not at all. Splitting it would mean a request that burns a
 single-use invite and leaves a logged-in user holding a vault with no
 main currency, or a user row with no way to unlock it. The server
 writes the profile row through the same validator that backs
@@ -128,9 +135,9 @@ two callers rather than two record writers.
   envelope, plus, for a vault owner, wrapped DEK + nonce, profile
   record id, profile schema version, profile ciphertext + nonce.
 - Out: principal row (username, kind), its `password` credential row
-  (salt, KDF envelope, Auth Key hash), a wrapper row for a vault owner
-  only, a profile record for a vault owner only, invalidated invite,
-  session cookie.
+  (salt, KDF envelope, Auth Key hash), a wrapper row, a vault epoch row
+  and a profile record for a vault owner only, invalidated invite,
+  session cookie, and `vaultEpoch` in a vault owner's answer.
 
 ## Rules
 
@@ -331,8 +338,11 @@ of the rule have drifted, which the shared fixture (Rules) prevents.
   the server cannot unwrap.
 - Registering through an administrator invite leaves a `principals`
   row with `kind: administrator`, one `credentials` row, **zero
-  `dek_wrappers` rows and zero `records` rows**, asserted against
-  both tables, because zero is the whole guarantee.
+  `dek_wrappers`, `vault_epochs` and `records` rows**, asserted
+  against all three tables, because zero is the whole guarantee. Its
+  answer carries no `vaultEpoch`.
+- A vault owner registration leaves exactly one `vault_epochs` row for
+  the account, and the answer's `vaultEpoch` equals it.
 - The `principals` row holds no salt, no KDF envelope, no Auth Key
   hash and no wrapped DEK, asserted against the table's full column
   set, so the test fails if one is added back.
@@ -407,10 +417,10 @@ of the rule have drifted, which the shared fixture (Rules) prevents.
   entirely before the request is sent, asserted by encrypting the blob
   in a test with no server interaction at all.
 - A registration whose profile insert fails leaves no principal row,
-  no credential row, no wrapper row, and an unconsumed invite; a
-  registration that succeeds leaves exactly one principal, one
-  `password` credential row, one wrapper, one profile record, and a
-  `used` invite.
+  no credential row, no wrapper row, no epoch row, and an unconsumed
+  invite; a registration that succeeds leaves exactly one principal,
+  one `password` credential row, one wrapper, one epoch row, one
+  profile record, and a `used` invite.
 - An administrator registration that succeeds leaves exactly one
   principal, one `password` credential row, a `used` invite, and
   nothing else.

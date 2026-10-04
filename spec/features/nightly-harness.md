@@ -383,7 +383,10 @@ app's own code did not produce:
   keys derived at `m = 32768`, as `harness.mjs` `makeStale` does, and
   `patch.py` then records that parameter.
 - **The current backup** is the body of `GET /api/export`, fetched by
-  the page with the `X-Solvent-Request` header.
+  the page through `api.js`, so it carries the `X-Solvent-Request`
+  header and the vault epoch. So does every other request the
+  generator sends for a vault, `plant` writes and `makeStale`'s
+  upgrade included (architecture.md, Vault epoch).
 - **The aged session's cookie** is read with CDP `Network.getCookies`
   in that account's profile, right after it registers.
 

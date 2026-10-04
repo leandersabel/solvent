@@ -147,7 +147,12 @@ Master Key wraps a DEK instead of encrypting records directly.
 6. Server verifies `currentAuthKey` against the stored hash, then
    replaces the **`password` credential row** (its `params` and its
    `verifier`) and, for a vault owner, that credential's **one
-   `dek_wrappers` row**, in one transaction. No other row is written,
+   `dek_wrappers` row**, in one transaction. For a vault owner that
+   transaction compares the vault epoch after `BEGIN IMMEDIATE` and
+   before any write, because a
+   page holding a DEK an import replaced would otherwise wrap the old
+   key under the new password and leave every record unreadable
+   (architecture.md, Vault epoch). No other row is written,
    and any other credential the account holds is left alone, because
    the DEK is the same key afterwards and every wrapper still opens it
    (architecture.md, One key, N wrappers).
@@ -283,9 +288,12 @@ from an administrator removing an account (admin-invites.md).
   deliberate second factor of intent, so it is verified server-side and
   not left as a UI formality.
 - Deletes the principal row, every credential row, every wrapper,
-  every record, and every session, in one transaction. Nothing is
-  soft-deleted: there is no vault to preserve that anyone could ever
-  open.
+  every record, the vault epoch, and every session, in one
+  transaction. Nothing is soft-deleted: there is no vault to preserve
+  that anyone could ever open.
+- Compares the vault epoch after `BEGIN IMMEDIATE`, so a page that
+  confirmed deleting a vault since replaced deletes nothing
+  (architecture.md, Vault epoch).
 - **No last-administrator check.** A vault owner is never an
   administrator, so removing one can never leave the instance
   unadministered. The guard belongs to the one path that can, which is
@@ -336,9 +344,10 @@ from an administrator removing an account (admin-invites.md).
   twice is the same as asking once.
 - **"Log out everywhere"** — `POST /api/auth/logout-all`. Invalidates
   every session for the user, **including the current one**. There is no
-  "all except this one" variant. Two acts do keep the current session
-  alive, each as part of its own transaction: a password change, and an
-  import (`export-import.md`).
+  "all except this one" variant. A password change alone ends every
+  other session and keeps the current one, as part of its own
+  transaction (Change password). An import ends none
+  (architecture.md, Vault epoch).
 - A settings row lists live sessions by issue time and last activity —
   `GET /api/sessions` → `[{ id, issuedAt, lastActiveAt, current }]`.
   Live means not past the absolute expiry. An expired row is left off
@@ -385,6 +394,15 @@ from an administrator removing an account (admin-invites.md).
   the server even if the client-side unwrap were bypassed.
 - Other sessions for the user are invalidated by a password change; the
   initiating session is not.
+- A vault owner's change-password request carrying the epoch from
+  before an import, with a correct `currentAuthKey`, answers Conflict
+  `{"refused":"vault-replaced"}`, and the `credentials`,
+  `dek_wrappers` and `sessions` rows are as they were. The restored
+  vault still opens with the unchanged password.
+- A `DELETE /api/auth/account` carrying the epoch from before an
+  import, with a correct `authKey` and `confirmUsername`, answers
+  Conflict `{"refused":"vault-replaced"}` and deletes nothing.
+- Account deletion leaves no `vault_epochs` row for the account.
 - A password change on a vault with old KDF parameters results in
   parameters equal to the server's current default.
 - The main currency field is not editable and states why.

@@ -141,7 +141,10 @@ a future shape is how data gets silently corrupted.
 
 All session-authenticated. All writes CSRF-protected (architecture.md,
 Application hardening). All request and response bodies are
-Pydantic-validated.
+Pydantic-validated. Each endpoint compares the vault epoch inside the
+transaction that reads or writes its rows, a write after
+`BEGIN IMMEDIATE`, and answers Conflict `{"refused":"vault-replaced"}`
+on a mismatch, writing nothing (architecture.md, Vault epoch).
 
 There is deliberately **no single-record `GET`.** The client fetches
 every record once per session and keeps the model in memory
@@ -209,6 +212,11 @@ specified and owned by `manage-accounts.md`, not here.
   plaintext.
 - **Two tabs write the same record concurrently** → the second sees
   Conflict and reloads; no merge is attempted anywhere in the system.
+  That Conflict carries no `refused` member.
+- **A page still holding the DEK an import replaced** reads or writes →
+  Conflict `{"refused":"vault-replaced"}`, nothing written, and the
+  page closes the vault instead of reloading (login.md, A vault
+  replaced elsewhere).
 - **A second `profile` record** → allowed by the schema, and a client
   bug. The API does not enforce a singleton, since it would be the only
   per-type rule in a deliberately type-agnostic store. Clients treat
@@ -223,8 +231,16 @@ specified and owned by `manage-accounts.md`, not here.
 - A `PUT` at `version: 1` creates a row; the same `PUT` repeated returns
   Conflict and does not increment anything.
 - A `PUT` at stored `version + 1` succeeds; at the stored version, at
-  `+2`, or at 1 for an existing row, all return Conflict and leave the
-  row byte-identical.
+  `+2`, or at 1 for an existing row, all return Conflict with no
+  `refused` member and leave the row byte-identical.
+- With the vault epoch replaced, a `GET`, a create `PUT`, an update
+  `PUT` and a `DELETE` each answer Conflict
+  `{"refused":"vault-replaced"}`, return no record and leave `records`
+  row for row as it was.
+- An import committing after a `PUT` or `DELETE` passed the request
+  gate and before its transaction began makes that request answer
+  `vault-replaced` and write nothing, asserted by holding the handler
+  at that point in a test.
 - `GET /api/records?type=account` returns only the session user's
   records, only of that type. With two users holding records, neither
   sees a single row of the other's.

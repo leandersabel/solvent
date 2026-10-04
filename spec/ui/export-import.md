@@ -30,8 +30,8 @@ download, same warning before it starts.
 - One line on what it does not carry: the file holds **one way in, your
   password**, and no device, no second method, no recovery key
   (`export-import.md`, What it does).
-- A tinted callout with a critical icon, **shown before the download
-  starts, not after**:
+- A Callout with the critical icon (`design-system.md`, Components),
+  **shown before the download starts, not after**:
 
   > This file is exactly as sensitive as your password. Anyone who has
   > both owns your vault. It stays locked with the password you have
@@ -110,9 +110,15 @@ Below the flow, what does and does not change:
 > Your password stays the same and your login is unaffected. Only the
 > contents of your vault are replaced: your holdings, your history, your
 > main currency, your dimensions and your idle lock all become the
-> file's. You are signed out anywhere else you are signed in. From this
+> file's. Every other tab and window of this browser, and every other
+> device where your vault is open, closes it and asks for your
+> password. Anything typed there and not yet saved is lost. From this
 > moment the two vaults are independent, so anything the file's author
 > records in their own vault afterwards never appears here.
+
+This tab stays open on the restored vault (Populated). What the other
+pages show is `unlock.md`, Replaced elsewhere, and `dashboard.md`,
+Replaced since last open.
 
 ## The decryption wait
 
