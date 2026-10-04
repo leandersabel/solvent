@@ -204,7 +204,10 @@ touches once and ends in one of:
   saying what is wrong or what changes, and the issue waits in line.
 - `change`, the requirements change: the run opens the requirements
   pull request.
-- Already met, a duplicate, or doubtful: the reasoning, and a question.
+- Already met or a duplicate: the reasoning, naming the change or the
+  issue that holds it, and the issue closed. An issue is closed once
+  fixed, whatever fixed it.
+- Doubtful: the reasoning, and a question.
 
 Questions follow Who asks the client. A `bug` where a requirement is
 what is wrong becomes a `change`, and the reverse, with a comment
