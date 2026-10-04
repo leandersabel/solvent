@@ -375,17 +375,12 @@ h1, h2, h3 {
 
 .callout {
   background: var(--surface-tinted);
-  color: var(--petrol-700);
-  border-radius: var(--radius-input);
-  padding: 12px 16px;
-  margin: 0 0 20px;
-  font-size: 14px;
-  line-height: 1.5;
-}
-
-.callout-critical {
-  border-left: 3px solid var(--status-critical);
   color: var(--ink-primary);
+  border-radius: var(--radius-input);
+  padding: 16px;
+  margin: 0 0 20px;
+  font-size: 15px;
+  line-height: 1.5;
 }
 
 /* A consequence stated under a hairline, its icon in critical. */
@@ -927,7 +922,8 @@ th.numeric {
 }
 
 .dashboard > .card,
-.dashboard > .banner { margin: 0; }
+.dashboard > .banner,
+.dashboard > .callout { margin: 0; }
 
 /* The figure, then the two sides of it and the one primary action,
    then which rates the figure is read at. */

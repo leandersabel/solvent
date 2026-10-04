@@ -698,6 +698,9 @@ export function archiveHoldingDialog(vault, holding, onDone, then = 'reload', sa
   });
 
   const done = (text) => {
+    // An outcome is not a form: a lock must not bring back the dialog
+    // that asked.
+    close.stopResuming();
     panel.replaceChildren(
       el('p', { role: 'status', text }),
       openRecording

@@ -31,9 +31,22 @@ pytestmark = pytest.mark.skipif(
 )
 
 
-def status_with(base: str, cookie: dict) -> int:
+def epoch_of(database: Path, username: str) -> str:
+    """The vault epoch a page holding that account's vault sends."""
+    conn = sqlite3.connect(database)
+    try:
+        return conn.execute(
+            "SELECT epoch FROM vault_epochs JOIN principals ON principals.id = principal_id WHERE username = ?",
+            (username,),
+        ).fetchone()[0]
+    finally:
+        conn.close()
+
+
+def status_with(base: str, cookie: dict, epoch: str) -> int:
     request = urllib.request.Request(
-        f"{base}/api/records?type=profile", headers={**CSRF, "Cookie": f"{cookie['name']}={cookie['value']}"}
+        f"{base}/api/records?type=profile",
+        headers={**CSRF, "X-Solvent-Vault": epoch, "Cookie": f"{cookie['name']}={cookie['value']}"},
     )
     try:
         return urllib.request.urlopen(request, timeout=30).status
@@ -82,13 +95,14 @@ def generated(tmp_path_factory):
 def patched(generated):
     cookie = json.loads((generated.out / "storage-state.json").read_text())["cookies"][0]
     before = tables(generated.database)
-    session_works = status_with(generated.base, cookie)
+    epoch = epoch_of(generated.database, generated.manifest["browserSession"]["username"])
+    session_works = status_with(generated.base, cookie, epoch)
     done = subprocess.run(
         [sys.executable, str(TOOLS / "patch.py"), str(generated.database), str(generated.out / "patches.json")],
         capture_output=True, text=True,
     )
     assert done.returncode == 0, done.stderr
-    return SimpleNamespace(cookie=cookie, before=before, after=tables(generated.database), session_works=session_works)
+    return SimpleNamespace(cookie=cookie, epoch=epoch, before=before, after=tables(generated.database), session_works=session_works)
 
 
 def test_the_generator_writes_every_output_and_the_manifest_covers_every_name(generated):
@@ -128,7 +142,7 @@ def test_the_generator_sends_no_request_to_the_rate_lookup(generated):
 def test_patch_changes_only_the_rows_it_names_and_the_aged_session_is_refused(generated, patched):
     assert patched.session_works == 200
     assert {t for t in patched.before if patched.before[t] != patched.after[t]} == {"sessions", "invites", "credentials"}
-    assert status_with(generated.base, patched.cookie) == 401
+    assert status_with(generated.base, patched.cookie, patched.epoch) == 401
     token = generated.manifest["invites"][0]["path"]
     request = urllib.request.Request(f"{generated.base}{token}")
     with pytest.raises(urllib.error.HTTPError) as refused:

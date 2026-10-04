@@ -5,7 +5,7 @@ Maintained by the compiler agent. Rows are in build order.
 | Feature | Compiled | Implemented | Verified |
 |---|---|---|---|
 | app-shell | x | | |
-| record-api | x | x | x |
+| record-api | x | | |
 | rate-lookup | x | | |
 | admin-invites | x | | |
 | register | x | | |
@@ -43,6 +43,12 @@ sources `rate-lookup` calls. It has no product file, so `qa` has no
 product criteria for it. `.github/workflows/nightly.yml` is the
 client's, so its part of the contract reaches the client as a pull
 request.
+
+The vault epoch crosses rows. `app-shell` owns its table and the gate's
+step 7, `register` writes it, `login` hands it to the page and owns the
+page's half, and `record-api`, `manage-accounts`, `export-import` and
+`account-settings` compare it in their own handlers. Each row's epoch
+criteria are asserted once the rows they need exist.
 
 `dependsOn` in each contract records coupling, which is many-to-many
 and in places circular. Build order is stated here, not derived from

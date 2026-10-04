@@ -339,18 +339,21 @@ def test_imported_records_land_under_the_session_user(app, owner):
     assert rows(app, "SELECT * FROM records WHERE principal_id = ?", (principal_id(app, "other"),)) == theirs
 
 
-def test_import_invalidates_every_other_session_and_keeps_this_one(app):
+def test_import_revokes_no_session(app):
     owner, auth_key = register(app, "owner")
     second, _ = sign_in(app, "owner", auth_key)
-    assert len(rows(app, "SELECT * FROM sessions")) == 2
+    sessions = rows(app, "SELECT id, token_hash FROM sessions ORDER BY id")
+    assert len(sessions) == 2
 
-    owner.post("/api/import", json=import_payload([]), headers=CSRF)
-    assert len(rows(app, "SELECT * FROM sessions")) == 1
-    assert second.get("/api/records?type=account", headers=CSRF).status_code == 401
+    assert owner.post("/api/import", json=import_payload([]), headers=CSRF).status_code == 200
+    assert rows(app, "SELECT id, token_hash FROM sessions ORDER BY id") == sessions
+    # The other session lives, and the vault epoch is what refuses its
+    # requests (test_vault_epoch.py).
+    assert second.get("/api/records?type=account", headers=CSRF).status_code == 409
     assert owner.get("/api/records?type=account", headers=CSRF).status_code == 200
 
 
-def test_a_create_from_a_session_the_import_ended_never_reaches_the_vault(app):
+def test_a_create_from_a_second_session_after_the_import_never_reaches_the_vault(app):
     """The second session still holds the old DEK. Its create is the
     write that would store ciphertext under a key no longer in the
     envelope, so the write path is what is asserted, not only a read."""
@@ -359,7 +362,7 @@ def test_a_create_from_a_session_the_import_ended_never_reaches_the_vault(app):
     assert owner.post("/api/import", json=import_payload([]), headers=CSRF).status_code == 200
 
     record_id, response = put_record(second)
-    assert response.status_code == 401
+    assert (response.status_code, response.get_json()) == (409, {"refused": "vault-replaced"})
     assert rows(app, "SELECT * FROM records WHERE record_id = ?", (record_id,)) == []
 
 

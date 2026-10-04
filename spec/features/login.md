@@ -50,10 +50,13 @@ time in all three cases (Rules, The sign-in wait).
    credentials).
 3. `POST /api/auth/login` `{ username, authKey }` → on success, sets the
    session cookie, writes `last_login_at`, and returns
-   `{ kind, kdfStale }` plus, for a vault owner only, `wrappedDek` and
-   `dekNonce`. That wrapper is the one belonging to the credential the
-   caller just authenticated with, never a list (architecture.md, One
-   key, N wrappers). An **unknown username still runs a full Argon2id
+   `{ kind, kdfStale }` plus, for a vault owner only, `wrappedDek`,
+   `dekNonce` and `vaultEpoch`. That wrapper is the one belonging to the
+   credential the caller just authenticated with, never a list
+   (architecture.md, One key, N wrappers). The wrapper and
+   `vaultEpoch` are read inside the transaction that writes the
+   session, so an import cannot land between them (architecture.md,
+   Vault epoch). An **unknown username still runs a full Argon2id
    verification** against a fixed decoy hash and discards the result.
    Without it the endpoint answers in microseconds for accounts that do
    not exist and in tens of milliseconds for ones that do, which
@@ -105,7 +108,10 @@ successful sign-in the client, without user interaction:
    for a vault owner, that credential's **one `dek_wrappers` row**. No
    other row changes, and no other credential is touched, because the
    DEK is the same key afterwards and every other wrapper still opens
-   it (architecture.md, One key, N wrappers).
+   it (architecture.md, One key, N wrappers). A vault owner's request
+   carries the epoch sign-in returned, and the server compares it after
+   `BEGIN IMMEDIATE`, so an import landing between sign-in and upgrade
+   is never overwritten by a wrapper around the old DEK.
 
 The server discriminates on the session's principal kind, not on which
 fields the client sent: a vault owner's request without a wrapper is a
@@ -116,7 +122,9 @@ vault and leave its wrapper opening under a superseded Master Key.
 The DEK itself does not change, so **no vault record is re-encrypted**.
 If the upgrade POST fails, the session continues normally on the old
 parameters and retries on the next sign-in — a failed upgrade must
-never lock anyone out.
+never lock anyone out. The one exception is a `vault-replaced`
+Conflict, which closes the vault like any other (A vault replaced
+elsewhere).
 
 ## The session a sign-in issues
 
@@ -164,6 +172,92 @@ from sign-in. Resetting it on unlock would make the limit sliding for
 anyone who unlocks more often than every twelve hours. Unlocking does
 move `last_login_at`, which no expiry reads.
 
+## A vault replaced elsewhere
+
+A restore closes the vault in every other page where it is open
+(`product/export-import.md`, What must be true). The server's half is
+the vault epoch (architecture.md, Vault epoch). This is the page's
+half, and it binds every page that holds an epoch, the registration
+page after registering included.
+
+**A page learns its epoch was replaced** in one of four ways:
+
+- **A `vault-replaced` Conflict** answering any request. The API module
+  handles it before any caller sees the response, so no screen's own
+  Conflict handling, the version reload, ever runs on it.
+- **A message on `BroadcastChannel("solvent-vault")`** naming the epoch
+  the page holds. The message is the JSON object
+  `{"replaced":"<epoch>"}`, the epoch that was replaced, and nothing
+  else: no key, no new epoch, nothing decrypted. A page ignores any
+  other message, and one naming an epoch it does not hold, so a message
+  about an older epoch never closes a page already on the new one. A
+  page holding no epoch acts on no message.
+- **Coming back into view.** When an unlocked page's
+  `visibilitychange` reports `visible`, it sends one
+  `GET /api/records?type=profile`, whose answer goes through the API
+  module like any other and whose body is discarded. This is how a page
+  in another browser, or on another device, notices before it is used.
+- **Signing in to another epoch**: the `vaultEpoch` a sign-in returns
+  differs from the one the page held. That sign-in is an unlock on a
+  live session, or a sign-in from the session-ran-out card after the
+  session ended for its own reason (expiry, log out everywhere, a
+  password change).
+
+**The page keeps its epoch until it signs in again.** It holds the
+epoch across a lock and across its session ending, because the next
+sign-in compares against it. Signing out discards it, and a reload has
+none, so neither compares anything.
+
+**A page that learns by Conflict or at sign-in posts
+`{"replaced":"<the epoch it held>"}`** on the channel before discarding
+that epoch, so every other page of this browser that holds it closes at
+once. A page that learned by message posts nothing, because every page
+on the channel received the same one. The channel reaches the pages of
+one browser profile and storage partition. A private window or another
+profile learns as another device does.
+
+**What it drops.** Whichever way it learned, the page discards
+everything a lock keeps: unsaved form input and every dialog that would
+come back after an unlock (`ui/unlock.md`, Rules). It was typed against
+a vault that no longer exists, and saving it could put a figure on a
+holding the restore does not hold. Before discarding, the page notes
+whether there was any, because the copy differs. A password field never
+counts, since no lock keeps one.
+
+**Learning by Conflict or message.** The page:
+
+1. discards the Master Key, the DEK and every decrypted value, as the
+   idle lock does (Rules);
+2. discards what a lock keeps, as above, and closes every dialog;
+3. discards the epoch it held, so the unlock that follows compares
+   nothing;
+4. draws the unlock card in its Replaced elsewhere state
+   (`ui/unlock.md`), in the wording for whether step 2 dropped
+   anything.
+
+A locked page holding the named epoch does the same, so its held input
+goes and its card turns to Replaced elsewhere. A request in flight when
+the vault closes draws nothing when it answers. Unlocking from Replaced
+elsewhere signs in on the live session as any unlock does, and opens
+the dashboard with no notice, rather than the view the page was on.
+
+**Learning at sign-in.** The page drops what a lock kept, opens the
+dashboard rather than the view it was on, and shows the Replaced since
+last open notice (`ui/dashboard.md`) in the wording for whether it
+dropped anything. This is how a page that was locked through the
+restore finds it, and a page whose session ended. A page on another
+device that is never used again closes no later than its idle lock,
+which discards everything but what a lock keeps, and signing in drops
+that too.
+
+**Another device meets Replaced elsewhere, not the session-ran-out
+card.** Import revokes no session (architecture.md, Vault epoch), so a
+page elsewhere keeps a live session, and its next request, or coming
+back into view, answers `vault-replaced`. It asks for the password
+only. Such a page reaches the session-ran-out card (`ui/unlock.md`)
+only when its session ended for its own reason, and then learns at
+sign-in.
+
 ## Inputs / outputs
 
 - In (browser only): password.
@@ -171,7 +265,7 @@ move `last_login_at`, which no expiry reads.
 - Out: session cookie carrying an opaque session token only — no key
   material of any kind, and no principal id (architecture.md,
   Application hardening). Plus `kind` and `kdfStale`, and, for a vault
-  owner, wrapped DEK + nonce.
+  owner, wrapped DEK + nonce and the vault epoch.
 
 ## Rules
 
@@ -249,7 +343,8 @@ move `last_login_at`, which no expiry reads.
     from the server, and it is scoped to the open form — nothing else
     decrypted is exempt. The same rule covers the manual lock button
     (`ui/design-system.md`, App shell) and a session expiring
-    mid-request.
+    mid-request. A replaced vault is the one lock it does not cover (A
+    vault replaced elsewhere).
 - **No idle rule for an administrator** (account-settings.md, Session
   and lock, which owns the reason). An administrator session is bounded
   by the absolute expiry and by signing out.
@@ -299,20 +394,29 @@ move `last_login_at`, which no expiry reads.
   prompt for and the admin area renders.
 - **A login response arrives with `kind` absent** → the client treats
   it as a failed login rather than defaulting to either kind, so it
-  never has a "kind absent" branch to get wrong.
+  never has a "kind absent" branch to get wrong. So does a vault
+  owner's response without `vaultEpoch`, because a page without one
+  could send no vault request.
+- **A restore lands between sign-in and the stale-KDF upgrade** → the
+  upgrade answers `vault-replaced` and writes nothing, and the page
+  closes the vault (A vault replaced elsewhere).
 - **Clock skew / expired session mid-request** → API returns
   Unauthorized, and the status alone is the signal, with no code in the
   body, because Unauthorized has one meaning (architecture.md, Status
   codes). The client prompts for re-unlock rather than discarding
-  unsaved input.
+  unsaved input, unless that sign-in finds the vault replaced (A vault
+  replaced elsewhere).
 
 ## Acceptance criteria
 
 - A valid vault owner username + password logs in, and the client
   holds a working DEK proven by decrypting the profile record.
 - A valid administrator username + password logs in, the response
-  carries `kind: administrator` and **no `wrappedDek` and no
-  `dekNonce`**, and the session reaches the admin area.
+  carries `kind: administrator` and **no `wrappedDek`, no `dekNonce`
+  and no `vaultEpoch`**, and the session reaches the admin area.
+- A vault owner's login response carries `vaultEpoch` equal to the
+  account's `vault_epochs` row, and after an import the next sign-in's
+  equals the epoch the import returned.
 - The login request body contains the Auth Key and nothing derived from
   the Master Key; the password appears in no request.
 - The session cookie contains no key material, and carries `HttpOnly`,
@@ -465,4 +569,51 @@ move `last_login_at`, which no expiry reads.
 - Re-unlocking after an idle lock refetches and re-decrypts the vault;
   it does not restore a model kept across the lock.
 - A test asserts no key material is written to `localStorage` or
-  `sessionStorage` at any point in the flow.
+  `sessionStorage` at any point in the flow, and no vault epoch either.
+- `POST /api/auth/upgrade-kdf` from a vault owner session carrying the
+  epoch from before an import answers Conflict
+  `{"refused":"vault-replaced"}`, and the `credentials` and
+  `dek_wrappers` rows are byte-identical afterwards.
+- **Two pages, one browser.** Pages A and B of one browser context
+  are unlocked on one vault, and B has a holding form open with a name
+  typed. A restores a file. Before B sends any request, B holds no key,
+  no decrypted holding name or figure and no typed name, every dialog
+  is closed, and its unlock card is in the Replaced elsewhere state in
+  the wording for dropped input. A is still open on the restored vault.
+  Unlocking B opens the dashboard with the restored figures and no
+  Replaced since last open notice, and no record in the vault fails to
+  decrypt.
+- The same with B showing only the dashboard, nothing typed and no
+  dialog open, puts B's card in the Replaced elsewhere wording for
+  nothing dropped.
+- With B's `BroadcastChannel` stubbed so no message arrives, B's save
+  of the new holding answers Conflict `{"refused":"vault-replaced"}`,
+  B shows Replaced elsewhere, B posts `{"replaced":"<its epoch>"}`, and
+  the vault's records afterwards are exactly the restored set. That
+  Conflict never reaches the holding form's version-reload path.
+- **Another browser context.** A page in a second context, unlocked on
+  the same vault with its own session, stays drawn while hidden during
+  a restore made in the first. Made visible, it sends one
+  `GET /api/records?type=profile`, shows Replaced elsewhere, and sends
+  nothing else. Its session row still exists.
+- A page locked by the idle period in a second context unlocks after a
+  restore made in the first. With a form's input held, the held input
+  is gone and the dashboard shows the Replaced since last open notice
+  in the wording for dropped input. With a dialog kept and nothing
+  typed in it, the same, since a kept dialog counts. With nothing kept,
+  the notice is in the wording for nothing dropped. In each case the
+  page posted `{"replaced":"<the epoch it held>"}`.
+- **A session that ended for its own reason.** A page in a second
+  context holds a form's typed input when the first context logs out
+  everywhere, signs in again and restores a file. The
+  page's next request answers Unauthorized and the card shows the
+  session-ran-out state, with the input still held. Signing in drops
+  the input, opens the dashboard, and shows Replaced since last open in
+  the wording for dropped input. Signing in with no restore in between
+  returns the page to its view with the input, and shows no notice.
+- Signing out and signing in again, and reloading and signing in
+  again, after a restore show no Replaced since last open notice.
+- A page ignores a channel message naming an epoch it does not hold,
+  a message of any other shape, and every message while it holds no
+  epoch. Every message a page posts has `replaced` as its only key,
+  holding the replaced epoch.

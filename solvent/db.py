@@ -5,6 +5,7 @@ schema, and seeds the platform's symbol table
 from __future__ import annotations
 
 import contextlib
+import secrets
 import sqlite3
 from datetime import datetime, timezone
 from pathlib import Path
@@ -33,6 +34,12 @@ def utcnow() -> str:
     """The server clock, in the one format every timestamp column
     holds. Set server-side, never accepted from a client."""
     return now().isoformat(timespec="seconds")
+
+
+def new_epoch() -> str:
+    """A vault epoch: 16 random bytes as 32 lowercase hex characters
+    (architecture.md, Vault epoch)."""
+    return secrets.token_bytes(16).hex()
 
 
 def connect(target, **kwargs) -> sqlite3.Connection:
@@ -81,6 +88,7 @@ def init_db(app: flask.Flask) -> None:
             conn.executescript(SCHEMA_PATH.read_text())
             _seed_symbols(conn)
             _prune_attempts(conn, app)
+            _fill_epochs(conn)
             conn.execute(
                 "UPDATE principals SET last_login_at = created_at "
                 "WHERE last_login_at IS NULL"
@@ -118,6 +126,20 @@ def _prune_attempts(conn: sqlite3.Connection, app: flask.Flask) -> None:
     from .ratelimit import prune
 
     prune(conn, app.config, now())
+
+
+def _fill_epochs(conn: sqlite3.Connection) -> None:
+    """A fresh epoch for each vault owner an earlier build left without
+    one, so every vault owner has one wherever a request can read it. A
+    row that exists is never rewritten: a page already holds it."""
+    for (principal_id,) in conn.execute(
+        "SELECT id FROM principals WHERE kind = 'vault_owner' AND id NOT IN "
+        "(SELECT principal_id FROM vault_epochs)"
+    ).fetchall():
+        conn.execute(
+            "INSERT INTO vault_epochs (principal_id, epoch) VALUES (?, ?)",
+            (principal_id, new_epoch()),
+        )
 
 
 def _seed_symbols(conn: sqlite3.Connection) -> None:
@@ -169,6 +191,18 @@ def write_transaction():
         conn.execute("ROLLBACK")
         raise
     conn.execute("COMMIT")
+
+
+@contextlib.contextmanager
+def read_transaction():
+    """One snapshot around a read, so everything a handler returns
+    comes from the same moment as the check it made first."""
+    conn = get_db()
+    conn.execute("BEGIN")
+    try:
+        yield conn
+    finally:
+        conn.execute("ROLLBACK")
 
 
 def _close_db(_exception: BaseException | None = None) -> None:

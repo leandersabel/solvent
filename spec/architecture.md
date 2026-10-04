@@ -181,6 +181,89 @@ learns the date and the main currency, never an amount and never which
 symbols a vault holds: the client asks for the whole quotable table
 and never a single holding's value.
 
+### Vault epoch
+
+**A page holding a replaced DEK neither writes nor reads.** Import
+gives the vault a new DEK (export-import.md), and every other page
+where the vault is open still holds the old one. The server cannot
+tell which key encrypted a blob. Unchecked, a create from such a page
+is stored and never decrypts again, and a delete or purge from it
+removes a restored record, because import keeps record ids. The vault
+epoch is the check: a value naming the DEK a page holds, which reveals
+nothing about the key.
+
+`vault_epochs`:
+
+| Column | Visibility | Notes |
+|---|---|---|
+| `principal_id` | plaintext | primary key, `ON DELETE CASCADE` from `principals` |
+| `epoch` | plaintext | 16 bytes from `secrets.token_bytes`, as 32 lowercase hex characters |
+
+- **Exactly one row per vault owner, none for an administrator.**
+  Registration writes it in the transaction that creates the principal
+  (register.md). Import replaces it in the transaction that replaces
+  the DEK (export-import.md). Nothing else writes it. Every process
+  start gives a fresh row to each vault owner without one, so a
+  database an earlier build wrote needs no migration and keeps its
+  schema version (app-shell.md, Database). A trigger refuses an
+  administrator's row, as it refuses an administrator's wrapper.
+- **Its own table.** `principals` holds identity and kind alone, and a
+  column on `dek_wrappers` would repeat one vault's value on every
+  wrapper.
+- **Random, not a counter**, so a fresh one needs no read of the old
+  one and says nothing about how often a vault was restored.
+- **The page learns it** from the sign-in that hands it the wrapper
+  (login.md), from registration (register.md) and from its own import
+  (export-import.md). It lives in page memory, never in localStorage or
+  sessionStorage. Unlike the keys it survives a lock and the session
+  ending, because the next sign-in compares it (login.md, A vault
+  replaced elsewhere).
+- **Every API request a page sends once it holds one carries it**, as
+  `X-Solvent-Vault: <epoch>`. The request gate answers a vault owner's
+  request to any API route outside Public with Bad Request when the
+  header is missing, and Conflict `{"refused":"vault-replaced"}` when
+  it is not the vault's (app-shell.md, The request gate). A missing
+  header is a refusal, not an exemption, so a page loaded before the
+  epoch existed fails loudly instead of writing.
+- **Every handler that serves a vault owner's own request and reads or
+  writes `records` or `dek_wrappers`, or deletes their principal,
+  compares it again inside its own transaction**, with the same
+  Conflict. An administrator removing a vault owner
+  (admin-invites.md) compares nothing: the administrator's page holds
+  no epoch, and the removal destroys the vault whatever key it is
+  under. A write compares after
+  `BEGIN IMMEDIATE` takes the lock, a read inside the transaction that
+  reads its rows. So a request racing an import either commits first
+  and is replaced with everything else, or answers Conflict. Sign-in
+  reads the wrapper and the epoch in one transaction, so
+  it never hands out one without the other. The handlers are record
+  read, write and delete (record-api.md), purge (manage-accounts.md),
+  export and import (export-import.md), the stale-KDF upgrade
+  (login.md), and password change and account deletion
+  (account-settings.md).
+- **A page that learns its epoch was replaced tells the browser's
+  other pages at once**, on a `BroadcastChannel` (login.md, A vault
+  replaced elsewhere).
+- **Not a secret.** Sign-in hands it to whoever proves the password,
+  and only a valid vault owner session reaches the comparison, so it is
+  compared as a plain string.
+- **A consistency control, not a boundary against the server.** A
+  server that ignores it can store a blob that does not decrypt, which
+  it can do anyway (Threat model).
+- **It is not in the AAD**, because a new AAD field makes every stored
+  record unreadable, and the AAD binds a blob to its slot rather than
+  to a key.
+- **The server checks no proof of which DEK a page holds**, such as a
+  key-check value. It can verify none, and a value only a client can
+  write would be missing for every existing vault until its owner's
+  next sign-in.
+- **Import rotates no cookie and revokes no session.** Every tab of one
+  browser shares the cookie, so a rotated one reaches the stale tabs
+  too. Revoking the importing session would close the tab the restore
+  was made in. Revoking the others protects nothing the epoch does not,
+  and would cost every other device the chance to say why it closed
+  before asking for the password.
+
 ## Status codes
 
 Every endpoint answers from this set, and every spec file names the
@@ -195,15 +278,17 @@ contract pins one value and prose stays readable.
 | Unauthorized | 401 | a refusal of an API request with the `X-Solvent-Request` header and no valid session (Refusals) |
 | Forbidden | 403 | a refusal of an API request without the `X-Solvent-Request` header (Refusals) |
 | Not Found | 404 | the target does not exist **or** belongs to someone else, and every other refusal (Refusals) |
-| Conflict | 409 | the write lost an optimistic-concurrency check, or the target's state forbids it |
+| Conflict | 409 | the write lost an optimistic-concurrency check, the target's state forbids it, or the request's vault epoch is not the vault's (Vault epoch) |
 | Content Too Large | 413 | a storage cap would be exceeded (Storage & data handling) |
 | Too Many Requests | 429 | a rate limit engaged (Application hardening) |
 | Server Error | 500 | an unhandled failure. Never a designed answer. It appears in this spec only where a test stubs one |
 
-A Bad Request names its reason, as the body `{"refused":"<reason>"}`,
-only where a feature file pins that reason, and only when the reason
-tells the caller nothing it did not send or could not already learn.
-Every other Bad Request carries no `refused` member.
+A Bad Request or a Conflict names its reason, as the body
+`{"refused":"<reason>"}`, only where this spec pins that reason, and
+only when the reason tells the caller nothing it did not send or could
+not already learn. Every other Bad Request or Conflict carries no
+`refused` member, so `vault-replaced` is never mistaken for a lost
+version check.
 
 ### Refusals
 
@@ -223,6 +308,11 @@ revoked session. An unknown path, a method the route does not answer
 (`OPTIONS` included) and an address the router would redirect
 (`//admin`) are refused as invented. Nothing answers Method Not Allowed,
 and no refusal redirects. app-shell.md, The request gate, applies this.
+
+The gate's vault epoch step (Vault epoch) is not a refusal in this
+sense. It runs only for a vault owner the steps above let through to
+a route of their own surface, so its answer says nothing about paths
+or kinds.
 
 ## Tech stack
 
@@ -293,7 +383,9 @@ and no refusal redirects. app-shell.md, The request gate, applies this.
 - **Accepted, not defended**:
   - Metadata: login timestamps, per-user record counts (including
     roughly how many priced symbols a vault holds, from the size of a
-    recording's burst of writes), and request sizes.
+    recording's burst of writes), request sizes, and when an unlocked
+    page comes back into view, which its epoch check reveals (login.md,
+    A vault replaced elsewhere).
   - Whatever a deployment's own TLS-terminating intermediary (reverse
     proxy, CDN edge, tunnel) sees of connection metadata.
   - Someone holding both `SECRET_KEY` and the database can recover the
@@ -375,7 +467,9 @@ and no refusal redirects. app-shell.md, The request gate, applies this.
   - **Anything that changes the DEK rewrites every wrapper in the same
     transaction.** Import re-keys the vault (export-import.md), so it is
     the flow this binds. A wrapper still holding the old DEK unwraps and
-    then fails on every record, so the vault looks corrupt.
+    then fails on every record, so the vault looks corrupt. The same
+    transaction replaces the vault epoch, so no page still holding the
+    old DEK reads or writes again (Vault epoch).
 - **Nonce strategy**: a fresh random 96-bit nonce for every encryption,
   including re-encrypting an existing record on edit. Collision risk is
   negligible well below 2³² messages under one key.
@@ -454,8 +548,8 @@ and no refusal redirects. app-shell.md, The request gate, applies this.
   cookie carries only a random session token, signed with the Flask
   `SECRET_KEY`, and the server looks the session up by the token's
   hash. Server-side rows are what make sessions listable and revocable:
-  "log out everywhere", invalidating other sessions on a password change
-  or an import, and the absolute expiry (login.md, Rules).
+  "log out everywhere", invalidating other sessions on a password
+  change, and the absolute expiry (login.md, Rules).
   `id` is a separate opaque handle, which `GET /api/sessions` returns,
   so no response hands JavaScript the cookie's value.
   - **No `kind` column.** Kind is read through `principal_id`, so a

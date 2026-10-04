@@ -21,7 +21,7 @@ from . import crypto, ratelimit
 from . import session as sessions
 from .config import DEFAULT_KDF_ENVELOPE
 from .db import get_db, utcnow, write_transaction
-from .guard import public
+from .guard import public, verify_epoch
 from .records import NONCE_BYTES
 from .validation import (
     Payload,
@@ -150,19 +150,23 @@ def login():
     if response_body["kdfStale"]:
         response_body["kdf"] = DEFAULT_KDF_ENVELOPE
 
-    if row["kind"] == "vault_owner":
-        wrapper = get_db().execute(
-            "SELECT * FROM dek_wrappers WHERE credential_id = ?", (credential["id"],)
-        ).fetchone()
-        if wrapper is None:
-            # A vault owner with no wrapper has nothing to unlock, and
-            # saying so would be a different answer than a wrong
-            # password gets.
-            abort(401)
-        response_body["wrappedDek"] = wrapper["wrapped_dek"]
-        response_body["dekNonce"] = wrapper["dek_nonce"]
-
+    # The wrapper and the epoch are read in the transaction that writes
+    # the session, so an import cannot land between them.
     with write_transaction() as conn:
+        if row["kind"] == "vault_owner":
+            wrapper = conn.execute(
+                "SELECT * FROM dek_wrappers WHERE credential_id = ?", (credential["id"],)
+            ).fetchone()
+            if wrapper is None:
+                # A vault owner with no wrapper has nothing to unlock, and
+                # saying so would be a different answer than a wrong
+                # password gets.
+                abort(401)
+            response_body["wrappedDek"] = wrapper["wrapped_dek"]
+            response_body["dekNonce"] = wrapper["dek_nonce"]
+            response_body["vaultEpoch"] = conn.execute(
+                "SELECT epoch FROM vault_epochs WHERE principal_id = ?", (row["id"],)
+            ).fetchone()["epoch"]
         raw_token = sessions.start(conn, row["id"])
     response = jsonify(response_body)
     sessions.set_cookie(response, raw_token)
@@ -238,6 +242,11 @@ def _rotate_credential(conn, body: CredentialRotation) -> None:
     if is_owner and decode_b64(body.wrappedDek) is None:
         abort(400)
 
+    if is_owner:
+        # After the lock is taken and before any write: a page holding a
+        # DEK an import replaced would wrap the old key.
+        verify_epoch(conn)
+
     credential = credential_for(g.principal["id"])
     conn.execute(
         "UPDATE credentials SET params = ?, verifier = ?, created_at = ? WHERE id = ?",
@@ -310,8 +319,9 @@ def delete_account():
         abort(400)
 
     with write_transaction() as conn:
-        # Credentials, wrappers, records and sessions all cascade from
-        # the principal row.
+        verify_epoch(conn)
+        # Credentials, wrappers, the vault epoch, records and sessions
+        # all cascade from the principal row.
         conn.execute("DELETE FROM principals WHERE id = ?", (g.principal["id"],))
     response = jsonify({"ok": True})
     sessions.clear_cookie(response)

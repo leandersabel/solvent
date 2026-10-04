@@ -89,9 +89,14 @@ successfully**.
   included. It is the one sanctioned way the main currency of a vault
   changes (`account-settings.md`), and you are told before you confirm,
   not after.
-- After a restore, you are signed out anywhere else you are signed in,
-  and have to sign in again. Nothing typed there afterwards reaches the
-  vault.
+- After a restore, the tab you restored in stays open. Every other tab,
+  window and device where your vault is open closes it and asks for
+  your password. Other tabs and windows of the same browser close at
+  once. Another device closes the next time its page is used, and at
+  the latest when it locks itself. Anything typed there and not yet
+  saved is lost, and the screen there says the vault was replaced and
+  whether anything typed was lost. Nothing entered anywhere else after
+  the restore reaches the vault.
 - A file restores into any account on the instance, given the password
   it was made under. Nothing in it names whose vault it was, which is
   what lets a vault move to a new account or a fresh install without

@@ -53,7 +53,7 @@ export async function launch() {
   return opened;
 }
 
-const { target } = await launch();
+const { target, port } = await launch();
 export const page = await Session.connect(target);
 await page.send('Page.enable');
 await page.send('Runtime.enable');
@@ -114,6 +114,20 @@ export async function openBrowser(url) {
   watched.push(await watch(session));
   if (url) await session.goto(url);
   return { session, close: () => opened.child.kill() };
+}
+
+// Another tab of the first browser, which shares its cookies and its
+// BroadcastChannel. `before` is a script run in the tab ahead of the
+// page's own.
+export async function openTab(url, before = null) {
+  const tab = await fetch(`http://127.0.0.1:${port}/json/new?about:blank`, { method: 'PUT' }).then((r) => r.json());
+  const session = await Session.connect(tab);
+  await session.send('Page.enable');
+  await session.send('Runtime.enable');
+  const { requests } = await watch(session).then((seen) => (watched.push(seen), seen));
+  if (before) await session.send('Page.addScriptToEvaluateOnNewDocument', { source: before });
+  if (url) await session.goto(url);
+  return { session, requests, close: () => fetch(`http://127.0.0.1:${port}/json/close/${tab.id}`) };
 }
 
 // The database the server runs on, read and written the way an
@@ -379,6 +393,12 @@ export const enterPasswordOn = async (session, password) => {
   }, password);
 };
 
+// The headers of a request a check sends by hand from a page that holds a
+// vault: the CSRF header and the vault epoch the page holds, as api.js
+// sends them (architecture.md, Vault epoch). For an expression run in the
+// page's own async function.
+export const HANDS = `{ 'X-Solvent-Request': '1', 'X-Solvent-Vault': (await import('/static/js/api.js')).vaultEpoch() }`;
+
 export const text = () => page.eval('document.body.innerText');
 export const labels = (selector) =>
   page.call((query) => [...document.querySelectorAll(query)].map((n) => n.textContent.trim()), selector);
@@ -416,18 +436,17 @@ export const importOwnExport = () =>
     const c = await import('/static/js/crypto.js');
     const s = await import('/static/js/session.js');
     const t = await import('/static/js/transfer.js');
-    const file = t.checkFile(await (await fetch('/api/export', { headers: { 'X-Solvent-Request': '1' } })).json());
+    const file = t.checkFile(JSON.parse(await (await api.downloadExport()).blob.text()));
 
     const { fileDek } = await t.openFile(file, password);
     // Re-key: a freshly generated DEK, never the file's.
     const { dek: newDek, records: rekeyed } = await t.rekey(fileDek, file.records);
     const wrapper = await s.wrapForMaster(newDek);
-    await api.post('/api/import', { ...wrapper, records: rekeyed });
+    const answered = await api.post('/api/import', { ...wrapper, records: rekeyed });
 
-    // Read the vault back from scratch, as a fresh unlock would.
-    const { Vault } = await import('/static/js/model.js');
-    const reopened = new Vault(newDek);
-    await reopened.load();
+    // The page takes the new key and epoch and reads the vault back, as
+    // the import screen does.
+    const reopened = await s.replaceDek(newDek, answered.vaultEpoch);
     const fileRaw = c.b64encode(new Uint8Array(await crypto.subtle.exportKey('raw', fileDek)));
     const newRaw = c.b64encode(new Uint8Array(await crypto.subtle.exportKey('raw', newDek)));
     return JSON.stringify({

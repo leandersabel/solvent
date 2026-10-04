@@ -5,9 +5,9 @@
 // Templates: dashboard.html. Modules: page-transfer.js, transfer.js,
 // transfer-worker.js, api.js, crypto.js, session.js, format.js.
 import {
-  BASE, BACKDATE, SECOND_PASSWORD, Session, VAULT_PASSWORD, answering, check, credentialOf, enterPassword,
-  importOwnExport, labels, launch, mintInvite, occurring, OWN, page, provoked, run, setProfile, setValue, redraw,
-  sql, story, text, vaultOwner, within,
+  BASE, BACKDATE, HANDS, enterPasswordOn, SECOND_PASSWORD, Session, VAULT_PASSWORD, answering, check, credentialOf, enterPassword,
+  importOwnExport, intoVault, labels, launch, mintInvite, occurring, openBrowser, openTab, OWN, page, provoked, run, setProfile, setValue, redraw,
+  signInOn, sql, story, text, vaultOwner, watched, within,
 } from '../harness.mjs';
 
 await run(async () => {
@@ -238,7 +238,7 @@ await run(async () => {
     const leftNames = JSON.parse(await page.eval(`(async () => JSON.stringify(
       [...(await import('/static/js/session.js')).currentVault().holdings.values()].map((h) => h.payload.name)
     ))()`));
-    const alive = await page.eval("fetch('/api/sessions', { headers: { 'X-Solvent-Request': '1' } }).then(r => r.status)");
+    const alive = await page.eval(`(async () => (await fetch('/api/sessions', { headers: ${HANDS} })).status)()`);
     // A download this page starts is what writes a file. The browser's
     // own background downloads reach the same folder and are not the
     // page's, so the page's downloads are what is counted.
@@ -525,7 +525,7 @@ await run(async () => {
         payload: { name: 'Transfer probe', unit: 'EUR', dims: {}, note: null, archivedAt: null, createdAt: '2026-01-01T00:00:00Z' },
       }]);
       await plantSecond([{ type: 'snapshot', accountId: transferred, payload: { date: BACKDATE, value: '321', note: null } }]);
-      const secondText = await second.eval("fetch('/api/export', { headers: { 'X-Solvent-Request': '1' } }).then(r => r.text())");
+      const secondText = await second.eval(`(async () => (await fetch('/api/export', { headers: ${HANDS} })).text())()`);
       // Written by the source after the export, for the injection check.
       const [later] = await plantSecond([{
         type: 'account',
@@ -714,5 +714,234 @@ await run(async () => {
         afterRestore.some((shown) => [...snapshotDates].some((iso) => dmyOf(iso) === shown)),
       afterRestore.join(' | '),
     );
+
+    // -- Two tabs of one browser (export-import.md, What it does) -------------
+    //
+    // Both tabs share one session cookie, so the server cannot tell them
+    // apart: the vault epoch is what closes the tab that did not restore.
+    // `quiet` stubs the broadcast channel, so that tab learns only from the
+    // answer to its own request.
+    const quiet = 'window.BroadcastChannel = class { postMessage() {} close() {} addEventListener() {} };';
+    const typedIn = async (session, name) => {
+      await session.waitUntil("[...document.querySelectorAll('button')].some((b) => b.textContent.trim() === 'Add a holding')", { label: 'the add button' });
+      await session.eval("[...document.querySelectorAll('button')].find((b) => b.textContent.trim() === 'Add a holding').click()");
+      await session.waitUntil("document.querySelector('.dialog #holding-name')", { label: 'the holding form' });
+      await session.call((value) => {
+        const node = document.querySelector('#holding-name');
+        node.value = value;
+        node.dispatchEvent(new Event('input', { bubbles: true }));
+      }, name);
+    };
+    const held = (session) =>
+      session.eval(`(async () => {
+        const s = await import('/static/js/session.js');
+        return JSON.stringify({ keys: s.holdsKeys(), vault: s.currentVault() !== null, dialog: Boolean(document.querySelector('.dialog')),
+          card: Boolean(document.querySelector('#unlock-password')), text: document.body.innerText });
+      })()`).then(JSON.parse);
+    const watcher = await openTab(`${BASE}/dashboard`);
+    const stubbed = await openTab('about:blank', quiet).then(async (tab) => (await tab.session.goto(`${BASE}/dashboard`), tab));
+    try {
+      for (const { session } of [watcher, stubbed]) {
+        await enterPasswordOn(session, VAULT_PASSWORD);
+        check('another tab of the browser opens the same vault', await intoVault(session, 'the other tab'));
+      }
+      await typedIn(watcher.session, 'Typed in the watching tab');
+      await typedIn(stubbed.session, 'Typed in the quiet tab');
+      const sentBefore = watcher.requests.length;
+
+      await toScreen();
+      await chooseFile(exportedPath);
+      await openWith(VAULT_PASSWORD);
+      await page.waitUntil("!document.querySelector('.review').hidden", { timeout: 60000, label: 'the review of the restore the other tabs meet' });
+      await setValue('#import-erase', 'ERASE');
+      await replaceVault();
+      await page.waitUntil("document.body.innerText.includes('Your vault was replaced from the file')", { timeout: 90000, label: 'the restore the other tabs meet' });
+      const restoredIds = sql(`SELECT record_id FROM records ${OWN} ORDER BY record_id`).map((r) => r.record_id);
+      check('the restore leaves exactly the file\'s records', JSON.stringify(restoredIds) === JSON.stringify(exported.records.map((r) => r.recordId).sort()));
+
+      // The tab that was not used closes the vault before it sends a request.
+      await watcher.session.waitUntil("document.body.innerText.includes('Your vault was replaced from a file in another tab')", { label: 'the other tab to close its vault' });
+      const closed = await held(watcher.session);
+      check(
+        'another tab of the browser holds no key and no vault, shows no dialog or typed name, and says what was lost',
+        !closed.keys && !closed.vault && !closed.dialog && closed.card && !closed.text.includes('Typed in the watching tab') &&
+          closed.text.includes('Your vault was replaced from a file in another tab, window or device. What you had typed here and not saved is gone.'),
+        JSON.stringify(closed),
+      );
+      check('that tab sent no request between the restore and closing', watcher.requests.length === sentBefore, `${watcher.requests.length - sentBefore} sent`);
+      check('this tab stays open on the restored vault', (await held(page)).vault);
+
+      // The tab that cannot hear the channel meets the refusal at its save.
+      const writesBefore = stubbed.requests.length;
+      await stubbed.session.eval("document.querySelector('.dialog button[type=submit]').click()");
+      await stubbed.session.waitUntil("document.querySelector('#unlock-password')", { label: 'the quiet tab to close on the refusal' });
+      const refused = stubbed.requests.slice(writesBefore).filter((r) => r.method === 'PUT');
+      check('a save from the tab that learned nothing is sent once', refused.length === 1, String(refused.length));
+      const quietState = await held(stubbed.session);
+      check(
+        'its save is refused as a replaced vault, never as a version conflict, and the tab asks for the password',
+        !quietState.vault && quietState.card && quietState.text.includes('Your vault was replaced from a file in another tab, window or device.') &&
+          !quietState.text.includes('changed in another'),
+        quietState.text,
+      );
+      check(
+        'neither tab put anything into the vault',
+        JSON.stringify(sql(`SELECT record_id FROM records ${OWN} ORDER BY record_id`).map((r) => r.record_id)) === JSON.stringify(restoredIds),
+      );
+
+      // Unlocking either one opens the restored dashboard with every record readable.
+      await enterPasswordOn(watcher.session, VAULT_PASSWORD);
+      check('unlocking the closed tab opens the restored vault', await intoVault(watcher.session, 'the closed tab to unlock'));
+      const reopened = await watcher.session.eval(`(async () => {
+        const s = await import('/static/js/session.js');
+        return JSON.stringify({ unreadable: s.currentVault().unreadable.length, holdings: s.currentVault().holdings.size, notice: document.body.innerText.includes('since you last opened it') });
+      })()`).then(JSON.parse);
+      check(
+        'every restored record reads in that tab and it shows no notice of its own',
+        reopened.unreadable === 0 && reopened.holdings === exported.records.filter((r) => r.recordType === 'account').length && !reopened.notice,
+        JSON.stringify(reopened),
+      );
+
+      // A message a page does not act on: another epoch, another shape.
+      await watcher.session.eval("window.__heard = []; new BroadcastChannel('solvent-vault').onmessage = (e) => window.__heard.push(e.data); true");
+      const mine = await watcher.session.eval("import('/static/js/api.js').then((api) => api.vaultEpoch())");
+      await page.call((epoch) => {
+        const channel = new BroadcastChannel('solvent-vault');
+        channel.postMessage({ replaced: '0'.repeat(32) });
+        channel.postMessage({ replaced: epoch, also: 1 });
+        channel.postMessage({ other: epoch });
+        channel.postMessage(epoch);
+      }, mine);
+      await watcher.session.waitUntil('window.__heard.length === 4', { label: 'the messages to arrive' });
+      check(
+        'a message naming another epoch, or of another shape, closes no page',
+        (await held(watcher.session)).vault && (await held(page)).vault,
+      );
+    } finally {
+      await watcher.close();
+      await stubbed.close();
+    }
+
+    // -- Another browser, which no channel reaches ----------------------------
+    //
+    // Its own profile, so its own session. It learns of a restore made here
+    // by a request, on coming back into view, or at its next sign-in.
+    const restoreHere = async () => {
+      await toScreen();
+      await chooseFile(exportedPath);
+      await openWith(VAULT_PASSWORD);
+      await page.waitUntil("!document.querySelector('.review').hidden", { timeout: 60000, label: 'the review of a restore the other browser meets' });
+      await setValue('#import-erase', 'ERASE');
+      await replaceVault();
+      await page.waitUntil("document.body.innerText.includes('Your vault was replaced from the file')", { timeout: 90000, label: 'the restore the other browser meets' });
+    };
+    const posts = `window.__posted = []; const post = BroadcastChannel.prototype.postMessage;
+      BroadcastChannel.prototype.postMessage = function (message) { window.__posted.push(message); return post.call(this, message); };
+      window.__visibility = 'visible'; Object.defineProperty(document, 'visibilityState', { get: () => window.__visibility });`;
+    const elsewhere = await openBrowser();
+    const far = elsewhere.session;
+    await far.send('Page.addScriptToEvaluateOnNewDocument', { source: posts });
+    const sent = () => watched[watched.length - 1].requests;
+    const posted = () => far.eval('JSON.stringify(window.__posted)').then(JSON.parse);
+    const see = (visibility) =>
+      far.call((state) => { window.__visibility = state; document.dispatchEvent(new Event('visibilitychange')); }, visibility);
+    const heldEpoch = () => far.eval("import('/static/js/api.js').then((api) => api.vaultEpoch())");
+    const typedInto = (name) =>
+      far.call(async (value) => {
+        [...document.querySelectorAll('button')].find((b) => b.textContent.trim() === 'Add a holding').click();
+        await new Promise((resolve) => setTimeout(resolve, 100));
+        const node = document.querySelector('#holding-name');
+        node.value = value;
+        node.dispatchEvent(new Event('input', { bubbles: true }));
+      }, name);
+    const lockButton = () => far.eval("document.querySelector('.btn-lock').click()");
+    try {
+      await far.goto(`${BASE}/login`);
+      await signInOn(far, VAULT_PASSWORD, 'leander');
+      check('a second browser opens the vault on a session of its own', await intoVault(far, 'the second browser'));
+      const epochHeld = await heldEpoch();
+
+      // Hidden through a restore made here, then back in view.
+      await see('hidden');
+      await restoreHere();
+      const sessionRows = sql("SELECT id FROM sessions WHERE principal_id = (SELECT id FROM principals WHERE username = 'leander')").length;
+      const before = sent().length;
+      check('a page hidden through the restore is still showing the vault', (await held(far)).vault);
+      await see('visible');
+      await far.waitUntil("document.body.innerText.includes('Your vault was replaced from a file in another tab')", { label: 'the hidden page to close on coming back' });
+      const after = sent().slice(before);
+      check(
+        'coming back into view sends one read of the profile and nothing else, and the page shows Replaced elsewhere',
+        after.length === 1 && after[0].method === 'GET' && after[0].url.endsWith('/api/records?type=profile') &&
+          (await held(far)).text.includes('Nothing you had typed here was lost.') && !(await held(far)).vault,
+        after.map((r) => `${r.method} ${r.url}`).join(', '),
+      );
+      check('its session row still exists', sql("SELECT id FROM sessions WHERE principal_id = (SELECT id FROM principals WHERE username = 'leander')").length === sessionRows);
+      check('it told the other pages of its browser which epoch it held', JSON.stringify(await posted()) === JSON.stringify([{ replaced: epochHeld }]), JSON.stringify(await posted()));
+
+      // Unlocking from Replaced elsewhere opens the restored dashboard with no notice.
+      await enterPasswordOn(far, VAULT_PASSWORD);
+      check('unlocking from Replaced elsewhere opens the dashboard', await intoVault(far, 'the vault after Replaced elsewhere'));
+      const reopened = await far.eval(`(async () => JSON.stringify({ hash: location.hash, notice: document.body.innerText.includes('since you last opened it'), unreadable: (await import('/static/js/session.js')).currentVault().unreadable.length }))()`).then(JSON.parse);
+      check('and shows no notice and no unreadable record', reopened.hash === '#/' && !reopened.notice && reopened.unreadable === 0, JSON.stringify(reopened));
+
+      // Locked through the restore, with input held.
+      await typedInto('Typed before the lock');
+      await lockButton();
+      await far.waitUntil("document.querySelector('#unlock-password')", { label: 'the lock' });
+      const lockedEpoch = await heldEpoch();
+      await restoreHere();
+      await enterPasswordOn(far, VAULT_PASSWORD);
+      await far.waitUntil("document.body.innerText.includes('since you last opened it')", { timeout: 90000, label: 'the notice after unlocking' });
+      const landed = await far.eval(`JSON.stringify({ hash: location.hash, dialog: Boolean(document.querySelector('.dialog')), notice: document.querySelector('[role=status].callout').textContent, typed: document.body.innerText.includes('Typed before the lock') })`).then(JSON.parse);
+      check(
+        'a page locked through the restore drops its held input and shows Replaced since last open for dropped input, on the dashboard',
+        landed.hash === '#/' && !landed.dialog && !landed.typed &&
+          landed.notice.includes('Your vault was replaced from a file since you last opened it here. What you had typed here and not saved is gone.'),
+        JSON.stringify(landed),
+      );
+      check('and it posted the epoch it held', JSON.stringify((await posted()).slice(1)) === JSON.stringify([{ replaced: lockedEpoch }]), JSON.stringify(await posted()));
+
+      // Nothing held, locked through a restore.
+      await lockButton();
+      await far.waitUntil("document.querySelector('#unlock-password')", { label: 'the second lock' });
+      await restoreHere();
+      await enterPasswordOn(far, VAULT_PASSWORD);
+      await far.waitUntil("document.body.innerText.includes('since you last opened it')", { timeout: 90000, label: 'the notice with nothing dropped' });
+      check(
+        'with nothing held, the notice says nothing was lost',
+        (await far.eval("document.querySelector('[role=status].callout').textContent")).includes('Nothing you had typed here was lost.'),
+      );
+
+      // Signing out and in again after a restore shows no notice.
+      await restoreHere();
+      await lockButton();
+      await far.waitUntil("document.querySelector('.known-username a')", { label: 'the lock before signing out' });
+      await far.eval("document.querySelector('.known-username a').click()");
+      await far.waitUntil("location.pathname === '/login'", { label: 'the sign-out' });
+      await signInOn(far, VAULT_PASSWORD, 'leander');
+      check('signing out and in again after a restore shows no notice', (await intoVault(far, 'the vault after signing out')) && !(await held(far)).text.includes('since you last opened it'));
+
+      // A session that ended for its own reason, with input held.
+      await typedInto('Typed as the session ended');
+      await page.eval("(async () => (await import('/static/js/api.js')).post('/api/auth/logout-all', {}))()");
+      await page.goto(`${BASE}/login`);
+      await signInOn(page, VAULT_PASSWORD, 'leander');
+      await intoVault(page, 'the vault after signing in again');
+      await restoreHere();
+      await far.eval("import('/static/js/api.js').then((api) => api.get('/api/records?type=profile'))", { awaitPromise: false });
+      await far.waitUntil("document.querySelector('#unlock-password') && !document.body.innerText.includes('Your vault was replaced')", { label: 'the session-ran-out card' });
+      check('the page whose session ended asks for the password and says nothing of a restore', !(await far.eval("Boolean(document.querySelector('.callout'))")));
+      await enterPasswordOn(far, VAULT_PASSWORD);
+      await far.waitUntil("document.body.innerText.includes('since you last opened it')", { timeout: 90000, label: 'the notice after the session ended' });
+      const ended = await far.eval(`JSON.stringify({ hash: location.hash, notice: document.querySelector('[role=status].callout').textContent, typed: document.body.innerText.includes('Typed as the session ended') })`).then(JSON.parse);
+      check(
+        'signing in after the session ended drops the input and shows Replaced since last open for dropped input',
+        ended.hash === '#/' && !ended.typed && ended.notice.includes('What you had typed here and not saved is gone.'),
+        JSON.stringify(ended),
+      );
+    } finally {
+      elsewhere.close();
+    }
   }
 });

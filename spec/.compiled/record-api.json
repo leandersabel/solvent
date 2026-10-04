@@ -3,8 +3,9 @@
   "summary": "One generic, type-agnostic store for every encrypted vault record, with server-enforced field consistency, optimistic-concurrency versioning, lazy client-side schema migration, and a byte-exact client-built AAD the server never sees.",
   "read": [
     {"file": "spec/features/record-api.md", "sections": ["all"]},
-    {"file": "spec/architecture.md", "sections": ["Record storage API", "Key management", "Storage & data handling", "Status codes", "Data model"]},
-    {"file": "spec/features/app-shell.md", "sections": ["The two surfaces", "Database", "CSRF"], "role": "the routing layer that answers an administrator session Not Found before any handler here runs, and the schema trigger that refuses an administrator a records row"},
+    {"file": "spec/architecture.md", "sections": ["Record storage API", "Vault epoch", "Key management", "Storage & data handling", "Status codes", "Data model"]},
+    {"file": "spec/features/app-shell.md", "sections": ["The two surfaces", "The request gate", "Database", "CSRF"], "role": "the routing layer that answers an administrator session Not Found before any handler here runs, the gate's step 7 that checks the epoch before any handler runs, and the schema trigger that refuses an administrator a records row"},
+    {"file": "spec/features/login.md", "sections": ["A vault replaced elsewhere"], "role": "what the page does with the Conflict these handlers answer on a replaced epoch: it closes the vault and never reaches a screen's version-reload"},
     {"file": "spec/features/record-rate.md", "sections": ["Where it lives: inside the vault", "Record shape"], "role": "why the fourth record type adds no plaintext column and no AAD byte"}
   ],
   "dependsOn": ["app-shell", "register", "login"],
@@ -34,6 +35,9 @@
       "noSingleRecordGet": {"value": "there is deliberately no by-id GET. A stale-version reload refetches that record's whole type", "cite": "spec/features/record-api.md#endpoints"},
       "purgeIsElsewhere": {"value": "DELETE /api/accounts/<account_id>?mode=purge is the one type-aware exception and is owned by manage-accounts.md, not this contract", "cite": "spec/features/record-api.md#endpoints"}
     },
+    "vaultEpochInHandlers": {"value": "each endpoint compares the vault epoch again inside the transaction that reads or writes its rows, a write after BEGIN IMMEDIATE, and answers Conflict {\"refused\":\"vault-replaced\"} on a mismatch, writing nothing. The gate's step 7 has already checked it once, and the handler's own compare is what closes the race with an import. Applies to GET, PUT and DELETE alike", "cite": "spec/features/record-api.md#endpoints, spec/architecture.md#vault-epoch"},
+    "versionConflictCarriesNoRefused": {"value": "the Conflict of a stale or occupied version carries no refused member, so vault-replaced is never mistaken for a lost version check. Two tabs writing one record: the second sees that Conflict and reloads. A page holding the replaced DEK sees vault-replaced and closes the vault instead of reloading", "cite": "spec/features/record-api.md#edge-cases, spec/architecture.md#status-codes"},
+    "replacedEpochReturnsNothing": {"value": "a request carrying a replaced epoch returns no record and leaves records row for row as it was, whatever its method", "cite": "spec/features/record-api.md#acceptance-criteria"},
     "storageCaps": {
       "maxCiphertextPerRecord": {"value": "64 KiB", "cite": "spec/architecture.md#storage-data-handling"},
       "maxRecordsPerVault": {"value": 50000, "cite": "spec/architecture.md#storage-data-handling"},
@@ -41,7 +45,9 @@
       "notOperatorConfig": {"value": "these three are compiled-contract parameters, not operator config, because the Content Too Large tests assert exact behaviour at a boundary", "cite": "spec/architecture.md#storage-data-handling"}
     },
     "statusCodes": {
-      "createAtOccupiedIdOrStaleVersion": {"value": 409, "cite": "spec/architecture.md#status-codes", "condition": "version is not 1 on a create, or not stored + 1 on an update (spec/features/record-api.md#endpoints)"},
+      "createAtOccupiedIdOrStaleVersion": {"value": 409, "cite": "spec/architecture.md#status-codes", "condition": "version is not 1 on a create, or not stored + 1 on an update. The body has no refused member (spec/features/record-api.md#endpoints, spec/features/record-api.md#acceptance-criteria)"},
+      "vaultReplaced": {"value": 409, "cite": "spec/architecture.md#status-codes", "condition": "a GET, a create PUT, an update PUT or a DELETE whose X-Solvent-Vault is not the vault's. The body is {\"refused\":\"vault-replaced\"}, nothing is written and no record is returned (spec/features/record-api.md#acceptance-criteria)"},
+      "vaultHeaderMissingOrMalformed": {"value": 400, "cite": "spec/architecture.md#status-codes", "condition": "answered by the gate's step 7 before any handler here, with no refused member (spec/features/app-shell.md#the-request-gate)"},
       "recordTypeChanged": {"value": 400, "cite": "spec/architecture.md#status-codes", "condition": "a PUT changing an immutable column (spec/features/record-api.md#endpoints)"},
       "malformedRecordId": {"value": 400, "cite": "spec/architecture.md#status-codes", "condition": "a record_id that is not a well-formed UUIDv4 (spec/features/record-api.md#edge-cases)"},
       "accountIdShapeViolation": {"value": 400, "cite": "spec/architecture.md#status-codes", "condition": "snapshot with accountId null, any other type with one set, or an accountId of the empty string on any type (spec/features/record-api.md#edge-cases)"},
@@ -65,7 +71,11 @@
       "a seeded administrator principal and session, for the Not Found assertion on every route here",
       "a record stored at an older schema_version, to assert that reading it leaves version, nonce and ciphertext byte-identical",
       "a record at a schema_version above the client's known version, to assert it is skipped and counted rather than guessed at",
-      "a ciphertext at the per-record cap boundary, a vault at the record-count cap, and a user at the byte quota"
+      "a ciphertext at the per-record cap boundary, a vault at the record-count cap, and a user at the byte quota",
+      "a vault whose epoch has been replaced (by an import or by replacing the vault_epochs row directly) and a request carrying the epoch from before, for each of GET, create PUT, update PUT and DELETE",
+      "a hold on a PUT or DELETE handler between the gate and its transaction, with an import committing at that point, for the race assertion",
+      "records captured before and after each replaced-epoch request, row for row, for the writes-nothing assertion",
+      "a stale-version write alongside a replaced-epoch write, for the body comparison: one with no refused member and one with vault-replaced"
     ],
     "focus": [
       "the AAD assertion must run byte for byte against the stored fixture, including every separator and the empty account_id. A test that recomputes the AAD with the same helper it is testing asserts nothing, and the spec asks specifically for the rate-in-vocabulary comparison to be made against the stored fixture rather than against a recomputation",
@@ -74,6 +84,9 @@
       "accountId must be null and never the empty string in a GET response and in an exported file, asserted against both, because the two are written by different code paths and a shared serializer is an assumption rather than a fact",
       "no log line contains a ciphertext value. This needs the captured log output of a real write, not a grep of the source",
       "an administrator session must get Not Found and not an empty list from GET /api/records. An empty list is the plausible wrong answer and it passes any test that only checks for the absence of another vault's rows",
+      "the replaced-epoch assertions must cover GET as well as the writes, each answering vault-replaced with no record in the body and records unchanged row for row. A test of the writes alone passes a read that still hands the old page a vault it cannot decrypt",
+      "the race must be asserted by holding the handler after the gate and before its transaction, committing an import at that point, and releasing it: the request answers vault-replaced and writes nothing. The gate's check alone passes every test that does not interleave, and the handler's own compare is the one that closes the race",
+      "the Conflict of a stale version must be shown to carry no refused member, and vault-replaced to carry it, by parsing both bodies. A handler that tags every Conflict makes a screen's version reload run on a replaced vault",
       "lazy migration must be shown to write nothing: read a record at an older schema_version and compare version, nonce and ciphertext before and after, rather than only checking that the decrypted payload came out in the new shape"
     ]
   },

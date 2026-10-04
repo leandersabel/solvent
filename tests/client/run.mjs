@@ -378,6 +378,96 @@ await check('a locked account reads as too many attempts at the salt request too
     error instanceof session.SignInError && error.message === 'throttled');
 });
 
+// ---- The vault epoch ---------------------------------------------------
+
+// A BroadcastChannel that delivers to the other instances of the same
+// name at once, so the check needs no timer and leaves no handle open.
+const channels = [];
+globalThis.BroadcastChannel = class {
+  constructor(name) {
+    this.name = name;
+    this.listeners = [];
+    channels.push(this);
+  }
+  addEventListener(type, listener) {
+    this.listeners.push(listener);
+  }
+  postMessage(data) {
+    for (const other of channels) {
+      if (other !== this && other.name === this.name) for (const listener of other.listeners) listener({ data });
+    }
+  }
+};
+
+const EPOCH = 'a'.repeat(32);
+const answering = (status, body) => async (url, init) => {
+  headersSent.push(init.headers);
+  return { ok: status < 400, status, json: async () => body };
+};
+let headersSent = [];
+
+await check('every request carries the vault epoch once the page holds one, and none before', async () => {
+  const api = await load('api.js');
+  globalThis.fetch = answering(200, {});
+  await api.get('/api/records?type=profile');
+  api.setVaultEpoch(EPOCH);
+  await api.get('/api/records?type=profile');
+  api.setVaultEpoch(null);
+  assert.equal(headersSent.at(-2)['X-Solvent-Vault'], undefined);
+  assert.equal(headersSent.at(-1)['X-Solvent-Vault'], EPOCH);
+  assert.equal(headersSent.at(-1)['X-Solvent-Request'], '1');
+});
+
+await check('a vault-replaced Conflict reaches no caller and asks the page to tell the channel, a plain Conflict reaches the caller', async () => {
+  const api = await load('api.js');
+  const told = [];
+  api.whenReplaced((announce) => told.push(announce));
+  api.setVaultEpoch(EPOCH);
+
+  globalThis.fetch = answering(409, { refused: 'vault-replaced' });
+  const settled = await Promise.race([
+    api.put('/api/records/x', {}).then(() => 'answered', () => 'rejected'),
+    new Promise((resolve) => setImmediate(() => resolve('pending'))),
+  ]);
+  assert.equal(settled, 'pending');
+  assert.deepEqual(told, [true]);
+
+  globalThis.fetch = answering(409, {});
+  await assert.rejects(api.put('/api/records/x', {}), (error) => error.status === 409);
+  assert.deepEqual(told, [true]);
+  api.setVaultEpoch(null);
+  api.whenReplaced(() => {});
+});
+
+await check('a message closes a page only when it names exactly the epoch the page holds', async () => {
+  const api = await load('api.js');
+  const told = [];
+  api.whenReplaced((announce) => told.push(announce));
+  api.setVaultEpoch(EPOCH);
+  api.setVaultEpoch(null);
+  const sender = new BroadcastChannel('solvent-vault');
+
+  // A page holding no epoch acts on nothing.
+  sender.postMessage({ replaced: EPOCH });
+  assert.deepEqual(told, []);
+
+  api.setVaultEpoch(EPOCH);
+  for (const message of [{ replaced: 'b'.repeat(32) }, { replaced: EPOCH, extra: 1 }, { other: EPOCH }, EPOCH, null]) {
+    sender.postMessage(message);
+  }
+  assert.deepEqual(told, []);
+  sender.postMessage({ replaced: EPOCH });
+  assert.deepEqual(told, [false]);
+
+  // The page that announces posts the one key.
+  const heard = [];
+  sender.addEventListener('message', ({ data }) => heard.push(data));
+  api.announce(EPOCH);
+  assert.deepEqual(heard, [{ replaced: EPOCH }]);
+  api.setVaultEpoch(null);
+  api.whenReplaced(() => {});
+});
+
 // ---- Migration --------------------------------------------------------
 
 await check('migration is a pure function on decrypted plaintext', () => {

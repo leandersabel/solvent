@@ -25,8 +25,8 @@ import {
   today,
   trackEdits,
 } from './dom.js';
-import { whenUnauthorized } from './api.js';
-import { onLock, currentVault, isUnlocked, holdsKeys, lock, signOut, startRegistered, LockedWhileOpeningError } from './session.js';
+import { get, whenUnauthorized } from './api.js';
+import { onLock, onReplaced, currentVault, isUnlocked, holdsKeys, lock, signOut, startRegistered, LockedWhileOpeningError } from './session.js';
 import { registerForm } from './register-form.js';
 import { unlockCard } from './unlock.js';
 import { dashboardView, datePicker as pickDate } from './view-dashboard.js';
@@ -35,7 +35,7 @@ import { holdingView } from './view-holding.js';
 import { recordingView } from './view-recording.js';
 import { resetSweepState, sweepView, unsavedOnSweep } from './view-sweep.js';
 import { settingsView } from './view-settings.js';
-import { dimensionsView } from './view-dimensions.js';
+import { dimensionsView, resetDimensionsState } from './view-dimensions.js';
 import { transferView } from './page-transfer.js';
 
 const container = document.getElementById('app');
@@ -70,6 +70,27 @@ if (container && container.dataset.kind === 'vault_owner') {
 // (login.md, Rules, the one named exception).
 let held = null;
 let vaultShown = false;
+
+// A vault replaced from a file elsewhere (login.md, A vault replaced
+// elsewhere). Each is `{ dropped }`, whether typed input went with it.
+// `elsewhere` is the unlock card's state for a page that learned while
+// it held the vault, and `sinceOpen` the dashboard's notice for a page
+// that learned only at unlock. Nothing is kept for either beyond that.
+let elsewhere = null;
+let sinceOpen = null;
+
+/** Drops everything a lock keeps, from the screen as it stands or from
+ *  what a lock already took, and says whether there was any. A replaced
+ *  vault keeps no input, no dialog and no view. */
+function dropKept() {
+  const kept = vaultShown
+    ? { fields: editedFields(container), dialogs: closeDialogsForLock() }
+    : held;
+  held = null;
+  resetSweepState();
+  resetDimensionsState();
+  return Boolean(kept && (kept.fields.length || kept.dialogs.length));
+}
 
 function render() {
   const left = unsavedOnSweep();
@@ -186,10 +207,18 @@ function draw() {
       container,
       unlockCard({
         knownUsername: username,
+        replaced: elsewhere,
         onUnlocked: (result) => {
           if (result.kind === 'administrator') {
             window.location.href = '/admin';
             return;
+          }
+          // The restored vault opens on the dashboard, never on a view
+          // that can name a record the restore removed.
+          if (result.replacedSince) sinceOpen = { dropped: dropKept() };
+          if (result.replacedSince || elsewhere) {
+            history.replaceState(null, '', '/dashboard#/');
+            elsewhere = null;
           }
           enterVault(result.username);
         },
@@ -199,6 +228,8 @@ function draw() {
   }
   const vault = currentVault();
   const [, view, argument, mode] = (window.location.hash || '#/').split('/');
+  // The notice is the dashboard's, and goes once the person leaves it.
+  if (['settings', 'holding', 'recording', 'sweep'].includes(view)) sinceOpen = null;
 
   if (view === 'settings' && argument === 'dimensions') {
     width('narrow');
@@ -256,6 +287,7 @@ function draw() {
   }
   mount(container, dashboardView(vault, actions, {
     unassignedOf: view === 'unassigned' ? argument : null,
+    replaced: sinceOpen,
   }));
 }
 
@@ -356,7 +388,28 @@ window.addEventListener('pagehide', () => {
   if (holdsKeys()) lock();
 });
 
+// A page whose vault was replaced elsewhere learns it from a refused
+// request, from a message of the restoring page, or on coming back into
+// view, and draws the card at once, before anything more is sent.
+onReplaced(() => {
+  elsewhere = { dropped: dropKept() };
+  sinceOpen = null;
+  if (container) clear(container);
+  render();
+});
+
+// How a page in another browser, or on another device, notices before
+// it is used. The answer goes through the API module like any other and
+// the body is discarded.
+document.addEventListener('visibilitychange', () => {
+  if (document.visibilityState === 'visible' && isUnlocked()) {
+    get('/api/records?type=profile').catch(() => {});
+  }
+});
+
 onLock(() => {
+  elsewhere = null;
+  sinceOpen = null;
   if (container && vaultShown) {
     held = {
       hash: window.location.hash,

@@ -88,7 +88,8 @@ volume (architecture.md, Tech stack). Each table's columns are stated
 by the feature that owns them: records (record-api.md), principals and
 credentials (register.md), DEK wrappers (register.md), invites
 (admin-invites.md), sessions (architecture.md, Application hardening),
-attempts (architecture.md, Rate limiting).
+attempts (architecture.md, Rate limiting), vault epochs
+(architecture.md, Vault epoch).
 
 **Every connection the app opens sets `PRAGMA secure_delete = ON`**
 (architecture.md, Storage & data handling).
@@ -111,6 +112,14 @@ without rebuilding `principals`, and a database at another schema
 version is refused at start, because this schema has no migration
 path beyond export and import.
 
+**Every process start gives each vault owner without a `vault_epochs`
+row a fresh one**, generated as registration generates it, in that same
+write transaction and before any request is served. So every vault
+owner has an epoch wherever a request can read one, whichever build
+wrote the file. The table is created `IF NOT EXISTS` and the schema
+version stays the same, for the reason above. A row that exists is
+never rewritten at start, because a page already holds it.
+
 **Expired `attempts` rows are deleted** (architecture.md, Rate
 limiting):
 
@@ -128,8 +137,9 @@ limiting):
 
 The schema is created in one place, so its triggers live here:
 
-- a `BEFORE INSERT` on `records` and
-- a `BEFORE INSERT` on `dek_wrappers`
+- a `BEFORE INSERT` on `records`,
+- a `BEFORE INSERT` on `dek_wrappers` and
+- a `BEFORE INSERT` on `vault_epochs`,
 
 each resolving the row's principal and aborting when its `kind` is
 `administrator`. They are the storage-layer half of "an administrator
@@ -196,7 +206,7 @@ is unreachable.
 
 Every request passes these steps in order, before any handler runs.
 The first that refuses decides the response, at the status
-architecture.md, Refusals gives.
+architecture.md, Refusals gives, or for step 7 the one it names.
 
 1. **Header.** An API request without `X-Solvent-Request: 1` is
    refused. No API route is exempt, so this needs no routing.
@@ -209,6 +219,19 @@ architecture.md, Refusals gives.
    refused.
 6. **Surface.** A route whose group the session's kind does not reach
    is refused.
+7. **Vault epoch.** A vault owner's request to an API route outside
+   Public needs `X-Solvent-Vault` holding exactly 32 lowercase hex
+   characters, or it is a Bad Request with no `refused` member. A value
+   other than the vault owner's `vault_epochs` row is Conflict
+   `{"refused":"vault-replaced"}` (architecture.md, Vault epoch).
+   Neither writes anything beyond `last_active_at`. An administrator's
+   request is not checked, and the header on it is ignored, as it is on
+   a Public route.
+
+Steps 1 to 6 are the refusals of architecture.md, Refusals. Step 7
+answers only a vault owner already let through to a route of their own
+surface, so it runs after them and teaches nothing about paths or
+kinds.
 
 The URL map sets `merge_slashes = False` and turns off automatic
 `OPTIONS` responses. Any other redirect or Method Not Allowed the
@@ -414,6 +437,23 @@ dialog to protect. Everything below describes the vault owner's bar.
   The requests: every route in the route map under every method it
   answers, an invented page path, `//admin`, an unanswered method on
   a page and an API route, `/api/invented` and `/api/admin/invented`.
+  Each request steps 1 to 6 refuse under a vault owner session is sent
+  with and without `X-Solvent-Vault`, and the two answers are
+  identical, because step 7 runs only on what those steps let through.
+- **Vault epoch over the route map.** Under a vault owner session with
+  the CSRF header, every API route outside Public, each method it
+  answers:
+  - without `X-Solvent-Vault`, with an empty one, with 31 or 33 hex
+    characters, and with 32 uppercase ones: Bad Request with no
+    `refused` member;
+  - with another vault owner's epoch, and with this vault's epoch from
+    before an import: Conflict with the body
+    `{"refused":"vault-replaced"}`;
+  - each of those leaving every table but `sessions.last_active_at`
+    row for row as it was.
+  Under an administrator session, every shared route answers the same
+  with any `X-Solvent-Vault`, none included. Every Public API route
+  answers the same with and without it.
 - Over the route map, every route requiring the header is under
   `/api/`, every other route is exempt and answers only `GET` and
   `HEAD`, and no route answers `OPTIONS`.
@@ -507,10 +547,16 @@ dialog to protect. Everything below describes the vault owner's bar.
   not load the record or decryption layer.
 - An administrator session's chrome carries no Update values action,
   no Lock button, and no nav entries.
-- Inserting a `records` row or a `dek_wrappers` row whose principal is
-  an administrator is rejected by the database itself, asserted
-  against the schema with a direct SQL insert rather than through an
-  endpoint.
+- Inserting a `records`, `dek_wrappers` or `vault_epochs` row whose
+  principal is an administrator is rejected by the database itself,
+  asserted against the schema with a direct SQL insert rather than
+  through an endpoint.
+- Starting the app on a database holding vault owners without a
+  `vault_epochs` row, one with a row, and an administrator gives each
+  vault owner without one a row of 32 lowercase hex characters, the
+  rows all distinct, leaves the existing row as it was, adds none for
+  the administrator, and leaves the file's schema version unchanged.
+  Starting it again changes nothing.
 - Starting the app on a database holding a `principals` row with a
   null `last_login_at` leaves that row's `last_login_at` equal to its
   `created_at`, leaves every non-null `last_login_at` as it was, and

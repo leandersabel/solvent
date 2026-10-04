@@ -43,6 +43,14 @@ CREATE TABLE IF NOT EXISTS dek_wrappers (
     created_at TEXT NOT NULL
 );
 
+-- Names the DEK a page holds, so a page holding one an import replaced
+-- neither writes nor reads (architecture.md, Vault epoch). One row per
+-- vault owner, written at registration and replaced by an import.
+CREATE TABLE IF NOT EXISTS vault_epochs (
+    principal_id TEXT PRIMARY KEY REFERENCES principals (id) ON DELETE CASCADE,
+    epoch TEXT NOT NULL
+);
+
 -- One generic store for every encrypted record (record-api.md). The
 -- five columns after principal_id are exactly the AAD, in storage order
 -- rather than AAD order.
@@ -147,6 +155,13 @@ WHEN (
     JOIN credentials ON credentials.principal_id = principals.id
     WHERE credentials.id = NEW.credential_id
 ) = 'administrator'
+BEGIN
+    SELECT RAISE(ABORT, 'an administrator has no vault');
+END;
+
+CREATE TRIGGER IF NOT EXISTS vault_epochs_refuse_administrator
+BEFORE INSERT ON vault_epochs
+WHEN (SELECT kind FROM principals WHERE id = NEW.principal_id) = 'administrator'
 BEGIN
     SELECT RAISE(ABORT, 'an administrator has no vault');
 END;

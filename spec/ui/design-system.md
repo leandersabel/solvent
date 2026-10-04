@@ -519,6 +519,15 @@ only its own content region.
   Used by **New recording** (`dashboard.md`) and by a recording that is
   gone (`recording-detail.md`, Error, the recording is gone).
 - **Card**: white surface, hairline border, 10px radius, 24px padding.
+- **Callout**: Surface tinted fill, no border, 6px radius, 16px
+  padding, body type in ink-primary, 15.8:1 on its fill. It states one
+  thing the reader must take in before going on, and is never
+  dismissible. Where something is at stake or already lost it carries
+  the critical icon at the start of its first line, the icon alone in
+  critical (5.99:1) and the text still ink-primary, and otherwise it
+  carries no icon, because a statement of what is true is not a
+  warning (Status). Each screen states its copy and whether it carries
+  the icon.
 - **Table**: no vertical rules; `rule` horizontal dividers; figure
   columns as Typography sets them.
 - **Select**: the Input's box, border, radius and focus ring, with a
@@ -678,7 +687,9 @@ copy for them:
   retried on the user's behalf.
 - **A conflict**: the copy names what changed in another tab or
   window, the screen reloads that record, and the user redoes the
-  edit. Never a merge and never a silent clobber.
+  edit. Never a merge and never a silent clobber. A vault replaced from
+  a file is not a conflict: the page closes the vault rather than
+  reloading anything (`unlock.md`, Replaced elsewhere).
 - **A save that landed in part**: nothing is rolled back and nothing
   records that a save was partial. The message names both halves, what
   landed and what did not, by name rather than by count, and what is

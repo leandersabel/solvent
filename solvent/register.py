@@ -24,7 +24,7 @@ from flask import Blueprint, abort, jsonify, make_response, render_template, req
 from . import crypto
 from . import session as sessions
 from .auth import SALT_BYTES
-from .db import get_db, utcnow, write_transaction
+from .db import get_db, new_epoch, utcnow, write_transaction
 from .guard import navigation, public
 from .pages import vault_page
 from .rates import table_rows
@@ -157,6 +157,7 @@ def register():
         body.profileNonce,
     )
 
+    epoch = new_epoch()
     with write_transaction() as conn:
         invite = usable_invite(conn, body.inviteToken)
         if invite is None:
@@ -206,6 +207,10 @@ def register():
                 "VALUES (?, ?, ?, ?)",
                 (credential_id, body.wrappedDek, body.dekNonce, now),
             )
+            conn.execute(
+                "INSERT INTO vault_epochs (principal_id, epoch) VALUES (?, ?)",
+                (principal_id, epoch),
+            )
             # Through the same validator that backs PUT /api/records, so
             # the profile registration writes is indistinguishable from
             # one written through the API.
@@ -231,6 +236,9 @@ def register():
 
         raw_token = sessions.start(conn, principal_id, now)
 
-    response = jsonify({"kind": invite["kind"]})
+    answer = {"kind": invite["kind"]}
+    if wants_vault:
+        answer["vaultEpoch"] = epoch
+    response = jsonify(answer)
     sessions.set_cookie(response, raw_token)
     return response

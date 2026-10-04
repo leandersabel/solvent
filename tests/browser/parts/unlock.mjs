@@ -6,7 +6,7 @@
 // Templates: dashboard.html, shell/. Modules: unlock.js, session.js,
 // api.js, crypto.js, kdf-worker.js, app.js.
 import {
-  ADMIN_PASSWORD, BASE, VAULT_PASSWORD, administrator, afterRead, backFromAway, check, chromeState, click,
+  ADMIN_PASSWORD, BASE, HANDS, VAULT_PASSWORD, administrator, afterRead, backFromAway, check, chromeState, click,
   credentialOf, enterPassword, enterPasswordOn, expectedFailures, hasChrome, holdRecords, intercept, intoVault,
   makeStale, markDocument, noChrome, occurring, openBrowser, page, recordsOf, run, setValue, signInOn, sitting, sql, story,
   text, unlockDashboard, unlockInPlace, vaultOwner, watched, within, WEAK_MEMORY,
@@ -27,7 +27,7 @@ await run(async () => {
   check('locking shows the unlock card again', (await text()).includes('Solvent cannot recover a lost password'));
   check('locking leaves no decrypted figure on screen', !(await text()).includes('12 450'));
   const sessionAlive = await page.eval(`(async () => {
-    const response = await fetch('/api/sessions', { headers: { 'X-Solvent-Request': '1' } });
+    const response = await fetch('/api/sessions', { headers: ${HANDS} });
     return response.status;
   })()`);
   check('the server session survives the lock', sessionAlive === 200, String(sessionAlive));
@@ -68,7 +68,7 @@ await run(async () => {
     note: document.querySelector('#app textarea')?.value,
     alive: true,
   })`));
-  const signedInAgain = await page.eval("fetch('/api/sessions', { headers: { 'X-Solvent-Request': '1' } }).then((r) => r.status)");
+  const signedInAgain = await page.eval(`(async () => (await fetch('/api/sessions', { headers: ${HANDS} })).status)()`);
   check(
     'signing in again returns to the form with what was typed, on a new session',
     resumed.hash === editing && resumed.note === 'typed as the session ran out' && signedInAgain === 200,
@@ -115,7 +115,7 @@ await run(async () => {
     // login.md, The session a sign-in issues: each unlock below signs in
     // on this same server session, so the list never grows.
     const listSessions = async () =>
-      JSON.parse(await sat.eval(`fetch('/api/sessions', { headers: { 'X-Solvent-Request': '1' } })
+      JSON.parse(await sat.eval(`(async () => fetch('/api/sessions', { headers: ${HANDS} }))()
         .then((r) => r.json()).then((l) => JSON.stringify(l.map((s) => [s.id, s.issuedAt, s.current])))`));
     const sessionsBefore = await listSessions();
     check(
@@ -466,7 +466,7 @@ await run(async () => {
   expectedFailures.add('/api/auth/upgrade-kdf');
   releaseUpgrade = await intercept(page, '*/api/auth/upgrade-kdf', () => ({ status: 500 }));
   await signInAgain('the vault with its upgrade failing');
-  const keptIn = await page.eval("fetch('/api/sessions', { headers: { 'X-Solvent-Request': '1' } }).then((r) => r.status)");
+  const keptIn = await page.eval(`(async () => (await fetch('/api/sessions', { headers: ${HANDS} })).status)()`);
   check(
     'a vault owner whose upgrade answers Server Error stays signed in, on the old parameters',
     keptIn === 200 && (await vaultNames()) === beforeUpgrade &&
@@ -561,7 +561,7 @@ await run(async () => {
   check(
     'Not you? Sign out ends the session and offers the full card',
     (await page.eval("Boolean(document.querySelector('#unlock-username'))")) &&
-      (await page.eval("fetch('/api/sessions', { headers: { 'X-Solvent-Request': '1' } }).then((r) => r.status)")) === 401,
+      (await page.eval(`(async () => (await fetch('/api/sessions', { headers: ${HANDS} })).status)()`)) === 401,
   );
 
 });

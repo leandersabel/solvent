@@ -6,14 +6,16 @@
 // same failures. Nothing on it announces, before then, that a username
 // belongs to an administrator, and nothing hints that an admin area
 // exists.
-import { el } from './dom.js';
+import { el, REPLACED_ELSEWHERE, replacedCallout } from './dom.js';
 import { DerivationError } from './crypto.js';
 import { LockedWhileOpeningError, SignInError, signIn, signOut } from './session.js';
 
 export const WAIT_NOTE =
   'This takes a moment by design. It is what makes your password hard to attack.';
 
-export function unlockCard({ knownUsername = null, onUnlocked }) {
+/** `replaced`, `{ dropped }`, draws the Replaced elsewhere state: the
+ *  vault was replaced from a file while this page held it. */
+export function unlockCard({ knownUsername = null, replaced = null, onUnlocked }) {
   const error = el('p', { class: 'field-error', role: 'alert', hidden: true });
   const password = el('input', {
     type: 'password',
@@ -54,6 +56,7 @@ export function unlockCard({ knownUsername = null, onUnlocked }) {
   // The wordmark sits above the card: in the page's own markup outside
   // the shell, and in the top bar inside it.
   const form = el('form', { class: 'card signin-card', novalidate: true, 'aria-label': 'Unlock' }, [
+    replaced ? replacedCallout(REPLACED_ELSEWHERE, replaced.dropped) : null,
     identity,
     error,
     el('div', { class: 'field' }, [

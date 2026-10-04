@@ -5,7 +5,7 @@ from __future__ import annotations
 from datetime import datetime, timedelta, timezone
 
 from solvent.session import COOKIE_NAME
-from tests.helpers import CSRF, b64, connect, register, register_body, rows
+from tests.helpers import CSRF, b64, connect, register, register_body, rows, session_status
 
 LOGIN = "/api/auth/login"
 
@@ -15,9 +15,7 @@ def cookie(client):
 
 
 def works(app, value):
-    c = app.test_client()
-    c.set_cookie(COOKIE_NAME, value)
-    return c.get("/api/sessions", headers=CSRF).status_code == 200
+    return session_status(app, value) == 200
 
 
 def sql(app, statement, args=()):

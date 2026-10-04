@@ -4,7 +4,7 @@
 // Templates: dashboard.html. Modules: view-settings.js, session.js,
 // format.js, api.js, crypto.js, dom.js.
 import {
-  BASE, DIRECT, LEAVING_PASSWORD, NEW_PASSWORD, VAULT_PASSWORD, WEAK_MEMORY, check, click, credentialOf,
+  BASE, DIRECT, HANDS, LEAVING_PASSWORD, NEW_PASSWORD, VAULT_PASSWORD, WEAK_MEMORY, check, click, credentialOf,
   enterPassword, expectedFailures, intercept, intoVault, makeStale, markDocument, mintInvite, openBrowser, page,
   recordsOf, run, signInOn, sitting, sql, story, text, unlockDashboard, vaultOwner, watched,
 } from '../harness.mjs';
@@ -148,7 +148,7 @@ await run(async () => {
 
   const exported = JSON.parse(
     await page.eval(`(async () => {
-      const response = await fetch('/api/export', { headers: { 'X-Solvent-Request': '1' } });
+      const response = await fetch('/api/export', { headers: ${HANDS} });
       const body = await response.json();
       // Encoded fields and random ids are blanked: a short needle can
       // turn up in base64 by chance, and their decoded bytes are scanned
@@ -235,7 +235,7 @@ await run(async () => {
   await page.waitUntil("document.body.innerText.includes('Nothing was signed out.')", { label: 'the sign-out error' });
   await releaseEverywhere();
   expectedFailures.delete('/api/auth/logout-all');
-  const stillIn = await page.eval("fetch('/api/sessions', { headers: { 'X-Solvent-Request': '1' } }).then((r) => r.status)");
+  const stillIn = await page.eval(`(async () => (await fetch('/api/sessions', { headers: ${HANDS} })).status)()`);
   check(
     'a failed sign out everywhere says so and leaves this session open',
     stillIn === 200 && (await page.eval('location.hash')) === '#/settings' && !(await page.eval("Boolean(document.querySelector('#unlock-password'))")),
@@ -311,8 +311,15 @@ await run(async () => {
     });
     return response.headers.getSetCookie().map((c) => c.split(';')[0]).join('; ');
   };
+  // Sent with the vault's own epoch, as the page that holds the session would.
   const statusWith = (cookie) =>
-    fetch(`${DIRECT}/api/sessions`, { headers: { 'X-Solvent-Request': '1', cookie } }).then((r) => r.status);
+    fetch(`${DIRECT}/api/sessions`, {
+      headers: {
+        'X-Solvent-Request': '1',
+        'X-Solvent-Vault': sql("SELECT epoch FROM vault_epochs WHERE principal_id = (SELECT id FROM principals WHERE username = 'leander')")[0].epoch,
+        cookie,
+      },
+    }).then((r) => r.status);
   const elsewhere = await otherSession('leander', VAULT_PASSWORD);
   check('the other session is open before the change', (await statusWith(elsewhere)) === 200);
 
@@ -408,7 +415,7 @@ await run(async () => {
   check(
     'a password change ends the other session and keeps this one',
     (await statusWith(elsewhere)) === 401 &&
-      (await page.eval("fetch('/api/sessions', { headers: { 'X-Solvent-Request': '1' } }).then((r) => r.status)")) === 200,
+      (await page.eval(`(async () => (await fetch('/api/sessions', { headers: ${HANDS} })).status)()`)) === 200,
   );
   const sameSession = JSON.parse(await page.eval(`(async () => {
     const { Vault } = await import('/static/js/model.js');
@@ -519,7 +526,7 @@ await run(async () => {
     await releaseDelete();
     check(
       'a failed deletion says nothing was deleted, and the vault and session are still there',
-      (await other.eval("fetch('/api/sessions', { headers: { 'X-Solvent-Request': '1' } }).then((r) => r.status)")) === 200 &&
+      (await other.eval(`(async () => (await fetch('/api/sessions', { headers: ${HANDS} })).status)()`)) === 200 &&
         sql('SELECT id FROM principals WHERE username = ?', 'leaving').length === 1 &&
         (await other.eval("document.body.innerText")).includes('Your vault is unchanged and you are still signed in.'),
     );

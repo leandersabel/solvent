@@ -19,12 +19,40 @@ import uuid
 from pathlib import Path
 
 import pytest
+from flask.testing import FlaskClient
+from werkzeug.datastructures import Headers
 
 from solvent.config import DEFAULT_KDF_ENVELOPE
 
 REPO_ROOT = Path(__file__).resolve().parent.parent
 
 CSRF = {"X-Solvent-Request": "1"}
+
+# The routes whose answer hands a page the vault epoch it then carries
+# (architecture.md, Vault epoch).
+_EPOCH_ANSWERS = ("/api/register", "/api/auth/login", "/api/import")
+
+
+class EpochClient(FlaskClient):
+    """A browser page's half of the vault epoch: it keeps the epoch the
+    last register, sign-in or import answered with and sends it on every
+    request, as the page's API module does. Set `epoch` to a value to
+    send another, or to None to send none. A request's own
+    `X-Solvent-Vault` header wins."""
+
+    epoch = None
+
+    def open(self, *args, **kwargs):
+        if self.epoch is not None:
+            headers = Headers(kwargs.get("headers") or {})
+            if "X-Solvent-Vault" not in headers:
+                headers["X-Solvent-Vault"] = self.epoch
+            kwargs["headers"] = headers
+        response = super().open(*args, **kwargs)
+        if response.status_code == 200 and response.request.path in _EPOCH_ANSWERS:
+            answered = response.get_json(silent=True) or {}
+            self.epoch = answered.get("vaultEpoch", self.epoch)
+        return response
 
 
 def b64(length: int = 32) -> str:
@@ -118,6 +146,32 @@ def sign_in(app, username: str, auth_key: str):
     )
     assert response.status_code == 200, response.get_data(as_text=True)
     return client, response.get_json()
+
+
+def session_status(app, cookie: str) -> int:
+    """What `GET /api/sessions` answers a client holding only this
+    cookie, sending the epoch of the vault the session belongs to as a
+    page does. A cookie matching no live row gets a placeholder epoch,
+    and is refused before the epoch is read."""
+    from solvent.session import COOKIE_NAME, _signer, hash_token
+
+    epoch = "0" * 32
+    with app.app_context():
+        try:
+            token_hash = hash_token(_signer().unsign(cookie).decode())
+        except Exception:
+            token_hash = None
+        found = rows(
+            app,
+            "SELECT epoch FROM sessions JOIN vault_epochs "
+            "ON vault_epochs.principal_id = sessions.principal_id WHERE token_hash = ?",
+            (token_hash,),
+        )
+    if found:
+        epoch = found[0]["epoch"]
+    client = app.test_client()
+    client.set_cookie(COOKIE_NAME, cookie)
+    return client.get("/api/sessions", headers={**CSRF, "X-Solvent-Vault": epoch}).status_code
 
 
 def principal_id(app, username: str) -> str:

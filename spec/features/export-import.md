@@ -108,11 +108,20 @@ injection fails at the cryptography rather than at a check.
 5. Client wraps `DEK_new` under the **current session's Master Key** —
    so the user's existing login password keeps working after the import.
 6. `POST /api/import` with the new wrapped DEK and the re-encrypted
-   records. The server, in one transaction, deletes every record
-   belonging to the session user, replaces their `password`
-   credential's wrapper, inserts the new set, and **invalidates every
-   other session for the user**, keeping the importing one.
-7. Client swaps its in-memory DEK to `DEK_new` and reloads the view.
+   records, carrying the page's vault epoch like every vault request.
+   The server, in one transaction begun with `BEGIN IMMEDIATE`, checks
+   that epoch is still the vault's, deletes every record belonging to
+   the session user, replaces their `password` credential's wrapper,
+   inserts the new set, and **replaces the vault epoch** with a fresh
+   one (architecture.md, Vault epoch). It answers OK
+   `{ records, vaultEpoch }`: the count it stored and the new epoch.
+   No session is revoked.
+7. Client swaps its in-memory DEK to `DEK_new` and its epoch to the new
+   one, posts `{"replaced":"<the old epoch>"}` on the vault channel
+   (login.md, A vault replaced elsewhere), and reloads the view. **The
+   restoring page stays open.** Every other page where the vault is
+   open closes it: at once in this browser, and elsewhere at its next
+   request, when it comes back into view, or at its next sign-in.
 
 **Import is the one flow that changes the DEK, so it is the one flow
 bound by the rewrite-every-wrapper rule** (architecture.md, One key, N
@@ -163,13 +172,18 @@ written.
   a large upload.
 - The import is one transaction. A failure at any point leaves the
   existing vault exactly as it was — never half-erased.
-- **Every other session is invalidated by the import**, in that same
-  transaction. A second session still holds `DEK_old` and the old
-  model: its updates to existing records fail the version check, but a
-  *create* — new UUID, `version: 1` — is accepted and stores ciphertext
-  under a key no longer in the envelope, producing a permanently
-  unreadable record whose only symptom is the decryption-failure
-  banner.
+- **No page still holding `DEK_old` reads or writes after the import
+  commits.** Such a page, another tab of this browser included, which
+  shares the importing session's cookie, would otherwise store a create
+  under a key no longer in the envelope, a permanently unreadable
+  record. Its delete or purge would remove a restored record, because
+  import keeps record ids. The vault epoch refuses all of it, and a
+  request racing the import loses whichever commits first
+  (architecture.md, Vault epoch).
+- **Export reads the vault epoch, the credential's `params`, the
+  wrapper and every record in one transaction**, so an import landing
+  mid-export cannot produce a file whose wrapper does not open its
+  records. An export the epoch refuses writes no `attempts` row.
 - Export is rate-limited per user — **default 5 per hour**, operator
   config (architecture.md, Rate limiting). It is a full vault read, and
   nobody backs up five times an hour.
@@ -211,6 +225,16 @@ written.
   decrypted, because it would restore a vault with no main currency.
 - **Browser tab closed mid-import** → the transaction either committed
   or it did not; there is no partial state to recover from.
+- **Two pages restore at once** → the later import answers Conflict
+  `{"refused":"vault-replaced"}` and writes nothing, and that page
+  closes the vault (login.md, A vault replaced elsewhere).
+- **The import committed and its answer was lost** → the restoring page
+  still holds the old epoch, so its next request answers
+  `vault-replaced` and it closes the vault. Unlocking with the
+  unchanged password opens the restored vault.
+- **Another page saves while the import runs** → the save commits
+  before the import and is replaced with everything else, or answers
+  `vault-replaced` and writes nothing.
 - **KDF envelope in the file is below the server minimum** → the import
   still succeeds (the file's envelope is only used to open the file; the
   vault's own envelope is the current account's, unchanged).
@@ -269,9 +293,28 @@ written.
   rejected whole —
   the same validator `PUT /api/records` runs.
 - Every record in the vault reads `version: 1` after an import.
-- A second session belonging to the importing user is invalidated: its
-  next API call returns Unauthorized, and a record it attempts to create
-  after the import never reaches the vault.
+- **The issue's two pages.** Pages A and B of one browser context are
+  unlocked on one vault, sharing one session. A restores a file. B
+  never gets to save a holding, and a create, an update, a delete and a
+  purge sent with B's epoch on the shared cookie each answer Conflict
+  `{"refused":"vault-replaced"}`. Reloading A and unlocking shows every
+  restored record and no record that cannot be read.
+- After an import, a second session of the importing user still exists.
+  Its next request carrying the old epoch answers Conflict
+  `{"refused":"vault-replaced"}`, and a create, an update, a delete and
+  a purge it sends each leave the vault's records exactly the imported
+  set.
+- The import answers `vaultEpoch` as 32 lowercase hex characters,
+  equal to the account's `vault_epochs` row afterwards and different
+  from the epoch before.
+- An import carrying a replaced epoch answers Conflict
+  `{"refused":"vault-replaced"}` and leaves `records`, `dek_wrappers`
+  and `vault_epochs` row for row as they were. Of two imports sent with
+  the same epoch, exactly one commits.
+- An import refused for any other reason, or failing mid-transaction,
+  leaves the vault epoch as it was.
+- An export carrying a replaced epoch answers Conflict
+  `{"refused":"vault-replaced"}` and writes no `attempts` row.
 - A fixture file at `formatVersion: 1` still imports after the format
   advances to 2.
 - The export screen shows the sensitivity warning before the download is

@@ -3,7 +3,7 @@
   "summary": "Create, edit, archive and delete a holding: name, native unit which doubles as its rate symbol, one dimension value per axis, and a note, all encrypted client-side. Archiving records the holding's zero on the day it is made, refreshing that day's prices like any recording, and a permanent delete cascades server-side.",
   "read": [
     {"file": "spec/features/manage-accounts.md", "sections": ["all"]},
-    {"file": "spec/architecture.md", "sections": ["Data model", "Record storage API", "Application hardening", "Key management", "Non-goals"]},
+    {"file": "spec/architecture.md", "sections": ["Data model", "Record storage API", "Vault epoch", "Application hardening", "Key management", "Non-goals"]},
     {"file": "spec/features/record-api.md", "sections": ["Row shape", "The AAD encoding", "Endpoints", "Rules"], "role": "the store, the version rule, and the one type-aware exception purge is"},
     {"file": "spec/features/account-settings.md", "sections": ["Dimensions", "Deleting is archiving", "The profile record"], "role": "where the dimension ids, labels and value order live"},
     {"file": "spec/features/account-settings.md", "sections": ["Dates and numbers"], "role": "the quantity formatter, for the stored figure the archive dialog names when its zero replaces one"},
@@ -49,13 +49,15 @@
     "unarchive": {"value": "clears archivedAt at version + 1 and writes nothing else, with no dialog. The zero stays a figure like any other: the holding rejoins active lists and the current total at zero until a new figure is recorded, and the zero becomes editable. Its unit rejoins the set the next recording refreshes", "cite": "spec/features/manage-accounts.md#unarchiving"},
     "archivedWithoutAZero": {"value": "a holding archived on D whose figure at D is not zero, or which has none, keeps its history as it is and gains no snapshot on unlock, on any read or on any write elsewhere. The chart draws its step at D. Unarchiving it and archiving it again writes the zero at the new D", "cite": "spec/features/manage-accounts.md#a-holding-archived-without-a-zero-at-d"},
     "purge": {"value": "DELETE /api/accounts/<account_id>?mode=purge removes the account record and cascades to every snapshot carrying that account_id, server-side and atomically. It deletes no price entry, because a price belongs to a symbol and the symbol is inside the ciphertext. Requires typing the account name to confirm, and the dialog states plainly that past net-worth figures will change", "cite": "spec/features/manage-accounts.md#delete-the-user-chooses"},
+    "purgeComparesEpoch": {"value": "the purge compares the vault epoch after BEGIN IMMEDIATE, because an import keeps record ids and a purge from a page holding the replaced DEK would otherwise delete a restored holding. A replaced epoch answers Conflict {\"refused\":\"vault-replaced\"} and leaves the holding and every one of its snapshots in place", "cite": "spec/features/manage-accounts.md#delete-the-user-chooses, spec/features/manage-accounts.md#acceptance-criteria"},
     "cascadeReach": {"value": "no other record type carries an account link, so nothing else can be swept up by the cascade", "cite": "spec/features/manage-accounts.md#delete-the-user-chooses"},
     "namesAreNotUnique": {"value": "two accounts may share a name. The record_id is identity", "cite": "spec/features/manage-accounts.md#rules"},
     "unitIsFrozenOnceRecorded": {"value": "changing the unit of an account that already has snapshots is blocked, because the existing quantities are counted in the old unit and a new unit would price the whole history off a different symbol's series. The archive's zero counts, so a holding archived and unarchived with no other value keeps its unit locked. Client-enforced by construction, since unit lives inside the ciphertext. Renaming, re-classifying and editing the note are always allowed", "cite": "spec/features/manage-accounts.md#rules"},
     "everyWriteReEncrypts": {"value": "every write re-encrypts the whole record with a fresh nonce and increments version", "cite": "spec/features/manage-accounts.md#rules"},
     "renderingRule": {"value": "decrypted names, notes and dimension labels are rendered with x-text or textContent only, never x-html", "cite": "spec/features/manage-accounts.md#rules"},
     "statusCodes": {
-      "staleVersionOnEdit": {"value": 409, "cite": "spec/architecture.md#status-codes", "condition": "a concurrent edit from a second tab. The UI reloads and asks the user to redo the edit (spec/features/manage-accounts.md#edge-cases)"},
+      "staleVersionOnEdit": {"value": 409, "cite": "spec/architecture.md#status-codes", "condition": "a concurrent edit from a second tab. The UI reloads and asks the user to redo the edit. The body has no refused member (spec/features/manage-accounts.md#edge-cases, spec/architecture.md#status-codes)"},
+      "purgeWithReplacedEpoch": {"value": 409, "cite": "spec/architecture.md#status-codes", "condition": "a purge whose X-Solvent-Vault is the epoch from before an import. The body is {\"refused\":\"vault-replaced\"}, nothing is deleted, and the page closes the vault instead of reloading (spec/features/manage-accounts.md#acceptance-criteria)"},
       "purgeOnAnotherUsersAccount": {"value": 404, "cite": "spec/architecture.md#status-codes", "condition": "Not Found, never Forbidden, and nothing is deleted (spec/features/manage-accounts.md#acceptance-criteria)"}
     }
   },
@@ -74,6 +76,7 @@
       "an archived holding with an entry before a past D, and the dates D, a day strictly between D and today, today and a day after today, typed into its entry's date field, for the refusal reason and the hint, plus a non-archived holding's entry for the absent hint",
       "a second seeded vault owner holding an account, for the purge isolation assertion",
       "a fault injected mid-purge, for the atomicity assertion",
+      "a vault restored from a file after a page read it, and a purge sent from that page naming a restored holding with the epoch from before the import, for the Conflict and untouched-snapshots assertion",
       "a profile holding an archived dimension and an archived value, plus accounts carrying entries that name them",
       "an account name, a note and a dimension label each containing an XSS payload, for the literal-text assertion in the list, the chart legend and every tooltip",
       "an account whose unit is free text and one whose unit is a listed symbol, for the rate-request-count assertion"
@@ -82,6 +85,8 @@
       "the unit-change block must be asserted against the UI refusing it, not against an API call being rejected. The server cannot see the unit, so a test written against the endpoint asserts a control that does not exist and would pass against a client that allows the change",
       "purge must be shown to delete no rate record, asserted by count before and after, because the failure is silent and only shows up later as a repriced history",
       "purge atomicity needs a fault injected mid-delete, with neither the account record nor its snapshots partially gone afterwards",
+      "a purge naming a restored holding with the pre-import epoch must answer vault-replaced and leave the holding and every snapshot in place, compared row for row. Import keeps record ids, so the id exists in the restored vault and a purge that only checks the id deletes it",
+      "an edit's Conflict on a stale version must stay distinguishable from vault-replaced by the refused member, and only the first runs the reload-and-redo. A form that reloads on both works against a vault that no longer exists",
       "the archive write order must be asserted on the wire with each write stubbed to fail in turn: the zero, then the prices, then the flag. A flag written first passes every happy-path test and archives a holding stepping off its last figure with no way to repair it",
       "after archiving a holding with no snapshots and unarchiving it, changing its unit must be refused at the UI. The zero is a recorded figure, and a lock keyed on the person having typed a value passes every other unit test",
       "the archive's price step must be asserted both ways by count: on a D holding no prices it writes one entry per needed unit, this holding's unit included, and on a D whose prices are complete it issues no request and rewrites none byte for byte. Writing nothing passes the second and fails the first, and writing every time passes the first and rewrites a recording's stored prices",

@@ -227,7 +227,7 @@ def test_a_vault_owner_login_returns_the_one_wrapper_and_the_kind(app):
     assert body["kind"] == "vault_owner"
     assert body["wrappedDek"]
     assert body["kdfStale"] is False
-    assert set(body) == {"kind", "kdfStale", "wrappedDek", "dekNonce"}
+    assert set(body) == {"kind", "kdfStale", "wrappedDek", "dekNonce", "vaultEpoch"}
 
 
 def test_an_administrator_login_carries_no_wrapper(app):
@@ -237,6 +237,7 @@ def test_an_administrator_login_carries_no_wrapper(app):
     assert body["kind"] == "administrator"
     assert "wrappedDek" not in body
     assert "dekNonce" not in body
+    assert "vaultEpoch" not in body
     # The session that login issued is the one that reaches the admin
     # area, page and API alike.
     assert signed_in.get("/").headers["Location"] == "/admin"

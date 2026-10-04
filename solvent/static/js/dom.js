@@ -134,6 +134,23 @@ export function icon(name, size = 16) {
   return svg;
 }
 
+/** What a page says when its vault was replaced from a file elsewhere
+ *  (ui/unlock.md, Replaced elsewhere; ui/dashboard.md, Replaced since
+ *  last open). Whether typed input was dropped decides the icon and the
+ *  second sentence. A polite live region, so a screen reader hears it. */
+export function replacedCallout(first, dropped) {
+  const second = dropped
+    ? 'What you had typed here and not saved is gone.'
+    : 'Nothing you had typed here was lost.';
+  return el('p', { class: dropped ? 'callout callout-critical' : 'callout', role: 'status' }, [
+    dropped ? icon('alert') : null,
+    `${dropped ? ' ' : ''}${first} ${second}`,
+  ]);
+}
+
+export const REPLACED_ELSEWHERE = 'Your vault was replaced from a file in another tab, window or device.';
+export const REPLACED_SINCE_OPEN = 'Your vault was replaced from a file since you last opened it here.';
+
 /** The top bar's Lock button: the padlock and its word, the word
  *  dropped from sight at phone width and still read aloud. */
 function lockButton(onclick) {
@@ -249,7 +266,9 @@ function onKey(event) {
  *  `resume`, from `resumable` below, reopens the same form against the
  *  vault a later unlock builds. A dialog without one is closed by a
  *  lock and not reopened, which is right for a confirmation: it holds
- *  nothing the person typed. */
+ *  nothing the person typed. A dialog that has come to show an outcome
+ *  rather than a form calls `close.stopResuming()`, so a lock no longer
+ *  keeps it. */
 export function dialog({ heading, body, actions, resume = null }) {
   const opener = document.activeElement;
   // No `aria-modal`: it hides everything outside the dialog from a
@@ -271,6 +290,9 @@ export function dialog({ heading, body, actions, resume = null }) {
     if (refocus && opener && opener.focus) opener.focus();
   };
   entry.close = close;
+  close.stopResuming = () => {
+    entry.resume = null;
+  };
 
   document.addEventListener('keydown', onKey);
   document.body.append(scrim);
@@ -365,13 +387,12 @@ export function restoreFields(root, kept) {
 }
 
 /** On a lock: close every dialog without handing focus back to a
- *  screen that is about to go, and keep only the edited fields of those
- *  that can be reopened. */
+ *  screen that is about to go, and keep each that can be reopened with
+ *  its edited fields, of which there may be none. */
 export function closeDialogsForLock() {
   const kept = [];
   for (const entry of [...openDialogs]) {
-    const fields = entry.resume ? editedFields(entry.panel) : [];
-    if (fields.length) kept.push({ resume: entry.resume, fields });
+    if (entry.resume) kept.push({ resume: entry.resume, fields: editedFields(entry.panel) });
     entry.close({ refocus: false });
   }
   return kept;
