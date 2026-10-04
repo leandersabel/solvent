@@ -219,6 +219,10 @@ export async function intercept(session, pattern, respond) {
       await session.send('Fetch.continueRequest', { requestId });
       return;
     }
+    if (answer.drop) {
+      await session.send('Fetch.failRequest', { requestId, errorReason: 'ConnectionReset' });
+      return;
+    }
     await session.send('Fetch.fulfillRequest', {
       requestId,
       responseCode: answer.status,

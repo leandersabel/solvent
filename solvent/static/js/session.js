@@ -46,6 +46,14 @@ export function onLock(listener) {
 
 export class SignInError extends Error {}
 
+// A refusal at the salt or the login. The limiter answers the salt
+// request too, and a locked account reads the same there as at the
+// login.
+const refusal = (error) => {
+  if (error.status === 429) return new SignInError('throttled');
+  return new SignInError(api.didNotGoThrough(error) ? 'unreachable' : 'invalid');
+};
+
 // ---- A vault replaced elsewhere (login.md, A vault replaced elsewhere) ----
 let replacedListener = () => {};
 
@@ -94,9 +102,7 @@ export async function signIn(username, password) {
   try {
     ({ salt, kdf } = await api.post('/api/auth/salt', { username }));
   } catch (error) {
-    // The limiter answers the salt request too, and a locked account
-    // reads the same there as at the login.
-    throw new SignInError(error.status === 429 ? 'throttled' : 'invalid');
+    throw refusal(error);
   }
   const keys = await crypto.deriveKeys(password, salt, kdf);
 
@@ -107,8 +113,7 @@ export async function signIn(username, password) {
       authKey: keys.authKey,
     });
   } catch (error) {
-    if (error.status === 429) throw new SignInError('throttled');
-    throw new SignInError('invalid');
+    throw refusal(error);
   }
 
   // A client that branches on a missing field treats a truncated
@@ -159,7 +164,7 @@ export async function signIn(username, password) {
     // replaced meanwhile and the page already dropped it.
     discardKeys();
     if (api.vaultEpoch() === answer.vaultEpoch) api.setVaultEpoch(previous);
-    throw error;
+    throw api.didNotGoThrough(error) ? new SignInError('unreachable') : error;
   }
 
   if (answer.kdfStale) await upgradeQuietly(password, answer.kdf, dek);

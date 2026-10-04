@@ -131,6 +131,19 @@ never look like a hang.
   unwrap failed. The same message, because it means corruption or
   tampering, not a typo. Nothing is logged: the server already answered
   OK and never sees the unwrap fail.
+- **The attempt did not go through**: the salt lookup, the sign-in or
+  the vault read got no answer, or a server error from Solvent or a
+  proxy in front of it. In the same place as the wrong-password message,
+  critical text with an icon:
+
+  > That did not go through. Everything you typed is still here, so you
+  > can try again.
+
+  Both fields stay filled, and Unlock tries again. A correct password is
+  never called wrong. The message is the same for every name and both
+  kinds, because the salt lookup and the sign-in fail the same way for
+  all of them, and the vault read comes only after the password
+  verified.
 - **Too many attempts**: "Too many attempts. Try again in a few
   minutes." Same shape and words whether or not the account exists.
 - **This browser cannot run the encryption**: a hard stop, "This browser
@@ -475,6 +488,9 @@ reason, and then learns at sign-in.
 - **A restore between sign-in and the stale-KDF upgrade**: the upgrade
   answers `vault-replaced`, writes nothing, and the page closes the
   vault.
+- **Solvent cannot be reached mid-sign-in**: whichever request got no
+  answer or a server error, the card reads as the attempt did not go
+  through, never as a wrong password, and no keys stay held.
 - **Clock skew or a session expired mid-request**: Unauthorized, the
   status alone with no code in the body (architecture.md, Status
   codes), and the card's session-ran-out state.
@@ -543,83 +559,89 @@ reason, and then learns at sign-in.
 16. A correct Auth Key whose DEK unwrap fails is a failed sign-in with
     the same message and no keys held. Test:
     `tests/browser/parts/unlock.mjs`.
-17. A vault owner below the default envelope is upgraded at sign-in:
+17. A salt lookup or sign-in that gets no answer or a server error, for
+    a vault owner, an administrator and an unknown username, and a vault
+    read that gets a server error after a correct password, each show
+    "That did not go through. Everything you typed is still here, so you
+    can try again." with both fields still filled, and the vault read
+    leaves no keys held. Test: `tests/browser/parts/unlock.mjs`.
+18. A vault owner below the default envelope is upgraded at sign-in:
     salt, envelope, Auth Key hash and wrapped DEK change, and the DEK is
     unchanged, proven by decrypting a record written before. Test:
     `tests/test_auth.py::test_the_upgrade_replaces_the_credential_and_its_one_wrapper`,
     `tests/browser/parts/unlock.mjs`.
-18. An administrator below the default envelope is upgraded the same
+19. An administrator below the default envelope is upgraded the same
     way, no `dek_wrappers` row is created, and the password still signs
     in. Test:
     `tests/test_auth.py::test_an_administrator_upgrade_creates_no_wrapper`.
-19. (blind) The upgrade writes the `password` credential row and, for a
+20. (blind) The upgrade writes the `password` credential row and, for a
     vault owner, its wrapper, and nothing else, comparing every other
     row of `principals`, `credentials` and `dek_wrappers`. Test:
     `tests/test_auth.py::test_the_upgrade_replaces_the_credential_and_its_one_wrapper`.
-20. `POST /api/auth/upgrade-kdf` with a wrapper from an administrator
+21. `POST /api/auth/upgrade-kdf` with a wrapper from an administrator
     session, or without one from a vault owner session, is a Bad Request
     and writes nothing. Test:
     `tests/test_auth.py::test_the_server_discriminates_on_kind_not_on_which_fields_arrived`.
-21. Raising the server's default memory parameter and signing in leaves
+22. Raising the server's default memory parameter and signing in leaves
     the vault at the new value with every record decryptable. Test:
     `tests/test_auth.py::test_raising_the_server_default_upgrades_an_account_at_the_old_one`.
-22. If `/api/auth/upgrade-kdf` answers Server Error, the caller stays
+23. If `/api/auth/upgrade-kdf` answers Server Error, the caller stays
     signed in and signs in afterwards on the old parameters. Test:
     `tests/browser/parts/unlock.mjs`,
     `tests/test_client.py::test_the_client_side_rules_hold`.
-23. `POST /api/auth/upgrade-kdf` from a vault owner carrying the epoch
+24. `POST /api/auth/upgrade-kdf` from a vault owner carrying the epoch
     from before an import answers Conflict
     `{"refused":"vault-replaced"}` and leaves `credentials` and
     `dek_wrappers` byte-identical. Test:
     `tests/test_vault_epoch.py::test_the_stale_kdf_upgrade_with_a_replaced_epoch_changes_nothing`.
-24. `POST /api/auth/login` returns at most one wrapper and no field
+25. `POST /api/auth/login` returns at most one wrapper and no field
     naming, counting or describing another credential. Test:
     `tests/test_auth.py::test_the_login_body_carries_no_field_describing_another_credential`.
-25. (blind) From one client: sign in, sign in again, fail once, sign in
+26. (blind) From one client: sign in, sign in again, fail once, sign in
     again, each carrying the previous cookie. The account has exactly
     one `sessions` row with the first `id` and `issued_at`, every
     replaced cookie answers Unauthorized, and the cookie carried into
     the failure still worked after it. Rows are compared, not cookies
     alone. Test:
     `tests/test_session.py::test_repeated_sign_ins_from_one_client_keep_one_row_and_a_failed_one_changes_nothing`.
-26. A sign-in carrying another account's live session deletes that row,
+27. A sign-in carrying another account's live session deletes that row,
     and the old cookie answers Unauthorized. Test:
     `tests/test_session.py::test_a_sign_in_over_another_accounts_live_session_replaces_that_row`.
-27. (blind) A sign-in with no cookie creates a new row and leaves the
+28. (blind) A sign-in with no cookie creates a new row and leaves the
     account's other live rows untouched. Test:
     `tests/test_session.py::test_a_sign_in_with_no_cookie_leaves_the_accounts_other_live_rows_alone`.
-28. (blind) A sign-in deletes the signing-in account's expired rows, and
+29. (blind) A sign-in deletes the signing-in account's expired rows, and
     only those. Test:
     `tests/test_session.py::test_a_sign_in_deletes_the_signing_in_accounts_expired_rows_and_only_those`.
-29. (blind) Signing in, then unlocking 11 hours later, leaves a session
+30. (blind) Signing in, then unlocking 11 hours later, leaves a session
     that answers Unauthorized 12 hours after the first sign-in. Test:
     `tests/test_session.py::test_unlocking_does_not_move_issued_at_so_the_expiry_counts_from_sign_in`.
-30. Everybody is signed out 12 hours after signing in, however busy.
+31. Everybody is signed out 12 hours after signing in, however busy.
     Test:
     `tests/test_session.py::test_a_session_past_the_absolute_lifetime_is_refused`,
     `tests/test_session.py::test_the_absolute_expiry_binds_an_administrator_the_same_way`.
-31. (blind) A sign-in sets `last_login_at` to the request time, and so
+32. (blind) A sign-in sets `last_login_at` to the request time, and so
     does an unlock on a live session, while `issued_at` stays, for both
     kinds with the clock stubbed. Test:
     `tests/test_last_login.py::test_a_sign_in_and_an_unlock_set_last_login_at_and_an_unlock_leaves_issued_at`.
-32. (blind) A wrong Auth Key, a rate-limited attempt and a locked-out
+33. (blind) A wrong Auth Key, a rate-limited attempt and a locked-out
     attempt each leave `last_login_at` unchanged. Test:
     `tests/test_last_login.py::test_a_wrong_auth_key_leaves_last_login_at`,
     `tests/test_last_login.py::test_a_rate_limited_or_locked_out_attempt_leaves_last_login_at`.
-33. (blind) The per-username throttle and, separately, the per-username
+34. (blind) The per-username throttle and, separately, the per-username
     lock refuse that username with Too Many Requests on both endpoints,
     body and headers byte-identical to the refusal for a nonexistent
     username over the same limit. Test:
     `tests/test_auth.py::test_exceeding_the_account_limit_locks_it_the_same_way_for_a_stranger`,
     `tests/test_attempts.py::test_every_refusal_is_byte_identical_to_the_one_for_a_username_nobody_has`.
-34. (blind) With per-username limits out of reach and the clock stubbed,
+35. (blind) With per-username limits out of reach and the clock stubbed,
     the configured failures from one address spread over unknown
     usernames lock the address: the next salt fetch and sign-in for an
     administrator, a vault owner and an unknown username each answer Too
     Many Requests byte-identically, and a different address signs the
     administrator in. Test:
     `tests/test_attempts.py::test_an_address_lock_refuses_every_username_and_spares_other_addresses`.
-35. (blind) The lock ends on time despite retries. Trip an address lock,
+36. (blind) The lock ends on time despite retries. Trip an address lock,
     retry every minute with a salt fetch, a wrong Auth Key and the
     administrator's correct Auth Key, each Too Many Requests, with the
     `attempts` row count unchanged. At the lock's length plus one second
@@ -627,105 +649,105 @@ reason, and then learns at sign-in.
     lock. Test:
     `tests/test_attempts.py::test_an_administrator_signs_in_when_the_lock_ends_despite_retries_during_it`,
     `tests/test_attempts.py::test_a_username_lock_ends_on_time_despite_retries`.
-36. (blind) A request refused by any limit, on either endpoint, leaves
+37. (blind) A request refused by any limit, on either endpoint, leaves
     `attempts` row for row as it was, and so do a salt fetch that answers
     OK, a Bad Request and a sign-in the concurrency cap turned away.
     Test:
     `tests/test_attempts.py::test_a_request_that_is_not_a_failure_or_is_refused_leaves_the_table_as_it_was`.
-37. A wrong Auth Key, for a real or unknown username, writes one
+38. A wrong Auth Key, for a real or unknown username, writes one
     `failure` row in the username's bucket and one in the address's.
     Test:
     `tests/test_attempts.py::test_a_failure_writes_one_row_per_bucket_and_a_success_clears_only_the_username`.
-38. (blind) A correct Auth Key deletes the username's `login:` and
+39. (blind) A correct Auth Key deletes the username's `login:` and
     `login-lock:` rows and leaves the address's. Test:
     `tests/test_attempts.py::test_a_success_deletes_the_username_lock_row_and_leaves_the_address_rows`.
-39. (blind) The failure that trips a per-username lock writes exactly
+40. (blind) The failure that trips a per-username lock writes exactly
     one `login-lock:` row, and one that trips an address lock exactly
     one `address-lock:` row, each in the failure's own transaction. A
     failure that trips neither writes neither. Test:
     `tests/test_attempts.py::test_a_failure_writes_a_lock_row_only_when_it_trips_the_lock`.
-40. (blind) The username lock lasts its full length however its
+41. (blind) The username lock lasts its full length however its
     failures are spread: at the defaults, with address limits out of
     reach, 10 wrong Auth Keys at 0:00, 9 at 15:01 and the 20th at 59:00
     give Too Many Requests at 60:01 and 74:00 and a sign-in at 74:01.
     Test:
     `tests/test_attempts.py::test_a_username_lock_runs_its_full_length_on_the_schedule_that_ages_failures_out`.
-41. A lock covers every username from that connection, a name nobody
+42. A lock covers every username from that connection, a name nobody
     has tried yet included, until it ends. Test:
     `tests/test_attempts.py::test_an_address_lock_refuses_every_username_and_spares_other_addresses`.
-42. (blind) No plaintext address is stored. After failures from
+43. (blind) No plaintext address is stored. After failures from
     `203.0.113.7` and `2001:db8:1:2::5`, no table value, no byte of the
     database file and no captured log line contains either address or
     the `/64` network. Test:
     `tests/test_attempts.py::test_no_plaintext_address_is_kept_in_a_table_the_file_or_a_log`.
-43. (blind) Each `address:` bucket key equals the value the test
+44. (blind) Each `address:` bucket key equals the value the test
     computes from architecture.md, Rate limiting, with the test's
     `SECRET_KEY`, and changes when `SECRET_KEY` does. Test:
     `tests/test_attempts.py::test_the_address_key_is_keyed_canonical_and_follows_the_secret`.
-44. The HKDF function returns RFC 5869 Test Case 1's OKM. Test:
+45. The HKDF function returns RFC 5869 Test Case 1's OKM. Test:
     `tests/test_attempts.py::test_hkdf_returns_rfc_5869_test_case_1`.
-45. `2001:db8:1:2::5` and `::6` share one address key,
+46. `2001:db8:1:2::5` and `::6` share one address key,
     `2001:db8:1:3::5` has another, `::ffff:203.0.113.7` shares
     `203.0.113.7`'s, and two unparseable addresses share one. Test:
     `tests/test_attempts.py::test_the_address_key_is_keyed_canonical_and_follows_the_secret`.
-46. (blind) With `TRUSTED_PROXY_HOPS` 0, failures from one peer with a
+47. (blind) With `TRUSTED_PROXY_HOPS` 0, failures from one peer with a
     different `X-Forwarded-For` each time lock that peer, and the first
     such request logs `config.proxy_header_ignored` once. With it 1,
     requests whose last entries differ count apart, and a client-written
     entry left of the proxy's changes nothing. Test:
     `tests/test_attempts.py::test_without_trusted_proxies_a_forwarded_header_changes_nothing_and_is_logged_once`,
     `tests/test_attempts.py::test_with_one_trusted_proxy_the_last_forwarded_entry_is_the_client`.
-47. (blind) Tripping a lock logs exactly one `auth.lockout` line and the
+48. (blind) Tripping a lock logs exactly one `auth.lockout` line and the
     requests it refuses none. The address line has no address and no
     address key. A username with a newline and a quote logs as one line
     holding its JSON string. Test:
     `tests/test_attempts.py::test_a_lock_logs_one_line_when_it_trips_and_the_requests_it_refuses_none`,
     `tests/test_attempts.py::test_an_address_lock_logs_one_line_with_no_address`.
-48. The card shows "Too many attempts. Try again in a few minutes." past
+49. The card shows "Too many attempts. Try again in a few minutes." past
     the limit. Test: `tests/browser/parts/unlock.mjs`.
-49. A vault opens on a phone and a tablet in a little under two seconds,
+50. A vault opens on a phone and a tablet in a little under two seconds,
     showing the working state and staying responsive to touch
     throughout. Test: no test.
-50. The card shows "Deriving your key" and goes quiet while the key is
+51. The card shows "Deriving your key" and goes quiet while the key is
     derived. Test: `tests/browser/parts/unlock.mjs`.
-51. A browser that cannot run the encryption gets a hard stop with no
+52. A browser that cannot run the encryption gets a hard stop with no
     fallback. Not enough memory offers Try again, which derives again.
     Test: `tests/browser/parts/unlock.mjs`.
-52. (blind) After the idle period, reading vault data prompts for
+53. (blind) After the idle period, reading vault data prompts for
     re-unlock, the keys are gone, and no decrypted holding name, value
     or snapshot is reachable, asserted against the in-memory model, not
     only the key handles. Unsaved form input is the one thing left.
     Test: `tests/browser/parts/unlock-idle.mjs`.
-53. (blind) Re-unlocking after a lock refetches and re-decrypts the
+54. (blind) Re-unlocking after a lock refetches and re-decrypts the
     vault rather than restoring a model kept across the lock. Test:
     `tests/browser/parts/unlock-idle.mjs`.
-54. What was typed in an open form is there after unlocking, and the
+55. What was typed in an open form is there after unlocking, and the
     person returns to the view the lock found. Test:
     `tests/browser/parts/unlock-idle.mjs`.
-55. A fill-in dialog comes back after unlocking with what was typed in
+56. A fill-in dialog comes back after unlocking with what was typed in
     it, a yes-or-no confirmation does not, and no password field is
     refilled. Test: `tests/browser/parts/unlock-lock.mjs`,
     `tests/browser/parts/unlock-idle.mjs`.
-56. Lock locks at once with no confirmation, keeps the server session,
+57. Lock locks at once with no confirmation, keeps the server session,
     and unlocking needs only the password. Test:
     `tests/browser/parts/unlock.mjs`.
-57. A refresh asks for the password again. Test:
+58. A refresh asks for the password again. Test:
     `tests/browser/parts/unlock.mjs`.
-58. (blind) No key material is written to `localStorage` or
+59. (blind) No key material is written to `localStorage` or
     `sessionStorage` at any step, upgrade, lock, unlock and restore
     included. Test: `tests/browser/parts/unlock.mjs`.
-59. (blind) No vault epoch is written to `localStorage` or
+60. (blind) No vault epoch is written to `localStorage` or
     `sessionStorage` at any step. An epoch kept in storage to survive a
     lock passes every functional test. Test: no test.
-60. A signed-in vault owner at the sign-in address goes to the dashboard
+61. A signed-in vault owner at the sign-in address goes to the dashboard
     and is asked only for the password. A signed-in administrator goes to
     the admin area. Test:
     `tests/test_auth.py::test_an_already_authenticated_caller_at_login_is_sent_to_the_root`,
     `tests/browser/parts/unlock.mjs`.
-61. A session that ran out mid-action shows the card with the username
+62. A session that ran out mid-action shows the card with the username
     known, and signing in returns to the form with what was typed. Test:
     `tests/browser/parts/unlock.mjs`.
-62. (blind) Two pages, one browser. Pages A and B are unlocked on one
+63. (blind) Two pages, one browser. Pages A and B are unlocked on one
     vault and B has a holding form open with a name typed. A restores a
     file. Before B sends any request, B holds no key, no decrypted name
     or figure and no typed name, every dialog is closed, and its card is
@@ -733,30 +755,30 @@ reason, and then learns at sign-in.
     restored vault. Unlocking B opens the dashboard with the restored
     figures, no notice and no unreadable record. Test:
     `tests/browser/parts/export-import.mjs`.
-63. (blind) The same with B showing only the dashboard and nothing kept
+64. (blind) The same with B showing only the dashboard and nothing kept
     puts B's card in the wording for nothing dropped. A kept dialog with
     nothing typed counts as dropped. Test:
     `tests/browser/parts/export-import.mjs`,
     `tests/browser/parts/unlock-replaced.mjs`.
-64. (blind) With B's channel stubbed so no message arrives, B's save
+65. (blind) With B's channel stubbed so no message arrives, B's save
     answers Conflict `{"refused":"vault-replaced"}`, B shows Replaced
     elsewhere and posts `{"replaced":"<its epoch>"}`, the records are
     exactly the restored set, and the Conflict never reaches the holding
     form's version reload. Test:
     `tests/browser/parts/export-import.mjs`,
     `tests/test_client.py::test_the_client_side_rules_hold`.
-65. (blind) A page in a second browser context, with its own session,
+66. (blind) A page in a second browser context, with its own session,
     stays drawn and sends nothing while hidden during a restore. Made
     visible, it sends one `GET /api/records?type=profile` and nothing
     else and shows Replaced elsewhere. Its session row still exists.
     Test: `tests/browser/parts/export-import.mjs`.
-66. (blind) A page idle-locked in a second context through a restore
+67. (blind) A page idle-locked in a second context through a restore
     shows, on unlocking, the Replaced since last open notice: for
     dropped input with a form's input held, the same with a kept dialog
     and nothing typed, and for nothing dropped with nothing kept. In
     each case it posted `{"replaced":"<the epoch it held>"}`. Test:
     `tests/browser/parts/export-import.mjs`.
-67. (blind) A page in a second context holding typed input when the
+68. (blind) A page in a second context holding typed input when the
     first logs out everywhere, signs in and restores: its next request
     answers Unauthorized and the card shows the session-ran-out state
     with the input held. Signing in drops the input, opens the dashboard
@@ -764,16 +786,16 @@ reason, and then learns at sign-in.
     in between, signing in returns to the view with the input and no
     notice. Test: `tests/browser/parts/export-import.mjs`,
     `tests/browser/parts/unlock.mjs`.
-68. (blind) Signing out and in again after a restore shows no Replaced
+69. (blind) Signing out and in again after a restore shows no Replaced
     since last open notice. Test: `tests/browser/parts/export-import.mjs`.
-69. (blind) Reloading and signing in again after a restore shows no
+70. (blind) Reloading and signing in again after a restore shows no
     Replaced since last open notice. Test: no test.
-70. (blind) A page ignores a channel message naming an epoch it does not
+71. (blind) A page ignores a channel message naming an epoch it does not
     hold, a message of any other shape, and every message while it holds
     no epoch. Every message a page posts has `replaced` as its only key,
     holding the replaced epoch. Test:
     `tests/test_client.py::test_the_client_side_rules_hold`,
     `tests/browser/parts/export-import.mjs`.
-71. (blind) A page that learned by Conflict or at sign-in posts the
+72. (blind) A page that learned by Conflict or at sign-in posts the
     epoch it held, and a page that learned by message posts nothing.
     Test: `tests/test_client.py::test_the_client_side_rules_hold`.
