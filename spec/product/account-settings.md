@@ -148,7 +148,8 @@ Each card shows:
 - Its **name**, editable in place. Renaming is instant and free, and
   touches no holding.
 - Its **coverage**, the same figure the dashboard shows: "7 of 10
-  holdings assigned", with the unassigned ones a click away. A
+  holdings assigned", with the unassigned ones a click away whenever
+  there are any. A
   dimension covering a third of the holdings draws a chart that is
   accurate and useless, and this is where that shows, at setup rather
   than in a confusing chart later.

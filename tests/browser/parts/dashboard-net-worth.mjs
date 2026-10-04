@@ -729,6 +729,85 @@ await run(async () => {
   );
   proxy.mode = 'answer';
 
+  // Coverage is a control only below N of N, and the holdings table is
+  // rendered only when it lists a row.
+  const dimsOf = () => model(({ v }) => [...v.holdings.values()].map((h) => ({ recordId: h.recordId, version: h.version, payload: h.payload })));
+  const original = await dimsOf();
+  let bumped = 0;
+  const assignAll = (except) => {
+    bumped += 1;
+    return plantHere(original.map((h) => ({
+      type: 'account',
+      recordId: h.recordId,
+      version: h.version + bumped,
+      payload: { ...h.payload, dims: h.payload.name === except ? {} : { liq: 'cash' } },
+    })));
+  };
+  const groupedByLiquidity = async (hash = '#/') => {
+    await reread();
+    await go(hash);
+    await ev(`(() => { const s = document.querySelector('.chart-card select'); s.value = 'liq'; s.dispatchEvent(new Event('change', { bubbles: true })); })()`);
+    await rec.frames();
+  };
+  const holdingsCard = () =>
+    ev(`JSON.stringify({
+      coverage: (document.querySelector('.chart-controls .coverage') || {}).tagName || null,
+      coverageText: (document.querySelector('.chart-controls .coverage') || {}).textContent || null,
+      coverageFocusable: document.querySelector('.chart-controls .coverage')?.tabIndex >= 0,
+      tables: document.querySelectorAll('.holdings-table').length,
+      heads: document.querySelectorAll('.holdings-card th').length,
+      rows: [...document.querySelectorAll('.holdings-table .row-name')].map((b) => b.textContent),
+      filter: document.querySelector('.holdings-card .filter-line')?.textContent || null,
+    })`).then(JSON.parse);
+
+  await assignAll('Mortgage');
+  await groupedByLiquidity();
+  const oneLeft = await holdingsCard();
+  await ev("document.querySelector('.chart-controls .coverage').click()");
+  await rec.frames();
+  const oneLeftFiltered = await holdingsCard();
+  check(
+    'net-worth-view: with one valued holding unassigned the coverage is a control, and activating it lists that holding as the only row',
+    oneLeft.coverage === 'BUTTON' && oneLeftFiltered.tables === 1 && oneLeftFiltered.rows.join() === 'Mortgage' &&
+      oneLeftFiltered.filter === 'Showing the holdings with no Liquidity value.Show all holdings',
+    JSON.stringify({ oneLeft, oneLeftFiltered }),
+  );
+
+  await assignAll(null);
+  await groupedByLiquidity();
+  const allAssigned = await holdingsCard();
+  const rowsBefore = allAssigned.rows;
+  await ev("document.querySelector('.chart-controls .coverage').click()");
+  await rec.frames();
+  const afterClick = await holdingsCard();
+  check(
+    'net-worth-view: at N of N the coverage is plain text, not focusable, and a click leaves the table\'s rows unchanged',
+    allAssigned.coverage === 'SPAN' && !allAssigned.coverageFocusable &&
+      /^(\d+) of \1 holdings assigned$/.test(allAssigned.coverageText) &&
+      afterClick.tables === 1 && afterClick.heads > 0 && afterClick.filter === null &&
+      afterClick.rows.join() === rowsBefore.join(),
+    JSON.stringify({ allAssigned, afterClick }),
+  );
+
+  await groupedByLiquidity('#/unassigned/liq');
+  const nothingLeft = await holdingsCard();
+  const unassignedText = await ev("document.querySelector('.holdings-card').innerText");
+  await ev("[...document.querySelectorAll('.holdings-card .filter-line button')].find((b) => b.textContent === 'Show all holdings').click()");
+  await rec.frames();
+  const restored = await holdingsCard();
+  check(
+    'net-worth-view: a filter with no unassigned holding left renders no table and no column heading, keeps its way back, and Show all holdings renders the table',
+    nothingLeft.tables === 0 && nothingLeft.heads === 0 && nothingLeft.filter === 'Every holding has a Liquidity value.Show all holdings' &&
+      unassignedText.includes('Every holding has a Liquidity value.') && !unassignedText.includes('Not yet valued') &&
+      restored.tables === 1 && restored.heads > 0 && restored.rows.length > 1 && restored.filter === null,
+    JSON.stringify({ nothingLeft, restored }),
+  );
+
+  bumped += 1;
+  await plantHere(original.map((h) => ({ type: 'account', recordId: h.recordId, version: h.version + bumped, payload: h.payload })));
+  await reread();
+  await go('#/');
+
   // Archiving records the zero, and the dates after the holding's last figure run down to it.
   const chartRows = () =>
     ev(`(async () => {

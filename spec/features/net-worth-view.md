@@ -492,19 +492,35 @@ is a column and every figure is absolute money.
 ## Edge cases
 
 - **No holdings** → empty state pointing at "Add your first holding."
-- **Holdings but no snapshots** → active holdings listed as "not yet valued,"
-  total shown as "—" rather than 0, no chart.
+- **Holdings but no snapshots** → active holdings listed as "not yet
+  valued" with no table headings above them (No listed row), total
+  shown as "—" rather than 0, no chart.
+- **No listed row** → the holdings table, headings included, is not
+  rendered, because a table of headings over nothing reads as a fault.
+  A listed row is an active holding with a figure in the selected
+  pricing mode, or an archived holding while "Show archived" is on,
+  narrowed to the unassigned ones while that filter applies, which
+  narrows the groups the same way. The "not yet valued" and "not
+  priced" groups stand alone under the section heading. `ui/dashboard.md`, States, owns what each case reads.
 - **A history of one day**, every snapshot, price entry and archive on
   one date → under every range the chart shows a single point at the
   middle of the plot (Ranges and modes, Reading a date) rather than
   failing or drawing a flat line back to the beginning of time.
-- **All holdings archived** → total is "—", history still renders.
+- **All holdings archived** → total is "—", history still renders, and
+  with "Show archived" off there is no holdings table (No listed row).
 - **A holding first valued and archived on the same date** → it
   appears on no chart date and on neither side of its step: absent just
   before its first snapshot, and absent at its archive.
 - **A dimension no holding carries** → one "Unassigned" band covering
   everything, with the coverage indicator reading 0 of N. Correct, and
   the indicator is what stops it being read as a bug.
+- **A dimension every active holding carries** → the coverage reads N
+  of N as plain text, never a control, because filtering to the
+  unassigned ones would list nothing. Coverage offers that filter only
+  while it reads fewer than N, and 0 of 0 is plain text too. A filter
+  already applied that lists no row, such as one opened from a link
+  made before the last holding was assigned, renders no table (No
+  listed row) and keeps its way back to every holding.
 - **A holding whose `dims` names an archived or unknown value** →
   "Unassigned", like any unclassified holding. The entry is preserved,
   so restoring the value restores the band.
@@ -699,6 +715,23 @@ is a column and every figure is absolute money.
   the holding count across all bands equals the total holding count.
 - An active holding with no snapshots is listed as "not yet valued"
   and is not counted as 0.
+- At a 1280px viewport, in a vault whose only holdings are active and
+  have no snapshots, the dashboard renders no holdings table and no
+  column heading, and every one of those holdings is under "not yet
+  valued". Recording a value for one renders the table with that
+  holding as its only row.
+- At a 1280px viewport, with every holding archived, "Show archived"
+  off renders no holdings table and no column heading, and on renders
+  the table with each archived holding as a row.
+- Under a dimension every active holding carries, the coverage reads
+  "N of N holdings assigned" with N the active holding count, is
+  neither a link nor a button, and is not focusable. Clicking it leaves
+  the holdings table's rows unchanged. With exactly one active holding
+  unassigned, and that holding valued, the coverage is a control, and
+  activating it lists that holding as the table's only row.
+- With the unassigned filter applied and no unassigned active holding
+  left, the dashboard renders no holdings table and no column heading,
+  and the filter's way back renders the table with every listed row.
 - With "Show archived" on, in both pricing modes, an archived holding
   in a unit with no price and an archived holding with no readable
   snapshot each render as a row of the holdings table with the Archived

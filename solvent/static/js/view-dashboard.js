@@ -301,20 +301,19 @@ function chartSection(vault, state, render, dimension, actions, { days, bands })
           groupBySelect(vault, state, render),
         ]),
         coverage
-          ? el('button', {
-              class: 'link-button coverage',
-              'aria-label': `${coverage.assigned} of ${coverage.total} holdings assigned. Show the unassigned ones.`,
-              onclick: () => {
-                state.unassignedOnly = true;
-                render();
-                const table = document.querySelector('.holdings-card');
-                if (table) table.scrollIntoView({ block: 'start' });
-              },
-            }, [
-              `${coverage.assigned} of ${coverage.total} `,
-              el('span', { class: 'wide-only', text: 'holdings ' }),
-              'assigned',
-            ])
+          ? coverage.assigned < coverage.total
+            ? el('button', {
+                class: 'link-button coverage',
+                'aria-label': `${coverage.assigned} of ${coverage.total} holdings assigned. Show the unassigned ones.`,
+                onclick: () => {
+                  state.unassignedOnly = true;
+                  render();
+                  const table = document.querySelector('.holdings-card');
+                  if (table) table.scrollIntoView({ block: 'start' });
+                },
+              }, coverageText(coverage))
+            // Nothing is left to filter to, so it is only a count.
+            : el('span', { class: 'coverage' }, coverageText(coverage))
           : null,
         el('div', { class: 'switch', role: 'group', 'aria-label': 'Scale' }, [
           switchButton('Absolute', !state.percentage, () => {
@@ -423,6 +422,14 @@ function chartSection(vault, state, render, dimension, actions, { days, bands })
       : null,
     el('details', {}, [el('summary', { text: 'View as table' }), chartTable(days, bands, vault.format, !dimension)]),
   ]);
+}
+
+function coverageText(coverage) {
+  return [
+    `${coverage.assigned} of ${coverage.total} `,
+    el('span', { class: 'wide-only', text: 'holdings ' }),
+    'assigned',
+  ];
 }
 
 function checkbox(checked, onchange) {
@@ -545,6 +552,7 @@ function holdingsTable(vault, state, render, actions, grouping) {
   const { rows, unpriced, unvalued } = holdingGroups(vault, state, grouping);
   const newestRate = vault.newestRateDate();
   const filtering = state.unassignedOnly && grouping;
+  const listed = rows.length + unpriced.length + unvalued.length > 0;
 
   const header = el('tr', {}, [
     el('th', { text: 'Name' }),
@@ -568,7 +576,11 @@ function holdingsTable(vault, state, render, actions, grouping) {
     ]),
     filtering
       ? el('p', { class: 'filter-line', role: 'status' }, [
-          el('span', { text: `Showing the holdings with no ${grouping.label} value.` }),
+          el('span', {
+            text: listed
+              ? `Showing the holdings with no ${grouping.label} value.`
+              : `Every holding has a ${grouping.label} value.`,
+          }),
           el('button', {
             class: 'link-button',
             text: 'Show all holdings',
@@ -582,7 +594,10 @@ function holdingsTable(vault, state, render, actions, grouping) {
           }),
         ])
       : null,
-    el('table', { class: 'data-table holdings-table' }, [
+    // Without a filter nothing listed means every holding is archived.
+    !filtering && !listed ? el('p', { class: 'hint', text: 'Every holding is archived.' }) : null,
+    // A table of headings alone reads as a fault.
+    rows.length ? el('table', { class: 'data-table holdings-table' }, [
       el('thead', {}, [header]),
       el(
         'tbody',
@@ -665,7 +680,7 @@ function holdingsTable(vault, state, render, actions, grouping) {
           ]),
         ),
       ),
-    ]),
+    ]) : null,
     unpriced.length
       ? group('Not priced', unpriced.map((r) => r.holding), vault, actions,
           'Their unit has no price at all, so they are excluded from the total rather than counted at their bare quantity.')

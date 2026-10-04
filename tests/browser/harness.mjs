@@ -617,7 +617,7 @@ export const redraw = async () => {
   await page.eval("location.hash = '#/unassigned/none'");
   await page.frames();
   await page.eval("location.hash = '#/'");
-  await page.waitUntil("document.querySelector('.holdings-table')", { label: 'the dashboard table' });
+  await page.waitUntil("document.querySelector('.holdings-card')", { label: 'the dashboard table' });
   await page.frames();
 };
 

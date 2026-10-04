@@ -13,7 +13,7 @@
     {"file": "spec/features/app-shell.md", "sections": ["The two surfaces", "CSRF"], "role": "/settings, GET /api/sessions, POST /api/auth/logout-all and DELETE /api/auth/account are vault routes, POST /api/auth/change-password is Shared, and POST /api/auth/logout is Public"},
     {"file": "spec/ui/design-system.md", "sections": ["Typography", "Spacing and shape", "Components", "States", "Accessibility", "App shell"], "role": "the input, dialog, disclosure, reorder and table conventions both screens below use, the phone-width sizes, and Typography, Figures, which states the money and quantity display rule for every screen"},
     {"file": "spec/ui/settings.md", "sections": ["all"], "role": "profile, change password, session and lock, and delete my account"},
-    {"file": "spec/ui/dimensions.md", "sections": ["all"], "role": "the only screen dimensions and their values are created, renamed, reordered, archived and restored on"},
+    {"file": "spec/ui/dimensions.md", "sections": ["all"], "role": "the only screen dimensions and their values are created, renamed, reordered, archived and restored on, and where each card's coverage line sits, whose link rule is net-worth-view.json's coverageLine"},
     {"file": "spec/ui/unlock.md", "sections": ["The derivation wait", "States", "Rules"], "role": "the re-unlock the idle period leads to, and the Replaced elsewhere state a vault replaced by an import turns the card into, the one lock the typed-input exception does not cover"}
   ],
   "dependsOn": ["app-shell", "record-api", "register", "login", "admin-invites", "export-import", "rate-lookup", "record-snapshot", "manage-accounts", "net-worth-view"],

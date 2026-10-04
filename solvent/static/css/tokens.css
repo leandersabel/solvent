@@ -1038,6 +1038,7 @@ th.numeric {
 }
 
 .chart-controls .coverage { font-size: 13px; padding: 0; }
+.chart-controls span.coverage { color: var(--ink-secondary); }
 
 /* Words a narrow screen drops, and the shorter ones it uses instead. */
 .narrow-only { display: none; }

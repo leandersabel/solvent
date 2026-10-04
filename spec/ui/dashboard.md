@@ -104,8 +104,11 @@ bands mirror down, the net-worth line runs over the top.
   ones excluded. Default "Total" — one band, no stacking — until the
   user configures a dimension. It also drives the breakdown section
   below. Beside it, the dimension's **coverage**: "7 of 10 holdings
-  assigned", clickable to filter the table to the unassigned ones
-  (`dimensions.md`, which owns what coverage is for).
+  assigned" (`dimensions.md`, which owns what coverage is for). While
+  fewer holdings are assigned than there are, the line is a link that
+  filters the holdings table to the unassigned ones (Holdings table).
+  At "10 of 10 holdings assigned" it is plain text, because there is
+  nothing to filter to.
 - **Absolute / percentage** toggle. Percentage normalizes each side
   against itself; the caption says so, because a reader will otherwise
   assume the shares are of the net figure.
@@ -231,6 +234,11 @@ The section heading holds the left of the card's head row and the
 "Show archived" toggle the right, with the table filling the card
 beneath them.
 
+The table renders only when it lists at least one row, because a table
+is never its headings alone (`design-system.md`, States). Otherwise the
+"Not yet valued" and "Not priced" groups stand directly beneath the
+head row, or the card holds the one line its state gives (States).
+
 Columns: Name · Dimensions · Latest value (native unit) · In main
 currency · As of · (row action).
 
@@ -284,6 +292,13 @@ currency · As of · (row action).
     valued", and In main currency and As of are empty.
   - Its row action is **Unarchive** in place of Record a value
     (`account-form.md`, Rules).
+- **Filtered to the unassigned**, reached from the coverage line here or
+  on `dimensions.md`: the table and both groups list only the holdings
+  with no value for the Group by dimension, archived ones included
+  while "Show archived" is on. A line in ink-secondary between the head
+  row and the table says so and ends in a **Show all holdings** link,
+  which clears the filter (States). Setting Group by to "Total" clears
+  it too.
 - Row click → the holding's detail screen (`account-detail.md`), which
   owns that holding's own list of values. A "Record a value" action on
   each active row opens the single-holding form at that holding
@@ -313,7 +328,7 @@ The regions keep their order and stack, 20px apart.
   at the left and its amount at the right, and the bar keeps the shared
   zero baseline beneath it.
 - **Holdings table**: a list rather than a table, with no column
-  headings. Each row holds the name with its dimension chips beneath
+  headings, rendered only when it lists a row, as the table is. Each row holds the name with its dimension chips beneath
   it at the left, and at the right the main-currency figure with any
   price date line and then the as-of date beneath it, preceded by the
   native figure where the unit is not the main currency. A row carries
@@ -333,12 +348,13 @@ The regions keep their order and stack, 20px apart.
 - **Empty — no holdings**: single centered card, "Add your first
   holding", primary button. No chart, no table, no zero total, and no
   New recording: there is nothing to record against yet.
-- **Empty — holdings but no snapshots**: table renders with every
-  active holding under "Not yet valued", and with "Show archived" on,
-  each archived one as an archived row reading "not yet valued"
-  (Holdings table). Total shows "—", not 0. No chart.
-  New recording works, because this is the state somebody leaves by
-  recording.
+- **Empty — holdings but no snapshots**: every active holding is under
+  "Not yet valued", directly beneath the holdings card's head row, with
+  no table and no column headings. With "Show archived" on, each
+  archived holding is an archived row reading "not yet valued", so the
+  table renders above the group with those rows alone (Holdings table).
+  Total shows "—", not 0. No chart. New recording works, because this
+  is the state somebody leaves by recording.
 - **Date picker open**: today is focused, dates holding a recording are
   marked, future dates are not selectable (`design-system.md`,
   Components). Dismissing it changes nothing and writes nothing.
@@ -353,7 +369,22 @@ The regions keep their order and stack, 20px apart.
   date beneath it on the date axis, at desktop and at phone width. No
   line runs back to the beginning of time.
 - **Populated — all holdings archived**: total "—", history still
-  renders.
+  renders. With "Show archived" off, the holdings card holds one line in
+  ink-secondary beneath its head row, and no table:
+
+  > Every holding is archived.
+
+  With it on, every holding is an archived row.
+- **Filtered to the unassigned**, with "Liquidity" as the Group by
+  dimension: the line above the table reads
+
+  > Showing the holdings with no Liquidity value. Show all holdings
+
+- **Filtered, nothing unassigned**: every holding the filter could list
+  has a value for the dimension. The line stands alone beneath the head
+  row, with no table and no groups:
+
+  > Every holding has a Liquidity value. Show all holdings
 - **No dimensions configured**: "Group by" offers only "Total", with a
   link to `dimensions.md` to create one. The chart is a single band, the
   breakdown section is absent, and every other control still works. This

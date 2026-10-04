@@ -47,6 +47,10 @@ await run(async () => {
 
   check('every holding is listed as not yet valued', (await text()).includes('Not yet valued'));
   check(
+    'with no holding valued, the groups stand under the head row with no table and no column heading',
+    await page.eval("!document.querySelector('.holdings-table') && !document.querySelector('.holdings-card th') && document.querySelector('.holdings-card .card-head + .table-group .group-heading')?.textContent === 'Not yet valued'"),
+  );
+  check(
     'a holding reads back the name it was given',
     (await labels('.plain-list .link-button')).join(',') ===
       'Cantonal account,UBS dollar account,Gold bars,Mortgage',
@@ -65,6 +69,10 @@ await run(async () => {
     }],
   });
   await unlockDashboard('the dashboard of the story');
+  check(
+    'once a holding is valued the table renders, with its column headings above the valued rows',
+    await page.eval("document.querySelectorAll('.holdings-table th').length > 0 && document.querySelectorAll('.holdings-table tbody tr').length > 0"),
+  );
 
   {
     await recordWrites();

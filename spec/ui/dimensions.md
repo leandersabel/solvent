@@ -25,9 +25,10 @@ Each card carries:
   instant: it writes the profile record and no account record
   (`account-settings.md`).
 - Its **coverage**, the same figure the dashboard shows: "7 of 10
-  holdings assigned", the unassigned count linking to a filtered list
-  of holdings. A dimension covering a third of the holdings draws a
-  chart that is correct and useless, and this is where that gets
+  holdings assigned", a link exactly where the dashboard's is one
+  (`dashboard.md`, Trend chart), opening the dashboard filtered to the
+  unassigned holdings. A dimension covering a third of the holdings
+  draws a chart that is correct and useless, and this is where that gets
   noticed — at the point of configuration, not after a confusing chart.
   - Coverage counts **active holdings**, the same set the dashboard
     table holds. An archived holding is a closed position and has no
@@ -136,7 +137,7 @@ out of the chart, and its only question is whether it comes back.
 
 The cards stack and each one keeps every control it has on a wide
 screen. The coverage line wraps under the label instead of sitting
-beside it, and its unassigned link stays a tap target of its own.
+beside it, and stays a tap target of its own wherever it is a link.
 
 ## States
 
