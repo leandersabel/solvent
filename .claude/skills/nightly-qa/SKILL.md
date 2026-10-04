@@ -1,42 +1,31 @@
 ---
 name: nightly-qa
-description: Plan tonight's QA walk, walk one shard of it against the client's acceptance lists, or merge what the shards recorded for the workflow to file. Run by .github/workflows/nightly.yml.
+description: Walk one shard of tonight's QA walk against the client's acceptance lists, or merge what the shards recorded for the workflow to file. Run by .github/workflows/nightly.yml.
 ---
 
 # Nightly QA
 
-The first argument names the part to run: `plan`, `walk` or `merge`.
+The first argument names the part to run: `walk` or `merge`.
 `CLAUDE.md`, The loop, Nightly and stable, is the contract this keeps.
 GitHub is read with `gh`, and you write nothing to it: the workflow
-splits the walk into shards from your plan, and files what the shards
-record after they all finish.
-
-## Plan
-
-The arguments are `plan <last tag>`. A feature is a page in
-`spec/features/` with a "What the client gets" section, named without
-`.md`. It is walked in full when its
-page changed since the last tag, or when an issue closed since then
-names it. Read the closed issues'
-titles and bodies for that, and nothing else about them. Write the
-features to walk in full to `qa-full.txt`, one name per line, and
-nothing else.
+chooses the features and splits them into shards, and files what the
+shards record after they all finish.
 
 ## Walk
 
-The arguments are `walk <url> <invite path> full=<features>
-smoke=<features> [<manifest>]`, each list comma-separated and possibly
-empty, where `<manifest>` is the path of the prepared data's manifest.
+The arguments are `walk <url> <invite path> <features> [<manifest>]`,
+the features comma-separated, each named after its page in
+`spec/features/`, and `<manifest>` the path of the prepared data's
+manifest.
 This shard's app is its own, and no other shard reaches it.
 
 1. **Read what is already reported**, once, before the first run. Read
    the titles and bodies of the open `bug` and `qa` issues by
    `leandersabel`, `claude[bot]` and `github-actions[bot]`, so you
    recognize a repeat (`CLAUDE.md`, The loop, Findings).
-2. **Run `qa`** in the foreground: once for each feature walked in
-   full, then once for every smoke path together, then, when the shard
-   has any, once for the wrong-password and lockout checks of the whole
-   shard. After each report, record its findings and what it could not
+2. **Run `qa`** in the foreground: once for each feature, then, when
+   the shard has any, once for the wrong-password and lockout checks of
+   the whole shard. After each report, record its findings and what it could not
    check (steps 3 and 4) before starting the next run, so a timeout
    loses at most the feature in hand.
 

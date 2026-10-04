@@ -7,6 +7,11 @@ on:
   schedule:
     - cron: "0 1 * * *"
   workflow_dispatch:
+    inputs:
+      full:
+        description: Walk every feature, as promotion requires
+        type: boolean
+        default: false
 
 permissions: {}
 
@@ -28,6 +33,7 @@ jobs:
       go: ${{ steps.decide.outputs.go }}
       today: ${{ steps.decide.outputs.today }}
       last: ${{ steps.decide.outputs.last }}
+      commit: ${{ steps.decide.outputs.commit }}
       image: ${{ steps.app.outputs.image }}
       failed: ${{ steps.failed.outputs.failed }}
     steps:
@@ -40,19 +46,23 @@ jobs:
       - run: gh workflow run agent.yml --ref master -f issue=alerts
 
       # At most one version a day, and none for a night whose only
-      # changes are to the spec, the docs or the pipeline.
+      # changes are to the spec, the docs or the pipeline, unless the
+      # client asks for a full walk.
       - id: decide
+        env:
+          FULL: ${{ inputs.full }}
         run: |
           today=$(date -u +%F)
           last=$(git tag --list '20[0-9][0-9]-[0-9][0-9]-[0-9][0-9]' --sort=-refname | head -n 1)
           echo "today=$today" >> "$GITHUB_OUTPUT"
           echo "last=$last" >> "$GITHUB_OUTPUT"
+          echo "commit=$(git rev-parse HEAD)" >> "$GITHUB_OUTPUT"
           if [ "$last" = "$today" ]; then
             echo "Version $today already exists."
             [ "${{ github.event_name }}" = workflow_dispatch ] && exit 1
             echo "go=false" >> "$GITHUB_OUTPUT"; exit 0
           fi
-          if [ -n "$last" ] && [ -z "$(git diff --name-only "$last" HEAD | grep -vE '^(spec/|\.github/|\.claude/|CLAUDE\.md|README\.md)')" ]; then
+          if [ "$FULL" != true ] && [ -n "$last" ] && [ -z "$(git diff --name-only "$last" HEAD | grep -vE '^(spec/|\.github/|\.claude/|CLAUDE\.md|README\.md)')" ]; then
             echo "No code changed since $last."
             echo "go=false" >> "$GITHUB_OUTPUT"; exit 0
           fi
@@ -132,48 +142,37 @@ jobs:
     needs: build
     if: needs.build.outputs.go == 'true'
     runs-on: ubuntu-latest
-    timeout-minutes: 20
-    environment: agent
+    timeout-minutes: 5
     permissions:
       contents: read
-      issues: read
-      id-token: write
+      actions: read
     outputs:
-      shards: ${{ steps.split.outputs.shards }}
+      shards: ${{ steps.plan.outputs.shards }}
+      every: ${{ steps.plan.outputs.every }}
+      record: ${{ steps.plan.outputs.record }}
       failed: ${{ steps.failed.outputs.failed }}
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
-          ref: master
+          ref: ${{ needs.build.outputs.commit }}
           fetch-depth: 0
 
-      # With no last version, every feature is walked in full.
-      - if: needs.build.outputs.last != ''
-        id: plan
-        uses: anthropics/claude-code-action@fd1c128679612beff4ca259c78021c506e8aa7a7 # v1.0.237
-        with:
-          claude_code_oauth_token: ${{ secrets.CLAUDE_CODE_OAUTH_TOKEN }}
-          prompt: >-
-            Run the `nightly-qa` skill with the arguments
-            `plan ${{ needs.build.outputs.last }}`.
-          allowed_bots: claude,github-actions,dependabot
-          bot_id: "209825114"
-          plugin_marketplaces: https://github.com/leandersabel/skald.git
-          plugins: skald@skald
-          claude_args: |
-            --model claude-opus-5-5
-            --allowedTools Read,Write,Glob,Grep,Skill,"Bash(gh issue list:*)","Bash(gh issue view:*)","Bash(git diff:*)","Bash(git log:*)"
-
-      # The plan is checked and split without a model, from the commit's
-      # own copy, so only known feature names reach the shards.
-      - run: git checkout -q HEAD -- .github/actions
-      - id: split
+      # What the last completed walk covered, kept by the night that
+      # walked it. Without it, every feature is walked.
+      - run: |
+          id=$(gh api "repos/$GITHUB_REPOSITORY/actions/artifacts?name=qa-walked&per_page=1" \
+            --jq '.artifacts[] | select(.expired | not) | .id') &&
+            [ -n "$id" ] &&
+            gh api "repos/$GITHUB_REPOSITORY/actions/artifacts/$id/zip" > "$RUNNER_TEMP/walked.zip" &&
+            unzip -o "$RUNNER_TEMP/walked.zip" qa-walked.json ||
+            echo "No record of a last walk."
+      - id: plan
         env:
-          LAST: ${{ needs.build.outputs.last }}
+          FULL: ${{ inputs.full }}
+          TODAY: ${{ needs.build.outputs.today }}
         run: python3 .github/actions/qa-plan/plan.py >> "$GITHUB_OUTPUT"
 
-      # Which steps failed, for the failure report. Inline, because the
-      # model in this job could rewrite anything in the working tree.
+      # Which steps failed, for the failure report.
       - if: failure() || cancelled()
         id: failed
         env:
@@ -307,7 +306,7 @@ jobs:
           prompt: >-
             Run the `nightly-qa` skill with the arguments
             `walk http://localhost:8000 ${{ steps.app.outputs.invite }}
-            full=${{ join(matrix.shard.full, ',') }} smoke=${{ join(matrix.shard.smoke, ',') }}
+            ${{ join(matrix.shard.features, ',') }}
             tools/nightly/fixtures/out/manifest.json`.
           # A scheduled run's actor is whoever last changed this file,
           # which can be a bot.
@@ -422,6 +421,15 @@ jobs:
           SHARDS: ${{ needs.plan.outputs.shards }}
         run: '[ "$(find shards -name qa-done.txt | wc -l)" -eq "$(jq length <<< "$SHARDS")" ]'
 
+      # What the completed walk covered, for the next night's plan.
+      - env:
+          RECORD: ${{ needs.plan.outputs.record }}
+        run: printf '%s\n' "$RECORD" > qa-walked.json
+      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+        with:
+          name: qa-walked
+          path: qa-walked.json
+
       - id: gate
         uses: ./.github/actions/release-gate
         with:
@@ -443,6 +451,7 @@ jobs:
         env:
           TODAY: ${{ needs.build.outputs.today }}
           LAST: ${{ needs.build.outputs.last }}
+          EVERY: ${{ needs.plan.outputs.every }}
         run: |
           echo "${{ github.token }}" | docker login ghcr.io -u "${{ github.actor }}" --password-stdin
           docker tag "$IMAGE:$TODAY" "$IMAGE:nightly"
@@ -451,6 +460,8 @@ jobs:
           # The release creates the tag through the API: the agent step
           # left git authenticated with a token it has since revoked.
           python3 tools/release-notes.py "$LAST" HEAD > notes.md
+          # Promotion looks for this line (promote.yml).
+          [ "$EVERY" != true ] || printf '\nQA walked every feature.\n' >> notes.md
           gh release create "$TODAY" --target "$(git rev-parse HEAD)" --prerelease --title "$TODAY" --notes-file notes.md
 
       # A failed night always leaves an issue the loop takes up.

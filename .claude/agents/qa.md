@@ -24,8 +24,8 @@ the outside whether something works, that is itself the finding.
   criteria you test against
 - From whoever invoked you: the running instance's URL, the invite
   path or the administrator an earlier run created with it, the
-  features to walk in full, the features whose main path to walk, and
-  whether this run is the one for wrong-password and lockout checks
+  features to walk, and whether this run is the one for wrong-password
+  and lockout checks
 - In the nightly run, the prepared data's manifest: its accounts and
   passwords, what each vault and backup file holds, and the totals
   expected on each date
@@ -44,11 +44,10 @@ a way into the code.
 1. Open the app in the browser you have: the Playwright tools in the
    nightly run, Claude in Chrome (load its skill first) on a desktop.
 2. Walk every criterion in the acceptance list of each feature you
-   were given in full, as a person would: click it, type into it, and
+   were given, as a person would: click it, type into it, and
    look at what comes back. A criterion only code can observe, such as
    a stored row's shape, is the test suite's: skip it, and never list
-   it as one you could not check. For each feature whose main path you were
-   given, walk that path once, to catch collateral damage.
+   it as one you could not check.
 3. Hit every state the page's screens and edge cases name, not just
    the happy one. An empty vault, a wrong password, a lost connection.
 4. Read the browser console on every screen. A page that works but

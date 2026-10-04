@@ -346,10 +346,14 @@ found.
   `.github/workflows/nightly.yml` builds the image once and runs the
   suite against that commit, unless the push check of the last commit
   that changed anything but `.claude/` or the top-level docs already
-  passed it. `qa` walks the full
-  acceptance list of every feature touched by an issue closed since the
-  last version, and a smoke path through the rest. The client can start
-  the same run by hand.
+  passed it. `qa` walks the acceptance list of each feature whose page
+  changed since the commit the last completed walk covered, each one a
+  changed file of the image or the harness names by its page's path,
+  and the one walked longest ago, so every feature is walked within as
+  many nights as there are features. A changed file naming none, or no
+  record of a last walk, walks every feature. The client can start the
+  same run by hand, and `gh workflow run nightly.yml -f full=true` walks
+  every feature.
 - The walk is split into shards that run at once. Each shard starts its
   own instance of tonight's image, hardened on a network with no route
   out, beside a stand-in that answers as the price sources through a
@@ -383,12 +387,14 @@ found.
   with that title.
 - A passing night is a pre-release named by its date, `YYYY-MM-DD`,
   with the image on `ghcr.io/leandersabel/solvent` tagged `:<date>` and
-  `:nightly`. There is at most one version a day.
+  `:nightly`. There is at most one version a day. Its notes say when QA
+  walked every feature.
 - The client promotes a nightly by marking its release the latest.
   That tags the same image `:stable` without a rebuild, rewrites the
   notes to cover everything since the last stable, and deletes the
   nightlies before it. While something would hold back that nightly,
-  promotion is refused and the release turns back into a pre-release.
+  or QA did not walk every feature of it, promotion is refused and the
+  release turns back into a pre-release.
 - Release notes are assembled from the merged pull requests' titles,
   without a model, grouped into changes and fixes, fixes for what
   agents found, and maintenance. Each line names who asked, who

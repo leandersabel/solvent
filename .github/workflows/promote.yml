@@ -30,13 +30,20 @@ jobs:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           fetch-depth: 0
+      # Only a nightly QA walked in full is made stable (nightly.yml).
+      - id: walked
+        run: |
+          gh release view "$TAG" --json body --jq .body | tr -d '\r' | grep -qxF "QA walked every feature." || {
+            echo "::error::QA did not walk every feature of $TAG. Run 'gh workflow run nightly.yml -f full=true' and promote the version it builds."
+            exit 1
+          }
       # A nightly something now holds back is not made stable.
       - id: gate
         uses: ./.github/actions/release-gate
         with:
           commit: ${{ env.TAG }}
           since: ${{ env.TAG }}
-      - if: failure() && steps.gate.outcome == 'failure'
+      - if: failure() && (steps.walked.outcome == 'failure' || steps.gate.outcome == 'failure')
         run: gh release edit "$TAG" --prerelease
       - run: |
           echo "${{ github.token }}" | docker login ghcr.io -u "${{ github.actor }}" --password-stdin
