@@ -564,7 +564,8 @@ reason, and then learns at sign-in.
     read that gets a server error after a correct password, each show
     "That did not go through. Everything you typed is still here, so you
     can try again." with both fields still filled, and the vault read
-    leaves no keys held. Test: `tests/browser/parts/unlock.mjs`.
+    leaves no keys held. Test: `tests/browser/parts/unlock.mjs`,
+    `tests/browser/parts/unlock-review-unreachable.mjs`.
 18. A vault owner below the default envelope is upgraded at sign-in:
     salt, envelope, Auth Key hash and wrapped DEK change, and the DEK is
     unchanged, proven by decrypting a record written before. Test:
