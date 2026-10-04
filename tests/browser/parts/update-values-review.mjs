@@ -95,20 +95,172 @@ await run(async () => {
     `${rateAsks().length} asks, ${putsAndDeletes().join(' ')}`,
   );
   check('review: the rows read as recorded on the reopened recording', (await rowState('Brokerage')).state === 'Recorded for this date.');
-  await lookUp('XAU-ozt');
-  const goldFilled = await lineState('XAU-ozt');
-  const goldDay = await format('dayMonth', proposalsFor(DX)['XAU-ozt'].asOf, 'short');
+  // GBP and gram gold have a source at this date and nothing stored; the
+  // stub's answer covers neither. Silver is `lookup: false`; m2 and PAINT
+  // are free text.
+  const offers = Object.fromEntries(await Promise.all(
+    ['USD', 'XAU-ozt', 'GBP', 'XAU-g', 'XAG-ozt', 'm2', 'PAINT'].map(async (u) => [u, (await lineState(u) || {}).lookup]),
+  ));
   check(
-    'review 34: pressing Look it up issues the one request, for this date',
-    rateAsks().length === 1 && rateAsks()[0].url.includes(`date=${DX}`),
+    'review rate 18: Look it up is offered on every empty line with a source, and not on lookup-false or free-text units',
+    offers.USD && offers['XAU-ozt'] && offers.GBP && offers['XAU-g'] && !offers['XAG-ozt'] && !offers.m2 && !offers.PAINT,
+    JSON.stringify(offers),
+  );
+  const snapshotsAtDX = bytes(await snapshotsAt(DX));
+  await lookUp('XAU-ozt');
+  const asked = await ev("Boolean(document.querySelector('.dialog'))");
+  const firstWrite = traffic.findIndex((t) => t.method === 'PUT');
+  check(
+    'review 34: pressing Look it up issues the one request, for this date, carrying no figure or holding',
+    rateAsks().length === 1 && new URL(rateAsks()[0].url).searchParams.get('date') === DX &&
+      [...new URL(rateAsks()[0].url).searchParams.keys()].every((k) => ['date', 'quote', 'symbol'].includes(k)) &&
+      !Object.values(id).some((h) => JSON.stringify(rateAsks()[0]).includes(h)),
     rateAsks().map((a) => a.url).join(' '),
   );
   check(
-    'review 36: Look it up fills the line with the answer, labeled with the day it is for, and writes nothing',
-    figure(goldFilled.value) === Number(proposalsFor(DX)['XAU-ozt'].rate) && goldFilled.chip.includes(goldDay) && writesSent().length === 0,
-    JSON.stringify({ goldFilled, goldDay }),
+    'review: Look it up reloads both types before its first write',
+    firstWrite >= 0 && reloadsAt('snapshot').some((at) => at < firstWrite) && reloadsAt('rate').some((at) => at < firstWrite),
+    JSON.stringify({ snapshot: reloadsAt('snapshot'), rate: reloadsAt('rate'), firstWrite }),
   );
-  check('review 35: the line left empty is still on offer for its own lookup', reopenedWording('USD', await lineState('USD')));
+  const savedAtDX = on(await stored('rate'), DX);
+  const savedAs = (unit) => savedAtDX.filter((p) => p.payload.symbol === unit);
+  const asProposed = (unit) => {
+    const [entry, ...more] = savedAs(unit);
+    const answer = proposalsFor(DX)[unit];
+    return entry && !more.length && entry.version === 1 && entry.payload.rateSource === 'proposed' &&
+      entry.payload.rate === answer.rate && entry.payload.rateAsOf === answer.asOf && entry.payload.rateTarget === 'CHF';
+  };
+  check(
+    'review 37 / rate 18: one press saves every empty line the answer covers as proposed with its rateAsOf, with no confirmation, and nothing else',
+    asProposed('USD') && asProposed('XAU-ozt') && savedAtDX.length === 2 && !asked &&
+      putsAndDeletes().length === 2 && putsAndDeletes().every((w) => w.startsWith('PUT')) &&
+      bytes(await snapshotsAt(DX)) === snapshotsAtDX,
+    JSON.stringify({ saved: savedAtDX.map((p) => p.payload), asked, writes: putsAndDeletes() }),
+  );
+  const goldFilled = await lineState('XAU-ozt');
+  const goldDay = await format('dayMonth', proposalsFor(DX)['XAU-ozt'].asOf, 'short');
+  check(
+    'review 36: the line shows the answer, labeled with the day it is for, and no longer offers Look it up',
+    figure(goldFilled.value) === Number(proposalsFor(DX)['XAU-ozt'].rate) && goldFilled.chip.includes(goldDay) && !goldFilled.lookup &&
+      !(await lineState('USD')).lookup,
+    JSON.stringify({ goldFilled, goldDay, usd: await lineState('USD') }),
+  );
+  check(
+    'review: a line the answer left out stays empty with its own Look it up',
+    reopenedWording('GBP', await lineState('GBP')) && reopenedWording('XAU-g', await lineState('XAU-g')),
+    JSON.stringify([await lineState('GBP'), await lineState('XAU-g')]),
+  );
+  await home();
+  check('review 37: leaving at once names no unit as unsaved', !(await text()).includes('not saved'), (await text()).slice(0, 300));
+
+  // ---- Look it up beside typed text, and a price filled in elsewhere ----
+
+  const recordInOutage = async (date) => {
+    proxy.mode = 'down';
+    await home();
+    await byAddress(`#/sweep/${date}`);
+    await typeRow('Brokerage', '2500');
+    await pressRow('Brokerage');
+    await home();
+    proxy.mode = 'answer';
+    await byAddress(`#/sweep/${date}`);
+  };
+  const DT = ago(46);
+  await recordInOutage(DT);
+  await typeLine('USD', '0.9');
+  await plantHere([r.price('XAU-ozt', DT, '2500', 'proposed')]);
+  const plantedGold = bytes(on(await stored('rate'), DT));
+  traffic.length = 0;
+  await lookUp('XAU-ozt');
+  const goldThere = await lineState('XAU-ozt');
+  check(
+    'review: Look it up leaves a typed line alone and a price stored elsewhere as stored, writing nothing',
+    writesSent().length === 0 && bytes(on(await stored('rate'), DT)) === plantedGold &&
+      (await lineState('USD')).value === '0.9' && figure(goldThere.value) === 2500,
+    JSON.stringify({ writes: putsAndDeletes(), usd: await lineState('USD'), goldThere }),
+  );
+  check(
+    'review: the banner says the price was filled in another window',
+    (await text()).includes('The XAU-ozt rate was filled in another window, and the line shows what is stored now.'),
+    (await text()).slice(0, 600),
+  );
+  await home();
+  const leftNotice = await text();
+  check(
+    'review: leaving with the typed line names that unit, and not the one stored elsewhere',
+    leftNotice.includes('the USD rate') && !leftNotice.includes('the XAU-ozt rate'),
+    leftNotice.slice(0, 400),
+  );
+
+  // ---- A create that fails, retried by the lines' own save -------------
+
+  const DU = ago(47);
+  await recordInOutage(DU);
+  const failRates = (entry) => entry.method === 'PUT' && (bodyOf(entry) || {}).recordType === 'rate' && 500;
+  r.faults.push(failRates);
+  traffic.length = 0;
+  await lookUp('USD');
+  r.faults.splice(r.faults.indexOf(failRates), 1);
+  const outsideLines = await ev(`(() => {
+    const copy = document.querySelector('main').cloneNode(true);
+    copy.querySelectorAll('.rate-line, .sweep-row').forEach((n) => n.remove());
+    return copy.textContent;
+  })()`);
+  check(
+    'review: a create that fails keeps the answer on its line and is named outside the lines',
+    figure((await lineState('USD')).value) === Number(proposalsFor(DU).USD.rate) &&
+      figure((await lineState('XAU-ozt')).value) === Number(proposalsFor(DU)['XAU-ozt'].rate) &&
+      outsideLines.includes('USD') && outsideLines.includes('XAU-ozt') && on(await stored('rate'), DU).length === 0,
+    JSON.stringify({ usd: await lineState('USD'), gold: await lineState('XAU-ozt'), outsideLines: outsideLines.slice(0, 400) }),
+  );
+  traffic.length = 0;
+  await press('Save the rate lines');
+  const retryAsked = await ev("Boolean(document.querySelector('.dialog'))");
+  const retried = on(await stored('rate'), DU);
+  check(
+    'review rate 18: the lines\' save retries the failed creates as proposed, asking nothing',
+    !retryAsked && retried.length === 2 && retried.every((p) => p.version === 1 && p.payload.rateSource === 'proposed' &&
+      p.payload.rateAsOf === proposalsFor(DU)[p.payload.symbol].asOf) && rateAsks().length === 0,
+    JSON.stringify({ retryAsked, retried: retried.map((p) => p.payload), asks: rateAsks().length }),
+  );
+
+  // ---- An answer after leaving, and a date emptied elsewhere -----------
+
+  const DL = ago(48);
+  await recordInOutage(DL);
+  traffic.length = 0;
+  const release = r.holdRates();
+  await rec.call((query) => document.querySelector(query).querySelector('.btn-inline:not([hidden])').click(), line('USD'));
+  await ev(`document.querySelector('.topbar nav a[href="#/"]').click()`);
+  release();
+  await quiet();
+  check(
+    'review: an answer arriving after the screen was left writes nothing',
+    rateAsks().length === 1 && writesSent().length === 0 && on(await stored('rate'), DL).length === 0,
+    putsAndDeletes().join(' '),
+  );
+
+  const DM = ago(49);
+  await recordInOutage(DM);
+  await r.unwatched(() => rec.call(async (date) => {
+    const api = await import('/static/js/api.js');
+    const c = await import('/static/js/crypto.js');
+    const dek = (await import('/static/js/session.js')).currentVault().dek;
+    for (const record of await api.get('/api/records?type=snapshot')) {
+      if ((await c.decryptRecord(dek, record)).date === date) await api.del(`/api/records/${record.recordId}`, { version: record.version });
+    }
+  }, DM));
+  check('review: the other window emptied the date', (await snapshotsAt(DM)).length === 0);
+  traffic.length = 0;
+  await lookUp('USD');
+  check(
+    'review: Look it up at a date another window emptied reloads and writes nothing',
+    typeReads('snapshot').length === 1 && typeReads('rate').length === 1 && writesSent().length === 0 &&
+      on(await stored('rate'), DM).length === 0,
+    `${putsAndDeletes().join(' ')} | ${typeReads('snapshot').length} ${typeReads('rate').length}`,
+  );
+  await reread();
+  await home();
 
   // ---- The same, by Recording detail's Update and by the date picker ----
 
