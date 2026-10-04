@@ -570,6 +570,16 @@ function unitList(units) {
   return units.length > 1 ? `${units.slice(0, -1).join(', ')} and ${units.at(-1)}` : units[0];
 }
 
+/** What a purge takes with it, read off the holding's snapshots. Only a
+ *  figure that is not zero moves a past total, so a holding whose only
+ *  figure is an archive's zero changes none. */
+function purgeCopy(snapshots) {
+  if (!snapshots.length) return 'There are no recorded values to delete. Your past net worth figures stay as they are.';
+  const values = snapshots.length === 1 ? '1 recorded value' : `${snapshots.length} recorded values`;
+  const changes = snapshots.some((s) => decimal.parse(s.payload.value) !== decimal.ZERO);
+  return `This also deletes ${values}. Your past net worth figures ${changes ? 'will change' : 'stay as they are'}.`;
+}
+
 /** The archive or delete decision, which a holding's own Archive
  *  action opens even when it has no snapshots. `then` names where a
  *  dialog reopened after a lock goes when it is done, `onDone` being
@@ -614,9 +624,7 @@ export function archiveHoldingDialog(vault, holding, onDone, then = 'reload', sa
       : null,
   ]);
   const deleteSection = el('div', { class: 'choice-section', hidden: !archived }, [
-    el('p', {
-      text: `This also deletes ${snapshots.length} recorded values. Your past net worth figures will change.`,
-    }),
+    el('p', { text: purgeCopy(snapshots) }),
     el('div', { class: 'field' }, [
       el('label', { for: 'delete-name', text: 'Type the holding’s name to delete it permanently' }),
       typed,

@@ -734,6 +734,15 @@ await run(async () => {
     await openHolding(emptyId);
     await click('Archive');
     await page.waitUntil("document.body.innerText.includes('Records zero for this holding on')", { label: 'the archive dialog of a holding with no values' });
+    await page.eval("document.querySelector('.dialog input[value=delete]').click()");
+    await page.frames();
+    check(
+      'a holding with no values says its delete takes no values and changes no past figure',
+      (await text()).includes('There are no recorded values to delete. Your past net worth figures stay as they are.') &&
+        !(await text()).includes('will change'),
+    );
+    await page.eval("document.querySelector('.dialog input[value=archive]').click()");
+    await page.frames();
     await inDialog('Archive');
     await page.waitUntil('!document.querySelector(".dialog")', { timeout: 60000, label: 'the empty holding to archive' });
     await page.idle();
@@ -742,6 +751,15 @@ await run(async () => {
       JSON.stringify(await vaultValue((v, id) => v.snapshotsFor(id).map(s => s.payload.date + ':' + s.payload.value + ':' + s.version), emptyId)) === JSON.stringify([`${today}:0:1`]) &&
         (await vaultValue((v, id) => v.holdings.get(id).payload.archivedAt, emptyId)) === today,
     );
+    await click('Delete');
+    await page.waitUntil("document.querySelector('.dialog')", { label: 'the purge dialog of a holding with only its zero' });
+    await page.frames();
+    check(
+      'a holding whose only figure is its zero deletes 1 recorded value and changes no past figure',
+      (await text()).includes('This also deletes 1 recorded value. Your past net worth figures stay as they are.'),
+    );
+    await inDialog('Cancel');
+    await page.waitUntil('!document.querySelector(".dialog")', { label: 'the purge dialog to close' });
     await click('Unarchive');
     await page.waitUntil("[...document.querySelectorAll('.form-actions button')].some(b => b.textContent === 'Archive')", { label: 'the empty holding active again' });
     check('unarchived, it reads zero, not not yet valued', (await page.eval("document.querySelector('.hero-figure').textContent")).trim() !== 'Not yet valued');

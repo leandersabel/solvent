@@ -51,7 +51,8 @@ is decorated, and nothing nags.
     runs down to it, so your net worth on the days between can change.
     Unarchiving undoes it in one action.
   - **Delete permanently** removes the holding and every value recorded
-    against it, and your past net worth figures change with it.
+    against it, and your past net worth figures change with it unless
+    every one of those values was zero.
 
 What it deliberately does not do:
 
@@ -180,8 +181,19 @@ the only way a holding with no values reaches it.
 **Delete permanently.** The user types the holding's name. The confirm
 stays disabled until the name matches, in the shared disabled look
 (design-system.md, Components), so a mistyped name reaches no error
-state. The dialog states: "This also deletes N recorded values. Your
-past net worth figures will change." Destructive styling, as the
+state. The dialog says what the delete takes with it, read from the
+holding's snapshots each time it opens, never from the action that
+opened it:
+
+- No snapshots: "There are no recorded values to delete. Your past net
+  worth figures stay as they are."
+- One: "This also deletes 1 recorded value." Several: "This also
+  deletes N recorded values." Either is followed by "Your past net
+  worth figures will change." when one of them is not zero, and by
+  "Your past net worth figures stay as they are." otherwise, because a
+  zero moves no past total.
+
+Destructive styling, as the
 secondary action. Nothing in it suggests a price entry goes with it,
 because none does.
 
@@ -857,3 +869,9 @@ Unarchiving and archiving it again writes the zero at the new D.
     phone width, and no date wraps. A note holding an email address
     pans nothing either. Test: `tests/browser/parts/account-detail.mjs`,
     `tests/browser/parts/account-detail-review-phone.mjs`.
+59. The permanent-delete dialog of a holding with no snapshots says
+    there are no recorded values to delete and that past net worth
+    figures stay as they are, and of one whose only snapshot is an
+    archive's zero, that it deletes 1 recorded value and past figures
+    stay as they are. Test: `tests/browser/parts/account-detail.mjs`,
+    `tests/browser/parts/account-detail-review-delete.mjs`.
