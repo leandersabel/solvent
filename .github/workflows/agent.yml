@@ -18,6 +18,9 @@ on:
     types: [completed]
   push:
     branches: [master]
+  # Hourly, the queue starts what usage held back.
+  schedule:
+    - cron: "17 * * * *"
   workflow_dispatch:
     inputs:
       issue:
@@ -54,6 +57,9 @@ jobs:
           jqe() { jq -r "$1" "$GITHUB_EVENT_PATH"; }
           from_branch() { sed -nE "s#^claude/(spec|issue)-([0-9]+)\$#\2#p" <<<"$1"; }
           dispatch() { gh workflow run agent.yml --ref master -f issue="$1"; }
+          # Whose rating counts (CLAUDE.md, The loop, Severity), and who
+          # closes accepted work: the client, or the loop merging its fix.
+          counts() { [[ "$1" == "$OWNER" || "$1" == "claude[bot]" || "$1" == "github-actions[bot]" ]]; }
           # Each code scanning alert on master gets an issue of its own,
           # which waits in line as filed (CLAUDE.md, The loop, Findings).
           # One whose fix merged, yet a later scan still finds it, reopens
@@ -103,18 +109,29 @@ jobs:
           queue=
           case "$EVENT" in
             issues)
+              label=$(jqe .label.name)
               if [ "$(jqe .action)" = closed ]; then
-                # A closed issue gives up its place in line and the slot.
-                gh issue edit "$(jqe .issue.number)" --remove-label queued || true
-                for n in $(gh issue list --state closed --label implementing --json number --jq '.[].number'); do
-                  gh issue edit "$n" --remove-label implementing
-                done
-                queue=true
-              elif [ "$(jqe .label.name)" = accepted ] && [ "$(jqe .issue.state)" = open ]; then
+                if ! counts "$sender" && jq -e '.issue.labels | any(.name == "accepted")' "$GITHUB_EVENT_PATH" >/dev/null; then
+                  # Only the client closes accepted work. Its author can
+                  # close an issue without triage access.
+                  gh issue reopen "$(jqe .issue.number)" --comment "Only @$OWNER or a merged pull request closes accepted work, so this issue is open again."
+                else
+                  # A closed issue gives up its place in line and the slot.
+                  gh issue edit "$(jqe .issue.number)" --remove-label queued || true
+                  for n in $(gh issue list --state closed --label implementing --json number --jq '.[].number'); do
+                    gh issue edit "$n" --remove-label implementing
+                  done
+                  queue=true
+                fi
+              elif [[ "$label" == "severity: "* ]] && ! counts "$sender"; then
+                # A rating that does not count is removed, so the line
+                # ranks only ratings that do.
+                gh issue edit "$(jqe .issue.number)" --remove-label "$label"
+              elif [ "$label" = accepted ] && [ "$(jqe .issue.state)" = open ]; then
                 # A finding is filed in line and has no run of its own
                 # (CLAUDE.md, The loop, Findings).
                 jq -e '.issue.labels | any(.name == "queued")' "$GITHUB_EVENT_PATH" >/dev/null || issue=$(jqe .issue.number)
-              elif [ "$(jqe .label.name)" = queued ] && [ "$sender" = "$OWNER" ]; then
+              elif [ "$label" = queued ] && [ "$sender" = "$OWNER" ]; then
                 queue=true
               fi ;;
             issue_comment)
@@ -160,6 +177,8 @@ jobs:
                 queue) issue=; queue=true ;;
                 *) [[ "$issue" =~ ^[0-9]+$ ]] || { echo "Not an issue number: $issue"; exit 1; } ;;
               esac ;;
+            schedule)
+              queue=true ;;
             push)
               # A merge frees the implementation slot and can leave the
               # loop's other pull requests conflicting. Each of those
@@ -201,6 +220,9 @@ jobs:
     # starts reads the issue as it then stands.
     concurrency:
       group: issue-${{ needs.route.outputs.issue }}
+    outputs:
+      refused: ${{ steps.usage.outputs.refused }}
+      usage: ${{ steps.usage.outputs.usage }}
     permissions:
       contents: write
       issues: write
@@ -242,6 +264,19 @@ jobs:
           claude_args: |
             --model claude-opus-5-5
             --permission-mode bypassPermissions
+      # What the subscription had left as the run ended, and whether it
+      # refused the run. A rejection while overage is in use is no refusal,
+      # and a run that ended well only quoted the words.
+      - id: usage
+        if: always() && steps.claude.outputs.execution_file
+        env:
+          SESSION: ${{ steps.claude.outputs.execution_file }}
+        run: |
+          jq -r '([.[] | select(.type == "rate_limit_event")][-1].rate_limit_info) as $limit
+            | ([.[] | select(.type == "result")][-1].result // "" | tostring) as $said
+            | "refused=\(($limit.status // "allowed" | IN("allowed", "allowed_warning") | not) and $limit.isUsingOverage != true
+                or ([.[] | select(.type == "result")][-1].is_error == true and ($said | test("usage limit"; "i"))))",
+              "usage=\($limit.unifiedWindows // {})"' "$SESSION" >> "$GITHUB_OUTPUT"
       - if: always() && steps.claude.outputs.execution_file
         uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
         with:
@@ -251,7 +286,8 @@ jobs:
       # A run that stopped before its GitHub token ended pushed what it
       # had to claude/<kind>-<issue>, with `Left to do:` in the commit
       # message and no pull request (advance skill). One fresh run
-      # continues from it, unless the issue now waits on the client.
+      # continues from it, unless the issue now waits on the client or
+      # the subscription refused this run.
       - id: continue
         if: always()
         env:
@@ -259,8 +295,9 @@ jobs:
           GH_REPO: ${{ github.repository }}
           ISSUE: ${{ needs.route.outputs.issue }}
           RESUME: ${{ github.event.inputs.resume }}
+          REFUSED: ${{ steps.usage.outputs.refused }}
         run: |
-          [ "$RESUME" != true ] || exit 0
+          [ "$RESUME" != true ] && [ "$REFUSED" != true ] || exit 0
           [ "$(gh api "repos/$GH_REPO/issues/$ISSUE" \
             --jq '.state == "open" and all(.labels[]; .name != "needs-answer" and .name != "stuck")')" = true ] || exit 0
           for kind in spec issue; do
@@ -283,6 +320,7 @@ jobs:
           ISSUE: ${{ needs.route.outputs.issue }}
           OWNER: ${{ github.repository_owner }}
           FINISHED: ${{ steps.claude.outcome == 'success' }}
+          REFUSED: ${{ steps.usage.outputs.refused }}
           RUN: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
         run: |
           issue=$(gh api "repos/$GH_REPO/issues/$ISSUE")
@@ -307,6 +345,17 @@ jobs:
           else
             why="The agent's run did not finish"
           fi
+          # An issue in line or under way that the subscription refused
+          # goes back in line without a word, and waits for headroom. One
+          # with an open pull request keeps it and the slot.
+          if [ "$REFUSED" = true ]; then
+            if jq -e 'any(.labels[]; .name == "implementing" or .name == "queued")' <<<"$issue" >/dev/null &&
+              [ -z "$(gh pr list --head "claude/issue-$ISSUE" --state open --json number --jq '.[].number')" ]; then
+              gh issue edit "$ISSUE" --remove-label implementing --add-label queued
+              exit 0
+            fi
+            why="The subscription's usage limit stopped the run"
+          fi
           gh issue edit "$ISSUE" --add-label stuck
           gh issue comment "$ISSUE" --body "@$OWNER $why: $RUN. Any comment here starts the next one."
 
@@ -330,8 +379,10 @@ jobs:
           GH_TOKEN: ${{ github.token }}
           GH_REPO: ${{ github.repository }}
           OWNER: ${{ github.repository_owner }}
-          # The issue the agent ran on.
+          # The issue the agent ran on, and the usage its run left.
           ISSUE: ${{ needs.route.outputs.issue }}
+          REFUSED: ${{ needs.advance.outputs.refused }}
+          USAGE: ${{ needs.advance.outputs.usage }}
         run: |
           # Open issues carrying label $1, read from the issues
           # themselves, because a search can lag behind a label just set.
@@ -356,6 +407,31 @@ jobs:
           # slot, and is picked again below.
           holding=$(open_with implementing | jq -r 'select(any(.labels[]; .name == "queued") | not) | .number')
           [ -z "$holding" ] || exit 0
+
+          # Nothing starts while usage lacks headroom: a run just
+          # refused, or a window near its limit that has not reset yet
+          # (CLAUDE.md, The loop, Implementation). Without this run's
+          # usage, the newest run's is read, and none lets the run start.
+          # A hold shows on the run's page.
+          hold() {
+            echo "::notice title=Queue held::$1"
+            echo "Queue held: $1" >> "$GITHUB_STEP_SUMMARY"
+            exit 0
+          }
+          [ "$REFUSED" != true ] || hold "the subscription refused the run on #$ISSUE for its usage limit."
+          if [ -z "$USAGE" ] || [ "$USAGE" = "{}" ]; then
+            USAGE=$(id=$(gh api "repos/$GH_REPO/actions/artifacts?name=session&per_page=30" \
+                --jq '[.artifacts[] | select((.expired | not) and .workflow_run.head_branch == "master" and .workflow_run.head_repository_id == .workflow_run.repository_id)][0].id // empty') &&
+              [ -n "$id" ] &&
+              gh api "repos/$GH_REPO/actions/artifacts/$id/zip" > "$RUNNER_TEMP/session.zip" &&
+              unzip -p "$RUNNER_TEMP/session.zip" claude-execution-output.json |
+              jq -c '[.[] | select(.type == "rate_limit_event")][-1].rate_limit_info.unifiedWindows // {}') || USAGE="{}"
+          fi
+          full=$(jq -r --argjson now "$(date +%s)" '[{name: "five-hour", limit: 0.9} + (.five_hour // empty),
+              {name: "weekly", limit: 0.8} + (.seven_day // empty)][]
+            | select(.utilization >= .limit and .resetsAt > $now)
+            | "the \(.name) window is at \(.utilization * 100 | round) percent until \(.resetsAt | todate)"' <<<"$USAGE" | paste -sd, - | sed 's/,/, and /g')
+          [ -z "$full" ] || hold "$full."
           # First in line: the lowest-numbered critical issue, then high,
           # then any (CLAUDE.md, The loop, Severity), among those a run
           # would start on and nothing waits on the client for.

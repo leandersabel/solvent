@@ -16,6 +16,7 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 10
     permissions:
+      actions: read
       contents: write
       packages: write
       pull-requests: read
@@ -30,13 +31,31 @@ jobs:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           fetch-depth: 0
+      # Only a version QA walked in full is made stable: a successful
+      # nightly run on master recorded every feature walked on its commit
+      # (nightly.yml). No agent writes that run's artifacts.
+      - id: walked
+        run: |
+          commit=$(git rev-parse "$TAG^{commit}")
+          for run in $(gh api "repos/$GH_REPO/actions/workflows/nightly.yml/runs?branch=master&status=success&per_page=100" \
+            --jq '.workflow_runs[] | select((.event == "schedule" or .event == "workflow_dispatch") and .head_repository.id == .repository.id) | .id'); do
+            for id in $(gh api "repos/$GH_REPO/actions/runs/$run/artifacts?name=qa-walked" --jq '.artifacts[] | select(.expired | not) | .id'); do
+              gh api "repos/$GH_REPO/actions/artifacts/$id/zip" > "$RUNNER_TEMP/walked.zip" || continue
+              if unzip -p "$RUNNER_TEMP/walked.zip" qa-walked.json | jq -e --arg commit "$commit" '.commit == $commit and .every == true' >/dev/null; then
+                echo "QA walked every feature of $TAG in run $run."
+                exit 0
+              fi
+            done
+          done
+          echo "::error::QA did not walk every feature of $TAG. Run 'gh workflow run nightly.yml -f full=true', which walks today's version in full, and promote that version."
+          exit 1
       # A nightly something now holds back is not made stable.
       - id: gate
         uses: ./.github/actions/release-gate
         with:
           commit: ${{ env.TAG }}
           since: ${{ env.TAG }}
-      - if: failure() && steps.gate.outcome == 'failure'
+      - if: failure() && (steps.walked.outcome == 'failure' || steps.gate.outcome == 'failure')
         run: gh release edit "$TAG" --prerelease
       - run: |
           echo "${{ github.token }}" | docker login ghcr.io -u "${{ github.actor }}" --password-stdin

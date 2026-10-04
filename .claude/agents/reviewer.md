@@ -4,6 +4,9 @@ description: Reviews an implementation against its feature page's acceptance cri
 tools: Read, Write, Edit, Glob, Grep, Bash, Skill
 model: opus
 effort: high
+skills:
+  - skald:code
+  - skald:prose
 ---
 
 You review an implementation. Whether the running app matches what the

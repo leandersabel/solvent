@@ -210,7 +210,8 @@ Questions follow Who asks the client. A `bug` where a requirement is
 what is wrong becomes a `change`, and the reverse, with a comment
 saying so. A decision the client never made is asked, never settled on
 their behalf. No agent closes an issue. A merged pull request or the
-client does.
+client does, and the workflow reopens, with a comment, an accepted
+issue anyone else closes.
 
 An issue holding several requests keeps the first. The loop files each
 of the rest as an issue of its own, in the client's words with a link
@@ -239,6 +240,11 @@ to where they asked, labeled `bug` or `change` and `accepted`.
   first in line gets it and its run starts: critical problems first,
   then high ones, then the rest, each lowest number first. An issue
   that waits on the client holds neither a place in line nor the slot.
+- No run starts from the line while the last run's usage of the
+  subscription stands at 90 percent of its five-hour window or 80
+  percent of its weekly one, until that window resets. The run's page
+  in Actions says which window holds it and until when, and an hourly
+  run of the workflow retries.
 - One run implements one issue, on `claude/issue-<issue>`. It
   reproduces the report, updates the issue's feature page where
   behavior or acceptance criteria change (`spec/design-system.md` when
@@ -306,7 +312,8 @@ alert's security rating, or medium for an error and low otherwise. The
 loop rates every other problem the next time it runs on it. A rating
 the client set stands, and the client can change any. Only a rating
 label set by `leandersabel`, `claude[bot]` or `github-actions[bot]`
-counts, and the highest that counts wins.
+counts, and the highest that counts wins. The workflow removes one
+anyone else adds.
 
 A problem rated high or critical holds back a version, however it was
 found.
@@ -340,10 +347,15 @@ found.
   `.github/workflows/nightly.yml` builds the image once and runs the
   suite against that commit, unless the push check of the last commit
   that changed anything but `.claude/` or the top-level docs already
-  passed it. `qa` walks the full
-  acceptance list of every feature touched by an issue closed since the
-  last version, and a smoke path through the rest. The client can start
-  the same run by hand.
+  passed it. `qa` walks the acceptance list of each feature whose page
+  changed since the commit the last completed walk covered, each one a
+  changed file of the image or the harness names by its page's path,
+  and the one walked longest ago, so every feature is walked within as
+  many completed walks as there are features. A changed file naming
+  none, or no record of a last walk, walks every feature. The client can
+  start the same run by hand, and `gh workflow run nightly.yml -f
+  full=true` walks every feature: on today's version when it exists,
+  and otherwise on a new one, even when no code changed.
 - The walk is split into shards that run at once. Each shard starts its
   own instance of tonight's image, hardened on a network with no route
   out, beside a stand-in that answers as the price sources through a
@@ -382,7 +394,8 @@ found.
   That tags the same image `:stable` without a rebuild, rewrites the
   notes to cover everything since the last stable, and deletes the
   nightlies before it. While something would hold back that nightly,
-  promotion is refused and the release turns back into a pre-release.
+  or no successful nightly run walked every feature of it, promotion is
+  refused and the release turns back into a pre-release.
 - Release notes are assembled from the merged pull requests' titles,
   without a model, grouped into changes and fixes, fixes for what
   agents found, and maintenance. Each line names who asked, who
@@ -409,6 +422,10 @@ found.
   work to a fresh run, labels the issue `stuck`, in a step that runs
   even when the agent crashes, times out or hits the usage limit. Any
   comment by the client starts the next run.
+- The exception is a run the subscription refused for its usage limit
+  on an issue in line or being implemented without a pull request: the
+  issue goes back in line, without `stuck` or a comment, and nothing
+  more starts until there is headroom (Implementation).
 - A failing check on an implementation pull request starts a run that
   fixes it on the same branch. After a bounded number of attempts, the
   pull request becomes a draft without auto-merge and the issue is
