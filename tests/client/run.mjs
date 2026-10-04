@@ -2155,6 +2155,25 @@ await check('record-rate: the rate-lines save writes the rates, then deletes, an
   assert.ok(copy.includes('Saved: USD, XAG-ozt'), copy);
 });
 
+await check('record-rate: the rate-lines save at a date holding no recording issues no request and writes nothing', async () => {
+  const server = recordServer();
+  const vault = await storedVault(server, { holdings: [['Francs', 'CHF'], ['Dollars', 'USD']], prices: [['USD', '2026-06-30', '0.9']] });
+  server.reset();
+  const sit = writes.sitting(vault, '2026-07-31');
+  const typed = { rate: '0.9', rateSource: 'manual', rateAsOf: null, proposedRate: null };
+  const result = await writes.saveRateLines(vault, sit, { rates: [{ existing: null, payload: writes.rateEntry(vault, 'USD', '2026-07-31', typed) }] });
+  assert.equal(result.refused, true);
+  assert.deepEqual(result.saved, []);
+  assert.equal(server.log.length, 0);
+  assert.equal(vault.holdsRecording('2026-07-31'), false);
+  // A date holding a recording is saved as before.
+  const at = writes.sitting(vault, '2026-06-30');
+  const [entry] = vault.entriesFor('USD');
+  const done = await writes.saveRateLines(vault, at, { rates: [{ existing: entry, payload: writes.editedRatePayload(entry.payload, '0.95') }] });
+  assert.equal(done.refused, false);
+  assert.equal(server.writesIn().length, 1);
+});
+
 await check('record-snapshot: a delete answering Not Found during a save counts as saved', async () => {
   const server = recordServer();
   const vault = await storedVault(server, { holdings: [['Dollars', 'USD']], prices: [['USD', '2026-07-31', '0.9']] });
@@ -2176,10 +2195,8 @@ await check('record-snapshot: a create at a date another session recorded is ref
   await other.load();
   await writes.saveSnapshot(other, vault.ids.Dollars, null, { date: '2026-07-31', value: '1', note: null });
   server.reset();
-  const result = await writes.saveRateLines(vault, sit, {
-    rates: [{ existing: null, payload: writes.rateEntry(vault, 'USD', '2026-07-31', { rate: '0.9', rateSource: 'manual', rateAsOf: null, proposedRate: null }) }],
-  });
-  assert.equal(result.refused, true);
+  const result = await writes.claimDate(vault, sit, { rates: ['USD'] });
+  assert.deepEqual(result, { refused: true, date: '2026-07-31' });
   assert.equal(server.writesIn().length, 0);
   assert.deepEqual(server.log.map((r) => r.query.type), ['snapshot', 'rate']);
   // The screen now describes the vault as it stands.

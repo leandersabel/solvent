@@ -45,6 +45,7 @@ export function sweepView(vault, date, actions = {}) {
   const refused = () => {
     for (const row of rows) row.reset();
     block.refresh();
+    syncSave();
     say(`${vault.format.longDate(date)} already has a recording. Another window got there first.`, {
       critical: true,
       children: [
@@ -77,14 +78,20 @@ export function sweepView(vault, date, actions = {}) {
   }
 
   const saveAll = el('button', { class: 'btn-primary', text: 'Save the rate lines', hidden: true });
+  // Offered only while the date holds a recording, because a price
+  // alone must never make one: a price typed before then waits for the
+  // first row recorded.
+  const syncSave = () => {
+    saveAll.hidden = !vault.holdsRecording(date) || !block.lines.some((line) => line.changed());
+  };
   const block = rateBlock(vault, date, {
     sit,
     onChange: () => {
-      saveAll.hidden = !block.lines.some((line) => line.changed());
+      syncSave();
       for (const row of rows) row.describe();
     },
   });
-  saveAll.addEventListener('click', () => saveRates(vault, sit, block, { say, refused, saveAll }));
+  saveAll.addEventListener('click', () => saveRates(vault, sit, block, { say, refused, syncSave }));
 
   // A date holding nothing arrives with its rate lines filled in by the
   // proposals for it. A reopened recording asks the source nothing on
@@ -107,6 +114,7 @@ export function sweepView(vault, date, actions = {}) {
     if (sit.proposals) block.showProposals(await sit.proposals);
     const { failed } = await writes.refreshPrices(vault, date, {}, (unit) => block.partFor(unit));
     block.refresh();
+    syncSave();
     if (failed.length) {
       say(`Recorded. Prices were not updated for ${failed.join(', ')}.`, { critical: true });
     }
@@ -118,6 +126,7 @@ export function sweepView(vault, date, actions = {}) {
       block,
       refused,
       ensurePrices,
+      onSaved: syncSave,
       onTyped: () => block.ask(holding.payload.unit),
     }),
   );
@@ -150,7 +159,7 @@ function heading(vault, date) {
   ]);
 }
 
-function sweepRow(vault, holding, date, { sit, block, refused, ensurePrices, onTyped }) {
+function sweepRow(vault, holding, date, { sit, block, refused, ensurePrices, onSaved, onTyped }) {
   const { format } = vault;
   const atDate = () => vault.snapshotsFor(holding.recordId).filter((s) => s.payload.date === date);
   // On a reopened recording, the figure a holding carried into that
@@ -294,6 +303,7 @@ function sweepRow(vault, holding, date, { sit, block, refused, ensurePrices, onT
     savedNote.textContent = 'Saved.';
     savedNote.hidden = false;
     reset();
+    onSaved();
   };
 
   const failedWith = async (failure) => {
@@ -816,7 +826,7 @@ export function partialCopy(result) {
 /** A rate line on a reopened recording saves by itself: filling in the
  *  price that was missing is a complete act and needs no holding
  *  touched alongside it. One confirmation covers every changed line. */
-function saveRates(vault, sit, block, { say, refused, saveAll }) {
+function saveRates(vault, sit, block, { say, refused, syncSave }) {
   const changed = block.lines.filter((line) => line.changed());
   if (changed.some((line) => line.invalid())) {
     for (const line of changed) line.describe();
@@ -859,7 +869,7 @@ function saveRates(vault, sit, block, { say, refused, saveAll }) {
           for (const { line } of planned) {
             if (!failed.has(line.unit) || conflicts.includes(line.unit)) line.reset();
           }
-          saveAll.hidden = !block.lines.some((line) => line.changed());
+          syncSave();
           const conflictCopy = conflicts.map((unit) => `The ${unit} rate was changed in another window, and the line shows what is stored now.`).join(' ');
           say([partialCopy(result), conflictCopy].filter(Boolean).join(' '), { critical: result.failed.length > 0 });
         },

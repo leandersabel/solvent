@@ -327,8 +327,14 @@ export function confirmFigure(vault, holding, date) {
  *
  *  No step is skipped because an earlier one failed. Each record is
  *  independent, and abandoning the rest would turn one failed write
- *  into several unattempted ones. */
+ *  into several unattempted ones.
+ *
+ *  Refused at a date holding no recording, before any request. */
 export async function saveRateLines(vault, sit, plan) {
+  // A price alone never makes a recording: at a date the model holds
+  // none, typed prices wait for the first quantity. Checked here as
+  // well as in the sweep, because hiding the control is not a refusal.
+  if (!vault.holdsRecording(sit.date)) return { refused: true, date: sit.date, saved: [], failed: [] };
   const rates = plan.rates || [];
   const deletes = plan.deletes || [];
   const creates = rates.filter((r) => !r.existing).map((r) => r.payload.symbol);
