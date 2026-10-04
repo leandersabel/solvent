@@ -225,9 +225,13 @@ nothing about the key.
   it is not the vault's (app-shell.md, The request gate). A missing
   header is a refusal, not an exemption, so a page loaded before the
   epoch existed fails loudly instead of writing.
-- **Every handler that reads or writes `records` or `dek_wrappers` for
-  a vault owner, or deletes the principal, compares it again inside its
-  own transaction**, with the same Conflict. A write compares after
+- **Every handler that serves a vault owner's own request and reads or
+  writes `records` or `dek_wrappers`, or deletes their principal,
+  compares it again inside its own transaction**, with the same
+  Conflict. An administrator removing a vault owner
+  (admin-invites.md) compares nothing: the administrator's page holds
+  no epoch, and the removal destroys the vault whatever key it is
+  under. A write compares after
   `BEGIN IMMEDIATE` takes the lock, a read inside the transaction that
   reads its rows. So a request racing an import either commits first
   and is replaced with everything else, or answers Conflict. Sign-in

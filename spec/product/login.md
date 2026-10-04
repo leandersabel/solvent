@@ -213,7 +213,8 @@ that could lock somebody out would be worse than no upgrade.
 - Unlocking after a lock re-reads and re-decrypts the vault rather than
   restoring what was on screen before.
 - What you were typing into an open form is still there after
-  unlocking, and it is the only thing that is.
+  unlocking, and it is the only thing that is. A restore made elsewhere
+  is the exception (`export-import.md`, What must be true).
 - The lock button in the top bar locks immediately, with no
   confirmation, and does not sign you out. Unlocking needs only the
   password.

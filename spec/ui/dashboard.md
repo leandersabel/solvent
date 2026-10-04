@@ -339,8 +339,9 @@ The regions keep their order and stack, 20px apart.
   never discard unsaved input, unless the vault was replaced meanwhile
   (Replaced since last open).
 - **Replaced since last open**: the page held the vault, the vault was
-  replaced from a file while the page was locked or signed out, and the
-  page learns it only at unlock (`spec/features/login.md`). Every input
+  replaced from a file while the page was locked, or while it stayed
+  open after its session ended for its own reason, and the page learns
+  it only at unlock (`spec/features/login.md`). Every input
   and dialog kept through the lock is dropped, and unlocking lands
   here rather than on the view the page was on, which can name a record
   the restore removed. A page on another device that was locked before

@@ -437,8 +437,9 @@ dialog to protect. Everything below describes the vault owner's bar.
   The requests: every route in the route map under every method it
   answers, an invented page path, `//admin`, an unanswered method on
   a page and an API route, `/api/invented` and `/api/admin/invented`.
-  Each request under a vault owner session is sent with and without
-  `X-Solvent-Vault`, and the two answers are identical.
+  Each request steps 1 to 6 refuse under a vault owner session is sent
+  with and without `X-Solvent-Vault`, and the two answers are
+  identical, because step 7 runs only on what those steps let through.
 - **Vault epoch over the route map.** Under a vault owner session with
   the CSRF header, every API route outside Public, each method it
   answers:
