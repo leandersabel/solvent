@@ -238,7 +238,8 @@ def figures(main_currency: str, holdings: "dict[str, dict]", snapshots: "dict[st
         else:
             assets += value
     return {
-        "total": _figure(total, 0),
+        # No holding valued: the dashboard shows "—", not a zero.
+        "total": _figure(total, 0) if shown else None,
         "assets": _figure(assets, 0),
         "debts": _figure(debts, 0),
         "holdings": shown,
@@ -264,7 +265,8 @@ COVERAGE = [
     "no-source-unit", "own-unit", "archived-holding", "other-main-currency",
     "damaged-record", "same-date-pair", "older-vault", "empty-vault",
     "idle-lock-out-of-range", "aged-session", "expired-invite", "current-backup", "older-backup",
-    "harness-admin",
+    "harness-admin", "cleared-date", "deleted-recording", "staggered-starts", "all-archived",
+    "code-like-names", "session-ends-mid-action",
 ]
 
 
@@ -333,6 +335,8 @@ def build_vault(account: dict, today: date) -> "tuple[dict, dict]":
     proposals_at: "dict[tuple[str, str], dict]" = {}
     archive_dates: "dict[str, str]" = {}
     odd: "list[tuple[str, str, str]]" = []
+    # Each cleared or deleted date, with the foreign prices it held.
+    removed: "list[tuple[str, str, dict]]" = []
 
     def active_units() -> "list[str]":
         return sorted({h["unit"] for h in holdings.values() if not h["archived"]} - {main})
@@ -384,6 +388,19 @@ def build_vault(account: dict, today: date) -> "tuple[dict, dict]":
             holdings[name]["archived"] = True
             archive_dates[name] = on
             ops.append({"op": "archive", "name": name, "date": on})
+        elif "clear" in step or "deleteRecording" in step:
+            kind = "clear" if "clear" in step else "deleteRecording"
+            on = resolve(step[kind]["date"], today)
+            if not any(s[0] == on for series in snapshots.values() for s in series):
+                raise PlanError(f"{kind} on {on}: no recording there")
+            for name in snapshots:
+                snapshots[name] = [s for s in snapshots[name] if s[0] != on]
+            held = {unit: dict(series) for unit, series in prices.items() if on in dict(series)}
+            if kind == "deleteRecording":
+                for unit in prices:
+                    prices[unit] = [p for p in prices[unit] if p[0] != on]
+            removed.append((kind, on, held))
+            ops.append({"op": kind, "date": on})
         elif "damaged" in step or "pair" in step:
             kind = "damaged" if "damaged" in step else "pair"
             plant = step[kind]
@@ -405,8 +422,32 @@ def build_vault(account: dict, today: date) -> "tuple[dict, dict]":
         if latest is None or latest[0] <= on:
             raise PlanError(f"the {kind} record of {name} on {on} is its latest quantity")
 
+    # A cleared or deleted date sits between two recordings, and one of
+    # its prices lies off the straight line between that unit's
+    # neighbors, so the chart bends there, or straightens once deleted.
+    recorded = {s[0] for series in snapshots.values() for s in series}
+    for kind, on, held in removed:
+        if on in archive_dates.values():
+            raise PlanError(f"{kind} on {on} sits on an archive date")
+        if not (min(recorded, default=on) < on < max(recorded, default=on)):
+            raise PlanError(f"{kind} on {on} is not between two recordings")
+        if not any(_off_the_line(series, on) for series in held.values()):
+            raise PlanError(f"{kind} on {on}: no price there lies off its neighbors' line")
+
     places = 0 if profile.get("moneyPlaces") == "0" else 2
     return {"ops": ops}, expected(main, holdings, snapshots, prices, places)
+
+
+def _off_the_line(series: "dict[str, Decimal]", on: str) -> bool:
+    """Whether the price at `on` differs from the straight line between
+    the nearest prices either side of it, compared exactly."""
+    before = [d for d in series if d < on]
+    after = [d for d in series if d > on]
+    if not before or not after:
+        return False
+    t0, t1, t2 = (date.fromisoformat(d).toordinal() for d in (max(before), on, min(after)))
+    r0, r1, r2 = series[max(before)], series[on], series[min(after)]
+    return r1 * (t2 - t0) != r0 * (t2 - t1) + r2 * (t1 - t0)
 
 
 def check_coverage(plan: dict) -> None:

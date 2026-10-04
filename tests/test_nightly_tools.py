@@ -633,6 +633,58 @@ def test_prepare_refuses_an_archive_that_would_look_a_price_up():
         prices.prepare(plan, date.today(), FIXTURES)
 
 
+def chart(plan: dict) -> dict:
+    return next(a for a in plan["accounts"] if a["username"] == "chart.owner")
+
+
+def test_clear_and_delete_write_their_ops_and_leave_the_expected_figures():
+    script, _ = prices.prepare(full_plan(), date.today(), FIXTURES)
+    ops = next(a for a in script["accounts"] if a["username"] == "chart.owner")["ops"]
+    assert [op for op in ops if op["op"] in ("clear", "deleteRecording")] == [
+        {"op": "clear", "date": "2017-09-29"}, {"op": "deleteRecording", "date": "2019-03-29"},
+    ]
+    account = chart(full_plan())
+    _, kept = prices.build_vault({**account, "steps": account["steps"][:-1]}, date.today())
+    _, whole = prices.build_vault({**account, "steps": account["steps"][:-2]}, date.today())
+    assert kept == whole
+
+
+@pytest.mark.parametrize(
+    "step, words",
+    [
+        ({"clear": {"date": "2016-03-31"}}, "between two recordings"),
+        ({"deleteRecording": {"date": {"daysAgo": 10}}}, "between two recordings"),
+        ({"clear": {"date": "2018-06-29"}}, "no recording there"),
+    ],
+)
+def test_prepare_refuses_a_cleared_or_deleted_date_that_bends_nothing(step, words):
+    plan = full_plan()
+    chart(plan)["steps"].append(step)
+    with pytest.raises(prices.PlanError, match=words):
+        prices.prepare(plan, date.today(), FIXTURES)
+
+
+def test_prepare_refuses_a_cleared_date_whose_prices_lie_on_the_line():
+    account = {
+        "username": "line", "password": "x", "kind": "vault_owner", "mainCurrency": "CHF",
+        "holdings": [{"name": "Land", "unit": "acre"}],
+        "steps": [
+            {"recording": {"date": d, "figures": {"Land": "1"}, "prices": {"acre": {"manual": r}}}}
+            for d, r in (("2020-01-01", "10"), ("2020-01-11", "11"), ("2020-01-21", "12"))
+        ] + [{"clear": {"date": "2020-01-11"}}],
+    }
+    with pytest.raises(prices.PlanError, match="off its neighbors' line"):
+        prices.build_vault(account, date.today())
+
+
+def test_with_nothing_valued_the_total_is_none_and_the_sides_are_zero():
+    holdings = {"Savings": {"unit": "CHF", "archived": True}}
+    result = prices.figures("CHF", holdings, {"Savings": [("2026-01-31", Decimal(5))]}, {}, 2, "latest")
+    assert result["total"] is None
+    assert result["assets"] == result["debts"] == {"exact": "0", "display": "0"}
+    assert result["excluded"] == {"Savings": "archived"}
+
+
 def test_prepare_writes_a_script_and_figures_for_every_vault(tmp_path):
     done = subprocess.run(
         [sys.executable, str(TOOLS / "prices.py"), "prepare", str(FIXTURES / "plan.json"), str(tmp_path)],

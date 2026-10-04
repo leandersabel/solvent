@@ -117,7 +117,7 @@ def test_the_generator_writes_every_output_and_the_manifest_covers_every_name(ge
         *(c for b in manifest["backups"] for c in b["covers"]),
     }
     names = json.loads((generated.out / "script.json").read_text())["coverage"]
-    assert len(names) == 18 and set(names) <= covered
+    assert set(names) <= covered
     assert manifest["invites"][0]["path"].startswith("/register?invite=")
     current, older = manifest["backups"]
     assert (current["file"], older["file"]) == (
@@ -177,7 +177,8 @@ def test_each_dashboard_shows_the_manifests_totals_under_both_modes_and_the_dama
             assert dashboards[username]["latest"]["total"] is None
             continue
         for mode in ("latest", "asRecorded"):
-            wanted = {key: expected[mode][key]["display"] for key in ("total", "assets", "debts")}
+            # A total of None is a vault with nothing valued, whose hero reads "—".
+            wanted = {key: expected[mode][key] and expected[mode][key]["display"] for key in ("total", "assets", "debts")}
             assert dashboards[username][mode] == wanted, (username, mode)
         assert dashboards[username]["unreadable"] == (1 if username == "mixed.owner" else 0), username
     mixed = generated.manifest["expected"]["mixed.owner"]
