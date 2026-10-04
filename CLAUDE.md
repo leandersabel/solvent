@@ -242,8 +242,9 @@ to where they asked, labeled `bug` or `change` and `accepted`.
   that waits on the client holds neither a place in line nor the slot.
 - No run starts from the line while the last run's usage of the
   subscription stands at 90 percent of its five-hour window or 80
-  percent of its weekly one, until that window resets. An hourly run of
-  the workflow retries.
+  percent of its weekly one, until that window resets. The run's page
+  in Actions says which window holds it and until when, and an hourly
+  run of the workflow retries.
 - One run implements one issue, on `claude/issue-<issue>`. It
   reproduces the report, updates the issue's feature page where
   behavior or acceptance criteria change (`spec/design-system.md` when

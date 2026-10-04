@@ -412,7 +412,13 @@ jobs:
           # refused, or a window near its limit that has not reset yet
           # (CLAUDE.md, The loop, Implementation). Without this run's
           # usage, the newest run's is read, and none lets the run start.
-          [ "$REFUSED" != true ] || exit 0
+          # A hold shows on the run's page.
+          hold() {
+            echo "::notice title=Queue held::$1"
+            echo "Queue held: $1" >> "$GITHUB_STEP_SUMMARY"
+            exit 0
+          }
+          [ "$REFUSED" != true ] || hold "the subscription refused the run on #$ISSUE for its usage limit."
           if [ -z "$USAGE" ] || [ "$USAGE" = "{}" ]; then
             USAGE=$(id=$(gh api "repos/$GH_REPO/actions/artifacts?name=session&per_page=30" \
                 --jq '[.artifacts[] | select((.expired | not) and .workflow_run.head_branch == "master" and .workflow_run.head_repository_id == .workflow_run.repository_id)][0].id // empty') &&
@@ -421,11 +427,11 @@ jobs:
               unzip -p "$RUNNER_TEMP/session.zip" claude-execution-output.json |
               jq -c '[.[] | select(.type == "rate_limit_event")][-1].rate_limit_info.unifiedWindows // {}') || USAGE="{}"
           fi
-          if jq -e --argjson now "$(date +%s)" 'any((.five_hour | select(.utilization >= 0.9)),
-            (.seven_day | select(.utilization >= 0.8)); .resetsAt > $now)' <<<"$USAGE" >/dev/null; then
-            echo "No usage headroom: $USAGE"
-            exit 0
-          fi
+          full=$(jq -r --argjson now "$(date +%s)" '[{name: "five-hour", limit: 0.9} + (.five_hour // empty),
+              {name: "weekly", limit: 0.8} + (.seven_day // empty)][]
+            | select(.utilization >= .limit and .resetsAt > $now)
+            | "the \(.name) window is at \(.utilization * 100 | round) percent until \(.resetsAt | todate)"' <<<"$USAGE" | paste -sd, - | sed 's/,/, and /g')
+          [ -z "$full" ] || hold "$full."
           # First in line: the lowest-numbered critical issue, then high,
           # then any (CLAUDE.md, The loop, Severity), among those a run
           # would start on and nothing waits on the client for.
