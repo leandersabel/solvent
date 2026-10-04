@@ -50,8 +50,10 @@ for path in sorted(glob.glob("qa-unfiled/*.json")):
             gh("workflow", "run", "agent.yml", "--ref", "master", "-f", f"issue={url.rsplit('/', 1)[1]}")
     os.remove(path)
 
+# A queue that could not be started is looked at again after the next
+# run, so it never fails the night.
 if os.environ.get("DISPATCH"):
-    gh("workflow", "run", "agent.yml", "--ref", "master", "-f", "issue=queue")
+    subprocess.run(["gh", "workflow", "run", "agent.yml", "--ref", "master", "-f", "issue=queue"])
 
 if os.path.isdir("qa-unfiled") and not os.listdir("qa-unfiled"):
     os.rmdir("qa-unfiled")

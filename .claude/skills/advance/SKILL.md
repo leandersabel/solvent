@@ -76,14 +76,14 @@ for criteria it could not check stays unrated.
    not opened by `github-actions[bot]` (`app/github-actions` in `gh`'s
    output): stop without a word.
 2. **Edited after acceptance.** Someone other than the client edited
-   the title or body after `accepted` was added: remove `accepted`, add
-   `needs-answer`, and comment to
+   the title or body after `accepted` was added: remove `accepted`,
+   `queued` and `implementing`, add `needs-answer`, and comment to
    `@leandersabel` that the text changed after it was accepted and that
    adding `accepted` again resumes it. Stop.
 3. **Stuck, and the client wrote since.** Remove `stuck`, and from each
    batch member the client wrote on. Fix attempts count from the
-   client's comment on. If the client asks to retry,
-   rerun the failed jobs (`gh run rerun <id> --failed`) rather than
+   client's comment on. If the client asks to retry, push an empty
+   commit to the branch, which runs its checks again, rather than
    changing code. Otherwise take the comment as guidance for the next
    attempt. A draft implementation pull request becomes ready again
    with auto-merge on. Then continue with the step below that applies.
@@ -114,8 +114,8 @@ for criteria it could not check stays unrated.
    - The client approved its head commit:
      - A check failed: go to Stuck.
      - A check is still running: stop. Its result starts the next run.
-     - All green: add `queued`, unless the pull request closes the
-       issue, and merge with squash.
+     - All green: merge with squash, then add `queued`, unless the
+       pull request closes the issue.
    - The client wrote since, in a review, a line comment or a comment:
      when it raises something only the client can decide, ask on the
      issue with `needs-answer`. Otherwise revise the requirements from the
@@ -188,8 +188,9 @@ Then one comment, and exactly one outcome:
 `queued` is all it takes to be implemented: the workflow hands the slot
 to the first in line and starts its run (`CLAUDE.md`, The loop,
 Implementation). Never start a run, and never add `implementing` to
-this issue. Every other outcome removes `queued`, so nothing in line
-waits on the client. A `bug` titled `The checks fail on master`, opened by
+this issue. Every other outcome removes `queued` and `implementing`,
+so nothing that waits on the client holds a place in line or the slot.
+A `bug` titled `The checks fail on master`, opened by
 `github-actions[bot]`, gets no `queued` and goes straight to
 Implementation, since every other implementation's checks fail until it
 is fixed.
@@ -230,16 +231,17 @@ closing `<details>` block.
 
 ## Implementation
 
-1. The issue carries `implementing`, which the workflow gave it with
-   the slot, or is the `bug` titled `The checks fail on master`, which
-   needs no slot.
+1. Without `implementing` on this issue, add `queued` and stop: the
+   workflow hands out the slot. The `bug` titled `The checks fail on
+   master` is the one exception, and needs no slot.
 
    An issue an agent filed waits in line as filed, so it has no reading
    of yours: its body is the reading. Test the report before anything
    is built on it. When the spec does not ask for what it expects, or
-   step 3's test cannot be made to fail on what it reports, the report
-   does not hold: a member leaves the batch, and for this issue remove
-   `implementing` and go to Clarify, as doubtful.
+   for a `bug` step 3's test cannot be made to fail on what it reports,
+   the report does not hold. A member whose report does not hold leaves
+   the batch. When this issue's does not, every member leaves, then
+   remove `implementing` and go to Clarify.
 
    This issue leads a batch when it is a `bug` or `code-scanning` issue
    whose rating that counts is `severity: low`. Its members are the
@@ -317,7 +319,7 @@ report does not hold gets `needs-answer` and the question instead of
 
 The issue leading the batch never leaves. When its own fix fails, go to
 Stuck. When its rating rises above low, every member leaves and it goes
-on alone. Check every rating before the pull request opens and on every
+on alone. When it gives up the slot, every member leaves first. Check every rating before the pull request opens and on every
 later run on this issue.
 
 ## Stuck

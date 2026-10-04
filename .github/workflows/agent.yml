@@ -43,6 +43,7 @@ jobs:
     outputs:
       issue: ${{ steps.route.outputs.issue }}
       queue: ${{ steps.route.outputs.queue }}
+      held: ${{ steps.route.outputs.held }}
     steps:
       - id: route
         env:
@@ -64,8 +65,8 @@ jobs:
                 | capture("<!-- batch: (?<n>[0-9]+) -->").n] | last // empty')
             [ -n "$lead" ] && [ "$lead" != "$1" ] || return 0
             gh issue view "$1" --json labels --jq '.labels[].name' | grep -qx implementing || return 0
-            gh issue view "$lead" --json state,labels --jq 'select(.state == "OPEN") | .labels[].name' \
-              | grep -qx implementing && echo "$lead"
+            if gh issue view "$lead" --json state,labels --jq 'select(.state == "OPEN") | .labels[].name' \
+              | grep -qx implementing; then echo "$lead"; fi
           }
           # Each code scanning alert on master gets an issue of its own,
           # which starts at once (CLAUDE.md, The loop, Intake). One whose
@@ -201,13 +202,18 @@ jobs:
           esac
           # Not started (advance skill, step 1): no agent runs on an
           # issue that is closed, or that lacks `accepted` unless the
-          # workflow opened it.
-          if [ -n "$issue" ] && [ "$(gh api "repos/$GH_REPO/issues/$issue" --jq '.state == "open"
-            and (any(.labels[]; .name == "accepted") or .user.login == "github-actions[bot]")')" != true ]; then
-            issue=
+          # workflow opened it. A read that fails lets the run start,
+          # and the skill checks again. `held` says whether the issue
+          # has the implementation slot as its run starts.
+          held=
+          if [ -n "$issue" ]; then
+            read -r started held < <(gh api "repos/$GH_REPO/issues/$issue" --jq '[.labels[].name] as $l
+              | "\(.state == "open" and (($l | index("accepted")) != null or .user.login == "github-actions[bot]")) \(($l | index("implementing")) != null)"' || echo true) || true
+            [ "$started" = true ] || issue=
           fi
           echo "issue=$issue" >> "$GITHUB_OUTPUT"
           echo "queue=$queue" >> "$GITHUB_OUTPUT"
+          echo "held=$held" >> "$GITHUB_OUTPUT"
 
   advance:
     needs: route
@@ -344,8 +350,8 @@ jobs:
                 | capture("<!-- batch: (?<n>[0-9]+) -->").n] | last // empty')
             [ -n "$lead" ] && [ "$lead" != "$1" ] || return 0
             gh issue view "$1" --json labels --jq '.labels[].name' | grep -qx implementing || return 0
-            gh issue view "$lead" --json state,labels --jq 'select(.state == "OPEN") | .labels[].name' \
-              | grep -qx implementing && echo "$lead"
+            if gh issue view "$lead" --json state,labels --jq 'select(.state == "OPEN") | .labels[].name' \
+              | grep -qx implementing; then echo "$lead"; fi
           }
           issue=$(gh api "repos/$GH_REPO/issues/$ISSUE")
           [ "$(jq -r .state <<<"$issue")" = open ] || exit 0
@@ -387,27 +393,64 @@ jobs:
       group: queue
     permissions:
       issues: write
+      pull-requests: read
       actions: write
     steps:
       - env:
           GH_TOKEN: ${{ github.token }}
           GH_REPO: ${{ github.repository }}
+          OWNER: ${{ github.repository_owner }}
+          # The issue the agent ran on, and whether it had the slot then.
+          ISSUE: ${{ needs.route.outputs.issue }}
+          HELD: ${{ needs.route.outputs.held }}
         run: |
+          # Open issues carrying label $1, read from the issues
+          # themselves, because a search can lag behind a label just set.
+          open_with() {
+            gh api --paginate "repos/$GH_REPO/issues?state=open&labels=$1&per_page=100" \
+              --jq '.[] | select(.pull_request | not)'
+          }
+
+          # The slot is only for an implementation under way. An issue
+          # the agent left waiting on the client gives it up, and when a
+          # lead gave it up in this run, its batch goes back in line.
+          if [ -n "$ISSUE" ]; then
+            read -r has waits < <(gh api "repos/$GH_REPO/issues/$ISSUE" --jq '[.labels[].name] as $l
+              | "\(.state == "open" and ($l | index("implementing")) != null) \(($l | index("needs-answer")) != null)"')
+            if [ "$has" = true ] && { [ "$waits" = true ] ||
+              [ -n "$(gh api "repos/$GH_REPO/pulls?state=open&head=$OWNER:claude/spec-$ISSUE" --jq '.[].number')" ]; }; then
+              gh issue edit "$ISSUE" --remove-label implementing
+              has=false
+            fi
+            if [ "$HELD" = true ] && [ "$has" = false ]; then
+              for n in $(open_with implementing | jq -r .number); do
+                lead=$(gh api --paginate "repos/$GH_REPO/issues/$n/comments" |
+                  jq -rs '[.[][] | select(.user.login == "claude[bot]") | .body
+                    | capture("<!-- batch: (?<n>[0-9]+) -->").n] | last // empty')
+                if [ "$lead" = "$ISSUE" ]; then gh issue edit "$n" --add-label queued --remove-label implementing; fi
+              done
+            fi
+          fi
+
           # The slot is free once no open issue carries `implementing`.
-          [ -z "$(gh issue list --state open --label implementing --limit 1 --json number --jq '.[].number')" ] || exit 0
+          # One that still carries `queued` was only half handed the
+          # slot, and is picked again below.
+          holding=$(open_with implementing | jq -r 'select(any(.labels[]; .name == "queued") | not) | .number')
+          [ -z "$holding" ] || exit 0
           # First in line: the lowest-numbered critical issue, then high,
           # then any (CLAUDE.md, The loop, Severity), among those a run
           # would start on and nothing waits on the client for.
-          next=$(gh issue list --state open --label queued --limit 1000 --json number,labels,author --jq '
-            map((.labels | map(.name)) as $l
-              | select(($l | index("accepted")) or .author.login == "app/github-actions")
-              | select($l | index("stuck") or index("needs-answer") | not)
-              | [(if $l | index("severity: critical") then 0 elif $l | index("severity: high") then 1 else 2 end), .number])
-            | min // empty | .[1]')
+          next=$(open_with queued | jq -c '(.labels | map(.name)) as $l
+            | select(($l | index("accepted")) or .user.login == "github-actions[bot]")
+            | select($l | index("stuck") or index("needs-answer") | not)
+            | [(if $l | index("severity: critical") then 0 elif $l | index("severity: high") then 1 else 2 end), .number]' |
+            jq -s 'min // empty | .[1]')
           [ -n "$next" ] || exit 0
           gh issue edit "$next" --add-label implementing --remove-label queued
+          for _ in 1 2 3; do
+            if gh workflow run agent.yml --ref master -f issue="$next"; then exit 0; fi
+            sleep 5
+          done
           # An issue with the slot and no run would hold up the queue.
-          gh workflow run agent.yml --ref master -f issue="$next" || {
-            gh issue edit "$next" --add-label queued --remove-label implementing
-            exit 1
-          }
+          gh issue edit "$next" --add-label queued --remove-label implementing
+          exit 1

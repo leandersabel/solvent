@@ -183,7 +183,8 @@ The client is `leandersabel`. No agent edits an issue body.
   issue is in the issue's language, following the `advance` skill's
   Writing section.
 - An issue starts the loop when `accepted` is added, or at once when
-  `github-actions[bot]` opened it. Adding a label takes triage access
+  `github-actions[bot]` opened it. A finding starts in line
+  (Findings). Adding a label takes triage access
   to the repository, and no form sets `accepted`. An agent adds it only
   to an issue it opens, as it opens it: a finding (Findings) or a
   request split off another issue (Clarify).
@@ -229,9 +230,9 @@ takes it up at once.
 - A `change` becomes a pull request from `claude/spec-<issue>` that
   touches only `spec/requirements.md`, or for a pipeline change only
   the pipeline, and links the issue. It closes the issue only when it
-  is a pipeline change that leaves nothing to implement. Its
-  description is the requirements it adds, changes or removes, in the
-  issue's language.
+  is a pipeline change that leaves nothing to implement and no workflow
+  file to change. Its description is the requirements it adds, changes
+  or removes, in the issue's language.
 - Approving merges it, and what is left to implement waits in line.
   Requesting changes gets a revision on the same pull request. Closing
   it stops the loop and leaves the issue to the client.
@@ -247,7 +248,8 @@ takes it up at once.
   model that runs one at a time. When no open issue carries
   `implementing`, the first in line gets it and its run starts:
   critical problems first, then high ones, then the rest, each lowest
-  number first (Severity).
+  number first (Severity). An issue that waits on the client holds
+  neither a place in line nor the slot.
 - When a problem rated `severity: low` takes the slot, every other
   `queued` problem rated low on the same feature or screen joins it in
   one batch: one implementation, one branch and one pull request, each
