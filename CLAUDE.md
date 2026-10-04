@@ -233,10 +233,10 @@ the client does.
 - Starts when a requirements pull request merges, or when clarifying
   finds a `bug` or `maintenance` with nothing to ask. One implementation runs at a time, holding
   the `claude/slot` branch, which GitHub creates only once: its issue
-  carries `implementing`, an issue ready meanwhile waits with
-  `queued`, and when the running one merges the next starts: critical
-  problems first, then high ones, then the rest, each lowest number
-  first (Severity).
+  carries `implementing`. An issue that is ready waits with `queued`
+  while another holds the slot or a queued issue ranks ahead of it. A
+  free slot always goes to the first in line: critical problems first,
+  then high ones, then the rest, each lowest number first (Severity).
 - When a problem rated `severity: low` takes the slot, every other
   `queued` problem rated low on the same feature or screen joins it in
   one batch: one implementation, one branch and one pull request, each

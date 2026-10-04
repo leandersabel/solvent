@@ -113,7 +113,8 @@ for criteria it could not check stays unrated.
      - A check failed: go to Stuck.
      - A check is still running: stop. Its result starts the next run.
      - All green: add `implementing`, or `queued` when another open
-       issue carries `implementing`. Merge with squash. For
+       issue carries `implementing` or a `queued` issue ranks ahead of
+       this one (Implementation step 1). Merge with squash. For
        `implementing`, go to Implementation.
    - The client wrote since, in a review, a line comment or a comment:
      when it raises something only the client can decide, ask on the
@@ -214,16 +215,26 @@ closing `<details>` block.
 
 ## Implementation
 
-1. Take the implementation slot by creating the branch `claude/slot`
+1. A `bug` titled `The checks fail on master`, opened by
+   `github-actions[bot]`, skips this step and the slot, since every
+   other implementation's checks fail until it is fixed.
+
+   A free slot goes to the first in line. Rank the open issues
+   carrying `queued`, and this one, by the rating that counts, critical
+   first, then high, then the rest, each lowest number first. When one
+   ranks ahead of this issue and this issue does not carry
+   `implementing`, add `queued`, start the run of the first in line
+   (`gh workflow run agent.yml --ref master -f issue=<n>`) when
+   `claude/slot` does not exist, comment which issue is first in line,
+   and stop.
+
+   Otherwise take the implementation slot by creating the branch `claude/slot`
    (`gh api -X POST repos/leandersabel/solvent/git/refs -f
    ref=refs/heads/claude/slot -f sha=<origin/master>`). GitHub creates
    it only once, so two runs never both hold the slot. Created: add
    `implementing` and remove `queued`. It already exists and this issue
    carries `implementing`: the slot is this issue's, so continue.
-   Otherwise it already exists: add `queued`, comment which issue carries `implementing`, and stop. A `bug` titled
-   `The checks fail on master`, opened by `github-actions[bot]`, skips
-   the slot, since every other implementation's checks fail until it is
-   fixed.
+   Otherwise it already exists: add `queued`, comment which issue carries `implementing`, and stop.
 
    Holding the slot, this issue leads a batch when it is a `bug` or
    `code-scanning` issue whose rating that counts is `severity: low`.
