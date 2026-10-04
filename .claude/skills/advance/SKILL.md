@@ -82,11 +82,13 @@ for criteria it could not check stays unrated.
    adding `accepted` again resumes it. Stop.
 3. **Stuck, and the client wrote since.** Remove `stuck`, and from each
    batch member the client wrote on. Fix attempts count from the
-   client's comment on. If the client asks to retry,
-   rerun the failed jobs (`gh run rerun <id> --failed`) rather than
-   changing code. Otherwise take the comment as guidance for the next
-   attempt. A draft implementation pull request becomes ready again
-   with auto-merge on. Then continue with the step below that applies.
+   client's comment on. If the client asks to retry, push an empty
+   commit to the branch of the pull request whose check failed rather
+   than changing code, which runs every check again and is no fix
+   attempt. On a requirements pull request, request the client's review
+   again, since the push dismissed it. Otherwise take the comment as
+   guidance for the next attempt. A draft implementation pull request
+   becomes ready again with auto-merge on. Then continue with the step below that applies.
 4. **Saved work.** A branch `claude/saved/<kind>-<issue>` is finished
    work an earlier run could not push. Push it to
    `claude/<kind>-<issue>` with `--force`, since no run on this issue
