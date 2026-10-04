@@ -5,7 +5,7 @@
     {"file": "spec/features/nightly-harness.md", "sections": ["all"]},
     {"file": "CLAUDE.md", "sections": ["The loop"], "role": "Nightly and stable is the requirement this feature serves: shards on a network of their own with no route out, the stand-in under the real source names, the vaults made with the app's own browser code, qa reaching the server only through harness tools, and nothing of the harness in the image"},
     {"file": "spec/architecture.md", "sections": ["Tech stack", "Vault epoch", "Status codes", "Application hardening", "Storage & data handling", "Threat model"], "role": "Tech stack, Packaging: the image holds nothing of the harness. Status codes: the stand-in's statuses are the providers' own and outside this set. Application hardening: the session, the sign-in limits each shard spends and the egress rules the stand-in is trusted under. Vault epoch: the X-Solvent-Vault header every vault request the generator sends carries"},
-    {"file": "spec/features/rate-lookup.md", "sections": ["Providers", "Seeded symbols", "SSRF and egress hardening", "Rate limiting and failure", "Edge cases"], "role": "the composition known_table must equal exactly, the seeded currency list prices.py must equal, the constants that name no setting, and the breaker that app_stop and app_start reset"},
+    {"file": "spec/features/rate-lookup.md", "sections": ["Providers", "Seeded symbols", "SSRF and egress hardening", "Rate limiting and failure", "Edge cases"], "role": "the composition known_table must equal exactly, the seeded currency list prices.py must equal, the constants that name no setting, and the per-provider breakers that app_stop and app_start reset"},
     {"file": "spec/features/net-worth-view.md", "sections": ["Current net worth", "Archived holdings"], "role": "the expected figures prepare computes independently: latest quantity times price, assets and debts, archived and unpriced holdings excluded"},
     {"file": "spec/features/record-rate.md", "sections": ["Record shape", "The refresh", "The write path", "Reading", "Editing a captured rate"], "role": "the rate records the script writes, the proposals it passes to refreshPrices, the price as recorded, and editedRatePayload"},
     {"file": "spec/features/record-snapshot.md", "sections": ["Record shape", "Same holding, same date: upsert"], "role": "the snapshot records written, and the same-date pair the plan plants"},
@@ -176,7 +176,7 @@
         "app_stop": {"arguments": "none", "does": "docker stop --time 10 <container>", "returns": "{\"state\": \"stopped\"}"},
         "app_start": {"arguments": "none", "does": "docker start <container>, then polls <url>/login until it answers 200, at most 60 seconds", "returns": "{\"state\": \"running\"}, or isError: true with {\"state\": \"not answering\"}"}
       }, "cite": "spec/features/nightly-harness.md#the-harness-tools"},
-      "breakerReset": {"value": "app_stop and app_start reset the app's circuit breaker, because it lives in process memory. app_start on a running container changes nothing and answers running", "cite": "spec/features/nightly-harness.md#edge-cases"}
+      "breakerReset": {"value": "app_stop and app_start reset every one of the app's circuit breakers, because the breakers live in process memory. app_start on a running container changes nothing and answers running", "cite": "spec/features/nightly-harness.md#edge-cases"}
     },
     "workflowRequirements": {
       "buildJob": {"value": "after the image is built and before any shard starts, a step with the id sources runs sources.py check in a container of tonight's image on the default network, appends its output to the step summary, and fails the job on exit 1", "cite": "spec/features/nightly-harness.md#what-the-workflow-does"},
@@ -199,7 +199,7 @@
       "sourceChanged": "the build job fails at sources, before any shard, and the failure issue names that step",
       "sourceDoesNotAnswer": "noted in the summary and the night goes on, since the stand-in answers the shards either way",
       "trustStoreMoved": "the probe fails the shard as the harness, rather than every lookup failing as a finding",
-      "breakerOpened": "the app skips that source for the cool-off after it comes back up, and app_stop then app_start resets it"
+      "breakerOpened": "the app skips that source, and only that source, for the cool-off after it comes back up, and app_stop then app_start resets every breaker"
     }, "cite": "spec/features/nightly-harness.md#edge-cases"}
   },
   "verify": {

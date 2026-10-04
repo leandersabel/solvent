@@ -10,8 +10,9 @@ from __future__ import annotations
 import json
 import ssl
 import time
+import urllib.error
 import urllib.request
-from datetime import date, timedelta
+from datetime import date, datetime, timedelta, timezone
 
 import pytest
 
@@ -25,7 +26,7 @@ def provider(monkeypatch):
     calls = []
     answers = {}
 
-    def fetch(url):
+    def fetch(_provider, url):
         calls.append(url)
         for fragment, payload in answers.items():
             if fragment in url:
@@ -33,7 +34,6 @@ def provider(monkeypatch):
         return None
 
     monkeypatch.setattr(rates, "_fetch_json", fetch)
-    rates.breaker.record_success()
     return type("Provider", (), {"calls": calls, "answers": answers})()
 
 
@@ -270,7 +270,6 @@ def test_the_circuit_breaker_opens_and_closes(app, owner, monkeypatch):
         raise OSError("provider down")
 
     monkeypatch.setattr(rates._opener, "open", failing)
-    rates.breaker.record_success()
 
     for _ in range(4):
         owner.get(f"/api/rates?date={PAST}&quote=CHF&symbol=USD", headers=CSRF)
@@ -278,7 +277,7 @@ def test_the_circuit_breaker_opens_and_closes(app, owner, monkeypatch):
     owner.get(f"/api/rates?date={PAST}&quote=CHF&symbol=USD", headers=CSRF)
     assert len(attempts) == opened
 
-    rates.breaker.record_success()
+    rates.breakers["frankfurter"].record_success()
     owner.get(f"/api/rates?date={PAST}&quote=CHF&symbol=USD", headers=CSRF)
     assert len(attempts) > opened
 
@@ -296,7 +295,6 @@ def test_a_whole_table_request_holding_gold_stays_within_one_egress_timeout(
         raise TimeoutError("provider hangs")
 
     monkeypatch.setattr(rates._opener, "open", hang)
-    rates.breaker.record_success()
 
     started = time.monotonic()
     response = owner.get(f"/api/rates?date={PAST}&quote=CHF", headers=CSRF)
@@ -487,9 +485,8 @@ def test_every_outbound_request_is_named(monkeypatch):
 
     scratch = Flask(__name__)
     scratch.config.update(RATE_BREAKER_COOLOFF_MINUTES=5, RATE_BREAKER_FAILURES=5)
-    rates.breaker.record_success()
     with scratch.app_context():
-        rates._fetch_json("https://api.frankfurter.dev/v1/2026-01-01?base=CHF")
+        rates._fetch_json("frankfurter", "https://api.frankfurter.dev/v1/2026-01-01?base=CHF")
 
     assert seen[0].get_header("User-agent") == rates.USER_AGENT
 
@@ -525,7 +522,6 @@ def opener(monkeypatch):
         return Response(answers[kind](request.full_url))
 
     monkeypatch.setattr(rates._opener, "open", open_)
-    rates.breaker.record_success()
     return type("Opener", (), {"requests": requests, "answers": answers})()
 
 
@@ -725,3 +721,158 @@ def test_the_only_environment_the_app_reads_is_its_configuration_and_none_of_it_
     assert [(h._context.verify_mode, h._context.check_hostname) for h in https] == [
         (ssl.CERT_REQUIRED, True)
     ]
+
+
+# ---- One breaker per provider ------------------------------------------
+
+FAILURE_KINDS = ["connect", "timeout", "non-200", "non-json"]
+
+
+@pytest.fixture
+def providers(monkeypatch):
+    """The app's opener, with Frankfurter and NBP each healthy or failing
+    in one of the ways a breaker counts. `requests` records the provider
+    of every request that went out, `lag_days` makes NBP publish that
+    many days before the date asked."""
+
+    class Response:
+        def __init__(self, body, status=200):
+            self.body, self.status = body, status
+
+        def read(self, _size=None):
+            return self.body
+
+        def __enter__(self):
+            return self
+
+        def __exit__(self, *_):
+            return False
+
+    state = type("Providers", (), {"requests": [], "fail": {}, "lag_days": 0})()
+
+    def open_(request, timeout=None):
+        url = request.full_url
+        provider = "nbp" if "nbp.pl" in url else "frankfurter"
+        state.requests.append(provider)
+        kind = state.fail.get(provider)
+        if kind == "connect":
+            raise ConnectionRefusedError("refused")
+        if kind == "timeout":
+            raise TimeoutError("timed out")
+        if kind == "non-200":
+            return Response(b"{}", status=503)
+        if kind == "non-json":
+            return Response(b"<html>")
+        if provider == "nbp":
+            end = date.fromisoformat(url.split("?")[0].rsplit("/", 1)[1])
+            published = (end - timedelta(days=state.lag_days)).isoformat()
+            return Response(json.dumps([{"data": published, "cena": 251.37}]).encode())
+        body = {
+            "base": url.rsplit("base=", 1)[1],
+            "date": url.split("/v1/")[1][:10],
+            "rates": {"PLN": 4.2537, "USD": 1.0876},
+        }
+        return Response(json.dumps(body).encode())
+
+    monkeypatch.setattr(rates._opener, "open", open_)
+    return state
+
+
+def _day(offset: int) -> str:
+    """A different date per request, so no cache entry answers in place
+    of a provider."""
+    return (date.fromisoformat(PAST) - timedelta(days=offset)).isoformat()
+
+
+@pytest.mark.parametrize("kind", FAILURE_KINDS)
+def test_frankfurter_failing_opens_its_breaker_while_nbp_keeps_answering(
+    app, owner, providers, kind
+):
+    """Each request is for a new date, quoted in PLN, so gold needs no
+    Frankfurter leg. NBP's successes between Frankfurter's failures must
+    not reset Frankfurter's count."""
+    app.config["RATE_BREAKER_FAILURES"] = 3
+    providers.fail["frankfurter"] = kind
+
+    for offset in range(6):
+        response = owner.get(f"/api/rates?date={_day(offset)}&quote=PLN", headers=CSRF)
+        assert response.status_code == 200
+        assert set(response.get_json()["rates"]) == {"XAU-g", "XAU-ozt"}
+
+    assert providers.requests.count("frankfurter") == 3
+    assert providers.requests.count("nbp") == 6
+
+
+@pytest.mark.parametrize("kind", FAILURE_KINDS)
+def test_nbp_failing_past_the_count_stops_only_the_gold_symbols(app, owner, providers, kind):
+    app.config["RATE_BREAKER_FAILURES"] = 3
+    providers.fail["nbp"] = kind
+
+    for offset in range(6):
+        response = owner.get(f"/api/rates?date={_day(offset)}&quote=CHF", headers=CSRF)
+        assert response.status_code == 200
+        symbols = set(response.get_json()["rates"])
+        assert {"USD", "PLN"} <= symbols
+        assert not symbols & {"XAU-g", "XAU-ozt"}
+
+    assert providers.requests.count("frankfurter") == 6
+    assert providers.requests.count("nbp") == 3
+
+
+def test_a_failing_fx_leg_of_gold_counts_against_frankfurter_not_nbp(app, owner, providers):
+    """NBP publishes the day before each date asked, so every gold
+    request needs a second Frankfurter request, for the day NBP
+    published: the currency leg."""
+    app.config["RATE_BREAKER_FAILURES"] = 3
+    providers.fail["frankfurter"] = "non-200"
+    providers.lag_days = 1
+
+    for offset in range(4):
+        url = f"/api/rates?date={_day(offset)}&quote=CHF&symbol=XAU-g"
+        assert owner.get(url, headers=CSRF).status_code == 204
+
+    # Two failures in the first request, the third opens the breaker
+    # and the leg of the second is not sent.
+    assert providers.requests.count("frankfurter") == 3
+    assert providers.requests.count("nbp") == 4
+    assert rates.breakers["nbp"].failures == 0
+    assert rates.breakers["frankfurter"].opened_at is not None
+
+
+@pytest.fixture
+def server_clock(monkeypatch):
+    """The clock the breakers read, stopped until a test moves it."""
+    now = [datetime.now(timezone.utc)]
+
+    class Stopped(datetime):
+        @classmethod
+        def now(cls, tz=None):
+            return now[0].astimezone(tz)
+
+    monkeypatch.setattr(rates, "datetime", Stopped)
+    return lambda seconds: now.__setitem__(0, now[0] + timedelta(seconds=seconds))
+
+
+@pytest.mark.parametrize("down, other", [("frankfurter", "nbp"), ("nbp", "frankfurter")])
+def test_each_provider_is_asked_again_after_its_own_cooloff(
+    app, owner, providers, server_clock, down, other
+):
+    app.config["RATE_BREAKER_FAILURES"] = 2
+    app.config["RATE_BREAKER_COOLOFF_MINUTES"] = 5
+    providers.fail[down] = "connect"
+
+    def lookup(offset):
+        before = list(providers.requests)
+        owner.get(f"/api/rates?date={_day(offset)}&quote=CHF", headers=CSRF)
+        return providers.requests[len(before):]
+
+    assert lookup(0) == ["frankfurter", "nbp"]
+    assert lookup(1) == ["frankfurter", "nbp"]
+    assert lookup(2) == [other]
+    server_clock(5 * 60 - 1)
+    assert lookup(3) == [other]
+    server_clock(1)
+    # The count starts again from zero, so it takes two more failures.
+    assert lookup(4) == ["frankfurter", "nbp"]
+    assert lookup(5) == ["frankfurter", "nbp"]
+    assert lookup(6) == [other]

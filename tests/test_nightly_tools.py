@@ -469,7 +469,6 @@ def from_standin(monkeypatch):
         return AppResponse(body)
 
     monkeypatch.setattr(rates._opener, "open", open_)
-    rates.breaker.record_success()
 
 
 def test_known_table_is_what_the_app_answers_for_the_whole_table(owner, from_standin):

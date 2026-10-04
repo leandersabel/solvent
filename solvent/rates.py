@@ -161,9 +161,9 @@ def _request(url: str) -> urllib.request.Request:
 
 
 class _Breaker:
-    """Opens after N consecutive provider failures and serves No
-    Content directly for the cool-off instead of retrying per
-    request."""
+    """Opens after N consecutive failures of one provider and fails its
+    requests without sending them for the cool-off, instead of retrying
+    per request."""
 
     def __init__(self) -> None:
         self.lock = threading.Lock()
@@ -192,11 +192,14 @@ class _Breaker:
             self.opened_at = None
 
 
-breaker = _Breaker()
+# One per provider: a shared one would let an outage of either silence
+# the other, and the other's successes keep resetting the count.
+breakers = {"frankfurter": _Breaker(), "nbp": _Breaker()}
 
 
-def _fetch_json(url: str) -> "object | None":
+def _fetch_json(provider: str, url: str) -> "object | None":
     config = current_app.config
+    breaker = breakers[provider]
     if breaker.is_open(timedelta(minutes=config["RATE_BREAKER_COOLOFF_MINUTES"])):
         return None
     # One deadline for the whole proxy request: gold makes several calls
@@ -238,7 +241,7 @@ def _fx_table(on: date, quote: str) -> "dict[str, tuple[Decimal, str]] | None":
     the provider does not publish resolves to its prior close, which is
     what the `date` field in the response carries.
     """
-    payload = _fetch_json(FX_URL.format(date=on.isoformat(), quote=quote))
+    payload = _fetch_json("frankfurter", FX_URL.format(date=on.isoformat(), quote=quote))
     if not isinstance(payload, dict):
         return None
     as_of = payload.get("date")
@@ -267,7 +270,7 @@ def _gold_pln(on: date) -> "tuple[Decimal, str] | None":
     prior-close rule in one request.
     """
     start = (on - _PRIOR_CLOSE_WINDOW).isoformat()
-    payload = _fetch_json(NBP_URL.format(start=start, end=on.isoformat()))
+    payload = _fetch_json("nbp", NBP_URL.format(start=start, end=on.isoformat()))
     if not isinstance(payload, list) or not payload:
         return None
     last = payload[-1]
