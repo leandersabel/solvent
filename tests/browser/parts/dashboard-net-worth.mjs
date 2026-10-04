@@ -228,7 +228,15 @@ await run(async () => {
       inside: getComputedStyle(details).overflowX,
     });
   })()`).then(JSON.parse);
+  // The chart draws from a resize observer, on a frame of its own, after
+  // a resize or a re-render.
+  const chartDrawn = () =>
+    rec.waitUntil(
+      "Number(document.querySelector('svg.trend')?.getAttribute('width')) === Math.floor(document.querySelector('.chart-frame').clientWidth)",
+      { label: "the chart drawn at the card's width" },
+    );
   await viewport(1280);
+  await chartDrawn();
   check(
     'net-worth-view: at 390px the data table scrolls inside the card and the page does not scroll sideways',
     phoneTable.page <= 0 && phoneTable.inside === 'auto',
@@ -253,7 +261,7 @@ await run(async () => {
     `${await priceDateOf('Silver coins')} | ${await priceDateOf('Dollar cash')}`,
   );
   await ev("[...document.querySelectorAll('.switch-option')].find(b => b.textContent.includes('as of each figure')).click()");
-  await rec.frames();
+  await chartDrawn();
   const modeAfter = {
     hero: await hero(),
     brokerage: (await tableRow('Brokerage')).converted,
@@ -272,14 +280,14 @@ await run(async () => {
     JSON.stringify({ ...modeBefore, chart: null, after: { ...modeAfter, chart: null } }),
   );
   await ev("[...document.querySelectorAll('.switch-option')].find(b => b.textContent.includes('Latest rates')).click()");
-  await rec.frames();
+  await chartDrawn();
   const marksOn = await ev(`(() => {
     const copy = document.querySelector('svg.trend').cloneNode(true);
     copy.querySelectorAll('.entry-mark').forEach(n => n.remove());
     return copy.innerHTML;
   })()`);
   await ev("document.querySelector('.chart-card input[type=checkbox]').click()");
-  await rec.frames();
+  await chartDrawn();
   check(
     'net-worth-view: Just the line takes the entry marks away and changes nothing else',
     (await ev("document.querySelectorAll('.entry-mark').length")) === 0 && (await ev("document.querySelector('svg.trend').innerHTML")) === marksOn,
@@ -631,7 +639,7 @@ await run(async () => {
     await pointAt('pointerdown', from);
     await pointAt('pointermove', to);
     await pointAt('pointerup', to);
-    await rec.frames();
+    await chartDrawn();
     const lo = Math.min(from, to);
     const hi = Math.max(from, to);
     dragged.push({
@@ -658,7 +666,7 @@ await run(async () => {
   }
   await pointAt('pointerdown', kb);
   await pointAt('pointerup', kb);
-  await rec.frames();
+  await chartDrawn();
   check(
     'net-worth-view: a drag in either direction selects the two days under it, earlier first, and the hero and every legend entry read the later day minus the earlier',
     dragged.every(({ got, want }) =>
