@@ -187,7 +187,9 @@ One table, every account, both kinds. Columns: **Username**, **Kind**,
   changed nowhere.
 - **Last signed in** always shows a date, because creating an account is
   its first sign-in (How it works, Endpoints).
-- **Items** is how many things the vault holds. For an administrator it
+- **Items** is how many things the owner added to the vault: holdings,
+  recordings and prices. A vault nobody has added anything to reads 0.
+  For an administrator it
   reads an ink-muted **No vault**, never a zero, because a zero invites
   the reader to think a vault sits there empty. Ink-muted is allowed
   because the Kind column says the same in the same row
@@ -483,14 +485,17 @@ Refusals).
   case. A used one is a Conflict, its status unchanged, with a message
   pointing at removing the account.
 - `GET /api/admin/accounts` returns, per account, `{ username, kind,
-  createdAt, lastLoginAt }`, plus `recordCount` **for a vault owner
+  createdAt, lastLoginAt }`, plus `itemCount` **for a vault owner
   only**. Both kinds are listed, because an administrator needs to see
   the others to know whether they are the last and to remove one.
   - `lastLoginAt` is a timestamp on every row and never null, because
     registration is a sign-in (login.md, The session a sign-in issues).
     A row whose `last_login_at` is null in the file is filled with its
     `created_at` at start-up (app-shell.md, Database).
-  - `recordCount` is **absent** for an administrator, not zero. Zero and
+  - `itemCount` counts the vault's `account`, `snapshot` and `rate`
+    records. Every `profile` record is left out, because registration
+    writes one and a second is allowed (record-api.md, Edge cases).
+  - `itemCount` is **absent** for an administrator, not zero. Zero and
     "has no vault" are different statements. The response is a union
     discriminated on `kind`, the shape rule `params` follows
     (architecture.md, Credentials and vault key wrappers). Nothing about
@@ -707,9 +712,9 @@ administrator), and the lost sole password (Bootstrap). The rest:
 20. The created link is shown once, and an administrator's account row
     reads No vault, never a zero. Test: `tests/browser/parts/admin.mjs`.
 21. (blind) `GET /api/admin/accounts` lists both kinds, and an
-    administrator's row has no `recordCount` key, asserted against the
+    administrator's row has no `itemCount` key, asserted against the
     row's full key set, not its value. Test:
-    `tests/test_admin.py::test_the_account_list_carries_no_record_count_for_an_administrator`.
+    `tests/test_admin.py::test_the_account_list_carries_no_item_count_for_an_administrator`.
 22. (blind) After the first administrator registers through a CLI invite,
     and again after a vault owner and a second administrator register
     through in-app invites, every row's `lastLoginAt` is non-null and
@@ -799,3 +804,7 @@ administrator), and the lost sole password (Bootstrap). The rest:
     registration, read after gunicorn stops. Not a source grep or the
     app's logger alone. Test:
     `tests/test_deployment.py::test_no_invite_token_reaches_the_containers_standard_output_or_error`.
+48. A freshly registered vault reads 0 items, and one holding one
+    `account`, one `snapshot`, one `rate` and a second `profile` record
+    reads 3. Test:
+    `tests/test_admin.py::test_items_count_what_the_owner_added_and_no_profile`.

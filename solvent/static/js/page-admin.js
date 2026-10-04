@@ -281,7 +281,7 @@ async function accounts(body) {
               // vault is sitting there empty.
               el('td', {
                 class: 'muted',
-                text: 'recordCount' in row ? String(row.recordCount) : 'No vault',
+                text: 'itemCount' in row ? String(row.itemCount) : 'No vault',
               }),
               el('td', {}, [
                 row.kind === 'administrator' && administrators === 1
