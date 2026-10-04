@@ -480,15 +480,80 @@ await run(async () => {
     oldPassword.close();
   }
 
+  // The Open sessions list after a change, with a second session open
+  // before Settings renders, so the rows fetched then include it.
+  const sessionRows = () =>
+    page.call(() => ({
+      rows: document.querySelectorAll('.sessions-table tbody tr').length,
+      marked: [...document.querySelectorAll('.sessions-table .chip')].filter((c) => c.textContent === 'This session').length,
+      failed: document.body.innerText.includes('The session list would not load.'),
+      retry: [...document.querySelectorAll('.session-list button')].some((b) => b.textContent === 'Retry'),
+      stayed: window.__stayed === true,
+    }));
+  const rowsAre = (rows) => page.waitUntil(
+    (count) => document.querySelectorAll('.sessions-table tbody tr').length === count,
+    { args: [rows], label: `${rows} session rows` },
+  );
+  const awayAndBack = async (label) => {
+    await page.eval("location.hash = '#/'");
+    await page.waitUntil("document.querySelector('.hero-figure')", { label: 'the dashboard before settings' });
+    await toSettings(label);
+  };
+
   // Back to the password the part's checks sign in with.
-  await toSettings('settings to change the password back');
+  await otherSession('leander', NEW_PASSWORD);
+  await awayAndBack('settings with two sessions open');
+  await rowsAre(2);
+  await page.eval('window.__stayed = true');
   await fillPasswords(NEW_PASSWORD, VAULT_PASSWORD);
   await submitPasswords();
   await page.waitUntil("document.body.innerText.includes('Your password is changed.')", {
     timeout: 60000,
     label: 'the password changed back',
   });
+  await page.holds(
+    (count) => document.querySelectorAll('.sessions-table tbody tr').length === count,
+    { args: [1], label: 'one session row after the change' },
+  );
+  const reloaded = await sessionRows();
+  check(
+    'after a password change the session list shows one row, marked This session, with no navigation',
+    reloaded.rows === 1 && reloaded.marked === 1 && reloaded.stayed,
+    JSON.stringify(reloaded),
+  );
 
+  // A reload that fails shows the card's error, never the old rows.
+  await otherSession('leander', VAULT_PASSWORD);
+  await awayAndBack('settings with two sessions open again');
+  await rowsAre(2);
+  expectedFailures.add('/api/sessions');
+  const releaseReload = await intercept(page, '*/api/sessions', () => ({ status: 500 }));
+  await fillPasswords(VAULT_PASSWORD, NEW_PASSWORD);
+  await submitPasswords();
+  await page.waitUntil("document.body.innerText.includes('The session list would not load.')", {
+    timeout: 60000,
+    label: 'the list error after the change',
+  });
+  const failedReload = await sessionRows();
+  check(
+    'a failed reload after a password change shows the load error and Retry, never the old rows',
+    failedReload.failed && failedReload.retry && failedReload.rows === 0,
+    JSON.stringify(failedReload),
+  );
+  await releaseReload();
+  expectedFailures.delete('/api/sessions');
+  await page.call(() => {
+    [...document.querySelectorAll('.session-list button')].find((b) => b.textContent === 'Retry').click();
+  });
+  await rowsAre(1);
+
+  await fillPasswords(NEW_PASSWORD, VAULT_PASSWORD);
+  await submitPasswords();
+  await page.waitUntil("document.body.innerText.includes('Your password is changed.')", {
+    timeout: 60000,
+    label: 'the password changed back again',
+  });
+  await rowsAre(1);
 
   // ---- Account settings: deleting a vault --------------------------------
 

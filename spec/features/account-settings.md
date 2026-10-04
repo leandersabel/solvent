@@ -419,6 +419,11 @@ from an administrator removing an account (admin-invites.md).
   otherwise keep, for a household instance where it answers nothing —
   and no endpoint returns any, because none is recorded. `id` is an
   opaque handle, never the session cookie's value.
+  The page fetches the list when it renders, on Retry, and again once a
+  change-password response is OK, because by then the server has ended
+  every other session and rows fetched earlier show sessions that are
+  gone. A failed fetch replaces the rows with the card's load error and
+  Retry (`ui/settings.md`), never leaving the earlier rows in view.
 
 ## Edge cases
 
@@ -493,6 +498,13 @@ from an administrator removing an account (admin-invites.md).
   bypassed.
 - Other sessions for the user are invalidated by a password change; the
   initiating session is not.
+- With a second session open before a password change, the Open
+  sessions list on the page that made the change holds one row, marked
+  This session, once the change succeeds, with no navigation in
+  between.
+- When the session list fetch after a successful password change fails,
+  the card shows its load error and Retry and none of the rows it
+  showed before the change.
 - A vault owner's change-password request carrying the epoch from
   before an import, with a correct `currentAuthKey`, answers Conflict
   `{"refused":"vault-replaced"}`, and the `credentials`,

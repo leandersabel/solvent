@@ -201,6 +201,13 @@ tradeoff moves beneath its select. The sample strip wraps, with
 - **Error, the change failed after the slow part**: "Nothing was
   changed. Your current password still works." Every field is kept, so
   nothing is re-typed and nothing is re-derived.
+- **Password changed**: the inline confirmation appears under Change
+  password, and the Open sessions table reloads
+  without leaving the page. It shows skeleton rows while it reloads,
+  then one row, carrying the chip that marks the current session. A
+  reload that fails shows that card's load error with its retry, as
+  when the session list would not load, never the rows from before the
+  change.
 - **Error, the idle lock would not save**: inline on that control,
   which goes back to the value the vault holds. The lock keeps running
   at that value.

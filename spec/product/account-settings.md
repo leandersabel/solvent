@@ -241,6 +241,9 @@ single total.
 - The delete dialog offers exporting first as its main action.
 - The list of open sessions shows only your own sessions, never anyone
   else's, and carries no IP address and no device information.
+- The list of open sessions matches what is open whenever it is shown.
+  Right after you change your password, it lists only the session you
+  are using, without you leaving the page.
 - Signing out ends the current session and leaves another session on
   the same account working. Signing out everywhere ends that one too,
   including the current one.
