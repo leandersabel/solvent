@@ -1,0 +1,15 @@
+# The groups of GitHub's generated release notes, by the labels the loop
+# puts on its pull requests (CLAUDE.md, The loop, Nightly and stable).
+# A pull request goes to the first group whose label it carries.
+changelog:
+  categories:
+    - title: Fixes for what QA found
+      labels: [qa]
+    - title: Changes
+      labels: [change]
+    - title: Fixes
+      labels: [bug, code-scanning]
+    - title: Maintenance
+      labels: [maintenance, dependencies]
+    - title: Other
+      labels: ["*"]

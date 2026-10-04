@@ -1,8 +1,11 @@
 name: Nightly failure
-description: Leaves an issue the loop takes up for a failed night.
+description: Leaves an issue the loop takes up for a failed nightly or candidate.
 inputs:
+  stage:
+    description: The stage that failed, nightly or candidate
+    default: nightly
   today:
-    description: The night's date
+    description: The version it would have published
     required: true
   steps:
     description: The final job's steps context, as JSON
@@ -20,6 +23,7 @@ runs:
     - run: python3 "$GITHUB_ACTION_PATH/report.py"
       shell: bash
       env:
+        STAGE: ${{ inputs.stage }}
         TODAY: ${{ inputs.today }}
         STEPS: ${{ inputs.steps }}
         NEEDS: ${{ inputs.needs }}

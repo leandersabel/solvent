@@ -1,0 +1,7 @@
+# What zizmor reports and the workflows mean.
+rules:
+  dangerous-triggers:
+    ignore:
+      # Its route job reads only who acted and on what before any agent
+      # runs, and checks out nothing from the run it follows.
+      - agent.yml

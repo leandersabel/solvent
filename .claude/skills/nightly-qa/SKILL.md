@@ -1,6 +1,6 @@
 ---
 name: nightly-qa
-description: Walk one shard of tonight's QA walk against the client's acceptance lists, or merge what the shards recorded for the workflow to file. Run by .github/workflows/nightly.yml.
+description: Walk one shard of a QA walk against the client's acceptance lists, or merge what the shards recorded for the workflow to file. Run by .github/workflows/walk.yml, for the nightly and the candidate.
 ---
 
 # Nightly QA

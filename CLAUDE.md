@@ -150,9 +150,10 @@ The client is `leandersabel`. No agent edits an issue body.
 
 - Every decision of the client's is a GitHub action by
   `leandersabel`: opening an issue, commenting, adding `accepted`,
-  reviewing a requirements pull request, promoting a release. Agents
-  write as `claude[bot]`, through the Claude GitHub App. Workflow steps
-  without a model write as `github-actions[bot]`.
+  reviewing a requirements pull request, starting a candidate or a
+  release. Agents write as `claude[bot]`, through the Claude GitHub
+  App. Workflow steps, and the run that files QA's findings, write as
+  `github-actions[bot]`.
 - State is read off GitHub: issues, labels, pull requests, reviews,
   checks and releases. No file tracks it, and no comment is read as an
   approval.
@@ -160,8 +161,8 @@ The client is `leandersabel`. No agent edits an issue body.
   event, with the issue number. The run reads the issue's state, takes
   the one next step and does the work itself, so no agent rebuilds
   context the run already holds. Repeating a run does no harm.
-  `reviewer` is its only subagent. `qa` walks the nightly version, and
-  `release` starts an instance outside it.
+  `reviewer` is its only subagent. `qa` walks the nightly and the
+  candidate, and `release` starts an instance outside them.
 - Changes reach `master` only as pull requests from `claude[bot]` or
   Dependabot. The client changes the pipeline through an issue like any
   other change, except a workflow file, which the Claude GitHub App
@@ -275,9 +276,10 @@ to where they asked, labeled `bug` or `change` and `accepted`.
 ### Merge gate
 
 - One ruleset on `master`: pull requests only, squash merges only, no
-  force push or deletion. The `test`, `image` and `dependencies` checks
-  are required. No approval is required except the code owner's, and a
-  push dismisses an earlier approval.
+  force push or deletion. The `test`, `image`, `workflows` and
+  `dependencies` checks are required. `workflows` lints the workflows
+  with actionlint and zizmor. No approval is required except the code
+  owner's, and a push dismisses an earlier approval.
 - `CODEOWNERS` makes `@leandersabel` the reviewer of
   `spec/requirements.md`, `spec/design/`, `.claude/`, `CLAUDE.md`,
   `SECURITY.md` and `.github/` outside `.github/workflows/`. So the
@@ -287,7 +289,8 @@ to where they asked, labeled `bug` or `change` and `accepted`.
   because nobody can approve a pull request of their own.
 - A pull request need not be up to date with `master`, because one
   implementation runs at a time and a requirements pull request touches
-  no code. The nightly run tests `master` as a whole before any version.
+  no code. A version is made only of a commit whose push check passed,
+  which tests `master` as a whole.
 - Dependabot's updates pass the same gate and merge when green, except
   one touching a file the client owns, which waits for their approval. A
   release is proposed only once it has aged: a week for a major or
@@ -326,7 +329,8 @@ found.
 - Every problem an agent or a workflow finds is an issue of its own,
   never only a remark in a comment or a pull request.
 - A problem the work in hand causes, or its issue covers, is part of
-  that work. Any other is filed by `claude[bot]` as a rated `bug`, or as
+  that work. Any other is filed by `claude[bot]`, or by QA's
+  filing run as `github-actions[bot]`, as a rated `bug`, or as
   `maintenance` when nothing the client sees changes, with `accepted`,
   `queued`, where it was found, and its reproduction: the steps, or a
   failing test. Without one it is not filed. An agent never files a
@@ -346,64 +350,98 @@ found.
 
 ### Nightly and stable
 
-- Every night that code on `master` changed since the last version,
-  `.github/workflows/nightly.yml` builds the image once and runs the
-  suite against that commit, unless the push check of the last commit
-  that changed anything but `.claude/` or the top-level docs already
-  passed it. `qa` walks the acceptance list of each feature whose page
-  changed since the commit the last completed walk covered, each one a
-  changed file of the image or the harness names by its page's path,
-  and the one walked longest ago, so every feature is walked within as
-  many completed walks as there are features. A changed file naming
-  none, or no record of a last walk, walks every feature. The client can
-  start the same run by hand, and `gh workflow run nightly.yml -f
-  full=true` walks every feature: on today's version when it exists,
-  and otherwise on a new one, even when no code changed.
-- The walk is split into shards that run at once. Each shard starts its
-  own instance of tonight's image, hardened on a network with no route
-  out, beside a stand-in that answers as the price sources through a
+- One image is built per version and moves through every stage by its
+  digest on `ghcr.io/leandersabel/solvent`. No stage rebuilds it. Each
+  stage records what it proved as a signed attestation on that digest
+  and moves a tag, so nothing a later stage relies on lives in workflow
+  artifacts. Every job checks out its own commit and no other.
+- No model in these stages runs in a job whose token can push an image,
+  move a tag, publish a release or write the repository. A model that
+  walks holds a token that only reads. The model that files findings holds one that
+  writes issues and nothing else, so findings are filed as
+  `github-actions[bot]`.
+- The stages:
+
+  | Stage | Started by | QA walks | A pass publishes | Image tags |
+  |---|---|---|---|---|
+  | Check | each pull request | nothing | nothing, the pull request merges | none |
+  | Nightly | the schedule, on a night code changed | the features that changed | a pre-release `YYYY.MM.N-dev.YYYYMMDD` | that version, `:nightly` |
+  | Candidate | the client | every feature | a pre-release `YYYY.MM.N-rc.N` | that version, `:rc` |
+  | Release | the client | nothing | the release `YYYY.MM.N` | that version, `:stable`, `:latest` |
+
+- Versions are CalVer by month. A release is `YYYY.MM.N`, numbered from
+  0 within the month. A nightly is a dev build of the next release,
+  `YYYY.MM.N-dev.YYYYMMDD`. A candidate keeps that version as `-rc.N`,
+  counting candidates of it from 1. So a dev build sorts before a
+  candidate, and a candidate before the release. Immutable releases and
+  a tag ruleset keep every version tag where it was made. Only
+  `:nightly`, `:rc`, `:stable` and `:latest` move.
+- **Build.** A reusable workflow, `.github/workflows/build.yml`, builds
+  the calling workflow's own commit in a job without a model or
+  secrets, pushes it by digest, tagged with its commit, and attests its
+  provenance. An image that already exists for that commit is verified
+  against its provenance and reused.
+- **Nightly.** Every night that code on `master` changed since the last
+  nightly, `.github/workflows/nightly.yml` builds, walks, files and
+  publishes. `qa` walks the acceptance list of each feature whose page
+  changed since the last nightly's commit, each one a changed file of
+  the image or the harness names by its page's path, and the one walked
+  longest ago. What each walk covered is read from the last nightly's
+  attestation. A changed file naming none, or no nightly yet, walks
+  every feature. A night that fails leaves its image in the registry,
+  where the next night on the same commit reuses it.
+- **Candidate.** The client runs `gh workflow run candidate.yml`. It
+  fixes the digest under `:nightly` as it starts, or the one the client
+  passes, and walks every feature of it. A pass moves `:rc` to it and
+  publishes a pre-release. A failure files its findings and leaves
+  `:rc` where it was. The client's UAT server follows `:rc`.
+- **Release.** The client runs `gh workflow run release.yml`. It takes
+  the digest under `:rc`, verifies that `build.yml` built it on
+  `master` and that a candidate walked every feature of it, runs the
+  release check, moves `:stable` and `:latest`, and publishes the
+  release. It never rebuilds and never walks, and refuses to run for
+  anyone but the client.
+- The walk is split into shards that run at once, on the digest, with
+  the harness from the workflow's own checkout. Each shard starts its
+  own instance of the image, hardened on a network with no route out,
+  beside a stand-in that answers as the price sources through a
   certificate authority made for the run, on prepared data. `qa` drives
   it in headless Chrome through the Playwright MCP server, and reaches
   the server only through the harness tools
   (`spec/features/nightly-harness.md`).
-- Before any instance starts, one real lookup goes to each price
-  source. A source that answers in a changed shape fails the night. One
-  that does not answer is noted in the summary and is no finding,
-  because the outage is the source's.
-- The image the nightly publishes is the one it tested. Nothing of the
+- The image a stage publishes is the one it walked. Nothing of the
   harness is in it, and Solvent has no setting naming a price source or
   a certificate authority.
 - QA records what it finds during the walk. Once every shard has
-  finished, a short run merges the records and another files them with
-  a fresh token, and the workflow files what that run could not. A
-  finding becomes a `bug` labeled `qa` as Findings says, and one without
-  the steps that reproduce it is dropped. Each feature with criteria QA
-  could not check gets a `maintenance` issue in line saying which and
-  why.
-- A night passes when the suite, the image, the harness and every QA
-  shard finish, no price source answers in a changed shape, and nothing
-  holds back the version: no open problem rated high or critical, no
-  such issue closed by anyone but the client without its fix in the
-  version, and no runtime Dependabot alert rated high or critical. That
-  check is the workflow's, never a model's.
-- A failed night always leaves an issue the loop takes up: the open
-  problems that held it back, or else a `bug` by `github-actions[bot]`
-  titled `The nightly failed: <cause>`, or a comment on the open one
-  with that title.
-- A passing night is a pre-release named by its date, `YYYY-MM-DD`,
-  with the image on `ghcr.io/leandersabel/solvent` tagged `:<date>` and
-  `:nightly`. There is at most one version a day.
-- The client promotes a nightly by marking its release the latest.
-  That tags the same image `:stable` without a rebuild, rewrites the
-  notes to cover everything since the last stable, and deletes the
-  nightlies before it. While something would hold back that nightly,
-  or no successful nightly run walked every feature of it, promotion is
-  refused and the release turns back into a pre-release.
-- Release notes are assembled from the merged pull requests' titles,
-  without a model, grouped into changes and fixes, fixes for what
-  agents found, and maintenance. Each line names who asked, who
-  approved the spec and who implemented it. A request split off another
-  issue is the client's, who asked for it there.
+  finished, a short run merges the records and another files them, and
+  the workflow files what that run could not. A finding becomes a `bug`
+  labeled `qa` as Findings says, and one without the steps that
+  reproduce it is dropped. Each feature with criteria QA could not
+  check gets a `maintenance` issue in line saying which and why.
+- A walk passes when every shard finishes. A nightly is published only
+  when its walk passed, the push check of its commit passed, and the
+  release check passes. A candidate is taken only from a published
+  nightly, and is published only when its walk and the release check
+  pass. The release check holds back a
+  version for an open problem rated high or critical, such an issue
+  closed by anyone but the client without its fix in the version, or a
+  runtime Dependabot alert rated high or critical. When it cannot read
+  one of those, it fails and says which. That check is the workflow's,
+  never a model's.
+- A failed nightly or candidate always leaves an issue the loop takes
+  up: the open problems that held it back, or else a `bug` by
+  `github-actions[bot]` titled `The <stage> failed: <cause>`, or a
+  comment on the open one with that title.
+- Every day, `.github/workflows/sources.yml` sends one real lookup to
+  each price source. A source that answers in a changed shape gets a
+  `bug` rated high by `github-actions[bot]`, or a comment on the open
+  one. One that does not answer is noted in the run's summary and is no
+  finding, because the outage is the source's.
+- Release notes are GitHub's generated notes since the last release,
+  grouped by the labels of the merged pull requests
+  (`.github/release.yml`).
+- Every week, `.github/workflows/cleanup.yml` deletes the images older
+  than 30 days that no release, and no moving tag, points to.
 - Deploying is the client's. Watching the repository's releases
   notifies the client of every version.
 
@@ -436,7 +474,7 @@ found.
 - Every merge to `master` rebases the loop's conflicting pull requests.
 - A failing check on `master` opens a `bug` issue as
   `github-actions[bot]`, which starts at once and skips the line, and
-  that night has no QA.
+  no version is made of that commit.
 - A code scanning alert on `master` opens a `code-scanning` issue as
   `github-actions[bot]` in line. Its fix is public, unlike a report
   under `SECURITY.md`, because anyone can scan the public code. An

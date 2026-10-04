@@ -233,7 +233,9 @@ comments propose, they never decide.
 8. Open a pull request against `master`. The title is English and says
    what changes for users. The body starts with `Closes #<issue>`, says
    the same in the issue's language, and puts the technical part in a
-   `<details>` block. Turn on auto-merge with squash. When a finding on
+   `<details>` block. It carries the issue's `bug`, `change`,
+   `maintenance` and `qa` labels, by which the release notes group it.
+   Turn on auto-merge with squash. When a finding on
    the change is still open after the second round, its failing
    reviewer test is committed too, and the pull request opens as a
    draft without auto-merge, listing the open findings. Then go to

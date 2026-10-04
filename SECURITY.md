@@ -10,7 +10,7 @@ You get an answer within seven days. There is no bug bounty.
 
 ## Supported versions
 
-The latest stable release. Nightly pre-releases are not supported.
+The latest release. Dev builds and candidates are not supported.
 
 ## Scope
 
