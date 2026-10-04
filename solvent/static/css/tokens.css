@@ -643,13 +643,6 @@ fieldset {
   color: #ffffff;
 }
 
-.btn-primary:disabled {
-  background: var(--petrol-200);
-  border-color: var(--petrol-200);
-  color: var(--ink-secondary);
-  cursor: not-allowed;
-}
-
 .btn-secondary {
   background: transparent;
   border: 1px solid var(--rule);
@@ -657,12 +650,6 @@ fieldset {
 }
 
 .btn-secondary:hover:not(:disabled) { background: var(--petrol-50); }
-
-.btn-secondary:disabled {
-  border-color: var(--hairline);
-  color: var(--ink-muted);
-  cursor: default;
-}
 
 .btn-destructive {
   background: transparent;
@@ -673,6 +660,17 @@ fieldset {
 .dialog .btn-destructive {
   background: var(--status-critical);
   color: #ffffff;
+}
+
+/* One disabled look for all three, after the rules above so that a
+   confirm's red does not show through. */
+.btn-primary:disabled,
+.btn-secondary:disabled,
+.btn-destructive:disabled {
+  background: var(--petrol-200);
+  border-color: var(--petrol-200);
+  color: var(--ink-secondary);
+  cursor: default;
 }
 
 .btn-large {

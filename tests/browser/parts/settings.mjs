@@ -271,16 +271,36 @@ await run(async () => {
       name.dispatchEvent(new Event('input', { bubbles: true }));
       return dialog.querySelector('.btn-destructive').disabled;
     }, password, typed);
+  const deleteLook = () =>
+    page.call(() => {
+      const probe = document.createElement('div');
+      probe.style.background = 'var(--status-critical)';
+      document.body.append(probe);
+      const critical = getComputedStyle(probe).backgroundColor;
+      probe.remove();
+      const button = document.querySelector('.dialog .btn-destructive');
+      // Ends the 150ms color transition, so the computed fill is the settled one.
+      button.style.transition = 'none';
+      const style = getComputedStyle(button);
+      return { cursor: style.cursor, red: style.backgroundColor === critical };
+    });
   const gates = [
     await deleteState('', 'leander'),
     await deleteState('something', 'Leander'),
-    await deleteState('something', 'leander'),
   ];
+  const disabledLook = await deleteLook();
+  gates.push(await deleteState('something', 'leander'));
+  const enabledLook = await deleteLook();
   await deleteState('', '');
   check(
     'Delete my vault stays disabled until the password is filled and the username matches exactly',
     gates.join(',') === 'true,true,false',
     gates.join(','),
+  );
+  check(
+    'a disabled Delete my vault reads as disabled, no red and a default cursor, and turns red once it can act',
+    disabledLook.cursor === 'default' && !disabledLook.red && enabledLook.red,
+    JSON.stringify({ disabledLook, enabledLook }),
   );
   check(
     'the deletion offers Export first as its primary action',

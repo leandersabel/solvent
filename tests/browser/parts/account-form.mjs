@@ -514,15 +514,34 @@ await run(async () => {
     await page.eval("document.querySelector('.dialog input[value=delete]').click()");
     await page.frames();
     const permanently = () => [...document.querySelectorAll('.dialog button')].find(b => b.textContent === 'Delete permanently').disabled;
+    const confirmLook = () => {
+      const button = [...document.querySelectorAll('.dialog button')].find(b => b.textContent === 'Delete permanently');
+      const probe = document.createElement('div');
+      probe.style.background = 'var(--status-critical)';
+      document.body.append(probe);
+      const critical = getComputedStyle(probe).backgroundColor;
+      probe.remove();
+      // Ends the 150ms color transition, so the computed fill is the settled one.
+      button.style.transition = 'none';
+      const style = getComputedStyle(button);
+      return { cursor: style.cursor, red: style.backgroundColor === critical };
+    };
     const deleteCopy = (await text()).includes('This also deletes 1 recorded values. Your past net worth figures will change.');
     await setValue('#delete-name', 'Not the name');
     const wrongName = await page.call(permanently);
+    const wrongLook = await page.call(confirmLook);
     await setValue('#delete-name', NAME);
     const rightName = await page.call(permanently);
+    const rightLook = await page.call(confirmLook);
     check(
       'Delete on a holding with values offers archive, preselected, and permanent delete behind the typed name',
       offered.archive && offered.both === 2 && deleteCopy && wrongName && !rightName,
       JSON.stringify({ offered, deleteCopy, wrongName, rightName }),
+    );
+    check(
+      'a disabled Delete permanently reads as disabled, no red and a default cursor, and turns red once the name matches',
+      wrongLook.cursor === 'default' && !wrongLook.red && rightLook.red,
+      JSON.stringify({ wrongLook, rightLook }),
     );
     await inDialog('Cancel');
     await page.waitUntil("!document.querySelector('.dialog')", { label: 'the dialog to close' });
