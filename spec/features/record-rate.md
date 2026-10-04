@@ -128,8 +128,9 @@ doing nothing accepts and writes it.
 - **A rate request is issued only for a symbol with no entry at the date
   and a rate source there** (Reading). So opening an old recording is
   silent (`record-snapshot.md`, Reopening and editing a recording).
-  Look it up on a line fills a missing price without a quantity, and
-  that press, not opening, issues the request.
+  Look it up on a line fills and saves a missing price without a
+  quantity, and that press, not opening, issues the request (Saving an
+  edited recording).
 - Per symbol, at that date:
   - **A proposal came back.** Left alone or changed, it is written.
   - **No proposal** (provider down, breaker open, No Content) and a
@@ -218,8 +219,20 @@ own version check.
   date, preceded by the pre-create reload when the sitting has not
   claimed the date and followed by the refresh, or a deletion when the
   figure is cleared.
-- **The rate-lines save** writes every changed line after one
-  confirmation naming what each moves. It needs no holding touched and
+- **Look it up** issues one rate request for the date. For every line
+  with no entry, no typed text and a rate source there that the answer
+  covers, it shows the proposal and creates its entry at `version: 1`,
+  as `proposed`, with no confirmation, because a missing price filled in
+  changes no price. Before the creates it reloads both types, which the
+  model then holds. A date found holding no record writes nothing,
+  since a price alone never makes a recording. A unit found priced
+  there meanwhile is left as stored and named. A create that fails
+  keeps the proposal on its line, unsaved and named, for the rate-lines
+  save to retry. An answer arriving after the screen was left or the
+  vault locked writes nothing.
+- **The rate-lines save** writes every changed line. One confirmation
+  names what each update or clear moves, and a save that only creates
+  entries asks nothing. It needs no holding touched and
   runs only at a date holding a record. Its order is fixed:
   0. If any line creates an entry, the pre-create reload. A slot taken,
      or the date found empty, refuses the whole save before any write.
@@ -482,9 +495,10 @@ silently.
     on no other line: not on a line holding an entry, not on free text,
     not on a `lookup: false` symbol, not on `XAU-g` at 2012-12-31.
     Opening asks nothing. Pressing it issues exactly one request to
-    `/api/rates`, for that date, shows the answer as a proposal carrying
-    its `rateAsOf`, and writes nothing until the rate-lines save. Test:
-    `tests/browser/parts/update-values.mjs`.
+    `/api/rates`, for that date, then creates one `proposed` entry
+    carrying its `rateAsOf` for each line with no entry, no typed text
+    and a rate source that the answer covers, and writes nothing else.
+    Test: `tests/browser/parts/update-values.mjs`.
 19. Adding a value for a holding skipped at a past date leaves every rate
     entry at that date byte-identical, and writes an entry only for a
     symbol that had none. Test: `tests/browser/parts/update-values.mjs`.

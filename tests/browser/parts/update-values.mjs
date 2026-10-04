@@ -378,17 +378,6 @@ await run(async () => {
     held.value !== '' && !held.lookup && unsourced.every((l) => l && !l.lookup),
     JSON.stringify({ held, unsourced }),
   );
-  const asksBefore = rateAsks().length;
-  await rec.call((query) => document.querySelector(query).querySelector('.btn-inline').click(), line('XAU-ozt'));
-  await quiet();
-  const goldAsked = await lineState('XAU-ozt');
-  check(
-    'record-rate: Look it up shows the answer as a proposal with its day, asks once for the reopened date, and writes nothing',
-    rateAsks().length === asksBefore + 1 && new URL(rateAsks().at(-1).url).searchParams.get('date') === D2 && writesSent().length === 0 &&
-      figure(goldAsked.value) === Number(proposalsFor(D2)['XAU-ozt'].rate) && goldAsked.chip === `Market rate as of ${await format('dayMonth', proposalsFor(D2)['XAU-ozt'].asOf, 'short')}`,
-    JSON.stringify({ goldAsked, url: rateAsks().at(-1).url, writes: writesSent().length }),
-  );
-
   traffic.length = 0;
   await typeRow('Current account', '1111');
   const saveLabel = (await rowState('Current account')).label;
@@ -580,20 +569,52 @@ await run(async () => {
   await rec.call((query) => document.querySelector(query).querySelector('.btn-inline').click(), line('USD'));
   await quiet();
   const lookedUp = await lineState('USD');
-  check(
-    'record-rate: Look it up is what asks, and what comes back is labeled like any proposal',
-    asksOnOpen === 0 && rateAsks().length === 1 && figure(lookedUp.value) === Number(proposalsFor(D1).USD.rate) && lookedUp.chip === 'Market rate',
-    JSON.stringify(lookedUp),
-  );
-  check(
-    'record-rate: Look it up asks for the line\'s own date, and writes nothing until the rate lines are saved',
-    new URL(rateAsks()[0].url).searchParams.get('date') === D1 && writesSent().length === 0,
-    `${rateAsks()[0].url}, ${writesSent().length} writes`,
-  );
-  await press('Save the rate lines');
-  await press('Save the prices', '.dialog');
   const firstUsd = on(await stored('rate'), D1).find((r) => r.payload.symbol === 'USD');
-  check('record-rate: a looked-up rate on a reopened recording saves by itself, as proposed', firstUsd && firstUsd.payload.rateSource === 'proposed');
+  const lookupWrites = writesSent();
+  check(
+    'record-rate: Look it up is what asks, for the line\'s own date, and the line reads as the stored market rate',
+    asksOnOpen === 0 && rateAsks().length === 1 && new URL(rateAsks()[0].url).searchParams.get('date') === D1 &&
+      figure(lookedUp.value) === Number(proposalsFor(D1).USD.rate) && lookedUp.chip === 'Market rate' && !lookedUp.lookup,
+    JSON.stringify({ lookedUp, url: rateAsks()[0].url }),
+  );
+  check(
+    'record-snapshot: a looked-up rate on a reopened recording saves by itself, as proposed, after a reload, with no further press and no confirmation',
+    lookupWrites.length === 1 && bodyOf(lookupWrites[0]).version === 1 && firstUsd && firstUsd.payload.rateSource === 'proposed' &&
+      firstUsd.payload.rate === proposalsFor(D1).USD.rate && typeReads('snapshot').length === 1 && typeReads('rate').length === 1 &&
+      traffic.indexOf(typeReads('rate')[0]) < traffic.indexOf(lookupWrites[0]) &&
+      !(await ev("Boolean(document.querySelector('.dialog'))")) &&
+      !(await ev("[...document.querySelectorAll('.rate-section button')].some((b) => b.textContent.trim() === 'Save the rate lines' && b.getClientRects().length > 0)")),
+    JSON.stringify(traffic.map((t) => `${t.method} ${t.url}`)),
+  );
+
+  // Two lines left empty by an outage: one press fills and saves both,
+  // and a line holding typed text is left to its own save.
+  const DQ = ago(170);
+  await plantHere([snap('Dollar cash', DQ, '10')]);
+  await reread();
+  traffic.length = 0;
+  await go(`#/recording/${DQ}`);
+  await press('Update');
+  await rec.waitUntil("document.querySelector('.sweep-row')", { label: 'the sweep' });
+  await quiet();
+  await typeLine('XAG-ozt', '26');
+  await rec.call((query) => document.querySelector(query).querySelector('.btn-inline:not([hidden])').click(), line('USD'));
+  await quiet();
+  const filled = on(await stored('rate'), DQ);
+  const asOf = (unit) => proposalsFor(DQ)[unit].asOf;
+  check(
+    'record-snapshot: one Look it up saves every empty published line the answer covers, as proposed with its day, and no typed line',
+    filled.map((e) => e.payload.symbol).sort().join() === 'USD,XAU-ozt' &&
+      filled.every((e) => e.payload.rateSource === 'proposed' && e.payload.rateAsOf === asOf(e.payload.symbol)) &&
+      figure((await lineState('XAG-ozt')).value) === 26,
+    JSON.stringify(filled.map((e) => e.payload)),
+  );
+  await typeLine('XAG-ozt', '');
+  await home();
+  check(
+    'record-snapshot: leaving straight after Look it up names no unit as unsaved',
+    !(await text()).includes('with changes that were not saved'),
+  );
 
   const DP = ago(150);
   await plantHere([snap('Savings', DP, '5100'), snap('Savings', DP, '5200'), price('USD', DP, '0.9'), price('USD', DP, '0.91')]);
@@ -842,7 +863,10 @@ await run(async () => {
   for (const recordId of planted) await rec.call(async (id) => (await import('/static/js/api.js')).del(`/api/records/${id}`), recordId);
   traffic.length = 0;
   await press('Save the rate lines');
-  await press('Save the prices', '.dialog');
+  check(
+    'record-snapshot: a rate-lines save that only fills a missing price asks nothing first',
+    !(await ev("Boolean(document.querySelector('.dialog'))")),
+  );
   const callout = await rec.call(() => ({
     callout: document.querySelector('.sweep .callout').textContent.trim(),
     critical: document.querySelector('.sweep .callout').classList.contains('callout-critical') &&
