@@ -1672,6 +1672,13 @@ select {
   gap: 8px;
 }
 
+.date-line {
+  flex-basis: 100%;
+  min-height: 20px;
+  line-height: 1.5;
+  margin: 0;
+}
+
 .date-text {
   flex: 1 1 10ch;
   min-width: 10ch;

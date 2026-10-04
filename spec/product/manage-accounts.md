@@ -154,7 +154,9 @@ as it is. Unarchiving it and archiving it again gives it one.
   value for it, on any date.
 - While a holding is archived, its earlier figures can still be
   corrected or deleted, but none can be moved onto the archive date or
-  past it.
+  past it. Trying to is refused because of the archive, never because
+  the date is in the future, and the refusal goes away as soon as you
+  enter a date before the archive.
 - Deleting the recording on an archived holding's archive date removes
   everything else recorded that day and keeps the holding's zero. The
   date stays a recording, and the confirmation says the zero stays.

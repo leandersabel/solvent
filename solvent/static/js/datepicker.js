@@ -13,8 +13,13 @@ import { el, mount, today } from './dom.js';
 const WEEK_START_MONDAY = 1;
 
 /** `value` is an ISO date or the empty string. `max` and `min` are ISO
- *  dates. */
-export function dateField(format, { id, value = '', min = null, max = null, onChange = null } = {}) {
+ *  dates. A screen whose upper limit has a reason of its own gives it as
+ *  `maxReason`, and `hint` is what the message line says until a date is
+ *  refused. */
+export function dateField(
+  format,
+  { id, value = '', min = null, max = null, maxReason = 'That date is in the future.', hint = '', onChange = null } = {},
+) {
   let current = value;
 
   const text = el('input', {
@@ -23,10 +28,10 @@ export function dateField(format, { id, value = '', min = null, max = null, onCh
     class: 'date-text',
     inputmode: 'numeric',
     placeholder: format.datePlaceholder(),
-    'aria-describedby': id ? `${id}-format` : null,
+    'aria-describedby': id ? `${id}-format ${id}-line` : null,
     value: format.date(current),
   });
-  const hint = el('span', {
+  const formatHint = el('span', {
     id: id ? `${id}-format` : null,
     class: 'visually-hidden',
     text: `Date, written ${format.datePlaceholder()}`,
@@ -38,9 +43,27 @@ export function dateField(format, { id, value = '', min = null, max = null, onCh
     'aria-expanded': 'false',
     text: '\u{1F4C5}',
   });
-  const error = el('p', { class: 'field-error', hidden: true });
+  // The one message line: the hint until a date is refused, and the
+  // refusal until the value fits, so the form never shifts.
+  const line = el('p', { id: id ? `${id}-line` : null, class: 'date-line hint', 'aria-live': 'polite', text: hint });
   const popover = el('div', { class: 'date-popover', hidden: true });
-  const wrap = el('div', { class: 'date-field' }, [text, open, popover, hint, error]);
+  const wrap = el('div', { class: 'date-field' }, [text, open, popover, formatHint, line]);
+
+  const show = (reason) => {
+    line.textContent = reason ?? hint;
+    line.className = `date-line ${reason ? 'field-error' : 'hint'}`;
+    if (reason) text.setAttribute('aria-invalid', 'true');
+    else text.removeAttribute('aria-invalid');
+  };
+  // Why the text in the field is refused, or null when it fits.
+  const refusal = () => {
+    if (!text.value.trim()) return 'Enter a date.';
+    const iso = format.parseDate(text.value);
+    if (!iso) return `Enter the date as ${format.datePlaceholder()}.`;
+    if (max && iso > max) return maxReason;
+    if (min && iso < min) return 'That date is out of range.';
+    return null;
+  };
 
   const settle = (iso, { redraw = true } = {}) => {
     current = iso;
@@ -49,32 +72,22 @@ export function dateField(format, { id, value = '', min = null, max = null, onCh
   };
 
   text.addEventListener('input', () => {
-    error.hidden = true;
     const iso = format.parseDate(text.value);
     // Typing is not finished until it parses, so an unparseable field
-    // reports no value rather than an old one.
+    // reports no value rather than an old one. A refusal on show stays
+    // until the value fits, and a new one waits for blur.
+    if (line.classList.contains('field-error')) show(refusal());
     settle(iso && inRange(iso, min, max) ? iso : '', { redraw: false });
   });
 
   text.addEventListener('blur', () => {
-    if (!text.value.trim()) {
-      error.hidden = true;
-      settle('');
+    const refused = refusal();
+    show(refused);
+    if (refused) {
+      if (!text.value.trim()) settle('');
       return;
     }
-    const iso = format.parseDate(text.value);
-    if (!iso) {
-      error.textContent = `That is not a date. Write it as ${format.datePlaceholder()}.`;
-      error.hidden = false;
-      return;
-    }
-    if (!inRange(iso, min, max)) {
-      error.textContent = max && iso > max ? 'That date is in the future.' : 'That date is out of range.';
-      error.hidden = false;
-      return;
-    }
-    error.hidden = true;
-    settle(iso);
+    settle(format.parseDate(text.value));
   });
 
   const closeCalendar = () => {
@@ -104,7 +117,7 @@ export function dateField(format, { id, value = '', min = null, max = null, onCh
       selected: current,
       onPick: (iso) => {
         settle(iso);
-        error.hidden = true;
+        show(null);
         closeCalendar();
         text.focus();
       },
@@ -120,6 +133,14 @@ export function dateField(format, { id, value = '', min = null, max = null, onCh
     },
     set(iso) {
       settle(iso);
+    },
+    /** Whether the text fits. A refusal shows on the field's own line
+     *  and takes the focus. */
+    validate() {
+      const refused = refusal();
+      show(refused);
+      if (refused) text.focus();
+      return !refused;
     },
   };
 }

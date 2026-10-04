@@ -604,8 +604,29 @@ only its own content region.
   is accepted without the calendar ever opening, the calendar is
   reachable from the keyboard, Escape closes it and returns focus to
   the button, and a date outside the allowed range is disabled in the
-  grid and named on blur. A field that does not parse reports no
+  grid, and refused when typed. A field that does not parse reports no
   value, so nothing saves an old date under a new one.
+  - **The upper limit and its reason come from the screen using the
+    field.** A screen that names neither has today as the limit and
+    the future as the reason.
+  - **A refusal is the field's own**, on its message line (Input, The
+    message line), with `aria-invalid` and `aria-describedby` as there.
+    The field refuses on blur and on Save, and clears the refusal as
+    soon as the value fits.
+  - **Save asks the field whether its value is valid.** A date refusal
+    never appears in a form-level line. Save with a refused date writes
+    nothing and moves focus to the field.
+  - The copy, unless the screen states its own reason:
+
+    | Value | Message line |
+    |---|---|
+    | Empty, on a form that needs a date | Enter a date. |
+    | Does not parse | Enter the date as DD.MM.YYYY. |
+    | After the upper limit | That date is in the future. |
+
+    The pattern is the field's own placeholder, in the order Settings
+    sets (`settings.md`, Dates and numbers), so "DD.MM.YYYY" stands for
+    whichever order the reader chose.
 - **Reorder control**: a drag handle, plus **Move up** and **Move
   down** on every item. The handle is never the only route. Order
   changes announce themselves ("moved to position 2 of 5") so the

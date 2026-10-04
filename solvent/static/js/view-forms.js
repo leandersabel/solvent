@@ -116,9 +116,12 @@ export function snapshotDialog(vault, holding, existing, onSaved, onOpenRecordin
   // date: onto it the move would displace the archive's zero, and after
   // it the entry would be a figure after the archive.
   const archivedAt = holding.payload.archivedAt;
+  const archivedOn = archivedAt && `Archived on ${vault.format.fullDate(archivedAt)}.`;
   const date = dateField(vault.format, {
     id: 'snapshot-date',
     max: archivedAt ? isoFromDay(dayNumber(archivedAt) - 1) : today(),
+    maxReason: archivedAt ? `${archivedOn} Enter an earlier date.` : undefined,
+    hint: archivedOn || '',
     value: existing ? existing.payload.date : today(),
     onChange: () => {
       if (moving()) changed();
@@ -260,12 +263,7 @@ export function snapshotDialog(vault, holding, existing, onSaved, onOpenRecordin
       if (stored === null) {
         return fail('Enter a number, with at most twelve decimal places.');
       }
-      if (!date.value) {
-        return fail(`Enter a date, written ${vault.format.datePlaceholder()}. A snapshot describes what was, so it cannot be in the future.`);
-      }
-      if (date.value > today()) {
-        return fail('A snapshot describes what was. Pick today or earlier.');
-      }
+      if (!date.validate()) return;
       const on = date.value;
       const atDate = vault
         .snapshotsFor(holding.recordId)
