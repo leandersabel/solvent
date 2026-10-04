@@ -7,7 +7,7 @@ import * as decimal from './decimal.js';
 import { chartTable, fillFor, trendChart } from './chart.js';
 import { dialog, el, icon, mount, priceDateLine, resumable, today } from './dom.js';
 import { dateGrid } from './datepicker.js';
-import { dayNumber, isoFromDay } from './model.js';
+import { isoFromDay } from './model.js';
 import * as writes from './writes.js';
 import { snapshotDialog } from './view-forms.js';
 
@@ -24,9 +24,9 @@ const RANGES = [
 export function dashboardView(vault, actions, { unassignedOf = null } = {}) {
   const known = unassignedOf && vault.activeDimensions().some((d) => d.id === unassignedOf);
   // A year of history or more opens on a year, anything shorter on all
-  // of it.
-  const dates = vault.recordingDates();
-  const short = !dates.length || dayNumber(dates[dates.length - 1]) - dayNumber(dates[0]) < 365;
+  // of it. History is what the chart draws, from the oldest snapshot.
+  const history = vault.chartRange(null);
+  const short = !history || history.lastDay - history.fromDay < 365;
   const state = {
     range: short ? 'All' : '1Y',
     dimensionId: known ? unassignedOf : '',
@@ -258,13 +258,8 @@ function reopenDatePicker(context) {
 /** The series the chart draws over the selected range, or null before
  *  anything has been recorded. */
 function chartSeries(vault, state, dimension) {
-  const dates = vault.recordingDates();
-  if (!dates.length) return null;
-  const lastDay = dayNumber(vault.chartLastDate());
-  const firstRecorded = dayNumber(dates[0]);
-  const span = RANGES.find(([label]) => label === state.range)[1];
-  const fromDay = span === null ? firstRecorded : Math.max(firstRecorded, lastDay - span);
-  return vault.series(dimension, fromDay, lastDay);
+  const range = vault.chartRange(RANGES.find(([label]) => label === state.range)[1]);
+  return range && vault.series(dimension, range.fromDay, range.lastDay);
 }
 
 function chartSection(vault, state, render, dimension, actions, { days, bands }) {
@@ -351,6 +346,8 @@ function chartSection(vault, state, render, dimension, actions, { days, bands })
         percentage: state.percentage,
         justTheLine: state.justTheLine,
         locale: vault.format.locale,
+        group: vault.format.group,
+        decimalPoint: vault.format.point,
         formatDay: (iso) => vault.format.dayMonth(iso, 'short'),
         formatDate: vault.format.longDate,
         onPickDate: (date) => actions.openRecording(date),

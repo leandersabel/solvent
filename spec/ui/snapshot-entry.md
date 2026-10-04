@@ -24,10 +24,13 @@ The same modal, pre-filled, is what edits an existing entry
 - **Holding** — preselected when opened from a row; otherwise a select.
   Static when editing: an entry does not move between holdings, since
   its value is denominated in one holding's unit.
-- **Date** — defaults to today. Future dates blocked. Editable when
-  correcting an existing entry. Moving it onto a date the holding
-  already holds prompts before destroying the record already there (see
-  below).
+- **Date**, the Date field (`design-system.md`, Components) — defaults
+  to today. Its upper limit is today, with the field's default reason.
+  For an archived holding's entry the limit is the day before the
+  archive date and the reason is the archive (Editing an existing
+  entry). Editable when correcting an existing entry. Moving it onto a
+  date the holding already holds prompts before destroying the record
+  already there (see below).
 - **Value**, the quantity field (`design-system.md`, Components), the
   largest thing on the form. Its live result converts at the price for
   **the date on the form**, which is the date's own price where one
@@ -100,11 +103,24 @@ The same modal, pre-filled with the stored value, date and note.
   date (`recording-detail.md`), where the holdings it moves are on the
   screen.
 - **An archived holding's entry moves only to a date before its archive
-  date.** The date picker offers nothing from the archive date on: onto
-  it the move would displace the archive's zero, and after it the entry
-  would be a figure after the archive (`manage-accounts.md`, While
-  archived). Value and note stay editable. The archive's zero itself
-  never opens here (`account-detail.md`).
+  date.** Onto the archive date the move would displace the archive's
+  zero, and after it the entry would be a figure after the archive
+  (`manage-accounts.md`, While archived).
+  - The grid disables every day from the archive date on.
+  - A typed date on or after the archive date is refused, after today
+    included, on the date field's message line:
+
+    > Archived on 12 March 2026. Enter an earlier date.
+
+  - From the moment the dialog opens, the message line carries the
+    hint "Archived on 12 March 2026." in ink-secondary.
+  - The date follows Settings (`settings.md`, Dates and numbers) and
+    always carries its year.
+  - Value and note stay editable. The archive's zero itself never
+    opens here (`account-detail.md`).
+
+  An entry on a holding that is not archived has no hint, and its
+  message line stays reserved, so a refusal never shifts the form.
 
 ## States
 
@@ -151,8 +167,10 @@ The same modal, pre-filled with the stored value, date and note.
   refused whole and nothing is written. The wording names the date and
   not the person, and one button opens that recording
   (`update-values.md`, which owns the copy).
-- **Error, validation**: the quantity field's own rules
-  (`design-system.md`, Components), and a future date refused inline.
+- **Error, validation**: the quantity field's own rules, and the Date
+  field's (`design-system.md`, Components). Every date refusal sits on
+  the date field's message line. The line above Save carries only the
+  outcomes of a save.
 - **Error, archived holding**: the entry point does not exist for
   archived holdings, at any date (`manage-accounts.md`, While
   archived).

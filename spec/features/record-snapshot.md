@@ -443,6 +443,32 @@ interpolation until resolved, because there is no correct curve through
 two values. Same family as a decryption failure: a visible fault beats
 a quiet wrong number.
 
+## Refusing a date
+
+A snapshot's date is typed into the date field
+(`ui/design-system.md`, Date field), on every form that writes one. The
+field refuses a date that is empty, that does not parse, or that lies
+past the latest date the form allows. That limit is today, because a
+snapshot describes what was. An archived holding's entry has a tighter
+one (`manage-accounts.md`, While archived).
+
+- **A refused date is refused on the date field's own message line**,
+  with the reason for what refused it. The field carries the reasons
+  for empty and unparseable text, and the screen using the field
+  supplies the reason for its limit (`ui/design-system.md`, Date field,
+  and the screen's own file for its limit).
+- **Save asks the field whether its value is valid.** On a refused
+  typed date it shows the field's refusal again and writes nothing. It
+  never treats a refused date as an empty one: text that does not parse
+  reports no value (`ui/design-system.md`, Date field), and reading that
+  as no date would give the wrong reason.
+- **The dialog's general error line never carries a date refusal.**
+  That line reports what a save did, and a reason away from its field
+  leaves the person searching for which field is wrong.
+- **The refusal clears as soon as the value fits**, before Save.
+- While refused, the input carries `aria-invalid="true"`, and its
+  `aria-describedby` names its message line.
+
 ## Inputs / outputs
 
 - In: holding, date, value, optional note.
@@ -463,7 +489,8 @@ a quiet wrong number.
   the rate line says quietly that nothing was written for that unit, and
   the holding is listed as **not priced** rather than counted wrong,
   which `net-worth-view.md` owns.
-- **Date is in the future** → blocked. A snapshot describes what was.
+- **Date is in the future** → refused on the date field (Refusing a
+  date).
 - **Date precedes the holding's `createdAt`** → allowed; backfilling
   history is a normal use.
 - **Editing a past snapshot** → allowed, versioned like any other write.
@@ -534,7 +561,16 @@ a quiet wrong number.
   saves: the save control is live throughout, one `snapshot` record is
   written, and the holding is listed as not priced. Asserted for a
   free-text unit and for a symbol whose lookup returned nothing.
-- A future-dated snapshot is rejected.
+- A typed future date is refused on the date field's own line with the
+  future-date reason, the input carries `aria-invalid="true"` and an
+  `aria-describedby` naming that line, and Save issues no `PUT` and
+  leaves the dialog's general error line empty.
+- Unparseable text in the date field, on Save, shows the unparseable
+  reason on the field's own line, never the empty-date reason, and
+  issues no `PUT`. An emptied date field, on Save, shows the empty-date
+  reason there.
+- Correcting a refused date to one the form allows clears the refusal
+  and `aria-invalid` before Save is pressed.
 - Attempting to record against an archived holding is blocked at every
   entry point and every date.
 - Editing a snapshot from a second tab with a stale `version` returns

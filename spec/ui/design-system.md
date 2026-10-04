@@ -171,6 +171,18 @@ reordered by size**, which would make the stack unreadable over time.
 - **Estimated stretches** take the estimated marker below — never a
   change to the fills.
 
+### Axes
+
+- **Each value tick reads the value of its own gridline, and no two
+  ticks read the same.** The step is one the tick's short form
+  (Typography, Figures) names exactly at every line, so a tick never
+  rounds to a neighbour's label or away from its own line. The step
+  rule is `net-worth-view.md`'s.
+- **A mark at either edge of the plot is drawn whole at every width**:
+  the net-worth line's dot, an entry mark, an archive marker. The plot
+  keeps half the widest mark clear inside its left and right edges, so
+  nothing on the first or last day is cut by the plot or the card.
+
 ### The two neutral bands
 
 "Unassigned" and "Other" (`net-worth-view.md`) are not categories the
@@ -325,6 +337,13 @@ Every figure is grouped and pointed as Settings sets it
   Decimals on money does not reach it, because rounding 12.5 ounces of
   gold to 13 loses part of the holding, and padding it to 12.50 claims
   a precision nobody recorded.
+- **A chart's value tick is the one figure that abbreviates.** From a
+  thousand up it reads in short form, "2.5k", pointed as Settings sets
+  it, so a reader with a decimal comma sees "2,5k". Below a thousand it
+  reads whole. The exact format is `net-worth-view.md`'s. Every other
+  figure, the chart's tooltip and legend included, shows in full,
+  because a tick only has to place a line and the readout is where a
+  value is read.
 
 ## Spacing and shape
 
@@ -604,8 +623,29 @@ only its own content region.
   is accepted without the calendar ever opening, the calendar is
   reachable from the keyboard, Escape closes it and returns focus to
   the button, and a date outside the allowed range is disabled in the
-  grid and named on blur. A field that does not parse reports no
+  grid, and refused when typed. A field that does not parse reports no
   value, so nothing saves an old date under a new one.
+  - **The upper limit and its reason come from the screen using the
+    field.** A screen that names neither has today as the limit and
+    the future as the reason.
+  - **A refusal is the field's own**, on its message line (Input, The
+    message line), with `aria-invalid` and `aria-describedby` as there.
+    The field refuses on blur and on Save, and clears the refusal as
+    soon as the value fits.
+  - **Save asks the field whether its value is valid.** A date refusal
+    never appears in a form-level line. Save with a refused date writes
+    nothing and moves focus to the field.
+  - The copy, unless the screen states its own reason:
+
+    | Value | Message line |
+    |---|---|
+    | Empty, on a form that needs a date | Enter a date. |
+    | Does not parse | Enter the date as DD.MM.YYYY. |
+    | After the upper limit | That date is in the future. |
+
+    The pattern is the field's own placeholder, in the order Settings
+    sets (`settings.md`, Dates and numbers), so "DD.MM.YYYY" stands for
+    whichever order the reader chose.
 - **Reorder control**: a drag handle, plus **Move up** and **Move
   down** on every item. The handle is never the only route. Order
   changes announce themselves ("moved to position 2 of 5") so the

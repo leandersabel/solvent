@@ -165,7 +165,7 @@ function sweepRow(vault, holding, date, { sit, block, refused, ensurePrices, onT
   const field = el('input', { type: 'text', inputmode: 'decimal', class: 'quantity' });
   const unit = vault.unitOf(holding.payload.unit);
   const suffix = el('span', { class: 'unit-suffix', text: unit.currency ? unit.symbol : unit.short });
-  const converted = el('p', { class: 'hint' });
+  const converted = el('p', { class: 'hint numeric' });
   const status = el('span', { class: 'row-state' });
   const age = el('span', { class: 'row-age' });
   const message = el('p', { class: 'field-error', hidden: true });
@@ -175,7 +175,7 @@ function sweepRow(vault, holding, date, { sit, block, refused, ensurePrices, onT
   const fieldColumn = el('div', { class: 'quantity-field' }, [field, suffix]);
   // The archive's zero shows as text: it is read-only until the
   // holding is unarchived.
-  const zeroText = el('span', { class: 'archive-zero', hidden: true });
+  const zeroText = el('span', { class: 'archive-zero numeric', hidden: true });
   const input = el('div', { class: 'sweep-input' }, [
     fieldColumn,
     zeroText,

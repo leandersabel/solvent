@@ -120,26 +120,27 @@ export function dayAt(x, x0, x1, firstDay, lastDay) {
  *  keeps its hue on both sides. A band in `hidden` is left out of the
  *  stack and the line, and keeps its color slot. */
 function drawChart({
-  days, bands, marks, annotations, percentage, justTheLine, onPickDate, onHover, onSelect, width = 900, locale, formatDay, formatDate,
+  days, bands, marks, annotations, percentage, justTheLine, onPickDate, onHover, onSelect, width = 900, locale, formatDay, formatDate, group = ',', decimalPoint = '.',
   hidden = new Set(), selection = null,
 }) {
-  // A phone-width card gets a shorter plot, fewer gridlines, and the
-  // value labels inside the plot rather than in a gutter beside it.
+  // A phone-width card gets a shorter plot and fewer gridlines. The
+  // value labels sit in a gutter at the plot's left at every width, wide
+  // enough for the widest label, and the plot keeps half the widest
+  // mark, the net-worth dot, clear inside both edges
+  // (spec/ui/design-system.md, Axes).
   const narrow = width < 560;
   const height = narrow ? 206 : 352;
   const pad = narrow
-    ? { top: 4, right: 6, bottom: 36, left: 0 }
+    ? { top: 8, right: 6, bottom: 36, left: 44 }
     : { top: 8, right: 6, bottom: 44, left: 48 };
 
   if (!days.length) return el('p', { class: 'empty-line', text: 'No history yet.' });
 
-  const plotWidth = width - pad.left - pad.right;
   const plotHeight = height - pad.top - pad.bottom;
   const plotBottom = pad.top + plotHeight;
   const firstDay = days[0];
   const lastDay = days[days.length - 1];
-  const spanDays = Math.max(1, lastDay - firstDay);
-  const x = (day) => pad.left + ((day - firstDay) / spanDays) * plotWidth;
+  const spanDays = lastDay - firstDay;
 
   const fills = new Map(bands.map((band, index) => [band, fillFor(band, index)]));
   // A day's samples are its value just before it and at it, so a
@@ -165,6 +166,17 @@ function drawChart({
   if (top === bottom) top = bottom + 1;
   const y = (value) => plotBottom - ((value - bottom) / (top - bottom)) * plotHeight;
 
+  const gridValues = valueTicks(bottom, top, narrow ? 3 : 6);
+  const valueLabels = gridValues.map((gridValue) => {
+    const tick = svg('text', { class: 'axis-tick', 'text-anchor': 'end' });
+    tick.textContent = tickLabel(gridValue, group, decimalPoint) + (percentage ? '%' : '');
+    return tick;
+  });
+  pad.left = Math.max(pad.left, Math.ceil(widest(valueLabels)) + 10);
+  const plotWidth = width - pad.left - pad.right;
+  // A range of one day draws its point in the middle of the plot, whole.
+  const x = (day) => pad.left + (spanDays ? (day - firstDay) / spanDays : 0.5) * plotWidth;
+
   const root = svg('svg', {
     viewBox: `0 0 ${width} ${height}`,
     width,
@@ -175,21 +187,15 @@ function drawChart({
     'aria-label': 'Net worth over time',
   });
 
-  // Gridlines under the fills, the value each one marks over them, so
-  // a label inside a narrow plot stays readable.
-  const grid = gridLines(bottom, top, narrow ? 3 : 6);
-  const valueLabels = [];
-  for (const gridValue of grid) {
-    const at = y(gridValue);
+  // Gridlines under the fills, the value each one marks beside the plot.
+  gridValues.forEach((gridValue, at) => {
+    const line = y(gridValue);
     if (gridValue !== 0) {
-      root.append(svg('line', { x1: pad.left, x2: width - pad.right, y1: at, y2: at, class: 'gridline' }));
+      root.append(svg('line', { x1: pad.left, x2: width - pad.right, y1: line, y2: line, class: 'gridline' }));
     }
-    const tick = narrow
-      ? svg('text', { x: 1, y: at + 13 > plotBottom ? at - 4 : at + 13, class: 'axis-tick' })
-      : svg('text', { x: pad.left - 10, y: at + 4, class: 'axis-tick', 'text-anchor': 'end' });
-    tick.textContent = percentage ? `${Math.round(gridValue)}%` : compact(gridValue);
-    valueLabels.push(tick);
-  }
+    valueLabels[at].setAttribute('x', pad.left - 10);
+    valueLabels[at].setAttribute('y', line + 4);
+  });
 
   layers.forEach((layer, at) => {
     const fill = fills.get(layer.band);
@@ -405,10 +411,24 @@ function drawChart({
   return root;
 }
 
+/** The widest of `labels` as the stylesheet sets them, measured in a
+ *  drawing of their own that is gone again before the chart's. */
+function widest(labels) {
+  const probe = svg('svg', { class: 'trend', width: 0, height: 0 });
+  probe.style.position = 'absolute';
+  probe.style.visibility = 'hidden';
+  probe.append(...labels.map((label) => label.cloneNode(true)));
+  document.body.append(probe);
+  const width = Math.max(...[...probe.children].map((label) => label.getBBox().width));
+  probe.remove();
+  return width;
+}
+
 /** Labels along the time axis: years over a long span, months over a
  *  shorter one, days over a few weeks. Spaced so no two collide, and
  *  none placed where it would run off either end of the plot. */
 function timeLabels(firstDay, lastDay, plotWidth, locale, formatDay) {
+  if (firstDay === lastDay) return [{ day: firstDay, text: formatDay(isoFromDay(firstDay)) }];
   const perDay = plotWidth / Math.max(1, lastDay - firstDay);
   const dayOf = (year, month, date = 1) => Math.round(Date.UTC(year, month, date) / 86400000);
   const first = new Date(firstDay * 86400000);
@@ -475,32 +495,36 @@ function areaPath(days, spans, x, y) {
   return `M${tops.join('L')}L${bottoms.reverse().join('L')}Z`;
 }
 
-function gridLines(bottom, top, count) {
-  const lines = [0];
+/** Where the value axis draws a line: every multiple of a 1, 2 or 5
+ *  times a power of ten step inside the domain, counted from zero as
+ *  `i * step` so each is an exact integer. The step is the smallest
+ *  such number, never below 1, that fits `count` of them in the span
+ *  (net-worth-view.md, Value ticks). */
+export function valueTicks(bottom, top, count) {
   const step = niceStep((top - bottom) / count);
-  for (let value = step; value <= top; value += step) lines.push(value);
-  for (let value = -step; value >= bottom; value -= step) lines.push(value);
-  return lines.sort((a, b) => a - b);
+  const ticks = [];
+  for (let i = Math.ceil(bottom / step); i * step <= top; i += 1) ticks.push(i * step || 0);
+  return ticks;
 }
 
 function niceStep(rough) {
-  if (rough <= 0) return 1;
+  if (rough <= 1) return 1;
   const magnitude = 10 ** Math.floor(Math.log10(rough));
-  for (const factor of [1, 2, 5, 10]) {
-    if (rough <= factor * magnitude) return factor * magnitude;
-  }
-  return 10 * magnitude;
+  return [1, 2, 5, 10].map((factor) => factor * magnitude).find((step) => step >= rough);
 }
 
-/** "1.5M", "500k", "−1M": the axis needs magnitude, not precision. */
-function compact(value) {
+const UNITS = [[1e9, 'B'], [1e6, 'M'], [1e3, 'k']];
+
+/** A tick's label: whole below a thousand, else its magnitude in the
+ *  largest of thousands, millions and billions that fits, to one
+ *  decimal with no trailing zero. The step rule makes that exact, so a
+ *  label never rounds its line (net-worth-view.md, Value ticks). */
+export function tickLabel(value, group, point) {
   const abs = Math.abs(value);
-  const sign = value < 0 ? '\u2212' : '';
-  const short = (n) => String(Number(n.toFixed(1)));
-  if (abs >= 1e9) return `${sign}${short(abs / 1e9)}B`;
-  if (abs >= 1e6) return `${sign}${short(abs / 1e6)}M`;
-  if (abs >= 1e3) return `${sign}${Math.round(abs / 1e3)}k`;
-  return `${sign}${Math.round(abs)}`;
+  const [size, suffix] = UNITS.find(([unit]) => abs >= unit) || [1, ''];
+  const tenths = Math.round((abs * 10) / size);
+  const mantissa = `${Math.floor(tenths / 10)}${tenths % 10 ? `.${tenths % 10}` : ''}`;
+  return decimal.toStoredDisplay(`${value < 0 ? '-' : ''}${mantissa}`, group, point) + suffix;
 }
 
 /** The table fallback. A static aria-label on the SVG is not

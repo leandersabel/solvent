@@ -431,10 +431,37 @@ await run(async () => {
     await inDialog('Close');
     await page.waitUntil("!document.querySelector('.dialog')", { label: 'the dialog to close' });
 
+    // The date field's own message line, whether the input names it, and
+    // whatever the dialog's general line says: a date refusal belongs on
+    // the first and never on the last.
+    const dateState = () => page.eval(`(() => {
+      const input = document.querySelector('#snapshot-date');
+      const line = document.querySelector('#snapshot-date-line');
+      const general = [...document.querySelectorAll('.dialog .field-error:not([hidden])')].filter((n) => n !== line);
+      return {
+        line: line ? line.textContent : null,
+        linked: Boolean(line) && (input.getAttribute('aria-describedby') || '').split(' ').includes(line.id),
+        invalid: input.getAttribute('aria-invalid'),
+        general: general.map((n) => n.textContent).join(' '),
+      };
+    })()`);
+    const typeDay = async (day) =>
+      setValue('#snapshot-date', await page.call(async (d) => (await import('/static/js/session.js')).currentVault().format.date(d), day));
+    const fullDay = (day) =>
+      page.call(async (d) => (await import('/static/js/session.js')).currentVault().format.fullDate(d), day);
+    const shiftDay = (day, by) => new Date(Date.parse(`${day}T00:00:00Z`) + by * 86400000).toISOString().slice(0, 10);
+
     // An archived holding's earlier figure still takes a new value, and its
     // date picker offers nothing from the archive date on.
     await page.eval("[...document.querySelectorAll('.card .data-table button')].find(b => b.textContent === 'Edit').click()");
     await page.waitUntil("document.querySelector('#snapshot-value')", { label: "an archived holding's earlier entry" });
+    const archivedHint = `Archived on ${await fullDay(today)}.`;
+    const opened = await dateState();
+    check(
+      "an archived holding's entry carries the archive on the date field's line from the moment the dialog opens",
+      opened.line === archivedHint && opened.invalid === null && opened.general === '',
+      JSON.stringify(opened),
+    );
     const dateText = await page.call(async (day) => (await import('/static/js/session.js')).currentVault().format.date(day), today);
     await setValue('#snapshot-date', dateText);
     await writesSeen();
@@ -445,6 +472,33 @@ await run(async () => {
       Boolean(await page.eval("document.querySelector('.dialog')")) && (await writesSeen()).length === 0 &&
         (await vaultValue((v, id) => v.snapshotsFor(id).map(s => s.payload.date).sort().join(','), euroId)) === `${BACKDATE},${today}`,
     );
+    const refused = await dateState();
+    check(
+      "the archive date typed into an archived holding's entry is refused on the date field's own line with the archive's reason",
+      refused.line === `${archivedHint.slice(0, -1)}. Enter an earlier date.` && refused.linked && refused.invalid === 'true',
+      JSON.stringify(refused),
+    );
+    check(
+      'a refused archive date puts nothing in the dialog general line, and never the future wording',
+      refused.general === '' && !(await page.eval("document.querySelector('.dialog').textContent")).includes('future'),
+      JSON.stringify(refused),
+    );
+    await typeDay(shiftDay(today, 1));
+    await inDialog('Save');
+    await page.idle();
+    const after = await dateState();
+    check(
+      "a date after today is refused with the archive's reason on an archived holding, not the future one",
+      after.line === refused.line && after.general === '' && (await writesSeen()).length === 0,
+      JSON.stringify(after),
+    );
+    await typeDay(BACKDATE);
+    const fits = await dateState();
+    check(
+      'the refusal clears as soon as an earlier date is typed back, before Save, and the line returns to the hint',
+      fits.line === archivedHint && fits.invalid === null && fits.general === '',
+      JSON.stringify(fits),
+    );
     const earlierText = await page.call(async (day) => (await import('/static/js/session.js')).currentVault().format.date(day), BACKDATE);
     await setValue('#snapshot-date', earlierText);
     await setValue('#snapshot-value', '110');
@@ -453,6 +507,76 @@ await run(async () => {
     check(
       "an archived holding's earlier value can still be edited",
       JSON.stringify(await vaultValue((v, id, day) => v.snapshotsFor(id).filter(s => s.payload.date === day).map(s => s.payload.value + ':' + s.version), euroId, BACKDATE)) === JSON.stringify(['110:2']),
+    );
+
+    // A holding archived on a past date: every date from it up to today, and
+    // after today, is refused with the archive as the reason.
+    const archivedDay = shiftDay(today, -10);
+    const [pastId] = await plant([
+      { type: 'account', payload: { name: 'Probe past archive', unit: 'CHF', dims: {}, note: null, archivedAt: archivedDay, createdAt: new Date().toISOString() } },
+    ]);
+    await plant([
+      { type: 'snapshot', accountId: pastId, payload: { date: shiftDay(today, -20), value: '40', note: null } },
+      { type: 'snapshot', accountId: pastId, payload: { date: archivedDay, value: '0', note: null } },
+    ]);
+    await reloadModel();
+    await openHolding(pastId);
+    await page.eval("[...document.querySelectorAll('.card .data-table button')].find(b => b.textContent === 'Edit').click()");
+    await page.waitUntil("document.querySelector('#snapshot-value')", { label: 'the entry before a past archive' });
+    const pastReason = `Archived on ${await fullDay(archivedDay)}. Enter an earlier date.`;
+    await writesSeen();
+    for (const day of [archivedDay, shiftDay(archivedDay, 3), today, shiftDay(today, 1)]) {
+      await typeDay(day);
+      await inDialog('Save');
+      await page.idle();
+      const state = await dateState();
+      check(
+        `${day} is refused on the entry of a holding archived on ${archivedDay}, with the archive as the reason`,
+        state.line === pastReason && state.linked && state.invalid === 'true' && state.general === '' && (await writesSeen()).length === 0,
+        JSON.stringify(state),
+      );
+    }
+    await typeDay(shiftDay(archivedDay, -1));
+    const cleared = await dateState();
+    check(
+      'the day before the archive fits, and the refusal is gone before Save',
+      cleared.line === `Archived on ${await fullDay(archivedDay)}.` && cleared.invalid === null,
+      JSON.stringify(cleared),
+    );
+    await inDialog('Cancel');
+    await page.waitUntil("!document.querySelector('.dialog')", { label: 'the dialog to close' });
+
+    // A figure sitting on the archive date, planted as a stale session leaves
+    // it, keeps its own date when edited, and becomes the archive's zero when
+    // edited to zero. It still cannot move to another date from D on.
+    const [staleId] = await plant([
+      { type: 'account', payload: { name: 'Probe stale figure', unit: 'CHF', dims: {}, note: null, archivedAt: archivedDay, createdAt: new Date().toISOString() } },
+    ]);
+    await plant([
+      { type: 'snapshot', accountId: staleId, payload: { date: shiftDay(today, -20), value: '40', note: null } },
+      { type: 'snapshot', accountId: staleId, payload: { date: archivedDay, value: '7', note: null } },
+    ]);
+    await reloadModel();
+    await openHolding(staleId);
+    await page.eval("[...document.querySelectorAll('.card .data-table button')].find(b => b.textContent === 'Edit').click()");
+    await page.waitUntil("document.querySelector('#snapshot-value')", { label: 'the figure on the archive date' });
+    await writesSeen();
+    await typeDay(shiftDay(archivedDay, 2));
+    await inDialog('Save');
+    await page.idle();
+    const offArchive = await dateState();
+    check(
+      'a figure on the archive date cannot move to a later date, and the archive is the reason',
+      offArchive.line === pastReason && offArchive.invalid === 'true' && (await writesSeen()).length === 0,
+      JSON.stringify(offArchive),
+    );
+    await typeDay(archivedDay);
+    await setValue('#snapshot-value', '0');
+    await inDialog('Save');
+    await page.waitUntil("!document.querySelector('.dialog')", { label: 'the figure on the archive date to save' });
+    check(
+      'a figure on the archive date saves under its own date, edited to zero',
+      (await vaultValue((v, id, day) => v.snapshotsFor(id).filter((s) => s.payload.date === day).map((s) => s.payload.value).join(','), staleId, archivedDay)) === '0',
     );
 
     await openHolding(poundId);

@@ -458,6 +458,9 @@ textarea {
   color: var(--ink-primary);
 }
 
+/* After the base block: its `font` shorthand resets the figures. */
+input[inputmode="decimal"] { font-variant-numeric: tabular-nums; }
+
 input[type="file"] {
   width: 100%;
   font: inherit;
@@ -1670,6 +1673,13 @@ select {
   flex-wrap: wrap;
   align-items: center;
   gap: 8px;
+}
+
+.date-line {
+  flex-basis: 100%;
+  min-height: 20px;
+  line-height: 1.5;
+  margin: 0;
 }
 
 .date-text {

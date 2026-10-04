@@ -21,7 +21,7 @@ export function snapshotDialog(vault, holding, existing, onSaved, onOpenRecordin
   });
   const note = el('textarea', { rows: '2', text: existing ? existing.payload.note || '' : '' });
   const unit = holding.payload.unit;
-  const converted = el('p', { class: 'hint' });
+  const converted = el('p', { class: 'hint numeric' });
   const error = el('p', { class: 'field-error', hidden: true });
   const pricesLine = el('p', { class: 'hint prices-line' });
   const pricesBody = el('div', { class: 'prices-body' });
@@ -114,11 +114,16 @@ export function snapshotDialog(vault, holding, existing, onSaved, onOpenRecordin
   };
   // An archived holding's entry moves only to a date before its archive
   // date: onto it the move would displace the archive's zero, and after
-  // it the entry would be a figure after the archive.
+  // it the entry would be a figure after the archive. A figure already
+  // on or after that date keeps its own date.
   const archivedAt = holding.payload.archivedAt;
+  const archivedOn = archivedAt && `Archived on ${vault.format.fullDate(archivedAt)}.`;
   const date = dateField(vault.format, {
     id: 'snapshot-date',
     max: archivedAt ? isoFromDay(dayNumber(archivedAt) - 1) : today(),
+    keep: existing ? existing.payload.date : null,
+    maxReason: archivedAt ? `${archivedOn} Enter an earlier date.` : undefined,
+    hint: archivedOn || '',
     value: existing ? existing.payload.date : today(),
     onChange: () => {
       if (moving()) changed();
@@ -260,12 +265,7 @@ export function snapshotDialog(vault, holding, existing, onSaved, onOpenRecordin
       if (stored === null) {
         return fail('Enter a number, with at most twelve decimal places.');
       }
-      if (!date.value) {
-        return fail(`Enter a date, written ${vault.format.datePlaceholder()}. A snapshot describes what was, so it cannot be in the future.`);
-      }
-      if (date.value > today()) {
-        return fail('A snapshot describes what was. Pick today or earlier.');
-      }
+      if (!date.validate()) return;
       const on = date.value;
       const atDate = vault
         .snapshotsFor(holding.recordId)

@@ -28,6 +28,13 @@ await run(async () => {
   await page.idle();
   await page.eval("document.querySelectorAll('.dialog details').forEach(d => (d.open = true))");
   await page.frames();
+  const tabular = (selector) => page.eval(`(() => {
+    const nodes = [...document.querySelectorAll(${JSON.stringify(selector)})];
+    return nodes.length > 0 && nodes.every((n) => getComputedStyle(n).fontVariantNumeric === 'tabular-nums');
+  })()`);
+  check('the form\'s value field has tabular digits', await tabular('#snapshot-value'));
+  check('the form\'s converted line has tabular digits', await tabular('#snapshot-value ~ .hint'));
+  check('the form\'s rate fields have tabular digits', await tabular('.dialog .rate-line input'));
   check(
     'the prices line says what the save writes',
     (await text()).includes('will be recorded with this'),
@@ -147,6 +154,55 @@ await run(async () => {
   await closeDialogs();
   check('record-snapshot: a value with more than twelve decimal places is refused at input', fine.includes('at most twelve decimal places'), fine);
   check('record-snapshot: a future date is refused inline and nothing is written', future === 'That date is in the future.' && writesSent().length === 0, future);
+
+  // Every date refusal sits on the date field's own line, never in the
+  // dialog's general one, and Save asks the field rather than reading no
+  // value as an empty date.
+  const dateState = () => ev(`(() => {
+    const input = document.querySelector('#snapshot-date');
+    const line = document.querySelector('#snapshot-date-line');
+    const general = [...document.querySelectorAll('.dialog .field-error:not([hidden])')].filter((n) => n !== line);
+    return {
+      line: line ? line.textContent : null,
+      linked: Boolean(line) && (input.getAttribute('aria-describedby') || '').split(' ').includes(line.id),
+      invalid: input.getAttribute('aria-invalid'),
+      general: general.map((n) => n.textContent).join(' '),
+      focused: document.activeElement === input,
+    };
+  })()`);
+  traffic.length = 0;
+  await openForm('Current account');
+  await set('#snapshot-value', '5');
+  await set('#snapshot-date', await format('date', isoOf(dayOf(T) + 1)));
+  await formSave();
+  const futureSaved = await dateState();
+  await set('#snapshot-date', 'not a date');
+  await formSave();
+  const garbled = await dateState();
+  await set('#snapshot-date', '');
+  await formSave();
+  const emptied = await dateState();
+  await set('#snapshot-date', await format('date', D1));
+  const fitted = await dateState();
+  await closeDialogs();
+  const pattern = await format('datePlaceholder');
+  const refusedOnItsLine = (state, reason) => state.line === reason && state.linked && state.invalid === 'true' && state.general === '';
+  check(
+    'record-snapshot: Save on a typed future date shows the refusal on the date field, focuses it and writes nothing',
+    refusedOnItsLine(futureSaved, 'That date is in the future.') && futureSaved.focused && writesSent().length === 0,
+    JSON.stringify(futureSaved),
+  );
+  check(
+    'record-snapshot: Save on text that does not parse says how to write the date, not that it is empty',
+    refusedOnItsLine(garbled, `Enter the date as ${pattern}.`) && garbled.focused,
+    JSON.stringify(garbled),
+  );
+  check('record-snapshot: Save on an emptied date asks for a date', refusedOnItsLine(emptied, 'Enter a date.') && emptied.focused, JSON.stringify(emptied));
+  check(
+    'record-snapshot: a date that fits clears the refusal before Save, and a holding that is not archived has no hint',
+    fitted.line === '' && fitted.invalid === null && fitted.general === '',
+    JSON.stringify(fitted),
+  );
 
   traffic.length = 0;
   await openForm('Current account');

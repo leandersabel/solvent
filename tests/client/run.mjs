@@ -1514,6 +1514,98 @@ await check('net-worth-view: the pointer rounds to the nearest day, a half to th
   assert.deepEqual([0, 10, 33, 50, 99].map((x) => dayAt(x, 10, 50, 7, 7)), [7, 7, 7, 7, 7]);
 });
 
+// The step the rule names, found by walking the 1, 2, 5 series up from
+// 1 rather than by the logarithm the chart takes.
+const niceAtLeast = (rough) => {
+  for (let n = 0; n < 15; n += 1) {
+    for (const f of [1, 2, 5]) if (f * 10 ** n >= rough) return f * 10 ** n;
+  }
+  throw new Error(`no step for ${rough}`);
+};
+const unitOf = { '': 1, k: 1e3, M: 1e6, B: 1e9 };
+/** A label read back to its value, in the exact scale-12 decimal, so
+ *  "1.1k" is 1100 and not the float 1100.0000000000002. */
+const readTick = (text, group, point) => {
+  const [, minus, digits, suffix] = /^(−?)([\d., ]+?)([kMB]?)$/.exec(text);
+  const plain = digits.split(group).join('').replace(point, '.');
+  return (minus ? -1n : 1n) * decimal.parse(plain) * BigInt(unitOf[suffix]);
+};
+
+await check('net-worth-view: value ticks over the sweep are exact, whole, counted from zero and never read alike', async () => {
+  const { valueTicks, tickLabel } = await load('chart.js');
+  const totals = new Set([0.4]);
+  for (let e = -1; e <= 10; e += 1) {
+    for (const m of [1, 2, 2.5, 5, 7.5]) {
+      const v = Number((m * 10 ** e).toPrecision(12));
+      for (const near of [v, Math.floor(v) - 1, Math.floor(v), Math.ceil(v), Math.ceil(v) + 1]) {
+        if (near > 0) totals.add(near);
+      }
+    }
+  }
+  assert.ok(totals.size > 100);
+  for (const [group, point] of [[',', '.'], ['.', ',']]) {
+    for (const total of totals) {
+      for (const signed of [total, -total]) {
+        const bottom = Math.min(0, signed);
+        const top = Math.max(0, signed);
+        for (const count of [6, 3]) {
+          const where = `${signed} in ${count}`;
+          const ticks = valueTicks(bottom, top, count);
+          const labels = ticks.map((tick) => tickLabel(tick, group, point));
+          assert.ok(ticks.includes(0), where);
+          assert.equal(new Set(labels).size, labels.length, `${where}: ${labels}`);
+          const step = niceAtLeast((top - bottom) / count);
+          assert.ok(step >= 1, where);
+          ticks.forEach((tick, at) => {
+            assert.ok(tick % step === 0, `${where}: ${tick} is no multiple of ${step}`);
+            assert.ok(tick >= bottom && tick <= top, where);
+            assert.equal(Object.is(tick, -0), false, where);
+            if (at) assert.equal(tick - ticks[at - 1], step, where);
+            assert.equal(readTick(labels[at], group, point), BigInt(tick) * 10n ** 12n, `${where}: ${labels[at]} is not ${tick}`);
+          });
+          // Every multiple inside the domain is there.
+          assert.equal(ticks.length, Math.floor(top / step) - Math.ceil(bottom / step) + 1, where);
+        }
+      }
+    }
+  }
+  // A domain with no extent runs from 0 to 1.
+  assert.deepEqual(valueTicks(0, 1, 6), [0, 1]);
+});
+
+await check('net-worth-view: one holding at 2500 has ticks 0 to 2500 by 500, reading 1.5k and 2.5k, or 1,5k and 2,5k under a decimal comma', async () => {
+  const { valueTicks, tickLabel } = await load('chart.js');
+  const ticks = valueTicks(0, 2500, 6);
+  assert.deepEqual(ticks, [0, 500, 1000, 1500, 2000, 2500]);
+  assert.deepEqual(ticks.map((t) => tickLabel(t, ',', '.')), ['0', '500', '1k', '1.5k', '2k', '2.5k']);
+  assert.deepEqual(ticks.map((t) => tickLabel(t, '.', ',')), ['0', '500', '1k', '1,5k', '2k', '2,5k']);
+  assert.deepEqual(valueTicks(0, 2500, 3), [0, 1000, 2000]);
+  assert.equal(tickLabel(-1500, ',', '.'), '−1.5k');
+  assert.equal(tickLabel(2500000, ',', '.'), '2.5M');
+  assert.equal(tickLabel(3e9, ',', '.'), '3B');
+});
+
+await check('net-worth-view: a range starts no earlier than the oldest snapshot, whatever price entry is older', () => {
+  const vault = model({
+    holdings: [{ name: 'Cash', unit: 'CHF' }],
+    figures: [['Cash', '2026-03-01', '100'], ['Cash', '2026-04-10', '200']],
+    prices: [['USD', '2026-01-15', '0.9']],
+  });
+  const last = day('2026-04-10');
+  for (const span of [183, 365, null]) {
+    assert.deepEqual(vault.chartRange(span), { fromDay: day('2026-03-01'), lastDay: last }, String(span));
+  }
+  assert.equal(vault.chartRange(30).fromDay, last - 30);
+  const single = model({
+    holdings: [{ name: 'Cash', unit: 'CHF' }],
+    figures: [['Cash', '2026-04-10', '200']],
+    prices: [['USD', '2025-01-15', '0.9']],
+  });
+  for (const span of [30, 183, 365, null]) {
+    assert.deepEqual(single.chartRange(span), { fromDay: last, lastDay: last }, String(span));
+  }
+});
+
 await check('net-worth-view: stepping a day is calendar arithmetic and skips or repeats none across a clock change in any zone', () => {
   const zone = process.env.TZ;
   try {

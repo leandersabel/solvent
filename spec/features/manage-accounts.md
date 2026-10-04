@@ -241,7 +241,12 @@ Failures:
 - **An entry's date moves only to a date before D.** Onto D it would
   displace the zero (`record-snapshot.md`, Moving the date onto an
   occupied date), and after D it would be a new figure after the
-  archive.
+  archive. A typed date on D or later is refused on the date field's
+  own line, with the archive as the reason (`record-snapshot.md`,
+  Refusing a date, and `ui/snapshot-entry.md` for the copy). The reason
+  is the archive's even when the date is also in the future, never the
+  future-date reason: D is never later than today, so the archive is
+  the limit that applies.
 - **Every other snapshot stays editable and deletable** as any snapshot
   is (`record-snapshot.md`, Editing an existing snapshot), including a
   non-zero figure at D. Edited to zero, that figure becomes the
@@ -397,6 +402,12 @@ Unarchiving it and archiving it again writes the zero at the new D.
   page or in the recording for D. An earlier entry's date cannot be
   moved to D or later, and an earlier entry's value can still be
   edited.
+- While archived, typing D into an earlier entry's date refuses it on
+  the date field's own line with the archive as the reason and no
+  future-date wording, and Save issues no `PUT`. The same holds for a
+  date strictly between a past D and today, and for a date after today.
+  Correcting the date to one before D clears the refusal before Save,
+  and Save then writes the move.
 - Deleting the recording at D deletes every other record bearing D and
   leaves the archive's zero byte-identical. The recording still opens,
   holding the zero.
