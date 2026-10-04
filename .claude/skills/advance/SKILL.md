@@ -188,7 +188,8 @@ Then one comment, and exactly one outcome:
 `queued` is all it takes to be implemented: the workflow hands the slot
 to the first in line and starts its run (`CLAUDE.md`, The loop,
 Implementation). Never start a run, and never add `implementing` to
-this issue. A `bug` titled `The checks fail on master`, opened by
+this issue. Every other outcome removes `queued`, so nothing in line
+waits on the client. A `bug` titled `The checks fail on master`, opened by
 `github-actions[bot]`, gets no `queued` and goes straight to
 Implementation, since every other implementation's checks fail until it
 is fixed.

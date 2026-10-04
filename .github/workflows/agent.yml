@@ -162,10 +162,15 @@ jobs:
                 # reports after they finish is filed by the nightly.
                 [ "$branch" = master ] && file_alerts
                 conclusion=$(jqe .workflow_run.conclusion)
-                if [[ "$branch" == claude/issue-* && "$conclusion" == failure ]] ||
-                  { [[ "$branch" == claude/spec-* ]] &&
-                    [ "$(gh pr list --head "$branch" --state open --json reviewDecision --jq '.[0].reviewDecision')" = APPROVED ]; }; then
+                if [[ "$branch" == claude/issue-* && "$conclusion" == failure ]]; then
                   issue=$(from_branch "$branch")
+                elif [[ "$branch" == claude/spec-* ]]; then
+                  pr=$(gh pr list --head "$branch" --state open --json number --jq '.[0].number // empty')
+                  sha=$(jqe .workflow_run.head_sha)
+                  if [ -n "$pr" ] && [ "$(gh api "repos/$GH_REPO/pulls/$pr/reviews?per_page=100" \
+                    --jq "any(.[]; .user.login == \"$OWNER\" and .state == \"APPROVED\" and .commit_id == \"$sha\")")" = true ]; then
+                    issue=$(from_branch "$branch")
+                  fi
                 fi
               fi ;;
             workflow_dispatch)
@@ -249,8 +254,8 @@ jobs:
           plugins: skald@skald
           # A pipeline change writes .claude/, which Claude Code refuses
           # in every other mode. The runner is discarded after the run,
-          # and a change under .claude/ merges only with the client's
-          # approval (CODEOWNERS).
+          # and the loop merges a change under .claude/ only with the
+          # client's approval (CLAUDE.md, The loop, Merge gate).
           claude_args: |
             --model claude-opus-5-5
             --permission-mode bypassPermissions
