@@ -682,4 +682,5 @@ fixture prevents.
     Everything you typed is still here, so you can try again.", sends
     nothing and keeps every field, and pressing the button again in the
     same page loads the worker and sends the registration. Test:
-    `tests/test_register_browser.py::test_the_registration_forms_answer_each_refusal_in_its_own_words`.
+    `tests/test_register_browser.py::test_the_registration_forms_answer_each_refusal_in_its_own_words`,
+    `tests/browser/parts/register-review-worker.mjs`.

@@ -819,4 +819,5 @@ reason, and then learns at sign-in.
     answer shows "That did not go through. Everything you typed is
     still here, so you can try again." with both fields still filled,
     and Unlock in the same page then opens the vault. Test:
-    `tests/browser/parts/unlock.mjs`.
+    `tests/browser/parts/unlock.mjs`,
+    `tests/browser/parts/unlock-review-worker.mjs`.
