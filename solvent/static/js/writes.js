@@ -169,18 +169,23 @@ export async function reloadType(vault, type) {
   vault.replaceType(type, await decryptAll(vault, await api.get(`/api/records?type=${type}`)));
 }
 
-/** A sitting at one date: the reload runs before the first record it
- *  creates and never again, because after it the date belongs to this
- *  session. `dateWasEmpty` is what the model said when the sitting
- *  began, which is what a create there is judged against. */
+/** A sitting at one date: a row's create reloads before the first record
+ *  it creates and never again, because after it the date belongs to this
+ *  session against creates. A rate-lines save reloads on every save that
+ *  creates, claimed or not (`claimDate`). `dateWasEmpty` is what the
+ *  model said when the sitting began, which is what the claiming reload
+ *  judges a create there against. */
 export function sitting(vault, date) {
   return { date, dateWasEmpty: !vault.holdsRecording(date), claimed: false, refreshed: false, proposals: null };
 }
 
 /** Claim the date for a sitting about to create records at it, or say
- *  why it cannot. `snapshots` names the holdings and `rates` the units
- *  the write would create an entry for. `except` is the one record of
- *  those holdings the write may find there, the one it deletes.
+ *  why it cannot. A claimed sitting reloads again only when `held`, and
+ *  that reload judges the slots and nothing else: the sitting's own
+ *  records are at the date, so finding it recorded refuses nothing.
+ *  `snapshots` names the holdings and `rates` the units the write would
+ *  create an entry for. `except` is the one record of those holdings the
+ *  write may find there, the one it deletes.
  *
  *  A date another session recorded since the sitting began, or any slot
  *  already taken, refuses the whole save before a single write. The
@@ -190,13 +195,13 @@ export function sitting(vault, date) {
  *  itself, and says `emptied` so the screen can tell it from a date
  *  another session recorded. */
 export async function claimDate(vault, sit, { snapshots = [], rates = [], except = null, held = false }) {
-  if (sit.claimed) return null;
+  if (sit.claimed && !held) return null;
   const fresh = await reloadCreateTypes(vault);
   const at = (list) => list.filter((record) => record.payload.date === sit.date);
   const emptied = held && at(fresh.snapshot).length === 0 && at(fresh.rate).length === 0;
   const taken =
     emptied ||
-    (sit.dateWasEmpty && (at(fresh.snapshot).length > 0 || at(fresh.rate).length > 0)) ||
+    (!sit.claimed && sit.dateWasEmpty && (at(fresh.snapshot).length > 0 || at(fresh.rate).length > 0)) ||
     at(fresh.snapshot).some((r) => snapshots.includes(r.accountId) && r.recordId !== except) ||
     at(fresh.rate).some((r) => rates.includes(r.payload.symbol));
   if (taken) {

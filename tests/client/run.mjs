@@ -2321,6 +2321,47 @@ await check('record-rate: a rate-lines save at a date another session emptied si
   assert.equal(vault.holdsRecording('2026-07-31'), false);
 });
 
+await check('record-rate: a second price saved in a sitting after another session emptied the date reloads, writes nothing, and leaves the date empty', async () => {
+  const server = recordServer();
+  const vault = await storedVault(server, {
+    holdings: [['Francs', 'CHF'], ['Gold', 'XAU-ozt'], ['Silver', 'XAG-ozt']],
+    figures: [['Francs', '2026-07-31', '5']],
+  });
+  const sit = writes.sitting(vault, '2026-07-31');
+  const typed = { rate: '2700', rateSource: 'manual', rateAsOf: null, proposedRate: null };
+  const create = (unit, rate) => ({ rates: [{ existing: null, payload: writes.rateEntry(vault, unit, '2026-07-31', { ...typed, rate }) }] });
+  const first = await writes.saveRateLines(vault, sit, create('XAU-ozt', '2700'));
+  assert.equal(first.refused, false);
+  const other = new Vault(vault.dek);
+  await other.load();
+  await writes.deleteRecording(other, '2026-07-31');
+  server.reset();
+  const second = await writes.saveRateLines(vault, sit, create('XAG-ozt', '31'));
+  assert.equal(second.refused, true);
+  assert.equal(second.emptied, true);
+  assert.deepEqual(server.log.map((r) => r.query.type), ['snapshot', 'rate']);
+  assert.equal(server.writesIn().length, 0);
+  assert.equal([...server.rows.values()].filter((r) => r.recordType === 'rate' || r.recordType === 'snapshot').length, 0);
+  assert.equal(vault.holdsRecording('2026-07-31'), false);
+});
+
+await check('record-snapshot: on a sweep at a new date, a rate-lines save that creates a price after the first row reloads once and writes it', async () => {
+  const server = recordServer();
+  const vault = await storedVault(server, { holdings: [['Francs', 'CHF'], ['Gold', 'XAU-ozt']] });
+  const sit = writes.sitting(vault, '2026-07-31');
+  assert.equal(sit.dateWasEmpty, true);
+  assert.equal(await writes.claimDate(vault, sit, { snapshots: [vault.ids.Francs] }), null);
+  await writes.saveSnapshot(vault, vault.ids.Francs, null, { date: '2026-07-31', value: '5', note: null });
+  server.reset();
+  const typed = { rate: '2700', rateSource: 'manual', rateAsOf: null, proposedRate: null };
+  const result = await writes.saveRateLines(vault, sit, { rates: [{ existing: null, payload: writes.rateEntry(vault, 'XAU-ozt', '2026-07-31', typed) }] });
+  assert.equal(result.refused, false);
+  assert.deepEqual(result.failed, []);
+  assert.deepEqual(server.log.filter((r) => r.method === 'GET').map((r) => r.query.type), ['snapshot', 'rate']);
+  assert.deepEqual(server.writesIn().map((r) => r.body.recordType), ['rate']);
+  assert.equal(vault.entriesFor('XAU-ozt').length, 1);
+});
+
 await check('record-snapshot: a delete answering Not Found during a save counts as saved', async () => {
   const server = recordServer();
   const vault = await storedVault(server, { holdings: [['Dollars', 'USD']], prices: [['USD', '2026-07-31', '0.9']] });

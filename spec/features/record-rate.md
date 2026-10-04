@@ -240,7 +240,11 @@ and the order is the whole of the guarantee.
     always one the person emptied (`product/record-snapshot.md`,
     Clearing one out, and deleting one).
   - **A rate-lines save that creates an entry learns of a recording
-    deleted elsewhere from its pre-create reload.** When the reloaded
+    deleted elsewhere from its pre-create reload**, which it runs on
+    every such save, even at a date the sitting already claimed
+    (`record-snapshot.md`, Creating and reopening are distinct acts).
+    The model in memory still holds the records the sitting wrote, so
+    it cannot tell a deleted date from a held one. When the reloaded
     date holds no snapshot and no rate, the save is refused whole before
     any write, the model takes the reloaded records, and every typed
     price stays on screen for the first quantity to carry
@@ -292,9 +296,10 @@ request under its own version check, and nothing spans two of them.
 - **The rate-lines save** writes every changed line together, after one
   confirmation naming what each moves (`ui/update-values.md`, Changing
   or clearing a rate says what it moves). Its order is fixed:
-  0. If any line creates an entry, the pre-create reload. Any slot
-     taken, or the date found holding nothing (The write path), refuses
-     the whole save before a single write.
+  0. If any line creates an entry, the pre-create reload, whether or
+     not the sitting has claimed the date. Any slot taken, or the date
+     found holding nothing (The write path), refuses the whole save
+     before a single write.
   1. Rate writes, creates and updates alike.
   2. Deletions, for the lines cleared.
 
@@ -644,6 +649,10 @@ to win silently.
   issues its reload and no `PUT` or `DELETE`. Every typed price stays
   on its line, no rate-lines save control shows, and the Callout saying
   another window deleted the recording shows under the date heading.
+- With a sweep open on a recording, a rate-lines save that created a
+  price, and a second session then deleting every record at that date,
+  a second rate-lines save that creates a price issues its reload and
+  no `PUT` or `DELETE`, and the vault holds no record at that date.
 - A rate-lines save changing two rates and clearing a third issues both
   rate `PUT`s before the `DELETE`.
 - With the second rate `PUT` of that save stubbed to fail, the first

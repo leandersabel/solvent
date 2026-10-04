@@ -264,11 +264,25 @@ decryption warning rather than silently shaping the list.
   record at the date is a create, and it brings the reload with it, as
   does moving an entry onto another date (Editing an existing
   snapshot).
-- **The reload runs once per sitting, not once per row.** After it, the
-  date belongs to this session: another session's attempt to create a
-  recording there is refused by its own reload, so the rows that follow
-  need no further check. A fifteen-row sweep costs one extra `GET`, not
-  fifteen.
+- **A row's create reloads once per sitting, not once per row.** After
+  the first reload, the date belongs to this session against creates:
+  another session's attempt to create a recording there is refused by
+  its own reload, so the rows that follow need no further check. A
+  fifteen-row sweep costs one extra pair of `GET`s, not fifteen.
+- **The rate-lines save reloads on every save that creates an entry,
+  claimed date or not** (`record-rate.md`, Saving an edited recording).
+  Nothing refuses another session's deletion of the date, so a claim
+  says nothing about whether the date still holds a recording. A row's
+  create needs no such check, because a quantity makes a recording
+  legitimately. A typed price alone never may, and only a fresh reload
+  shows the date emptied. The cost is one pair of `GET`s per rate-lines
+  save that creates, not per line, and that save comes once per
+  confirmation.
+- **A reload after the claim judges the slots and nothing else.** The
+  records the session wrote itself are at the date, so finding the date
+  recorded does not refuse it. It refuses a slot the save would create
+  that is already taken, and, for the rate-lines save, a date holding
+  no record at all.
 - **A save is refused whole** when the reload finds the date recorded
   elsewhere, or finds any slot the save would create already taken.
   Nothing is written, not even into slots that are still free. The
@@ -666,6 +680,9 @@ one (`manage-accounts.md`, While archived).
   recording and for one holding added inside a reopened one.
 - A fifteen-row sweep at a new date issues exactly one extra type
   reload, before the first row is written, and none after it.
+- On a sweep at a new date, after the first row is recorded, a
+  rate-lines save that creates a price issues one type reload and
+  writes that price.
 - Editing inside a reopened recording never shows the replace prompt,
   while the single-holding form at an occupied date still does.
 - Asking for a new recording and picking a date that already holds
