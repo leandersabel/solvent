@@ -154,6 +154,13 @@ async function inPage(op) {
   } else if (op.op === 'archive') {
     const { status, unpriced } = await writes.archiveHolding(v, holding(op.name), op.date);
     if (status !== 'archived' || unpriced.length) throw new Error(`archiving ${op.name}: ${status}`);
+  } else if (op.op === 'clear') {
+    // The figures go and the date's rates stay, as clearing every figure
+    // on Recording detail leaves them.
+    for (const { snapshot } of v.recording(op.date).figures) await writes.deleteRecord(v, snapshot);
+  } else if (op.op === 'deleteRecording') {
+    const remaining = await writes.deleteRecording(v, op.date);
+    if (remaining.length) throw new Error(`deleting the recording at ${op.date} left ${remaining.length} records`);
   } else if (op.op === 'pair') {
     const id = holding(op.name).recordId;
     for (const value of op.values) {

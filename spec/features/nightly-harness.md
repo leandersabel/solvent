@@ -323,6 +323,18 @@ leaves out.
 | `current-backup` | tonight's export of the `long-history` vault |
 | `older-backup` | `fixtures/backup-format-1.json` |
 | `harness-admin` | the administrator through whom the invites were made |
+| `cleared-date` | a recording whose figures were all cleared, its rates kept, between two recordings, with a foreign price there off the straight line between that unit's neighbors, so the date still bends the band |
+| `deleted-recording` | a recording deleted whole, between two recordings, with a foreign price there off the straight line between that unit's neighbors |
+| `staggered-starts` | two holdings whose first snapshots are years apart |
+| `all-archived` | a vault whose every holding is archived |
+| `code-like-names` | a holding, a dimension and a dimension value each named like markup or script |
+| `session-ends-mid-action` | a vault owner used for nothing else, whose session `qa` ends from a second tab with a form open in the first, because signing out deletes the session as expiry does |
+
+A plan step `clear` deletes every snapshot at a date and keeps its
+rates. `deleteRecording` deletes the date's whole recording. `prepare`
+refuses either on an archive date, outside the vault's recorded dates,
+or where no price at the date lies off its neighbors' line, compared
+exactly.
 
 Neither the damaged record nor the pair is its holding's latest
 quantity, and neither sits on a holding's archive date, so every
@@ -351,6 +363,8 @@ record-rate.md, Reading, computed independently of the app in
   at scale 12, as `static/js/decimal.js` multiplies.
 - The total is the sum of those figures at scale 12. `assets` sums the
   figures above zero and `debts` those below.
+- With no holding valued the total is `null`, because the dashboard
+  shows `—`, while `assets` and `debts` are zero.
 - Each is given `exact`, at scale 12 without trailing zeros, and
   `display`, rounded half-even to the places the vault's profile shows,
   with no grouping and `-` for a negative.
@@ -376,8 +390,8 @@ app's own code did not produce:
 - **Records** are written only through the served modules
   `/static/js/session.js`, `writes.js`, `crypto.js` and `api.js`:
   `saveProfile`, `saveHolding`, `saveSnapshot`, `refreshPrices` with
-  the script's proposals, `saveRate` with `editedRatePayload`, and
-  `archiveHolding`. The damaged record and the pair are the
+  the script's proposals, `saveRate` with `editedRatePayload`,
+  `archiveHolding`, `deleteRecord` for a `clear` and `deleteRecording`. The damaged record and the pair are the
   exceptions, written as `tests/browser/harness.mjs` `plant` writes.
   No record is written by the generator's own crypto.
 - **No lookup**: proposals come from the script, so the generator
@@ -692,3 +706,10 @@ On failure it prints `docker logs` of `solvent` and `standin`.
     Test: `tests/test_nightly_tools.py::test_every_python_file_imports_the_standard_library_and_only_what_the_spec_lists`, `tests/test_nightly_tools.py::test_the_generator_imports_node_builtins_and_the_chrome_driver_alone`.
 41. (blind) No module under `solvent/` imports from `tools/`.
     Test: `tests/test_nightly_tools.py::test_nothing_in_the_app_imports_from_tools`.
+42. `clear` keeps the date's rates and leaves the expected figures as
+    they were, and `deleteRecording` writes its own op. Test: `tests/test_nightly_tools.py::test_a_cleared_date_keeps_its_prices_and_a_deleted_recording_keeps_nothing`.
+43. (blind) `prepare` refuses a cleared or deleted date outside the
+    recorded dates, with no recording, or whose prices all lie on their
+    neighbors' line. Test: `tests/test_nightly_tools.py::test_prepare_refuses_a_cleared_or_deleted_date_that_bends_nothing`, `tests/test_nightly_tools.py::test_prepare_refuses_a_cleared_date_whose_prices_lie_on_the_line`.
+44. With no holding valued the expected total is `null` and `assets` and
+    `debts` are zero. Test: `tests/test_nightly_tools.py::test_with_nothing_valued_the_total_is_none_and_the_sides_are_zero`.

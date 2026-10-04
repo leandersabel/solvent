@@ -1095,8 +1095,9 @@ rule of the chart (Archived holdings, Ranges and modes).
     mode or band visibility issues no network request and never waits,
     captured as requests. Test:
     `tests/browser/parts/dashboard-net-worth.mjs`.
-69. A holding and a dimension value named `<script>alert(1)</script>`
-    render as literal text in the list, the legend and every tooltip.
+69. A holding named `<script>alert(1)</script>` renders as literal text
+    in the list, and a dimension value so named in the legend and every
+    tooltip.
     Test: `tests/browser/parts/dashboard-net-worth.mjs`.
 70. With no holdings the screen says so and offers to add one, with no
     zero total. Test: `tests/browser/parts/register.mjs`.

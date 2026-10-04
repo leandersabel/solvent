@@ -558,6 +558,288 @@
      }
     }
    ]
+  },
+  {
+   "username": "chart.owner",
+   "password": "heron basalt clover tinsel",
+   "kind": "vault_owner",
+   "mainCurrency": "CHF",
+   "covers": [
+    "cleared-date",
+    "deleted-recording",
+    "staggered-starts"
+   ],
+   "about": "Savings and a dollar account recorded from 2016, and a fund recorded only from 2022. Every figure of 2017-09-29 was cleared, so that date carries prices alone, and the recording of 2019-03-29 was deleted.",
+   "profile": {
+    "groupSeparator": "none"
+   },
+   "holdings": [
+    {
+     "name": "Savings",
+     "unit": "CHF"
+    },
+    {
+     "name": "Dollar account",
+     "unit": "USD"
+    },
+    {
+     "name": "Later fund",
+     "unit": "CHF"
+    }
+   ],
+   "steps": [
+    {
+     "recording": {
+      "date": "2016-03-31",
+      "figures": {
+       "Savings": "20000.00",
+       "Dollar account": "5000.00"
+      }
+     }
+    },
+    {
+     "recording": {
+      "date": "2017-03-31",
+      "figures": {
+       "Savings": "21000.00",
+       "Dollar account": "5200.00"
+      }
+     }
+    },
+    {
+     "recording": {
+      "date": "2017-09-29",
+      "figures": {
+       "Savings": "21500.00",
+       "Dollar account": "5300.00"
+      }
+     }
+    },
+    {
+     "recording": {
+      "date": "2018-03-29",
+      "figures": {
+       "Savings": "22000.00",
+       "Dollar account": "5400.00"
+      }
+     }
+    },
+    {
+     "recording": {
+      "date": "2019-03-29",
+      "figures": {
+       "Savings": "22500.00",
+       "Dollar account": "5500.00"
+      }
+     }
+    },
+    {
+     "recording": {
+      "date": "2020-03-31",
+      "figures": {
+       "Savings": "23000.00",
+       "Dollar account": "5600.00"
+      }
+     }
+    },
+    {
+     "recording": {
+      "date": "2022-03-31",
+      "figures": {
+       "Savings": "24000.00",
+       "Dollar account": "5800.00",
+       "Later fund": "10000.00"
+      }
+     }
+    },
+    {
+     "recording": {
+      "date": {
+       "daysAgo": 10
+      },
+      "figures": {
+       "Savings": "25000.00",
+       "Dollar account": "6000.00",
+       "Later fund": "11000.00"
+      }
+     }
+    },
+    {
+     "clear": {
+      "date": "2017-09-29"
+     }
+    },
+    {
+     "deleteRecording": {
+      "date": "2019-03-29"
+     }
+    }
+   ]
+  },
+  {
+   "username": "archived.owner",
+   "password": "lagoon pepper sextant amber",
+   "kind": "vault_owner",
+   "mainCurrency": "CHF",
+   "covers": [
+    "all-archived"
+   ],
+   "about": "Every holding is archived: the dollar account 30 days ago and the savings 10 days ago.",
+   "profile": {
+    "groupSeparator": "none"
+   },
+   "holdings": [
+    {
+     "name": "Savings",
+     "unit": "CHF"
+    },
+    {
+     "name": "Dollar account",
+     "unit": "USD"
+    }
+   ],
+   "steps": [
+    {
+     "recording": {
+      "date": {
+       "daysAgo": 90
+      },
+      "figures": {
+       "Savings": "8000.00",
+       "Dollar account": "2000.00"
+      }
+     }
+    },
+    {
+     "recording": {
+      "date": {
+       "daysAgo": 30
+      },
+      "figures": {
+       "Savings": "8200.00"
+      }
+     }
+    },
+    {
+     "archive": {
+      "holding": "Dollar account",
+      "date": {
+       "daysAgo": 30
+      }
+     }
+    },
+    {
+     "archive": {
+      "holding": "Savings",
+      "date": {
+       "daysAgo": 10
+      }
+     }
+    }
+   ]
+  },
+  {
+   "username": "names.owner",
+   "password": "thimble saddle cobalt fennel",
+   "kind": "vault_owner",
+   "mainCurrency": "CHF",
+   "covers": [
+    "code-like-names"
+   ],
+   "about": "A holding, a dimension and a dimension value named like code. Each must read as the text it is wherever it appears.",
+   "profile": {
+    "groupSeparator": "none",
+    "dimensions": [
+     {
+      "id": "code0001",
+      "label": "<img src=x onerror=alert(1)>",
+      "archivedAt": null,
+      "values": [
+       {
+        "id": "code0002",
+        "label": "<script>alert(1)</script>",
+        "archivedAt": null
+       },
+       {
+        "id": "cash0003",
+        "label": "Cash",
+        "archivedAt": null
+       }
+      ]
+     }
+    ]
+   },
+   "holdings": [
+    {
+     "name": "<script>alert(1)</script>",
+     "unit": "CHF",
+     "dims": {
+      "code0001": "code0002"
+     }
+    },
+    {
+     "name": "Savings",
+     "unit": "CHF",
+     "dims": {
+      "code0001": "cash0003"
+     }
+    }
+   ],
+   "steps": [
+    {
+     "recording": {
+      "date": {
+       "daysAgo": 60
+      },
+      "figures": {
+       "<script>alert(1)</script>": "1000.00",
+       "Savings": "4000.00"
+      }
+     }
+    },
+    {
+     "recording": {
+      "date": {
+       "daysAgo": 20
+      },
+      "figures": {
+       "<script>alert(1)</script>": "1200.00",
+       "Savings": "4100.00"
+      }
+     }
+    }
+   ]
+  },
+  {
+   "username": "signout.owner",
+   "password": "orchid kettle mosaic ferry",
+   "kind": "vault_owner",
+   "mainCurrency": "CHF",
+   "covers": [
+    "session-ends-mid-action"
+   ],
+   "about": "Used for nothing else. With a form open and typed in, sign out in a second tab, then save in the first: the session has ended mid-action.",
+   "profile": {
+    "groupSeparator": "none"
+   },
+   "holdings": [
+    {
+     "name": "Savings",
+     "unit": "CHF"
+    }
+   ],
+   "steps": [
+    {
+     "recording": {
+      "date": {
+       "daysAgo": 30
+      },
+      "figures": {
+       "Savings": "3000.00"
+      }
+     }
+    }
+   ]
   }
  ],
  "invites": [
