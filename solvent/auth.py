@@ -286,8 +286,10 @@ def change_password():
     sends no wrapper, because there is no DEK to unwrap and none to
     re-wrap."""
     body = parse(ChangePassword, request.get_json(silent=True))
+    ratelimit.guard_auth(g.principal["username"])
     credential = credential_for(g.principal["id"])
     if not crypto.verify_auth_key(credential["verifier"], body.currentAuthKey):
+        ratelimit.record_auth_failure(g.principal["username"])
         abort(400)
 
     with write_transaction() as conn:
@@ -312,10 +314,12 @@ def delete_account():
     unadministered.
     """
     body = parse(DeleteAccount, request.get_json(silent=True))
-    if normalize_username(body.confirmUsername) != g.principal["username"]:
-        abort(400)
+    ratelimit.guard_auth(g.principal["username"])
     credential = credential_for(g.principal["id"])
     if not crypto.verify_auth_key(credential["verifier"], body.authKey):
+        ratelimit.record_auth_failure(g.principal["username"])
+        abort(400)
+    if normalize_username(body.confirmUsername) != g.principal["username"]:
         abort(400)
 
     with write_transaction() as conn:

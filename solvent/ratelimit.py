@@ -81,8 +81,8 @@ def address_key() -> str:
 
 
 def guard_auth(username: str) -> None:
-    """The per-username and per-address limits on the salt and login
-    endpoints, checked before either does any work.
+    """The per-username and per-address limits on every endpoint that
+    checks a password, checked before it does any work.
 
     A lockout response is the same shape whether or not the account
     exists, which is what keeps the limiter from becoming the

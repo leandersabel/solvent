@@ -584,10 +584,14 @@ or kinds.
     caller has proven they are entitled to know. The size difference
     falls under the accepted request-size leak.
   - Any future pre-authentication step needs the same decoy treatment.
-- **Rate limiting** guards `/api/auth/salt` and `/api/auth/login`. The
+- **Rate limiting** guards `/api/auth/salt`, `/api/auth/login`,
+  `POST /api/auth/change-password` and `DELETE /api/auth/account`. The
   Argon2id derivation runs client-side, so a scripted attacker pays
-  nothing per guess and throttling is the only bound. Both endpoints
-  check every limit below before doing any work, and a request any one
+  nothing per guess and throttling is the only bound. The last two
+  check a password too, so a stolen session would otherwise guess
+  through them without limit. Each endpoint checks every limit below,
+  for the username it names or the session's, before doing any work,
+  and a request any one
   refuses gets Too Many Requests with the same body and headers, whether
   or not the username exists and whatever its kind.
   - **Per username**: 10 failed sign-ins within 15 minutes throttle the
@@ -596,11 +600,12 @@ or kinds.
   - **Per address**: 30 failed sign-ins from one client address within
     15 minutes lock that address for 15 minutes from the failure that
     tripped the lock. The lock refuses every username from that
-    address, administrators' included, on both endpoints. Without it an
+    address, administrators' included, on every guarded endpoint. Without it an
     attacker stays under the per-username limit by trying a few
     passwords on every username.
   - **A failed sign-in** is a `/api/auth/login` whose verification,
-    real or decoy, did not match. Nothing else
+    real or decoy, did not match, or a change-password or account
+    deletion whose password check did not. Nothing else
     counts: not the salt fetch, which verifies nothing and whose
     enumeration the decoy closes (Login enumeration), not a Bad
     Request, and not a request the concurrency cap or a limit turned

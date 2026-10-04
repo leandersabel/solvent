@@ -561,9 +561,11 @@ Key wraps a DEK instead of encrypting records directly.
 4. The client re-wraps the same DEK under `MK_new` with a fresh nonce.
 5. `POST /api/auth/change-password`
    `{ currentAuthKey, salt, kdf, authKey, wrappedDek, dekNonce }`.
-6. The server verifies `currentAuthKey` against the stored hash. A
-   mismatch is a Bad Request with no `refused` member and writes
-   nothing. Otherwise it replaces the **`password` credential row**
+6. The server checks the sign-in limits for the session's username,
+   then verifies `currentAuthKey` against the stored hash. A mismatch
+   is a Bad Request with no `refused` member, counts as a failed
+   sign-in and writes nothing else (architecture.md, Rate limiting).
+   Otherwise it replaces the **`password` credential row**
    (`params` and `verifier`) and, for a vault owner, that credential's
    **one `dek_wrappers` row**, in one all-or-nothing transaction, and
    writes no other row (architecture.md, Key management). For a vault
@@ -687,9 +689,12 @@ from an administrator removing an account (`admin-invites.md`).
 
 `DELETE /api/auth/account` `{ authKey, confirmUsername }`.
 
-- The server checks `authKey` against the stored hash in constant time,
-  and that `confirmUsername` equals the session user's normalized
-  username. A mismatch on either is a Bad Request and deletes nothing.
+- The server checks the sign-in limits for the session's username,
+  then `authKey` against the stored hash in constant time, and that
+  `confirmUsername` equals the session user's normalized username. A
+  mismatch on either is a Bad Request and deletes nothing. A wrong
+  `authKey` counts as a failed sign-in (architecture.md, Rate
+  limiting).
   The typed username is a deliberate second factor of intent, so it is
   verified server-side, not left as a UI formality.
 - It deletes the principal row, every credential row, every wrapper,
@@ -768,7 +773,8 @@ from an administrator removing an account (`admin-invites.md`).
   does not open the held wrapper. A Bad Request with an unchanged pair,
   or a second Bad Request, is final: a vault owner sees the
   change-failed error, an administrator the wrong-password one. One
-  retry, never a loop.
+  retry, never a loop. The first Bad Request counts as a failed sign-in
+  (architecture.md, Rate limiting).
 - **Password changed on another session since this tab opened the
   vault**: that change ended this session, so the request answers
   Unauthorized whatever it carries, and the client treats it as any
@@ -813,8 +819,9 @@ from an administrator removing an account (`admin-invites.md`).
 10. A change-password request answers Unauthorized when another
     session's password change ended this session. Test: no test.
 11. (blind) A change-password request with a wrong `currentAuthKey`
-    answers Bad Request and writes nothing, called directly with the
-    client-side unwrap bypassed. Test: `tests/test_auth.py::test_a_wrong_current_auth_key_is_refused_server_side`.
+    answers Bad Request and writes nothing but its failed sign-in,
+    called directly with the client-side unwrap bypassed. Test: `tests/test_auth.py::test_a_wrong_current_auth_key_is_refused_server_side`,
+    `tests/test_review_account_settings.py::test_a_wrong_current_password_is_one_failed_sign_in_and_writes_nothing_else`.
 12. (blind) A password change invalidates every other session of the
     user and keeps the initiating one, asserted from both sides. Test:
     `tests/test_auth.py::test_a_password_change_ends_every_other_session_and_keeps_this_one`.
@@ -1029,3 +1036,8 @@ from an administrator removing an account (`admin-invites.md`).
 76. A dimension save that fails says so on its card and shows the stored
     value, and a Conflict names the other tab and reloads the profile.
     Test: `tests/browser/parts/dimensions.mjs`.
+77. (blind) A wrong password at `POST /api/auth/change-password`, from
+    either kind of session, or at `DELETE /api/auth/account` counts as a
+    failed sign-in, and once the sign-in limits engage, both endpoints
+    and sign-in refuse the right password with Too Many Requests and
+    write nothing. Test: `tests/test_attempts.py::test_a_wrong_password_on_a_settings_form_is_a_failed_sign_in`.

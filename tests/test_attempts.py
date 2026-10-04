@@ -19,6 +19,7 @@ import pytest
 from werkzeug.middleware.proxy_fix import ProxyFix
 
 from solvent import db, ratelimit
+from solvent.config import DEFAULT_KDF_ENVELOPE
 from solvent.crypto import hkdf_sha256
 from solvent.validation import normalize_username
 from tests.helpers import CSRF, b64, connect, register, rows
@@ -269,6 +270,48 @@ def test_salt_fetches_and_successes_never_count_towards_the_address(app):
         assert post(client, SALT, "owner").status_code == 200
         assert post(client, LOGIN, "owner", owner_key).status_code == 200
     assert attempts(app) == []
+
+
+# ---- Forms that check the password ------------------------------------
+
+
+def change_password(client, auth_key, kind):
+    body = {"currentAuthKey": auth_key, "salt": b64(16), "kdf": dict(DEFAULT_KDF_ENVELOPE), "authKey": b64()}
+    if kind == "vault_owner":
+        body.update(wrappedDek=b64(48), dekNonce=b64(12))
+    return client.post("/api/auth/change-password", json=body, headers=CSRF)
+
+
+def delete_account(client, auth_key, kind):
+    return client.delete(
+        "/api/auth/account", json={"authKey": auth_key, "confirmUsername": "someone"}, headers=CSRF
+    )
+
+
+@pytest.mark.parametrize(
+    "form, kind",
+    [
+        (change_password, "vault_owner"),
+        (change_password, "administrator"),
+        (delete_account, "vault_owner"),
+    ],
+    ids=["change password", "change password, administrator", "delete my vault"],
+)
+def test_a_wrong_password_on_a_settings_form_is_a_failed_sign_in(app, form, kind):
+    """A stolen session could guess the password there without limit."""
+    app.config.update(ADDRESS_LIMIT_OUT_OF_REACH, LOGIN_ATTEMPTS_PER_ACCOUNT=OUT_OF_REACH, LOGIN_LOCKOUT_THRESHOLD=3)
+    session, auth_key = register(app, "someone", kind=kind)
+    key = expected_key(app.config["SECRET_KEY"], "127.0.0.1")
+    for _ in range(3):
+        assert form(session, b64(), kind).status_code == 400
+    assert sorted(r["bucket"] for r in attempts(app)) == sorted(
+        [f"address:{key}"] * 3 + ["login:someone"] * 3 + ["login-lock:someone"]
+    )
+    before = attempts(app)
+
+    assert form(session, auth_key, kind).status_code == 429
+    assert post(app.test_client(), LOGIN, "someone", auth_key).status_code == 429
+    assert attempts(app) == before
 
 
 # ---- What is written --------------------------------------------------
