@@ -8,6 +8,7 @@ import { dialog, el, inlineRename, resumable } from './dom.js';
 
 const CONFLICT = 'Your settings were changed in another tab.';
 const SAVE_FAILED = 'That did not save. Nothing changed.';
+const RENAME_FAILED = 'That rename did not save.';
 
 /** Opaque and immutable, never shown and never derived from a label,
  *  and checked against every id the profile in memory already holds. */
@@ -41,6 +42,10 @@ let openUnassigned = () => {};
 let pending = null;
 let failure = null;
 let announcement = '';
+// What each open rename field holds, by the id of what it renames, so a
+// redraw rebuilds it as it was (dom.js, inlineRename). Typed text is
+// kept only until the field closes, and nothing here survives a lock.
+const drafts = new Map();
 
 /** The screen's write state, dropped when the vault it was drawn from
  *  is replaced: a write that was answered `vault-replaced` never settles,
@@ -49,6 +54,7 @@ export function resetDimensionsState() {
   pending = null;
   failure = null;
   announcement = '';
+  drafts.clear();
 }
 
 export function dimensionsView(vault, { reload: onChanged, openUnassigned: onOpen }) {
@@ -144,8 +150,13 @@ function dimensionCard(vault, dimension, { index, count, busy, failed }) {
     failed ? errorLine(failed) : null,
     el('div', { class: 'card-head' }, [
       dragHandle(dimension.label, busy),
-      inlineLabel(vault, dimension.id, dimension.label, (label) =>
-        saveDimensions(vault, vault.dimensions.map((d) => (d.id === dimension.id ? { ...d, label } : d))),
+      inlineLabel(
+        vault,
+        dimension.id,
+        dimension.id,
+        dimension.label,
+        (label) => vault.dimensions.map((d) => (d.id === dimension.id ? { ...d, label } : d)),
+        busy,
       ),
       el('button', {
         class: 'btn-inline',
@@ -188,15 +199,18 @@ function dimensionCard(vault, dimension, { index, count, busy, failed }) {
           );
         const row = el('li', { class: 'value-row', dataset: { value: value.id } }, [
           dragHandle(value.label, busy),
-          inlineLabel(vault, dimension.id, value.label, (label) =>
-            saveDimensions(
-              vault,
+          inlineLabel(
+            vault,
+            dimension.id,
+            value.id,
+            value.label,
+            (label) =>
               vault.dimensions.map((d) =>
                 d.id === dimension.id
                   ? { ...d, values: d.values.map((v) => (v.id === value.id ? { ...v, label } : v)) }
                   : d,
               ),
-            ),
+            busy,
           ),
           el('button', {
             class: 'btn-inline',
@@ -214,11 +228,13 @@ function dimensionCard(vault, dimension, { index, count, busy, failed }) {
             class: 'btn-inline',
             text: 'Archive',
             disabled: busy,
-            onclick: () =>
+            onclick: () => {
+              drafts.delete(value.id);
               patchValue(vault, dimension.id, value.id, (v) => ({
                 ...v,
                 archivedAt: new Date().toISOString(),
-              })),
+              }));
+            },
           }),
         ]);
         dropTarget(row, 'value', moveValue);
@@ -345,26 +361,16 @@ function overflowMenu(label, busy, items) {
   return el('div', { class: 'overflow-menu' }, [toggle, menu]);
 }
 
-function inlineLabel(vault, cardId, text, save) {
+/** A rename is written like any other change, so the screen waits for
+ *  it. A failure leaves its field open with what was typed. */
+function inlineLabel(vault, cardId, id, text, build, busy) {
+  if (!drafts.has(id)) drafts.set(id, {});
   return inlineRename(
     text,
-    async (label) => {
-      try {
-        await save(label);
-      } catch (error) {
-        if (error.status === 409) conflict(vault, cardId);
-        throw error;
-      }
-    },
-    (error) => (error.status === 409 ? CONFLICT : 'That rename did not save.'),
+    (label) => writeProfile(vault, build(label), cardId, id),
+    (error) => (error.status === 409 ? CONFLICT : RENAME_FAILED),
+    { disabled: busy, draft: drafts.get(id) },
   );
-}
-
-/** A rename, whose own field stays open with what was typed on a
- *  failure. */
-async function saveDimensions(vault, dimensions) {
-  await writes.saveProfile(vault, { ...vault.profile, dimensions });
-  reload();
 }
 
 /** Another tab wrote the profile first: read it again, say so on the
@@ -375,24 +381,28 @@ async function conflict(vault, cardId) {
   reload();
 }
 
-/** Every other write: drawn at once, controls disabled until it
- *  answers, and put back with a message on the card if it fails. */
-async function writeProfile(vault, dimensions, cardId) {
+/** Every write: drawn at once, controls disabled until it answers, and
+ *  put back with a message on the card if it fails. A rename passes the
+ *  id of its field: its failure is the field's message, not the card's,
+ *  and rejects so the field knows. */
+async function writeProfile(vault, dimensions, cardId, renamed) {
   pending = dimensions;
   reload();
   try {
     await writes.saveProfile(vault, { ...vault.profile, dimensions });
     pending = null;
+    drafts.delete(renamed);
     reload();
   } catch (error) {
     pending = null;
     announcement = '';
-    if (error.status === 409) {
-      await conflict(vault, cardId);
-      return;
+    if (error.status === 409) await conflict(vault, cardId);
+    else {
+      if (renamed) Object.assign(drafts.get(renamed) ?? {}, { error: RENAME_FAILED });
+      else failure = { id: cardId, text: SAVE_FAILED };
+      reload();
     }
-    failure = { id: cardId, text: SAVE_FAILED };
-    reload();
+    if (renamed) throw error;
   }
 }
 
@@ -508,6 +518,7 @@ function archiveDimension(vault, dimension) {
         text: 'Archive',
         onclick: () => {
           close();
+          for (const id of [dimension.id, ...dimension.values.map((v) => v.id)]) drafts.delete(id);
           patch(vault, dimension.id, (d) => ({
             ...d,
             archivedAt: new Date().toISOString(),
