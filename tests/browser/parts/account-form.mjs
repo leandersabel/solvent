@@ -515,7 +515,7 @@ await run(async () => {
     await page.eval("document.querySelector('.dialog input[value=delete]').click()");
     await page.frames();
     const permanently = () => [...document.querySelectorAll('.dialog button')].find(b => b.textContent === 'Delete permanently').disabled;
-    const deleteCopy = (await text()).includes('This also deletes 1 recorded values. Your past net worth figures will change.');
+    const deleteCopy = (await text()).includes('This also deletes 1 recorded value. Your past net worth figures will change.');
     await setValue('#delete-name', 'Not the name');
     const wrongName = await page.call(permanently);
     const wrongLook = await confirmLook('Delete permanently');
