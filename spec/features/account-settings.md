@@ -76,7 +76,7 @@ record as ciphertext like any other and never learns any of it.
 
 Every figure reaches the screen through one formatter built from the
 profile, so a setting cannot apply on one screen and not another.
-`money`, `whole`, `percent`, `compact` and `rate` each take a value
+`money`, `whole`, `percent` and `compact` each take a value
 exact at scale 12 (`record-snapshot.md`, Record shape) and round it
 half-even, like every other rounding in the product. Every figure
 entry writes a negative with the true minus, `−`, decided on the
@@ -115,7 +115,17 @@ formatter answers:
   under a period group mark is a silent tenfold error. It returns the
   canonical decimal string (`record-snapshot.md`, Record shape) or
   nothing.
-- **rate** — six places, because a currency pair moves in the fourth.
+- **editable(value, places)** — a rate, wherever one is written: in
+  its field, in the note naming the figure an edit replaced, beside a
+  rival entry, and in a recording's price column. Every digit of the
+  exact value is kept, never rounded, and the fraction is padded to at
+  least `places`, grouped and pointed as configured and signed as money
+  is. A rate takes six, because a currency pair moves in the fourth.
+  `0.797` writes `0.797000`, and a proposal at eight places writes all
+  eight, because rounding it would name a figure nobody proposed.
+- **parseFigure** — the reverse, for a rate field. It reads as
+  `parseQuantity` does and returns the exact value at scale 12, or
+  nothing.
 - **date** and **parseDate** — the field form. `date` writes an ISO
   date in digits, in the configured order and separator, and
   `parseDate` reads it back. They serve a date field and nothing else.
@@ -161,12 +171,18 @@ locale's own group mark is in force instead. The point is never
 swapped to make room for the chosen mark, because that would change
 how every figure reads and which input a field accepts.
 
-**A field that edits a stored figure prefills it through `quantity`,
+**A field that edits a stored `value` prefills it through `quantity`,
 whatever the unit**, money included, because a prefill at
 `moneyPlaces` saved untouched would write the rounding. A field whose
 text still equals its prefill is untouched and is never parsed, so what
 it saves is the stored string itself (`record-snapshot.md`, Confirming
 a previous value).
+
+**A rate field prefills through `editable` at six places and compares
+by value**, never by text. Its `parseFigure` reading equals the stored
+or proposed rate whenever padding is all that differs, so an untouched
+line writes nothing and keeps its provenance (`record-rate.md`, Editing
+a captured rate).
 
 Nothing here touches stored data. Values stay exact at scale 12 and
 dates stay ISO, so any of these settings can be changed and changed

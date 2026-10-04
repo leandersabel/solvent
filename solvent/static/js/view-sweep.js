@@ -659,7 +659,7 @@ function rateLine(vault, unit, date, { sit, readOnly: blockReadOnly, fillMissing
       // changes. The proposed badge is never silently kept.
       provenance.textContent =
         figure !== null && figure !== parsed(stored.rate) && original !== null
-          ? `Edited from ${original}`
+          ? editedFrom(original, format)
           : provenanceChip(stored, format);
       explanation.textContent = !readOnly && !line.value() ? 'Cleared. Saving removes this price.' : '';
       return;
@@ -674,7 +674,7 @@ function rateLine(vault, unit, date, { sit, readOnly: blockReadOnly, fillMissing
         figure === parsed(line.proposal.rate)
           ? provenanceChip({ rateSource: 'proposed', rateAsOf: line.proposal.asOf, date }, format)
           : figure !== null
-            ? `Edited from ${line.proposal.rate}`
+            ? editedFrom(line.proposal.rate, format)
             : '';
       explanation.textContent = '';
       return;
@@ -835,9 +835,15 @@ function rateLine(vault, unit, date, { sit, readOnly: blockReadOnly, fillMissing
   return line;
 }
 
+/** The note naming the figure an edit replaced, written as a rate is
+ *  everywhere: every digit kept, at least six places. */
+function editedFrom(rate, format) {
+  return `Edited from ${format.editable(decimal.parse(rate), 6)}`;
+}
+
 export function provenanceChip(payload, format) {
   if (payload.rateSource === 'manual') return 'Typed by you';
-  if (payload.rateSource === 'edited') return `Edited from ${payload.proposedRate}`;
+  if (payload.rateSource === 'edited') return editedFrom(payload.proposedRate, format);
   return payload.rateAsOf && payload.rateAsOf !== payload.date
     ? `Market rate as of ${format.dayMonth(payload.rateAsOf, 'short')}`
     : 'Market rate';

@@ -327,7 +327,7 @@ whatever the price, so counting it would overstate what the change
 moves (`net-worth-view.md`, Archived holdings).
 
 Editing a filled line flips its provenance the moment it changes, to
-"Edited from 0.9312", naming the figure that was replaced
+"Edited from 0.931200", naming the figure that was replaced
 (`recording-detail.md`). The proposed badge is never silently kept.
 
 ## At phone width

@@ -249,9 +249,10 @@ await run(async () => {
   check('record-snapshot: the sweep carries a row for each of the fifteen holdings', (await ev("document.querySelectorAll('.sweep-row').length")) === 15);
   await typeLine('XAU-ozt', '2711.13');
   const flipped = await lineState('XAU-ozt');
+  const asRate = (rate) => model(({ v, decimal }, text) => v.format.editable(decimal.parse(text), 6), rate);
   check(
     'record-rate: editing a proposed line flips its provenance the moment it changes',
-    flipped.chip === `Edited from ${proposalsFor(D10)['XAU-ozt'].rate}`,
+    flipped.chip === `Edited from ${await asRate(proposalsFor(D10)['XAU-ozt'].rate)}`,
     flipped.chip,
   );
   // A row prefilled from "12.5" offers Confirm, Record once edited and
@@ -427,7 +428,7 @@ await run(async () => {
       .map(f => decimal.format(decimal.multiply(decimal.parse(f.snapshot.payload.value), v.priceOn('USD', day).rate))), D2);
   const usdBefore = await usdFigures();
   await typeLine('USD', '0.93');
-  check('record-rate: editing a stored proposal flips its chip to the figure it replaced', (await lineState('USD')).chip === 'Edited from 0.92');
+  check('record-rate: editing a stored proposal flips its chip to the figure it replaced', (await lineState('USD')).chip === 'Edited from 0.920000');
   await press('Save the rate lines');
   const confirmation = await ev("document.querySelector('.dialog').textContent");
   await press('Save the prices', '.dialog');

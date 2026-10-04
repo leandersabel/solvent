@@ -160,10 +160,6 @@ export function formatter(profile) {
         ? stored
         : readDecimal(typed, group, point),
 
-    /** A rate, which needs more places than money: a currency pair
-     *  moves in the fourth decimal. */
-    rate: (value) => decimal.toDisplay(value, 6, group, point),
-
     /** A stored ISO date, written the way this reader reads one. */
     date: (iso) => writeDate(iso, date.order, date.sep),
 

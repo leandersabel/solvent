@@ -1959,6 +1959,15 @@ const PROPOSALS = {
 };
 const ratesAt = (vault, date) => vault.recording(date).prices;
 
+await check('record-rate: Edited from writes the replaced figure through editable, every digit kept', async () => {
+  const { formatter } = await load('format.js');
+  const swiss = formatter({ locale: 'de-DE', groupSeparator: 'apostrophe' });
+  const chip = (proposedRate, shape) => views.provenanceChip({ rateSource: 'edited', proposedRate }, shape);
+  assert.equal(chip('1234.56789', swiss), 'Edited from 1\u2019234,567890');
+  assert.equal(chip('0.12345678', swiss), 'Edited from 0,12345678');
+  assert.equal(chip('0.9312', formatter({ locale: 'en-US' })), 'Edited from 0.931200');
+});
+
 await check('record-rate: recording one franc figure prices every other active unit once, the main currency never', async () => {
   const server = recordServer(() => PROPOSALS);
   const vault = await storedVault(server, {

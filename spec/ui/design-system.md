@@ -332,6 +332,12 @@ Every figure is grouped and pointed as Settings sets it
 (`settings.md`, Dates and numbers).
 
 - **Money** shows the places Decimals on money sets.
+- **A price shows every digit it has, padded to at least six decimal
+  places**, as text and in a field alike, never rounded. 0.9312 reads
+  0.931200, 0.93124567 reads 0.93124567, and "Edited from 0.931200"
+  names it the same way. Decimals on money
+  does not reach it, because a price is not money
+  (`features/account-settings.md`, editable).
 - **A quantity in a unit that is not a currency shows exactly the
   decimals it was entered with**, as text and in a field alike. 12.125,
   12.5, 12.50 and 80 read as typed, never rounded and never padded.

@@ -84,7 +84,7 @@ on the sweep (`update-values.md`), and each is a chip
 | Stored as | Chip | Meaning |
 |---|---|---|
 | `proposed` | "Market rate", or "Market rate as of 29 Jul" where the provider's figure is for an earlier day | the app proposed it and nobody changed it |
-| `edited` | "Edited from 0.9312", naming the figure that was replaced | the app proposed it and the person changed it |
+| `edited` | "Edited from 0.931200", naming the figure that was replaced as a price is written (`design-system.md`, Figures) | the app proposed it and the person changed it |
 | `manual` | "Typed by you" | nothing was available, so the person supplied it |
 
 A price says where it came from **a year later exactly as it did the

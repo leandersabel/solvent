@@ -652,6 +652,13 @@ to win silently.
 - Editing a `proposed` entry's rate stores `edited`, keeps `rateAsOf`,
   and stores the replaced figure as `proposedRate`. Editing an `edited`
   one a second time leaves `proposedRate` at the original proposal.
+- With locale `de-DE` and `groupSeparator` `apostrophe`, an `edited`
+  entry whose `proposedRate` is `"1234.56789"` reads `Edited from
+  1’234,567890` on its rate line and in its recording's price column,
+  and one whose `proposedRate` is `"0.12345678"` reads `Edited from
+  0,12345678`. A figure typed over a proposal of `"1234.56789"`, before
+  any save, reads `Edited from 1’234,567890` on its line, and so does a
+  stored `proposed` entry at that rate once its line is changed.
 - Editing one entry changes the converted figure of every holding
   measured in that symbol at that date, and the confirmation names how
   many holdings that is.
