@@ -90,7 +90,11 @@ stack in the middle of the ground, centered both ways.
 
 - **Username** field, when signing in. When unlocking again, the
   username is static ink-secondary text with a "Not you? Sign out" link
-  beside it, which ends the session and offers the full card.
+  beside it, which ends the session and offers the full card. A
+  hidden text field holds the known username before the password, so a
+  password manager pairs the password with that login. It is not
+  `type=hidden`, which managers do not read as a username, and sign-in
+  never reads it.
 - **Password** field, `type=password`, with a show-and-hide toggle
   inside the field at its right end.
 - Each field carries its label above it.
@@ -192,7 +196,7 @@ never look like a hang.
 
 #### Rules
 
-- Autocomplete: `username` and `current-password`.
+- Autocomplete: `username` and `current-password`, in both modes.
 - The page embeds the server's current default KDF envelope
   (architecture.md, Key management).
 - Unlocking again returns to the previous view with unsaved input
@@ -804,3 +808,8 @@ reason, and then learns at sign-in.
 72. (blind) A page that learned by Conflict or at sign-in posts the
     epoch it held, and a page that learned by message posts nothing.
     Test: `tests/test_client.py::test_the_client_side_rules_hold`.
+73. Unlocking again, the card holds one hidden text field with
+    `autocomplete="username"` and the known username, before the
+    password field, and no username field a person can type in. With
+    another name written into it, unlocking still signs in as the known
+    username. Test: `tests/browser/parts/unlock.mjs`.

@@ -37,6 +37,24 @@ await run(async () => {
     const blob = JSON.stringify(localStorage) + JSON.stringify(sessionStorage);
     return blob === '{}{}' || (!blob.includes('Dek') && !blob.includes('authKey') && !blob.includes('key'));
   })()`));
+  const pairing = JSON.parse(await page.eval(`(() => {
+    const fields = [...document.querySelectorAll('form.signin-card input:not([type=checkbox])')];
+    const named = fields.filter((f) => f.autocomplete === 'username');
+    return JSON.stringify({
+      named: named.map((f) => [f.type, f.hidden, f.value, f.id]),
+      first: fields[0] === named[0],
+      typeable: fields.filter((f) => f.type !== 'password' && f.checkVisibility()).length,
+    });
+  })()`));
+  check(
+    'unlocking again, the card holds one hidden username field with the known username, before the password',
+    JSON.stringify(pairing.named) === JSON.stringify([['text', true, 'leander', '']]) &&
+      pairing.first && pairing.typeable === 0,
+    JSON.stringify(pairing),
+  );
+  // A name written into the hidden field never reaches the server.
+  await setValue('form.signin-card input[autocomplete=username]', 'somebody-else');
+  await unlockInPlace('the vault unlocked with another name in the hidden field');
 
   await unlockDashboard('the dashboard after the lock');
 
