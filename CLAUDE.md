@@ -5,22 +5,19 @@ the rest of the spec and the code are derived from it.
 
 ## The pipeline
 
-The client writes vague. Each stage narrows it, and only one agent
-talks to the client.
+The client writes vague. The `advance` run (The loop) narrows it to
+requirements, a feature page and code, doing the work itself.
 
-| Stage | Agent | Owns |
+| Stage | Who | Owns |
 |---|---|---|
-| Requirements | `product-owner`, for the client | `spec/requirements.md` |
-| Spec | `product-owner` | What the client gets, in `spec/features/*.md` |
-| | `architect` | `spec/architecture.md`, How it works, Edge cases and Acceptance criteria in `spec/features/*.md`, `security/` |
-| | `designer` | Screens in `spec/features/*.md`, `spec/design-system.md` |
-| Code | `engineer` | application code and its tests |
-| | `reviewer` | findings against the feature page |
-| | `release` | `Dockerfile`, a running instance |
-| | `qa` | findings against the client's intent, filed as `qa` issues |
+| Requirements | the `advance` run, for the client | `spec/requirements.md` |
+| Spec and code | the `advance` run | `spec/features/*.md`, `spec/design-system.md`, `spec/architecture.md`, application code and its tests |
+| Review | `reviewer` | its own tests, and findings against the feature page and the security rules |
+| Release | `release` | `Dockerfile`, a running instance |
+| Nightly | `qa` | findings against the client's intent, filed as `qa` issues |
 
-The architecture comes before the screens because it sets what a
-screen may use at all, such as which assets a page can load.
+`spec/architecture.md` bounds the screens: it sets what a screen may
+use at all, such as which assets a page can load.
 
 The client approves changes to `spec/requirements.md` and nothing else
 (The loop, Requirements). From there the pipeline runs to a nightly
@@ -28,13 +25,11 @@ version on its own.
 
 ## Who asks the client
 
-Only `product-owner`, only in the client's terms, and only in a comment
-on the issue. Another agent hands its question to whoever invoked it.
-The product owner asks the client the ones that turn on the client's
-risk tolerance, money or taste, and the agents decide the rest.
-
-A question that cannot be put without technical vocabulary belongs to
-the architect, who decides it and states the result in the spec.
+Only the `advance` run on an issue, only in the client's terms, and
+only in a comment on that issue. A subagent never asks. The run asks
+the client the questions that turn on the client's risk tolerance,
+money or taste, and decides the rest, technical ones included, stating
+the result in the spec.
 
 The client's answer becomes a statement in `spec/requirements.md`. No
 file keeps questions or a list of decisions: a decision is the
@@ -211,11 +206,11 @@ touches once and ends in one of:
   pull request.
 - Already met, a duplicate, or doubtful: the reasoning, and a question.
 
-Only the run on an issue asks the client, in the client's terms, on
-that issue. A `bug` where a requirement is what is wrong becomes a
-`change`, and the reverse, with a comment saying so. A decision the
-client never made is asked, never settled on their behalf. No agent
-closes an issue. A merged pull request or the client does.
+Questions follow Who asks the client. A `bug` where a requirement is
+what is wrong becomes a `change`, and the reverse, with a comment
+saying so. A decision the client never made is asked, never settled on
+their behalf. No agent closes an issue. A merged pull request or the
+client does.
 
 An issue holding several requests keeps the first. The loop files each
 of the rest as an issue of its own, in the client's words with a link

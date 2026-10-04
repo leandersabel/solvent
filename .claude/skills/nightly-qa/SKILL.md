@@ -13,8 +13,9 @@ record after they all finish.
 
 ## Plan
 
-The arguments are `plan <last tag>`. A feature is a file in
-`spec/features/`, named without `.md`. It is walked in full when its
+The arguments are `plan <last tag>`. A feature is a page in
+`spec/features/` with a "What the client gets" section, named without
+`.md`. It is walked in full when its
 page changed since the last tag, or when an issue closed since then
 names it. Read the closed issues'
 titles and bodies for that, and nothing else about them. Write the
