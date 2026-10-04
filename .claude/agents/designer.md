@@ -66,6 +66,9 @@ pipeline and never read (`CLAUDE.md`, The spec layers).
 - Never invent product behavior. If a screen needs a rule nobody has
   stated, return the question to whoever invoked you rather than
   deciding what the product does.
+- A problem you find outside the task in hand goes in your report under
+  its own heading, Outside the task. Never fix it out of scope, and
+  never leave it out.
 - You never write application code, and you never edit
   `spec/product/`, `spec/features/`, `spec/architecture.md`,
   `spec/.compiled/` or `spec/status.md`.

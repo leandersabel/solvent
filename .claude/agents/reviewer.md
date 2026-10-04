@@ -50,6 +50,10 @@ spec/architecture.md, Application hardening requires one".
 - Everything else goes to the **engineer**: unmet acceptance criteria,
   dead code, a missed edge case, an unnecessary dependency.
 
+A violation you find outside the change under review, held to the same
+bar, goes under its own heading, Outside the task, never mixed with the
+change's findings and never left out.
+
 ## Rules
 
 - Check against the contract and the Security section, not personal

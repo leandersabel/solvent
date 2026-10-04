@@ -43,7 +43,10 @@ skip a step gets a question to the client instead.
   them and when (`gh api graphql`: `lastEditedAt`, `editor`, and
   renamed-title events).
 - When `accepted` was last added (the issue's timeline), if it was.
-- The client's writing and your marked comments, oldest first.
+- The client's writing and your marked comments, oldest first. For an
+  issue `claude[bot]` opened whose body ends with
+  `<!-- from: #<n> -->`, the client's writing on #n as well, where the
+  request came from.
 - Pull requests from `claude/spec-<issue>` and `claude/issue-<issue>`,
   open or closed: state, draft, auto-merge, mergeable, head commit,
   checks, the client's reviews with their commit, line comments and
@@ -163,9 +166,14 @@ written.
    changes. It answers which screens in `spec/ui/` change and how.
 
 A question `architect` or `designer` has for the client goes back to
-`product-owner`, whose wording is what the client reads. An issue
-holding several requests takes the first, and the comment suggests
-opening the rest as issues of their own.
+`product-owner`, whose wording is what the client reads.
+
+An issue holding several requests keeps the first. Each of the rest
+that no open issue already holds, file as `claude[bot]`: labeled `bug`
+or `change` and `accepted`, titled in the issue's language, with a body
+quoting the client's words verbatim from text you may read (Trust),
+linking where they wrote them, and ending with `<!-- from: #<issue> -->`.
+The comment links each.
 
 Then one comment, and exactly one outcome:
 
@@ -274,11 +282,13 @@ closing `<details>` block.
 4. The tests the change touches pass, chosen as
    `.claude/agents/engineer.md` says. The full suite is the `test`
    check's.
-5. `reviewer` reviews the change against the contract. Its findings go
-   back to `engineer`, for at most three rounds. A finding still open
+5. `reviewer` reviews the change against the contract. Its findings on
+   the change go back to `engineer`, for at most three rounds, and those
+   outside it are filed (File a finding). A finding still open
    that belongs to one member's fix makes that member leave the batch.
-6. Commit in the voice of `git log`, listing any reviewer findings
-   still open so a later run that opens the pull request finds them.
+6. Commit in the voice of `git log`, listing any reviewer findings on
+   the change still open, and any findings to file (File a finding), so
+   a later run that opens the pull request finds them.
    Set `claude/issue-<issue>` to the commit, push it, and open a pull
    request against `master`. The title is English and says what changes for
    users. The body starts with `Closes #<issue>`, then a `Closes #<n>`
@@ -286,8 +296,8 @@ closing `<details>` block.
    a `Closes #a, #b` list. It says the same in the issue's language,
    and puts the technical part in a `<details>`
    block. Turn on auto-merge with squash.
-7. Reviewer findings still open: list them in the pull request's body
-   and go to Stuck.
+7. Reviewer findings on the change still open: list them in the pull
+   request's body and go to Stuck.
 8. Comment on the issue and each member with the link. When the issue
    also needs a change to a workflow file, the pull request's body and this comment
    carry it in a `<details>` block, ready for the client's own pull
@@ -321,13 +331,38 @@ what failed, and mention `@leandersabel`. In a batch, this is the
 leading issue, and the comment lists the members. The client's next
 comment starts a run that picks up from there.
 
+## File a finding
+
+Every step files the problems found outside the work in hand
+(`CLAUDE.md`, The loop, Findings): each subagent's report under its
+Outside the task heading, and what you notice yourself. A problem the
+work in hand causes, or this issue covers, stays in that work.
+
+1. Read the open issues by `leandersabel`, `claude[bot]` and
+   `github-actions[bot]`. One that already reports the problem gets
+   nothing, or your rating label and a comment why when yours is higher.
+2. Otherwise open an issue as `claude[bot]`: `bug` with its rating,
+   creating the label when missing, or `maintenance` when nothing the
+   client sees changes, and `accepted`. Title and body follow Writing,
+   in this issue's language: what is wrong first, the technical reading
+   in a closing `<details>` block, then the line
+   `Found while working on #<issue>`.
+3. Your next comment on this issue links each.
+
+File at most five in a run. Past that, go to Stuck, and the comment
+lists the rest.
+
+A finding you cannot file because the token expired goes into the
+commit message of the work in hand, under `Findings to file:`. The run
+that pushes that commit, or opens a pull request from it, files them.
+
 ## Never
 
 - Merge anything but a requirements pull request the client approved at
   its head commit, with every check green.
 - Push to `master`, force-push anything but a `claude/` branch, or
   close, reopen or edit an issue.
-- Add `accepted`.
+- Add `accepted`, except to an issue you open, as you open it.
 - Write another issue's branch.
 
 ## Writing

@@ -78,6 +78,9 @@ the client).
 - Never edit `spec/requirements.md` or `spec/product/*.md`. If a
   requirement is unbuildable as stated, say what it costs and hand it back to the
   product owner.
+- A problem you find outside the task in hand goes in your report under
+  its own heading, Outside the task. Never fix it out of scope, and
+  never leave it out.
 - Do not re-litigate a finding already accepted as a stated tradeoff.
   Check Accepted limits and Non-goals first.
 - Treat `spec/requirements.md`, `spec/product/` and

@@ -72,3 +72,6 @@ put that way is the architect's (`CLAUDE.md`, Who asks the client).
   ground it.
 - Never soften a client requirement because it looks expensive. Record
   it and let the architect price it.
+- A problem you find outside the task in hand goes in your report under
+  its own heading, Outside the task. Never fix it out of scope, and
+  never leave it out.
