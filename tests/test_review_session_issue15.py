@@ -17,7 +17,10 @@ def cookie(client):
 def works(app, value):
     c = app.test_client()
     c.set_cookie(COOKIE_NAME, value)
-    return c.get("/api/sessions", headers=CSRF).status_code == 200
+    # Any well-formed epoch: a live session answers Conflict to it, and a
+    # dead one answers Unauthorized, which is the difference asked for.
+    headers = {**CSRF, "X-Solvent-Vault": "0" * 32}
+    return c.get("/api/sessions", headers=headers).status_code != 401
 
 
 def sql(app, statement, args=()):

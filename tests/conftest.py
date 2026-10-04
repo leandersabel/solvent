@@ -4,7 +4,7 @@ from datetime import datetime, timedelta, timezone
 
 import pytest
 
-from tests.helpers import register
+from tests.helpers import EpochClient, register
 
 
 @pytest.fixture
@@ -94,3 +94,12 @@ def cheap_argon2(monkeypatch):
         PasswordHasher(memory_cost=64, time_cost=1, parallelism=1, type=Type.ID),
     )
     monkeypatch.setattr(crypto, "_DECOY_VERIFIER", None)
+
+
+@pytest.fixture(autouse=True)
+def epoch_clients(monkeypatch):
+    """Every app a test builds hands out clients that carry the vault
+    epoch, as a page does."""
+    import solvent
+
+    monkeypatch.setattr(solvent._Flask, "test_client_class", EpochClient)

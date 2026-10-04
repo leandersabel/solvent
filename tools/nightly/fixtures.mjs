@@ -187,9 +187,8 @@ const makeOlder = (session, password, memory) =>
 
 const exportBody = (session) =>
   session.call(async () => {
-    const response = await fetch('/api/export', { headers: { 'X-Solvent-Request': '1' } });
-    if (!response.ok) throw new Error(`export answered ${response.status}`);
-    return response.text();
+    const api = await import('/static/js/api.js');
+    return (await api.downloadExport()).blob.text();
   });
 
 async function run() {

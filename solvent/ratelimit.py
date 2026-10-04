@@ -146,8 +146,12 @@ def clear_auth_failures(username: str) -> None:
     )
 
 
-def _guard_hourly(bucket: str, limit: int) -> None:
-    with write_transaction():
+def _guard_hourly(bucket: str, limit: int, within=None) -> None:
+    """`within`, when given, runs first in the transaction, so a caller's
+    own refusal writes no row."""
+    with write_transaction() as conn:
+        if within:
+            within(conn)
         if _count(bucket, "request", 60) >= limit:
             abort(429)
         record(bucket)
@@ -159,10 +163,10 @@ def guard_rates(principal_id: str) -> None:
     _guard_hourly(f"rates:{principal_id}", current_app.config["RATE_REQUESTS_PER_HOUR"])
 
 
-def guard_export(principal_id: str) -> None:
+def guard_export(principal_id: str, within) -> None:
     """Per-user, because an export is a full vault read
     (export-import.md, Rules)."""
-    _guard_hourly(f"export:{principal_id}", current_app.config["EXPORTS_PER_USER_HOUR"])
+    _guard_hourly(f"export:{principal_id}", current_app.config["EXPORTS_PER_USER_HOUR"], within)
 
 
 def prune(conn, config, now) -> None:

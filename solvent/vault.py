@@ -17,7 +17,8 @@ from flask import Blueprint, abort, g, jsonify, request
 
 from . import ratelimit
 from .auth import credential_for
-from .db import get_db, utcnow, write_transaction
+from .db import new_epoch, read_transaction, utcnow, write_transaction
+from .guard import verify_epoch
 from .records import (
     MAX_BYTES_PER_USER,
     MAX_RECORDS_PER_VAULT,
@@ -50,6 +51,7 @@ def purge_account(account_id: str):
         abort(400)
 
     with write_transaction() as conn:
+        verify_epoch(conn)
         owned = conn.execute(
             "SELECT 1 FROM records WHERE principal_id = ? AND record_id = ? "
             "AND record_type = 'account'",
@@ -79,12 +81,17 @@ def export_vault():
     reachable by navigation: the client fetches it and saves the
     response through a blob URL.
     """
-    ratelimit.guard_export(g.principal["id"])
+    ratelimit.guard_export(g.principal["id"], verify_epoch)
 
-    credential = credential_for(g.principal["id"])
-    wrapper = get_db().execute(
-        "SELECT * FROM dek_wrappers WHERE credential_id = ?", (credential["id"],)
-    ).fetchone()
+    # One transaction, so an import landing mid-export cannot produce a
+    # file whose wrapper does not open its records.
+    with read_transaction() as conn:
+        verify_epoch(conn)
+        credential = credential_for(g.principal["id"])
+        wrapper = conn.execute(
+            "SELECT * FROM dek_wrappers WHERE credential_id = ?", (credential["id"],)
+        ).fetchone()
+        records = [_row_json(row) for row in fetch_all(g.principal["id"])]
     params = json.loads(credential["params"])
 
     payload = {
@@ -95,7 +102,7 @@ def export_vault():
         "kdf": params["kdf"],
         "wrappedDek": wrapper["wrapped_dek"],
         "dekNonce": wrapper["dek_nonce"],
-        "records": [_row_json(row) for row in fetch_all(g.principal["id"])],
+        "records": records,
     }
     response = jsonify(payload)
     response.headers["Content-Disposition"] = (
@@ -120,7 +127,8 @@ class ImportRequest(Payload):
 
 @bp.post("/api/import")
 def import_vault():
-    """Replace the vault entirely, in one transaction.
+    """Replace the vault entirely, in one transaction that also replaces
+    the vault epoch.
 
     The server assigns `principal_id` from the session on every
     imported record and reads none from the payload, so one account's
@@ -144,7 +152,9 @@ def import_vault():
 
     credential = credential_for(g.principal["id"])
 
+    epoch = new_epoch()
     with write_transaction() as conn:
+        verify_epoch(conn)
         conn.execute(
             "DELETE FROM records WHERE principal_id = ?", (g.principal["id"],)
         )
@@ -163,11 +173,11 @@ def import_vault():
             "WHERE credential_id = ?",
             (body.wrappedDek, body.dekNonce, utcnow(), credential["id"]),
         )
-        # A second session still holds the old DEK, and a create it
-        # sends afterwards would store ciphertext under a key no longer
-        # in the envelope.
+        # Every page still holding the old DEK now fails the epoch
+        # check, whichever session it is on. No session is revoked
+        # (architecture.md, Vault epoch).
         conn.execute(
-            "DELETE FROM sessions WHERE principal_id = ? AND id != ?",
-            (g.principal["id"], g.session["id"]),
+            "UPDATE vault_epochs SET epoch = ? WHERE principal_id = ?",
+            (epoch, g.principal["id"]),
         )
-    return jsonify({"records": len(body.records)})
+    return jsonify({"records": len(body.records), "vaultEpoch": epoch})

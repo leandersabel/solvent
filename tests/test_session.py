@@ -170,7 +170,10 @@ def log_in(client, username, auth_key):
 def alive(cookie_holder_app, cookie) -> bool:
     client = cookie_holder_app.test_client()
     client.set_cookie(COOKIE_NAME, cookie)
-    return client.get("/api/sessions", headers=CSRF).status_code == 200
+    # Any well-formed epoch: a live session answers Conflict to it, and a
+    # dead one answers Unauthorized, which is the difference asked for.
+    headers = {**CSRF, "X-Solvent-Vault": "0" * 32}
+    return client.get("/api/sessions", headers=headers).status_code != 401
 
 
 def age_session(app, session_id, **ago):

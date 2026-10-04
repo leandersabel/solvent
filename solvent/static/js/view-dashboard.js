@@ -5,7 +5,7 @@
 // band visibility and selection all read a model already in memory.
 import * as decimal from './decimal.js';
 import { chartTable, fillFor, trendChart } from './chart.js';
-import { dialog, el, icon, mount, priceDateLine, resumable, today } from './dom.js';
+import { dialog, el, icon, mount, priceDateLine, REPLACED_SINCE_OPEN, replacedCallout, resumable, today } from './dom.js';
 import { dateGrid } from './datepicker.js';
 import { isoFromDay } from './model.js';
 import * as writes from './writes.js';
@@ -21,7 +21,10 @@ const RANGES = [
 /** `unassignedOf` opens the screen grouped by that dimension with the
  *  table filtered to the holdings it leaves unassigned, which is where
  *  a coverage link elsewhere lands (ui/dimensions.md). */
-export function dashboardView(vault, actions, { unassignedOf = null } = {}) {
+/** `replaced`, `{ dropped }`, adds the Replaced since last open notice
+ *  above everything else: the vault was replaced from a file while this
+ *  page was locked or its session had ended. */
+export function dashboardView(vault, actions, { unassignedOf = null, replaced = null } = {}) {
   const known = unassignedOf && vault.activeDimensions().some((d) => d.id === unassignedOf);
   // A year of history or more opens on a year, anything shorter on all
   // of it. History is what the chart draws, from the oldest snapshot.
@@ -42,10 +45,12 @@ export function dashboardView(vault, actions, { unassignedOf = null } = {}) {
 
   const root = el('section', { class: 'screen screen-wide dashboard' });
 
+  const notice = replaced ? replacedCallout(REPLACED_SINCE_OPEN, replaced.dropped) : null;
+
   const render = () => {
     const holdings = [...vault.holdings.values()];
     if (!holdings.length) {
-      mount(root, emptyVault(vault, actions));
+      mount(root, [notice, emptyVault(vault, actions)]);
       return;
     }
     const dimension = vault
@@ -54,6 +59,7 @@ export function dashboardView(vault, actions, { unassignedOf = null } = {}) {
     const history = chartSeries(vault, state, dimension);
 
     mount(root, [
+      notice,
       vault.unreadable.length ? decryptionBanner(vault) : null,
       duplicateBanner(vault, actions),
       hero(vault, state, render, actions, history, dimension),

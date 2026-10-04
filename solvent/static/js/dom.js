@@ -134,6 +134,23 @@ export function icon(name, size = 16) {
   return svg;
 }
 
+/** What a page says when its vault was replaced from a file elsewhere
+ *  (ui/unlock.md, Replaced elsewhere; ui/dashboard.md, Replaced since
+ *  last open). Whether typed input was dropped decides the icon and the
+ *  second sentence. A polite live region, so a screen reader hears it. */
+export function replacedCallout(first, dropped) {
+  const second = dropped
+    ? 'What you had typed here and not saved is gone.'
+    : 'Nothing you had typed here was lost.';
+  return el('p', { class: dropped ? 'callout callout-critical' : 'callout', role: 'status' }, [
+    dropped ? icon('alert') : null,
+    `${dropped ? ' ' : ''}${first} ${second}`,
+  ]);
+}
+
+export const REPLACED_ELSEWHERE = 'Your vault was replaced from a file in another tab, window or device.';
+export const REPLACED_SINCE_OPEN = 'Your vault was replaced from a file since you last opened it here.';
+
 /** The top bar's Lock button: the padlock and its word, the word
  *  dropped from sight at phone width and still read aloud. */
 function lockButton(onclick) {

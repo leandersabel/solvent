@@ -16,7 +16,8 @@ from typing import Literal, Optional
 from flask import Blueprint, abort, g, jsonify, request
 from pydantic import Field
 
-from .db import get_db, utcnow, write_transaction
+from .db import get_db, read_transaction, utcnow, write_transaction
+from .guard import verify_epoch
 from .validation import Payload, decode_b64, is_uuid4, parse
 
 bp = Blueprint("records", __name__)
@@ -207,7 +208,9 @@ def list_records():
     record_type = request.args.get("type")
     if record_type not in RECORD_TYPES or set(request.args) != {"type"}:
         abort(400)
-    rows = fetch_all(g.principal["id"], record_type)
+    with read_transaction() as conn:
+        verify_epoch(conn)
+        rows = fetch_all(g.principal["id"], record_type)
     return jsonify([_row_json(row) for row in rows])
 
 
@@ -215,6 +218,7 @@ def list_records():
 def put_record(record_id: str):
     body = parse(RecordWrite, request.get_json(silent=True))
     with write_transaction() as conn:
+        verify_epoch(conn)
         store(conn, g.principal["id"], record_id, body)
     return jsonify({"recordId": record_id, "version": body.version})
 
@@ -224,6 +228,7 @@ def delete_record(record_id: str):
     if not is_uuid4(record_id):
         abort(400)
     with write_transaction() as conn:
+        verify_epoch(conn)
         deleted = conn.execute(
             "DELETE FROM records WHERE principal_id = ? AND record_id = ?",
             (g.principal["id"], record_id),

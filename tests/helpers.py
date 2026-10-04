@@ -19,12 +19,40 @@ import uuid
 from pathlib import Path
 
 import pytest
+from flask.testing import FlaskClient
+from werkzeug.datastructures import Headers
 
 from solvent.config import DEFAULT_KDF_ENVELOPE
 
 REPO_ROOT = Path(__file__).resolve().parent.parent
 
 CSRF = {"X-Solvent-Request": "1"}
+
+# The routes whose answer hands a page the vault epoch it then carries
+# (architecture.md, Vault epoch).
+_EPOCH_ANSWERS = ("/api/register", "/api/auth/login", "/api/import")
+
+
+class EpochClient(FlaskClient):
+    """A browser page's half of the vault epoch: it keeps the epoch the
+    last register, sign-in or import answered with and sends it on every
+    request, as the page's API module does. Set `epoch` to a value to
+    send another, or to None to send none. A request's own
+    `X-Solvent-Vault` header wins."""
+
+    epoch = None
+
+    def open(self, *args, **kwargs):
+        if self.epoch is not None:
+            headers = Headers(kwargs.get("headers") or {})
+            if "X-Solvent-Vault" not in headers:
+                headers["X-Solvent-Vault"] = self.epoch
+            kwargs["headers"] = headers
+        response = super().open(*args, **kwargs)
+        if response.status_code == 200 and response.request.path in _EPOCH_ANSWERS:
+            answered = response.get_json(silent=True) or {}
+            self.epoch = answered.get("vaultEpoch", self.epoch)
+        return response
 
 
 def b64(length: int = 32) -> str:

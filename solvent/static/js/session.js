@@ -43,6 +43,26 @@ export function onLock(listener) {
 
 export class SignInError extends Error {}
 
+// ---- A vault replaced elsewhere (login.md, A vault replaced elsewhere) ----
+let replacedListener = () => {};
+
+/** `listener` draws what the page shows once its vault is closed
+ *  because it was replaced. It runs after the keys are gone. */
+export function onReplaced(listener) {
+  replacedListener = listener;
+}
+
+/** The page learned its epoch was replaced, by an answer or by a
+ *  message. */
+function closeReplaced(tellOthers) {
+  if (tellOthers) api.announce(api.vaultEpoch());
+  api.setVaultEpoch(null);
+  discardKeys();
+  replacedListener();
+}
+
+api.whenReplaced(closeReplaced);
+
 /** A lock came while the vault was being read, so the vault is not
  *  opened: the lock wins, and the caller shows the card the lock drew
  *  rather than the vault or an error. */
@@ -99,6 +119,10 @@ export async function signIn(username, password) {
     if (answer.kdfStale) await upgradeQuietly(password, answer.kdf, null);
     return { kind: 'administrator' };
   }
+  // A page without an epoch could send no vault request.
+  if (typeof answer.vaultEpoch !== 'string' || !answer.vaultEpoch) {
+    throw new SignInError('invalid');
+  }
 
   let dek;
   try {
@@ -110,6 +134,11 @@ export async function signIn(username, password) {
     throw new SignInError('invalid');
   }
 
+  // The page's epoch moves to the vault's before the vault is read,
+  // since the read carries it. A different one means the vault was
+  // replaced while this page was locked or its session had ended.
+  const previous = api.vaultEpoch();
+  api.setVaultEpoch(answer.vaultEpoch);
   const began = generation;
   try {
     await openVault(
@@ -121,8 +150,11 @@ export async function signIn(username, password) {
   } catch (error) {
     // A vault that could not be read is not unlocked, and nothing
     // keeps the keys it was opened with: the card shows its error and
-    // a page left now carries nothing.
+    // a page left now carries nothing. The epoch goes back to the one
+    // the held input was typed against, unless the vault was found
+    // replaced meanwhile and the page already dropped it.
     discardKeys();
+    if (api.vaultEpoch() === answer.vaultEpoch) api.setVaultEpoch(previous);
     throw error;
   }
 
@@ -131,7 +163,9 @@ export async function signIn(username, password) {
   // new Master Key in after a lock took the old one out.
   stillOpen(began);
 
-  return begin(username);
+  const replacedSince = previous !== null && previous !== answer.vaultEpoch;
+  if (replacedSince) api.announce(previous);
+  return { ...begin(username), replacedSince };
 }
 
 /** What a vault owner's registration hands over: the keys the form
@@ -266,10 +300,14 @@ export function wrapForMaster(dek) {
   return crypto.wrapDek(dek, masterKey);
 }
 
-/** After an import: the in-memory DEK becomes the new one and the model
- *  is read again under it. The Master Key stays, because the password
+/** After an import: the in-memory DEK becomes the new one, the page's
+ *  epoch the one the import answered with, and every other page of this
+ *  browser is told its epoch was replaced. The model is read again
+ *  under the new DEK. The Master Key stays, because the password
  *  did not change (export-import.md, The re-key step). */
-export async function replaceDek(dek) {
+export async function replaceDek(dek, vaultEpoch) {
+  api.announce(api.vaultEpoch());
+  api.setVaultEpoch(vaultEpoch);
   const next = new Vault(dek);
   await next.load();
   vault = next;
@@ -322,6 +360,7 @@ export function restartIdleTimer() {
 }
 
 export function signOut() {
+  api.setVaultEpoch(null);
   lock();
   return api.post('/api/auth/logout', {});
 }

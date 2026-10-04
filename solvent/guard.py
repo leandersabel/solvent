@@ -10,13 +10,18 @@ The surface check runs once, so no individual endpoint repeats it.
 """
 from __future__ import annotations
 
+import re
+
 import flask
-from flask import abort, g, request
+from flask import abort, g, jsonify, make_response, request
 
 from . import session as sessions
+from .db import get_db
 
 HEADER_NAME = "X-Solvent-Request"
 REQUIRED_VALUE = "1"
+VAULT_HEADER = "X-Solvent-Vault"
+_EPOCH_SHAPE = re.compile(r"[0-9a-f]{32}")
 
 SHARED = "shared"
 VAULT = "vault"
@@ -73,6 +78,21 @@ def surface_of(rule: str) -> str:
         if hit:
             return surface
     return UNPLACED
+
+
+def verify_epoch(conn) -> None:
+    """Conflict `vault-replaced` unless the request carries the signed-in
+    vault owner's current vault epoch (architecture.md, Vault epoch).
+
+    The gate calls it before any handler. Every handler that reads or
+    writes the vault calls it again inside its own transaction, because
+    an import can land between the two.
+    """
+    row = conn.execute(
+        "SELECT epoch FROM vault_epochs WHERE principal_id = ?", (g.principal["id"],)
+    ).fetchone()
+    if row is None or row["epoch"] != request.headers.get(VAULT_HEADER):
+        abort(make_response(jsonify(refused="vault-replaced"), 409))
 
 
 def navigation(view_func):
@@ -151,3 +171,10 @@ def init_app(app: flask.Flask) -> None:
         # 6.
         if g.principal["kind"] not in _REACHES[surface_of(str(request.url_rule))]:
             abort(404)
+
+        # 7. Only a vault owner let through to a route of their own
+        # surface, so the answer says nothing about paths or kinds.
+        if api and not public_route and g.principal["kind"] == "vault_owner":
+            if not _EPOCH_SHAPE.fullmatch(request.headers.get(VAULT_HEADER, "")):
+                abort(400)
+            verify_epoch(get_db())

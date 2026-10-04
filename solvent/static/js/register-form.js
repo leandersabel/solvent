@@ -222,6 +222,10 @@ export function registerForm({ kind, token: inviteToken, currencies, kdf, onCrea
       }
 
       const answer = await api.post('/api/register', body);
+      // The page holds the epoch of the vault it just made, which every
+      // request it sends from here on carries (login.md, A vault
+      // replaced elsewhere).
+      if (isVault) api.setVaultEpoch(answer.vaultEpoch ?? null);
       created = isVault
         ? { kind: answer.kind, username: body.username, masterKey: keys.masterKey, dek, wrapper }
         : { kind: answer.kind, username: body.username };

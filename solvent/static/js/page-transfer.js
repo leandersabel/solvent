@@ -300,10 +300,11 @@ function importCard(vault, reload) {
       return;
     }
 
+    let answered;
     try {
       progress('Uploading…');
       const wrapper = await wrapForMaster(rekeyed.dek);
-      await api.post('/api/import', { ...wrapper, records: rekeyed.records });
+      answered = await api.post('/api/import', { ...wrapper, records: rekeyed.records });
     } catch {
       phase.hidden = true;
       fail('The import did not go through, and it was undone whole. Your original vault is fully intact and readable.');
@@ -313,7 +314,7 @@ function importCard(vault, reload) {
 
     const theirs = opened.profile ? opened.profile.mainCurrency : null;
     const before = vault.mainCurrency;
-    const next = await replaceDek(rekeyed.dek);
+    const next = await replaceDek(rekeyed.dek, answered.vaultEpoch);
     restored = {
       counts: transfer.countKinds(parsed.records),
       currency: next.mainCurrency,
@@ -333,7 +334,7 @@ function importCard(vault, reload) {
     error,
     el('p', {
       class: 'hint',
-      text: 'Your password stays the same and your login is unaffected. Only the contents of your vault are replaced: your holdings, your history, your main currency, your dimensions and your idle lock all become the file’s. You are signed out anywhere else you are signed in. From this moment the two vaults are independent, so anything the file’s author records in their own vault afterwards never appears here.',
+      text: 'Your password stays the same and your login is unaffected. Only the contents of your vault are replaced: your holdings, your history, your main currency, your dimensions and your idle lock all become the file’s. Every other tab and window of this browser, and every other device where your vault is open, closes it and asks for your password. Anything typed there and not yet saved is lost. From this moment the two vaults are independent, so anything the file’s author records in their own vault afterwards never appears here.',
     }),
   ]);
 }
