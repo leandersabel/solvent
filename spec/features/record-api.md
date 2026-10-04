@@ -129,7 +129,9 @@ server a per-record access pattern it cannot see today.
   create carries 1 with no row present, an update exactly the stored
   version + 1. Anything else is a Conflict with no `refused` member and
   nothing written, so a stale tab never silently overwrites a newer
-  write. Changing an immutable column is a Bad Request.
+  write. Changing an immutable column is a Bad Request. A row is keyed
+  by `principal_id` and `record_id`, so an id another user holds is a
+  create in the caller's own vault.
 - **`DELETE /api/records/<record_id>`** deletes one record. A record
   that does not exist, or is another user's, is Not Found.
 
@@ -204,8 +206,9 @@ owns it.
 7. A `DELETE` naming another user's `record_id` returns Not Found and
    changes nothing. Test:
    `tests/test_records.py::test_reaching_another_vaults_record_is_not_found_never_forbidden`.
-8. A `PUT` naming another user's `record_id` returns Not Found and
-   changes nothing. Test: no test.
+8. A `PUT` naming another user's `record_id` writes a row in the
+   caller's own vault and leaves the other user's row as it was. Test:
+   `tests/test_records.py::test_reaching_another_vaults_record_is_not_found_never_forbidden`.
 9. (blind) An administrator session gets Not Found, not an empty list,
    from `GET /api/records`. Test:
    `tests/test_guard.py::test_an_administrator_gets_not_found_from_records_not_an_empty_list`.
