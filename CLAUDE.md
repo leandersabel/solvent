@@ -210,7 +210,8 @@ Questions follow Who asks the client. A `bug` where a requirement is
 what is wrong becomes a `change`, and the reverse, with a comment
 saying so. A decision the client never made is asked, never settled on
 their behalf. No agent closes an issue. A merged pull request or the
-client does.
+client does, and the workflow reopens an accepted issue anyone else
+closes, with a comment saying so.
 
 An issue holding several requests keeps the first. The loop files each
 of the rest as an issue of its own, in the client's words with a link
@@ -310,7 +311,8 @@ alert's security rating, or medium for an error and low otherwise. The
 loop rates every other problem the next time it runs on it. A rating
 the client set stands, and the client can change any. Only a rating
 label set by `leandersabel`, `claude[bot]` or `github-actions[bot]`
-counts, and the highest that counts wins.
+counts, and the highest that counts wins. The workflow removes one
+anyone else adds.
 
 A problem rated high or critical holds back a version, however it was
 found.

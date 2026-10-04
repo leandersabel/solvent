@@ -57,6 +57,8 @@ jobs:
           jqe() { jq -r "$1" "$GITHUB_EVENT_PATH"; }
           from_branch() { sed -nE "s#^claude/(spec|issue)-([0-9]+)\$#\2#p" <<<"$1"; }
           dispatch() { gh workflow run agent.yml --ref master -f issue="$1"; }
+          # Whose rating and close count (CLAUDE.md, The loop, Severity).
+          counts() { [[ "$1" == "$OWNER" || "$1" == "claude[bot]" || "$1" == "github-actions[bot]" ]]; }
           # Each code scanning alert on master gets an issue of its own,
           # which waits in line as filed (CLAUDE.md, The loop, Findings).
           # One whose fix merged, yet a later scan still finds it, reopens
@@ -106,18 +108,29 @@ jobs:
           queue=
           case "$EVENT" in
             issues)
+              label=$(jqe .label.name)
               if [ "$(jqe .action)" = closed ]; then
-                # A closed issue gives up its place in line and the slot.
-                gh issue edit "$(jqe .issue.number)" --remove-label queued || true
-                for n in $(gh issue list --state closed --label implementing --json number --jq '.[].number'); do
-                  gh issue edit "$n" --remove-label implementing
-                done
-                queue=true
-              elif [ "$(jqe .label.name)" = accepted ] && [ "$(jqe .issue.state)" = open ]; then
+                if ! counts "$sender" && jq -e '.issue.labels | any(.name == "accepted")' "$GITHUB_EVENT_PATH" >/dev/null; then
+                  # Only the client closes accepted work. Its author can
+                  # close an issue without triage access.
+                  gh issue reopen "$(jqe .issue.number)" --comment "Only @$OWNER closes accepted work, so this issue is open again."
+                else
+                  # A closed issue gives up its place in line and the slot.
+                  gh issue edit "$(jqe .issue.number)" --remove-label queued || true
+                  for n in $(gh issue list --state closed --label implementing --json number --jq '.[].number'); do
+                    gh issue edit "$n" --remove-label implementing
+                  done
+                  queue=true
+                fi
+              elif [[ "$label" == "severity: "* ]] && ! counts "$sender"; then
+                # A rating that does not count is removed, so the line
+                # ranks only ratings that do.
+                gh issue edit "$(jqe .issue.number)" --remove-label "$label"
+              elif [ "$label" = accepted ] && [ "$(jqe .issue.state)" = open ]; then
                 # A finding is filed in line and has no run of its own
                 # (CLAUDE.md, The loop, Findings).
                 jq -e '.issue.labels | any(.name == "queued")' "$GITHUB_EVENT_PATH" >/dev/null || issue=$(jqe .issue.number)
-              elif [ "$(jqe .label.name)" = queued ] && [ "$sender" = "$OWNER" ]; then
+              elif [ "$label" = queued ] && [ "$sender" = "$OWNER" ]; then
                 queue=true
               fi ;;
             issue_comment)
