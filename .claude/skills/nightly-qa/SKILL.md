@@ -76,9 +76,24 @@ This shard's app is its own, and no other shard reaches it.
    - how the app reads while Solvent is stopped;
    - the idle lock, in one wait, for `login` and `account-settings`. In
      a shard walking both, the run for whichever comes first checks it
-     for both.
+     for both;
+   - for `account-settings`, that a password change brings a weakly
+     protected vault up to current strength. On the older vault the
+     manifest reserves for it, used for nothing else, `qa` signs in with
+     the upgrade held back by a route on `/api/auth/upgrade-kdf`,
+     removes the route, reads the stored strength from
+     `POST /api/auth/salt` with `browser_evaluate`, changes the
+     password, reads it again, and signs in fresh with the new password;
+   - for `account-settings`, that signing out, signing out everywhere
+     and deleting the vault end the right sessions, with one session in
+     each browser;
+   - for `account-settings`, that open sessions lists only your own,
+     signed in as a prepared owner while the other prepared owners still
+     hold the live sessions the manifest's `live-sessions` coverage
+     names.
 
-   Without a manifest, `qa` builds its data by hand and lists what that
+   A check whose data the manifest lacks is a criterion `qa` could not
+   check. Without a manifest, `qa` builds its data by hand and lists what that
    leaves it unable to check.
 3. **Record each finding** in `qa-unfiled/<n>.json`, numbered from 1
    and continuing across runs, as
