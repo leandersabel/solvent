@@ -399,6 +399,40 @@ export const enterPasswordOn = async (session, password) => {
 // page's own async function.
 export const HANDS = `{ 'X-Solvent-Request': '1', 'X-Solvent-Vault': (await import('/static/js/api.js')).vaultEpoch() }`;
 
+// The settled computed look of the dialog button `label` on `session`,
+// read against the design tokens (design-system.md, Buttons): whether it
+// wears the disabled look (petrol-200 fill and border, ink-secondary
+// label, opacity 1), and whether any red shows on it.
+export const confirmLook = (label, session = page) =>
+  session.call((name) => {
+    const token = (property, variable) => {
+      const probe = document.createElement('div');
+      probe.style[property] = `var(${variable})`;
+      document.body.append(probe);
+      const value = getComputedStyle(probe)[property];
+      probe.remove();
+      return value;
+    };
+    const petrol = token('backgroundColor', '--petrol-200');
+    const critical = token('backgroundColor', '--status-critical');
+    const ink = token('color', '--ink-secondary');
+    const button = [...document.querySelectorAll('.dialog button')].find((b) => b.textContent.trim() === name);
+    // Ends the 150ms color transition, so the computed look is the settled one.
+    button.style.transition = 'none';
+    const style = getComputedStyle(button);
+    return {
+      cursor: style.cursor,
+      opacity: style.opacity,
+      petrolFill: style.backgroundColor === petrol,
+      petrolBorder: style.borderTopColor === petrol,
+      inkLabel: style.color === ink,
+      red: [style.backgroundColor, style.borderTopColor, style.color].includes(critical),
+      redFill: style.backgroundColor === critical,
+    };
+  }, label);
+export const looksDisabled = (look) =>
+  look.cursor === 'default' && look.opacity === '1' && look.petrolFill && look.petrolBorder && look.inkLabel && !look.red;
+export const looksEnabledRed = (look) => look.redFill && look.opacity === '1';
 export const text = () => page.eval('document.body.innerText');
 export const labels = (selector) =>
   page.call((query) => [...document.querySelectorAll(query)].map((n) => n.textContent.trim()), selector);

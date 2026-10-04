@@ -4,8 +4,8 @@
 // Templates: dashboard.html. Modules: view-holding-form.js, view-holding.js,
 // view-forms.js, view-dimensions.js, view-dashboard.js, writes.js, model.js.
 import {
-  accountRows, BACKDATE, BASE, check, choose, click, enterPassword, failing, idNamed, inDatabase, inDialog, labels,
-  landing, openHolding, OWN, page, payloadOf, plant, provoked, recording, recordReads, recordWrites, reloadModel,
+  accountRows, BACKDATE, BASE, check, choose, click, confirmLook, enterPassword, failing, idNamed, inDatabase, inDialog, labels,
+  landing, looksDisabled, looksEnabledRed, openHolding, OWN, page, payloadOf, plant, provoked, recording, recordReads, recordWrites, reloadModel,
   rowOf, run, setProfile, setValue, sql, text, TODAY_FIGURES, unlockDashboard, VAULT_PASSWORD, vaultOwner,
   vaultValue, writesSeen, writing,
 } from '../harness.mjs';
@@ -514,33 +514,21 @@ await run(async () => {
     await page.eval("document.querySelector('.dialog input[value=delete]').click()");
     await page.frames();
     const permanently = () => [...document.querySelectorAll('.dialog button')].find(b => b.textContent === 'Delete permanently').disabled;
-    const confirmLook = () => {
-      const button = [...document.querySelectorAll('.dialog button')].find(b => b.textContent === 'Delete permanently');
-      const probe = document.createElement('div');
-      probe.style.background = 'var(--status-critical)';
-      document.body.append(probe);
-      const critical = getComputedStyle(probe).backgroundColor;
-      probe.remove();
-      // Ends the 150ms color transition, so the computed fill is the settled one.
-      button.style.transition = 'none';
-      const style = getComputedStyle(button);
-      return { cursor: style.cursor, red: style.backgroundColor === critical };
-    };
     const deleteCopy = (await text()).includes('This also deletes 1 recorded values. Your past net worth figures will change.');
     await setValue('#delete-name', 'Not the name');
     const wrongName = await page.call(permanently);
-    const wrongLook = await page.call(confirmLook);
+    const wrongLook = await confirmLook('Delete permanently');
     await setValue('#delete-name', NAME);
     const rightName = await page.call(permanently);
-    const rightLook = await page.call(confirmLook);
+    const rightLook = await confirmLook('Delete permanently');
     check(
       'Delete on a holding with values offers archive, preselected, and permanent delete behind the typed name',
       offered.archive && offered.both === 2 && deleteCopy && wrongName && !rightName,
       JSON.stringify({ offered, deleteCopy, wrongName, rightName }),
     );
     check(
-      'a disabled Delete permanently reads as disabled, no red and a default cursor, and turns red once the name matches',
-      wrongLook.cursor === 'default' && !wrongLook.red && rightLook.red,
+      'a disabled Delete permanently is petrol-200 with an ink-secondary label at full opacity, a default cursor and no red, and turns red once the name matches',
+      looksDisabled(wrongLook) && looksEnabledRed(rightLook),
       JSON.stringify({ wrongLook, rightLook }),
     );
     await inDialog('Cancel');
