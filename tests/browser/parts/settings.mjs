@@ -244,6 +244,24 @@ await run(async () => {
     (await page.eval("document.getElementById('format-places').value")) === '2',
   );
 
+  // At phone width the chip keeps "This session" whole, on one line.
+  await page.send('Emulation.setDeviceMetricsOverride', { width: 390, height: 844, deviceScaleFactor: 2, mobile: false });
+  await page.frames();
+  const phoneChip = await page.call(() => {
+    const chip = [...document.querySelectorAll('.sessions-table .chip')].find((c) => c.textContent === 'This session');
+    return {
+      height: chip.getBoundingClientRect().height,
+      lineHeight: parseFloat(getComputedStyle(chip).lineHeight),
+      pans: document.documentElement.scrollWidth - document.documentElement.clientWidth,
+    };
+  });
+  await page.send('Emulation.clearDeviceMetricsOverride');
+  check(
+    'at 390px the This session chip sits on one line and the page does not scroll sideways',
+    phoneChip.height < 2 * phoneChip.lineHeight && phoneChip.pans <= 0,
+    JSON.stringify(phoneChip),
+  );
+
   // Signing out everywhere, failed.
   expectedFailures.add('/api/auth/logout-all');
   const releaseEverywhere = await intercept(page, '*/api/auth/logout-all', () => ({ status: 500 }));

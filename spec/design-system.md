@@ -380,9 +380,10 @@ outside it use, are `app-shell.md`'s (The chrome).
   radius, 12px. Used for a dimension assignment (`Liquidity: Cash`), for
   status chips such as "Archived", and for a price's provenance, whose
   wording is `record-snapshot.md`'s (Recording detail). A chip never
-  exceeds its container. Its text wraps rather than clipping or
-  truncating, because a provenance cut short no longer says where the
-  price came from.
+  exceeds its container. Its text wraps between words rather than
+  clipping or truncating, because a provenance cut short no longer says
+  where the price came from. It breaks inside a word only when that
+  word alone is wider than its container.
 - **Date picker, marked**: a Dialog headed "New recording" whose body
   is the month grid itself, open the moment the control is pressed.
   There is no date field, no Open or confirm button and no popup of its

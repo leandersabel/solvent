@@ -185,7 +185,9 @@ the dialog.
 Everything set side by side stacks. A profile pair puts its label above
 its value, the four selects run in one column, and the idle lock
 tradeoff moves beneath its select. The sample strip wraps, with
-**Save** beneath the sample when the width runs out.
+**Save** beneath the sample when the width runs out. Open sessions
+keeps its three columns: the first is as wide as the "This session"
+chip on one line, and the dates wrap between words in their own.
 
 #### States
 
@@ -1041,3 +1043,5 @@ from an administrator removing an account (`admin-invites.md`).
     failed sign-in, and once the sign-in limits engage, both endpoints
     and sign-in refuse the right password with Too Many Requests and
     write nothing. Test: `tests/test_attempts.py::test_a_wrong_password_on_a_settings_form_is_a_failed_sign_in`.
+78. At 390 px wide, the "This session" chip sits on one line and the
+    page does not scroll sideways. Test: `tests/browser/parts/settings.mjs`.
