@@ -184,19 +184,24 @@ export function sitting(vault, date) {
  *  A date another session recorded since the sitting began, or any slot
  *  already taken, refuses the whole save before a single write. The
  *  model then takes the reloaded records, so the screen can show the
- *  recording as it now stands. */
-export async function claimDate(vault, sit, { snapshots = [], rates = [], except = null }) {
+ *  recording as it now stands. `held` refuses a date the reload finds
+ *  holding no record, for a write that must not make the recording
+ *  itself, and says `emptied` so the screen can tell it from a date
+ *  another session recorded. */
+export async function claimDate(vault, sit, { snapshots = [], rates = [], except = null, held = false }) {
   if (sit.claimed) return null;
   const fresh = await reloadCreateTypes(vault);
   const at = (list) => list.filter((record) => record.payload.date === sit.date);
+  const emptied = held && at(fresh.snapshot).length === 0 && at(fresh.rate).length === 0;
   const taken =
+    emptied ||
     (sit.dateWasEmpty && (at(fresh.snapshot).length > 0 || at(fresh.rate).length > 0)) ||
     at(fresh.snapshot).some((r) => snapshots.includes(r.accountId) && r.recordId !== except) ||
     at(fresh.rate).some((r) => rates.includes(r.payload.symbol));
   if (taken) {
     vault.replaceType('snapshot', fresh.snapshot);
     vault.replaceType('rate', fresh.rate);
-    return { refused: true, date: sit.date };
+    return emptied ? { refused: true, date: sit.date, emptied: true } : { refused: true, date: sit.date };
   }
   sit.claimed = true;
   return null;
@@ -327,18 +332,25 @@ export function confirmFigure(vault, holding, date) {
  *
  *  No step is skipped because an earlier one failed. Each record is
  *  independent, and abandoning the rest would turn one failed write
- *  into several unattempted ones. */
+ *  into several unattempted ones.
+ *
+ *  Refused at a date holding no recording, before any request. */
 export async function saveRateLines(vault, sit, plan) {
+  // A price alone never makes a recording: at a date the model holds
+  // none, typed prices wait for the first quantity. Checked here as
+  // well as in the sweep, because hiding the control is not a refusal.
+  if (!vault.holdsRecording(sit.date)) return { refused: true, date: sit.date, saved: [], failed: [] };
   const rates = plan.rates || [];
   const deletes = plan.deletes || [];
   const creates = rates.filter((r) => !r.existing).map((r) => r.payload.symbol);
   // A save that only changes and clears what is there claims nothing:
   // the version rule on each record is the check that catches another
   // session on exactly those records.
-  if (creates.length && (await claimDate(vault, sit, { rates: creates }))) {
+  const refusal = creates.length ? await claimDate(vault, sit, { rates: creates, held: true }) : null;
+  if (refusal) {
     // Refused whole, before a single write. The person is looking at
     // a screen that no longer describes the vault.
-    return { refused: true, date: sit.date, saved: [], failed: [] };
+    return { ...refusal, saved: [], failed: [] };
   }
 
   const saved = [];

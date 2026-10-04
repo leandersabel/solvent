@@ -239,6 +239,15 @@ Line states:
   would make a provider outage stop somebody recording what they went
   and looked up, which is the one thing this screen may not do.
 
+**The rate lines have a save control only while this date holds a
+recording.** At a date holding none there is nothing for a price to
+belong to, so the block shows no save, and a price typed there waits
+and goes in with the first row recorded (Writes). From that row on the
+save is offered as on a reopened recording, however the sweep was
+entered. Leaving before then writes nothing (Writes), and the screen
+landed on names the unit whose price was left (States, Closing with
+changes unsaved).
+
 ### Rate lines on a reopened recording
 
 - The lines open on **the rates this recording wrote**, with their
@@ -254,11 +263,10 @@ Line states:
   issues the request, and what comes back is labeled with the day it
   is actually for like any proposal, to be taken, changed or left
   empty.
-- **A rate line on a reopened recording saves by itself.** On a new
-  sweep the rates ride in with the first row recorded, because until
-  then there is nothing for them to belong to. On a recording that
-  already exists there is, so filling in the rate that was missing is a
-  complete act and needs no holding touched alongside it.
+- **A rate line on a reopened recording saves by itself**, through the
+  lines' own save (The rates, at the foot of the sweep). Filling in the
+  rate that was missing is a complete act and needs no holding touched
+  alongside it.
 
 ### Changing or clearing a rate says what it moves
 
@@ -372,6 +380,17 @@ write.
   What was typed into the refused attempt is gone and is typed again
   there. The screen does not offer to carry it across, because a rescue
   that works only sometimes is worse than none.
+- **The date was emptied while you were working**: another window
+  deleted this recording before a rate-lines save. The save is refused
+  before anything is written, and the screen reloads to a date holding
+  nothing: every row reads as nothing recorded for this date (A row),
+  and the rate block has no save (The rates, at the foot of the sweep).
+  What was typed stays, on the lines and in the rows. A Callout under
+  the date heading, carrying the critical icon, says:
+
+  > Another window deleted the recording for 31 July. Your prices were
+  > not saved. They are still here and are saved with the first holding
+  > you record for this date.
 - **A rate-lines save that landed in part**: the screen **stays open**
   and every line keeps its own state, saved or not saved with what was
   typed still in front of the person. The message names both halves,

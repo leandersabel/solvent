@@ -98,7 +98,7 @@ await run(async () => {
   const r = await startRecorder();
   await r.register();
   const {
-    rec, accountIds, T, ago, D1, D2, D5, D6, D7,
+    rec, accountIds, T, ago, D1, D2, D5, D6, D7, D8,
     D9, D10, proxy, holdRates, proposalsFor, traffic, faults, writesSent,
     rateAsks, typeReads, bodyOf, ev, text, quiet, set, press,
     stored, on, bytes, plantHere, reread, go, format, model,
@@ -744,6 +744,126 @@ await run(async () => {
     euroLive && on(await stored('snapshot'), D9).some((s) => s.accountId === id['Euro account'] && s.payload.value === '40.50') && (await group('Not priced')).includes('Euro account'),
   );
   proxy.mode = 'answer';
+
+  // ---- record-rate: a price typed at a date holding no record ------------
+
+  await home();
+  await newRecording(D8);
+  await rec.waitUntil((query) => document.querySelector(query).querySelector('input').value !== '', { args: [line('USD')], label: 'the proposals for the date' });
+  await quiet();
+  const saveOffered = () =>
+    ev("[...document.querySelectorAll('.rate-section button')].some((b) => b.textContent.trim() === 'Save the rate lines' && b.getClientRects().length > 0)");
+  traffic.length = 0;
+  await typeLine('PAINT', '3.5');
+  check(
+    'record-rate: a price typed at a date holding no record shows no rate-lines save and stays on screen',
+    !(await saveOffered()) && figure((await lineState('PAINT')).value) === 3.5 && writesSent().length === 0,
+  );
+  const refusedWrite = await rec.call(async (date) => {
+    const writes = await import('/static/js/writes.js');
+    const vault = (await import('/static/js/session.js')).currentVault();
+    const payload = writes.rateEntry(vault, 'PAINT', date, { rate: '3.5', rateSource: 'manual', rateAsOf: null, proposedRate: null });
+    return JSON.stringify(await writes.saveRateLines(vault, writes.sitting(vault, date), { rates: [{ existing: null, payload }] }));
+  }, D8).then(JSON.parse);
+  check(
+    'record-rate: the client\'s rate-lines write, called at a date holding no record, issues no request and writes nothing',
+    refusedWrite.refused === true && traffic.length === 0 && on(await stored('rate'), D8).length === 0,
+    `${JSON.stringify(refusedWrite)} ${traffic.map((r) => `${r.method} ${r.url}`).join(' | ')}`,
+  );
+  await home();
+  check(
+    'record-rate: leaving with a price typed and no row recorded writes nothing and the next screen names the unit',
+    writesSent().length === 0 && on(await stored('rate'), D8).length === 0 && on(await stored('snapshot'), D8).length === 0 &&
+      (await text()).includes(`You left the recording for ${await format('longDate', D8)} with changes that were not saved: the PAINT rate.`),
+  );
+
+  await newRecording(D8);
+  await rec.waitUntil((query) => document.querySelector(query).querySelector('input').value !== '', { args: [line('USD')], label: 'the proposals for the date again' });
+  await quiet();
+  await typeLine('PAINT', '3.5');
+  traffic.length = 0;
+  await typeRow('Current account', '77');
+  await pressRow('Current account');
+  const atD8 = on(await stored('rate'), D8).map((r) => r.payload);
+  const writtenKinds = writesSent().map((r) => bodyOf(r).recordType);
+  const sourceOf = (symbol) => (atD8.find((p) => p.symbol === symbol) || {}).rateSource;
+  check(
+    'record-rate: the first row recorded writes its snapshot, then the typed price as manual and every proposal as proposed',
+    writtenKinds[0] === 'snapshot' && atD8.map((p) => p.symbol).sort().join(',') === 'PAINT,USD,XAU-ozt' &&
+      atD8.find((p) => p.symbol === 'PAINT').rate === '3.5' && sourceOf('PAINT') === 'manual' &&
+      sourceOf('USD') === 'proposed' && sourceOf('XAU-ozt') === 'proposed',
+    `${writtenKinds.join(',')} ${JSON.stringify(atD8)}`,
+  );
+  await typeLine('PAINT', '4');
+  check('record-rate: from the first row recorded the rate-lines save is offered', await saveOffered());
+  await home();
+
+  // A row's save that meets a Conflict because another window deleted
+  // the date's only record leaves a date holding nothing, and with it
+  // the rate-lines save.
+  const DG = ago(45);
+  const [lone] = await plantHere([snap('Current account', DG, '10')]);
+  await reread();
+  await go(`#/recording/${DG}`);
+  await press('Update');
+  await typeLine('PAINT', '3.5');
+  const offeredBefore = await saveOffered();
+  await rec.call(async (recordId) => (await import('/static/js/api.js')).del(`/api/records/${recordId}`), lone);
+  await typeRow('Current account', '11');
+  await pressRow('Current account');
+  check(
+    'record-rate: the rate-lines save goes when a Conflict leaves the date holding no record',
+    offeredBefore && !(await saveOffered()) && figure((await lineState('PAINT')).value) === 3.5 &&
+      (await rowState('Current account')).error === 'This figure was changed in another window.',
+    `${offeredBefore} ${await saveOffered()}`,
+  );
+  await home();
+
+  // A rate-lines save that creates a price, after another window deleted
+  // every record at the date, writes nothing and keeps what was typed.
+  const DH = ago(46);
+  const planted = await plantHere([snap('Current account', DH, '10'), price('USD', DH, '0.9')]);
+  await reread();
+  await go(`#/recording/${DH}`);
+  await press('Update');
+  await typeLine('PAINT', '3.5');
+  await typeRow('Savings', '5001');
+  for (const recordId of planted) await rec.call(async (id) => (await import('/static/js/api.js')).del(`/api/records/${id}`), recordId);
+  traffic.length = 0;
+  await press('Save the rate lines');
+  await press('Save the prices', '.dialog');
+  const callout = await rec.call(() => ({
+    callout: document.querySelector('.sweep .callout').textContent.trim(),
+    critical: document.querySelector('.sweep .callout').classList.contains('callout-critical') &&
+      Boolean(document.querySelector('.sweep .callout svg.icon-alert')),
+    underHeading: document.querySelector('.sweep-head').nextElementSibling === document.querySelector('.sweep .callout'),
+    banner: document.querySelector('.sweep .banner').hidden,
+  }));
+  check(
+    'record-rate: a rate-lines save at a date another window emptied reloads, writes nothing and says so under the date heading',
+    writesSent().length === 0 && typeReads('snapshot').length === 1 && typeReads('rate').length === 1 && callout.banner && callout.critical && callout.underHeading &&
+      callout.callout === `Another window deleted the recording for ${await format('dayMonth', DH)}. Your prices were not saved. They are still here and are saved with the first holding you record for this date.`,
+    JSON.stringify(callout),
+  );
+  const emptiedStates = await ev("[...document.querySelectorAll('.row-state')].map(n => n.textContent)");
+  check(
+    'record-rate: the emptied date reads as nothing recorded, offers no rate-lines save and keeps every typed price and figure',
+    emptiedStates.every((state) => state === 'Nothing recorded for this date.') && !(await saveOffered()) &&
+      figure((await lineState('PAINT')).value) === 3.5 && (await rowState('Savings')).field === '5001' && !(await rowState('Savings')).error,
+    JSON.stringify({ emptiedStates, paint: await lineState('PAINT') }),
+  );
+  traffic.length = 0;
+  await typeRow('Current account', '13');
+  await pressRow('Current account');
+  const refilled = on(await stored('rate'), DH).map((r) => r.payload);
+  check(
+    'record-rate: the typed price goes in with the first row recorded, after its snapshot, beside the proposals',
+    writesSent().map((r) => bodyOf(r).recordType)[0] === 'snapshot' && on(await stored('snapshot'), DH).length === 1 &&
+      refilled.find((p) => p.symbol === 'PAINT')?.rate === '3.5' && refilled.find((p) => p.symbol === 'PAINT').rateSource === 'manual' &&
+      refilled.find((p) => p.symbol === 'USD')?.rateSource === 'proposed',
+    JSON.stringify(refilled),
+  );
+  await home();
 
   // The sweep keeps its columns while its block is 720px wide, under
   // one window width, and stacks one pixel under.

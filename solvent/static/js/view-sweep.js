@@ -7,7 +7,7 @@
 // own age in plain language instead.
 import * as decimal from './decimal.js';
 import * as writes from './writes.js';
-import { ageInWords, dialog, el, mount, priceDateLine } from './dom.js';
+import { ageInWords, dialog, el, icon, mount, priceDateLine } from './dom.js';
 import { dayNumber } from './model.js';
 
 // One sitting per date, kept across redraws of the same screen and
@@ -45,6 +45,7 @@ export function sweepView(vault, date, actions = {}) {
   const refused = () => {
     for (const row of rows) row.reset();
     block.refresh();
+    syncSave();
     say(`${vault.format.longDate(date)} already has a recording. Another window got there first.`, {
       critical: true,
       children: [
@@ -55,6 +56,28 @@ export function sweepView(vault, date, actions = {}) {
         }),
       ],
     });
+  };
+
+  // Another window deleted the recording before a rate-lines save: the
+  // screen shows the empty date, and what was typed stays for the first
+  // row recorded to carry.
+  const callout = el('p', { class: 'callout callout-critical', role: 'status', hidden: true });
+  const emptied = (restore) => {
+    restore();
+    sit.dateWasEmpty = true;
+    syncSave();
+    mount(callout, [
+      icon('alert'),
+      ` Another window deleted the recording for ${vault.format.dayMonth(date)}. Your prices were not saved. They are still here and are saved with the first holding you record for this date.`,
+    ]);
+    callout.hidden = false;
+  };
+  const keepTyped = () => {
+    const restores = [...rows.map((row) => row.keep()), ...block.lines.map((line) => line.keep())];
+    return () => {
+      restores.forEach((restore) => restore());
+      for (const row of rows) row.describe();
+    };
   };
 
   // An archived holding has a row only where the recording already
@@ -77,14 +100,20 @@ export function sweepView(vault, date, actions = {}) {
   }
 
   const saveAll = el('button', { class: 'btn-primary', text: 'Save the rate lines', hidden: true });
+  // Offered only while the date holds a recording, because a price
+  // alone must never make one: a price typed before then waits for the
+  // first row recorded.
+  const syncSave = () => {
+    saveAll.hidden = !vault.holdsRecording(date) || !block.lines.some((line) => line.changed());
+  };
   const block = rateBlock(vault, date, {
     sit,
     onChange: () => {
-      saveAll.hidden = !block.lines.some((line) => line.changed());
+      syncSave();
       for (const row of rows) row.describe();
     },
   });
-  saveAll.addEventListener('click', () => saveRates(vault, sit, block, { say, refused, saveAll }));
+  saveAll.addEventListener('click', () => saveRates(vault, sit, block, { say, refused, syncSave, emptied, keepTyped }));
 
   // A date holding nothing arrives with its rate lines filled in by the
   // proposals for it. A reopened recording asks the source nothing on
@@ -107,6 +136,7 @@ export function sweepView(vault, date, actions = {}) {
     if (sit.proposals) block.showProposals(await sit.proposals);
     const { failed } = await writes.refreshPrices(vault, date, {}, (unit) => block.partFor(unit));
     block.refresh();
+    syncSave();
     if (failed.length) {
       say(`Recorded. Prices were not updated for ${failed.join(', ')}.`, { critical: true });
     }
@@ -118,12 +148,14 @@ export function sweepView(vault, date, actions = {}) {
       block,
       refused,
       ensurePrices,
+      onSaved: syncSave,
       onTyped: () => block.ask(holding.payload.unit),
     }),
   );
 
   const element = el('section', { class: 'screen sweep' }, [
     heading(vault, date),
+    callout,
     banner,
     el('div', { class: 'sweep-rows' }, rows.map((row) => row.element)),
     el('section', { class: 'rate-section' }, [
@@ -150,7 +182,7 @@ function heading(vault, date) {
   ]);
 }
 
-function sweepRow(vault, holding, date, { sit, block, refused, ensurePrices, onTyped }) {
+function sweepRow(vault, holding, date, { sit, block, refused, ensurePrices, onSaved, onTyped }) {
   const { format } = vault;
   const atDate = () => vault.snapshotsFor(holding.recordId).filter((s) => s.payload.date === date);
   // On a reopened recording, the figure a holding carried into that
@@ -194,6 +226,18 @@ function sweepRow(vault, holding, date, { sit, block, refused, ensurePrices, onT
     field.className = stored ? 'quantity recorded' : 'quantity carried';
     row.describe();
   });
+
+  /** What was typed here, put back after the vault's records were
+   *  replaced under the screen. A figure that was not typed shows what
+   *  the vault holds now. */
+  row.keep = () => {
+    const text = field.value;
+    const typed = row.changed();
+    return () => {
+      reset();
+      if (typed) field.value = text;
+    };
+  };
 
   row.describe = () => {
     const entries = atDate();
@@ -294,6 +338,7 @@ function sweepRow(vault, holding, date, { sit, block, refused, ensurePrices, onT
     savedNote.textContent = 'Saved.';
     savedNote.hidden = false;
     reset();
+    onSaved();
   };
 
   const failedWith = async (failure) => {
@@ -302,6 +347,7 @@ function sweepRow(vault, holding, date, { sit, block, refused, ensurePrices, onT
       // stored now, and the person redoes the edit against it.
       await writes.reloadType(vault, 'snapshot').catch(() => {});
       reset();
+      onSaved();
       showError(message, 'This figure was changed in another window.');
       return;
     }
@@ -536,6 +582,20 @@ function rateLine(vault, unit, date, { sit, readOnly: blockReadOnly, fillMissing
     if (line.invalid()) return true;
     if (line.proposal) return line.lookedUp || line.figure() !== parsed(line.proposal.rate);
     return !line.prefilled || line.figure() !== parsed(line.carried.payload.rate);
+  };
+
+  /** The same, for a line: a typed figure survives the reset. */
+  line.keep = () => {
+    const text = field.value;
+    const typed = line.changed();
+    return () => {
+      line.reset();
+      if (typed) {
+        field.value = text;
+        line.typed = true;
+        line.describe();
+      }
+    };
   };
 
   /** What the refresh writes for this unit, where the date has no
@@ -816,7 +876,7 @@ export function partialCopy(result) {
 /** A rate line on a reopened recording saves by itself: filling in the
  *  price that was missing is a complete act and needs no holding
  *  touched alongside it. One confirmation covers every changed line. */
-function saveRates(vault, sit, block, { say, refused, saveAll }) {
+function saveRates(vault, sit, block, { say, refused, syncSave, emptied, keepTyped }) {
   const changed = block.lines.filter((line) => line.changed());
   if (changed.some((line) => line.invalid())) {
     for (const line of changed) line.describe();
@@ -845,9 +905,11 @@ function saveRates(vault, sit, block, { say, refused, saveAll }) {
               .filter(({ change }) => change.remove)
               .map(({ line, change }) => ({ entry: change.remove, name: line.unit })),
           };
+          const restore = keepTyped();
           const result = await writes.saveRateLines(vault, sit, plan);
           if (result.refused) {
-            refused();
+            if (result.emptied) emptied(restore);
+            else refused();
             return;
           }
           const conflicts = result.failed.filter((f) => f.status === 409).map((f) => f.name);
@@ -859,7 +921,7 @@ function saveRates(vault, sit, block, { say, refused, saveAll }) {
           for (const { line } of planned) {
             if (!failed.has(line.unit) || conflicts.includes(line.unit)) line.reset();
           }
-          saveAll.hidden = !block.lines.some((line) => line.changed());
+          syncSave();
           const conflictCopy = conflicts.map((unit) => `The ${unit} rate was changed in another window, and the line shows what is stored now.`).join(' ');
           say([partialCopy(result), conflictCopy].filter(Boolean).join(' '), { critical: result.failed.length > 0 });
         },
