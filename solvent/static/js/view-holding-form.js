@@ -54,6 +54,7 @@ function unitPicker(vault, current, locked) {
     'aria-controls': 'holding-unit-list',
     'aria-autocomplete': 'list',
     'aria-expanded': 'true',
+    'aria-describedby': 'holding-unit-line',
     placeholder: 'Search the list',
     disabled: locked,
   });
@@ -65,13 +66,19 @@ function unitPicker(vault, current, locked) {
   // The choice itself, as a field, so a lock keeps it the way it keeps
   // anything else the person chose.
   const chosen = el('input', { type: 'hidden', class: 'unit-chosen', value: value || '' });
-  const freeText = el('input', { type: 'text', id: 'holding-unit-other', hidden: true, placeholder: 'm²', 'aria-label': 'Unit' });
+  const freeText = el('input', { type: 'text', id: 'holding-unit-other', hidden: true, placeholder: 'm²', 'aria-label': 'Unit', 'aria-describedby': 'holding-unit-line' });
   const freeNote = el('p', { class: 'hint', hidden: true });
   const listed = el('p', { class: 'hint listed-offer', hidden: true });
   const commitment = el('p', { class: 'hint' });
   const notice = el('p', { class: 'field-error', hidden: true });
   const retry = el('button', { type: 'button', class: 'btn-inline', text: 'Try again', hidden: true });
-  const error = el('p', { class: 'field-error', hidden: true });
+  const error = el('p', { id: 'holding-unit-line', class: 'field-error', hidden: true, 'aria-live': 'polite' });
+  const marked = (problem) => {
+    for (const input of [search, freeText]) {
+      if (problem) input.setAttribute('aria-invalid', 'true');
+      else input.removeAttribute('aria-invalid');
+    }
+  };
 
   const rowFor = (symbol) => (table || []).find((row) => row.symbol === symbol);
   const matchIgnoringCase = (text) =>
@@ -86,6 +93,16 @@ function unitPicker(vault, current, locked) {
     chosen.value = next || '';
     if (announce) chosen.dispatchEvent(new Event('change', { bubbles: true }));
     draw();
+    // A refusal on screen follows the unit as it stands and goes the
+    // moment it fits. Typing never raises one.
+    if (!error.hidden) {
+      const { problem } = check();
+      if (problem) error.textContent = problem;
+      else {
+        error.hidden = true;
+        marked(false);
+      }
+    }
   };
 
   const offerListed = () => {
@@ -239,6 +256,19 @@ function unitPicker(vault, current, locked) {
     load();
   });
 
+  /** The unit the controls hold, or a reason there is none. */
+  function check() {
+    // Locked by construction: whatever the controls hold, a holding
+    // with a recorded value keeps its unit.
+    if (locked) return { unit: current };
+    const unit = other ? freeText.value.trim() : value;
+    if (!unit) return { problem: 'Choose a unit, or type one under Something else.' };
+    if (other && table && matchIgnoringCase(unit) && unit !== current) {
+      return { problem: `${matchIgnoringCase(unit).symbol} is on the list. Use it from there.` };
+    }
+    return { unit };
+  }
+
   search.addEventListener('input', draw);
   search.addEventListener('keydown', (event) => {
     if (event.key === 'ArrowDown') {
@@ -266,11 +296,13 @@ function unitPicker(vault, current, locked) {
   return {
     element: el('div', { class: 'field unit-field' }, [
       el('label', { for: 'holding-unit', text: 'Measured in' }),
-      error,
       search,
       list,
       chosen,
       freeText,
+      // Every refusal is of the typed unit or of none chosen, so its line
+      // sits under the free-text field.
+      error,
       freeNote,
       listed,
       notice,
@@ -280,20 +312,13 @@ function unitPicker(vault, current, locked) {
     /** The unit to save, or a reason there is none. */
     read() {
       error.hidden = true;
-      // Locked by construction: whatever the controls hold, a holding
-      // with a recorded value keeps its unit.
-      if (locked) return { unit: current };
-      const unit = other ? freeText.value.trim() : value;
-      if (!unit) return { problem: 'Choose a unit, or type one under Something else.' };
-      if (other && table && matchIgnoringCase(unit) && unit !== current) {
-        offerListed();
-        return { problem: `${matchIgnoringCase(unit).symbol} is on the list. Use it from there.` };
-      }
-      return { unit };
+      marked(false);
+      return check();
     },
     refuse(text) {
       error.textContent = text;
       error.hidden = false;
+      marked(true);
     },
   };
 }
@@ -463,8 +488,18 @@ export function holdingForm(vault, existing, onSaved, { onCancel = null, onConfl
   const dims = { ...(payload.dims || {}) };
   const locked = Boolean(existing) && vault.snapshotsFor(existing.recordId).length > 0;
 
-  const name = el('input', { type: 'text', id: 'holding-name', value: payload.name, required: true });
-  const nameError = el('p', { class: 'field-error', hidden: true });
+  const name = el('input', {
+    type: 'text', id: 'holding-name', value: payload.name, required: true, 'aria-describedby': 'holding-name-line',
+  });
+  const nameError = el('p', { id: 'holding-name-line', class: 'field-error', hidden: true, 'aria-live': 'polite' });
+  const nameRefused = (refused) => {
+    nameError.hidden = !refused;
+    if (refused) name.setAttribute('aria-invalid', 'true');
+    else name.removeAttribute('aria-invalid');
+  };
+  name.addEventListener('input', () => {
+    if (name.value.trim()) nameRefused(false);
+  });
   const unit = unitPicker(vault, payload.unit, locked);
   const note = el('textarea', { rows: '3', text: payload.note || '' });
   const error = el('p', { class: 'field-error', hidden: true, role: 'alert' });
@@ -474,8 +509,8 @@ export function holdingForm(vault, existing, onSaved, { onCancel = null, onConfl
     notice ? el('p', { class: 'field-error', role: 'alert', text: notice }) : null,
     el('div', { class: 'field' }, [
       el('label', { for: 'holding-name', text: 'Name' }),
-      nameError,
       name,
+      nameError,
     ]),
     unit.element,
     dimensionBlock(vault, dims),
@@ -490,14 +525,14 @@ export function holdingForm(vault, existing, onSaved, { onCancel = null, onConfl
   form.addEventListener('submit', async (event) => {
     event.preventDefault();
     error.hidden = true;
-    nameError.hidden = true;
+    nameRefused(false);
     // Inline per field: a name is required, and a unit is required
     // whether picked or typed. Nothing else is.
     const chosen = unit.read();
     let refused = false;
     if (!name.value.trim()) {
       nameError.textContent = 'Give the holding a name.';
-      nameError.hidden = false;
+      nameRefused(true);
       refused = true;
     }
     if (chosen.problem) {
