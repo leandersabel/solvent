@@ -109,6 +109,18 @@ await check('interpolation is exact at the midpoint', () => {
   );
 });
 
+await check('division is exact at scale 12 and rounds half-even', () => {
+  const d = (a, b) => decimal.format(decimal.divide(decimal.parse(a), decimal.parse(b)));
+  assert.equal(d('500', '2000'), '0.25');
+  assert.equal(d('1', '3'), '0.333333333333');
+  assert.equal(d('2', '3'), '0.666666666667');
+  assert.equal(d('-1', '3'), '-0.333333333333');
+  assert.equal(d('1', '-4'), '-0.25');
+  // A half at the twelfth place goes to the even digit.
+  assert.equal(d('0.000000000001', '2'), '0');
+  assert.equal(d('0.000000000003', '2'), '0.000000000002');
+});
+
 // ---- The AAD ----------------------------------------------------------
 
 const encoder = new TextEncoder();
@@ -622,6 +634,59 @@ await check('a thousands separator never collides with the decimal point', async
   assert.equal(shape.money(1234567890000000000n), '1.234.567,89');
 });
 
+await check('a thousands mark equal to the language\u2019s decimal point gives way to the language\u2019s own', async () => {
+  const { formatter } = await load('format.js');
+  const million = 1234567890000000000n;
+  // The point is always the language's. Swapping it to make room would
+  // turn 1,234,567.89 into 1.234.567,89 and flip which input a field takes.
+  const english = formatter({ locale: 'en-US', groupSeparator: 'period' });
+  assert.equal(english.money(million), '1,234,567.89');
+  assert.equal(english.parseQuantity('12.5'), '12.5');
+  assert.equal(english.parseQuantity('12,5'), null);
+  const german = formatter({ locale: 'de-DE', groupSeparator: 'comma' });
+  assert.equal(german.money(million), '1.234.567,89');
+  assert.equal(german.parseQuantity('12,5'), '12.5');
+  assert.equal(german.parseQuantity('12.5'), null);
+});
+
+await check('percent writes a percentage grouped, pointed and half-even at the places asked, whatever Decimals says', async () => {
+  const { formatter } = await load('format.js');
+  const p = (text) => decimal.parse(text);
+  for (const moneyPlaces of ['0', '2']) {
+    const german = formatter({ locale: 'de-DE', groupSeparator: 'period', moneyPlaces });
+    assert.equal(german.percent(p('136794.6'), 1), '136.794,6%');
+    assert.equal(german.percent(p('0.25'), 1), '0,2%');
+    assert.equal(german.percent(p('0.35'), 1), '0,4%');
+    assert.equal(german.percent(p('-0.25'), 1), '\u22120,2%');
+    assert.equal(german.percent(p('-0.04'), 1), '0,0%');
+    assert.equal(german.percent(p('-50'), 0), '\u221250%');
+    assert.equal(german.percent(p('12.5'), 1), '12,5%');
+  }
+  const swiss = formatter({ locale: 'de-CH', groupSeparator: 'apostrophe', moneyPlaces: '0' });
+  assert.equal(swiss.percent(p('10957493'), 1), '10\u2019957\u2019493.0%');
+});
+
+await check('compact writes a value tick in its short form, grouped and pointed as configured', async () => {
+  const { formatter } = await load('format.js');
+  const scaled = (n) => BigInt(n) * decimal.ONE;
+  const shape = formatter({ locale: 'de-DE', groupSeparator: 'apostrophe' });
+  for (const [value, want] of [
+    [999, '999'], [0, '0'], [1000, '1k'], [1500, '1,5k'], [2000000, '2M'], [-2500000, '\u22122,5M'],
+    [-1500, '\u22121,5k'], [3e9, '3B'], [1500000000000, '1\u2019500B'],
+  ]) {
+    assert.equal(shape.compact(scaled(value)), want, String(value));
+  }
+  assert.equal(formatter({ locale: 'en-US', groupSeparator: 'comma' }).compact(scaled(1500)), '1.5k');
+  assert.equal(formatter({ locale: 'en-US', groupSeparator: 'comma' }).compact(scaled(1500000000000)), '1,500B');
+});
+
+await check('no client module but the formatter writes a figure with toFixed, toLocaleString or Intl.NumberFormat', async () => {
+  const { readdirSync, readFileSync } = await import('node:fs');
+  const writers = readdirSync(JS).filter((name) => name.endsWith('.js') && name !== 'format.js')
+    .filter((name) => /\.toFixed\(|\.toLocaleString\(|Intl\.NumberFormat/.test(readFileSync(new URL(name, JS), 'utf8')));
+  assert.deepEqual(writers, []);
+});
+
 await check('a date round-trips through the format the reader types', async () => {
   const { formatter } = await load('format.js');
   for (const settings of [
@@ -713,6 +778,8 @@ await check('a field shows a figure grouped and reads it back exactly', async ()
     { locale: 'de-DE' },
     { locale: 'fr-CH' },
     { locale: 'en-US', groupSeparator: 'none' },
+    { locale: 'en-US', groupSeparator: 'period' },
+    { locale: 'de-DE', groupSeparator: 'comma' },
   ]) {
     const shape = formatter(settings);
     for (const stored of ['48210.35', '-780000', '1150000.5', '0.000000000001', '12.5', '0']) {
@@ -1622,7 +1689,8 @@ const readTick = (text, group, point) => {
 };
 
 await check('net-worth-view: value ticks over the sweep are exact, whole, counted from zero and never read alike', async () => {
-  const { valueTicks, tickLabel } = await load('chart.js');
+  const { valueTicks } = await load('chart.js');
+  const { formatter } = await load('format.js');
   const totals = new Set([0.4]);
   for (let e = -1; e <= 10; e += 1) {
     for (const m of [1, 2, 2.5, 5, 7.5]) {
@@ -1633,7 +1701,9 @@ await check('net-worth-view: value ticks over the sweep are exact, whole, counte
     }
   }
   assert.ok(totals.size > 100);
-  for (const [group, point] of [[',', '.'], ['.', ',']]) {
+  for (const [locale, group, point] of [['en-US', ',', '.'], ['de-DE', '.', ',']]) {
+    const shape = formatter({ locale, groupSeparator: group === ',' ? 'comma' : 'period' });
+    assert.equal(shape.point, point);
     for (const total of totals) {
       for (const signed of [total, -total]) {
         const bottom = Math.min(0, signed);
@@ -1641,7 +1711,7 @@ await check('net-worth-view: value ticks over the sweep are exact, whole, counte
         for (const count of [6, 3]) {
           const where = `${signed} in ${count}`;
           const ticks = valueTicks(bottom, top, count);
-          const labels = ticks.map((tick) => tickLabel(tick, group, point));
+          const labels = ticks.map((tick) => shape.compact(BigInt(tick) * decimal.ONE));
           assert.ok(ticks.includes(0), where);
           assert.equal(new Set(labels).size, labels.length, `${where}: ${labels}`);
           const step = niceAtLeast((top - bottom) / count);
@@ -1664,15 +1734,19 @@ await check('net-worth-view: value ticks over the sweep are exact, whole, counte
 });
 
 await check('net-worth-view: one holding at 2500 has ticks 0 to 2500 by 500, reading 1.5k and 2.5k, or 1,5k and 2,5k under a decimal comma', async () => {
-  const { valueTicks, tickLabel } = await load('chart.js');
+  const { valueTicks } = await load('chart.js');
+  const { formatter } = await load('format.js');
+  const english = formatter({ locale: 'en-US', groupSeparator: 'comma' });
+  const german = formatter({ locale: 'de-DE', groupSeparator: 'period' });
+  const tickLabel = (value, shape) => shape.compact(BigInt(value) * decimal.ONE);
   const ticks = valueTicks(0, 2500, 6);
   assert.deepEqual(ticks, [0, 500, 1000, 1500, 2000, 2500]);
-  assert.deepEqual(ticks.map((t) => tickLabel(t, ',', '.')), ['0', '500', '1k', '1.5k', '2k', '2.5k']);
-  assert.deepEqual(ticks.map((t) => tickLabel(t, '.', ',')), ['0', '500', '1k', '1,5k', '2k', '2,5k']);
+  assert.deepEqual(ticks.map((t) => tickLabel(t, english)), ['0', '500', '1k', '1.5k', '2k', '2.5k']);
+  assert.deepEqual(ticks.map((t) => tickLabel(t, german)), ['0', '500', '1k', '1,5k', '2k', '2,5k']);
   assert.deepEqual(valueTicks(0, 2500, 3), [0, 1000, 2000]);
-  assert.equal(tickLabel(-1500, ',', '.'), '−1.5k');
-  assert.equal(tickLabel(2500000, ',', '.'), '2.5M');
-  assert.equal(tickLabel(3e9, ',', '.'), '3B');
+  assert.equal(tickLabel(-1500, english), '−1.5k');
+  assert.equal(tickLabel(2500000, english), '2.5M');
+  assert.equal(tickLabel(3e9, english), '3B');
 });
 
 await check('net-worth-view: a range starts no earlier than the oldest snapshot, whatever price entry is older', () => {
@@ -2696,6 +2770,140 @@ await check('a username error names the character before the length, and short o
   assert.equal(username.usernameProblem('ab', true), 'Use at least 3 characters.');
   assert.equal(username.usernameProblem('', true), null);
   assert.equal(username.usernameProblem('  Bob  ', true), null);
+});
+
+// ---- Change password holds the credential it signed in with ------------
+
+globalThis.document ??= { addEventListener() {} };
+
+// A server holding one password credential and answering the routes a
+// sign-in and a password change touch, logging each request it gets.
+// `rekey` is another session's upgrade: a fresh salt, the same DEK
+// wrapped under the new Master Key.
+async function credentialServer(kind, password) {
+  const server = { log: [], bodies: [], dek: await cryptoModule.generateDek(), kdfStale: false };
+  server.rekey = async (pass, fill, kdf = KDF) => {
+    server.salt = cryptoModule.b64encode(new Uint8Array(16).fill(fill));
+    server.kdf = kdf;
+    const keys = await cryptoModule.deriveKeys(pass, server.salt, kdf);
+    server.authKey = keys.authKey;
+    server.wrapper = kind === 'vault_owner' ? await cryptoModule.wrapDek(server.dek, keys.masterKey) : null;
+  };
+  await server.rekey(password, 21);
+  const reply = (status, body = {}) => ({ ok: status < 400, status, json: async () => body });
+  globalThis.fetch = async (url, init) => {
+    const body = init.body ? JSON.parse(init.body) : null;
+    server.log.push(url);
+    server.bodies.push(body);
+    if (url === '/api/auth/salt') return reply(200, { salt: server.salt, kdf: server.kdf });
+    if (url === '/api/auth/login') {
+      if (body.authKey !== server.authKey) return reply(401);
+      return reply(200, {
+        kind,
+        vaultEpoch: EPOCH,
+        ...server.wrapper,
+        kdfStale: server.kdfStale,
+        kdf: { ...KDF, m: KDF.m * 2 },
+      });
+    }
+    if (url === '/api/auth/upgrade-kdf' || url === '/api/auth/change-password') {
+      if (body.currentAuthKey !== undefined && body.currentAuthKey !== server.authKey) return reply(400);
+      Object.assign(server, { salt: body.salt, kdf: body.kdf, authKey: body.authKey });
+      if (body.wrappedDek) server.wrapper = { wrappedDek: body.wrappedDek, dekNonce: body.dekNonce };
+      return reply(200);
+    }
+    return reply(200, []);
+  };
+  return server;
+}
+const only = (server, url) => server.log.filter((u) => u === url).length;
+const PASSWORD = 'a long enough password';
+const NEXT = 'another long enough password';
+
+await check('a vault owner who types the wrong current password sends no request at all', async () => {
+  const session = await load('session.js');
+  const server = await credentialServer('vault_owner', PASSWORD);
+  await session.signIn('leander', PASSWORD);
+  server.log.length = 0;
+  await assert.rejects(session.changePassword('leander', 'not it', NEXT, KDF), session.WrongPasswordError);
+  assert.deepEqual(server.log, []);
+  session.lock();
+});
+
+await check('a change after sign-in, a second change and a change after a lock send no salt request', async () => {
+  const session = await load('session.js');
+  const server = await credentialServer('vault_owner', PASSWORD);
+  await session.signIn('leander', PASSWORD);
+  server.log.length = 0;
+  await session.changePassword('leander', PASSWORD, NEXT, KDF);
+  await session.changePassword('leander', NEXT, PASSWORD, KDF);
+  assert.deepEqual(server.log, ['/api/auth/change-password', '/api/auth/change-password']);
+  session.lock();
+  await session.signIn('leander', PASSWORD);
+  server.log.length = 0;
+  await session.changePassword('leander', PASSWORD, NEXT, KDF);
+  assert.deepEqual(server.log, ['/api/auth/change-password']);
+  session.lock();
+});
+
+await check('a change after this tab upgraded the KDF, and after an import, sends no salt request', async () => {
+  const session = await load('session.js');
+  const server = await credentialServer('vault_owner', PASSWORD);
+  server.kdfStale = true;
+  await session.signIn('leander', PASSWORD);
+  assert.equal(only(server, '/api/auth/upgrade-kdf'), 1);
+  server.log.length = 0;
+  await session.changePassword('leander', PASSWORD, NEXT, KDF);
+  assert.deepEqual(server.log, ['/api/auth/change-password']);
+
+  const dek = await cryptoModule.generateDek();
+  const wrapper = await session.wrapForMaster(dek);
+  await session.replaceDek(dek, EPOCH, wrapper);
+  server.log.length = 0;
+  await session.changePassword('leander', NEXT, PASSWORD, KDF);
+  assert.deepEqual(server.log, ['/api/auth/change-password']);
+  session.lock();
+});
+
+await check('a credential another session upgraded costs one salt lookup and one resend', async () => {
+  const session = await load('session.js');
+  const server = await credentialServer('vault_owner', PASSWORD);
+  await session.signIn('leander', PASSWORD);
+  await server.rekey(PASSWORD, 22, { ...KDF, m: KDF.m * 2 });
+  server.log.length = 0;
+  server.bodies.length = 0;
+  await session.changePassword('leander', PASSWORD, NEXT, KDF);
+  assert.deepEqual(server.log, ['/api/auth/change-password', '/api/auth/salt', '/api/auth/change-password']);
+  const [first, , second] = server.bodies;
+  assert.notEqual(first.currentAuthKey, second.currentAuthKey);
+  assert.deepEqual({ ...first, currentAuthKey: 0 }, { ...second, currentAuthKey: 0 });
+  const fresh = await cryptoModule.deriveKeys(NEXT, server.salt, server.kdf);
+  assert.equal(server.authKey, fresh.authKey);
+  session.lock();
+});
+
+await check('a refused change with an unchanged credential is final, after one salt lookup', async () => {
+  const session = await load('session.js');
+  const server = await credentialServer('vault_owner', PASSWORD);
+  await session.signIn('leander', PASSWORD);
+  server.authKey = 'changed under the same salt';
+  server.log.length = 0;
+  await assert.rejects(session.changePassword('leander', PASSWORD, NEXT, KDF), (e) => e.status === 400);
+  assert.deepEqual(server.log, ['/api/auth/change-password', '/api/auth/salt']);
+  session.lock();
+});
+
+await check('an administrator with the wrong current password still has the server refuse it', async () => {
+  const session = await load('session.js');
+  const server = await credentialServer('administrator', PASSWORD);
+  await session.signIn('root', PASSWORD);
+  server.log.length = 0;
+  await assert.rejects(session.changePassword('root', 'not it', NEXT, KDF), (e) => e.status === 400);
+  assert.equal(only(server, '/api/auth/change-password'), 1);
+  assert.equal(only(server, '/api/auth/salt'), 1);
+  server.log.length = 0;
+  await session.changePassword('root', PASSWORD, NEXT, KDF);
+  assert.deepEqual(server.log, ['/api/auth/change-password']);
 });
 
 // ---- Report -----------------------------------------------------------

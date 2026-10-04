@@ -190,6 +190,8 @@ function heroPart(label, figure) {
   ]);
 }
 
+const abs = (n) => (n < 0n ? -n : n);
+
 /** The change over the chart's selected range, or across a selected
  *  span, read at its two days from the value model. The arrow carries
  *  the sign as well as the color does. A year or more back is named by
@@ -200,17 +202,18 @@ function heroChange(vault, { days }, range, selection, dimension) {
   const [from, to] = selection || [days[0], days[days.length - 1]];
   const start = netAt(from);
   const change = netAt(to) - start;
-  const sign = change > 0n ? '+' : '';
-  const ratio = start === 0n
-    ? null
-    : (Number(decimal.format(change)) / Math.abs(Number(decimal.format(start)))) * 100;
+  // The sign is the amount's own and the figures after it are
+  // magnitudes, so the arrow, the amount and the percentage agree.
+  const sign = change > 0n ? '+' : change < 0n ? '\u2212' : '';
+  const percentage = start === 0n
+    ? ''
+    : ` \u00b7 ${sign}${vault.format.percent(decimal.divide(abs(change) * 100n, abs(start)), 1)}`;
   const tone = change > 0n ? 'good' : change < 0n ? 'critical' : 'flat';
   return el('p', { class: `hero-change ${tone}` }, [
     change === 0n ? null : icon(change > 0n ? 'up' : 'down'),
     el('span', {
       class: 'hero-delta',
-      text: `${vault.mainCurrency} ${sign}${vault.format.whole(change)}` +
-        (ratio === null ? '' : ` · ${ratio > 0 ? '+' : ratio < 0 ? '\u2212' : ''}${Math.abs(ratio).toFixed(1)}%`),
+      text: `${vault.mainCurrency} ${sign}${vault.format.whole(abs(change))}${percentage}`,
     }),
     el('span', {
       class: 'hero-since',
@@ -301,20 +304,19 @@ function chartSection(vault, state, render, dimension, actions, { days, bands })
           groupBySelect(vault, state, render),
         ]),
         coverage
-          ? el('button', {
-              class: 'link-button coverage',
-              'aria-label': `${coverage.assigned} of ${coverage.total} holdings assigned. Show the unassigned ones.`,
-              onclick: () => {
-                state.unassignedOnly = true;
-                render();
-                const table = document.querySelector('.holdings-card');
-                if (table) table.scrollIntoView({ block: 'start' });
-              },
-            }, [
-              `${coverage.assigned} of ${coverage.total} `,
-              el('span', { class: 'wide-only', text: 'holdings ' }),
-              'assigned',
-            ])
+          ? coverage.assigned < coverage.total
+            ? el('button', {
+                class: 'link-button coverage',
+                'aria-label': `${coverage.assigned} of ${coverage.total} holdings assigned. Show the unassigned ones.`,
+                onclick: () => {
+                  state.unassignedOnly = true;
+                  render();
+                  const table = document.querySelector('.holdings-card');
+                  if (table) table.scrollIntoView({ block: 'start' });
+                },
+              }, coverageText(coverage))
+            // Nothing is left to filter to, so it is only a count.
+            : el('span', { class: 'coverage' }, coverageText(coverage))
           : null,
         el('div', { class: 'switch', role: 'group', 'aria-label': 'Scale' }, [
           switchButton('Absolute', !state.percentage, () => {
@@ -352,8 +354,7 @@ function chartSection(vault, state, render, dimension, actions, { days, bands })
         percentage: state.percentage,
         justTheLine: state.justTheLine,
         locale: vault.format.locale,
-        group: vault.format.group,
-        decimalPoint: vault.format.point,
+        format: vault.format,
         formatDay: (iso) => vault.format.dayMonth(iso, 'short'),
         formatDate: vault.format.longDate,
         onPickDate: (date) => actions.openRecording(date),
@@ -421,8 +422,16 @@ function chartSection(vault, state, render, dimension, actions, { days, bands })
           }),
         ])
       : null,
-    el('details', {}, [el('summary', { text: 'View as table' }), chartTable(days, bands, vault.format)]),
+    el('details', {}, [el('summary', { text: 'View as table' }), chartTable(days, bands, vault.format, !dimension)]),
   ]);
+}
+
+function coverageText(coverage) {
+  return [
+    `${coverage.assigned} of ${coverage.total} `,
+    el('span', { class: 'wide-only', text: 'holdings ' }),
+    'assigned',
+  ];
 }
 
 function checkbox(checked, onchange) {
@@ -545,6 +554,7 @@ function holdingsTable(vault, state, render, actions, grouping) {
   const { rows, unpriced, unvalued } = holdingGroups(vault, state, grouping);
   const newestRate = vault.newestRateDate();
   const filtering = state.unassignedOnly && grouping;
+  const listed = rows.length + unpriced.length + unvalued.length > 0;
 
   const header = el('tr', {}, [
     el('th', { text: 'Name' }),
@@ -568,7 +578,11 @@ function holdingsTable(vault, state, render, actions, grouping) {
     ]),
     filtering
       ? el('p', { class: 'filter-line', role: 'status' }, [
-          el('span', { text: `Showing the holdings with no ${grouping.label} value.` }),
+          el('span', {
+            text: listed
+              ? `Showing the holdings with no ${grouping.label} value.`
+              : `Every holding has a ${grouping.label} value.`,
+          }),
           el('button', {
             class: 'link-button',
             text: 'Show all holdings',
@@ -582,7 +596,10 @@ function holdingsTable(vault, state, render, actions, grouping) {
           }),
         ])
       : null,
-    el('table', { class: 'data-table holdings-table' }, [
+    // Without a filter nothing listed means every holding is archived.
+    !filtering && !listed ? el('p', { class: 'hint', text: 'Every holding is archived.' }) : null,
+    // A table of headings alone reads as a fault.
+    rows.length ? el('table', { class: 'data-table holdings-table' }, [
       el('thead', {}, [header]),
       el(
         'tbody',
@@ -665,7 +682,7 @@ function holdingsTable(vault, state, render, actions, grouping) {
           ]),
         ),
       ),
-    ]),
+    ]) : null,
     unpriced.length
       ? group('Not priced', unpriced.map((r) => r.holding), vault, actions,
           'Their unit has no price at all, so they are excluded from the total rather than counted at their bare quantity.')

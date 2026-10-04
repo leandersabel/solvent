@@ -57,6 +57,10 @@ be set against it, because a language is a coarse guess at taste. A
 Swiss reader may want an apostrophe between thousands and no
 centimes, and no language says that.
 
+The decimal point is always your language's. A thousands mark that is
+also your language's decimal point is not applied, because 1.234 would
+then mean two things. Your language's own pairing of marks stands.
+
 A sample line shows the choice before it is saved.
 
 The settings live in the vault, so they follow you to any browser you
@@ -148,7 +152,8 @@ Each card shows:
 - Its **name**, editable in place. Renaming is instant and free, and
   touches no holding.
 - Its **coverage**, the same figure the dashboard shows: "7 of 10
-  holdings assigned", with the unassigned ones a click away. A
+  holdings assigned", with the unassigned ones a click away whenever
+  there are any. A
   dimension covering a third of the holdings draws a chart that is
   accurate and useless, and this is where that shows, at setup rather
   than in a confusing chart later.
@@ -198,6 +203,9 @@ single total.
   sitting.
 - Dates and figures on every screen are written the way the settings
   say, the calendar you pick a date from included.
+- A thousands mark that is also your language's decimal point is not
+  applied. In English (US) with a period chosen for thousands, figures
+  read CHF 1,234,567.89, and a value field takes 12.5 and refuses 12,5.
 - A date typed the way the settings write it is accepted. A date that
   does not exist is refused rather than quietly moved.
 - Changing any of the date or number settings and changing it back
@@ -233,6 +241,9 @@ single total.
 - The delete dialog offers exporting first as its main action.
 - The list of open sessions shows only your own sessions, never anyone
   else's, and carries no IP address and no device information.
+- The list of open sessions matches what is open whenever it is shown.
+  Right after you change your password, it lists only the session you
+  are using, without you leaving the page.
 - Signing out ends the current session and leaves another session on
   the same account working. Signing out everywhere ends that one too,
   including the current one.

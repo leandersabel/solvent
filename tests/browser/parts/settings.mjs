@@ -4,8 +4,8 @@
 // Templates: dashboard.html. Modules: view-settings.js, session.js,
 // format.js, api.js, crypto.js, dom.js.
 import {
-  BASE, DIRECT, HANDS, LEAVING_PASSWORD, NEW_PASSWORD, VAULT_PASSWORD, WEAK_MEMORY, check, click, credentialOf,
-  enterPassword, expectedFailures, intercept, intoVault, makeStale, markDocument, mintInvite, openBrowser, page,
+  BASE, DIRECT, HANDS, LEAVING_PASSWORD, NEW_PASSWORD, VAULT_PASSWORD, WEAK_MEMORY, check, click, confirmLook, credentialOf,
+  enterPassword, expectedFailures, intercept, intoVault, looksDisabled, looksEnabledRed, makeStale, markDocument, mintInvite, openBrowser, page,
   recordsOf, run, signInOn, sitting, sql, story, text, unlockDashboard, vaultOwner, watched,
 } from '../harness.mjs';
 
@@ -41,6 +41,21 @@ await run(async () => {
       node.dispatchEvent(new Event('change', { bubbles: true }));
     }, id, value);
   };
+  // Under the language's own order the sample spells the month, as
+  // every date shown for reading does.
+  await setSelect('format-locale', 'en-US');
+  await setSelect('format-dates', 'locale');
+  await page.frames();
+  const spelledSample = await page.eval(`(async () => {
+    const f = (await import('/static/js/format.js')).formatter({ locale: 'en-US', dateStyle: 'locale' });
+    const { today } = await import('/static/js/dom.js');
+    return JSON.stringify({ shown: document.querySelector('.sample-date').textContent, expected: f.longDate(today()) });
+  })()`);
+  check(
+    'the settings sample line writes its date with longDate, spelling the month under the language\'s own order',
+    JSON.parse(spelledSample).shown === JSON.parse(spelledSample).expected && /[A-Za-z]/.test(JSON.parse(spelledSample).shown),
+    spelledSample,
+  );
   await setSelect('format-locale', 'de-CH');
   await setSelect('format-group', 'apostrophe');
   await setSelect('format-places', '0');
@@ -259,13 +274,20 @@ await run(async () => {
   const gates = [
     await deleteState('', 'leander'),
     await deleteState('something', 'Leander'),
-    await deleteState('something', 'leander'),
   ];
+  const disabledLook = await confirmLook('Delete my vault');
+  gates.push(await deleteState('something', 'leander'));
+  const enabledLook = await confirmLook('Delete my vault');
   await deleteState('', '');
   check(
     'Delete my vault stays disabled until the password is filled and the username matches exactly',
     gates.join(',') === 'true,true,false',
     gates.join(','),
+  );
+  check(
+    'a disabled Delete my vault is petrol-200 with an ink-secondary label at full opacity, a default cursor and no red, and turns red once it can act',
+    looksDisabled(disabledLook) && looksEnabledRed(enabledLook),
+    JSON.stringify({ disabledLook, enabledLook }),
   );
   check(
     'the deletion offers Export first as its primary action',
@@ -345,8 +367,11 @@ await run(async () => {
     }, PASSWORD_CARD);
   const changeRequests = () =>
     watched[0].requests.filter((r) => r.url.endsWith('/api/auth/change-password'));
+  const apiSince = (index, tail = '/api/') =>
+    watched[0].requests.slice(index).filter((r) => r.url.includes(tail));
 
   await fillPasswords('not the password at all', NEW_PASSWORD);
+  const beforeWrong = watched[0].requests.length;
   await submitPasswords();
   await page.waitUntil("document.body.innerText.includes('That is not your current password.')", {
     timeout: 60000,
@@ -367,11 +392,17 @@ await run(async () => {
     `${JSON.stringify(wrongCurrent.above)}, ${changeRequests().length} sent`,
   );
   check(
+    'a wrong current password sends no request of any kind, a salt lookup included',
+    apiSince(beforeWrong).length === 0,
+    apiSince(beforeWrong).map((r) => r.url).join(' | '),
+  );
+  check(
     'every field is kept after a wrong current password',
     wrongCurrent.kept.join('|') === ['not the password at all', NEW_PASSWORD, NEW_PASSWORD].join('|'),
   );
 
   await fillPasswords(VAULT_PASSWORD, NEW_PASSWORD);
+  const beforeChangeRequests = watched[0].requests.length;
   const working = await page.call((words) => {
     const card = [...document.querySelectorAll('.card')].find((c) => c.textContent.includes(words));
     const button = card.querySelector('.btn-primary');
@@ -393,6 +424,11 @@ await run(async () => {
   check(
     'the change confirms what else happened',
     (await text()).includes('Every other session was signed out, and this one is still open.'),
+  );
+  check(
+    'a successful change sends no salt request',
+    apiSince(beforeChangeRequests, '/api/auth/salt').length === 0,
+    apiSince(beforeChangeRequests).map((r) => r.url).join(' | '),
   );
   const afterChange = credentialOf('leander');
   const embedded = await page.eval("document.getElementById('kdf-envelope').textContent");
@@ -451,15 +487,80 @@ await run(async () => {
     oldPassword.close();
   }
 
+  // The Open sessions list after a change, with a second session open
+  // before Settings renders, so the rows fetched then include it.
+  const sessionRows = () =>
+    page.call(() => ({
+      rows: document.querySelectorAll('.sessions-table tbody tr').length,
+      marked: [...document.querySelectorAll('.sessions-table .chip')].filter((c) => c.textContent === 'This session').length,
+      failed: document.body.innerText.includes('The session list would not load.'),
+      retry: [...document.querySelectorAll('.session-list button')].some((b) => b.textContent === 'Retry'),
+      stayed: window.__stayed === true,
+    }));
+  const rowsAre = (rows) => page.waitUntil(
+    (count) => document.querySelectorAll('.sessions-table tbody tr').length === count,
+    { args: [rows], label: `${rows} session rows` },
+  );
+  const awayAndBack = async (label) => {
+    await page.eval("location.hash = '#/'");
+    await page.waitUntil("document.querySelector('.hero-figure')", { label: 'the dashboard before settings' });
+    await toSettings(label);
+  };
+
   // Back to the password the part's checks sign in with.
-  await toSettings('settings to change the password back');
+  await otherSession('leander', NEW_PASSWORD);
+  await awayAndBack('settings with two sessions open');
+  await rowsAre(2);
+  await page.eval('window.__stayed = true');
   await fillPasswords(NEW_PASSWORD, VAULT_PASSWORD);
   await submitPasswords();
   await page.waitUntil("document.body.innerText.includes('Your password is changed.')", {
     timeout: 60000,
     label: 'the password changed back',
   });
+  await page.holds(
+    (count) => document.querySelectorAll('.sessions-table tbody tr').length === count,
+    { args: [1], label: 'one session row after the change' },
+  );
+  const reloaded = await sessionRows();
+  check(
+    'after a password change the session list shows one row, marked This session, with no navigation',
+    reloaded.rows === 1 && reloaded.marked === 1 && reloaded.stayed,
+    JSON.stringify(reloaded),
+  );
 
+  // A reload that fails shows the card's error, never the old rows.
+  await otherSession('leander', VAULT_PASSWORD);
+  await awayAndBack('settings with two sessions open again');
+  await rowsAre(2);
+  expectedFailures.add('/api/sessions');
+  const releaseReload = await intercept(page, '*/api/sessions', () => ({ status: 500 }));
+  await fillPasswords(VAULT_PASSWORD, NEW_PASSWORD);
+  await submitPasswords();
+  await page.waitUntil("document.body.innerText.includes('The session list would not load.')", {
+    timeout: 60000,
+    label: 'the list error after the change',
+  });
+  const failedReload = await sessionRows();
+  check(
+    'a failed reload after a password change shows the load error and Retry, never the old rows',
+    failedReload.failed && failedReload.retry && failedReload.rows === 0,
+    JSON.stringify(failedReload),
+  );
+  await releaseReload();
+  expectedFailures.delete('/api/sessions');
+  await page.call(() => {
+    [...document.querySelectorAll('.session-list button')].find((b) => b.textContent === 'Retry').click();
+  });
+  await rowsAre(1);
+
+  await fillPasswords(NEW_PASSWORD, VAULT_PASSWORD);
+  await submitPasswords();
+  await page.waitUntil("document.body.innerText.includes('Your password is changed.')", {
+    timeout: 60000,
+    label: 'the password changed back again',
+  });
+  await rowsAre(1);
 
   // ---- Account settings: deleting a vault --------------------------------
 

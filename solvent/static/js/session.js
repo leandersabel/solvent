@@ -13,10 +13,13 @@ import { deleteRecord } from './writes.js';
 const DEFAULT_IDLE_MINUTES = 15;
 
 let masterKey = null;
-// The DEK as the server holds it, wrapped under the Master Key: what a
-// password change unwraps to prove the current password before sending
-// anything. Ciphertext, as public as the row it came from.
-let wrapper = null;
+// The password credential as this tab last knew it: `{ salt, kdf }` and,
+// for a vault owner, the DEK's wrapper `{ wrappedDek, dekNonce }` under
+// the Master Key. A password change derives from the salt and unwraps
+// the wrapper to prove the current password before sending anything
+// (account-settings.md, The held credential). Public or ciphertext, as
+// the rows they came from.
+let held = null;
 let vault = null;
 let idleTimer = null;
 const lockListeners = [];
@@ -116,6 +119,7 @@ export async function signIn(username, password) {
   }
 
   if (answer.kind === 'administrator') {
+    held = { salt, kdf };
     if (answer.kdfStale) await upgradeQuietly(password, answer.kdf, null);
     return { kind: 'administrator' };
   }
@@ -144,7 +148,7 @@ export async function signIn(username, password) {
     await openVault(
       keys.masterKey,
       dek,
-      { wrappedDek: answer.wrappedDek, dekNonce: answer.dekNonce },
+      { salt, kdf, wrappedDek: answer.wrappedDek, dekNonce: answer.dekNonce },
       began,
     );
   } catch (error) {
@@ -177,10 +181,10 @@ export async function signIn(username, password) {
  *  to draw the vault. A page load here would drop them. The keys come
  *  in as arguments from the form in the same document and are not
  *  stored anywhere but the variables above. */
-export async function startRegistered({ username, masterKey: key, dek, wrapper: wrapped }) {
+export async function startRegistered({ username, masterKey: key, dek, wrapper, salt, kdf }) {
   const began = generation;
   try {
-    await openVault(key, dek, wrapped, began);
+    await openVault(key, dek, { salt, kdf, ...wrapper }, began);
   } catch (error) {
     // The keys are held for the retry, so the idle limit runs from now
     // as it would on an open vault. A lock during the read took them
@@ -194,9 +198,9 @@ export async function startRegistered({ username, masterKey: key, dek, wrapper: 
 // Where both ways in meet: the keys are held, and the vault is read
 // with them. The vault is open only once it has been read whole, and
 // only if nothing locked it meanwhile.
-async function openVault(key, dek, wrapped, began) {
+async function openVault(key, dek, credential, began) {
   masterKey = key;
-  wrapper = wrapped;
+  held = credential;
   const next = new Vault(dek);
   try {
     await next.load();
@@ -246,27 +250,32 @@ async function upgradeKdf(password, targetKdf, dek) {
   const rewrapped = dek ? await crypto.wrapDek(dek, keys.masterKey) : null;
   Object.assign(body, rewrapped);
   await api.post('/api/auth/upgrade-kdf', body);
-  if (dek) {
-    masterKey = keys.masterKey;
-    wrapper = rewrapped;
-  }
+  held = { salt, kdf: targetKdf, ...rewrapped };
+  if (dek) masterKey = keys.masterKey;
 }
+
+const sameEnvelope = (a, b) =>
+  a.salt === b.salt && JSON.stringify(Object.entries(a.kdf).sort()) === JSON.stringify(Object.entries(b.kdf).sort());
 
 /** Change password: the DEK does not change, so no vault record is
  *  re-encrypted. Only the envelope around the key is rebuilt, which is
  *  the whole reason the Master Key wraps a DEK instead of encrypting
- *  records directly (account-settings.md). */
+ *  records directly (account-settings.md).
+ *
+ *  The current password is checked against the credential this tab
+ *  holds, so a vault owner's wrong one sends nothing, a salt lookup
+ *  included. */
 export async function changePassword(username, currentPassword, newPassword, kdf) {
-  const { salt: currentSalt, kdf: currentKdf } = await api.post('/api/auth/salt', {
-    username,
-  });
-  const current = await crypto.deriveKeys(currentPassword, currentSalt, currentKdf);
+  const lookup = () => api.post('/api/auth/salt', { username });
+  const credential = held ?? (await lookup());
+  const derive = ({ salt, kdf: envelope }) => crypto.deriveKeys(currentPassword, salt, envelope);
+  const current = await derive(credential);
   // For a vault owner the unwrap is the first of the two checks, and
   // a failure stops here with nothing sent. An administrator has
   // nothing to unwrap, so the server's check is their only one.
-  if (wrapper) {
+  if (held?.wrappedDek) {
     try {
-      await crypto.unwrapDek(wrapper.wrappedDek, wrapper.dekNonce, current.masterKey);
+      await crypto.unwrapDek(held.wrappedDek, held.dekNonce, current.masterKey);
     } catch {
       throw new WrongPasswordError();
     }
@@ -282,11 +291,19 @@ export async function changePassword(username, currentPassword, newPassword, kdf
   };
   const rewrapped = vault ? await crypto.wrapDek(vault.dek, next.masterKey) : null;
   Object.assign(body, rewrapped);
-  await api.post('/api/auth/change-password', body);
-  if (vault) {
-    masterKey = next.masterKey;
-    wrapper = rewrapped;
+  try {
+    await api.post('/api/auth/change-password', body);
+  } catch (failure) {
+    if (failure.status !== 400) throw failure;
+    // Another live session may have upgraded the credential since this
+    // tab opened the vault. One lookup, and one resend when it differs.
+    const fresh = await lookup();
+    if (sameEnvelope(fresh, credential)) throw failure;
+    body.currentAuthKey = (await derive(fresh)).authKey;
+    await api.post('/api/auth/change-password', body);
   }
+  held = { salt, kdf, ...rewrapped };
+  if (vault) masterKey = next.masterKey;
 }
 
 export function authKeyFor(username, password) {
@@ -305,9 +322,10 @@ export function wrapForMaster(dek) {
  *  browser is told its epoch was replaced. The model is read again
  *  under the new DEK. The Master Key stays, because the password
  *  did not change (export-import.md, The re-key step). */
-export async function replaceDek(dek, vaultEpoch) {
+export async function replaceDek(dek, vaultEpoch, wrapped) {
   api.announce(api.vaultEpoch());
   api.setVaultEpoch(vaultEpoch);
+  held = { ...held, ...wrapped };
   const next = new Vault(dek);
   await next.load();
   vault = next;
@@ -331,7 +349,7 @@ export function lock() {
 function discardKeys() {
   generation += 1;
   masterKey = null;
-  wrapper = null;
+  held = null;
   vault = null;
   clearTimeout(idleTimer);
   idleTimer = null;

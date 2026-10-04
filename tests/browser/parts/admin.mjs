@@ -2,8 +2,8 @@
 // dialog over it, and the only way out of it.
 // Templates: admin.html. Modules: page-admin.js, dom.js, shell.js.
 import {
-  ADMIN_PASSWORD, BASE, CLOCK, MINUTE, administrator, check, click, labels, openBrowser, setValue, signInOn, text, page,
-  run, watched,
+  ADMIN_PASSWORD, BASE, CLOCK, MINUTE, SECOND_PASSWORD, administrator, check, click, confirmLook, labels, looksDisabled,
+  looksEnabledRed, mintInvite, openBrowser, register, setValue, signInOn, text, page, run, watched,
 } from '../harness.mjs';
 
 await run(async () => {
@@ -43,6 +43,30 @@ await run(async () => {
     'the only administrator has no Remove control',
     (await text()).includes('The only administrator'),
   );
+
+  // A second administrator, so the first has an account to remove.
+  const { session: second, close: closeSecond } = await openBrowser();
+  await register(second, mintInvite('administrator'), 'ops.second', SECOND_PASSWORD);
+  await second.waitUntil("location.pathname === '/admin' && document.querySelector('#app .section-switcher')", {
+    timeout: 90000,
+    label: 'the second administrator',
+  });
+  closeSecond();
+  await click('Invites');
+  await click('Accounts');
+  await page.waitUntil("document.body.innerText.includes('ops.second')", { label: 'the second administrator in the list' });
+  await page.eval(`[...document.querySelectorAll('tr')].find((r) => r.textContent.includes('ops.second')).querySelector('button').click()`);
+  await page.waitUntil("document.querySelector('.dialog input')", { label: 'the removal dialog' });
+  const removeDisabled = await confirmLook('Remove account');
+  await setValue('.dialog input', 'ops.second');
+  const removeEnabled = await confirmLook('Remove account');
+  check(
+    'a disabled Remove account is petrol-200 with an ink-secondary label at full opacity, a default cursor and no red, and turns red once the username matches',
+    looksDisabled(removeDisabled) && looksEnabledRed(removeEnabled),
+    JSON.stringify({ removeDisabled, removeEnabled }),
+  );
+  await click('Cancel');
+  await page.waitUntil("!document.querySelector('.dialog')", { label: 'the dialog to close' });
 
   await click('Units');
   await page.waitUntil("document.body.innerText.includes('XAU-ozt')", { label: 'the unit table' });

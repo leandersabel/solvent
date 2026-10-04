@@ -337,13 +337,20 @@ Every figure is grouped and pointed as Settings sets it
   Decimals on money does not reach it, because rounding 12.5 ounces of
   gold to 13 loses part of the holding, and padding it to 12.50 claims
   a precision nobody recorded.
+- **A percentage shows one decimal place**, grouped and pointed like
+  every other figure, so a change reads "+136,794.6%" by default and
+  "+136.794,6%" under German with a period as the thousands mark.
+  Decimals on money does not reach it, because a percentage is not
+  money.
 - **A chart's value tick is the one figure that abbreviates.** From a
-  thousand up it reads in short form, "2.5k", pointed as Settings sets
-  it, so a reader with a decimal comma sees "2,5k". Below a thousand it
-  reads whole. The exact format is `net-worth-view.md`'s. Every other
-  figure, the chart's tooltip and legend included, shows in full,
-  because a tick only has to place a line and the readout is where a
-  value is read.
+  thousand up it reads in short form, "2.5k" or "1.5M", grouped and
+  pointed as Settings sets it, so a reader with a decimal comma sees
+  "2,5k" and "1,5M". Below a thousand it reads whole, and in the
+  percentage view every tick reads as a whole percent, grouped the same
+  way. The exact format is `net-worth-view.md`'s. Every other figure,
+  the chart's tooltip and legend included, shows in full, because a
+  tick only has to place a line and the readout is where a value is
+  read.
 
 ## Spacing and shape
 
@@ -433,6 +440,13 @@ only its own content region.
   darker step of the same one.
 - **Button, destructive**: critical text on transparent, critical border;
   filled critical only inside a confirmation dialog.
+- **Button, disabled**: one look for primary, secondary and
+  destructive, filled or outlined. petrol-200 fill and border, the
+  label in ink-secondary at 5.24:1 on that fill, no hover change and
+  `cursor: default`. Nothing of the enabled variant shows through, the
+  critical red included, so a confirm turns red only once it can act.
+  Never `opacity`: it lets the variant's color through and drops the
+  label under the 4.5:1 floor.
 - **Input**: white fill, hairline border, petrol-600 2px focus ring.
   Never remove the focus ring. **An inline rename is this same input
   revealed in place** by an Edit action and saved by an explicit
@@ -708,6 +722,9 @@ upward from zero reads as a slot machine. Respect
 - Body text ≥4.5:1, large text and non-text ≥3:1. The tables above give
   the measured value for every token; the sub-4.5 ones are marked with
   their permitted use.
+- A disabled button's label meets the 4.5:1 floor too (Components,
+  Button, disabled), because it still names what the button does once
+  it can act.
 - Visible focus ring on every interactive element, never suppressed.
 - Identity is never color-alone: charts carry a legend for ≥2 series and
   direct labels for ≤4; status carries an icon and a label.

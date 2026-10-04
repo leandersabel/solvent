@@ -42,10 +42,14 @@ holding. Decrypted payload:
     scale-12 values is scale 24, divided back by 10¹² with
     **round-half-even**. Addition and subtraction need no rescale, which
     is why a sum of snapshots is exact by construction.
-  - **Division** happens in two places only — the percentage view and
-    per-holding interpolation (`net-worth-view.md`) — and rounds
-    half-even at scale 12 as well. Rounding for *display* is a separate,
-    later step applied to a figure already exact at scale 12.
+  - **Division** happens in two places only, per-holding interpolation
+    and the change percentage (`net-worth-view.md`, Values between
+    entries and The change), and rounds half-even at scale 12 as well.
+    Rounding for *display* is a separate, later step applied to a
+    figure already exact at scale 12. The percentage view's shares are
+    no figure: they place the drawing, in floats like the rest of its
+    stack, and its ticks are exact integers (`net-worth-view.md`, Value
+    ticks).
   - A decimal library was rejected on the same grounds as a charting
     library (`net-worth-view.md`): what it supplies is rescaling and a
     rounding mode — the helpers above — against one more file to

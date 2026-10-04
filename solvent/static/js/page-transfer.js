@@ -301,9 +301,10 @@ function importCard(vault, reload) {
     }
 
     let answered;
+    let wrapper;
     try {
       progress('Uploading…');
-      const wrapper = await wrapForMaster(rekeyed.dek);
+      wrapper = await wrapForMaster(rekeyed.dek);
       answered = await api.post('/api/import', { ...wrapper, records: rekeyed.records });
     } catch {
       phase.hidden = true;
@@ -314,7 +315,7 @@ function importCard(vault, reload) {
 
     const theirs = opened.profile ? opened.profile.mainCurrency : null;
     const before = vault.mainCurrency;
-    const next = await replaceDek(rekeyed.dek, answered.vaultEpoch);
+    const next = await replaceDek(rekeyed.dek, answered.vaultEpoch, wrapper);
     restored = {
       counts: transfer.countKinds(parsed.records),
       currency: next.mainCurrency,

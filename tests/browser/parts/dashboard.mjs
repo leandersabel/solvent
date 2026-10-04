@@ -130,7 +130,7 @@ await run(async () => {
       [...document.querySelectorAll('.range-buttons button')].find(b => b.textContent === 'All').click();
       await new Promise((r) => requestAnimationFrame(() => requestAnimationFrame(r)));
       const row = [...document.querySelectorAll('details table tbody tr')]
-        .find(r => r.cells[0].textContent === v.format.date(day));
+        .find(r => r.cells[0].textContent === v.format.longDate(day));
       return JSON.stringify({ shown: row ? row.cells[1].textContent : null, expected: v.format.money((await import('/static/js/decimal.js')).parse(figure)) });
     }, date, expected).then(JSON.parse);
   const banner = () => labels('.banner-critical button');
@@ -610,14 +610,19 @@ await run(async () => {
   await soloReads('one recording and an older price');
 
   // A decimal comma reaches the value ticks, the one figure that abbreviates.
-  await setProfile({ groupSeparator: 'period' });
+  const profileBefore = await page.call(async () => (await import('/static/js/session.js')).currentVault().profile);
+  await setProfile({ locale: 'de-DE', groupSeparator: 'period' });
   await unlockDashboard('the dashboard under a decimal comma');
   await viewport(1280);
   check(
     'net-worth-view: under a decimal comma the ticks at 1500 and 2500 read 1,5k and 2,5k',
     JSON.stringify((await drawn('1Y')).values) === JSON.stringify(['0', '500', '1k', '1,5k', '2k', '2,5k']),
   );
-  await setProfile({ groupSeparator: 'locale' });
+  await page.call(async (profile) => {
+    const s = await import('/static/js/session.js');
+    const writes = await import('/static/js/writes.js');
+    await writes.saveProfile(s.currentVault(), profile);
+  }, profileBefore);
 
   // ---- Value labels of a negative total, drawn whole ----------------------
   //

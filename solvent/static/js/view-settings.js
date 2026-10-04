@@ -20,13 +20,14 @@ import { strengthGauge } from './strength.js';
 /** `open` goes to one of the screens reached from here, by the last
  *  part of its address. */
 export function settingsView(vault, { username, kdf, reload, open }) {
+  const sessions = sessionCard(vault);
   return [
     el('h1', { class: 'screen-heading', text: 'Settings' }),
     profileCard(vault, username),
     formatCard(vault, reload),
     organizingCard(vault, open),
-    changePasswordCard(kdf, username),
-    sessionCard(vault),
+    changePasswordCard(kdf, username, () => sessions.load()),
+    sessions.card,
     dangerZone(username, open),
   ];
 }
@@ -94,7 +95,7 @@ function formatCard(vault, reload) {
       dateStyle: dates.value,
     });
     sampleFigure.textContent = `${vault.mainCurrency} ${shape.money(1234567890000000000n)}`;
-    sampleDate.textContent = shape.date(today());
+    sampleDate.textContent = shape.longDate(today());
   };
   for (const control of [language, group, places, dates]) {
     control.addEventListener('change', preview);
@@ -189,7 +190,9 @@ function organizingCard(vault, open) {
   ]);
 }
 
-function changePasswordCard(kdf, username) {
+/** `sessions` fetches the session list again: the server ends every
+ *  other session before it answers a change, so the rows shown are stale. */
+function changePasswordCard(kdf, username, sessions) {
   const current = el('input', { type: 'password', autocomplete: 'current-password' });
   const next = el('input', { type: 'password', autocomplete: 'new-password' });
   const confirm = el('input', { type: 'password', autocomplete: 'new-password' });
@@ -231,11 +234,12 @@ function changePasswordCard(kdf, username) {
       await changePassword(username, current.value, next.value, kdf);
       current.value = next.value = confirm.value = '';
       show(done, 'Your password is changed. Every other session was signed out, and this one is still open.');
+      sessions();
     } catch (failure) {
       // Every field is kept, so nothing is typed or derived twice.
       show(
         error,
-        failure instanceof WrongPasswordError || failure.status === 400
+        failure instanceof WrongPasswordError
           ? 'That is not your current password.'
           : 'Nothing was changed. Your current password still works.',
       );
@@ -329,7 +333,7 @@ function sessionCard(vault) {
   };
   load();
 
-  return el('section', { class: 'card' }, [
+  const card = el('section', { class: 'card' }, [
     el('h2', { class: 'section-heading', text: 'Session and lock' }),
     el('div', { class: 'idle-grid' }, [
       field('Idle lock', idle),
@@ -369,6 +373,7 @@ function sessionCard(vault) {
     ]),
     everywhereError,
   ]);
+  return { card, load };
 }
 
 /** The Danger zone holds one destructive button, and the deletion is

@@ -4,8 +4,8 @@
 // Templates: dashboard.html. Modules: view-holding-form.js, view-holding.js,
 // view-forms.js, view-dimensions.js, view-dashboard.js, writes.js, model.js.
 import {
-  accountRows, BACKDATE, BASE, check, choose, click, enterPassword, failing, idNamed, inDatabase, inDialog, labels,
-  landing, openHolding, OWN, page, payloadOf, plant, provoked, recording, recordReads, recordWrites, reloadModel,
+  accountRows, BACKDATE, BASE, check, choose, click, confirmLook, enterPassword, failing, idNamed, inDatabase, inDialog, labels,
+  landing, looksDisabled, looksEnabledRed, openHolding, OWN, page, payloadOf, plant, provoked, recording, recordReads, recordWrites, reloadModel,
   rowOf, run, setProfile, setValue, sql, text, TODAY_FIGURES, unlockDashboard, VAULT_PASSWORD, vaultOwner,
   vaultValue, writesSeen, writing,
 } from '../harness.mjs';
@@ -47,6 +47,10 @@ await run(async () => {
 
   check('every holding is listed as not yet valued', (await text()).includes('Not yet valued'));
   check(
+    'with no holding valued, the groups stand under the head row with no table and no column heading',
+    await page.eval("!document.querySelector('.holdings-table') && !document.querySelector('.holdings-card th') && document.querySelector('.holdings-card .card-head + .table-group .group-heading')?.textContent === 'Not yet valued'"),
+  );
+  check(
     'a holding reads back the name it was given',
     (await labels('.plain-list .link-button')).join(',') ===
       'Cantonal account,UBS dollar account,Gold bars,Mortgage',
@@ -65,6 +69,10 @@ await run(async () => {
     }],
   });
   await unlockDashboard('the dashboard of the story');
+  check(
+    'once a holding is valued the table renders, with its column headings above the valued rows',
+    await page.eval("document.querySelectorAll('.holdings-table th').length > 0 && document.querySelectorAll('.holdings-table tbody tr').length > 0"),
+  );
 
   {
     await recordWrites();
@@ -509,12 +517,19 @@ await run(async () => {
     const deleteCopy = (await text()).includes('This also deletes 1 recorded values. Your past net worth figures will change.');
     await setValue('#delete-name', 'Not the name');
     const wrongName = await page.call(permanently);
+    const wrongLook = await confirmLook('Delete permanently');
     await setValue('#delete-name', NAME);
     const rightName = await page.call(permanently);
+    const rightLook = await confirmLook('Delete permanently');
     check(
       'Delete on a holding with values offers archive, preselected, and permanent delete behind the typed name',
       offered.archive && offered.both === 2 && deleteCopy && wrongName && !rightName,
       JSON.stringify({ offered, deleteCopy, wrongName, rightName }),
+    );
+    check(
+      'a disabled Delete permanently is petrol-200 with an ink-secondary label at full opacity, a default cursor and no red, and turns red once the name matches',
+      looksDisabled(wrongLook) && looksEnabledRed(rightLook),
+      JSON.stringify({ wrongLook, rightLook }),
     );
     await inDialog('Cancel');
     await page.waitUntil("!document.querySelector('.dialog')", { label: 'the dialog to close' });

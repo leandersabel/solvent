@@ -31,7 +31,7 @@ await run(async () => {
     proxy, proposalsFor, traffic, unwatched, writesSent, rateAsks, ev, text, quiet,
     press, realClick, uncovered, realKey, stored, on, bytes, plantHere,
     reread, go, format, model, line, lineState, figure, tableRow,
-    hero, home, sweepToday, script, id, price,
+    hero, home, sweepToday, script, id, price, viewport,
   } = r;
 
   traffic.length = 0;
@@ -169,9 +169,70 @@ await run(async () => {
     'net-worth-view: a history shorter than a year opens on All',
     (await ev("document.querySelector('.range-buttons .active').textContent")) === 'All',
   );
+  // The chart's data table over All, beside what the value model says
+  // of each of its days: the columns, the dates as `longDate` writes
+  // them, and Net worth as the exact sum of the row's bands.
+  const dataTable = () =>
+    rec.call(async () => {
+      const { currentVault } = await import('/static/js/session.js');
+      const { isoFromDay } = await import('/static/js/model.js');
+      const decimal = await import('/static/js/decimal.js');
+      const v = currentVault();
+      [...document.querySelectorAll('.range-buttons button')].find(b => b.textContent === 'All').click();
+      await new Promise((r) => requestAnimationFrame(() => requestAnimationFrame(r)));
+      const picked = document.querySelector('.chart-card select').value;
+      const dimension = v.activeDimensions().find((d) => d.id === picked) || null;
+      const range = v.chartRange(null);
+      const { days, bands } = v.series(dimension, range.fromDay, range.lastDay);
+      const table = document.querySelector('.chart-card details table');
+      const rows = [...table.querySelectorAll('tbody tr')].map((tr) => [...tr.cells].map((c) => c.textContent));
+      const expected = days.map((day, i) => [
+        v.format.longDate(isoFromDay(day)),
+        ...(dimension ? bands.map((b) => v.format.money(b.points[i])) : []),
+        v.format.money(bands.reduce((sum, b) => sum + b.points[i], decimal.ZERO)),
+      ]);
+      return JSON.stringify({
+        heads: [...table.querySelectorAll('thead th')].map((th) => th.textContent),
+        bands: dimension ? bands.map((b) => b.label) : [],
+        rows: rows.length,
+        match: JSON.stringify(rows) === JSON.stringify(expected),
+        first: rows[0], expectedFirst: expected[0],
+        fieldForm: v.format.date(isoFromDay(days[0])) === v.format.longDate(isoFromDay(days[0])) ? null : v.format.date(isoFromDay(days[0])),
+      });
+    }).then(JSON.parse);
+  const totalTable = await dataTable();
+  check(
+    'net-worth-view: under Total the data table has Date and Net worth only, its dates as longDate writes them, and its Net worth the exact sum',
+    totalTable.heads.join('|') === 'Date|Net worth' && totalTable.rows > 1 && totalTable.match &&
+      totalTable.first[0] !== totalTable.fieldForm,
+    JSON.stringify(totalTable),
+  );
   traffic.length = 0;
   await ev(`(() => { const s = [...document.querySelectorAll('.chart-card select')][0]; s.value = 'liq'; s.dispatchEvent(new Event('change', { bubbles: true })); })()`);
   await rec.frames();
+  const dimensionTable = await dataTable();
+  check(
+    'net-worth-view: under a dimension the data table has Date, each band in band order, then Net worth last, with the same dates and the exact sum',
+    dimensionTable.heads.join('|') === ['Date', ...dimensionTable.bands, 'Net worth'].join('|') &&
+      dimensionTable.bands.length > 0 && dimensionTable.match && dimensionTable.first[0] !== dimensionTable.fieldForm,
+    JSON.stringify(dimensionTable),
+  );
+  // At phone width the table scrolls sideways inside its card, never the page.
+  await viewport(390);
+  const phoneTable = await ev(`(() => {
+    const details = document.querySelector('.chart-card details');
+    details.open = true;
+    return JSON.stringify({
+      page: document.documentElement.scrollWidth - document.documentElement.clientWidth,
+      inside: getComputedStyle(details).overflowX,
+    });
+  })()`).then(JSON.parse);
+  await viewport(1280);
+  check(
+    'net-worth-view: at 390px the data table scrolls inside the card and the page does not scroll sideways',
+    phoneTable.page <= 0 && phoneTable.inside === 'auto',
+    JSON.stringify(phoneTable),
+  );
   const modeBefore = {
     hero: await hero(),
     brokerage: (await tableRow('Brokerage')).converted,
@@ -668,6 +729,85 @@ await run(async () => {
   );
   proxy.mode = 'answer';
 
+  // Coverage is a control only below N of N, and the holdings table is
+  // rendered only when it lists a row.
+  const dimsOf = () => model(({ v }) => [...v.holdings.values()].map((h) => ({ recordId: h.recordId, version: h.version, payload: h.payload })));
+  const original = await dimsOf();
+  let bumped = 0;
+  const assignAll = (except) => {
+    bumped += 1;
+    return plantHere(original.map((h) => ({
+      type: 'account',
+      recordId: h.recordId,
+      version: h.version + bumped,
+      payload: { ...h.payload, dims: h.payload.name === except ? {} : { liq: 'cash' } },
+    })));
+  };
+  const groupedByLiquidity = async (hash = '#/') => {
+    await reread();
+    await go(hash);
+    await ev(`(() => { const s = document.querySelector('.chart-card select'); s.value = 'liq'; s.dispatchEvent(new Event('change', { bubbles: true })); })()`);
+    await rec.frames();
+  };
+  const holdingsCard = () =>
+    ev(`JSON.stringify({
+      coverage: (document.querySelector('.chart-controls .coverage') || {}).tagName || null,
+      coverageText: (document.querySelector('.chart-controls .coverage') || {}).textContent || null,
+      coverageFocusable: document.querySelector('.chart-controls .coverage')?.tabIndex >= 0,
+      tables: document.querySelectorAll('.holdings-table').length,
+      heads: document.querySelectorAll('.holdings-card th').length,
+      rows: [...document.querySelectorAll('.holdings-table .row-name')].map((b) => b.textContent),
+      filter: document.querySelector('.holdings-card .filter-line')?.textContent || null,
+    })`).then(JSON.parse);
+
+  await assignAll('Mortgage');
+  await groupedByLiquidity();
+  const oneLeft = await holdingsCard();
+  await ev("document.querySelector('.chart-controls .coverage').click()");
+  await rec.frames();
+  const oneLeftFiltered = await holdingsCard();
+  check(
+    'net-worth-view: with one valued holding unassigned the coverage is a control, and activating it lists that holding as the only row',
+    oneLeft.coverage === 'BUTTON' && oneLeftFiltered.tables === 1 && oneLeftFiltered.rows.join() === 'Mortgage' &&
+      oneLeftFiltered.filter === 'Showing the holdings with no Liquidity value.Show all holdings',
+    JSON.stringify({ oneLeft, oneLeftFiltered }),
+  );
+
+  await assignAll(null);
+  await groupedByLiquidity();
+  const allAssigned = await holdingsCard();
+  const rowsBefore = allAssigned.rows;
+  await ev("document.querySelector('.chart-controls .coverage').click()");
+  await rec.frames();
+  const afterClick = await holdingsCard();
+  check(
+    'net-worth-view: at N of N the coverage is plain text, not focusable, and a click leaves the table\'s rows unchanged',
+    allAssigned.coverage === 'SPAN' && !allAssigned.coverageFocusable &&
+      /^(\d+) of \1 holdings assigned$/.test(allAssigned.coverageText) &&
+      afterClick.tables === 1 && afterClick.heads > 0 && afterClick.filter === null &&
+      afterClick.rows.join() === rowsBefore.join(),
+    JSON.stringify({ allAssigned, afterClick }),
+  );
+
+  await groupedByLiquidity('#/unassigned/liq');
+  const nothingLeft = await holdingsCard();
+  const unassignedText = await ev("document.querySelector('.holdings-card').innerText");
+  await ev("[...document.querySelectorAll('.holdings-card .filter-line button')].find((b) => b.textContent === 'Show all holdings').click()");
+  await rec.frames();
+  const restored = await holdingsCard();
+  check(
+    'net-worth-view: a filter with no unassigned holding left renders no table and no column heading, keeps its way back, and Show all holdings renders the table',
+    nothingLeft.tables === 0 && nothingLeft.heads === 0 && nothingLeft.filter === 'Every holding has a Liquidity value.Show all holdings' &&
+      unassignedText.includes('Every holding has a Liquidity value.') && !unassignedText.includes('Not yet valued') &&
+      restored.tables === 1 && restored.heads > 0 && restored.rows.length > 1 && restored.filter === null,
+    JSON.stringify({ nothingLeft, restored }),
+  );
+
+  bumped += 1;
+  await plantHere(original.map((h) => ({ type: 'account', recordId: h.recordId, version: h.version + bumped, payload: h.payload })));
+  await reread();
+  await go('#/');
+
   // Archiving records the zero, and the dates after the holding's last figure run down to it.
   const chartRows = () =>
     ev(`(async () => {
@@ -693,7 +833,7 @@ await run(async () => {
   // the chart as it was: later dates run down to it like any new last figure.
   check(
     'net-worth-view: archiving leaves every chart point up to the holding\'s last figure, and leaves the total',
-    shapeBefore[0].startsWith(await format('date', D1)) && shapeBefore[0] === shapeAfter[0] &&
+    shapeBefore[0].startsWith(await format('longDate', D1)) && shapeBefore[0] === shapeAfter[0] &&
       (await hero()) !== totalBefore && !(await tableRow('Fund 4')),
   );
   await pointAt('pointermove', rangeDays);
@@ -722,4 +862,39 @@ await run(async () => {
   );
   await home();
 
+  // The change beside the net worth is written by the formatter, so it
+  // follows the thousands mark and the decimal point as the amounts do.
+  const profile = await model(({ v }) => ({ recordId: v.profileRecord.recordId, version: v.profileRecord.version, payload: v.profile }));
+  await plantHere([{
+    type: 'profile',
+    recordId: profile.recordId,
+    version: profile.version + 1,
+    payload: { ...profile.payload, locale: 'de-DE', groupSeparator: 'period', moneyPlaces: '0' },
+  }]);
+  await reread();
+  await go('#/');
+  await press('All');
+  const change = await model(({ v }) => {
+    const { fromDay, lastDay } = v.chartRange(null);
+    const net = (day) => v.valuesAt(null, day).reduce((sum, band) => sum + band.value, 0n);
+    return { start: String(net(fromDay)), end: String(net(lastDay)) };
+  });
+  const start = BigInt(change.start);
+  const amount = BigInt(change.end) - start;
+  // Tenths of a percent, half-even: amount * 100 / |start| * 10.
+  const dividend = amount * 1000n;
+  const divisor = start < 0n ? -start : start;
+  let tenths = dividend / divisor;
+  const twice = (dividend % divisor) * 2n;
+  if (twice > divisor || (twice === divisor && tenths % 2n === 1n)) tenths += 1n;
+  const grouped = (digits) => digits.replace(/\B(?=(\d{3})+(?!\d))/g, '.');
+  const sign = amount > 0n ? '+' : amount < 0n ? '\u2212' : '';
+  const magnitude = tenths < 0n ? -tenths : tenths;
+  const wantPercent = `${sign}${grouped(String(magnitude / 10n))},${magnitude % 10n}%`;
+  const shownDelta = await ev("document.querySelector('.hero-delta').textContent");
+  check(
+    'net-worth-view: the hero\'s change percentage is grouped and pointed as the settings say, beside the amount',
+    shownDelta.endsWith(` \u00b7 ${wantPercent}`),
+    JSON.stringify({ shownDelta, wantPercent }),
+  );
 }, { signsIn: false });

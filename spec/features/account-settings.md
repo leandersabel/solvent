@@ -76,43 +76,90 @@ record as ciphertext like any other and never learns any of it.
 
 Every figure reaches the screen through one formatter built from the
 profile, so a setting cannot apply on one screen and not another.
-The formatter answers:
+`money`, `whole`, `percent`, `compact` and `rate` each take a value
+exact at scale 12 (`record-snapshot.md`, Record shape) and round it
+half-even, like every other rounding in the product. Every figure
+entry writes a negative with the true minus, `−`, decided on the
+figure as written, so a value that rounds to zero carries no sign. The
+formatter answers:
 
 - **money** — a figure in any currency at `moneyPlaces`, grouped and
   pointed as configured: the main currency, and a holding's own unit
   whose `kind` in the symbol table is `currency` (`rate-lookup.md`).
-  Rounding is half-even, like every other rounding in the product
-  (`net-worth-view.md`).
+- **whole** — a summary figure in the main currency, in whole units,
+  grouped and pointed as configured, where the screen file names one
+  (`ui/dashboard.md`).
+- **percent(value, places)** — a percentage at `places`, grouped and
+  pointed as configured, followed by `%` with no space. `value` is
+  already the percentage, so 12.5 writes `12.5%`. It does not follow
+  `moneyPlaces`, because Decimals on money covers money only: a
+  percentage keeps the places its caller asks for.
+- **compact** — a value tick on the trend chart, in the short form
+  `net-worth-view.md`, Value ticks, defines, grouped and pointed as
+  configured.
 - **quantity** — a stored `value` in any other unit, a metal or free
   text, shown digit for digit from its decimal string
   (`record-snapshot.md`, Record shape): never rounded, never padded,
   with the group mark in force between groups of three in the integer
-  part and the configured decimal point. `"12.125"` reads `12.125`,
+  part and the locale's decimal point. `"12.125"` reads `12.125`,
   `"12.50"` reads `12.50` and `"80"` reads `80`. It does not follow
   `moneyPlaces`, because rounding 12.125 ounces of gold misstates the
   holding and padding 80 m² to `80.00` claims a precision nobody
   measured. It formats a stored string and nothing computed, so there
   is nothing to round. A negative value is signed as money is.
-- **parseQuantity** — the reverse, for a field. The configured decimal
+- **parseQuantity** — the reverse, for a field. The locale's decimal
   point is the point, and so is `.` wherever `.` is not the group mark
-  in force, because a keyboard does not always offer the configured
-  one. The group mark in force is accepted only between groups of three
+  in force, because a keyboard does not always offer the locale's one. The group mark in force is accepted only between groups of three
   digits in the integer part, and anywhere else the input is malformed
   rather than the mark being dropped, because reading `12.5` as 125
   under a period group mark is a silent tenfold error. It returns the
   canonical decimal string (`record-snapshot.md`, Record shape) or
   nothing.
 - **rate** — six places, because a currency pair moves in the fourth.
-- **date** and **parseDate** — an ISO date written in the configured
-  order, and the reverse. `parseDate` returns nothing rather than
-  guessing: a two-digit year is refused, and 31 February is refused
-  rather than rolled into March.
+- **date** and **parseDate** — the field form. `date` writes an ISO
+  date in digits, in the configured order and separator, and
+  `parseDate` reads it back. They serve a date field and nothing else.
+  `parseDate` returns nothing rather than guessing: a two-digit year is
+  refused, and 31 February is refused rather than rolled into March.
+- **Dates shown for reading** never go through `date`, because under
+  the `locale` style it writes digits where every other date spells its
+  month, and one screen would write a day two ways. Each writer serves
+  one slot:
+  - **longDate** — day, abbreviated month and year: a date in a
+    sentence, a row, a tooltip or a table.
+  - **fullDate** — the month in full, for a heading.
+  - **dayMonth** — day and month, long or abbreviated, for a label that
+    already implies the year.
+  - **monthYear** — the month in full and the year, for how far back a
+    long range reaches.
+  - **dateTime** — a moment, such as a session's start, in the
+    browser's time zone: the day as `longDate` writes it, a comma, and
+    hours and minutes in the locale's form.
+
+  Under `dateStyle` `locale` they spell the month in the locale's
+  language. Under `dmy`, `ymd` or `mdy`, every one but `monthYear`
+  writes the whole date in that style (`20.09.2026`, `2026-09-20`,
+  `09/20/2026`), the text `date` writes, because the style is what the
+  reader asked every date to look like. `dayMonth` writes the year too,
+  since a style has no yearless shape and a rate delay can cross New
+  Year. `monthYear` keeps its spelling under every style, because a
+  style has no shape for a month alone.
+
+**No screen writes a figure itself.** Its digits, group marks, decimal
+point, rounding, minus and percent sign are what an entry above
+returns. A screen adds only words, a unit or currency code, and the
+sign of a signed change (`net-worth-view.md`, The change). A figure
+written with `toFixed`, `toLocaleString`, `Intl.NumberFormat`,
+`String` of a number or a template string skips every setting at once.
 
 Defaults come from `Intl` for the chosen locale, read at run time
 rather than tabulated, so there is no second and staler copy of what
-the engine already knows. A `groupSeparator` equal to that locale's
-decimal point is not applied, because `1.234` would then mean two
-things; the locale's own pairing stands.
+the engine already knows. The decimal point is always the locale's,
+because no setting chooses it. A `groupSeparator` equal to that point
+is not applied, because `1.234` would then mean two things: the
+locale's own group mark is in force instead. The point is never
+swapped to make room for the chosen mark, because that would change
+how every figure reads and which input a field accepts.
 
 **A field that edits a stored figure prefills it through `quantity`,
 whatever the unit**, money included, because a prefill at
@@ -134,9 +181,10 @@ Master Key wraps a DEK instead of encrypting records directly.
 1. User enters current password and a new password (twice). The new one
    is held to the same client-side bar as registration: ≥12 characters,
    zxcvbn ≥3 (register.md).
-2. Client derives `MK_old` + `AK_old` from the stored salt and envelope,
-   and unwraps the DEK. A failed unwrap means the current password is
-   wrong — stop, do not send anything.
+2. Client derives `MK_old` + `AK_old` from the salt and KDF envelope it
+   holds, and unwraps the held wrapper (The held credential, below). A
+   failed unwrap means the current password is wrong: stop, and send
+   nothing, a salt lookup included.
 3. Client generates a fresh 128-bit salt and derives `MK_new` + `AK_new`
    with the server's **current default** KDF parameters, read from the
    envelope the app shell embeds (architecture.md, Key management), not
@@ -144,9 +192,10 @@ Master Key wraps a DEK instead of encrypting records directly.
 4. Client re-wraps the same DEK under `MK_new` with a fresh nonce.
 5. `POST /api/auth/change-password`
    `{ currentAuthKey, salt, kdf, authKey, wrappedDek, dekNonce }`.
-6. Server verifies `currentAuthKey` against the stored hash, then
-   replaces the **`password` credential row** (its `params` and its
-   `verifier`) and, for a vault owner, that credential's **one
+6. Server verifies `currentAuthKey` against the stored hash. A
+   mismatch is a Bad Request with no `refused` member and writes
+   nothing. Otherwise it replaces the **`password` credential row**
+   (its `params` and its `verifier`) and, for a vault owner, that credential's **one
    `dek_wrappers` row**, in one transaction. For a vault owner that
    transaction compares the vault epoch after `BEGIN IMMEDIATE` and
    before any write, because a
@@ -162,6 +211,19 @@ Master Key wraps a DEK instead of encrypting records directly.
 For a vault owner the current password is verified in two independent
 places — client-side by the DEK unwrap, server-side by the Auth Key.
 Both must hold.
+
+**The held credential.** A vault owner's tab holds the `password`
+credential's salt, KDF envelope, `wrappedDek` and `dekNonce` as one
+set, from the sign-in, unlock or registration that opened the vault,
+because step 2's unwrap needs a salt and a wrapper that belong
+together. Every flow in the tab that rewrites any of them replaces the
+held copy with what it sent, once the server answers OK: the stale-KDF
+upgrade (login.md), a password change, and an import's re-key, which
+replaces the wrapper alone (export-import.md). A lock discards the set
+with the keys, and the unlock that follows fills it again. An
+administrator's tab holds the salt and envelope the same way. Holding
+them exposes nothing new: the salt and envelope answer anyone at
+`/api/auth/salt`, and the wrapper opens only under the password.
 
 **An administrator changes their password through the same endpoint**,
 sending no `wrappedDek` and no `dekNonce`, and steps 2 and 4 collapse
@@ -357,11 +419,40 @@ from an administrator removing an account (admin-invites.md).
   otherwise keep, for a household instance where it answers nothing —
   and no endpoint returns any, because none is recorded. `id` is an
   opaque handle, never the session cookie's value.
+  The page fetches the list when it renders, on Retry, and again once a
+  change-password response is OK, because by then the server has ended
+  every other session and rows fetched earlier show sessions that are
+  gone. A failed fetch replaces the rows with the card's load error and
+  Retry (`ui/settings.md`), never leaving the earlier rows in view.
 
 ## Edge cases
 
-- **Wrong current password** → detected client-side at the DEK unwrap;
-  nothing is sent, generic error.
+- **Wrong current password, a vault owner** → detected client-side at
+  the DEK unwrap; no request of any kind is sent, generic error.
+- **Wrong current password, an administrator** → there is nothing to
+  unwrap, so the request is sent and the server answers Bad Request;
+  generic error, nothing changed.
+- **Credential upgraded by another live session since this tab opened
+  the vault** → a sign-in elsewhere ran the stale-KDF upgrade, which
+  ends no session, so `AK_old` from the held salt fails at the server
+  with Bad Request. For a vault owner the unwrap in step 2 already
+  proved the password against the held set, which still belongs
+  together, so that Bad Request means a stale salt, not a wrong
+  password. The client looks up `/api/auth/salt` once. When its salt or
+  envelope differs from the held one, it re-derives `currentAuthKey`
+  from the fresh pair and resends the request once, unchanged apart
+  from `currentAuthKey`, since the new salt, `authKey` and wrapper never
+  depended on the old salt. The held set stays as it was until the
+  change succeeds, because the fresh salt does not open the held
+  wrapper. A Bad Request with an unchanged pair, or a second Bad
+  Request, is final: a vault owner sees the change-failed error, an
+  administrator the wrong-password one. There is one retry, never a
+  loop.
+- **Password changed on another session since this tab opened the
+  vault** → that change ended this session (step 7), so the request
+  answers Unauthorized whatever it carries, and the client treats it as
+  any expired session (login.md, Edge cases). The unlock that follows
+  looks the new salt up, so the stale held set never reaches a request.
 - **New password equals current** → refused.
 - **New password fails the policy** → inline error, no derivation.
 - **Change-password request fails after derivation** → old password
@@ -390,10 +481,30 @@ from an administrator removing an account (admin-invites.md).
   before it, in the same session and after a fresh login.
 - The old password no longer logs in; the new one does.
 - The change-password request contains neither password, in any form.
-- A change-password request with a wrong `currentAuthKey` is rejected by
-  the server even if the client-side unwrap were bypassed.
+- A vault owner's wrong current password shows "That is not your
+  current password." and sends no request at all between submit and the
+  error, `/api/auth/salt` included.
+- A successful change sends no `/api/auth/salt` request: the first
+  after sign-in, a second from the same tab, one after that tab's
+  stale-KDF upgrade, and one after that tab's import.
+- After another session's stale-KDF upgrade, a change with the right
+  current password from a tab that signed in before it succeeds,
+  sending one `/api/auth/salt` request and two change-password
+  requests, and the new password then signs in.
+- After a lock and unlock, a change with the right current password
+  succeeds, and no `/api/auth/salt` request follows the unlock's own.
+- A change-password request with a wrong `currentAuthKey` answers Bad
+  Request and writes nothing, even with the client-side unwrap
+  bypassed.
 - Other sessions for the user are invalidated by a password change; the
   initiating session is not.
+- With a second session open before a password change, the Open
+  sessions list on the page that made the change holds one row, marked
+  This session, once the change succeeds, with no navigation in
+  between.
+- When the session list fetch after a successful password change fails,
+  the card shows its load error and Retry and none of the rows it
+  showed before the change.
 - A vault owner's change-password request carrying the epoch from
   before an import, with a correct `currentAuthKey`, answers Conflict
   `{"refused":"vault-replaced"}`, and the `credentials`,
@@ -418,6 +529,33 @@ from an administrator removing an account (admin-invites.md).
 - Under that profile `parseQuantity` reads `1’234,50` as `"1234.50"`
   and `12.5` as `"12.5"`. With locale `de-DE` and `groupSeparator`
   `period` it reads `1.234,5` as `"1234.5"` and refuses `12.5`.
+- With locale `en-US` and `groupSeparator` `period`, `money` writes
+  1234567.89 as `1,234,567.89`, and `parseQuantity` reads `12.5` as
+  `"12.5"` and refuses `12,5`. With locale `de-DE` and
+  `groupSeparator` `comma`, `money` writes 1234567.89 as
+  `1.234.567,89`.
+- With locale `de-DE` and `groupSeparator` `period`, `percent` at one
+  place writes 136794.6 as `136.794,6%` under `moneyPlaces` `0` and
+  `2` alike. It writes 0.25 as `0,2%`, 0.35 as `0,4%`, −0.25 as
+  `−0,2%` and −0.04 as `0,0%`, and at no places writes −50 as `−50%`.
+- With locale `de-CH`, `groupSeparator` `apostrophe` and `moneyPlaces`
+  `0`, `percent` at one place writes 10957493 as `10’957’493.0%`.
+- With locale `de-DE` and `groupSeparator` `apostrophe`, `compact`
+  writes 999 as `999`, 1500 as `1,5k`, 2000000 as `2M`, −2500000 as
+  `−2,5M` and 1500000000000 as `1’500B`.
+- No client module but the formatter's calls `toFixed`,
+  `toLocaleString` or `Intl.NumberFormat`.
+- With locale `en-US` and no `dateStyle`, 2026-09-20 reads
+  `09/20/2026` from `date`, `Sep 20, 2026` from `longDate`,
+  `September 20, 2026` from `fullDate`, `September 20` and `Sep 20`
+  from `dayMonth`, and `September 2026` from `monthYear`, and a moment
+  that day starts `Sep 20, 2026, ` in `dateTime`.
+- With locale `en-US` and `dateStyle` `dmy`, `date`, `longDate`,
+  `fullDate` and both forms of `dayMonth` read 2026-09-20 as
+  `20.09.2026`, a moment that day starts `20.09.2026, ` in `dateTime`,
+  and `monthYear` reads `September 2026`.
+- The settings sample line writes its date with `longDate`, so under
+  locale `en-US` and no `dateStyle` it spells the month.
 - With locale `de-CH` and `moneyPlaces` `0`, the edit dialog for a past
   snapshot of a `USD` holding stored as `"1000.40"` prefills `1’000.40`,
   and changing only its note writes `value` `"1000.40"`. The same dialog

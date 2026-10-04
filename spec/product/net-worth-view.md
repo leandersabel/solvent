@@ -117,10 +117,11 @@ What it is for, in order:
   when the net figure is near zero.
 
 Beside the grouping control, the app states how much of your money the
-dimension covers: "7 of 10 holdings assigned", clickable to see
-which ones are not. A dimension you only ever filled in for three
-holdings draws a chart that is perfectly correct and completely
-misleading, and this line is what stops that being read as a bug.
+dimension covers: "7 of 10 holdings assigned". While any holding is
+unassigned, clicking the line shows you which. A dimension you only
+ever filled in for three holdings draws a chart that is perfectly
+correct and completely misleading, and this line is what stops that
+being read as a bug.
 
 The crosshair's date is also the way back into that day. Where you
 recorded something on the date under the cursor, the chart opens that
