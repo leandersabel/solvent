@@ -29,8 +29,10 @@ jobs:
     permissions:
       actions: write
       contents: read
+      packages: read
     outputs:
       go: ${{ steps.decide.outputs.go }}
+      existing: ${{ steps.decide.outputs.existing }}
       today: ${{ steps.decide.outputs.today }}
       last: ${{ steps.decide.outputs.last }}
       commit: ${{ steps.decide.outputs.commit }}
@@ -47,7 +49,8 @@ jobs:
 
       # At most one version a day, and none for a night whose only
       # changes are to the spec, the docs or the pipeline, unless the
-      # client asks for a full walk.
+      # client asks for a full walk. A full walk on a day whose version
+      # exists walks that version and builds nothing.
       - id: decide
         env:
           FULL: ${{ inputs.full }}
@@ -56,6 +59,13 @@ jobs:
           last=$(git tag --list '20[0-9][0-9]-[0-9][0-9]-[0-9][0-9]' --sort=-refname | head -n 1)
           echo "today=$today" >> "$GITHUB_OUTPUT"
           echo "last=$last" >> "$GITHUB_OUTPUT"
+          if [ "$last" = "$today" ] && [ "$FULL" = true ]; then
+            echo "Version $today already exists, so QA walks it in full."
+            git checkout -q "$today"
+            echo "commit=$(git rev-parse HEAD)" >> "$GITHUB_OUTPUT"
+            echo "existing=true" >> "$GITHUB_OUTPUT"
+            echo "go=true" >> "$GITHUB_OUTPUT"; exit 0
+          fi
           echo "commit=$(git rev-parse HEAD)" >> "$GITHUB_OUTPUT"
           if [ "$last" = "$today" ]; then
             echo "Version $today already exists."
@@ -72,7 +82,7 @@ jobs:
       # in the push check of the last commit that changed anything the
       # tests read. That is everything but .claude/ and top-level docs,
       # because tests read the spec.
-      - if: steps.decide.outputs.go == 'true'
+      - if: steps.decide.outputs.go == 'true' && steps.decide.outputs.existing != 'true'
         id: tested
         run: |
           code=$(git log -1 --format=%H HEAD -- . ':(exclude).claude/' ':(exclude,glob)*.md')
@@ -88,20 +98,26 @@ jobs:
               break
             fi
           done
-      - if: steps.decide.outputs.go == 'true'
+      - if: steps.decide.outputs.go == 'true' && steps.decide.outputs.existing != 'true'
         uses: ./.github/actions/setup
-      - if: steps.decide.outputs.go == 'true' && steps.tested.outputs.passed != 'true'
+      - if: steps.decide.outputs.go == 'true' && steps.decide.outputs.existing != 'true' && steps.tested.outputs.passed != 'true'
         id: suite
         run: python -m pytest -q
 
       # Built once, so every shard tests, and the release publishes, the
-      # same image.
+      # same image. A version that exists is pulled as published.
       - if: steps.decide.outputs.go == 'true'
         id: app
         env:
           TODAY: ${{ steps.decide.outputs.today }}
+          EXISTING: ${{ steps.decide.outputs.existing }}
         run: |
-          docker build -t "$IMAGE:$TODAY" .
+          if [ "$EXISTING" = true ]; then
+            echo "${{ github.token }}" | docker login ghcr.io -u "${{ github.actor }}" --password-stdin
+            docker pull "$IMAGE:$TODAY"
+          else
+            docker build -t "$IMAGE:$TODAY" .
+          fi
           echo "image=$(docker image inspect -f '{{.Id}}' "$IMAGE:$TODAY")" >> "$GITHUB_OUTPUT"
           docker save -o image.tar "$IMAGE:$TODAY"
 
@@ -148,7 +164,6 @@ jobs:
       actions: read
     outputs:
       shards: ${{ steps.plan.outputs.shards }}
-      every: ${{ steps.plan.outputs.every }}
       record: ${{ steps.plan.outputs.record }}
       failed: ${{ steps.failed.outputs.failed }}
     steps:
@@ -202,7 +217,7 @@ jobs:
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
-          ref: master
+          ref: ${{ needs.build.outputs.commit }}
 
       # Node and Chrome, for the generator of the prepared data.
       - uses: ./.github/actions/setup
@@ -365,7 +380,7 @@ jobs:
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
-          ref: master
+          ref: ${{ needs.build.outputs.commit }}
           fetch-depth: 0
 
       # A night whose build or plan failed has no walk to judge.
@@ -421,8 +436,8 @@ jobs:
           SHARDS: ${{ needs.plan.outputs.shards }}
         run: '[ "$(find shards -name qa-done.txt | wc -l)" -eq "$(jq length <<< "$SHARDS")" ]'
 
-      # What the completed walk covered, for the next night's plan. Without
-      # it, the next night walks every feature.
+      # What the completed walk covered, for the next night's plan and
+      # for promotion. Without it, the next night walks every feature.
       - env:
           RECORD: ${{ needs.plan.outputs.record }}
         continue-on-error: true
@@ -439,10 +454,13 @@ jobs:
           commit: HEAD
           since: ${{ needs.build.outputs.last }}
 
-      - uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8.0.1
+      # A version that exists is published already.
+      - if: needs.build.outputs.existing != 'true'
+        uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8.0.1
         with:
           name: image
-      - id: image
+      - if: needs.build.outputs.existing != 'true'
+        id: image
         env:
           TODAY: ${{ needs.build.outputs.today }}
           BUILT: ${{ needs.build.outputs.image }}
@@ -450,11 +468,11 @@ jobs:
           docker load -i image.tar
           [ "$(docker image inspect -f '{{.Id}}' "$IMAGE:$TODAY")" = "$BUILT" ]
 
-      - id: publish
+      - if: needs.build.outputs.existing != 'true'
+        id: publish
         env:
           TODAY: ${{ needs.build.outputs.today }}
           LAST: ${{ needs.build.outputs.last }}
-          EVERY: ${{ needs.plan.outputs.every }}
         run: |
           echo "${{ github.token }}" | docker login ghcr.io -u "${{ github.actor }}" --password-stdin
           docker tag "$IMAGE:$TODAY" "$IMAGE:nightly"
@@ -463,8 +481,6 @@ jobs:
           # The release creates the tag through the API: the agent step
           # left git authenticated with a token it has since revoked.
           python3 tools/release-notes.py "$LAST" HEAD > notes.md
-          # Promotion looks for this line (promote.yml).
-          [ "$EVERY" != true ] || printf '\nQA walked every feature.\n' >> notes.md
           gh release create "$TODAY" --target "$(git rev-parse HEAD)" --prerelease --title "$TODAY" --notes-file notes.md
 
       # A failed night always leaves an issue the loop takes up.

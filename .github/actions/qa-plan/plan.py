@@ -1,7 +1,7 @@
 """Chooses tonight's QA walk and splits it into shards that run at once
 (CLAUDE.md, The loop, Nightly and stable). Prints for the workflow
-`shards=<json>`, `every=<true|false>` and `record=<json>`, which a night
-whose walk completes keeps for the next as qa-walked.json.
+`shards=<json>` and `record=<json>`, which a night whose walk completes
+keeps as qa-walked.json, for the next night and for promotion.
 
 A feature is a `spec/features/` page with a "What the client gets"
 section. Tonight walks each feature whose page changed since the commit
@@ -72,5 +72,5 @@ for name in sorted(walk, key=lambda name: (-features[name], name)):
     shard["cost"] += features[name]
 today = os.environ.get("TODAY") or datetime.date.today().isoformat()
 print("shards=" + json.dumps([{"id": i, "features": s["features"]} for i, s in enumerate(shards, 1)]))
-print("every=" + json.dumps(walk == features.keys()))
-print("record=" + json.dumps({"commit": git("rev-parse", "HEAD").strip(), "walked": walked | dict.fromkeys(walk, today)}))
+record = {"commit": git("rev-parse", "HEAD").strip(), "every": walk == features.keys(), "walked": walked | dict.fromkeys(walk, today)}
+print("record=" + json.dumps(record))

@@ -67,7 +67,7 @@ def last_walk(repo, **days):
 def test_without_a_record_every_client_facing_page_is_walked(repo):
     out = plan(repo)
     assert walked(out) == ["dashboard", "export", "login"]
-    assert out["every"] is True
+    assert out["record"]["every"] is True
 
 
 def test_a_changed_page_is_walked_with_the_one_walked_longest_ago(repo):
@@ -75,7 +75,7 @@ def test_a_changed_page_is_walked_with_the_one_walked_longest_ago(repo):
     commit(repo, {"spec/features/export.md": "# export\n\n## What the client gets\n\nchanged\n"})
     out = plan(repo, record)
     assert walked(out) == ["dashboard", "export"]
-    assert out["every"] is False
+    assert out["record"]["every"] is False
 
 
 def test_a_feature_never_walked_comes_first_in_rotation(repo):
@@ -100,7 +100,7 @@ def test_a_deleted_file_walks_the_features_it_named(repo):
 def test_changed_code_naming_no_walked_feature_walks_every_one(repo, path):
     record = last_walk(repo, login="2026-10-01", dashboard="2026-09-20", export="2026-09-25")
     commit(repo, {path: "changed\n"})
-    assert plan(repo, record)["every"] is True
+    assert plan(repo, record)["record"]["every"] is True
 
 
 @pytest.mark.parametrize("path", ["tests/test_login.py", ".github/workflows/x.yml", "README.md", "spec/requirements.md", "tools/release-notes.py"])
@@ -112,12 +112,12 @@ def test_a_file_outside_the_image_and_the_harness_walks_only_the_rotation(repo, 
 
 def test_full_walks_every_feature(repo):
     record = last_walk(repo, login="2026-10-01", dashboard="2026-09-20", export="2026-09-25")
-    assert plan(repo, record, full=True)["every"] is True
+    assert plan(repo, record, full=True)["record"]["every"] is True
 
 
 @pytest.mark.parametrize("commit", ["0" * 40, "--output=x", None])
 def test_an_unknown_last_commit_walks_every_feature(repo, commit):
-    assert plan(repo, {"commit": commit, "walked": {}})["every"] is True
+    assert plan(repo, {"commit": commit, "walked": {}})["record"]["every"] is True
     assert not (repo / "x").exists()
 
 
@@ -126,6 +126,7 @@ def test_the_record_carries_tonight_forward(repo):
     out = plan(repo, record)
     assert out["record"] == {
         "commit": git(repo, "rev-parse", "HEAD"),
+        "every": False,
         "walked": {"login": "2026-10-01", "dashboard": "2026-10-04", "export": "2026-09-25"},
     }
 

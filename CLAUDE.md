@@ -354,7 +354,8 @@ found.
   many completed walks as there are features. A changed file naming
   none, or no record of a last walk, walks every feature. The client can
   start the same run by hand, and `gh workflow run nightly.yml -f
-  full=true` walks every feature, even when no code changed.
+  full=true` walks every feature: on today's version when it exists,
+  and otherwise on a new one, even when no code changed.
 - The walk is split into shards that run at once. Each shard starts its
   own instance of tonight's image, hardened on a network with no route
   out, beside a stand-in that answers as the price sources through a
@@ -388,14 +389,13 @@ found.
   with that title.
 - A passing night is a pre-release named by its date, `YYYY-MM-DD`,
   with the image on `ghcr.io/leandersabel/solvent` tagged `:<date>` and
-  `:nightly`. There is at most one version a day. Its notes say when QA
-  walked every feature.
+  `:nightly`. There is at most one version a day.
 - The client promotes a nightly by marking its release the latest.
   That tags the same image `:stable` without a rebuild, rewrites the
   notes to cover everything since the last stable, and deletes the
   nightlies before it. While something would hold back that nightly,
-  or QA did not walk every feature of it, promotion is refused and the
-  release turns back into a pre-release.
+  or no successful nightly run walked every feature of it, promotion is
+  refused and the release turns back into a pre-release.
 - Release notes are assembled from the merged pull requests' titles,
   without a model, grouped into changes and fixes, fixes for what
   agents found, and maintenance. Each line names who asked, who
