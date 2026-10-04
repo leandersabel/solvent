@@ -239,8 +239,8 @@ takes it up at once.
 
 - Starts when a requirements pull request merges, or when clarifying
   finds a `bug` or `maintenance` with nothing to ask. One implementation runs at a time, holding
-  the `claude/slot` branch, which GitHub creates only once: its issue
-  carries `implementing`. An issue that is ready waits with `queued`
+  the slot: its issue carries `implementing`, and the `claude/slot`
+  branch names it. An issue that is ready waits with `queued`
   while another holds the slot or a queued issue ranks ahead of it. A
   free slot always goes to the first in line: critical problems first,
   then high ones, then the rest, each lowest number first (Severity).

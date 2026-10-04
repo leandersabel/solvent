@@ -115,10 +115,9 @@ for criteria it could not check stays unrated.
    - The client approved its head commit:
      - A check failed: go to Stuck.
      - A check is still running: stop. Its result starts the next run.
-     - All green: add `implementing`, or `queued` when another open
-       issue carries `implementing` or a `queued` issue ranks ahead of
-       this one (Implementation step 1). Merge with squash. For
-       `implementing`, go to Implementation.
+     - All green: add `queued`, merge with squash, and go to
+       Implementation. `queued` comes first because the merge starts
+       the first in line, and this issue keeps its place in that line.
    - The client wrote since, in a review, a line comment or a comment:
      when it raises something only the client can decide, ask on the
      issue with `needs-answer`. Otherwise revise the requirements from the
@@ -232,17 +231,43 @@ closing `<details>` block.
    first, then high, then the rest, each lowest number first. When one
    ranks ahead of this issue and this issue does not carry
    `implementing`, add `queued`, start the run of the first in line
-   (`gh workflow run agent.yml --ref master -f issue=<n>`) when
-   `claude/slot` does not exist, comment which issue is first in line,
+   (`gh workflow run agent.yml --ref master -f issue=<n>`) when no open
+   issue carries `implementing`, comment which issue is first in line,
    and stop.
 
-   Otherwise take the implementation slot by creating the branch `claude/slot`
-   (`gh api -X POST repos/leandersabel/solvent/git/refs -f
-   ref=refs/heads/claude/slot -f sha=<origin/master>`). GitHub creates
-   it only once, so two runs never both hold the slot. Created: add
-   `implementing` and remove `queued`. It already exists and this issue
-   carries `implementing`: the slot is this issue's, so continue.
-   Otherwise it already exists: add `queued`, comment which issue carries `implementing`, and stop.
+   The `implementing` labels lock the slot, because the workflow frees
+   it only while no open issue carries one. The branch `claude/slot`,
+   which belongs to no issue, names the holder in its commit's message,
+   `slot #<n>`. Read whom it names (`gh api
+   repos/leandersabel/solvent/git/ref/heads/claude/slot --jq
+   .object.sha`, then `gh api repos/leandersabel/solvent/git/commits/<sha>
+   --jq .message`).
+
+   - It names this issue, and this issue carries `implementing`: the
+     slot is this issue's, so continue.
+   - Otherwise add `implementing` first, then list the open issues
+     carrying it (`gh api
+     'repos/leandersabel/solvent/issues?state=open&labels=implementing'`,
+     never a search, whose index lags). Adding before listing means
+     that of two runs taking the slot at once, at least one sees the
+     other. Any issue listed other than this one and its batch members,
+     the issues whose latest `<!-- batch: <L> -->` marker in your
+     comments names this issue: back off.
+   - None: make a commit with `origin/master`'s tree, `origin/master` as
+     its parent and the message `slot #<issue>` (`gh api -X POST
+     repos/leandersabel/solvent/git/commits -f message='slot #<issue>'
+     -f tree=<tree> -f 'parents[]=<origin/master>'`), and create
+     `claude/slot` at it (`gh api -X POST
+     repos/leandersabel/solvent/git/refs -f ref=refs/heads/claude/slot
+     -f sha=<commit>`). When it already exists, read whom it names
+     again. Another issue, open and carrying `implementing`: back off.
+     Otherwise the slot is left over, so point it at the commit (`gh api
+     -X PATCH repos/leandersabel/solvent/git/refs/heads/claude/slot -f
+     sha=<commit> -F force=true`). Remove `queued` and continue.
+
+   To back off, remove `implementing`, add `queued`, and comment which
+   issue carries `implementing`. List again, and when no open issue
+   carries it, start the run of the first in line. Stop.
 
    Holding the slot, this issue leads a batch when it is a `bug` or
    `code-scanning` issue whose rating that counts is `severity: low`.
@@ -305,9 +330,10 @@ closing `<details>` block.
 
 An implementation never changes `spec/requirements.md`,
 `spec/design/`, `.github/`, `.claude/`, `CLAUDE.md` or `SECURITY.md`.
-When a requirement has to change, every member leaves the batch, then
-remove `implementing`, delete `claude/slot`, and return to Clarify with
-a question or a `change`.
+When a requirement has to change, every member leaves the batch. Then
+delete `claude/slot` when it names this issue, remove `implementing`,
+start the run of the first in line when no open issue carries
+`implementing`, and return to Clarify with a question or a `change`.
 
 ### Leaving a batch
 
