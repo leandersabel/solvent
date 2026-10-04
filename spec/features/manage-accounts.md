@@ -51,7 +51,8 @@ is decorated, and nothing nags.
     runs down to it, so your net worth on the days between can change.
     Unarchiving undoes it in one action.
   - **Delete permanently** removes the holding and every value recorded
-    against it, and your past net worth figures change with it.
+    against it, and your past net worth figures change with it unless
+    every one of those values was zero.
 
 What it deliberately does not do:
 
@@ -872,4 +873,5 @@ Unarchiving and archiving it again writes the zero at the new D.
     there are no recorded values to delete and that past net worth
     figures stay as they are, and of one whose only snapshot is an
     archive's zero, that it deletes 1 recorded value and past figures
-    stay as they are. Test: `tests/browser/parts/account-detail.mjs`.
+    stay as they are. Test: `tests/browser/parts/account-detail.mjs`,
+    `tests/browser/parts/account-detail-review-delete.mjs`.
