@@ -3,9 +3,10 @@
 // pressable over any open dialog, by mouse, by touch and by key, and one
 // press leaves nothing of the vault behind.
 // Templates: dashboard.html, shell/. Modules: dom.js, shell.js, app.js,
-// session.js, view-holding.js, view-forms.js.
+// session.js, view-holding.js, view-holding-form.js, view-forms.js.
 import {
-  VAULT_PASSWORD, check, click, enterPassword, occurring, page, run, setValue, story, text, unlockDashboard, vaultOwner,
+  VAULT_PASSWORD, check, click, enterPassword, occurring, openHolding, page, run, setValue, story, text, unlockDashboard, vaultOwner,
+  vaultValue,
 } from '../harness.mjs';
 
 await run(async () => {
@@ -286,5 +287,41 @@ await run(async () => {
       closed.dialogs === 0 && closed.inert === 0 && closed.hidden === 0 && closed.height === '' && closed.sticky !== 'sticky' && closed.nav,
       JSON.stringify(closed),
     );
+
+    // The archive or delete dialog holds a choice and a typed name, so it
+    // comes back though it deletes, and its confirm still waits for the
+    // whole name.
+    const [holdingId, holdingName] = await vaultValue(
+      (v) => [...v.holdings.values()].filter((h) => !h.payload.archivedAt).map((h) => [h.recordId, h.payload.name])[0],
+    );
+    const partial = holdingName.slice(0, 3);
+    await openHolding(holdingId);
+    await click('Archive');
+    await page.waitUntil("document.querySelector('.dialog input[value=delete]')", { label: 'the archive or delete dialog' });
+    await page.eval("document.querySelector('.dialog input[value=delete]').click()");
+    await setValue('#delete-name', partial);
+    const lockOverDelete = await geometry();
+    await page.mouseClick(lockOverDelete.x, lockOverDelete.y);
+    await page.waitUntil("document.querySelector('#unlock-password')", { timeout: 20000, label: 'the password screen over the archive or delete dialog' })
+      .catch(() => {});
+    const deleteGone = await nothingLeft();
+    const deleteBack = deleteGone.password ? await comesBack('the vault after locking over the archive or delete dialog') : { headings: [] };
+    const confirmState = () => page.eval(`JSON.stringify({
+      chosen: document.querySelector('.dialog input[value=delete]')?.checked,
+      typed: document.querySelector('#delete-name')?.value,
+      disabled: [...document.querySelectorAll('.dialog button')].find((b) => b.textContent === 'Delete permanently')?.disabled,
+    })`).then(JSON.parse);
+    const half = await confirmState();
+    await setValue('#delete-name', holdingName);
+    const whole = await confirmState();
+    check(
+      'locking over the archive or delete dialog brings it back with Delete permanently chosen and the typed text, enabled only by the whole name',
+      deleteGone.password && deleteGone.dialogs === 0 && deleteGone.plaintext === 0 &&
+        deleteBack.headings.length === 1 && deleteBack.headings[0] === `Archive or delete ${holdingName}?` &&
+        half.chosen && half.typed === partial && half.disabled && whole.disabled === false,
+      JSON.stringify({ deleteGone, deleteBack, half, whole }),
+    );
+    await page.key('Escape');
+    await page.holds("!document.querySelector('.scrim')");
   }
 });

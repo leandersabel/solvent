@@ -725,9 +725,12 @@ reason, and then learns at sign-in.
 55. What was typed in an open form is there after unlocking, and the
     person returns to the view the lock found. Test:
     `tests/browser/parts/unlock-idle.mjs`.
-56. A fill-in dialog comes back after unlocking with what was typed in
-    it, a yes-or-no confirmation does not, and no password field is
-    refilled. Test: `tests/browser/parts/unlock-lock.mjs`,
+56. A dialog to fill in or choose something comes back after unlocking
+    with what was typed or chosen in it, destructive or not, a
+    yes-or-no confirmation does not, and no password field is refilled.
+    The Archive or delete dialog comes back with Delete permanently
+    chosen and the typed name, its confirm enabled only by the whole
+    name. Test: `tests/browser/parts/unlock-lock.mjs`,
     `tests/browser/parts/unlock-idle.mjs`.
 57. Lock locks at once with no confirmation, keeps the server session,
     and unlocking needs only the password. Test:
