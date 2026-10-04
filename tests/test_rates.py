@@ -650,6 +650,73 @@ def test_each_class_has_its_own_floor_on_both_sides(owner, opener, symbol, day, 
     assert bool(opener.requests) == (status == 200)
 
 
+def test_the_symbol_table_carries_each_symbols_since(owner):
+    table = {
+        row["symbol"]: row["since"]
+        for row in owner.get("/api/rates/symbols", headers=CSRF).get_json()
+    }
+    assert table["USD"] == "1999-01-04"
+    assert table["BRL"] == "2000-01-13"
+    assert table["XAU-g"] == table["XAU-ozt"] == "2013-01-02"
+    assert table["XAG-ozt"] is None
+
+
+def test_the_floor_and_since_cannot_drift_over_the_whole_table(owner, opener):
+    """Every row with a `since`, quoted in EUR, is refused the day
+    before it and asked for on it."""
+    table = owner.get("/api/rates/symbols", headers=CSRF).get_json()
+    for row in table:
+        if row["symbol"] == "EUR" or row["since"] is None:
+            continue
+        since = date.fromisoformat(row["since"])
+        _publish(opener, data=row["since"])
+        before = len(opener.requests)
+        refused = owner.get(
+            f"/api/rates?date={since - timedelta(days=1)}&quote=EUR&symbol={row['symbol']}",
+            headers=CSRF,
+        )
+        assert refused.status_code == 400, row["symbol"]
+        assert len(opener.requests) == before
+        owner.get(
+            f"/api/rates?date={since}&quote=EUR&symbol={row['symbol']}", headers=CSRF
+        )
+        assert len(opener.requests) > before, row["symbol"]
+
+
+def test_a_symbol_with_no_adapter_answers_no_content_at_any_date(owner, opener):
+    for day in ("2012-12-31", "1998-12-31"):
+        response = owner.get(
+            f"/api/rates?date={day}&quote=CHF&symbol=XAG-ozt", headers=CSRF
+        )
+        assert response.status_code == 204
+    assert opener.requests == []
+
+
+def test_the_whole_table_before_gold_asks_no_gold_source(owner, opener):
+    _publish(opener, data="2012-12-31")
+    body = owner.get("/api/rates?date=2012-12-31&quote=CHF", headers=CSRF).get_json()
+    assert [r.full_url for r in opener.requests] == [
+        rates.FX_URL.format(date="2012-12-31", quote="CHF")
+    ]
+    assert "USD" in body["rates"]
+    assert not {"XAU-g", "XAU-ozt"} & set(body["rates"])
+
+
+def test_the_whole_table_leaves_out_currencies_not_yet_published(owner, opener):
+    _publish(opener, data="1999-06-30")
+    body = owner.get("/api/rates?date=1999-06-30&quote=CHF", headers=CSRF).get_json()
+    assert "USD" in body["rates"]
+    assert not {"BRL", "CNY", "ILS", "INR"} & set(body["rates"])
+
+
+def test_a_quote_before_its_own_start_asks_nothing_and_spares_the_breaker(owner, opener):
+    rates.breakers["frankfurter"].failures = 0
+    response = owner.get("/api/rates?date=1999-06-30&quote=BRL", headers=CSRF)
+    assert response.status_code == 204
+    assert opener.requests == []
+    assert rates.breakers["frankfurter"].failures == 0
+
+
 _CONFIG_VARIABLES = {
     "DATABASE_PATH": None,
     "HSTS_PRELOAD": "1",

@@ -82,7 +82,7 @@ def answer(host: str, method: str, target: str, today: "date | None" = None) -> 
     if source == "frankfurter":
         found = FX_PATH.match(split.path) if method == "GET" else None
         day = parse_day(found.group(1)) if found else None
-        if day and len(query) == 1 and query[0][0] == "base" and query[0][1] in prices.REF and day >= prices.FRANKFURTER_START:
+        if day and len(query) == 1 and query[0][0] == "base" and query[0][1] in prices.REF and day >= prices.START[query[0][1]]:
             published = prices.last_publication_day("frankfurter", day, today)
             rates = prices.frankfurter_rates(published, query[0][1])
             body = {

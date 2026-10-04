@@ -36,6 +36,13 @@ REF = {
 }
 CURRENCIES = sorted(REF)
 
+# The first publication day of each currency's real series, kept apart
+# from the app's own floors so one that drifts shows as a wrong answer.
+START = {
+    code: date(2000, 1, 13) if code in ("BRL", "CNY", "ILS", "INR") else FRANKFURTER_START
+    for code in CURRENCIES
+}
+
 SCALE = Decimal("1e-12")
 # Wide enough that no figure a vault can hold overflows the context's
 # precision when it is rounded to scale 12.
@@ -90,14 +97,15 @@ def _significant(value: Decimal, digits: int) -> Decimal:
 
 def frankfurter_rates(day: "date | str", quote: str) -> "dict[str, Decimal]":
     """What Frankfurter publishes for publication day `day`: for every
-    currency but `quote`, how many of it one `quote` buys."""
+    currency but `quote` that has started, how many of it one `quote`
+    buys."""
     if quote not in REF:
         raise ValueError(f"not a known currency: {quote}")
     factor = 1 + Decimal((_day(day).toordinal() % 101) - 50) / 2000
     return {
         code: _significant(REF[code] / REF[quote] * factor, 5)
         for code in CURRENCIES
-        if code != quote
+        if code != quote and START[code] <= _day(day)
     }
 
 
@@ -127,7 +135,7 @@ def known_table(on: "date | str", quote: str, today: "date | None" = None) -> "d
         raise ValueError(f"not a known currency: {quote}")
 
     published = last_publication_day("frankfurter", day, today)
-    if day >= FRANKFURTER_START and published is not None:
+    if day >= START[quote] and published is not None:
         for code, rate in frankfurter_rates(published, quote).items():
             table[code] = {
                 "rate": _eight_places(Decimal(1) / rate),

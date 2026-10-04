@@ -104,10 +104,14 @@ SEEDED_SYMBOLS = [
 FX_URL = "https://api.frankfurter.dev/v1/{date}?base={quote}"
 NBP_URL = "https://api.nbp.pl/api/cenyzlota/{start}/{end}?format=json"
 
-# NBP publishes from 2013-01-02 and Frankfurter from 1999-01-04. A
-# single global floor would either reject valid FX dates or wave through
-# gold dates the provider has no data for.
+# NBP publishes from 2013-01-02 and Frankfurter from 1999-01-04, except
+# the currencies in `_FX_LATER_START`. A single global floor would either
+# reject valid FX dates or wave through dates the provider has no data
+# for.
 _FX_FLOOR = date(1999, 1, 4)
+_FX_LATER_START = {
+    code: date(2000, 1, 13) for code in ("BRL", "CNY", "ILS", "INR")
+}
 _GOLD_FLOOR = date(2013, 1, 2)
 
 # NBP prices one gram of fine gold. XAU-g takes the figure directly and
@@ -465,8 +469,23 @@ def _quote_leg(
     return pln * leg["PLN"][0], "nbp+frankfurter"
 
 
-def _floor_for(row) -> date:
-    return _GOLD_FLOOR if row["kind"] == "metal" else _FX_FLOOR
+def _since(row) -> "date | None":
+    """The first date the provider publishes this symbol, derived from
+    the adapter registry like `hasAdapter`, or None with no adapter."""
+    provider = adapter_for(row["symbol"], row["kind"])
+    if provider == "nbp":
+        return _GOLD_FLOOR
+    if provider == "frankfurter":
+        return _FX_LATER_START.get(row["symbol"], _FX_FLOOR)
+    return None
+
+
+def _floor_for(row, quote_row) -> "date | None":
+    """The date a rate source applies from: the later of the symbol's
+    floor and the quote's, because Frankfurter answers Not Found for a
+    base before its start."""
+    since = _since(row)
+    return None if since is None else max(since, _since(quote_row))
 
 
 @bp.get("/api/rates")
@@ -501,7 +520,9 @@ def get_rates():
         rows = [
             row
             for row in table_rows()
-            if row["lookup"] and row["symbol"] != quote and on >= _floor_for(row)
+            if row["lookup"]
+            and row["symbol"] != quote
+            and on >= (_floor_for(row, quote_row) or on)
         ]
         resolved = _resolve(rows, quote, on)
         if not resolved:
@@ -517,7 +538,8 @@ def get_rates():
     ).fetchone()
     if row is None:
         abort(400)
-    if on < _floor_for(row):
+    floor = _floor_for(row, quote_row)
+    if floor is not None and on < floor:
         # Out of range, rather than merely unanswerable.
         abort(400)
 
@@ -540,6 +562,7 @@ def list_symbols():
                 "label": row["label"],
                 "kind": row["kind"],
                 "lookup": bool(row["lookup"]),
+                "since": since.isoformat() if (since := _since(row)) else None,
             }
             for row in table_rows()
         ]

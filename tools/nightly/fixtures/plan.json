@@ -125,7 +125,7 @@
     "long-history",
     "current-backup"
    ],
-   "about": "A vault recorded at every month end from mid-2012 on, with a debt. Gold before 2013 is priced by hand. Its current backup is prepared.",
+   "about": "A vault recorded at 1998-12-31 and at every month end from 2011 on, with a debt. A unit before its published prices begin is priced by hand: the dollar in 1998 and gold before 2013. Its current backup is prepared.",
    "backup": true,
    "profile": {
     "groupSeparator": "none"
@@ -150,8 +150,27 @@
    ],
    "steps": [
     {
+     "recording": {
+      "date": "1998-12-31",
+      "figures": {
+       "Checking": "7000.00",
+       "Dollar deposit": "2500.00",
+       "Gold": "30.00",
+       "Mortgage": "-310000.00"
+      },
+      "prices": {
+       "USD": {
+        "manual": "1.60"
+       },
+       "XAU-g": {
+        "manual": "11.20"
+       }
+      }
+     }
+    },
+    {
      "monthEnds": {
-      "from": "2012-06-30",
+      "from": "2011-01-31",
       "series": {
        "Checking": {
         "start": "8000.00",

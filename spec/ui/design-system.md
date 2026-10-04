@@ -257,9 +257,10 @@ get mistaken for one, and none of them is:
 - **A recording holding no figures.** Its prices are why the date is
   still there, which makes it an ordinary state rather than wreckage
   (`recording-detail.md`).
-- **A price the source did not answer for, or a unit nobody has priced
-  yet.** The line says so in ink-secondary prose and nothing is
-  blocked (`update-values.md`). Marking an outage the product expects,
+- **A price the source did not answer for, a unit nobody has priced
+  yet, or a date before a unit's published prices begin.** The line
+  says so in ink-secondary prose and nothing is blocked
+  (`update-values.md`). Marking an outage the product expects,
   and degrades cleanly through, trains the reader to ignore the mark
   before the day it means something.
 

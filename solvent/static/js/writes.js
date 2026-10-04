@@ -126,9 +126,10 @@ export async function fetchProposals(vault, date) {
 }
 
 /** Whether a recording at `date` would have anything to ask the proxy:
- *  a unit with no entry there that somebody publishes a price for. */
+ *  a unit with no entry there that somebody publishes a price for at
+ *  that date. */
 export function needsLookup(vault, date, also = null) {
-  return vault.missingUnits(date, also).some((unit) => vault.quotable(unit));
+  return vault.missingUnits(date, also).some((unit) => vault.quotable(unit, date));
 }
 
 /** Decrypt a freshly read list of records the way the load does,

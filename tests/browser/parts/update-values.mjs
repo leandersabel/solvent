@@ -865,6 +865,45 @@ await run(async () => {
   );
   await home();
 
+  // ---- record-rate: a published unit before its published prices begin -
+
+  proxy.mode = 'answer';
+  const EARLY = '2012-12-31';
+  const begins = await format('fullDate', '2013-01-02');
+  traffic.length = 0;
+  await go(`#/sweep/${EARLY}`);
+  const early = await lineState('XAU-ozt');
+  const earlyUsd = await lineState('USD');
+  check(
+    'record-rate: gold before its published prices begin says so and is the owner\'s to price, never an outage',
+    early.value === '' && early.says === `Published prices for XAU-ozt begin on ${begins}. This one is yours to set.` && !early.lookup &&
+      earlyUsd.value !== '',
+    JSON.stringify({ early, earlyUsd }),
+  );
+  check(
+    'record-rate: the sweep asks the proxy once, for the date, and takes nothing from it for gold',
+    rateAsks().length === 1 && new URL(rateAsks()[0].url).searchParams.get('date') === EARLY,
+    traffic.map((r) => r.url).join(' | '),
+  );
+  await typeRow('Gold bars', '2');
+  await pressRow('Gold bars');
+  const earlyAsked = await lineState('XAU-ozt');
+  check(
+    'record-rate: recording gold before its published prices asks for a price in the line\'s own words and writes none',
+    earlyAsked.says === `What was 1 XAU-ozt worth in CHF on ${await format('fullDate', EARLY)}? Published prices for XAU-ozt begin on ${begins}. The figure records either way, and until a price exists the holding is listed as not priced.` &&
+      on(await stored('snapshot'), EARLY).length === 1 && !on(await stored('rate'), EARLY).some((r) => r.payload.symbol === 'XAU-ozt'),
+    JSON.stringify(earlyAsked),
+  );
+  traffic.length = 0;
+  await go(`#/sweep/${EARLY}`);
+  const earlyReopened = await lineState('XAU-ozt');
+  check(
+    'record-rate: a reopened recording offers no Look it up on gold before its published prices and asks the proxy nothing',
+    !earlyReopened.lookup && earlyReopened.says.startsWith('Published prices for XAU-ozt begin on') && rateAsks().length === 0,
+    JSON.stringify(earlyReopened),
+  );
+  await home();
+
   // The sweep keeps its columns while its block is 720px wide, under
   // one window width, and stacks one pixel under.
   await viewport(1280);

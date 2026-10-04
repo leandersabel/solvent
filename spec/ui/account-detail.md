@@ -66,11 +66,12 @@ main currency · (row actions).
   date** (`record-rate.md`, Reading), which is what the holding was
   worth that day. A cell that cannot convert reads "not priced", never
   repeating the quantity.
-  - **A unit with a rate source** converts at its price at exactly that
-    date. With none there, "not priced", never a conversion at another
-    day's price.
-  - **A unit with no rate source** converts at its newest price at or
-    before that date. Where that price is from an earlier day, the price
+  - **A unit with a rate source at that date** converts at its price at
+    exactly that date. With none there, "not priced", never a
+    conversion at another day's price.
+  - **A unit with no rate source at that date**, one only its owner
+    prices or one dated before its published prices begin, converts at
+    its newest price at or before that date. Where that price is from an earlier day, the price
     date line sits beneath the figure, "priced 15 Jan 2024"
     (`design-system.md`, Components). With no price at or before the
     date, "not priced".

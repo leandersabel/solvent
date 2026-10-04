@@ -280,6 +280,12 @@ def test_the_stand_in_answers_every_row_of_the_table(server):
     assert answer["rates"] == {
         code: prices.json_number(rate) for code, rate in prices.frankfurter_rates("2026-07-24", "CHF").items()
     }
+    # A table lists a currency from its own first day, and a base before its
+    # own first day is Not Found.
+    answer = json.loads(server.get("api.frankfurter.dev", "/v1/1999-06-30?base=CHF")[2])
+    assert "USD" in answer["rates"] and not {"BRL", "CNY", "ILS", "INR"} & set(answer["rates"])
+    assert server.get("api.frankfurter.dev", "/v1/2000-01-12?base=BRL")[0] == 404
+    assert "USD" in json.loads(server.get("api.frankfurter.dev", "/v1/2000-01-13?base=BRL")[2])["rates"]
     for target in ("/v1/1998-12-31?base=CHF", "/v1/2026-07-24?base=XXX", "/v1/2026-07-24", "/v2/2026-07-24?base=CHF",
                    "/v1/2026-07-24?base=CHF&x=1", "/v1/2026-13-45?base=CHF"):
         status, headers, body = server.get("api.frankfurter.dev", target)
@@ -473,15 +479,32 @@ def from_standin(monkeypatch):
 
 def test_known_table_is_what_the_app_answers_for_the_whole_table(owner, from_standin):
     today = datetime.now(timezone.utc).date().isoformat()
-    # A weekday, a weekend, the day before 2013-01-02 and today.
-    for day in ("2026-07-29", "2026-07-25", "2013-01-01", today):
-        for quote in ("CHF", "EUR", "PLN"):
-            answer = owner.get(f"/api/rates?date={day}&quote={quote}", headers=CSRF).get_json()
-            table = {symbol: {k: v for k, v in entry.items() if k != "cached"} for symbol, entry in answer["rates"].items()}
-            assert table == prices.known_table(day, quote), (day, quote)
+    # A weekday, a weekend, the day before 2013-01-02, a day before four
+    # currencies start, and today.
+    for day in ("2026-07-29", "2026-07-25", "2013-01-01", "1999-06-30", today):
+        for quote in ("CHF", "EUR", "PLN", "BRL"):
+            response = owner.get(f"/api/rates?date={day}&quote={quote}", headers=CSRF)
+            expected = prices.known_table(day, quote)
+            if not expected:
+                assert response.status_code == 204, (day, quote)
+                continue
+            table = {symbol: {k: v for k, v in entry.items() if k != "cached"} for symbol, entry in response.get_json()["rates"].items()}
+            assert table == expected, (day, quote)
     assert "XAU-g" not in prices.known_table("2013-01-01", "CHF")
     assert prices.known_table("2026-07-25", "PLN")["XAU-g"]["source"] == "nbp"
     assert prices.known_table("2026-07-25", "CHF")["XAU-g"]["asOf"] == "2026-07-24"
+    assert not {"BRL", "CNY", "ILS", "INR"} & set(prices.known_table("1999-06-30", "CHF"))
+    assert "USD" in prices.known_table("1999-06-30", "CHF")
+    assert prices.known_table("1999-06-30", "BRL") == {}
+
+
+def test_each_currencys_start_is_the_real_series_and_the_apps_since_agrees(owner):
+    assert set(prices.START) == set(prices.CURRENCIES)
+    assert {c for c, d in prices.START.items() if d != prices.FRANKFURTER_START} == {"BRL", "CNY", "ILS", "INR"}
+    table = {row["symbol"]: row["since"] for row in owner.get("/api/rates/symbols", headers=CSRF).get_json()}
+    for code in prices.CURRENCIES:
+        assert table[code] == prices.START[code].isoformat(), code
+    assert table["XAU-g"] == prices.NBP_START.isoformat()
 
 
 def hand_vault():
@@ -631,6 +654,21 @@ def test_prepare_writes_a_script_and_figures_for_every_vault(tmp_path):
     assert mixed_figures["latest"]["excluded"] == {"Closed account": "archived"}
     assert mixed_figures["latest"]["total"]["exact"] != mixed_figures["asRecorded"]["total"]["exact"]
     assert not (tmp_path / "script.json").read_text().count("fixtures/out")
+
+
+def test_the_long_history_vault_prices_a_unit_by_hand_before_its_published_prices(tmp_path):
+    script, expected = prices.prepare(full_plan(), date.today(), FIXTURES)
+    ops = next(a for a in script["accounts"] if "long-history" in a["covers"])["ops"]
+    recordings = {op["date"]: op for op in ops if op["op"] == "recording"}
+    dates = sorted(recordings)
+    assert dates[0] == "1998-12-31" and dates[1] == "2011-01-31"
+    first = recordings["1998-12-31"]
+    assert first["proposals"] == {} and set(first["manual"]) == {"USD", "XAU-g"}
+    for stamp, op in recordings.items():
+        if stamp < "2013-01-02":
+            assert "XAU-g" in op["manual"] and "XAU-g" not in op["proposals"], stamp
+        elif stamp > "1999-01-04":
+            assert "XAU-g" in op["proposals"] and "USD" in op["proposals"], stamp
 
 
 def test_the_plan_covers_what_the_spec_names_and_its_unreadable_record_is_never_the_latest():

@@ -175,13 +175,18 @@ every process that asks gets the same answer.
 - **Publication days** are Monday to Friday, with no holidays, up to
   and including the stand-in's current UTC date. Frankfurter publishes
   from `1999-01-04` and NBP from `2013-01-02`, the start of the real
-  series the app calls and each symbol's date floor (rate-lookup.md,
-  SSRF and egress hardening). The app sends no earlier date, so the
-  stand-in's `404` before them is never exercised by it.
+  series the app calls (rate-lookup.md, Providers). The app sends no
+  earlier date, so the stand-in's `404` before them is never exercised
+  by it.
 - **Currencies** are Frankfurter's list, the same set as the seeded
   currency half of the symbol table (rate-lookup.md, Seeded symbols).
-  Each has a reference value `ref[C]`, units of C per euro, in a
-  constant table in `prices.py`, with `ref["EUR"] = 1`.
+  Each has a reference value `ref[C]`, units of C per euro, and a first
+  publication day `start[C]`, in constant tables in `prices.py`, with
+  `ref["EUR"] = 1`. `start[C]` is the real series' start that
+  rate-lookup.md, Providers, FX, gives: `2000-01-13` for `BRL`, `CNY`,
+  `ILS` and `INR`, and `1999-01-04` for every other. `prices.py` keeps
+  its own copy rather than importing the app's, so an app floor that
+  drifts from the source shows as a wrong answer.
 - **Frankfurter**, for publication day `p`, base `Q` and symbol `C ≠ Q`:
   `rates[C] = ref[C] / ref[Q] × f(p)`, rounded half-even to 5
   significant digits, where
@@ -195,8 +200,10 @@ every process that asks gets the same answer.
 
 `prices.known_table(date, quote)` is what `/api/rates` must answer for
 the whole table on that date and quote, without `cached`: every
-currency but `quote`, and `XAU-g` and `XAU-ozt` where NBP published
-within the 14-day window, each `{rate, base, asOf, source}`. It applies
+currency but `quote` whose `start` the date has reached, and `XAU-g`
+and `XAU-ozt` where NBP published within the 14-day window, each
+`{rate, base, asOf, source}`, and nothing at all on a date before
+`start[quote]`. It applies
 rate-lookup.md's composition exactly as pinned there (Providers), so
 it is the oracle for every proposal `qa` sees.
 
@@ -204,7 +211,7 @@ it is the oracle for every proposal `qa` sees.
 
 | Host | Request | Answer |
 |---|---|---|
-| `api.frankfurter.dev` | `GET /v1/<D>?base=<Q>`, `Q` a known currency, `D` on or after `1999-01-04` | `200`, `{"amount": 1.0, "base": Q, "date": <last publication day ≤ D>, "rates": {C: …}}` for every known `C ≠ Q` |
+| `api.frankfurter.dev` | `GET /v1/<D>?base=<Q>`, `Q` a known currency, `D` on or after `start[Q]` | `200`, `{"amount": 1.0, "base": Q, "date": <last publication day ≤ D>, "rates": {C: …}}` for every known `C ≠ Q` with `start[C]` on or before that day |
 | `api.frankfurter.dev` | anything else | `404`, `{"message": "not found"}` |
 | `api.nbp.pl` | `GET /api/cenyzlota/<S>/<E>?format=json`, `S ≤ E`, span at most 93 days, a publication day in range | `200`, `[{"data": <day>, "cena": …}, …]`, every publication day in range, ascending |
 | `api.nbp.pl` | same, no publication day in range | `404`, `Not Found - Brak danych` as `text/plain` |
@@ -305,7 +312,7 @@ one out.
 | Coverage | What the prepared item must be |
 |---|---|
 | `household` | two vault owners with the same main currency, each holding `USD` and `XAU-ozt`, so one recording date in both reaches each source once |
-| `long-history` | a vault recorded at every month end from before `2013-01-02` through the last month end before today, holding the main currency, `USD`, `XAU-g` and a debt. Gold dates before `2013-01-02` carry a price typed by hand |
+| `long-history` | a vault with main currency `CHF`, holding the main currency, `USD`, `XAU-g` and a debt, recorded at `1998-12-31` and at every month end from `2011-01-31` through the last month end before today. A unit at a date before its `since` carries a price typed by hand, as `manual`, because no source publishes one: `USD` at `1998-12-31` and `XAU-g` at every date before `2013-01-02` |
 | `many-dimension-values` | a dimension with at least five values, each held by at least one holding |
 | `rate-edited-long-ago` | a proposed rate, more than five years back, edited to a figure other than the known price, and a holding whose latest quantity sits on that date, so the edited rate is its price as recorded |
 | `no-source-unit` | a holding in `XAG-ozt`, priced by hand |
@@ -599,9 +606,10 @@ On failure it prints `docker logs` of `solvent` and `standin`.
   restart of the stand-in.
 - `known_table` equals what the app's `/api/rates` returns for the
   whole table, without `cached`, on dates covering a weekday, a
-  weekend, the day before `2013-01-02` and today, for `CHF`, `EUR` and
-  `PLN`, with the app's opener stubbed to answer from `standin.py`'s
-  routing.
+  weekend, the day before `2013-01-02`, `1999-06-30` and today, for
+  `CHF`, `EUR`, `PLN` and `BRL`, with the app's opener stubbed to answer
+  from `standin.py`'s routing. An empty `known_table` matches No
+  Content.
 - The currency list in `prices.py` equals the seeded currencies in
   `solvent.rates`.
 - `sources.py`'s classification yields `no-answer` for a timeout, a

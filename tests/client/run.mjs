@@ -1882,10 +1882,12 @@ const writes = await load('writes.js');
 const views = await load('view-sweep.js');
 
 const SYMBOLS = [
-  { symbol: 'CHF', label: 'Swiss Franc', kind: 'currency', lookup: true },
-  { symbol: 'USD', label: 'United States Dollar', kind: 'currency', lookup: true },
-  { symbol: 'XAU-ozt', label: 'Gold, troy ounce', kind: 'metal', lookup: true },
-  { symbol: 'XAG-ozt', label: 'Silver, troy ounce', kind: 'metal', lookup: false },
+  { symbol: 'CHF', label: 'Swiss Franc', kind: 'currency', lookup: true, since: '1999-01-04' },
+  { symbol: 'USD', label: 'United States Dollar', kind: 'currency', lookup: true, since: '1999-01-04' },
+  { symbol: 'BRL', label: 'Brazilian Real', kind: 'currency', lookup: true, since: '2000-01-13' },
+  { symbol: 'XAU-ozt', label: 'Gold, troy ounce', kind: 'metal', lookup: true, since: '2013-01-02' },
+  { symbol: 'XAU-g', label: 'Gold, gram', kind: 'metal', lookup: true, since: '2013-01-02' },
+  { symbol: 'XAG-ozt', label: 'Silver, troy ounce', kind: 'metal', lookup: false, since: null },
 ];
 
 function recordServer(rates = () => null) {
@@ -2066,6 +2068,45 @@ await check('record-rate: the price at a date is the exact day for a sourced uni
   // A flagged pair is no entry at its date.
   await writes.saveRate(vault, null, writes.rateEntry(vault, 'USD', '2010-01-05', writes.ratePart({ figure: money('1.1') })));
   assert.equal(vault.priceAtDate('USD', '2010-01-05'), null);
+});
+
+await check('record-rate: a unit before its since has no rate source, asks the proxy nothing and is priced by its own entries', async () => {
+  const server = recordServer(() => PROPOSALS);
+  const vault = await storedVault(server, {
+    holdings: [['Gold', 'XAU-g'], ['Dollars', 'USD']],
+    prices: [
+      ['XAU-g', '2011-06-30', '60'],
+      ['XAU-g', '2013-01-02', '70', 'proposed'],
+    ],
+  });
+  assert.equal(vault.quotable('XAU-g', '2013-01-02'), true);
+  assert.equal(vault.quotable('XAU-g', '2012-12-31'), false);
+  assert.equal(vault.publishedFrom('XAU-g'), '2013-01-02');
+  // The price at a date: the newest estimate at or before it, with its date.
+  assert.equal(decimal.format(vault.priceAtDate('XAU-g', '2012-12-31').rate), '60');
+  assert.equal(vault.priceAtDate('XAU-g', '2012-12-31').date, '2011-06-30');
+  assert.equal(vault.priceAtDate('XAU-g', '2011-06-29'), null);
+  assert.equal(vault.priceAtDate('XAU-g', '2013-01-03'), null);
+  // Only the unit with no source at the date is left out of the question.
+  assert.equal(writes.needsLookup(vault, '2012-12-31'), true);
+  const alone = await storedVault(server, { holdings: [['Gold', 'XAU-g']] });
+  assert.equal(writes.needsLookup(alone, '2012-12-31'), false);
+  assert.equal(writes.needsLookup(alone, '2013-01-02'), true);
+  server.reset();
+  await writes.refreshPrices(alone, '2012-12-31', {});
+  assert.equal(server.writesIn().length, 0);
+});
+
+await check('record-rate: the main currency\'s since bounds every unit quoted into it', async () => {
+  const vault = new Vault(null);
+  vault.profile = { mainCurrency: 'BRL' };
+  vault.symbols = new Map(SYMBOLS.map((row) => [row.symbol, row]));
+  assert.equal(vault.publishedFrom('USD'), '2000-01-13');
+  assert.equal(vault.quotable('USD', '2000-01-13'), true);
+  assert.equal(vault.quotable('USD', '2000-01-12'), false);
+  // A main currency retired since registration bounds nothing.
+  vault.symbols.delete('BRL');
+  assert.equal(vault.quotable('USD', '1999-01-04'), true);
 });
 
 await check('record-snapshot: a date move writes the snapshot, then the new date\'s prices, then the displaced record\'s delete', async () => {

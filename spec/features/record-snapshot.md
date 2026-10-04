@@ -388,7 +388,10 @@ added at that date on the single-holding form:
   the entry reads not priced at its new date (`record-rate.md`,
   Reading), on the recording and on the holding's page, until that date
   has an entry. It never borrows the price of the date it left or of
-  any earlier one.
+  any earlier one. A new date before the symbol's `since` is the
+  exception `record-rate.md`, Reading, makes for a symbol with no rate
+  source there: no request asks about the symbol, and the entry takes
+  the newest price at or before its new date, with that price's date.
 - **The dialog shows the new date's prices as soon as the date
   changes**, the same folded line the form shows for a new figure:
   proposals fetched for an empty date, the missing lines filled for a
@@ -485,8 +488,9 @@ one (`manage-accounts.md`, While archived).
 
 - **No price is available for the unit**, because the provider is down,
   rate-limited or has no data for that date, because the unit is free
-  text nobody has priced, or because the person left the rate line
-  empty → **the quantity saves regardless**. **Nothing in the price half
+  text nobody has priced, because the date precedes the unit's `since`
+  and nothing was typed at or before it, or because the person left the
+  rate line empty → **the quantity saves regardless**. **Nothing in the price half
   ever blocks a quantity**, in any form: no disabled save, no required
   rate field, no warning to dismiss first. The price half degrades on
   its own terms (`record-rate.md`, The refresh),
@@ -565,7 +569,8 @@ one (`manage-accounts.md`, While archived).
 - A quantity in a unit with no price entry at all, and none typed,
   saves: the save control is live throughout, one `snapshot` record is
   written, and the holding is listed as not priced. Asserted for a
-  free-text unit and for a symbol whose lookup returned nothing.
+  free-text unit, for a symbol whose lookup returned nothing, and for
+  `XAU-g` at 2012-12-31, before its `since`.
 - A typed future date is refused on the date field's own line with the
   future-date reason, the input carries `aria-invalid="true"` and an
   `aria-describedby` naming that line, and Save issues no `PUT` and
@@ -592,6 +597,12 @@ one (`manage-accounts.md`, While archived).
   moves, no `USD` entry is written, and the figure reads not priced on
   the 2026-04-10 recording and in the holding's list of values, never
   at the 2010-03-31 rate.
+- Moving an `XAU-g` snapshot to 2012-06-29, a date holding no records,
+  in a vault whose only other unit is the main currency, issues no
+  request to `/api/rates` and writes no `rate` entry. With an `XAU-g`
+  entry at 2011-06-30, the figure then converts at that entry and
+  carries 2011-06-30 on that date's recording and in the holding's list
+  of values. With none at or before 2012-06-29, it reads not priced.
 - Moving a snapshot onto a date whose prices are complete issues no
   request to `/api/rates` and leaves every `rate` entry at that date
   byte-identical. Onto a date missing one symbol, it writes that

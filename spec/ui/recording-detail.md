@@ -53,13 +53,14 @@ as `design-system.md`, Typography, sets it.
 - **The holding's name is the link**, opening that holding
   (`account-detail.md`), because "which holding was that" is the
   question this screen provokes.
-- **A figure in a unit with a rate source** converts at that unit's
-  price at this date and no other. With none here it reads **not
-  priced** in place of the converted figure. It never converts at
+- **A figure in a unit with a rate source at this date** converts at
+  that unit's price at this date and no other. With none here it reads
+  **not priced** in place of the converted figure. It never converts at
   another day's price, and never shows the bare quantity as though the
   unit were the main currency (`net-worth-view.md`).
-- **A figure in a unit with no rate source** converts at that unit's
-  newest price at or before this date. Where that price is from an
+- **A figure in a unit with no rate source at this date**, one only its
+  owner prices or one dated before its published prices begin,
+  converts at that unit's newest price at or before this date. Where that price is from an
   earlier day, the price date line sits beneath the converted figure,
   "priced 15 Jan 2024" (`design-system.md`, Components). With no price
   at or before this date it reads **not priced**.
