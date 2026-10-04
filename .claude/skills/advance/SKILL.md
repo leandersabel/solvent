@@ -146,8 +146,12 @@ one outcome:
   `queued` added.
 - **Change**, including a pipeline change: the requirements it adds,
   changes or removes, `needs-answer` removed, then Requirements.
-- **Already met, a duplicate, or doubtful:** the reasoning and a
-  question to the client, `needs-answer` added.
+- **Already met:** the reasoning, naming the change that met it, and
+  the issue closed as completed.
+- **A duplicate:** the reasoning, naming the issue that holds it, and
+  the issue closed as not planned.
+- **Doubtful:** the reasoning and a question to the client,
+  `needs-answer` added.
 
 A bug or maintenance comment ends with the technical reading in a
 `<details>` block: the feature page, the criterion and the code it
@@ -203,7 +207,10 @@ comments propose, they never decide.
    An issue filed as a finding has no Clarify comment: its body is the
    reading.
 4. Reproduce the report. For a `bug` or `code-scanning` issue, write a
-   test that fails on the reported behavior. When the spec does not ask
+   test that fails on the reported behavior. When `master` already
+   behaves as the report expects and a change merged since explains it,
+   the issue is fixed: remove `implementing` and close it as completed
+   in a comment naming that change. When the spec does not ask
    for what the report expects, or no test can be made to fail on it,
    the report does not hold: remove `implementing`, add
    `needs-answer`, and ask the client in a comment. A code scanning
