@@ -266,7 +266,9 @@ function onKey(event) {
  *  `resume`, from `resumable` below, reopens the same form against the
  *  vault a later unlock builds. A dialog without one is closed by a
  *  lock and not reopened, which is right for a confirmation: it holds
- *  nothing the person typed. */
+ *  nothing the person typed. A dialog that has come to show an outcome
+ *  rather than a form calls `close.stopResuming()`, so a lock no longer
+ *  keeps it. */
 export function dialog({ heading, body, actions, resume = null }) {
   const opener = document.activeElement;
   // No `aria-modal`: it hides everything outside the dialog from a
@@ -288,6 +290,9 @@ export function dialog({ heading, body, actions, resume = null }) {
     if (refocus && opener && opener.focus) opener.focus();
   };
   entry.close = close;
+  close.stopResuming = () => {
+    entry.resume = null;
+  };
 
   document.addEventListener('keydown', onKey);
   document.body.append(scrim);
