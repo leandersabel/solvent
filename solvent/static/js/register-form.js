@@ -25,9 +25,10 @@ const NETWORK = 'That did not go through. Everything you typed is still here, so
  *
  *  `onCreated` is called once the server has made the account and
  *  started its session, with `{ kind, username }` and, for a vault
- *  owner, the keys this form made: `{ masterKey, dek, wrapper }`. They
- *  pass in memory to the caller and nowhere else. By then the password
- *  fields are empty and the invite token has been dropped. */
+ *  owner, the keys this form made, `{ masterKey, dek, wrapper }`, and
+ *  the `salt` and `kdf` they came from. They pass in memory to the
+ *  caller and nowhere else. By then the password fields are empty and
+ *  the invite token has been dropped. */
 export function registerForm({ kind, token: inviteToken, currencies, kdf, onCreated }) {
   let token = inviteToken;
   const isVault = kind === 'vault_owner';
@@ -227,7 +228,7 @@ export function registerForm({ kind, token: inviteToken, currencies, kdf, onCrea
       // replaced elsewhere).
       if (isVault) api.setVaultEpoch(answer.vaultEpoch ?? null);
       created = isVault
-        ? { kind: answer.kind, username: body.username, masterKey: keys.masterKey, dek, wrapper }
+        ? { kind: answer.kind, username: body.username, masterKey: keys.masterKey, dek, wrapper, salt, kdf }
         : { kind: answer.kind, username: body.username };
     } catch (failure) {
       submit.textContent = isVault ? 'Create vault' : 'Create account';

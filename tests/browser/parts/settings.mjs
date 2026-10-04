@@ -360,8 +360,11 @@ await run(async () => {
     }, PASSWORD_CARD);
   const changeRequests = () =>
     watched[0].requests.filter((r) => r.url.endsWith('/api/auth/change-password'));
+  const apiSince = (index, tail = '/api/') =>
+    watched[0].requests.slice(index).filter((r) => r.url.includes(tail));
 
   await fillPasswords('not the password at all', NEW_PASSWORD);
+  const beforeWrong = watched[0].requests.length;
   await submitPasswords();
   await page.waitUntil("document.body.innerText.includes('That is not your current password.')", {
     timeout: 60000,
@@ -382,11 +385,17 @@ await run(async () => {
     `${JSON.stringify(wrongCurrent.above)}, ${changeRequests().length} sent`,
   );
   check(
+    'a wrong current password sends no request of any kind, a salt lookup included',
+    apiSince(beforeWrong).length === 0,
+    apiSince(beforeWrong).map((r) => r.url).join(' | '),
+  );
+  check(
     'every field is kept after a wrong current password',
     wrongCurrent.kept.join('|') === ['not the password at all', NEW_PASSWORD, NEW_PASSWORD].join('|'),
   );
 
   await fillPasswords(VAULT_PASSWORD, NEW_PASSWORD);
+  const beforeChangeRequests = watched[0].requests.length;
   const working = await page.call((words) => {
     const card = [...document.querySelectorAll('.card')].find((c) => c.textContent.includes(words));
     const button = card.querySelector('.btn-primary');
@@ -408,6 +417,11 @@ await run(async () => {
   check(
     'the change confirms what else happened',
     (await text()).includes('Every other session was signed out, and this one is still open.'),
+  );
+  check(
+    'a successful change sends no salt request',
+    apiSince(beforeChangeRequests, '/api/auth/salt').length === 0,
+    apiSince(beforeChangeRequests).map((r) => r.url).join(' | '),
   );
   const afterChange = credentialOf('leander');
   const embedded = await page.eval("document.getElementById('kdf-envelope').textContent");

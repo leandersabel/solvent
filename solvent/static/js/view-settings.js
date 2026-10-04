@@ -235,7 +235,7 @@ function changePasswordCard(kdf, username) {
       // Every field is kept, so nothing is typed or derived twice.
       show(
         error,
-        failure instanceof WrongPasswordError || failure.status === 400
+        failure instanceof WrongPasswordError
           ? 'That is not your current password.'
           : 'Nothing was changed. Your current password still works.',
       );
