@@ -315,11 +315,11 @@ def delete_account():
     """
     body = parse(DeleteAccount, request.get_json(silent=True))
     ratelimit.guard_auth(g.principal["username"])
-    if normalize_username(body.confirmUsername) != g.principal["username"]:
-        abort(400)
     credential = credential_for(g.principal["id"])
     if not crypto.verify_auth_key(credential["verifier"], body.authKey):
         ratelimit.record_auth_failure(g.principal["username"])
+        abort(400)
+    if normalize_username(body.confirmUsername) != g.principal["username"]:
         abort(400)
 
     with write_transaction() as conn:

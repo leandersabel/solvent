@@ -819,8 +819,9 @@ from an administrator removing an account (`admin-invites.md`).
 10. A change-password request answers Unauthorized when another
     session's password change ended this session. Test: no test.
 11. (blind) A change-password request with a wrong `currentAuthKey`
-    answers Bad Request and writes nothing, called directly with the
-    client-side unwrap bypassed. Test: `tests/test_auth.py::test_a_wrong_current_auth_key_is_refused_server_side`.
+    answers Bad Request and writes nothing but its failed sign-in,
+    called directly with the client-side unwrap bypassed. Test: `tests/test_auth.py::test_a_wrong_current_auth_key_is_refused_server_side`,
+    `tests/test_review_account_settings.py::test_a_wrong_current_password_is_one_failed_sign_in_and_writes_nothing_else`.
 12. (blind) A password change invalidates every other session of the
     user and keeps the initiating one, asserted from both sides. Test:
     `tests/test_auth.py::test_a_password_change_ends_every_other_session_and_keeps_this_one`.
