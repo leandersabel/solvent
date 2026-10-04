@@ -60,13 +60,19 @@ could not cover. The compiler ticks `spec/status.md`, not you.
   - every `tests/test_*.py` that imports or names a touched module;
   - when templates, static JS or CSS, vendored files, `tests/browser/`
     or `tests/client/` change, the browser tests for them:
-    `test_browser.py` for screens and flows, `test_register_browser.py`
-    for registration, `test_client.py` for the client crypto layer,
-    `test_chrome.py` for the app shell, and all four when unclear;
+    `test_browser.py -k <part>` for each part in `tests/browser/parts/`
+    whose screen changed, and the whole file only when JS or CSS every
+    screen loads changed, `test_register_browser.py` for registration,
+    `test_client.py` for the client crypto layer, `test_chrome.py` for
+    the app shell, and all four when unclear;
   - `test_headers.py` and `test_guard.py` when middleware, the content
     security policy or routing changes;
   - when `conftest.py`, `helpers.py` or `tests/fixtures/` change, the
     tests that use the touched fixture, helper or file.
+- A failing test your change does not touch may be known to fail some
+  of the time. Search the open issues for its name. With a match, rerun
+  it once and go on. Without one, run it once on the base commit, and
+  if it fails there too, name it in your report.
 - Stay inside the current contract's scope. Do not refactor unrelated
   features while implementing one.
 - A problem you find outside the contract in hand goes in your report

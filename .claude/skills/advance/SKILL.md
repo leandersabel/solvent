@@ -277,7 +277,9 @@ closing `<details>` block.
    members follow one at a time, lowest number first, the same way.
    After each, the tests it touches pass, then commit, set
    `claude/issue-<issue>` and push. No member starts after the run's
-   first 90 minutes, and the ones not started leave the batch.
+   first 30 minutes, so review and the pull request finish within the
+   hour the run's GitHub token lasts. The ones not started leave the
+   batch.
 4. The tests the change touches pass, chosen as
    `.claude/agents/engineer.md` says. The full suite is the `test`
    check's.
