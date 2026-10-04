@@ -588,7 +588,14 @@ function holdingsTable(vault, state, render, actions, grouping) {
         'tbody',
         {},
         rows.map(({ holding, value }) =>
-          el('tr', { class: holding.payload.archivedAt ? 'dimmed' : null }, [
+          el('tr', {
+            class: [holding.payload.archivedAt && 'dimmed', value.state === 'unpriced' && 'unpriced'].filter(Boolean).join(' ') || null,
+            // The whole row opens the holding, which is how a phone,
+            // with no row action, reaches Record a value or Unarchive.
+            onclick: (event) => {
+              if (!event.target.closest('button')) actions.openHolding(holding.recordId);
+            },
+          }, [
             el('td', { class: 'cell-name' }, [
               el('button', {
                 class: 'link-button row-name',

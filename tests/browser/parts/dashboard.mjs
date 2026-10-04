@@ -344,6 +344,15 @@ await run(async () => {
             name: r.querySelector('.row-name').textContent,
             chip: Boolean(r.querySelector('.chip-archived')),
             buttons: [...r.querySelectorAll('.cell-action button')].map(b => b.textContent),
+            shownButtons: [...r.querySelectorAll('button:not(.row-name)')].filter(b => b.getClientRects().length).map(b => b.textContent),
+            tops: [r.querySelector('.cell-native'), r.querySelector('.cell-converted')].map(c => c.getBoundingClientRect().top),
+            // Somewhere on the row that is no control: the quantity's
+            // cell, or the row's right end where that cell is hidden.
+            edge: (() => {
+              const cell = r.querySelector('.cell-native').getBoundingClientRect();
+              const row = r.getBoundingClientRect();
+              return cell.width ? { x: cell.left + cell.width / 2, y: cell.top + cell.height / 2 } : { x: row.right - 6, y: row.top + row.height / 2 };
+            })(),
             actionShown: getComputedStyle(r.querySelector('.cell-action')).display !== 'none',
             figures: [r.querySelector('.cell-native').textContent, r.querySelector('.cell-converted').textContent, asof.textContent],
             visible: cells.filter(c => getComputedStyle(c).display !== 'none').map(c => c.textContent.trim()).filter(Boolean),
@@ -396,6 +405,24 @@ await run(async () => {
           emptyRow.visible.join('|') === 'not yet valued',
         JSON.stringify(emptyRow),
       );
+      // The quantity leads and "not priced" sits beneath it at phone
+      // width; on one line each at desktop width.
+      check(
+        `net-worth-view: an archived holding in a unit with no price reads its quantity, then "not priced" (${where})`,
+        width === 390 ? cellarRow?.tops[0] < cellarRow?.tops[1] : cellarRow?.tops[0] === cellarRow?.tops[1],
+        JSON.stringify(cellarRow?.tops),
+      );
+      // A row action is Unarchive or Record a value at desktop width
+      // and nothing at phone width, where the row's tap opens the holding.
+      check(
+        width === 390
+          ? `net-worth-view: no row, archived or active, shows a row action (${where})`
+          : `net-worth-view: Unarchive stays visible on an archived row (${where})`,
+        width === 390
+          ? shown.rows.length > 1 && shown.rows.every((r) => r.shownButtons.length === 0)
+          : cellarRow?.shownButtons.join() === 'Unarchive' && emptyRow?.shownButtons.join() === 'Unarchive',
+        JSON.stringify(shown.rows.map((r) => [r.name, r.shownButtons])),
+      );
       check(
         `net-worth-view: archived rows keep their text in ink-secondary and never at reduced opacity (${where})`,
         cellarRow?.secondary === true && cellarRow.opaque === true && emptyRow?.secondary === true && emptyRow.opaque === true,
@@ -418,6 +445,42 @@ await run(async () => {
     await pickMode('Latest rates');
   }
   await page.send('Emulation.clearDeviceMetricsOverride');
+
+  // A press on a row, off its name, opens the holding's screen, which
+  // offers Unarchive for an archived holding and Record a value for an
+  // active one.
+  for (const [width, phone] of [[390, true], [1280, false]]) {
+    await atWidth(width);
+    await page.send('Emulation.setTouchEmulationEnabled', { enabled: phone });
+    for (const [kind, archived, offered] of [
+      ['an archived', true, 'Unarchive'],
+      ['an active', false, 'Record a value'],
+    ]) {
+      await reloadModel();
+      if (!(await page.eval("document.querySelector('.holdings-card .checkbox input').checked"))) await toggleArchived();
+      // A press lands only on what is in the viewport.
+      const named = (await archiveCard()).rows.find((r) => r.chip === archived)?.name;
+      await page.call((wanted) => [...document.querySelectorAll('.holdings-table .row-name')].find((b) => b.textContent === wanted)?.scrollIntoView({ block: 'center' }), named);
+      await page.frames();
+      const row = (await archiveCard()).rows.find((r) => r.name === named);
+      let opened = false;
+      if (row) {
+        await (phone ? page.tap(row.edge.x, row.edge.y) : page.mouseClick(row.edge.x, row.edge.y));
+        opened = await page.waitUntil("location.hash.startsWith('#/holding/')", { timeout: 10000, label: 'the holding screen' }).then(() => true, () => false);
+      }
+      if (opened) await page.waitUntil("document.querySelector('.form-actions button')", { label: 'the holding screen' });
+      const offers = opened ? await labels('.form-actions button') : [];
+      check(
+        `net-worth-view: pressing ${kind} row opens the holding's screen, offering ${offered} (${width}px)`,
+        opened && offers.includes(offered),
+        JSON.stringify([row?.name, opened, offers]),
+      );
+    }
+  }
+  await page.send('Emulation.setTouchEmulationEnabled', { enabled: false });
+  await page.send('Emulation.clearDeviceMetricsOverride');
+  await reloadModel();
+  if (await page.eval("document.querySelector('.holdings-card .checkbox input').checked")) await toggleArchived();
 
   // Holdings and no snapshot at all: every active holding is under Not
   // yet valued and the total is a dash. Each archived one is a row

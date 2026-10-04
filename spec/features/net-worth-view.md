@@ -654,7 +654,8 @@ the sub-pixel bound above. The figure shown is the model's.
 - With "Show archived" on, in both pricing modes, an archived holding
   in a unit with no price and an archived holding with no readable
   snapshot each render as a row of the holdings table with the Archived
-  chip and Unarchive, the first reading its latest quantity and "not
+  chip, and with Unarchive at desktop width (`spec/ui/dashboard.md`, At
+  phone width), the first reading its latest quantity and "not
   priced", the second "not yet valued". Neither is listed under not
   priced or not yet valued, while an active holding in the first one's
   unit stays under not priced. With the toggle off, neither archived

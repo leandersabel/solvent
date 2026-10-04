@@ -302,12 +302,13 @@ The regions keep their order and stack, 20px apart.
   headings. Each row holds the name with its dimension chips beneath
   it at the left, and at the right the main-currency figure with any
   price date line and then the as-of date beneath it, preceded by the
-  native figure where the unit is not the main currency. An archived
-  row keeps its ink-secondary text, its "Archived" chip and Unarchive
-  in place of Record a value. Where its unit has no price, the right
-  side reads its quantity and then "not priced", with no price date
-  line. Where it has no readable snapshot, the right side reads "not yet
-  valued", with no as-of date.
+  native figure where the unit is not the main currency. A row carries
+  no row action, because tapping it opens the holding's screen, which
+  offers Record a value or Unarchive (`account-detail.md`). An archived
+  row keeps its ink-secondary text and its "Archived" chip. Where its
+  unit has no price, the right side reads its quantity and then "not
+  priced", with no price date line. Where it has no readable snapshot,
+  the right side reads "not yet valued", with no as-of date.
 
 ## States
 
