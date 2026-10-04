@@ -21,6 +21,15 @@ await run(async () => {
   );
 
   await page.waitUntil("document.querySelector('input[type=text]')", { label: 'the invite form' });
+  await page.waitUntil("document.querySelector('#app .empty-line, #app table.data-table')", { label: 'the outstanding invites' });
+  check(
+    'the outstanding invites sit in a card of their own, opening on their heading',
+    await page.eval(`(() => {
+      const card = document.querySelector('#app .empty-line, #app table.data-table').closest('.card');
+      return !!card && card !== document.querySelector('input[type=text]').closest('.card')
+        && card.firstElementChild.matches('h2.section-heading');
+    })()`),
+  );
   await setValue('input[type=text]', 'Sprint test');
   await click('Create invite link');
   await page.waitUntil("document.body.innerText.includes('Copy this now')", { label: 'the one-time link' });
