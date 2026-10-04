@@ -414,6 +414,14 @@ rule.
   rows unaffected.
 - **Row, Conflict**: "This figure was changed in another window." The
   row reloads to the stored record and nothing is retried.
+- **The holding was archived or deleted in another window**: the row
+  saves nothing and leaves the screen, as it would from a sweep drawn
+  now, and the banner says, critical:
+
+  > Fund 2 was archived in another window. Nothing was saved.
+
+  "deleted" for a holding that is gone (Creating and reopening are
+  distinct acts).
 - **The date became taken while you were working**: the save is refused
   whole and nothing is written (Creating and reopening are distinct
   acts). The wording is not an accusation:
@@ -714,6 +722,14 @@ The same Dialog, prefilled with the stored value, date and note.
 - **The date became taken while you were working**: refused whole,
   nothing written, copy as on Update values, one button opening that
   recording.
+- **The holding was archived or deleted in another window**: nothing
+  written, and the Dialog says so above Save, with **Done** alone,
+  which closes it:
+
+  > Fund 2 was archived in another window. Nothing was saved.
+
+  A move reads "Nothing was moved.", and a holding that is gone
+  "deleted".
 - **Validation**: the quantity field's and the Date field's own rules
   (Refusing a date).
 - **Archived holding**: the entry point does not exist for it, at any
@@ -935,6 +951,14 @@ session can cause.
   claimed date or not**, one pair of `GET`s per save, because a typed
   price alone never makes a recording and only a fresh reload shows the
   date emptied (`record-rate.md`, The write path).
+- **Every figure created for a holding, and every date move, first
+  reads the holdings afresh** (`GET /api/records?type=account`), claimed
+  date or not, because a sitting can outlive an archive made in another
+  window (`manage-accounts.md`, While archived). A create is refused
+  when the holding is now archived or gone, at any date, and a move
+  when it is gone or archived on or before the new date. Nothing is
+  written, and the model takes the holdings, snapshots and rates as
+  they now stand. The holdings read comes before the date's reload.
 - **A reload after the claim judges the slots only.** The session's own
   records are at the date, so finding the date recorded does not refuse
   it. It refuses a slot the save would create that is taken and, for
@@ -1140,7 +1164,7 @@ Editing an existing entry).
   balances, and net worth is a signed sum.
 - **Non-numeric or malformed value**: inline validation, no submission.
 - **Recording against an archived holding**: blocked at every entry
-  point and date. The archive's own zero is no exception, because it is
+  point and date, a screen drawn before the archive included. The archive's own zero is no exception, because it is
   written while the holding is still active, before `archivedAt` is set
   (`manage-accounts.md`, Archiving).
 - **Two windows entering the same value, or editing the same
@@ -1486,3 +1510,13 @@ Editing an existing entry).
     wide window, no chip wider than its container and no two boxes
     intersecting, asserted on rendered geometry, not on text in the DOM.
     Test: `tests/browser/parts/snapshot-entry.mjs`.
+87. (blind) A single-holding form open since before another window
+    archived its holding writes nothing at an earlier date, and says the
+    holding was archived in another window. Test:
+    `tests/browser/parts/snapshot-entry.mjs`.
+88. A date move onto or past an archive another window made since the
+    form opened writes nothing and says nothing was moved. Test:
+    `tests/browser/parts/snapshot-entry.mjs`.
+89. (blind) A sweep row of a holding archived in another window after
+    the sweep claimed its date writes nothing, says so, and leaves the
+    screen. Test: `tests/browser/parts/update-values.mjs`.

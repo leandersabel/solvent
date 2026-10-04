@@ -98,7 +98,7 @@ await run(async () => {
     rec, dayOf, isoOf, T, ago, D1, D5, D8,
     D9, D10, D11, proxy, traffic, faults, writesSent, rateAsks, typeReads,
     bodyOf, ev, quiet, set, press, stored, on, bytes,
-    plantHere, reread, go, format, line, lineState, typeLine, figure,
+    plantHere, archiveElsewhere, reread, go, format, line, lineState, typeLine, figure,
     home, id, layout, snap, price, viewport,
   } = r;
 
@@ -555,4 +555,40 @@ await run(async () => {
     `${silverForm} | ${lineType}`,
   );
   await closeDialogs();
+
+  // #229: a form opened before another window archived its holding.
+  const DA = ago(65);
+  await openForm('Fund 2');
+  await set('#snapshot-date', await format('date', DA));
+  await set('#snapshot-value', '5');
+  await archiveElsewhere('Fund 2', T);
+  traffic.length = 0;
+  await formSave();
+  const archivedForm = await formError();
+  await closeDialogs();
+  check(
+    'record-snapshot: a form open since before its holding was archived elsewhere records nothing, at an earlier date too, and says so',
+    archivedForm === 'Fund 2 was archived in another window. Nothing was saved.' && writesSent().length === 0 &&
+      on(await stored('snapshot'), DA).every((s) => s.accountId !== id['Fund 2']),
+    archivedForm,
+  );
+
+  await plantHere([snap('Fund 3', DA, '3')]);
+  await reread();
+  await go(`#/holding/${id['Fund 3']}`);
+  await rec.call((day) => [...document.querySelectorAll('.card .data-table tbody tr')].find(r => r.cells[0].textContent.startsWith(day))
+    .querySelectorAll('button').forEach(b => { if (b.textContent === 'Edit') b.click(); }), await format('longDate', DA));
+  await rec.waitUntil("document.querySelector('#snapshot-date')", { label: 'the edit form' });
+  await set('#snapshot-date', await format('date', ago(5)));
+  await archiveElsewhere('Fund 3', ago(8));
+  traffic.length = 0;
+  await formSave();
+  const archivedMove = await formError();
+  await closeDialogs();
+  check(
+    'record-snapshot: a move onto or past an archive made elsewhere since the form opened is refused and moves nothing',
+    archivedMove === 'Fund 3 was archived in another window. Nothing was moved.' && writesSent().length === 0 &&
+      on(await stored('snapshot'), DA).some((s) => s.accountId === id['Fund 3']),
+    archivedMove,
+  );
 });

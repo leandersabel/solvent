@@ -409,6 +409,15 @@ export async function startRecorder() {
   const id = {};
   const accountIds = [];
   const snap = (name, date, value) => ({ type: 'snapshot', accountId: id[name], payload: { date, value, note: null } });
+  // What archiving the holding on `date` writes, done by another window
+  // behind the model on screen: the zero, then the flag.
+  const archiveElsewhere = async (name, date) => {
+    const record = (await stored('account')).find((a) => a.recordId === id[name]);
+    await plantHere([
+      snap(name, date, '0'),
+      { type: 'account', recordId: record.recordId, version: record.version + 1, payload: { ...record.payload, archivedAt: date } },
+    ]);
+  };
   const price = (symbol, date, rate, rateSource = 'manual') => ({
     type: 'rate',
     payload: { symbol, date, rate, rateTarget: 'CHF', rateSource, rateAsOf: rateSource === 'manual' ? null : date, proposedRate: null },
@@ -516,6 +525,7 @@ export async function startRecorder() {
     on,
     bytes,
     plantHere,
+    archiveElsewhere,
     reread,
     go,
     format,

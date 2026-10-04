@@ -174,6 +174,15 @@ export function sweepView(vault, date, actions = {}) {
       sit,
       block,
       refused,
+      closed: (refusal, row) => {
+        // The holding takes no figure here any more, so its row goes, as
+        // it would from a sweep drawn now.
+        rows.splice(rows.indexOf(row), 1);
+        row.element.remove();
+        block.refresh();
+        syncSave();
+        say(closedCopy(row.holding, refusal, 'saved'), { critical: true });
+      },
       ensurePrices,
       onSaved: syncSave,
       onTyped: () => block.ask(holding.payload.unit),
@@ -209,7 +218,7 @@ function heading(vault, date) {
   ]);
 }
 
-function sweepRow(vault, holding, date, { sit, block, refused, ensurePrices, onSaved, onTyped }) {
+function sweepRow(vault, holding, date, { sit, block, refused, closed, ensurePrices, onSaved, onTyped }) {
   const { format } = vault;
   const atDate = () => vault.snapshotsFor(holding.recordId).filter((s) => s.payload.date === date);
   // On a reopened recording, the figure a holding carried into that
@@ -243,7 +252,7 @@ function sweepRow(vault, holding, date, { sit, block, refused, ensurePrices, onS
     savedNote,
   ]);
 
-  const row = { name: holding.payload.name };
+  const row = { name: holding.payload.name, holding };
 
   /** Put the field back to what the vault holds for this row. */
   const reset = (row.reset = () => {
@@ -311,7 +320,8 @@ function sweepRow(vault, holding, date, { sit, block, refused, ensurePrices, onS
       return;
     }
     // An archived holding whose figure here is gone takes no new one.
-    if (row.element) row.element.hidden = Boolean(holding.payload.archivedAt) && !stored;
+    const gone = Boolean(holding.payload.archivedAt) && !stored;
+    if (row.element) row.element.hidden = gone;
     const carried = carriedInto();
     const reference = stored || carried;
     if (stored) {
@@ -324,7 +334,7 @@ function sweepRow(vault, holding, date, { sit, block, refused, ensurePrices, onS
       control.textContent = untouched ? 'Confirm' : 'Record';
       // Nothing to confirm where the holding was never valued: the
       // field is the only control until something is typed in it.
-      control.disabled = !carried && !field.value.trim();
+      control.disabled = gone || (!carried && !field.value.trim());
     }
     // The two row states differ in wording and in ink weight, never in
     // color alone. A changed figure puts the brass on the row's control.
@@ -429,7 +439,8 @@ function sweepRow(vault, holding, date, { sit, block, refused, ensurePrices, onS
         rates: sit.refreshed ? [] : vault.missingUnits(date),
       });
       if (refusal) {
-        refused();
+        if (refusal.closed) closed(refusal, row);
+        else refused();
         return;
       }
       // The quantity goes first and the prices after, on their own
@@ -465,6 +476,13 @@ function sweepRow(vault, holding, date, { sit, block, refused, ensurePrices, onS
     control,
   ]);
   return row;
+}
+
+/** A holding archived or deleted in another window since this one read
+ *  it: what was typed is not written (record-snapshot.md, Update values
+ *  and Snapshot entry, States). */
+export function closedCopy(holding, { closed }, act) {
+  return `${holding.payload.name} was ${closed} in another window. Nothing was ${act}.`;
 }
 
 /** What a quantity converts to at `price` (`{ rate, date }`, or null for

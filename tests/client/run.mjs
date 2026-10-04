@@ -2134,9 +2134,10 @@ await check('record-snapshot: a date move writes the snapshot, then the new date
   let ratePuts = 0;
   server.faults.push((r) => (r.method === 'PUT' && r.body.recordType === 'rate' && (ratePuts += 1) === 1 ? 500 : null));
   const result = await writes.editSnapshot(vault, holding, moving, { date: '2026-04-10', value: '100', note: null }, { sit, displaced, proposals });
-  // The reload that claims the date, the quantity, every rate (the one
-  // that failed included), and the deletion after the last of them.
-  assert.deepEqual(recordTrace(server), ['GET snapshot', 'GET rate', 'PUT snapshot', 'PUT rate', 'PUT rate', 'DELETE']);
+  // The holdings read, the reload that claims the date, the quantity,
+  // every rate (the one that failed included), and the deletion after
+  // the last of them.
+  assert.deepEqual(recordTrace(server), ['GET account', 'GET snapshot', 'GET rate', 'PUT snapshot', 'PUT rate', 'PUT rate', 'DELETE']);
   assert.equal(result.failed.length, 1);
   assert.equal(result.undeleted, false);
   assert.equal(ratesAt(vault, '2026-04-10').length, 1);
@@ -2390,12 +2391,13 @@ await check('record-snapshot: a create at a date another session recorded is ref
   // The screen now describes the vault as it stands.
   assert.equal(vault.holdsRecording('2026-07-31'), true);
 
-  // A sitting that claimed its date reloads nothing more.
+  // A sitting that claimed its date reloads the date no more, and reads
+  // only the holdings again.
   const fresh = writes.sitting(vault, '2026-08-31');
   assert.equal(await writes.claimDate(vault, fresh, { snapshots: [vault.ids.Francs] }), null);
   server.reset();
   assert.equal(await writes.claimDate(vault, fresh, { snapshots: [vault.ids.Dollars] }), null);
-  assert.equal(server.log.length, 0);
+  assert.deepEqual(server.log.map((r) => r.query.type), ['account']);
 });
 
 await check('record-snapshot: inside a reopened date, a slot another session filled refuses the create', async () => {
