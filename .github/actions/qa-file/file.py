@@ -1,9 +1,11 @@
 """Files what nightly QA recorded in qa-unfiled/ (CLAUDE.md, The loop,
 Nightly and stable): a comment on the open `qa` issue a record repeats,
-or else a new issue. Each record is deleted once filed, so a rerun files
-nothing twice. With DISPATCH set, each new issue starts the loop,
-because one the workflow's token opens starts no workflow by itself.
-Needs `gh` signed in to the repository.
+or else a new issue. A rated finding is filed in line, with `queued`
+(CLAUDE.md, The loop, Findings). Each record is deleted once filed, so a
+rerun files nothing twice. With DISPATCH set, each new issue without a
+rating starts the loop, and so does the queue, because what the
+workflow's token does starts no workflow by itself. Needs `gh` signed in
+to the repository.
 """
 import glob
 import json
@@ -35,15 +37,21 @@ for path in sorted(glob.glob("qa-unfiled/*.json")):
         gh("issue", "comment", str(repeats), "--body-file", "-", body=str(record["comment"]))
     else:
         labels = [label for label in record.get("labels", []) if label in RATINGS | {"bug", "qa", "accepted"}]
-        for label in RATINGS.intersection(labels):
+        rated = RATINGS.intersection(labels)
+        for label in rated:
             subprocess.run(["gh", "label", "create", label], capture_output=True)
+        if rated:
+            labels.append("queued")
         flags = []
         for label in labels:
             flags += ["--label", label]
         url = gh("issue", "create", "--title", str(record["title"]), "--body-file", "-", *flags, body=str(record["body"]))
-        if os.environ.get("DISPATCH"):
+        if not rated and os.environ.get("DISPATCH"):
             gh("workflow", "run", "agent.yml", "--ref", "master", "-f", f"issue={url.rsplit('/', 1)[1]}")
     os.remove(path)
+
+if os.environ.get("DISPATCH"):
+    gh("workflow", "run", "agent.yml", "--ref", "master", "-f", "issue=queue")
 
 if os.path.isdir("qa-unfiled") and not os.listdir("qa-unfiled"):
     os.rmdir("qa-unfiled")

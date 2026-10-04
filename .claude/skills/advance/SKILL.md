@@ -95,9 +95,8 @@ for criteria it could not check stays unrated.
    that made the work writes after its push (`Fix attempt <n>`, what
    changed, a new review request), and stop. Otherwise continue below.
 5. **Batched under another issue.** The issue carries `implementing`
-   and belongs to the batch of another open issue #L. If the client
-   wrote since, start #L's run (`gh workflow run agent.yml --ref master
-   -f issue=<L>`). Stop without a comment.
+   and belongs to the batch of another open issue #L: stop without a
+   comment. What the client writes on a member starts #L's run.
 6. **Implementation pull request open.**
    - A check failed: Implementation steps 3 to 5 from the existing
      branch, set it, push, and comment `Fix attempt <n>` on the pull request,
@@ -115,10 +114,8 @@ for criteria it could not check stays unrated.
    - The client approved its head commit:
      - A check failed: go to Stuck.
      - A check is still running: stop. Its result starts the next run.
-     - All green: add `implementing`, or `queued` when another open
-       issue carries `implementing` or a `queued` issue ranks ahead of
-       this one (Implementation step 1). Merge with squash. For
-       `implementing`, go to Implementation.
+     - All green: add `queued`, unless the pull request closes the
+       issue, and merge with squash.
    - The client wrote since, in a review, a line comment or a comment:
      when it raises something only the client can decide, ask on the
      issue with `needs-answer`. Otherwise revise the requirements from the
@@ -137,9 +134,9 @@ for criteria it could not check stays unrated.
     implementation pull request is open, or `claude/issue-<issue>` holds
     commits beyond `origin/master` and no pull request came from it:
     Implementation.
-11. **Queued**, and no other open issue carries `implementing`:
-    Implementation.
-12. **Requirements merged, no implementation yet:** Implementation.
+11. **Queued.** The client wrote since: Clarify. Otherwise stop
+    without a comment.
+12. **Requirements merged, no implementation yet:** add `queued`.
 13. **Otherwise:** Clarify.
 
 ## Clarify
@@ -180,13 +177,21 @@ Then one comment, and exactly one outcome:
 - **Unclear:** the questions, `needs-answer` added, `@leandersabel`
   mentioned.
 - **Bug:** what the requirement is and what Solvent does, its rating
-  added when it has none, `needs-answer` removed, then Implementation.
+  added when it has none, `needs-answer` removed, `queued` added.
 - **Maintenance:** what changes in the code and why, `maintenance`
-  added, `needs-answer` removed, then Implementation.
+  added, `needs-answer` removed, `queued` added.
 - **Change**, including a pipeline change: the requirements it adds,
   changes or removes, `needs-answer` removed, then Requirements.
 - **Already met, a duplicate, or doubtful:** the reasoning and a
   question to the client, `needs-answer` added.
+
+`queued` is all it takes to be implemented: the workflow hands the slot
+to the first in line and starts its run (`CLAUDE.md`, The loop,
+Implementation). Never start a run, and never add `implementing` to
+this issue. A `bug` titled `The checks fail on master`, opened by
+`github-actions[bot]`, gets no `queued` and goes straight to
+Implementation, since every other implementation's checks fail until it
+is fixed.
 
 A `bug` where a requirement is what is wrong is relabeled `change`, and
 a `change` the requirements already ask for is relabeled `bug`, and the
@@ -215,47 +220,38 @@ closing `<details>` block.
 3. Commit, set `claude/spec-<issue>` to the commit, push it, and open
    a pull request against `master`. The title
    is English and says what it requires. The body starts with
-   `Part of #<issue>` and lists the requirements added, changed or
-   removed, in the issue's language. Request `leandersabel`'s review.
-   Never turn on auto-merge.
+   `Part of #<issue>`, or with `Closes #<issue>` for a pipeline change
+   that leaves nothing to implement and needs no workflow file changed,
+   and lists the requirements added, changed or removed, in the issue's
+   language. Request `leandersabel`'s review. Never turn on auto-merge.
 4. Comment on the issue that the requirements are ready for review,
    with the link.
 
 ## Implementation
 
-1. A `bug` titled `The checks fail on master`, opened by
-   `github-actions[bot]`, skips this step and the slot, since every
-   other implementation's checks fail until it is fixed.
+1. The issue carries `implementing`, which the workflow gave it with
+   the slot, or is the `bug` titled `The checks fail on master`, which
+   needs no slot.
 
-   A free slot goes to the first in line. Rank the open issues
-   carrying `queued`, and this one, by the rating that counts, critical
-   first, then high, then the rest, each lowest number first. When one
-   ranks ahead of this issue and this issue does not carry
-   `implementing`, add `queued`, start the run of the first in line
-   (`gh workflow run agent.yml --ref master -f issue=<n>`) when
-   `claude/slot` does not exist, comment which issue is first in line,
-   and stop.
+   An issue an agent filed waits in line as filed, so it has no reading
+   of yours: its body is the reading. Test the report before anything
+   is built on it. When the spec does not ask for what it expects, or
+   step 3's test cannot be made to fail on what it reports, the report
+   does not hold: a member leaves the batch, and for this issue remove
+   `implementing` and go to Clarify, as doubtful.
 
-   Otherwise take the implementation slot by creating the branch `claude/slot`
-   (`gh api -X POST repos/leandersabel/solvent/git/refs -f
-   ref=refs/heads/claude/slot -f sha=<origin/master>`). GitHub creates
-   it only once, so two runs never both hold the slot. Created: add
-   `implementing` and remove `queued`. It already exists and this issue
-   carries `implementing`: the slot is this issue's, so continue.
-   Otherwise it already exists: add `queued`, comment which issue carries `implementing`, and stop.
-
-   Holding the slot, this issue leads a batch when it is a `bug` or
-   `code-scanning` issue whose rating that counts is `severity: low`.
-   Its members are the open `bug` and `code-scanning` issues carrying `queued` whose
-   rating that counts is `severity: low`, that nobody but the client
-   edited after `accepted` was added, with no marked comment saying they
-   left a batch because their fix failed, and whose reading in your
-   marked comments names a file in `spec/product/`, `spec/features/` or
-   `spec/ui/` that this issue's reading names. On each, add
-   `implementing`, remove `queued`, and comment in its language that it
-   is fixed together with #<issue>, ending with `<!-- batch: <issue> -->`
-   before `<!-- advance -->`. Comment on this issue which issues joined
-   it.
+   This issue leads a batch when it is a `bug` or `code-scanning` issue
+   whose rating that counts is `severity: low`. Its members are the
+   open `bug` and `code-scanning` issues carrying `queued` whose rating
+   that counts is `severity: low`, that nobody but the client edited
+   after `accepted` was added, with no marked comment saying they left a
+   batch because their fix failed or a requirement has to change, and
+   that name, in their body or your reading, a file in `spec/product/`,
+   `spec/features/` or `spec/ui/` that this issue's body or reading
+   names. On each, add `implementing`, remove `queued`, and comment in
+   its language that it is fixed together with #<issue>, ending with
+   `<!-- batch: <issue> -->` before `<!-- advance -->`. Comment on this
+   issue which issues joined it.
 2. `git fetch origin`. A leftover `claude/issue-<issue>` without a pull
    request, holding commits beyond `origin/master`, is the last run's
    work: rebase it onto `origin/master` and start `work` from it. It is
@@ -306,17 +302,17 @@ closing `<details>` block.
 An implementation never changes `spec/requirements.md`,
 `spec/design/`, `.github/`, `.claude/`, `CLAUDE.md` or `SECURITY.md`.
 When a requirement has to change, every member leaves the batch, then
-remove `implementing`, delete `claude/slot`, and return to Clarify with
-a question or a `change`.
+remove `implementing` and return to Clarify with a question or a
+`change`.
 
 ### Leaving a batch
 
 A member leaves in this order. Remove its `Closes` line from an open
 pull request's body before any push, so auto-merge cannot close it without
 its fix. Revert its commits, set `claude/issue-<issue>` and push. Add
-`queued`, remove `implementing`, and comment on it why. One that needs
-a requirement change gets no `queued`: start its run instead, which
-takes it to Clarify.
+`queued`, remove `implementing`, and comment on it why. One whose
+report does not hold gets `needs-answer` and the question instead of
+`queued`.
 
 The issue leading the batch never leaves. When its own fix fails, go to
 Stuck. When its rating rises above low, every member leaves and it goes
@@ -343,7 +339,8 @@ work in hand causes, or this issue covers, stays in that work.
    nothing, or your rating label and a comment why when yours is higher.
 2. Otherwise open an issue as `claude[bot]`: `bug` with its rating,
    creating the label when missing, or `maintenance` when nothing the
-   client sees changes, and `accepted`. Title and body follow Writing,
+   client sees changes, with `accepted` and `queued`, so it waits in
+   line as filed. Title and body follow Writing,
    in this issue's language: what is wrong first, the technical reading
    in a closing `<details>` block, then the line
    `Found while working on #<issue>`.

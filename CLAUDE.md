@@ -203,12 +203,12 @@ Each run on a new issue, or on a reply from the client, ends in one of:
 - `bug`, Solvent falls short of the requirements, or of
   `spec/product/` where no requirement covers it, in the code, the
   spec or both: the comment says what the requirement is and what
-  Solvent does, and implementation starts.
+  Solvent does, and the issue waits in line (Implementation).
 - `change`, the requirements change: the comment says what changes for
   the client, and the requirements pull request opens.
 - `maintenance`, nothing the client sees changes, in the code or the
-  agent-owned spec:
-  the comment says what changes and why, and implementation starts.
+  agent-owned spec: the comment says what changes and why, and the
+  issue waits in line.
 - Already met, a duplicate, or doubtful: the reasoning, and a question
   to the client.
 
@@ -228,22 +228,26 @@ takes it up at once.
 
 - A `change` becomes a pull request from `claude/spec-<issue>` that
   touches only `spec/requirements.md`, or for a pipeline change only
-  the pipeline, and links the issue without closing it. Its description
-  is the requirements it adds, changes or removes, in the issue's
-  language.
-- Approving merges it and starts implementation. Requesting changes
-  gets a revision on the same pull request. Closing it stops the loop
-  and leaves the issue to the client.
+  the pipeline, and links the issue. It closes the issue only when it
+  is a pipeline change that leaves nothing to implement. Its
+  description is the requirements it adds, changes or removes, in the
+  issue's language.
+- Approving merges it, and what is left to implement waits in line.
+  Requesting changes gets a revision on the same pull request. Closing
+  it stops the loop and leaves the issue to the client.
 
 ### Implementation
 
-- Starts when a requirements pull request merges, or when clarifying
-  finds a `bug` or `maintenance` with nothing to ask. One implementation runs at a time, holding
-  the `claude/slot` branch, which GitHub creates only once: its issue
-  carries `implementing`. An issue that is ready waits with `queued`
-  while another holds the slot or a queued issue ranks ahead of it. A
-  free slot always goes to the first in line: critical problems first,
-  then high ones, then the rest, each lowest number first (Severity).
+- An issue is ready when its requirements pull request merges, when
+  clarifying finds a `bug` or `maintenance` with nothing to ask, or
+  when an agent files it as a finding (Findings). A ready issue waits
+  in line with `queued`. One implementation runs at a time, and its
+  issue carries `implementing`.
+- The workflow hands out the slot, never an agent, in a step without a
+  model that runs one at a time. When no open issue carries
+  `implementing`, the first in line gets it and its run starts:
+  critical problems first, then high ones, then the rest, each lowest
+  number first (Severity).
 - When a problem rated `severity: low` takes the slot, every other
   `queued` problem rated low on the same feature or screen joins it in
   one batch: one implementation, one branch and one pull request, each
@@ -319,10 +323,13 @@ found.
   remark in a comment, a pull request or a reading.
 - A problem the work in hand causes, or its issue covers, is part of
   that work. Any other is filed by `claude[bot]` as a rated `bug`, or as
-  `maintenance` when nothing the client sees changes, with `accepted`
-  and where it was found, and the loop takes it up at once. An agent
-  never files a `change`, because a requirement is only ever the
-  client's request.
+  `maintenance` when nothing the client sees changes, with `accepted`,
+  `queued` and where it was found. An agent never files a `change`,
+  because a requirement is only ever the client's request.
+- A finding waits in line as filed, with no run of its own, because
+  whoever found it already said what is wrong. The run that implements
+  it tests the report first, and one that does not hold goes to the
+  client as a question.
 - A finding made while working on an issue is written in that issue's
   language.
 - What an open issue by `leandersabel`, `claude[bot]` or
@@ -374,8 +381,8 @@ found.
   installation's lookups.
 - Every finding becomes a `bug` issue as Findings says, labeled `qa` as
   well. Each feature with criteria QA could not check gets an issue
-  saying which and why, the same way. QA only records them during
-  the walk. Once every shard has finished, a short run merges what the
+  saying which and why, which the loop clarifies at once. QA only
+  records them during the walk. Once every shard has finished, a short run merges what the
   shards recorded, and another files it with a fresh token, so a long
   walk never outlasts the token. What that run could not file,
   the workflow files the same way, as `github-actions[bot]`, before the
@@ -435,10 +442,10 @@ found.
   fixes it on the same branch. When it still fails after a bounded
   number of attempts, or reviewer findings remain, the pull request
   becomes a draft without auto-merge and the issue is `stuck`.
-- A fix in a batch that cannot be finished, or whose rating rises above
-  low, leaves the batch for the queue, and the rest go on. One that
-  needs a requirement change goes back to clarifying. When the fix of
-  the issue that took the slot fails, the batch is `stuck`.
+- A fix in a batch that cannot be finished, whose rating rises above
+  low, or that needs a requirement change leaves the batch for the
+  queue, and the rest go on. When the fix of the issue that took the
+  slot fails, the batch is `stuck`.
 - Every merge to `master` rebases the loop's open pull requests.
 - A failing check on `master` opens a `bug` issue as
   `github-actions[bot]`, which starts at once and skips the
