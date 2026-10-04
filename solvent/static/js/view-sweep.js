@@ -10,8 +10,8 @@ import * as writes from './writes.js';
 import { ageInWords, dialog, el, icon, mount, priceDateLine } from './dom.js';
 import { dayNumber } from './model.js';
 
-// One sitting per date, kept across redraws of the same screen and
-// dropped whenever a route starts a sweep afresh.
+// One sitting per date, kept across redraws of the sweep on screen and
+// dropped whenever a sweep is arrived at from another screen (app.js).
 let sittings = new Map();
 // The sweep on screen, so leaving it can name what it held unsaved.
 let current = null;

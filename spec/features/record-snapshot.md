@@ -141,6 +141,13 @@ recording and editing one the same gesture, and they are different acts
 (Creating and reopening are distinct acts). **Delete is not on this
 screen**, so an edit can never slip into a deletion.
 
+**Arriving at the sweep from another screen begins a sitting**, by
+Update, New recording or its address alike, so the sweep reads the date
+as the vault holds it then. A date recorded since the last visit opens
+as a reopened recording, never with what an earlier sitting there
+showed. A redraw of the sweep on screen, and its return after a lock,
+continue the sitting.
+
 #### Nothing counts what is left alone
 
 A partial update is the ordinary case. Four holdings this month and the
@@ -1251,9 +1258,11 @@ Editing an existing entry).
     press). Test: `tests/browser/parts/update-values.mjs`,
     `tests/browser/parts/recording-detail.mjs`.
 35. A line left empty because no price came back says so on the
-    reopened recording and offers Look it up. A line holding a price
-    never offers it, nor one dated before its unit's published prices.
-    Test: `tests/browser/parts/update-values.mjs`.
+    reopened recording and offers Look it up, whichever way the recording
+    is reached. A line holding a price never offers it, nor one dated
+    before its unit's published prices.
+    Test: `tests/browser/parts/update-values.mjs`,
+    `tests/browser/parts/update-values-review.mjs`.
 36. Pressing Look it up fills the line when the source answers, labeled
     with the day it is for, as a proposal to take, change or leave. Test:
     `tests/browser/parts/update-values.mjs`.

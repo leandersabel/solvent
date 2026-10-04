@@ -713,6 +713,16 @@ await run(async () => {
       on(await stored('snapshot'), D7).length === 1 && on(await stored('rate'), D7).length === 0,
     JSON.stringify(outage),
   );
+  await home();
+  traffic.length = 0;
+  await go(`#/sweep/${D7}`);
+  const reopenedOutage = await lineState('USD');
+  check(
+    'record-rate: a recording reopened by its address after an outage at it says no rate was recorded, offers Look it up and asks nothing',
+    reopenedOutage.says === 'No rate was recorded for USD on this date.' && reopenedOutage.lookup &&
+      rateAsks().length === 0 && writesSent().length === 0,
+    JSON.stringify(reopenedOutage),
+  );
 
   proxy.mode = 'none';
   await plantHere([{
