@@ -44,18 +44,42 @@ export class DerivationError extends Error {
   }
 }
 
+// A worker whose script did not load fires `error` and never answers.
+// It is dropped, so the next derivation loads it again.
+function startWorker() {
+  const started = new Worker('/static/js/kdf-worker.js', { type: 'module' });
+  started.addEventListener('error', () => {
+    started.terminate();
+    if (worker === started) worker = null;
+  });
+  return started;
+}
+
 function runArgon2id(password, salt, kdf) {
-  worker ??= new Worker('/static/js/kdf-worker.js', { type: 'module' });
+  worker ??= startWorker();
+  const running = worker;
   const id = ++nextCall;
   return new Promise((resolve, reject) => {
+    const stop = () => {
+      running.removeEventListener('message', onMessage);
+      running.removeEventListener('error', onError);
+    };
     const onMessage = (event) => {
       if (event.data.id !== id) return;
-      worker.removeEventListener('message', onMessage);
+      stop();
       if (event.data.ok) resolve(event.data.raw);
       else reject(new DerivationError(event.data.message, event.data.outOfMemory));
     };
-    worker.addEventListener('message', onMessage);
-    worker.postMessage({ id, password, salt, kdf });
+    // A TypeError, as fetch throws for a request that got no answer, so
+    // every caller reads it as one (api.didNotGoThrough). No timeout,
+    // because a real derivation takes seconds on a phone.
+    const onError = () => {
+      stop();
+      reject(new TypeError('The key derivation did not load.'));
+    };
+    running.addEventListener('message', onMessage);
+    running.addEventListener('error', onError);
+    running.postMessage({ id, password, salt, kdf });
   });
 }
 

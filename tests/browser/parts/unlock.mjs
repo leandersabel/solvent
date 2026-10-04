@@ -435,6 +435,27 @@ await run(async () => {
     await signInOn(card, ADMIN_PASSWORD, 'ops.leander');
     await card.waitUntil("location.pathname === '/admin'", { timeout: 60000, label: 'the admin area from the card' });
     check('an administrator signs in through the one card and lands in the admin area', true);
+
+    // A cold sign-in whose derivation's worker script gets no answer
+    // reads as not going through, and Unlock recovers in the same page.
+    await card.send('Network.clearBrowserCookies');
+    await card.send('Network.setCacheDisabled', { cacheDisabled: true });
+    await card.goto(`${BASE}/login`);
+    expectedFailures.add('/static/js/kdf-worker.js');
+    const restore = await intercept(card, '*/static/js/kdf-worker.js', () => ({ drop: true }));
+    const cold = await attempt('leander', VAULT_PASSWORD);
+    const coldKept = await card.eval(
+      "[document.querySelector('#unlock-username').value, document.querySelector('#unlock-password').value].join('/')",
+    );
+    await restore();
+    expectedFailures.delete('/static/js/kdf-worker.js');
+    check(
+      'a worker script that does not load reads as not going through and keeps both fields',
+      cold.error === UNREACHED && coldKept === `leander/${VAULT_PASSWORD}`,
+      JSON.stringify({ error: cold.error, kept: coldKept === `leander/${VAULT_PASSWORD}` }),
+    );
+    await card.eval("document.querySelector('button[type=submit]').click()");
+    check('once the worker script loads, Unlock opens the vault without a reload', await intoVault(card, 'the vault after the worker loads'));
   } finally {
     cardBrowser.close();
   }
@@ -448,7 +469,7 @@ await run(async () => {
       source: `window.__derivations = 0;
         window.Worker = class {
           constructor() { this.listeners = []; }
-          addEventListener(_type, listener) { this.listeners.push(listener); }
+          addEventListener(type, listener) { if (type === 'message') this.listeners.push(listener); }
           removeEventListener(_type, listener) { this.listeners = this.listeners.filter((l) => l !== listener); }
           postMessage(message) {
             window.__derivations += 1;

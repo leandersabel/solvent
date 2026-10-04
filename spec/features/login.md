@@ -137,7 +137,8 @@ never look like a hang.
   OK and never sees the unwrap fail.
 - **The attempt did not go through**: the salt lookup, the sign-in or
   the vault read got no answer, or a server error from Solvent or a
-  proxy in front of it. In the same place as the wrong-password message,
+  proxy in front of it, or the derivation's worker did not load
+  (architecture.md, Key management). In the same place as the wrong-password message,
   critical text with an icon:
 
   > That did not go through. Everything you typed is still here, so you
@@ -814,3 +815,9 @@ reason, and then learns at sign-in.
     another name written into it, unlocking still signs in as the known
     username. Test: `tests/browser/parts/unlock.mjs`,
     `tests/browser/parts/unlock-review-username.mjs`.
+74. A sign-in from a fresh page whose derivation's worker script gets no
+    answer shows "That did not go through. Everything you typed is
+    still here, so you can try again." with both fields still filled,
+    and Unlock in the same page then opens the vault. Test:
+    `tests/browser/parts/unlock.mjs`,
+    `tests/browser/parts/unlock-review-worker.mjs`.
