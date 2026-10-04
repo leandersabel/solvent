@@ -49,10 +49,17 @@ page.on((message) => {
 
 // The answer the next POST /api/register gets.
 let answer = null;
+// While set, the derivation's worker script gets no answer.
+let workerDown = false;
+const workerLoads = [];
 page.on(async (message) => {
   if (message.method !== 'Fetch.requestPaused') return;
-  const { requestId } = message.params;
-  if (!answer) {
+  const { requestId, request } = message.params;
+  if (request.url.endsWith('/kdf-worker.js')) {
+    workerLoads.push(workerDown);
+    if (workerDown) await page.send('Fetch.failRequest', { requestId, errorReason: 'ConnectionRefused' });
+    else await page.send('Fetch.continueRequest', { requestId });
+  } else if (!answer) {
     await page.send('Fetch.continueRequest', { requestId });
   } else if (answer.drop) {
     await page.send('Fetch.failRequest', { requestId, errorReason: 'ConnectionReset' });
@@ -65,7 +72,11 @@ page.on(async (message) => {
     });
   }
 });
-await page.send('Fetch.enable', { patterns: [{ urlPattern: '*/api/register', requestStage: 'Request' }] });
+// No cache, so each page asks for the worker script.
+await page.send('Network.setCacheDisabled', { cacheDisabled: true });
+await page.send('Fetch.enable', {
+  patterns: ['*/api/register', '*/static/js/kdf-worker.js'].map((urlPattern) => ({ urlPattern, requestStage: 'Request' })),
+});
 
 const text = () => page.eval('document.body.innerText');
 const shows = (message, label) =>
@@ -241,6 +252,34 @@ try {
   await shows(STOP, 'the hard stop');
   check('a browser that cannot run the encryption gets a hard stop with no form, no retry and no request',
     !(await page.eval("document.querySelector('form') !== null")) && !(await page.eval("document.querySelector('button') !== null")) && posts.length === 0 && !(await text()).includes('did not go through'));
+
+  // ---- Solvent cannot be reached at submit ------------------------
+  // The worker script loads only at submit, so with Solvent down it
+  // fails first. The form must not hang, and must recover once Solvent
+  // is back, without a reload.
+  for (const [which, label] of [['vault', 'Create vault'], ['admin', 'Create account']]) {
+    await open(which);
+    await fillRest(which === 'vault');
+    await type('input[type=text]', 'Bob');
+    workerDown = true;
+    workerLoads.length = 0;
+    posts.length = 0;
+    await submit();
+    const settled = await shows(NETWORK, `the worker not loading, ${which}`).then(() => true, () => false);
+    check(`${which}: a worker script that does not load shows that the submit did not go through`,
+      settled && workerLoads.includes(true), await text());
+    check(`${which}: with the worker not loading, nothing is sent, every field is kept and the button is back`,
+      posts.length === 0 &&
+        (await page.eval("JSON.stringify([document.querySelector('input[type=text]').value, document.querySelector('input[type=password]').value])")) === JSON.stringify(['bob', PASSWORD]) &&
+        !(await disabled()) && (await page.eval("document.querySelector('button[type=submit]').textContent")) === label);
+    workerDown = false;
+    answer = { status: 400, body: '{}' };
+    await submit();
+    const retried = await shows('Solvent did not accept this registration', `the retry, ${which}`).then(() => true, () => false);
+    check(`${which}: pressing the button again in the same page loads the worker and sends the registration`,
+      retried && workerLoads.includes(false) && posts.length === 1, JSON.stringify({ workerLoads, sent: posts.length }));
+  }
+  posts.length = 0;
 
   // ---- The administrator form -------------------------------------
   await open('admin');

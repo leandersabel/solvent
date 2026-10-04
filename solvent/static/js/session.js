@@ -104,7 +104,11 @@ export async function signIn(username, password) {
   } catch (error) {
     throw refusal(error);
   }
-  const keys = await crypto.deriveKeys(password, salt, kdf);
+  // A worker that did not load reads as an attempt that did not go
+  // through, never as a wrong password.
+  const keys = await crypto.deriveKeys(password, salt, kdf).catch((error) => {
+    throw error instanceof crypto.DerivationError ? error : refusal(error);
+  });
 
   let answer;
   try {

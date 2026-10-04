@@ -427,6 +427,11 @@ or kinds.
     parameter. **libsodium.js** is rejected: a few hundred KB of
     Emscripten port for one function, with a heap whose allocation
     behaviour has to be verified per browser.
+  - **The worker loads on the first derivation of a page**, and a
+    load that fails ends that derivation as a request that got no
+    answer, so the screen says it did not go through and never waits
+    for good. The next derivation loads the worker again. There is no
+    timeout, because a real derivation takes seconds on a phone.
   - **Versioned envelope**: the KDF algorithm, version and parameters
     live in the password credential's `params` beside its salt, so a
     login detects stale parameters and re-wraps the DEK after unlock

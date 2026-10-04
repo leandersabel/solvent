@@ -231,8 +231,9 @@ which state is In the browser.
   - On the administrator form: "Solvent did not accept this
     registration. No account was created and your invite link is still
     unused. If this happens again, ask whoever sent you the invite."
-- **Error, the submit did not go through**: no response, or a server
-  error from Solvent or a proxy in front of it. The only state worded
+- **Error, the submit did not go through**: no response, a server
+  error from Solvent or a proxy in front of it, or the derivation's
+  worker not loading (architecture.md, Key management). The only state worded
   as a failure to get through. Above the primary button, every field
   still filled, the password included, so nobody re-types a password
   and waits again because of a network blip.
@@ -484,6 +485,7 @@ have committed before the connection dropped.
 | Conflict | that username is taken |
 | any other refusal status | the registration is refused |
 | no response, a Server Error, or any status of that class from a proxy | the submit did not go through |
+| the derivation's worker does not load | the submit did not go through |
 
 Every answer but the invite's leaves every field filled, so nobody
 re-types anything to retry. A `{"refused":"username"}` reaching the
@@ -675,3 +677,9 @@ fixture prevents.
     couple of seconds setting up takes the screen shows it is working
     and stays responsive to touch. Test: no test.
 45. No endpoint accepts a `method` other than `password`. Test: no test.
+46. On both forms, with the derivation's worker script getting no
+    answer at submit, the form shows "That did not go through.
+    Everything you typed is still here, so you can try again.", sends
+    nothing and keeps every field, and pressing the button again in the
+    same page loads the worker and sends the registration. Test:
+    `tests/test_register_browser.py::test_the_registration_forms_answer_each_refusal_in_its_own_words`.

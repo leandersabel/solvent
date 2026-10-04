@@ -29,8 +29,8 @@ globalThis.Worker = class {
   constructor() {
     this.listeners = [];
   }
-  addEventListener(_type, listener) {
-    this.listeners.push(listener);
+  addEventListener(type, listener) {
+    if (type === 'message') this.listeners.push(listener);
   }
   removeEventListener(_type, listener) {
     this.listeners = this.listeners.filter((l) => l !== listener);
