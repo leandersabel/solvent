@@ -94,7 +94,7 @@ function formatCard(vault, reload) {
       dateStyle: dates.value,
     });
     sampleFigure.textContent = `${vault.mainCurrency} ${shape.money(1234567890000000000n)}`;
-    sampleDate.textContent = shape.date(today());
+    sampleDate.textContent = shape.longDate(today());
   };
   for (const control of [language, group, places, dates]) {
     control.addEventListener('change', preview);

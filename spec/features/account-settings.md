@@ -103,10 +103,34 @@ The formatter answers:
   canonical decimal string (`record-snapshot.md`, Record shape) or
   nothing.
 - **rate** — six places, because a currency pair moves in the fourth.
-- **date** and **parseDate** — an ISO date written in the configured
-  order, and the reverse. `parseDate` returns nothing rather than
-  guessing: a two-digit year is refused, and 31 February is refused
-  rather than rolled into March.
+- **date** and **parseDate** — the field form. `date` writes an ISO
+  date in digits, in the configured order and separator, and
+  `parseDate` reads it back. They serve a date field and nothing else.
+  `parseDate` returns nothing rather than guessing: a two-digit year is
+  refused, and 31 February is refused rather than rolled into March.
+- **Dates shown for reading** never go through `date`, because under
+  the `locale` style it writes digits where every other date spells its
+  month, and one screen would write a day two ways. Each writer serves
+  one slot:
+  - **longDate** — day, abbreviated month and year: a date in a
+    sentence, a row, a tooltip or a table.
+  - **fullDate** — the month in full, for a heading.
+  - **dayMonth** — day and month, long or abbreviated, for a label that
+    already implies the year.
+  - **monthYear** — the month in full and the year, for how far back a
+    long range reaches.
+  - **dateTime** — a moment, such as a session's start, in the
+    browser's time zone: the day as `longDate` writes it, a comma, and
+    hours and minutes in the locale's form.
+
+  Under `dateStyle` `locale` they spell the month in the locale's
+  language. Under `dmy`, `ymd` or `mdy`, every one but `monthYear`
+  writes the whole date in that style (`20.09.2026`, `2026-09-20`,
+  `09/20/2026`), the text `date` writes, because the style is what the
+  reader asked every date to look like. `dayMonth` writes the year too,
+  since a style has no yearless shape and a rate delay can cross New
+  Year. `monthYear` keeps its spelling under every style, because a
+  style has no shape for a month alone.
 
 Defaults come from `Intl` for the chosen locale, read at run time
 rather than tabulated, so there is no second and staler copy of what
@@ -418,6 +442,17 @@ from an administrator removing an account (admin-invites.md).
 - Under that profile `parseQuantity` reads `1’234,50` as `"1234.50"`
   and `12.5` as `"12.5"`. With locale `de-DE` and `groupSeparator`
   `period` it reads `1.234,5` as `"1234.5"` and refuses `12.5`.
+- With locale `en-US` and no `dateStyle`, 2026-09-20 reads
+  `09/20/2026` from `date`, `Sep 20, 2026` from `longDate`,
+  `September 20, 2026` from `fullDate`, `September 20` and `Sep 20`
+  from `dayMonth`, and `September 2026` from `monthYear`, and a moment
+  that day starts `Sep 20, 2026, ` in `dateTime`.
+- With locale `en-US` and `dateStyle` `dmy`, `date`, `longDate`,
+  `fullDate` and both forms of `dayMonth` read 2026-09-20 as
+  `20.09.2026`, a moment that day starts `20.09.2026, ` in `dateTime`,
+  and `monthYear` reads `September 2026`.
+- The settings sample line writes its date with `longDate`, so under
+  locale `en-US` and no `dateStyle` it spells the month.
 - With locale `de-CH` and `moneyPlaces` `0`, the edit dialog for a past
   snapshot of a `USD` holding stored as `"1000.40"` prefills `1’000.40`,
   and changing only its note writes `value` `"1000.40"`. The same dialog

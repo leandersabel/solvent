@@ -411,6 +411,32 @@ the sub-pixel bound above. The figure shown is the model's.
   recording stays reachable by pointer where a day is narrower than a
   pixel.
 
+### The data table
+
+"View as table" (`ui/dashboard.md`) lists the chart's figures as a real
+table. It stands in for the chart's numbers, not for its current view,
+so hiding a band and the percentage view leave it unchanged: every band
+is a column and every figure is absolute money.
+
+- **Rows are the days the chart samples**, oldest first, one per day:
+  the range's first and last day, and every day in the range carrying a
+  snapshot, a price entry for the unit of any holding, archived ones
+  included, or an `archivedAt` (Values between entries). Downsampling
+  removes no row. A day the table does not list is read through the
+  keyboard (Reading a date).
+- **The first column is the date, written by `longDate`**
+  (`account-settings.md`, Dates and numbers), the form the chart's
+  tooltip writes, so a day reads the same in both.
+- **Under a dimension the bands follow**, one column each, headed by
+  the band's label, in band order (Grouping by dimension), with
+  "Unassigned" and "Other" wherever the chart has them.
+- **"Net worth" is the last column**: the exact decimal sum of the
+  row's band values, rounded only for display. It is never read off the
+  drawing's stack, which is in floats. Under Total the single band
+  already is net worth, so "Net worth" is the only figure column.
+- Every figure is the value at the row's day, the side at it (Archived
+  holdings), written by `money`.
+
 ## Inputs / outputs
 
 - In: ciphertext records fetched from the API, decrypted with the
@@ -458,7 +484,7 @@ the sub-pixel bound above. The figure shown is the model's.
     Master Key capture that is not a configuration problem. Chart.js and
     uPlot pass the CSP tests cleanly and are both MIT.
 - The chart is **keyboard reachable** (Reading a date) **and has a
-  data-table fallback**. A static `aria-label` on the SVG is not
+  data-table fallback** (The data table). A static `aria-label` on the SVG is not
   sufficient for the primary screen of the app.
 - Formatting follows the reader's settings (account-settings.md, Dates
   and numbers).
@@ -590,7 +616,29 @@ the sub-pixel bound above. The figure shown is the model's.
   day carrying one, and on that day's tick, it opens that date's
   recording.
 - With a history long enough to downsample, the readout at a day whose
-  sample the downsampling dropped equals the value model at that day.
+  sample the downsampling dropped equals the value model at that day,
+  and the data table lists that day.
+- Under Total the data table's columns are Date and Net worth, and
+  nothing else. Under a dimension they are Date, the chart's bands in
+  the legend's order, then Net worth.
+- With snapshots on 2026-01-15 and 2026-06-30, a `USD` price entry on
+  2026-04-10 for a `USD` holding, and a holding in the main currency
+  archived on 2026-05-20 with no snapshot that day, loaded from a
+  fixture, and no other entry, the data table under
+  All lists 2026-01-15, 2026-04-10, 2026-05-20 and 2026-06-30, in that
+  order, and no other day. Under 1M it lists the range's first day and
+  2026-06-30 only.
+- Each data table row's band cells equal the value model's bands at its
+  day, and its Net worth equals their exact decimal sum. Two holdings in
+  the main currency, in different bands, each recorded at
+  `4503599627370496.25`, give a Net worth of
+  `9,007,199,254,740,992.50` under `en-US`, which a float sum cannot
+  write.
+- Each data table row's date equals `longDate` of its day and the
+  tooltip's date on that day: 2026-01-15 reads `Jan 15, 2026` under
+  `en-US` with no `dateStyle`, and `15.01.2026` under `dmy`.
+- Hiding a band, and switching to Percentage, leave the data table's
+  text unchanged.
 - Over a sweep of single-holding totals from 0.40 to 10^10, covering
   each 1, 2, 2.5, 5 and 7.5 times a power of ten and the integers either
   side, positive and negative, at a 1280px and a 390px viewport: no two

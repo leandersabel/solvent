@@ -421,7 +421,7 @@ function chartSection(vault, state, render, dimension, actions, { days, bands })
           }),
         ])
       : null,
-    el('details', {}, [el('summary', { text: 'View as table' }), chartTable(days, bands, vault.format)]),
+    el('details', {}, [el('summary', { text: 'View as table' }), chartTable(days, bands, vault.format, !dimension)]),
   ]);
 }
 

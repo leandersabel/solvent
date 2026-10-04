@@ -175,8 +175,20 @@ row's right end. The "View as table" disclosure closes the card.
   - Focus leaving the chart takes the crosshair away, as the pointer
     leaving the plot does.
 
-  A "View as table" disclosure exposes the same series as a real table.
   Nothing the chart offers is reachable only by pointer.
+- **View as table** opens the chart's numbers as a Table
+  (`design-system.md`, Components), one row for each date
+  `net-worth-view.md` lists for the range.
+  - Columns: "Date", then each band under its legend name in band
+    order, then "Net worth". Under Group by "Total" there are only
+    "Date" and "Net worth", because the one band is the net worth.
+  - Dates read exactly as the tooltip writes them, in the long reading
+    form under every date setting, never in the form a date field
+    takes.
+  - Figures are in the main currency, with the places Decimals on money
+    sets (`design-system.md`, Figures).
+  - Hiding a band or switching to Percentage leaves the table
+    unchanged, because it stands in for the chart's numbers.
 - Chart colors, band order, mark specs and the axes come from
   `design-system.md` (Chart palette, Axes).
 - **No control here issues a network request** — range, dimension, mode,
@@ -294,7 +306,9 @@ The regions keep their order and stack, 20px apart.
   ticks sit in a gutter at the plot's left, outside it, so no tick lies
   over a band or a mark. The legend
   runs in two columns and drops each band's figure, which the breakdown
-  below carries, and the key to the entry marks sits beneath it.
+  below carries, and the key to the entry marks sits beneath it. The
+  table under View as table keeps every column and scrolls sideways
+  inside the card, never the page.
 - **Breakdown**: each bar's label moves above the bar, the band's name
   at the left and its amount at the right, and the bar keeps the shared
   zero baseline beneath it.

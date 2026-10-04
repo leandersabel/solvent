@@ -1163,8 +1163,8 @@ th.numeric {
   flex: none;
 }
 
-.chart-card details { margin: 12px 0 0; }
-.chart-card details .data-table { margin-top: 12px; }
+.chart-card details { margin: 12px 0 0; overflow-x: auto; }
+.chart-card details .data-table { margin-top: 12px; white-space: nowrap; }
 
 /* ---- The holdings table ---- */
 

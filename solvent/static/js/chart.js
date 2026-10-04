@@ -529,13 +529,20 @@ export function tickLabel(value, group, point) {
 
 /** The table fallback. A static aria-label on the SVG is not
  *  sufficient for the primary screen of the app, so the same series is
- *  exposed as a real table behind a disclosure. */
-export function chartTable(days, bands, format) {
+ *  exposed as a real table behind a disclosure. It stands in for the
+ *  chart's numbers, not its view: every band, in absolute money. Net
+ *  worth is the exact sum of the row's bands, never the drawing's
+ *  float stack, and under Total it is the only figure column. Dates are
+ *  written for reading, as the tooltip writes them
+ *  (net-worth-view.md, The data table). */
+export function chartTable(days, bands, format, total) {
+  const shown = total ? [] : bands;
+  const figures = (index) => [...shown.map((band) => band.points[index]), bands.reduce((sum, band) => sum + band.points[index], 0n)];
   return el('table', { class: 'data-table' }, [
     el('thead', {}, [
       el('tr', {}, [
         el('th', { text: 'Date' }),
-        ...bands.map((band) => el('th', { class: 'numeric', text: band.label })),
+        ...[...shown.map((band) => band.label), 'Net worth'].map((label) => el('th', { class: 'numeric', text: label })),
       ]),
     ]),
     el(
@@ -543,13 +550,8 @@ export function chartTable(days, bands, format) {
       {},
       days.map((day, index) =>
         el('tr', {}, [
-          el('td', { text: format.date(isoFromDay(day)) }),
-          ...bands.map((band) =>
-            el('td', {
-              class: 'numeric',
-              text: format.money(band.points[index]),
-            }),
-          ),
+          el('td', { text: format.longDate(isoFromDay(day)) }),
+          ...figures(index).map((value) => el('td', { class: 'numeric', text: format.money(value) })),
         ]),
       ),
     ),

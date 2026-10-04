@@ -41,6 +41,21 @@ await run(async () => {
       node.dispatchEvent(new Event('change', { bubbles: true }));
     }, id, value);
   };
+  // Under the language's own order the sample spells the month, as
+  // every date shown for reading does.
+  await setSelect('format-locale', 'en-US');
+  await setSelect('format-dates', 'locale');
+  await page.frames();
+  const spelledSample = await page.eval(`(async () => {
+    const f = (await import('/static/js/format.js')).formatter({ locale: 'en-US', dateStyle: 'locale' });
+    const { today } = await import('/static/js/dom.js');
+    return JSON.stringify({ shown: document.querySelector('.sample-date').textContent, expected: f.longDate(today()) });
+  })()`);
+  check(
+    'the settings sample line writes its date with longDate, spelling the month under the language\'s own order',
+    JSON.parse(spelledSample).shown === JSON.parse(spelledSample).expected && /[A-Za-z]/.test(JSON.parse(spelledSample).shown),
+    spelledSample,
+  );
   await setSelect('format-locale', 'de-CH');
   await setSelect('format-group', 'apostrophe');
   await setSelect('format-places', '0');

@@ -76,7 +76,7 @@ await run(async () => {
     await page.frames();
     return page.call(async (archived) => {
       const v = (await import('/static/js/session.js')).currentVault();
-      const day = v.format.date(archived);
+      const day = v.format.longDate(archived);
       return JSON.stringify([...document.querySelectorAll('.chart-card details table tbody tr')]
         .filter((r) => r.cells[0].textContent !== day).map((r) => r.textContent));
     }, archiveDay);
@@ -203,7 +203,7 @@ await run(async () => {
     return JSON.stringify({
       headline: document.querySelector('.hero-amount').textContent === v.format.whole(total),
       lastRow: rows.at(-1).cells[1].textContent === v.format.money(total),
-      lastDate: rows.at(-1).cells[0].textContent === v.format.date(v.chartLastDate()),
+      lastDate: rows.at(-1).cells[0].textContent === v.format.longDate(v.chartLastDate()),
       change: document.querySelector('.hero-delta').textContent.startsWith('CHF ' + (total - first > 0n ? '+' : '') + v.format.whole(total - first)),
       edgeDot: Number(document.querySelector('.net-end').getAttribute('cy')) === y,
       // The zero is recorded at the archive date, so the holding is on neither side of it.
@@ -305,7 +305,7 @@ await run(async () => {
       const v = (await import('/static/js/session.js')).currentVault();
       const table = document.querySelector('.chart-card details table');
       const column = [...table.querySelectorAll('thead th')].findIndex(th => th.textContent === bandLabel);
-      const row = [...table.querySelectorAll('tbody tr')].find(r => r.cells[0].textContent === v.format.date(day));
+      const row = [...table.querySelectorAll('tbody tr')].find(r => r.cells[0].textContent === v.format.longDate(day));
       const decimal = await import('/static/js/decimal.js');
       const { dayNumber } = await import('/static/js/model.js');
       // The side just before the archive date is the zero.

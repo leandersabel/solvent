@@ -130,7 +130,7 @@ await run(async () => {
       [...document.querySelectorAll('.range-buttons button')].find(b => b.textContent === 'All').click();
       await new Promise((r) => requestAnimationFrame(() => requestAnimationFrame(r)));
       const row = [...document.querySelectorAll('details table tbody tr')]
-        .find(r => r.cells[0].textContent === v.format.date(day));
+        .find(r => r.cells[0].textContent === v.format.longDate(day));
       return JSON.stringify({ shown: row ? row.cells[1].textContent : null, expected: v.format.money((await import('/static/js/decimal.js')).parse(figure)) });
     }, date, expected).then(JSON.parse);
   const banner = () => labels('.banner-critical button');

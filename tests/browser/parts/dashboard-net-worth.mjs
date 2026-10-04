@@ -31,7 +31,7 @@ await run(async () => {
     proxy, proposalsFor, traffic, unwatched, writesSent, rateAsks, ev, text, quiet,
     press, realClick, uncovered, realKey, stored, on, bytes, plantHere,
     reread, go, format, model, line, lineState, figure, tableRow,
-    hero, home, sweepToday, script, id, price,
+    hero, home, sweepToday, script, id, price, viewport,
   } = r;
 
   traffic.length = 0;
@@ -169,9 +169,70 @@ await run(async () => {
     'net-worth-view: a history shorter than a year opens on All',
     (await ev("document.querySelector('.range-buttons .active').textContent")) === 'All',
   );
+  // The chart's data table over All, beside what the value model says
+  // of each of its days: the columns, the dates as `longDate` writes
+  // them, and Net worth as the exact sum of the row's bands.
+  const dataTable = () =>
+    rec.call(async () => {
+      const { currentVault } = await import('/static/js/session.js');
+      const { isoFromDay } = await import('/static/js/model.js');
+      const decimal = await import('/static/js/decimal.js');
+      const v = currentVault();
+      [...document.querySelectorAll('.range-buttons button')].find(b => b.textContent === 'All').click();
+      await new Promise((r) => requestAnimationFrame(() => requestAnimationFrame(r)));
+      const picked = document.querySelector('.chart-card select').value;
+      const dimension = v.activeDimensions().find((d) => d.id === picked) || null;
+      const range = v.chartRange(null);
+      const { days, bands } = v.series(dimension, range.fromDay, range.lastDay);
+      const table = document.querySelector('.chart-card details table');
+      const rows = [...table.querySelectorAll('tbody tr')].map((tr) => [...tr.cells].map((c) => c.textContent));
+      const expected = days.map((day, i) => [
+        v.format.longDate(isoFromDay(day)),
+        ...(dimension ? bands.map((b) => v.format.money(b.points[i])) : []),
+        v.format.money(bands.reduce((sum, b) => sum + b.points[i], decimal.ZERO)),
+      ]);
+      return JSON.stringify({
+        heads: [...table.querySelectorAll('thead th')].map((th) => th.textContent),
+        bands: dimension ? bands.map((b) => b.label) : [],
+        rows: rows.length,
+        match: JSON.stringify(rows) === JSON.stringify(expected),
+        first: rows[0], expectedFirst: expected[0],
+        fieldForm: v.format.date(isoFromDay(days[0])) === v.format.longDate(isoFromDay(days[0])) ? null : v.format.date(isoFromDay(days[0])),
+      });
+    }).then(JSON.parse);
+  const totalTable = await dataTable();
+  check(
+    'net-worth-view: under Total the data table has Date and Net worth only, its dates as longDate writes them, and its Net worth the exact sum',
+    totalTable.heads.join('|') === 'Date|Net worth' && totalTable.rows > 1 && totalTable.match &&
+      totalTable.first[0] !== totalTable.fieldForm,
+    JSON.stringify(totalTable),
+  );
   traffic.length = 0;
   await ev(`(() => { const s = [...document.querySelectorAll('.chart-card select')][0]; s.value = 'liq'; s.dispatchEvent(new Event('change', { bubbles: true })); })()`);
   await rec.frames();
+  const dimensionTable = await dataTable();
+  check(
+    'net-worth-view: under a dimension the data table has Date, each band in band order, then Net worth last, with the same dates and the exact sum',
+    dimensionTable.heads.join('|') === ['Date', ...dimensionTable.bands, 'Net worth'].join('|') &&
+      dimensionTable.bands.length > 0 && dimensionTable.match && dimensionTable.first[0] !== dimensionTable.fieldForm,
+    JSON.stringify(dimensionTable),
+  );
+  // At phone width the table scrolls sideways inside its card, never the page.
+  await viewport(390);
+  const phoneTable = await ev(`(() => {
+    const details = document.querySelector('.chart-card details');
+    details.open = true;
+    return JSON.stringify({
+      page: document.documentElement.scrollWidth - document.documentElement.clientWidth,
+      inside: getComputedStyle(details).overflowX,
+    });
+  })()`).then(JSON.parse);
+  await viewport(1280);
+  check(
+    'net-worth-view: at 390px the data table scrolls inside the card and the page does not scroll sideways',
+    phoneTable.page <= 0 && phoneTable.inside === 'auto',
+    JSON.stringify(phoneTable),
+  );
   const modeBefore = {
     hero: await hero(),
     brokerage: (await tableRow('Brokerage')).converted,
@@ -693,7 +754,7 @@ await run(async () => {
   // the chart as it was: later dates run down to it like any new last figure.
   check(
     'net-worth-view: archiving leaves every chart point up to the holding\'s last figure, and leaves the total',
-    shapeBefore[0].startsWith(await format('date', D1)) && shapeBefore[0] === shapeAfter[0] &&
+    shapeBefore[0].startsWith(await format('longDate', D1)) && shapeBefore[0] === shapeAfter[0] &&
       (await hero()) !== totalBefore && !(await tableRow('Fund 4')),
   );
   await pointAt('pointermove', rangeDays);
