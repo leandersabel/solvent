@@ -101,7 +101,7 @@ await run(async () => {
     rec, accountIds, T, ago, D1, D2, D5, D6, D7, D8,
     D9, D10, proxy, holdRates, proposalsFor, traffic, faults, writesSent,
     rateAsks, typeReads, bodyOf, ev, text, quiet, set, press,
-    stored, on, bytes, plantHere, reread, go, format, model,
+    stored, on, bytes, plantHere, archiveElsewhere, reread, go, format, model,
     typeRow, clickRow, pressRow, rowState, line, lineState, typeLine, figure,
     tableRow, group, hero, home, newRecording, sweepToday, script, id,
     snap, price, layout, viewport,
@@ -210,8 +210,8 @@ await run(async () => {
   const firstPut = traffic.findIndex((r) => r.method === 'PUT');
   const reloads = traffic.map((r, i) => (r.url.includes('/api/records?type=') ? i : -1)).filter((i) => i >= 0);
   check(
-    'record-snapshot: the first create at a date reloads both types first',
-    reloads.length === 2 && reloads.every((i) => i < firstPut),
+    'record-snapshot: the first create at a date reloads the holdings and both types first',
+    reloads.length === 3 && reloads.every((i) => i < firstPut) && traffic[reloads[0]].url.endsWith('type=account'),
     JSON.stringify(traffic.map((r) => `${r.method} ${r.url.split('/api/')[1]}`)),
   );
   await home();
@@ -968,5 +968,23 @@ await run(async () => {
     JSON.stringify(phone),
   );
   await rec.send('Emulation.clearDeviceMetricsOverride');
+
+  // #229: a sweep whose date this session already claimed, and a
+  // holding archived in another window since.
+  const DA = ago(70);
+  await go(`#/sweep/${DA}`);
+  await typeRow('Fund 4', '4');
+  await pressRow('Fund 4');
+  await archiveElsewhere('Fund 5', T);
+  traffic.length = 0;
+  await typeRow('Fund 5', '5');
+  await pressRow('Fund 5');
+  const archivedSaid = await ev("document.querySelector('.sweep .banner').textContent");
+  check(
+    'record-snapshot: a sweep row of a holding archived elsewhere since the sweep opened records nothing, says so and goes',
+    archivedSaid === 'Fund 5 was archived in another window. Nothing was saved.' && writesSent().length === 0 &&
+      (await rowState('Fund 5')) === undefined && on(await stored('snapshot'), DA).every((s) => s.accountId !== id['Fund 5']),
+    archivedSaid,
+  );
   await home();
 });

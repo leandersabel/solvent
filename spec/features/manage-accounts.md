@@ -575,11 +575,19 @@ Failures, each a state of the archive dialog:
   guards the zero against edits, not against deleting the holding.
 
 All of this is client-enforced by construction, like the unit rule: the
-server sees neither a date nor `archivedAt`. A session whose model
-predates the archive can still write a figure at D or later, and no
-such figure reaches a total, because the chart counts an archived
-holding on no date from D on and draws whatever D holds as the step
-(`net-worth-view.md`, Archived holdings).
+server sees neither a date nor `archivedAt`. So a session whose model
+predates the archive reads the holding afresh before every figure it
+records for it, and is refused when the holding is now archived
+(`record-snapshot.md`, Creating and reopening are distinct acts). A
+plaintext archived flag the server could enforce is rejected, because
+it tells the server which holdings are closed and when, and still
+cannot judge a move against an encrypted date. Pinning the holding's
+version on the server is rejected too, because a rename elsewhere
+would refuse a save. Two sessions crossing inside one round trip can
+still put a figure beside the zero, and none at D or later reaches a
+total, because the chart counts an archived holding on no date from D
+on and draws whatever D holds as the step (`net-worth-view.md`,
+Archived holdings).
 
 #### Unarchiving
 

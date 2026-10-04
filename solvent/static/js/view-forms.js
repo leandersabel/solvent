@@ -5,7 +5,7 @@ import * as writes from './writes.js';
 import { dialog, el, mount, resumable, today } from './dom.js';
 import { dateField } from './datepicker.js';
 import { dayNumber, isoFromDay } from './model.js';
-import { describeConverted as showConverted, rateBlock, rateChangeCopy } from './view-sweep.js';
+import { closedCopy, describeConverted as showConverted, rateBlock, rateChangeCopy } from './view-sweep.js';
 
 /** One holding, one date: the small form for an odd date or a
  *  backfill. There is no rate field on it, because a price belongs to
@@ -168,6 +168,7 @@ export function snapshotDialog(vault, holding, existing, onSaved, onOpenRecordin
       rates: sit ? vault.missingUnits(on) : [],
     });
     if (refusal) {
+      if (refusal.closed) return finishWith(closedCopy(refusal, 'saved'));
       describePrices();
       return refusedAt(on);
     }
@@ -225,6 +226,7 @@ export function snapshotDialog(vault, holding, existing, onSaved, onOpenRecordin
       choose: (priced) => block.partFor(priced),
     });
     if (result.refused) {
+      if (result.closed) return finishWith(closedCopy(result, 'moved'));
       describePrices();
       return refusedAt(on);
     }

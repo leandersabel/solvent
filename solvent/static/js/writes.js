@@ -179,6 +179,26 @@ export function sitting(vault, date) {
   return { date, dateWasEmpty: !vault.holdsRecording(date), claimed: false, refreshed: false, proposals: null };
 }
 
+/** Whether a holding was archived or deleted in another session, read
+ *  afresh before every figure recorded for it, because a sitting can
+ *  outlive an archive made elsewhere (manage-accounts.md, While
+ *  archived). An archived holding takes no new figure, and a move
+ *  `onto` a date only before its archive. Resolves to null, or to
+ *  `{ holding, closed }` with `closed` 'archived' or 'deleted' after the
+ *  model takes the vault as it now stands. */
+async function holdingClosed(vault, id, onto) {
+  const name = vault.holdings.get(id).payload.name;
+  vault.replaceType('account', await decryptAll(vault, await api.get('/api/records?type=account')));
+  const fresh = vault.holdings.get(id);
+  const archivedAt = fresh && fresh.payload.archivedAt;
+  const closed = !fresh ? 'deleted' : archivedAt && (onto === null || onto >= archivedAt) ? 'archived' : null;
+  if (!closed) return null;
+  const recent = await reloadCreateTypes(vault);
+  vault.replaceType('snapshot', recent.snapshot);
+  vault.replaceType('rate', recent.rate);
+  return { holding: name, closed };
+}
+
 /** Claim the date for a sitting about to create records at it, or say
  *  why it cannot. A claimed sitting reloads again only when `held`, and
  *  that reload judges the slots and nothing else: the sitting's own
@@ -193,8 +213,16 @@ export function sitting(vault, date) {
  *  recording as it now stands. `held` refuses a date the reload finds
  *  holding no record, for a write that must not make the recording
  *  itself, and says `emptied` so the screen can tell it from a date
- *  another session recorded. */
-export async function claimDate(vault, sit, { snapshots = [], rates = [], except = null, held = false }) {
+ *  another session recorded. Before any of that, every holding in
+ *  `snapshots` is read afresh on every call, claimed or not, and one
+ *  archived or deleted elsewhere refuses with its name and `closed`
+ *  (`holdingClosed`). `move` judges an archive against the new date of
+ *  a move. */
+export async function claimDate(vault, sit, { snapshots = [], rates = [], except = null, held = false, move = false }) {
+  for (const id of snapshots) {
+    const shut = await holdingClosed(vault, id, move ? sit.date : null);
+    if (shut) return { refused: true, date: sit.date, ...shut };
+  }
   if (sit.claimed && !held) return null;
   const fresh = await reloadCreateTypes(vault);
   const at = (list) => list.filter((record) => record.payload.date === sit.date);
@@ -276,10 +304,10 @@ export async function refreshPrices(vault, date, proposals, choose = null, also 
  *
  *  `sit` is the sitting that refreshes the new date, or null for a date
  *  whose prices are complete; the prices written are `proposals` as
- *  they came, or what `choose(unit)` says. Resolves to `{ refused }` before any
- *  write, else `{ moved, failed, undeleted }`: the saved entry, the
- *  units whose price did not land, and whether the displaced record
- *  stayed. */
+ *  they came, or what `choose(unit)` says. Resolves to `claimDate`'s
+ *  refusal before any write, else `{ moved, failed, undeleted }`: the
+ *  saved entry, the units whose price did not land, and whether the
+ *  displaced record stayed. */
 export async function editSnapshot(vault, holding, existing, payload, { sit = null, displaced = null, proposals = {}, choose = null }) {
   const unit = holding.payload.unit;
   const on = payload.date;
@@ -291,8 +319,9 @@ export async function editSnapshot(vault, holding, existing, payload, { sit = nu
       snapshots: [holding.recordId],
       except: displaced ? displaced.recordId : null,
       rates: sit ? vault.missingUnits(on, unit) : [],
+      move: true,
     });
-    if (refusal) return { refused: true };
+    if (refusal) return refusal;
   }
   const moved = await saveSnapshot(vault, holding.recordId, existing, payload);
   const { failed } = sit ? await refreshPrices(vault, on, proposals, choose, unit) : { failed: [] };

@@ -66,13 +66,6 @@ export class Vault {
       }
     }
     this._sortSeries();
-    // Oldest first, so every list of holdings reads in the order they
-    // were added.
-    this.holdings = new Map(
-      [...this.holdings].sort(([idA, a], [idB, b]) =>
-        (a.payload.createdAt || '').localeCompare(b.payload.createdAt || '') || idA.localeCompare(idB),
-      ),
-    );
     return this;
   }
 
@@ -126,6 +119,13 @@ export class Vault {
   _sortSeries() {
     for (const list of this.snapshots.values()) list.sort(byDate);
     for (const list of this.rates.values()) list.sort(byDate);
+    // Oldest first, so every list of holdings reads in the order they
+    // were added.
+    this.holdings = new Map(
+      [...this.holdings].sort(([idA, a], [idB, b]) =>
+        (a.payload.createdAt || '').localeCompare(b.payload.createdAt || '') || idA.localeCompare(idB),
+      ),
+    );
   }
 
   get mainCurrency() {
@@ -270,8 +270,7 @@ export class Vault {
    *  reload a Conflict costs (record-api.md, Endpoints), and the one a
    *  refused create shows the person. */
   replaceType(type, entries) {
-    const map = type === 'snapshot' ? this.snapshots : this.rates;
-    map.clear();
+    ({ account: this.holdings, snapshot: this.snapshots, rate: this.rates })[type].clear();
     for (const entry of entries) this._index(entry);
     this._sortSeries();
   }
