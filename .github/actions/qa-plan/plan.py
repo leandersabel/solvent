@@ -1,15 +1,18 @@
 """Splits tonight's QA walk into shards that run at once (CLAUDE.md,
 The loop, Nightly and stable), and prints them for the workflow's
-matrix as `shards=<json>`. A feature is a `spec/product/` file, walked
-in full when qa-full.txt names it, or always when LAST is empty.
+matrix as `shards=<json>`. A feature is a `spec/features/` page with a
+"What the client gets" section, walked in full when qa-full.txt names
+it, or always when LAST is empty.
 """
 import json
 import os
 import pathlib
 
 SHARDS = 6
+CLIENT_FACING = "\n## What the client gets\n"
 
-features = {path.stem: len(path.read_text().splitlines()) for path in pathlib.Path("spec/product").glob("*.md")}
+pages = {path.stem: path.read_text() for path in pathlib.Path("spec/features").glob("*.md")}
+features = {name: len(text.splitlines()) for name, text in pages.items() if CLIENT_FACING in text}
 if os.environ["LAST"]:
     full = set(pathlib.Path("qa-full.txt").read_text().split())
     unknown = full - features.keys()
@@ -18,7 +21,7 @@ if os.environ["LAST"]:
 else:
     full = set(features)
 
-# A feature costs about its file's length to walk in full, and a tenth
+# A feature costs about its page's length to walk in full, and a tenth
 # of that for its main path. Each goes to the shard with least so far,
 # and there are no more shards than features walked in full.
 cost = {name: lines if name in full else lines // 10 for name, lines in features.items()}

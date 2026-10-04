@@ -1,6 +1,6 @@
 // The import's decrypt and re-encrypt, in a Worker so the tab stays
 // responsive through the longest operation in the product
-// (spec/ui/export-import.md, The decryption wait).
+// (spec/features/export-import.md, Export / import, The decryption wait).
 //
 // Every plaintext payload lives and dies here. The page receives the
 // new DEK and ciphertext only, and ends the worker once it has them.

@@ -1,5 +1,5 @@
 // The strength gauge's zxcvbn comes from strength.js alone
-// (spec/features/register.md, zxcvbnLoading). A script source planted
+// (spec/features/register.md, Rules). A script source planted
 // in the served registration page, as a JSON block and as data
 // attributes, early and late in <body>, and an element named zxcvbn
 // that clobbers window.zxcvbn, must change nothing about what loads.

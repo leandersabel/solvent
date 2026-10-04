@@ -1,7 +1,8 @@
-// The dashboard over a vault with a history (spec/ui/dashboard.md): the
-// month grid New recording opens, the chart, its controls and what they
-// ask of the server, a record that cannot be read, a provider that
-// revises its figures, and archived holdings on the chart.
+// The dashboard over a vault with a history
+// (spec/features/net-worth-view.md, Dashboard): the month grid New
+// recording opens, the chart, its controls and what they ask of the
+// server, a record that cannot be read, a provider that revises its
+// figures, and archived holdings on the chart.
 // Templates: dashboard.html. Modules: view-dashboard.js, chart.js,
 // datepicker.js, model.js, format.js, decimal.js.
 import { check, run } from '../harness.mjs';

@@ -1,6 +1,7 @@
-// The bar above a dialog (spec/ui/unlock.md, features/app-shell.md): Lock
-// stays pressable over any open dialog, by mouse, by touch and by key,
-// and one press leaves nothing of the vault behind.
+// The bar above a dialog (spec/features/login.md, Unlock, and
+// spec/features/app-shell.md, The bar above a dialog): Lock stays
+// pressable over any open dialog, by mouse, by touch and by key, and one
+// press leaves nothing of the vault behind.
 // Templates: dashboard.html, shell/. Modules: dom.js, shell.js, app.js,
 // session.js, view-holding.js, view-forms.js.
 import {

@@ -1,4 +1,4 @@
-// The sign-in wait (spec/ui/unlock.md, features/login.md): the time from
+// The sign-in wait (spec/features/login.md, Unlock): the time from
 // submitting the card to the Auth Key leaving the browser is the same
 // whoever is being signed in.
 // Templates: shell/. Modules: unlock.js, session.js, crypto.js,

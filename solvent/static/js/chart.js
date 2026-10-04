@@ -14,7 +14,7 @@ import { dayNumber, isoFromDay } from './model.js';
 const NS = 'http://www.w3.org/2000/svg';
 
 // Categorical slots, assigned in fixed order and never cycled
-// (spec/ui/design-system.md, Chart palette).
+// (spec/design-system.md, Chart palette).
 const SLOTS = ['#0098b7', '#ad7d00', '#964265', '#7f79d1'];
 const UNASSIGNED_FILL = '#c4cccf';
 const OTHER_FILL = '#798285';
@@ -127,7 +127,7 @@ function drawChart({
   // value labels sit in a gutter at the plot's left at every width, wide
   // enough for the widest label, and the plot keeps half the widest
   // mark, the net-worth dot, clear inside both edges
-  // (spec/ui/design-system.md, Axes).
+  // (spec/features/net-worth-view.md, Axes).
   const narrow = width < 560;
   const height = narrow ? 206 : 352;
   const pad = narrow

@@ -1,7 +1,7 @@
-// A vault replaced from a file elsewhere (spec/ui/unlock.md, Replaced
-// elsewhere and Rules): the page that held it keeps nothing, including
-// the state of a write that never answered, and a dialog a lock keeps
-// comes back with nothing typed in it.
+// A vault replaced from a file elsewhere (spec/features/login.md, Unlock,
+// Replaced elsewhere and Rules): the page that held it keeps nothing,
+// including the state of a write that never answered, and a dialog a lock
+// keeps comes back with nothing typed in it.
 // Templates: dashboard.html. Modules: app.js, api.js, session.js,
 // view-dimensions.js, dom.js.
 import {

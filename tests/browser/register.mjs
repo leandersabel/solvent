@@ -1,5 +1,5 @@
 // The registration forms against stubbed answers
-// (spec/ui/register.md, The username field and States;
+// (spec/features/register.md, Register, The username field and States;
 // spec/features/register.md, In the browser).
 //
 // Every answer to POST /api/register is made here, so no invite is

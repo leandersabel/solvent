@@ -1,6 +1,7 @@
-// One holding (spec/ui/account-detail.md): everything about it, its own
-// list of values, and the archive lifecycle: the zero an archive records,
-// the flag, the refusals and conflicts on the way, and unarchiving.
+// One holding (spec/features/manage-accounts.md, Account detail):
+// everything about it, its own list of values, and the archive lifecycle:
+// the zero an archive records, the flag, the refusals and conflicts on the
+// way, and unarchiving.
 // Templates: dashboard.html. Modules: view-holding.js, view-forms.js,
 // writes.js, model.js, view-dashboard.js, chart.js, decimal.js.
 import {

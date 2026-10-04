@@ -1,4 +1,4 @@
-// A vault owner's own account (spec/ui/settings.md).
+// A vault owner's own account (spec/features/account-settings.md, Settings).
 //
 // Nothing here is about the instance or about anybody else. An
 // administrator never reaches this address at all.
@@ -48,10 +48,10 @@ function profileCard(vault, username) {
   ]);
 }
 
-/** Dates and numbers (spec/ui/settings.md, Dates and numbers), whose
- *  defaults and overrides static/js/format.js explains. Saved into the
- *  profile record, so the settings follow the vault to any browser
- *  rather than staying on one machine.
+/** Dates and numbers (spec/features/account-settings.md, Settings,
+ *  Dates and numbers), whose defaults and overrides static/js/format.js
+ *  explains. Saved into the profile record, so the settings follow the
+ *  vault to any browser rather than staying on one machine.
  */
 function formatCard(vault, reload) {
   const settings = vault.profile || {};
@@ -377,7 +377,8 @@ function sessionCard(vault) {
 }
 
 /** The Danger zone holds one destructive button, and the deletion is
- *  its dialog (spec/ui/settings.md, Delete my account). */
+ *  its dialog (spec/features/account-settings.md, Settings, Delete my
+ *  account). */
 function dangerZone(username, open) {
   return el('details', { class: 'card danger-zone' }, [
     el('summary', { text: 'Danger zone' }),
@@ -396,7 +397,7 @@ function dangerZone(username, open) {
  *  came here wanting a backup and left with a wiped vault has been
  *  failed by the dialog. The typed username is one of the few typed
  *  confirmations the product asks for, because nothing could bring the
- *  vault back (spec/ui/design-system.md, Dialog). */
+ *  vault back (spec/design-system.md, Dialog). */
 function deleteAccountDialog(username, open) {
   const password = el('input', { type: 'password', autocomplete: 'current-password' });
   const typed = el('input', { type: 'text', autocomplete: 'off', spellcheck: 'false' });

@@ -1,5 +1,5 @@
-// The page served wherever no screen can be (spec/ui/error-page.md), and
-// the app shell's rule that every page declares its icon.
+// The page served wherever no screen can be (spec/features/app-shell.md,
+// Error page), and the app shell's rule that every page declares its icon.
 // Templates: error.html, shell/. Modules: app.js, shell.js.
 import {
   ADMIN_PASSWORD, BASE, VAULT_PASSWORD, administrator, check, openBrowser, problems, run, signInOn, vaultOwner,
@@ -62,7 +62,7 @@ await run(async () => {
 
   // ---- App shell: one Not Found, whoever navigates to it ----------------
   //
-  // app-shell.md, Refusals: a page refusal is the same page whatever the
+  // architecture.md, Refusals: a page refusal is the same page whatever the
   // session, the kind or the header, so a navigation to /admin cannot be
   // told apart from one to an address that was never there. Each is a
   // real top-level navigation, in a browser holding the session it names.

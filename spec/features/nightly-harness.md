@@ -1,22 +1,24 @@
 # Nightly harness
 
-## What it does
-
-The tooling the nightly run puts around the built image so `qa` can
+The tooling the nightly run puts around the built image, so `qa` can
 check what no browser alone can see: the price sources answering under
 their real names, data that took years to accumulate, promises that
-take hours to come due, and the server's own log. It is pipeline
-tooling under `tools/nightly/`. It is never in the image, and nothing
-in the image knows it exists (CLAUDE.md, The loop, Nightly and stable).
+take hours to come due, and the server's own log.
 
-The image under test is tonight's, unchanged. Every harness container
-runs that image with its entrypoint overridden and `tools/nightly/`
-mounted read-only. No step builds, commits or tags an image, so the
-image the nightly publishes is the one every shard tested.
+## How it works
 
-## Which features it serves
+### What it does
 
-| Harness part | Product features it lets `qa` check |
+It is pipeline tooling under `tools/nightly/`, never in the image, and
+nothing in the image knows it exists (CLAUDE.md, The loop, Nightly and
+stable). Every harness container runs tonight's image unchanged, with
+its entrypoint overridden and `tools/nightly/` mounted read-only. No
+step builds, commits or tags an image, so the image the nightly
+publishes is the one every shard tested.
+
+### Which features it serves
+
+| Harness part | Features it lets `qa` check |
 |---|---|
 | The stand-in, its request list and failure modes, the known prices | `rate-lookup`, `record-snapshot`, `net-worth-view`, `manage-accounts` |
 | The source check | `rate-lookup` |
@@ -26,53 +28,49 @@ image the nightly publishes is the one every shard tested.
 | The expired invite and the harness administrator | `register`, `admin-invites` |
 | The server log, stopping and starting the app | `app-shell`, `login`, `admin-invites` |
 
-## Trust boundaries
+### Trust boundaries
 
-- **The app has no route out.** Its only network is internal, so a
-  lookup reaches the stand-in or nothing, and no fixture value can
-  reach a real source.
+- **The app has no route out** (The network), so a lookup reaches the
+  stand-in or nothing, and no fixture value can reach a real source.
 - **The stand-in is trusted by name and by a mounted trust store, never
   by a setting.** The app's provider hosts and URL templates are
   constants (rate-lookup.md, SSRF and egress hardening). The harness
-  answers those names on its own network, and mounts a trust store
+  answers those names on its own network and mounts a trust store
   holding only the run's certificate authority over the image's system
-  store. So an installation has no switch a test could have flipped.
+  store, so an installation has no switch a test could have flipped.
 - **The run's certificate authority vouches for the provider names
-  alone, for one day, and signs once.** Its key is deleted as soon as the
-  stand-in's certificate is signed, and it is name-constrained, so
-  whoever reads the runner afterwards holds nothing that can vouch for
-  another host.
-- **`qa` reaches the server only through the harness tools.** The tools
-  have fixed names and argument shapes, take no command, path,
-  container name or URL as an argument, and run with an empty
-  environment, so no token reaches them. The walk step holds no
-  unrestricted shell (What the workflow does).
-- **Everything the server says is untrusted text.** The log and the
-  request list return to `qa` as JSON strings, never interpreted.
-- **Fixture passwords are public.** They are committed in the plan and
+  alone, for one day, and signs once.** Its key is deleted once the
+  stand-in's certificate is signed, so whoever reads the runner
+  afterwards holds nothing that can vouch for another host.
+- **`qa` reaches the server only through the harness tools.** They have
+  fixed names and argument shapes, take no command, path, container
+  name or URL, and run with an empty environment, so no token reaches
+  them. The walk step holds no unrestricted shell (What the workflow
+  does).
+- **Everything the server says is untrusted text**, returned to `qa` as
+  JSON strings, never interpreted.
+- **Fixture passwords are public.** They are committed in the plan,
   open only throwaway vaults on an instance nobody outside the runner
-  can reach. They are never reused for anything else.
-- **Prepared data never leaves the runner.** The output directory and
-  the TLS directory are never uploaded as artifacts.
+  can reach, and are never reused.
+- **Prepared data never leaves the runner.** The output and TLS
+  directories are never uploaded as artifacts.
 
-## Files
+### Files
 
-Under `tools/nightly/`, standard library only, Python 3.12 or later and
-Node 24 or later. None adds a dependency. Imports beyond the standard
-library and `node:` built-ins are exactly these:
+Python 3.12 or later and Node 24 or later, adding no dependency.
+Beyond the standard library and `node:` built-ins, the only imports
+are these:
 
-- `standin.py`, `mcp.py` and `prices.py prepare` import `prices`, their
-  sibling in `tools/nightly/`, which is on the path as the running
-  script's own directory. Every price comes from that one module.
+- `standin.py`, `mcp.py` and `prices.py prepare` import their sibling
+  `prices`, on the path as the script's own directory, so every price
+  comes from that one module.
 - `sources.py` imports from `solvent.rates` the constants rate-lookup.md
-  names for it (SSRF and egress hardening), running in tonight's image
-  with `PYTHONPATH=/app`.
-- `fixtures.mjs` imports `tests/browser/cdp.mjs`, the Chrome driver,
+  names for it (SSRF and egress hardening).
+- `fixtures.mjs` imports the Chrome driver `tests/browser/cdp.mjs`
   rather than keeping a second one.
 
-Nothing else imports from `solvent` or `tests/`. Nothing in `solvent`
-imports from `tools/`, and the harness's own tests are the only code
-outside it that does.
+Nothing else imports from `solvent` or `tests/`. Only the harness's own
+tests import from `tools/`, and nothing in `solvent` does.
 
 | Path | What it is |
 |---|---|
@@ -86,17 +84,15 @@ outside it that does.
 | `mcp.py` | the harness tools, as an MCP server |
 | `fixtures/plan.json` | what the prepared data holds, committed |
 | `fixtures/backup-format-1.json` | the older backup file, committed, never regenerated |
-| `fixtures/backup-format-1.plan.json`, `fixtures/backup-format-1.expected.json` | what it was made from and what it holds, committed with it |
+| `fixtures/backup-format-1.plan.json`, `fixtures/backup-format-1.expected.json` | the plan that made it and the figures it holds, committed with it |
 | `fixtures/out/` | tonight's generated data, ignored by git |
 
-`qa` may read `fixtures/plan.json`,
-`fixtures/out/manifest.json` and the backup files, never the code.
+`qa` may read `fixtures/plan.json`, `fixtures/out/manifest.json` and
+the backup files, never the code. A script that runs to an end exits 0
+on success, 1 on a failed check and 2 on a usage error, and writes
+nothing but its stated outputs.
 
-A script that runs to an end exits 0 on success, 1 on a check that
-failed, and 2 on a usage error. No script writes anything but its
-stated outputs.
-
-## The network
+### The network
 
 Each shard creates its own Docker networks:
 
@@ -105,15 +101,13 @@ Each shard creates its own Docker networks:
 - `nightly-edge`, an ordinary bridge: the relay's other leg, which
   publishes `127.0.0.1:8000`.
 
-The stand-in joins `nightly` with the network aliases
-`api.frankfurter.dev` and `api.nbp.pl`, so Docker's resolver answers
-those names with its address on that network.
+The stand-in joins `nightly` with the aliases `api.frankfurter.dev` and
+`api.nbp.pl`, so Docker's resolver answers those names with its
+address. A port cannot be published from an internal network, which is
+why the relay exists. It is the runner's only way to the app, and the
+app sees it as every client's peer.
 
-A port cannot be published from an internal network, which is why the
-relay exists. It is the runner's only way to the app, and the app sees
-it as every client's peer.
-
-## The run's certificate authority
+### The run's certificate authority
 
 `python3 tools/nightly/ca.py <dir>` runs the `openssl` command line with
 argument lists, never a shell, and writes into `<dir>`, which must be
@@ -153,7 +147,7 @@ container, the image's OpenSSL CA directory. `sources.py probe` proves
 the image's default context then accepts the stand-in, so a base image
 that moves its trust store fails the harness rather than every lookup.
 
-## The stand-in
+### The stand-in
 
 `python /harness/standin.py --cert <leaf.pem> --key <leaf.key> --state
 <dir> [--port 443]`, in a container of tonight's image on `nightly`.
@@ -166,7 +160,7 @@ that moves its trust store fails the harness rather than every lookup.
 - The statuses here are the providers' own, outside Solvent's status
   set (architecture.md, Status codes).
 
-### Known prices
+#### Known prices
 
 `prices.py` is the one home of every price the stand-in publishes. A
 price is a pure function of the source, the date and the currency, so
@@ -174,19 +168,18 @@ every process that asks gets the same answer.
 
 - **Publication days** are Monday to Friday, with no holidays, up to
   and including the stand-in's current UTC date. Frankfurter publishes
-  from `1999-01-04` and NBP from `2013-01-02`, the start of the real
-  series the app calls (rate-lookup.md, Providers). The app sends no
-  earlier date, so the stand-in's `404` before them is never exercised
-  by it.
-- **Currencies** are Frankfurter's list, the same set as the seeded
-  currency half of the symbol table (rate-lookup.md, Seeded symbols).
-  Each has a reference value `ref[C]`, units of C per euro, and a first
-  publication day `start[C]`, in constant tables in `prices.py`, with
-  `ref["EUR"] = 1`. `start[C]` is the real series' start that
-  rate-lookup.md, Providers, FX, gives: `2000-01-13` for `BRL`, `CNY`,
-  `ILS` and `INR`, and `1999-01-04` for every other. `prices.py` keeps
-  its own copy rather than importing the app's, so an app floor that
-  drifts from the source shows as a wrong answer.
+  from `1999-01-04` and NBP from `2013-01-02`, the real series' starts
+  and each symbol's date floor (rate-lookup.md, Providers). The app
+  sends no earlier date, so it never exercises the stand-in's `404`
+  before them.
+- **Currencies** are Frankfurter's list, the seeded currency half of
+  the symbol table (rate-lookup.md, Seeded symbols). Constant tables in
+  `prices.py` give each a reference value `ref[C]`, units of C per euro
+  with `ref["EUR"] = 1`, and a first publication day `start[C]`: the
+  real series' start (rate-lookup.md, Providers, FX), `2000-01-13` for
+  `BRL`, `CNY`, `ILS` and `INR` and `1999-01-04` for every other.
+  `prices.py` keeps its own copy rather than importing the app's, so an
+  app floor that drifts from the source shows as a wrong answer.
 - **Frankfurter**, for publication day `p`, base `Q` and symbol `C ≠ Q`:
   `rates[C] = ref[C] / ref[Q] × f(p)`, rounded half-even to 5
   significant digits, where
@@ -203,11 +196,11 @@ the whole table on that date and quote, without `cached`: every
 currency but `quote` whose `start` the date has reached, and `XAU-g`
 and `XAU-ozt` where NBP published within the 14-day window, each
 `{rate, base, asOf, source}`, and nothing at all on a date before
-`start[quote]`. It applies
+`start[quote]`. An empty table matches No Content. It applies
 rate-lookup.md's composition exactly as pinned there (Providers), so
 it is the oracle for every proposal `qa` sees.
 
-### What it answers
+#### What it answers
 
 | Host | Request | Answer |
 |---|---|---|
@@ -220,14 +213,14 @@ it is the oracle for every proposal `qa` sees.
 
 JSON answers carry `Content-Type: application/json; charset=utf-8`.
 
-### Failure modes
+#### Failure modes
 
 `<state>/modes.json` is `{"frankfurter": "up" | "down", "nbp": "up" |
 "down"}`. The stand-in reads it on every request. Absent, unreadable or
 malformed, both sources are up. A source that is down answers every
 request `503` with an empty body, after recording it.
 
-### The request list
+#### The request list
 
 Every request the stand-in receives is one line appended to
 `<state>/requests.jsonl`, written before the answer is sent, the file
@@ -250,7 +243,7 @@ opened, appended and closed under a lock per request:
 - A request the stand-in cannot parse is still a line, with what could
   be read and `status` as sent.
 
-## The relay
+### The relay
 
 `python /harness/relay.py --listen 0.0.0.0:8000 --to solvent:8000`,
 in a container of tonight's image. It copies bytes both ways between
@@ -258,11 +251,11 @@ each accepted connection and one new connection to the fixed target,
 and closes both when either side closes. It reads, logs and alters
 nothing.
 
-## The source checks
+### The source checks
 
 `python /harness/sources.py check|probe`, in a container of tonight's
-image with `PYTHONPATH=/app`, so it requests exactly what the app
-requests: it imports `FX_URL`, `NBP_URL`, `USER_AGENT`,
+image with `PYTHONPATH=/app`, requests exactly what the app requests:
+it imports `FX_URL`, `NBP_URL`, `USER_AGENT`,
 `EGRESS_TIMEOUT_SECONDS`, `MAX_RESPONSE_BYTES` and `SEEDED_SYMBOLS`
 from `solvent.rates`, and opens each URL with the default context and
 redirects off, as the app does.
@@ -290,24 +283,25 @@ job, on the default bridge network.
 | `changed` | any other status but `200`, `3xx` included, because the app follows no redirect. A `200` body over the size cap, not JSON, or off the shape above |
 | `ok` | `200` with the shape above |
 
-It exits 1 when any source is `changed`, and 0 otherwise. Its
-`no-answer` lines are the note in the run's summary.
+It exits 1 when any source is `changed`, and 0 otherwise, so a source
+that does not answer is a note in the run's summary and the night goes
+on.
 
 **`probe`** runs per shard against the stand-in, on `nightly` with
 `trust/` mounted as in the app. It exits 0 only when both sources are
 `ok` and a TCP connection to `1.1.1.1:443` does not open within 3
-seconds, which proves the trust store, the aliases and the missing route out
-together.
+seconds, which proves the trust store, the aliases and the missing
+route out together.
 
-## Prepared data
+### Prepared data
 
-### The plan
+#### The plan
 
 `fixtures/plan.json` names every prepared account with its username,
 password, kind and main currency, and what its vault holds. The
-manifest's coverage names below are the contract: each must be covered
-by at least one prepared item, and a test fails the plan that leaves
-one out.
+coverage names below are the contract: each must be covered by at
+least one prepared item, and `prepare` exits 1 naming any the plan
+leaves out.
 
 | Coverage | What the prepared item must be |
 |---|---|
@@ -319,7 +313,7 @@ one out.
 | `own-unit` | a holding in a unit outside the symbol table, priced by hand on one old date only, so its price is older than the vault's newest |
 | `archived-holding` | a holding archived on a recording date at which every unit already has a price, so archiving makes no lookup |
 | `other-main-currency` | a vault whose main currency is `EUR` |
-| `damaged-record` | a `snapshot` whose ciphertext was encrypted under the AAD of another `record_id`, so it fails authentication |
+| `damaged-record` | a `snapshot` whose ciphertext is encrypted under the AAD of another `record_id`, so it fails authentication |
 | `same-date-pair` | two snapshots of one holding at one date |
 | `older-vault` | a vault whose credential's KDF envelope has `m = 32768`, below the server default, and is otherwise the default |
 | `empty-vault` | a vault owner with no holdings |
@@ -337,7 +331,7 @@ expected total has exactly one correct value. The stored idle period of
 written through `saveProfile` all the same. Every other quantity, rate
 and setting in the plan is one the app's own screens could write.
 
-### `prices.py prepare`
+#### `prices.py prepare`
 
 `python3 tools/nightly/prices.py prepare <plan> <out>` expands the plan
 against the current UTC date and writes:
@@ -352,12 +346,12 @@ The expected figures follow net-worth-view.md, Current net worth, and
 record-rate.md, Reading, computed independently of the app in
 `Decimal`:
 
-- each active, priced holding's figure is its latest quantity times its
+- Each active, priced holding's figure is its latest quantity times its
   price (the latest price, or the price as recorded), rounded half-even
-  at scale 12, as `static/js/decimal.js` multiplies;
-- the total is the sum of those figures at scale 12. `assets` sums the
-  figures above zero and `debts` those below;
-- each is given `exact`, at scale 12 without trailing zeros, and
+  at scale 12, as `static/js/decimal.js` multiplies.
+- The total is the sum of those figures at scale 12. `assets` sums the
+  figures above zero and `debts` those below.
+- Each is given `exact`, at scale 12 without trailing zeros, and
   `display`, rounded half-even to the places the vault's profile shows,
   with no grouping and `-` for a negative.
 
@@ -366,7 +360,7 @@ are listed by name under `excluded`, with the reason. An archived
 holding's reason is `archived` whatever else is true of it
 (net-worth-view.md, Current net worth, Archived comes first).
 
-### `fixtures.mjs`
+#### `fixtures.mjs`
 
 `node tools/nightly/fixtures.mjs --base <url> --invite <path> --plan
 <plan> --out <dir>`, with `CHROME` naming the browser. It reads
@@ -393,9 +387,11 @@ app's own code did not produce:
   `patch.py` then records that parameter.
 - **The current backup** is the body of `GET /api/export`, fetched by
   the page through `api.js`, so it carries the `X-Solvent-Request`
-  header and the vault epoch. So does every other request the
-  generator sends for a vault, `plant` writes and `makeStale`'s
-  upgrade included (architecture.md, Vault epoch).
+  header and the vault epoch.
+- **Every request the generator sends for a vault carries the vault
+  epoch** registration or sign-in handed it, `plant` writes and
+  `makeStale`'s upgrade included, because the gate refuses a request
+  without one (architecture.md, Vault epoch).
 - **The aged session's cookie** is read with CDP `Network.getCookies`
   in that account's profile, right after it registers.
 
@@ -408,7 +404,7 @@ Outputs in `<dir>`:
 | `patches.json` | the dating back for `patch.py` |
 | `storage-state.json` | Playwright storage state, `{"cookies": [<the aged session's cookie>], "origins": []}`, with `expires`, `httpOnly`, `secure` and `sameSite` as CDP reported them |
 
-### The manifest
+#### The manifest
 
 ```json
 {
@@ -438,7 +434,7 @@ Outputs in `<dir>`:
 Every coverage name appears under some `covers`. `qa` reads nothing
 else to know what is prepared.
 
-### Dating back
+#### Dating back
 
 `python /harness/patch.py <database> <patches.json>`, in a one-off
 container of tonight's image with `--network none`, the app's volume,
@@ -467,18 +463,18 @@ and the app stopped. `patches.json`:
 - It opens the file through `sqlite3` with `PRAGMA secure_delete = ON`,
   as the app does, and touches no other table.
 
-### The older backup file
+#### The older backup file
 
-`fixtures/backup-format-1.json` was made once, by `prepare` and
+`fixtures/backup-format-1.json` is made once, by `prepare` and
 `fixtures.mjs` from `backup-format-1.plan.json`, at the server's
-default KDF envelope of that build, with every date absolute. Its
-expected figures were kept as `backup-format-1.expected.json`. None of
-the three is regenerated, because a file made by today's build is not
-an older one (export-import.md, Acceptance criteria, keeps its own
-fixture the same way). The manifest carries its password and points at
-it.
+default KDF envelope of the build that made it, with every date
+absolute. Its expected figures are kept as
+`backup-format-1.expected.json`. None of the three is regenerated,
+because a file made by today's build is not an older one
+(export-import.md, Acceptance criteria, keeps its own fixture the same
+way). The manifest carries its password and points at it.
 
-## The harness tools
+### The harness tools
 
 `mcp.py` is an MCP server over stdio: JSON-RPC 2.0, one message per
 line, no network listener.
@@ -507,20 +503,24 @@ env -i PATH=/usr/bin:/bin python3 tools/nightly/mcp.py \
 |---|---|---|---|
 | `server_log` | `since`: integer ≥ 0, default 0 | `docker logs <container>`, stderr merged into stdout | `{"lines": [...], "next": n}`, at most 500 lines from line `since` |
 | `price_requests` | `since`: integer ≥ 0, default 0 | reads `requests.jsonl` | `{"requests": [...], "next": seq}`, at most 200 entries with `seq` above both `since` and the start count |
-| `price_source` | `source`: `frankfurter` \| `nbp`, `state`: `up` \| `down` | writes `modes.json` through a temporary file and `os.replace` | the modes now in force |
+| `price_source` | `source`: `frankfurter` \| `nbp`, `state`: `up` \| `down` | writes `modes.json` through a temporary file and `os.replace` | the modes in force |
 | `known_prices` | `date`: `YYYY-MM-DD` on or before today, `quote`: a known currency | `prices.known_table` | the table, independent of the modes |
 | `app_stop` | none | `docker stop --time 10 <container>` | `{"state": "stopped"}` |
 | `app_start` | none | `docker start <container>`, then polls `<url>/login` until it answers 200, at most 60 seconds | `{"state": "running"}`, or `isError: true` with `{"state": "not answering"}` |
 
-## What the workflow does
+### What the workflow does
 
-`.github/workflows/nightly.yml` is the client's. This is what it must
-do for the harness to hold.
+`.github/workflows/nightly.yml` is the client's file, and no agent
+writes it. So the harness's part of the contract that lives there
+reaches the client as a pull request, with the exact change in it and
+in its comment on the issue (CLAUDE.md, The loop, When something
+fails). This is what the workflow must do for the harness to hold.
 
 **Build job**, after the image is built and before any shard starts: a
 step with the id `sources` runs `sources.py check` in a container of
-tonight's image on the default network, appends its output to the
-step summary, and fails the job on exit 1.
+tonight's image on the default network and appends its output to the
+step summary. On exit 1 it fails the job before any shard, and the
+failure issue names that step.
 
 **Each QA shard**, before the walk, in steps whose failure fails the
 shard as the harness:
@@ -531,8 +531,8 @@ shard as the harness:
 4. Starts `standin` on `nightly` with both aliases, as the runner's own
    user, with `--sysctl net.ipv4.ip_unprivileged_port_start=443`,
    `tls/` and `tools/nightly/` read-only and `standin/` writable.
-5. Starts `solvent` on `nightly` alone, with the hardening it has
-   today, a fresh `SECRET_KEY`, and `tls/trust/` read-only at
+5. Starts `solvent` on `nightly` alone, with the hardening the workflow
+   gives it, a fresh `SECRET_KEY`, and `tls/trust/` read-only at
    `/etc/ssl/certs`.
 6. Starts `relay` on `nightly-edge` publishing `127.0.0.1:8000:8000`,
    then connects it to `nightly`.
@@ -550,10 +550,10 @@ Every harness container runs `--read-only --cap-drop ALL
 
 **The walk step**:
 
-- passes `tools/nightly/fixtures/out/manifest.json` as the manifest;
+- passes `tools/nightly/fixtures/out/manifest.json` as the manifest.
 - adds the `harness` MCP server as above, and
   `--storage-state tools/nightly/fixtures/out/storage-state.json` to the
-  Playwright server's arguments;
+  Playwright server's arguments.
 - allows `mcp__harness` and `mcp__playwright`, and no `Bash` beyond
   `gh issue list` and `gh issue view`. With an unrestricted shell the
   walk would reach Docker, the database volume and the internet, and
@@ -563,95 +563,132 @@ On failure it prints `docker logs` of `solvent` and `standin`.
 
 ## Edge cases
 
-- **A source answers the check in a changed shape** → the build job
-  fails at `sources`, before any shard, and the failure issue names
-  that step.
-- **A source does not answer the check** → noted in the summary, and
-  the night goes on. The stand-in answers the shards either way.
-- **The base image moves its trust store** → the probe fails the shard
-  as the harness, rather than every lookup failing as a finding.
-- **`qa` sets a source down and its breaker opens** → the app skips
-  that source, and only that source, for the cool-off after it comes
-  back up (rate-lookup.md, Rate limiting and failure). `app_stop` and
+- **A source does not answer the check**: the stand-in answers the
+  shards either way.
+- **The base image moves its trust store**: the probe fails the shard
+  as the harness (The run's certificate authority), rather than every
+  lookup failing as a finding.
+- **`qa` sets a source down and its breaker opens**: the app skips that
+  source, and only that source, for the cool-off after it comes back up
+  (rate-lookup.md, Rate limiting and failure). `app_stop` and
   `app_start` reset every breaker, because the breakers live in process
   memory.
-- **`app_start` before `app_stop`** → `docker start` on a running
+- **`app_start` before `app_stop`**: `docker start` on a running
   container changes nothing, and the tool answers `running`.
-- **The prepared data spans midnight UTC** → `prepare` reads the date
+- **The prepared data spans midnight UTC**: `prepare` reads the date
   once and writes it as the manifest's `today`. The expected figures
   hold for that date, since no later price is written.
-- **A plan that leaves a coverage name uncovered** → `prepare` exits 1
-  naming it.
 
 ## Acceptance criteria
 
-- `ca.py` writes exactly the outputs above. The CA and the leaf carry
-  every field in the table, read back with `openssl x509 -text`. The
-  validity is at most one day. No private key but `leaf.key` exists
-  anywhere under the output directory or the system's temporary
-  directory afterwards. `trust/` holds two files byte-identical to
-  `ca.pem`, one named by its subject hash.
-- A Python 3.13 default context loaded with `ca.pem` alone completes a
-  handshake with `standin.py` on 127.0.0.1 under `server_hostname`
-  `api.frankfurter.dev` and `api.nbp.pl`, and fails under any other
-  name.
-- `standin.py` answers every row of the answers table as stated, with a
-  weekend `D` answered at the preceding Friday and a range holding no
-  weekday answered `404`.
-- With `modes.json` setting a source down, every request to it is
-  answered `503` and still recorded with `mode: "down"`. With the file
-  absent or holding invalid JSON, both answer.
-- Every request, a malformed one included, is one line of
-  `requests.jsonl` with every field above. `seq` continues across a
-  restart of the stand-in.
-- `known_table` equals what the app's `/api/rates` returns for the
-  whole table, without `cached`, on dates covering a weekday, a
-  weekend, the day before `2013-01-02`, `1999-06-30` and today, for
-  `CHF`, `EUR`, `PLN` and `BRL`, with the app's opener stubbed to answer
-  from `standin.py`'s routing. An empty `known_table` matches No
-  Content.
-- The currency list in `prices.py` equals the seeded currencies in
-  `solvent.rates`.
-- `sources.py`'s classification yields `no-answer` for a timeout, a
-  refused connection, `429` and `503`. It yields `changed` for `301`,
-  `404`, a non-JSON `200`, a body over the cap, a missing `PLN`, a
-  missing seeded currency, a boolean rate, an empty NBP array and a
-  date outside the window. It yields `ok` for the real providers'
-  documented shapes. `check` exits 1 exactly when a line is `changed`.
-- `relay.py` carries a request and its response byte for byte, in both
-  directions, and closes both sides when either closes.
-- `prepare` fails a plan missing any coverage name, and one whose
-  damaged record or pair is its holding's latest quantity. Its
-  `expected.json` matches a hand-computed vault covering an archived
-  holding, an unpriced one, a main-currency one, a debt and an edited
-  rate, under both modes.
-- `fixtures.mjs`, run from the test suite against a fresh instance,
-  exits 0, sends no request to `/api/rates`, and writes every output
-  above. After `patch.py` runs on that instance's database, each
-  vault's dashboard shows the manifest's `display` total under both
-  pricing modes, the damaged record is reported unreadable, and the
-  aged session's cookie is refused as no session. The
-  `idle-lock-out-of-range` vault's profile record, decrypted, holds
-  `idleLockMinutes: 0`, and its Settings screen shows an idle lock of
-  five minutes.
-- `patch.py` changes exactly the rows its file names, in `sessions`,
-  `invites` and `credentials`, and every other table is byte-identical
-  in a dump afterwards. A patch naming an unknown username or label,
-  or a `kdfMemory` of 65536, changes nothing and exits 1.
-- `backup-format-1.json` has `formatVersion: 1` and a `kdf` envelope at
-  `m = 65536, t = 3, p = 1`, and its plan and expected files exist.
-- `mcp.py`, driven over stdio, lists exactly the tools in the table
-  with their schemas. A call with an extra argument, a wrong enum value
-  or a malformed date returns `isError: true` and runs nothing. With a
-  stand-in `docker` first on `PATH`, `server_log`, `app_stop` and
-  `app_start` run it with exactly `logs <container>`,
-  `stop --time 10 <container>` and `start <container>`.
-  `price_source` leaves `modes.json` holding the new state.
-  `price_requests` omits the lines present at start.
-- `mcp.py` started under `env -i` with `GH_TOKEN` and
-  `CLAUDE_CODE_OAUTH_TOKEN` in the parent's environment has neither in
-  its own, read from `/proc/<pid>/environ`.
-- The imports of every file under `tools/nightly/`, read from its
-  source, are the standard library, `node:` built-ins and exactly the
-  imports listed under Files. No module under `solvent/` imports from
-  `tools/`.
+1. `ca.py` writes exactly the outputs in its table, and `trust/` holds
+   two files byte-identical to `ca.pem`, one named by its subject hash.
+   Test: `tests/test_nightly_tools.py::test_the_ca_writes_exactly_its_outputs_and_no_other_private_key`.
+2. (blind) The CA and the leaf carry every field in the certificate
+   table, read back from the certificates with `openssl x509 -text`, and
+   the validity is at most one day. Test: `tests/test_nightly_tools.py::test_every_certificate_field_reads_back_as_the_table_says`.
+3. (blind) No private key but `leaf.key` exists anywhere under the
+   output directory or the system's temporary directory afterwards,
+   also when signing fails midway, not only on the success path.
+   Test: `tests/test_nightly_tools.py::test_the_ca_writes_exactly_its_outputs_and_no_other_private_key`, `tests/test_nightly_tools.py::test_a_failed_signing_leaves_no_key_and_no_output`.
+4. (blind) A Python 3.13 default context loaded with `ca.pem` alone, not
+   a hand-built relaxed one, completes a handshake with `standin.py` on
+   127.0.0.1 under `server_hostname` `api.frankfurter.dev` and
+   `api.nbp.pl`. Test: `tests/test_nightly_tools.py::test_a_default_python_context_trusts_the_stand_in_under_both_names`.
+5. (blind) The same handshake fails under any other server name.
+   Test: `tests/test_nightly_tools.py::test_the_handshake_fails_under_any_other_name`.
+6. `standin.py` answers every row of the answers table as stated, a
+   weekend `D` at the preceding Friday, and a range holding no weekday
+   with `404`. Test: `tests/test_nightly_tools.py::test_the_stand_in_answers_every_row_of_the_table`.
+7. (blind) With `modes.json` setting a source down, every request to it
+   is answered `503` and still recorded with `mode: "down"`.
+   Test: `tests/test_nightly_tools.py::test_a_source_that_is_down_answers_503_and_is_still_recorded`.
+8. With `modes.json` absent or holding invalid JSON, both sources
+   answer. Test: `tests/test_nightly_tools.py::test_modes_that_are_absent_or_malformed_leave_both_sources_up`.
+9. (blind) Every request, a malformed one included, is one line of
+   `requests.jsonl` with every field. Test: `tests/test_nightly_tools.py::test_every_request_is_a_line_with_every_field_and_seq_continues_across_a_restart`, `tests/test_nightly_tools.py::test_a_request_that_stalls_is_still_recorded_with_what_was_read`.
+10. (blind) `seq` continues across a restart of the stand-in.
+    Test: `tests/test_nightly_tools.py::test_every_request_is_a_line_with_every_field_and_seq_continues_across_a_restart`.
+11. (blind) `known_table` equals what the app's `/api/rates` returns for
+    the whole table, without `cached`, on a weekday, a weekend, the day
+    before `2013-01-02`, `1999-06-30` and today, for `CHF`, `EUR`, `PLN`
+    and `BRL`, with the app's opener stubbed to answer from
+    `standin.py`'s routing, never compared with itself or a hand-written
+    figure. Test: `tests/test_nightly_tools.py::test_known_table_is_what_the_app_answers_for_the_whole_table`.
+12. (blind) An empty `known_table` matches No Content: on `1999-06-30`
+    the `CHF` table omits `BRL`, `CNY`, `ILS` and `INR`, and `BRL` answers
+    No Content. Test: `tests/test_nightly_tools.py::test_known_table_is_what_the_app_answers_for_the_whole_table`.
+13. The currency list in `prices.py` equals the seeded currencies in
+    `solvent.rates`. Test: `tests/test_nightly_tools.py::test_the_currency_list_is_the_seeded_currencies`.
+14. (blind) `sources.py` classifies a timeout, a refused connection,
+    `429` and `503` as `no-answer`. Test: `tests/test_nightly_tools.py::test_a_throttled_or_failing_source_is_no_answer`, `tests/test_nightly_tools.py::test_the_requests_failures_are_classified`.
+15. (blind) `sources.py` classifies `301`, `404`, a non-JSON `200`, a
+    body over the cap, a missing `PLN`, a missing seeded currency, a
+    boolean rate, an empty NBP array and a date outside the window as
+    `changed`. Test: `tests/test_nightly_tools.py::test_any_other_status_is_changed_redirects_included`, `tests/test_nightly_tools.py::test_a_200_that_is_off_the_shape_is_changed`.
+16. `sources.py` classifies the real providers' documented shapes as
+    `ok`. Test: `tests/test_nightly_tools.py::test_the_real_providers_documented_shapes_are_ok`.
+17. `check` exits 1 exactly when a line is `changed`, and `probe` exits
+    0 only when both sources are `ok`. Test: `tests/test_nightly_tools.py::test_check_exits_1_exactly_when_a_line_is_changed_and_probe_needs_everything_ok`.
+18. (blind) Run on the real `nightly` network, `probe` fails when a TCP
+    connection to `1.1.1.1:443` opens, so a network with a route out
+    never passes. Test: no test.
+19. `relay.py` carries a request and its response byte for byte, in
+    both directions, and closes both sides when either closes.
+    Test: `tests/test_nightly_tools.py::test_the_relay_carries_bytes_both_ways_and_closes_both_sides`.
+20. `prepare` fails a plan missing any coverage name. Test: `tests/test_nightly_tools.py::test_prepare_refuses_a_plan_that_leaves_a_coverage_name_out`.
+21. (blind) `prepare` fails a plan whose damaged record or pair is its
+    holding's latest quantity. Test: `tests/test_nightly_tools.py::test_prepare_refuses_a_damaged_record_or_pair_that_leaves_two_correct_totals`.
+22. `prepare`'s `expected.json` matches a hand-computed vault covering
+    an archived holding, an unpriced one, a main-currency one, a debt
+    and an edited rate, under both pricing modes. Test: `tests/test_nightly_tools.py::test_expected_figures_match_a_hand_computed_vault_under_both_modes`.
+23. (blind) An archived holding that is also unpriced or has no
+    quantity is listed under `excluded` with the reason `archived`.
+    Test: `tests/test_nightly_tools.py::test_expected_figures_match_a_hand_computed_vault_under_both_modes`.
+24. `fixtures.mjs`, run from the test suite against a fresh instance,
+    exits 0 and writes every output. Test: `tests/test_nightly_browser.py::test_the_generator_writes_every_output_and_the_manifest_covers_every_name`.
+25. (blind) `fixtures.mjs` sends no request to `/api/rates`, asserted
+    from the request log. Test: `tests/test_nightly_browser.py::test_the_generator_sends_no_request_to_the_rate_lookup`.
+26. (blind) `fixtures.mjs` writes no record by its own crypto: records
+    go through the served modules, and only the damaged record and the
+    pair use `plant`. Test: `tests/test_nightly_tools.py::test_the_generator_writes_no_record_by_its_own_crypto`.
+27. (blind) Every vault request the generator sends, `plant` writes and
+    `makeStale`'s upgrade included, carries `X-Solvent-Vault`, shown
+    from a request capture of a fresh run. Test: no test.
+28. (blind) After `patch.py` runs on that instance's database, each
+    vault's dashboard, in a real browser, shows the manifest's
+    `display` total under both pricing modes, and the damaged record is
+    reported unreadable. Test: `tests/test_nightly_browser.py::test_each_dashboard_shows_the_manifests_totals_under_both_modes_and_the_damaged_record_is_unreadable`.
+29. After `patch.py`, the aged session's cookie is refused as no
+    session. Test: `tests/test_nightly_browser.py::test_patch_changes_only_the_rows_it_names_and_the_aged_session_is_refused`.
+30. (blind) The `idle-lock-out-of-range` vault's profile record,
+    decrypted, holds `idleLockMinutes: 0`, and its Settings screen
+    shows an idle lock of five minutes. Test: `tests/test_nightly_browser.py::test_the_out_of_range_idle_lock_is_stored_as_zero_and_shown_as_five_minutes`.
+31. (blind) `patch.py` changes exactly the rows its file names, in
+    `sessions`, `invites` and `credentials`, and every other table is
+    byte-identical in a dump afterwards. Test: `tests/test_nightly_tools.py::test_patch_changes_exactly_the_rows_it_names`.
+32. (blind) A patch naming an unknown username or label, or a
+    `kdfMemory` of 65536, changes nothing and exits 1. Test: `tests/test_nightly_tools.py::test_a_patch_that_cannot_apply_changes_nothing`.
+33. `backup-format-1.json` has `formatVersion: 1` and a `kdf` envelope
+    at `m = 65536, t = 3, p = 1`, and its plan and expected files exist.
+    Test: `tests/test_nightly_tools.py::test_the_older_backup_and_its_plan_and_figures_are_committed`.
+34. `mcp.py`, driven over stdio, lists exactly the tools in the table
+    with their schemas. Test: `tests/test_nightly_tools.py::test_the_protocol_lists_exactly_the_tools_and_answers_as_specified`.
+35. (blind) A call with an extra argument, a wrong enum value or a
+    malformed date returns `isError: true` and runs nothing, shown by
+    the handler, not by the schema's declaration alone. Test: `tests/test_nightly_tools.py::test_an_argument_outside_the_schema_is_refused_by_name_and_runs_nothing`.
+36. (blind) With a stand-in `docker` first on `PATH`, `server_log`,
+    `app_stop` and `app_start` run it with exactly `logs <container>`,
+    `stop --time 10 <container>` and `start <container>`. Test: `tests/test_nightly_tools.py::test_the_tools_run_docker_with_exactly_these_argument_lists`.
+37. `price_source` leaves `modes.json` holding the new state. Test: `tests/test_nightly_tools.py::test_price_source_leaves_the_new_state_and_known_prices_is_the_table`.
+38. `price_requests` omits the lines present at start. Test: `tests/test_nightly_tools.py::test_price_requests_omit_what_was_there_at_start`.
+39. (blind) `mcp.py` started under `env -i` with `GH_TOKEN` and
+    `CLAUDE_CODE_OAUTH_TOKEN` in the parent's environment has neither in
+    its own, read from `/proc/<pid>/environ`, not from inside the
+    process. Test: `tests/test_nightly_tools.py::test_the_server_holds_neither_token_in_its_environment`.
+40. (blind) The imports of every file under `tools/nightly/`, Python and
+    Node alike, read from its source, are the standard library, `node:`
+    built-ins and exactly the imports listed under Files.
+    Test: `tests/test_nightly_tools.py::test_every_python_file_imports_the_standard_library_and_only_what_the_spec_lists`, `tests/test_nightly_tools.py::test_the_generator_imports_node_builtins_and_the_chrome_driver_alone`.
+41. (blind) No module under `solvent/` imports from `tools/`.
+    Test: `tests/test_nightly_tools.py::test_nothing_in_the_app_imports_from_tools`.

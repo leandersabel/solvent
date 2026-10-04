@@ -45,7 +45,7 @@ export function el(tag, props = {}, children = []) {
   return node;
 }
 
-// An inline rename (spec/ui/design-system.md, Components): the label
+// An inline rename (spec/design-system.md, Components): the label
 // with an Edit action that reveals an ordinary input in place. Only
 // Save or Enter writes, so clicking away never does. A blank name is
 // refused, and a rejected `save` keeps the field open with what was
@@ -149,9 +149,10 @@ export function icon(name, size = 16) {
 }
 
 /** What a page says when its vault was replaced from a file elsewhere
- *  (ui/unlock.md, Replaced elsewhere; ui/dashboard.md, Replaced since
- *  last open). Whether typed input was dropped decides the icon and the
- *  second sentence. A polite live region, so a screen reader hears it. */
+ *  (login.md, Unlock, Replaced elsewhere, and net-worth-view.md,
+ *  Dashboard, Replaced since last open). Whether typed input was dropped
+ *  decides the icon and the second sentence. A polite live region, so a
+ *  screen reader hears it. */
 export function replacedCallout(first, dropped) {
   const second = dropped
     ? 'What you had typed here and not saved is gone.'
@@ -275,7 +276,7 @@ function onKey(event) {
 }
 
 /** A focus-trapping dialog with the Escape and restore behaviour every
- *  one in the product shares (spec/ui/design-system.md, Components).
+ *  one in the product shares (spec/design-system.md, Components).
  *
  *  `resume`, from `resumable` below, reopens the same form against the
  *  vault a later unlock builds. A dialog without one is closed by a
@@ -423,7 +424,8 @@ export function reopenDialogs(kept, context) {
   }
 }
 
-/** "3 weeks ago", "about a year ago" (spec/ui/update-values.md, Age).
+/** "3 weeks ago", "about a year ago" (spec/features/record-snapshot.md,
+ *  Update values, Age).
  *  Relative, because the question is how long this has been sitting
  *  and a date makes the reader do the arithmetic. Both ends are
  *  calendar dates with no hour, so the count is whole calendar days

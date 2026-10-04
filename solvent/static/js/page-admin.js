@@ -1,4 +1,4 @@
-// The administration surface (spec/ui/admin.md).
+// The administration surface (spec/features/admin-invites.md, Admin).
 //
 // Every control here maps to a route under /api/admin/ or to the
 // shared change-password endpoint. Nothing on it renders a figure, a

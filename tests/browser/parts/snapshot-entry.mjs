@@ -1,6 +1,6 @@
-// Snapshot entry (spec/ui/snapshot-entry.md): one holding, one date, the
-// small form for an odd date, a figure added late, or an old statement
-// backfilled, and what it writes, refuses and prices.
+// Snapshot entry (spec/features/record-snapshot.md, Snapshot entry): one
+// holding, one date, the small form for an odd date, a figure added late,
+// or an old statement backfilled, and what it writes, refuses and prices.
 // Templates: dashboard.html. Modules: view-forms.js, view-holding.js,
 // writes.js, datepicker.js, format.js, decimal.js, model.js.
 import { BACKDATE, check, click, page, run, setValue, story, text, unlockDashboard, vaultOwner } from '../harness.mjs';

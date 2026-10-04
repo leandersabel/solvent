@@ -1,5 +1,5 @@
-// The administration area (spec/ui/admin.md): its four sections, the
-// dialog over it, and the only way out of it.
+// The administration area (spec/features/admin-invites.md, Admin): its
+// four sections, the dialog over it, and the only way out of it.
 // Templates: admin.html. Modules: page-admin.js, dom.js, shell.js.
 import {
   ADMIN_PASSWORD, BASE, CLOCK, MINUTE, SECOND_PASSWORD, administrator, check, click, confirmLook, labels, looksDisabled,

@@ -24,10 +24,10 @@ bp = Blueprint("records", __name__)
 
 RECORD_TYPES = ("account", "snapshot", "rate", "profile")
 
-# architecture.md, Storage & data handling. Compiled-contract
-# parameters, not operator config: the Content Too Large tests assert
-# exact behaviour at a boundary, and a boundary that moves per
-# deployment is one the contract cannot state.
+# architecture.md, Storage & data handling. Fixed by the spec, not
+# operator config: the Content Too Large tests assert exact behaviour
+# at a boundary, and a boundary that moves per deployment is one the
+# spec cannot state.
 MAX_CIPHERTEXT_BYTES = 64 * 1024
 MAX_RECORDS_PER_VAULT = 50_000
 MAX_BYTES_PER_USER = 32 * 1024 * 1024

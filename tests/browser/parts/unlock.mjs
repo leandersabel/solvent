@@ -1,8 +1,8 @@
-// Signing in and out, and the card that asks (spec/ui/unlock.md): the one
-// card for both kinds of account, what it shows while it works and when
-// it refuses, the sitting that survives a sign-in, a vault that cannot
-// be read, a session that ends mid-action, and the upgrade of an old
-// key-derivation envelope on sign-in.
+// Signing in and out, and the card that asks (spec/features/login.md,
+// Unlock): the one card for both kinds of account, what it shows while it
+// works and when it refuses, the sitting that survives a sign-in, a vault
+// that cannot be read, a session that ends mid-action, and the upgrade of
+// an old key-derivation envelope on sign-in.
 // Templates: dashboard.html, shell/. Modules: unlock.js, session.js,
 // api.js, crypto.js, kdf-worker.js, app.js.
 import {

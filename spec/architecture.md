@@ -175,13 +175,6 @@ symbol.
 The server never accepts a `principal_id` from the client. It is
 always taken from the session.
 
-**Conversion-rate lookup**: a server-side proxy fetches rates from
-public providers and proposes them to the client (rate-lookup.md). It
-caches, and no browser leaks its update timing to a third party. It
-learns the date and the main currency, never an amount and never which
-symbols a vault holds: the client asks for the whole quotable table
-and never a single holding's value.
-
 ### Vault epoch
 
 **A page holding a replaced DEK neither writes nor reads.** Import
@@ -397,7 +390,7 @@ or kinds.
     `quote` on every lookup, and the date of each lookup.
   - Wholesale deletion of a vault's record set. Detecting it needs a
     DEK-authenticated manifest of expected record ids and versions,
-    which v1 does not ship.
+    which Solvent does not ship.
 
 ### Key management
 
@@ -428,7 +421,7 @@ or kinds.
   - **Why `argon2id`**: one algorithm in a small file to audit and
     re-pin, a SIMD and a non-SIMD binary chosen at runtime, and memory
     managed JS-side, so a failed allocation is an ordinary error the
-    client can catch and report (`ui/unlock.md`). CI asserts an RFC 9106
+    client can catch and report (login.md, Unlock). CI asserts an RFC 9106
     known-answer vector. **`hash-wasm`** is rejected: identical output,
     but 16 to 19 percent slower on Apple devices, which set the memory
     parameter. **libsodium.js** is rejected: a few hundred KB of
@@ -694,8 +687,8 @@ or kinds.
 - **Blob and quota limits**: **64 KiB** per ciphertext blob, **50 000**
   records per vault, **32 MiB** total per user, rejected before the row
   reaches the database with Content Too Large (record-api.md).
-  - These are **compiled-contract parameters**, not operator config,
-    because the tests assert exact behaviour at the boundary.
+  - These are **fixed by the spec**, not operator config, because the
+    tests assert exact behavior at the boundary.
   - Each has an order of magnitude of headroom over decades of monthly
     recordings. They bound a runaway client or a hostile payload, not
     honest use.

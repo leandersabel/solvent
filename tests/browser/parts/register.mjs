@@ -1,6 +1,6 @@
-// Registration (spec/ui/register.md): the administrator form, the vault
-// owner form and what each leaves behind, and the invite staying out of
-// every request.
+// Registration (spec/features/register.md, Register): the administrator
+// form, the vault owner form and what each leaves behind, and the invite
+// staying out of every request.
 // Templates: register.html. Modules: page-register.js, register-form.js,
 // username.js, strength.js, crypto.js, kdf-worker.js, session.js.
 import {

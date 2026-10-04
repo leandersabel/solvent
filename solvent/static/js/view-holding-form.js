@@ -1,5 +1,5 @@
 // The holding form and the archive or delete decision for a holding
-// that already has history (spec/ui/account-form.md).
+// that already has history (spec/features/manage-accounts.md, Account form).
 //
 // Names, notes, labels and unit text are decrypted or server-supplied
 // strings and reach the page through `textContent` only.

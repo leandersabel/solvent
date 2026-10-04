@@ -1,47 +1,231 @@
 # Export / import
 
-## What it does
+The whole vault written to one local file that stays encrypted, and a
+vault restored from such a file. It is a user-held backup and the only
+migration path across data-model upgrades.
 
-Export writes the whole vault — every ciphertext record plus the salt,
-KDF envelope, and wrapped DEK needed to open it — to a single local
-file. The file is fully encrypted; without the password it reveals
-nothing but record counts and types.
+## What the client gets
 
-**It carries both timelines.** Quantities and prices are separate
-records (`record-rate.md`) and both are ordinary vault records, so both
-ride in the same `records` array with no format change and no second
-section. A file missing the price entries would restore a vault whose
-whole history reprices itself, which is the failure storing a price
-permanently exists to prevent.
+Your whole vault downloads into one file on your own machine, and one
+file puts it back. The file is locked with your password from end to
+end. It is fine on a USB stick, an external disk or a cloud drive, and
+worth nothing to anyone who has it without the password.
+
+- **A backup you hold yourself**, independent of your server's own
+  backups, and the way out: you leave with your data without asking
+  anyone.
+- **The way your vault survives an upgrade** that changes how records
+  are shaped. A file written by an older version of the app is brought
+  up to date as it goes back in.
+- **A restore replaces everything**, main currency included, and you are
+  told before you confirm. Your password and login stay as they are.
+- **A file restores into any account on the instance**, given its
+  password, because nothing in it names whose vault it was. A vault
+  moves to a new account or a fresh install unaided, and a backup found
+  by a stranger names nobody.
+- **After a restore, the tab you restored in stays open.** Everywhere
+  else your vault is open, it closes and asks for your password: in the
+  same browser at once, on another device when its page is next used
+  and at the latest when it locks. Unsaved typing there is lost, the
+  screen says so, and nothing entered there reaches the vault.
+
+What it deliberately does not do:
+
+- **No way back in without the password.** Nothing in the file or on
+  the server opens a vault whose password is lost. The file guards
+  against losing the machine, not against forgetting.
+- **No merge.** Combining a file with what is already there needs rules
+  for which copy of a thing wins, and those rules would be wrong in ways
+  nobody notices for a year.
+- **No upload, no sync.** The file is one moment, copied, and the app
+  sends it nowhere.
+- **No partial download.** Both jobs the file does mean the whole vault.
+- **No "do not ask me again"** on the confirmation. It destroys a vault
+  every time.
+- **Nothing reminds you to make a backup**, and no screen shows when
+  you last made one. Every download is one you start, so nothing in the
+  app depends on knowing when one was made.
+
+## Screens
+
+### Export / import
+
+Its own screen on the vault surface, reached from Settings through a row
+reading "Download your vault, or restore one from a file." It does not
+exist for an administrator session (`app-shell.md`, The two surfaces).
+Content max-width 720px, two cards. Neither card treats the file's
+portability as a hazard to warn about.
+
+The delete-my-account dialog's "Export first" (`account-settings.md`,
+Settings) reaches the same export, warning included.
+
+#### Export
+
+- One paragraph on what the file is: every holding, figure and captured
+  price, plus the salt, KDF envelope and wrapped DEK that open it.
+  Encrypted throughout.
+- One line: the file holds **one way in, your password**, and no device,
+  no second method, no recovery key.
+- A Callout with the critical icon (design-system.md, Components),
+  **shown before the download starts, not after**, and never
+  dismissible:
+
+  > This file is exactly as sensitive as your password. Anyone who has
+  > both owns your vault. It stays locked with the password you have
+  > right now, even if you change it later, and if you lose that
+  > password the file is permanently unreadable.
+
+- Primary button "Export vault", **not a link**: it fetches and saves
+  through a blob URL, because the endpoint needs a header a navigation
+  cannot send (Export).
+- Afterwards, in ink-muted: what the file holds by kind, figures and
+  prices both named, and its approximate size.
+
+#### Import
+
+A flow in one card, each step revealed as the previous completes.
+Replace-only, and nothing on the screen may imply a merge exists.
+
+1. **Choose file.** Drag-drop or picker. Validated client-side for size,
+   `format` and `formatVersion` before parse, and refused when it
+   carries no profile record. Nothing is decrypted first.
+2. **Password for that file.** Labeled "The password this file was
+   exported under", never "your password", because they can differ and
+   this is the feature's most confusing point. It decrypts **the profile
+   alone**, all the review needs, so a wrong password is caught before
+   any other record is touched or any request sent.
+3. **Review.** What is in the file, by kind: holdings, recorded figures,
+   captured prices, and the date it was exported, in the date style of
+   the vault that is open. Alongside it, what will be destroyed, in the
+   same kinds and with the total: "Your vault currently holds X records.
+   All of them will be deleted." Both sides read in the same terms,
+   because the step exists to answer what is being traded for what.
+   - Prices get their own line, because this is where a person sees both
+     timelines are in the file before destroying the ones they have.
+   - **A vault holding only its profile is empty here**, because the
+     profile is settings, not anything the person put in. The destroyed
+     side reads "Your vault is empty. Nothing will be deleted." The step
+     still shows, since somebody who believes they have data needs to
+     see that before restoring.
+   - A **different main currency** gets its own line: "This vault is
+     kept in EUR. Yours is currently in CHF." It changes every figure on
+     the dashboard, so it is not something to discover afterwards.
+   - When the file carries an **older `formatVersion`**, one line: "This
+     file was written by an earlier version. It is brought up to date as
+     it goes in." Not a warning, and nothing to decide.
+   - A line that does not apply is left out, never printed as "null".
+4. **Confirm.** The user types `ERASE` and presses the destructive
+   primary button "Replace my vault". Into an empty vault the word is
+   dropped. Every other vault requires it, and no setting turns it off.
+
+Below the flow, what does and does not change:
+
+> Your password stays the same and your login is unaffected. Only the
+> contents of your vault are replaced: your holdings, your history, your
+> main currency, your dimensions and your idle lock all become the
+> file's. Every other tab and window of this browser, and every other
+> device where your vault is open, closes it and asks for your
+> password. Anything typed there and not yet saved is lost. From this
+> moment the two vaults are independent, so anything the file's author
+> records in their own vault afterwards never appears here.
+
+This tab stays open on the restored vault (Populated). What the other
+pages show is `login.md`, Unlock, Replaced elsewhere, and
+`net-worth-view.md`, Dashboard, Replaced since last open.
+
+#### The decryption wait
+
+The re-key (The re-key step) is the longest operation in the product.
+
+- Named phases. "Decrypting 340 of 1 208…" and "Re-encrypting …" each
+  carry determinate progress, because one bar that stalls halfway looks
+  broken. "Uploading" is one request, so it waits without a percentage.
+- It runs in a Worker, and the tab stays responsive.
+- **Nothing is uploaded until every record has decrypted.**
+
+#### At phone width
+
+- The review's two halves stack. What will be destroyed stays above the
+  confirm step either way, so it is never scrolled past.
+- The `ERASE` field and the destructive button sit together, so the
+  word and what it does are on screen at once.
+
+#### States
+
+- **Loading**: export assembles server-side and the button shows a
+  progress state. Import as in The decryption wait.
+- **Empty**: an empty vault exports a file carrying its profile record
+  alone. The button stays enabled and the screen says so: "Your vault is
+  empty, so the file holds its settings and no holdings, figures or
+  prices", followed by the file's size.
+- **Error, export ceiling reached**: the button is disabled with the
+  reason beside it: "You have downloaded your vault several times in the
+  last hour. You can do it again shortly."
+- **Error, export failed**: the button returns to rest, and the message
+  says nothing was written to disk and nothing in the vault changed.
+- **Error, wrong password for the file**: "That password does not open
+  this file." Nothing is uploaded and the vault is untouched. The flow
+  returns to step 2 with the file still selected.
+- **Error, one record fails to decrypt**: the whole import aborts,
+  naming which record: "No records were imported. Your vault is
+  unchanged." A partial restore is worse than none.
+- **Error, malformed JSON, wrong `format`, or a newer `formatVersion`**:
+  refused at step 1 with a clear message. A newer file in an older app
+  is not something to guess at.
+- **Error, oversized file**: refused client-side by its size, before
+  parse, and server-side before any write.
+- **Error, a file with no profile record**: refused at step 1, before
+  any password is asked for: "This file carries no vault settings, so
+  it would restore a vault with no main currency. It cannot be
+  restored."
+- **Error, import failed server-side**: the screen says plainly that the
+  original vault is intact and readable.
+- **Populated**: on success the view reloads in place against the
+  imported data and confirms what was restored, by kind. Where the main
+  currency changed, the confirmation says the figures on screen are now
+  in it.
+
+#### What it deliberately does not show
+
+Beyond what the feature does not do (What the client gets):
+
+- **No control that could be read as a merge.** No "keep what I have",
+  no per-record choice, no preview of what would survive.
+- **No destination picker**, and no hint, reset or recovery route for
+  the file's password.
+- **No identity read off a file**, no username, vault name or device. No
+  step treats a file made by somebody else as suspicious.
+
+## How it works
+
+### What it does
+
+Without the password the file reveals nothing but record counts and
+types (architecture.md, Key management, No password recovery).
+
+**It carries both timelines.** Quantities and prices are both ordinary
+vault records (`record-rate.md`), so both ride in the same `records`
+array with no format change and no second section. A file missing the
+price entries would restore a vault whose whole history reprices
+itself, which is the failure storing a price permanently exists to
+prevent.
 
 **The file carries exactly one wrapper: the password credential's**
-(architecture.md, Credentials and vault key wrappers). Not a list, and never
-a wrapper belonging to another method, because a wrapper bound to an
-authenticator does not travel: a file restored on another machine, or
-after the authenticator is lost, could not use it, and its credential
-id in a file the user may hand to someone else is a device correlator
-sitting in a backup for no benefit. This is the reason the password
-method is mandatory and permanent: it is what makes a vault exportable
-at all.
+(architecture.md, Credentials and vault key wrappers). A wrapper bound
+to an authenticator does not travel to another machine, and its
+credential id in a shared file is a device correlator. The password
+method is what makes a vault exportable at all.
 
-It serves two jobs: a **user-held backup** independent of the host's own
-backups, and the **migration path across data-model upgrades**. It is
-explicitly *not* a password-recovery mechanism (architecture.md, No
-password recovery) and not a sync mechanism.
+### Export
 
-## Export
-
-`GET /api/export` returns a JSON file, `Content-Disposition: attachment`,
-named `solvent-vault-<YYYY-MM-DD>.json`. The name carries no user
-identifier, for the same reason the contents carry none: a file found
-on a lost machine or a shared drive must not say whose vault it is.
-Two vaults exported on one day collide in a downloads folder, and the
-browser's own numbering is the answer to that.
+`GET /api/export` returns a JSON file with `Content-Disposition:
+attachment`, named `solvent-vault-<YYYY-MM-DD>.json`. Two vaults
+exported on one day collide in a downloads folder, and the browser's
+own numbering is the answer to that.
 
 It **requires the `X-Solvent-Request` header** despite being a GET
-(architecture.md, CSRF), so it is not reachable by navigation: the
-client fetches it and saves the response through a blob URL rather than
-pointing an `<a href>` at it. Following the URL directly is a Forbidden.
+(architecture.md, Application hardening, CSRF), so it is not reachable
+by navigation. Following the URL directly is a Forbidden.
 
 ```json
 {
@@ -59,269 +243,287 @@ pointing an `<a href>` at it. Following the URL directly is a Forbidden.
 }
 ```
 
-The file carries **no user identifier**. It does not need one: a
-record's AAD is built from the record's own fields (record-api.md), so
-the ciphertext authenticates without knowing who exported it. This is
-also why the file is portable between accounts at all.
+Neither the file nor its name carries a **user identifier**, because a
+file found on a lost machine or a shared drive must not say whose vault
+it is. The file carries no vault epoch either. A record's AAD is built
+from the record's own fields (`record-api.md`, The AAD encoding), so
+the ciphertext authenticates without knowing who exported it, which is
+what makes the file portable between accounts.
 
-The export screen must state, in plain language and before the download
-starts, that **this file is exactly as sensitive as the password** —
-anyone holding both owns the vault — and that losing the password makes
-the file permanently unreadable.
+### Import: replace-only
 
-## Import: replace-only
+Import **replaces the vault entirely**, with no merge, behind the typed
+`ERASE` when the vault holds records beyond its profile (Screens).
 
-Import **replaces the vault entirely**. There is no merge. The purpose
-is restore and migration, both of which mean "make this vault be what
-the file says," and a merge would need conflict rules that would be
-mostly untested and quietly wrong.
-
-If the target vault holds records beyond its profile, the user must
-type `ERASE` to confirm, against a dialog stating exactly how many
-records will be destroyed. A vault holding only its profile counts as
-empty (Edge cases).
-
-### The re-key step
+#### The re-key step
 
 Records are decrypted and re-encrypted client-side under a **freshly
 generated DEK** rather than restored verbatim under the file's key.
 
-A vault transfer leaves two accounts holding the same DEK: the exporter
-keeps their vault and keeps writing to it, and the importer now holds a
-key that opens those writes. A malicious or compromised server could
-then inject the exporter's *later* records into the importer's vault,
-where they would decrypt cleanly — data the exporter never handed over.
-Re-keying makes the two vaults share no key material at all, so the
-injection fails at the cryptography rather than at a check.
+A verbatim restore leaves two accounts holding one DEK, so a
+compromised server could inject the exporter's *later* records into the
+importer's vault, where they decrypt cleanly. Re-keying leaves the two
+vaults no shared key material, so that fails at the cryptography rather
+than at a check.
 
-1. User, logged in as the target account, selects the file and enters
-   **the password that vault was exported under** (which may differ from
-   their current one).
-2. Client derives `MK_file` from the file's salt + KDF envelope and
-   unwraps `DEK_file`.
-3. Client decrypts every record using `DEK_file` and the record's own
-   AAD, built from its per-record fields. Any failure aborts the whole
-   import before anything is sent.
-4. Client generates a **new random 256-bit `DEK_new`**, and re-encrypts
-   each record under it with a fresh nonce. `version` resets to 1, and
-   the AAD is rebuilt for that version.
-5. Client wraps `DEK_new` under the **current session's Master Key** —
-   so the user's existing login password keeps working after the import.
-6. `POST /api/import` with the new wrapped DEK and the re-encrypted
-   records, carrying the page's vault epoch like every vault request.
-   The server, in one transaction begun with `BEGIN IMMEDIATE`, checks
-   that epoch is still the vault's, deletes every record belonging to
-   the session user, replaces their `password` credential's wrapper,
-   inserts the new set, and **replaces the vault epoch** with a fresh
-   one (architecture.md, Vault epoch). It answers OK
-   `{ records, vaultEpoch }`: the count it stored and the new epoch.
-   No session is revoked.
-7. Client swaps its in-memory DEK to `DEK_new` and its epoch to the new
-   one, posts `{"replaced":"<the old epoch>"}` on the vault channel
-   (login.md, A vault replaced elsewhere), and reloads the view. **The
-   restoring page stays open.** Every other page where the vault is
-   open closes it: at once in this browser, and elsewhere at its next
-   request, when it comes back into view, or at its next sign-in.
+1. The user, signed in as the target account, selects the file and
+   enters **the password that vault was exported under**.
+2. The client derives `MK_file` from the file's salt and KDF envelope
+   and unwraps `DEK_file`.
+3. The client decrypts every record with `DEK_file` and the record's
+   own AAD. Any failure aborts the whole import before anything is
+   sent.
+4. The client generates a **new random 256-bit `DEK_new`** and
+   re-encrypts each record under it with a fresh nonce. `version` resets
+   to 1, and the AAD is rebuilt for that version.
+5. The client wraps `DEK_new` under the **current session's Master
+   Key**, so the login password keeps working. Salt, KDF envelope and
+   Auth Key are untouched.
+6. `POST /api/import` carries the new wrapped DEK and the re-encrypted
+   records, with the page's vault epoch like every vault request. In one
+   transaction begun with `BEGIN IMMEDIATE`, the server checks that
+   epoch is still the vault's, deletes every record of the session user,
+   replaces their `password` credential's wrapper, inserts the new set,
+   and **replaces the vault epoch** with a fresh one. It answers OK
+   `{ records, vaultEpoch }`: the count it stored and the new epoch. No
+   session is revoked and no cookie rotates (architecture.md, Vault
+   epoch).
+7. The client swaps its in-memory DEK to `DEK_new` and its epoch to the
+   new one, posts `{"replaced":"<the old epoch>"}` on the vault channel
+   (`login.md`, A vault replaced elsewhere), and reloads the view. **The
+   restoring page stays open.** Every other page closes the vault at
+   once in this browser, and elsewhere at its next request, when it
+   comes back into view, or at its next sign-in.
 
-**Import is the one flow that changes the DEK, so it is the one flow
-bound by the rewrite-every-wrapper rule** (architecture.md, One key, N
-wrappers). Every credential the vault holds must end this
-transaction wrapping `DEK_new`, and any method the importing session
-cannot re-wrap is **deleted in that same transaction**, never left
-behind. In v1 this costs nothing, because the password
-method is the only one and the importing session is holding its Master
-Key by definition.
+**Import is the one flow that changes the DEK**, so the
+rewrite-every-wrapper rule binds it (architecture.md, Key management,
+One key, N wrappers). A method the importing session cannot re-wrap is
+**deleted in the same transaction**, because a stale wrapper is worse
+than a missing one. With password the only method, this costs nothing.
 
-**The profile record is replaced along with everything else**, so the
-main currency, dimensions, and idle-lock setting all become the file's.
-That is the one sanctioned way the main currency changes
-(`account-settings.md`, Main currency): import replaces the history
-too, so every price entry's `rateTarget` matches the profile it
-arrived with. The import review step names the change when the file's
-main currency differs from the current one, because arriving at a
-vault denominated in another currency without being told is a bad
-surprise even when it is correct.
+**The profile record is replaced with everything else**, so main
+currency, dimensions and idle lock become the file's. It is the one
+sanctioned way the main currency changes (`account-settings.md`, Main
+currency), because the history arrives with it and every price entry's
+`rateTarget` matches the profile it came with.
 
-Consequences: the user's **password does not change** across an import,
-but their **DEK does** — and it is a key that has never existed anywhere
-before, not the file's. Salt, KDF envelope, and Auth Key are untouched.
-The exported file keeps opening with `DEK_file` and its own password;
-re-keying the live vault does not reach backwards into files already
+The exported file keeps opening with `DEK_file` and its own password,
+because re-keying the live vault does not reach back into files already
 written.
 
-## Rules
+### Rules
 
 - The server assigns `principal_id` from the session on every imported
-  record. It never reads a `principalId` from the uploaded payload, so
-  one account's import can never write into another's vault. Export and import are both
-  on the vault surface, so an administrator session receives Not Found
+  record and never reads a `principalId` from the payload, so one
+  account's import can never write into another's vault. Both routes
+  are on the vault surface, so an administrator session gets Not Found
   from either (`app-shell.md`, The two surfaces).
-- Strict server-side validation before any write: total payload size
-  cap, per-record ciphertext size cap, record count cap, known
-  `recordType` values, well-formed UUIDs, base64 decodes cleanly,
-  `accountId` present exactly for `snapshot` records and `null` for
-  every other type, never `""` (record-api.md), and referencing an
-  `account` record in the same import.
+- Strict server-side validation before any write: total payload size,
+  per-record ciphertext size and record count caps (architecture.md,
+  Storage & data handling), known `recordType` values, well-formed
+  UUIDs, base64 that decodes cleanly, and `accountId` set exactly for
+  `snapshot` records, referencing an `account` record in the same
+  import, and `null` for every other type, never `""`.
 - **Every record goes through the same per-record validator as
-  `PUT /api/records`** (record-api.md), field-consistency check
-  included, so there is one set of rules with two callers. That
-  validator also enforces `version: 1` on every imported record rather
-  than trusting the client to have reset it at step 4 — a record
-  arriving at any other version is a Bad Request for the whole payload.
-- Client-side validation mirrors this so a bad file fails fast without
+  `PUT /api/records`** (`record-api.md`), field-consistency check
+  included, so there is one set of rules with two callers. It also
+  enforces `version: 1` on every imported record rather than trusting
+  the client's step 4. A record at any other version is a Bad Request
+  for the whole payload.
+- Client-side validation mirrors this, so a bad file fails fast without
   a large upload.
-- The import is one transaction. A failure at any point leaves the
-  existing vault exactly as it was — never half-erased.
-- **No page still holding `DEK_old` reads or writes after the import
-  commits.** Such a page, another tab of this browser included, which
-  shares the importing session's cookie, would otherwise store a create
-  under a key no longer in the envelope, a permanently unreadable
-  record. Its delete or purge would remove a restored record, because
-  import keeps record ids. The vault epoch refuses all of it, and a
-  request racing the import loses whichever commits first
-  (architecture.md, Vault epoch).
-- **Export reads the vault epoch, the credential's `params`, the
-  wrapper and every record in one transaction**, so an import landing
+- The import is one transaction. A failure at any point leaves the vault
+  exactly as it was, never half-erased, and a tab closed mid-import
+  leaves no partial state to recover from.
+- **Export reads the vault epoch, the credential's `params`, the wrapper
+  and every record in one transaction**, so an import landing
   mid-export cannot produce a file whose wrapper does not open its
   records. An export the epoch refuses writes no `attempts` row.
-- Export is rate-limited per user — **default 5 per hour**, operator
-  config (architecture.md, Rate limiting). It is a full vault read, and
-  nobody backs up five times an hour.
+- Export is rate-limited per user, **default 5 per hour**, operator
+  config `EXPORTS_PER_USER_HOUR` (architecture.md, Application
+  hardening, Rate limiting), because it is a full vault read and nobody
+  backs up five times an hour.
 
 ## Edge cases
 
-- **Import into a vault that already has data** → typed `ERASE`
-  confirmation naming the record count to be destroyed. No merge option
-  is offered.
-- **Wrong password for the export file** → DEK unwrap fails; abort with
-  "That password does not open this file." Nothing is uploaded, the
-  existing vault is untouched.
-- **One record fails to decrypt** → abort the entire import and report
-  which record. A partial restore is worse than none.
-- **Malformed JSON, wrong `format`, or unknown `formatVersion`
-  (newer)** → reject with a clear message. A newer file in an older app
-  is not something to guess at.
-- **There is no `formatVersion` below 1.**
-- **Older `formatVersion`** → migrate the plaintext shape client-side
-  after decryption, before re-encrypting, reusing the same per-type
-  migration chain the client already applies lazily on read
-  (`record-api.md`, Schema migration). Each supported old version needs
-  an explicit migration path and a test with a real fixture file. There
-  is exactly one set of migration functions in the product, and a
-  second, import-only copy would drift.
-- **Oversized file** → rejected client-side by size before parse, and
-  server-side before write.
-- **Import of a vault exported by a different user** → works. It is a
-  vault transfer, and it requires that vault's password. After it, the
-  two vaults share no key material, so the source's later writes cannot
-  be injected into the destination.
-- **Export of an empty vault** → valid. A registered vault always holds
-  its profile record, so the file carries that one record.
-- **Import into a vault holding only its profile** → the vault counts
-  as empty. The review says nothing will be deleted and no `ERASE` is
-  asked for, because the profile is the vault's settings rather than
-  anything the person put in it.
-- **A file with no profile record** → refused before anything is
-  decrypted, because it would restore a vault with no main currency.
-- **Browser tab closed mid-import** → the transaction either committed
-  or it did not; there is no partial state to recover from.
-- **Two pages restore at once** → the later import answers Conflict
-  `{"refused":"vault-replaced"}` and writes nothing, and that page
-  closes the vault (login.md, A vault replaced elsewhere).
-- **The import committed and its answer was lost** → the restoring page
+The refusals a person meets on the screen are under Screens, States.
+There is no `formatVersion` below 1.
+
+- **Older `formatVersion`**: the plaintext shape migrates client-side
+  after decryption and before re-encryption, through the same per-type
+  migration chain the client applies lazily on read (`record-api.md`,
+  Schema migration). Each supported old version needs an explicit
+  migration path and a test with a real fixture file. There is exactly
+  one set of migration functions in the product, because an import-only
+  copy would drift.
+- **Two pages restore at once**: the later import answers Conflict
+  `{"refused":"vault-replaced"}` and writes nothing, and that page closes
+  the vault (`login.md`, A vault replaced elsewhere).
+- **The import committed and its answer was lost**: the restoring page
   still holds the old epoch, so its next request answers
-  `vault-replaced` and it closes the vault. Unlocking with the
-  unchanged password opens the restored vault.
-- **Another page saves while the import runs** → the save commits
-  before the import and is replaced with everything else, or answers
-  `vault-replaced` and writes nothing.
-- **KDF envelope in the file is below the server minimum** → the import
-  still succeeds (the file's envelope is only used to open the file; the
-  vault's own envelope is the current account's, unchanged).
+  `vault-replaced` and it closes the vault. Unlocking with the unchanged
+  password opens the restored vault.
+- **Another page saves while the import runs**: the save commits first
+  and is replaced with everything else, or answers `vault-replaced` and
+  writes nothing (architecture.md, Vault epoch).
+- **The file's KDF envelope is below the server minimum**: the import
+  still succeeds. The file's envelope only opens the file, and the
+  vault's own envelope stays the account's.
 
 ## Acceptance criteria
 
-- Export → wipe the vault → import round-trips to an identical set of
-  decrypted records: same ids, types, `account_id` links, and plaintext
-  payloads, for quantities and prices alike.
-- A vault exported and reimported draws a byte-identical chart and the
-  same total in both pricing modes (`net-worth-view.md`), which is the
-  test that fails if either timeline is dropped.
-- The exported file contains no plaintext holding name, note, dimension
-  label, value, rate, symbol, date, or currency, verified by scanning
-  the file for known values.
-- After importing, the user logs in with their **unchanged** password
-  and can read every restored record.
-- Importing a file exported by a *different* user succeeds, and every
-  record decrypts afterwards.
-- After an import, the vault's wrapped DEK unwraps to a key that is not
-  the file's `DEK_file` — asserted directly, since a verbatim restore
-  would pass every other test in this list.
-- A record taken from the *source* vault after the export, and inserted
-  directly into the destination's rows, fails to decrypt. This is the
-  regression test for the re-key: it passes only because the two vaults
-  hold different DEKs.
-- The exported file still opens with its original password after the
-  source vault has been re-keyed by an unrelated import.
-- No exported file contains a user identifier in any field.
-- An exported file carries exactly one wrapper, and no field that
-  names, counts, or describes a credential.
-- An import replaces `wrapped_dek` and `dek_nonce` on the `password`
-  credential's `dek_wrappers` row and leaves that credential's `params`
-  and `verifier` byte-identical: the salt, the KDF envelope, and the
-  Auth Key hash all survive an import, and the user logs in afterwards
-  with the unchanged password.
-- A file with one record's ciphertext altered by a single byte aborts
-  the import, uploads nothing, and leaves the pre-existing vault intact.
-- Importing with the wrong password aborts before any request is sent.
-- A `POST /api/import` payload carrying a `principalId` field, at the
-  top level or on a record, is refused whole with Bad Request, and
-  neither the session user's vault nor the named user's changes
-  (`record-api.md`, Rules).
-- A file with no profile record is refused before any record is
-  decrypted and before any request is sent.
-- Importing into a vault holding only its profile says nothing will be
-  deleted and asks for no `ERASE`.
-- Importing into a non-empty vault without the typed `ERASE`
-  confirmation is refused.
-- Simulating a DB failure mid-import leaves the original vault fully
-  intact and readable.
-- Payloads over the size cap, over the record-count cap, or with an
-  unknown `recordType` are rejected before any write.
-- A payload with one record at `version: 2`, or one `snapshot` whose
-  `accountId` names no `account` record in the same payload, is
-  rejected whole —
-  the same validator `PUT /api/records` runs.
-- Every record in the vault reads `version: 1` after an import.
-- **The issue's two pages.** Pages A and B of one browser context are
-  unlocked on one vault, sharing one session. A restores a file. B
-  never gets to save a holding, and a create, an update, a delete and a
-  purge sent with B's epoch on the shared cookie each answer Conflict
-  `{"refused":"vault-replaced"}`. Reloading A and unlocking shows every
-  restored record and no record that cannot be read.
-- After an import, a second session of the importing user still exists.
-  Its next request carrying the old epoch answers Conflict
-  `{"refused":"vault-replaced"}`, and a create, an update, a delete and
-  a purge it sends each leave the vault's records exactly the imported
-  set.
-- The import answers `vaultEpoch` as 32 lowercase hex characters,
-  equal to the account's `vault_epochs` row afterwards and different
-  from the epoch before.
-- An import carrying a replaced epoch answers Conflict
-  `{"refused":"vault-replaced"}` and leaves `records`, `dek_wrappers`
-  and `vault_epochs` row for row as they were. Of two imports sent with
-  the same epoch, exactly one commits.
-- An import refused for any other reason, or failing mid-transaction,
-  leaves the vault epoch as it was.
-- An export carrying a replaced epoch answers Conflict
-  `{"refused":"vault-replaced"}` and writes no `attempts` row.
-- A fixture file at `formatVersion: 1` still imports after the format
-  advances to 2.
-- The export screen shows the sensitivity warning before the download is
-  triggered, not after.
-- `GET /api/export` as a plain top-level navigation returns Forbidden
-  and writes no file, with a valid session cookie present — the
-  regression test for the header requirement.
-- An export over the per-user limit returns Too Many Requests and
-  writes no `attempts` row, so the limit lifts an hour after the oldest
-  export it let through, however often the client retried.
+1. (blind) Export, wipe, import restores the same ids, types, `account_id`
+   links and decrypted payloads, figures and prices alike. Test:
+   `tests/browser/parts/export-import.mjs`.
+2. (blind) A reimported vault draws a byte-identical chart and the same
+   total in both pricing modes (`net-worth-view.md`), which fails if
+   either timeline is dropped. Test:
+   `tests/browser/parts/export-import.mjs`.
+3. An export carries profile, account, snapshot and rate records in one
+   `records` array. Test:
+   `tests/test_transfer.py::test_the_export_carries_both_timelines_and_one_wrapper`.
+4. (blind) A scan of the file's actual bytes finds no plaintext holding
+   name, note, dimension label, value, rate, symbol, date or currency.
+   Test: `tests/browser/parts/export-import.mjs`.
+5. No field of an exported file holds a user identifier. Test:
+   `tests/test_transfer.py::test_the_exported_file_carries_no_user_identifier`.
+6. (blind) The `Content-Disposition` header, not the saved name, names a
+   dated file and no user. Test:
+   `tests/test_transfer.py::test_the_export_filename_is_dated_and_names_nobody`.
+7. An exported file carries exactly one wrapper and no field that names,
+   counts or describes a credential. Test:
+   `tests/test_transfer.py::test_the_export_carries_exactly_one_wrapper_and_nothing_describing_a_credential`.
+8. An empty vault exports a valid file holding its profile alone. Test:
+   `tests/test_transfer.py::test_an_empty_vault_exports_a_file_with_only_its_profile`.
+9. After an import the unchanged password signs in and every restored
+   record reads. Test: `tests/browser/parts/export-import.mjs`.
+10. A file exported by a different user imports, and every record
+    decrypts. Test: `tests/browser/parts/export-import.mjs`.
+11. (blind) After an import the stored wrapper unwraps to a key that is
+    not the file's `DEK_file`, asserted directly, since a verbatim restore
+    passes every other criterion. Test:
+    `tests/browser/parts/export-import.mjs`.
+12. (blind) A record the source vault writes after the export, inserted
+    straight into the destination's rows, fails to decrypt. Test:
+    `tests/browser/parts/export-import.mjs`.
+13. The exported file still opens with its own password after its vault is
+    re-keyed by an import. Test:
+    `tests/test_client.py::test_the_client_side_rules_hold`,
+    `tests/browser/parts/export-import.mjs`.
+14. (blind) An import replaces `wrapped_dek` and `dek_nonce` and leaves
+    the credential's `params` and `verifier` byte-identical, compared
+    field by field, since a rewritten envelope under the same password
+    also signs in. Test:
+    `tests/test_transfer.py::test_import_replaces_the_wrapper_and_leaves_the_credential_untouched`.
+15. One byte altered in one record's ciphertext aborts the import, names
+    the record, uploads nothing and leaves the vault intact. Test:
+    `tests/test_client.py::test_the_client_side_rules_hold`,
+    `tests/browser/parts/export-import.mjs`.
+16. A wrong password for the file aborts before any request is sent, with
+    the file still chosen. Test:
+    `tests/test_client.py::test_the_client_side_rules_hold`,
+    `tests/browser/parts/export-import.mjs`.
+17. A `principalId` field at the top level or on a record refuses the
+    whole import with Bad Request, and neither vault changes. Test:
+    `tests/test_transfer.py::test_a_principal_id_in_the_payload_is_refused_whole_and_neither_vault_changes`.
+18. Imported records land under the session user. Test:
+    `tests/test_transfer.py::test_imported_records_land_under_the_session_user`.
+19. A file with no profile record is refused before decryption, before a
+    password is asked for and before any request. Test:
+    `tests/test_client.py::test_the_client_side_rules_hold`,
+    `tests/browser/parts/export-import.mjs`.
+20. A file that is not JSON, has the wrong `format` or a newer
+    `formatVersion`, or is oversized, is refused at the first step. Test:
+    `tests/test_client.py::test_the_client_side_rules_hold`,
+    `tests/browser/parts/export-import.mjs`.
+21. Into a vault holding only its profile, the review says nothing will be
+    deleted and asks for no `ERASE`. Test:
+    `tests/browser/parts/export-import.mjs`.
+22. Into a non-empty vault, an import without the typed `ERASE` is refused
+    and changes nothing. Test: `tests/browser/parts/export-import.mjs`.
+23. The review sets the file against what will be deleted, in the same
+    kinds, prices on their own line. Test:
+    `tests/browser/parts/export-import.mjs`.
+24. The review names a main currency that differs from the vault's. Test:
+    `tests/browser/parts/export-import.mjs`.
+25. The review says so when the file carries an older `formatVersion`.
+    Test: no test.
+26. A DB failure mid-import leaves the original vault intact and readable,
+    and the screen says so. Test:
+    `tests/test_transfer.py::test_a_fault_mid_import_leaves_the_original_vault_intact`,
+    `tests/browser/parts/export-import.mjs`.
+27. A payload over the total size cap or the record-count cap is refused
+    before any write. Test:
+    `tests/test_transfer.py::test_a_payload_over_the_total_size_cap_is_refused_before_any_write`,
+    `tests/test_transfer.py::test_a_payload_over_the_record_count_cap_is_refused`.
+28. A payload with an unknown `recordType` is refused before any write.
+    Test:
+    `tests/test_transfer.py::test_an_unknown_record_type_is_rejected_before_any_write`.
+29. A payload with one record at `version: 2` is refused whole. Test:
+    `tests/test_transfer.py::test_a_record_at_any_version_but_one_is_rejected_whole`.
+30. A payload with a `snapshot` whose `accountId` names no `account` in
+    the payload is refused whole. Test:
+    `tests/test_transfer.py::test_a_snapshot_naming_no_account_in_the_same_payload_is_rejected_whole`.
+31. Every record reads `version: 1` after an import. Test:
+    `tests/test_transfer.py::test_import_replaces_the_vault_entirely`,
+    `tests/browser/parts/export-import.mjs`.
+32. (blind) Pages A and B of one browser share a cookie and A restores. B
+    never saves a holding, its create, update, delete and purge each
+    answer Conflict `{"refused":"vault-replaced"}`, and A unlocked shows
+    every restored record and none unreadable. Test:
+    `tests/test_vault_epoch.py::test_a_page_holding_the_replaced_key_never_reaches_the_vault`,
+    `tests/browser/parts/export-import.mjs`.
+33. (blind) A second session of the importing user still exists after an
+    import, never Unauthorized. Its create, update, delete and purge with
+    the old epoch each answer Conflict `{"refused":"vault-replaced"}` and
+    leave the imported set. Test:
+    `tests/test_vault_epoch.py::test_a_second_session_with_the_old_epoch_writes_nothing`,
+    `tests/test_transfer.py::test_import_revokes_no_session`.
+34. (blind) The restoring page stays open holding the new epoch and
+    `DEK_new`, and posts the old epoch on the vault channel once. Test:
+    `tests/browser/parts/export-import.mjs`.
+35. (blind) The import answers `vaultEpoch` as 32 lowercase hex
+    characters, equal to the `vault_epochs` row afterwards and different
+    from the one before. Test:
+    `tests/test_vault_epoch.py::test_the_next_sign_in_after_an_import_carries_the_new_epoch`.
+36. (blind) An import with a replaced epoch answers Conflict
+    `{"refused":"vault-replaced"}` and leaves `records`, `dek_wrappers`
+    and `vault_epochs` row for row. Test:
+    `tests/test_vault_epoch.py::test_an_import_with_a_replaced_epoch_writes_nothing`.
+37. (blind) Of two imports sent at once with one epoch, exactly one
+    commits. A serial test cannot show it. Test:
+    `tests/test_vault_epoch.py::test_of_two_imports_with_one_epoch_exactly_one_commits`.
+38. (blind) An import refused for another reason, or failing
+    mid-transaction, leaves the epoch as it was. Test:
+    `tests/test_vault_epoch.py::test_an_import_refused_for_another_reason_leaves_the_epoch`,
+    `tests/test_vault_epoch.py::test_a_fault_mid_import_leaves_the_epoch`.
+39. (blind) An export with a replaced epoch answers Conflict
+    `{"refused":"vault-replaced"}` and writes no `attempts` row, also when
+    the import lands between the gate and the export's transaction. Test:
+    `tests/test_vault_epoch.py::test_an_export_with_a_replaced_epoch_is_refused_and_writes_no_attempt`,
+    `tests/test_vault_epoch.py::test_an_import_between_the_gate_and_the_export_leaves_no_attempt_row`.
+40. (blind) An import landing mid-export cannot produce a file whose
+    wrapper does not open its records. Test: no test.
+41. (blind) The checked-in `formatVersion: 1` fixture, never regenerated,
+    still imports after the format advances. Test:
+    `tests/test_client.py::test_the_client_side_rules_hold`.
+42. The sensitivity warning is on screen before the download is triggered.
+    Test: `tests/browser/parts/export-import.mjs`.
+43. (blind) A top-level navigation to `GET /api/export` with a valid
+    session cookie is Forbidden and writes no file. Test:
+    `tests/test_guard.py::test_export_requires_the_header_despite_being_a_get`,
+    `tests/browser/parts/export-import.mjs`.
+44. (blind) Over the per-user limit, export answers Too Many Requests and
+    writes no `attempts` row however often it is retried, so the limit
+    lifts an hour after the oldest export let through. Test:
+    `tests/test_transfer.py::test_a_refused_export_writes_no_row_and_the_limit_lifts_an_hour_after_the_oldest`.
+45. At the export ceiling the button is disabled with the reason beside
+    it. Test: `tests/browser/parts/export-import.mjs`.
+46. An administrator session gets Not Found from export and import. Test:
+    `tests/test_transfer.py::test_an_administrator_reaches_neither_export_nor_import`.
+47. After a restore another tab of the browser closes the vault before
+    sending a request, holds no key, and says typed input was lost. Test:
+    `tests/browser/parts/export-import.mjs`.
+48. A file already downloaded opens with its own password after a password
+    change, and the change-password screen says so. Test:
+    `tests/browser/parts/settings.mjs`.

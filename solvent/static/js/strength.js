@@ -1,5 +1,5 @@
 // The password bar: at least twelve characters and a zxcvbn score of
-// at least three (spec/ui/register.md, The strength gauge).
+// at least three (spec/features/register.md, Register, The strength gauge).
 //
 // Both are enforced in the browser, because the server never sees the
 // password and cannot check it. The bar reads as a magnitude rather

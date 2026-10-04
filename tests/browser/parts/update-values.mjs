@@ -1,6 +1,6 @@
-// Update values, the sweep (spec/ui/update-values.md): one date, every
-// holding on one screen, with the rate lines beneath it, for a recording
-// being made and one being reopened.
+// Update values, the sweep (spec/features/record-snapshot.md, Update
+// values): one date, every holding on one screen, with the rate lines
+// beneath it, for a recording being made and one being reopened.
 // Templates: dashboard.html. Modules: view-sweep.js, writes.js, model.js,
 // api.js, decimal.js, format.js, datepicker.js.
 import {

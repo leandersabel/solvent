@@ -1,6 +1,5 @@
 """Template context for the authenticated chrome
-(spec/ui/design-system.md, App shell; spec/features/app-shell.md, The
-chrome).
+(spec/features/app-shell.md, The chrome).
 
 No routes of its own. Every authenticated screen is another feature's
 blueprint whose templates extend `templates/shell/base.html`.
@@ -29,7 +28,7 @@ ALPINE_SRI = "sha384-MKLWq9B+VC0W3U8kDIBEsSu8uCnQ1B0UQpRaB+F7uR5ocXFbymMUKuLRntu
 # vault, so a vault owner has nowhere administrative to go.
 # In-page addresses, because the vault surface is one page: the keys
 # live in its memory and a page load would charge the Argon2id
-# derivation again (ui/unlock.md). Both are real addresses on the
+# derivation again (login.md, Unlock). Both are real addresses on the
 # server too, and either one typed or bookmarked lands here.
 NAV_ENTRIES: "tuple[dict, ...]" = (
     {"label": "Dashboard", "href": "#/"},

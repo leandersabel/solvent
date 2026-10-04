@@ -1,9 +1,9 @@
 """SECRET_KEY startup rule (spec/features/app-shell.md, Configuration,
 Edge cases, Acceptance criteria).
 
-The compiled contract calls for a process-launch harness here, not a
-unit test of the config-loading function in isolation
-(spec/.compiled/app-shell.json, verify.focus): a unit test could pass
+The criterion is blind (spec/features/app-shell.md, Acceptance
+criteria) and needs a process-launch harness, not a unit test of the
+config-loading function in isolation: a unit test could pass
 while `create_app`/`app.py` still swallowed the error and started
 anyway. The `load_config` tests check the message, and the subprocess
 tests are the ones that exercise "the app does not start".

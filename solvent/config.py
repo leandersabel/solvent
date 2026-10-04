@@ -2,7 +2,7 @@
 Configuration; spec/architecture.md, Tech stack, Container hardening).
 
 Every operator-tunable number lives here with the default the spec
-names. What the spec pins as a compiled-contract parameter -- the
+names. What the spec fixes instead of leaving to the operator -- the
 storage caps, the KDF envelope -- is a constant instead, because a
 boundary that moves per deployment is one the acceptance tests cannot
 state (architecture.md, Storage & data handling).

@@ -69,8 +69,9 @@ const isReplaced = (error) => error.status === 409 && error.body?.refused === 'v
 
 // A session that ran out mid-action answers Unauthorized, and the vault
 // asks for the password again rather than losing what was typed
-// (spec/ui/unlock.md, States). A wrong password at sign-in answers
-// Unauthorized too, which is that screen's own answer and not this.
+// (spec/features/login.md, Unlock, States). A wrong password at sign-in
+// answers Unauthorized too, which is that screen's own answer and not
+// this.
 let unauthorized = () => {};
 
 export function whenUnauthorized(listener) {

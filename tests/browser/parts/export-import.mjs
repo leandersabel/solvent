@@ -1,7 +1,7 @@
-// Export and import (spec/ui/export-import.md): the vault written to a
-// file that opens with its own password, and restored from one, into the
-// same vault, an empty one or another person's, with every refusal on
-// the way.
+// Export and import (spec/features/export-import.md, Export / import): the
+// vault written to a file that opens with its own password, and restored
+// from one, into the same vault, an empty one or another person's, with
+// every refusal on the way.
 // Templates: dashboard.html. Modules: page-transfer.js, transfer.js,
 // transfer-worker.js, api.js, crypto.js, session.js, format.js.
 import {

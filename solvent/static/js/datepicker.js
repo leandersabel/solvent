@@ -1,4 +1,4 @@
-// A date field in the reader's own format (spec/ui/design-system.md,
+// A date field in the reader's own format (spec/design-system.md,
 // Date field).
 //
 // Not `input type=date`: that control is written in the browser's

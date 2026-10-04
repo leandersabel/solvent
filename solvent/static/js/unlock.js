@@ -1,5 +1,5 @@
 // The one sign-in card, at one address, for both kinds of account
-// (spec/ui/unlock.md).
+// (spec/features/login.md, Unlock).
 //
 // It looks and behaves identically for both until a correct password
 // has been given: same fields, same wording, same button, same wait,
