@@ -1,6 +1,6 @@
-// The dashboard (spec/ui/dashboard.md): the total, the chart, the table of
-// holdings and what the screen says of a vault that holds two entries for
-// one date.
+// The dashboard (spec/features/net-worth-view.md, Dashboard): the total,
+// the chart, the table of holdings and what the screen says of a vault
+// that holds two entries for one date.
 // Templates: dashboard.html. Modules: view-dashboard.js, chart.js, model.js,
 // format.js, decimal.js.
 import {

@@ -1,4 +1,5 @@
-// One date, and everything recorded at it (spec/ui/recording-detail.md).
+// One date, and everything recorded at it
+// (spec/features/record-snapshot.md, Recording detail).
 //
 // It is for looking. Opening it issues no write and no price request,
 // however old the day is, because a screen that repriced March by
@@ -114,8 +115,8 @@ function priceRow(vault, entry, onChanged) {
 }
 
 /** The fault named, and the one way out of it: keeping this entry
- *  deletes the others for its date (recording-detail.md, Error, two
- *  entries at this date). */
+ *  deletes the others for its date (record-snapshot.md, Recording detail,
+ *  two entries at this date). */
 function keepCell(vault, rivals, note, onChanged) {
   if (!rivals.length) return el('td', {});
   return el('td', {}, [

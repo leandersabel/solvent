@@ -400,7 +400,7 @@ export const enterPasswordOn = async (session, password) => {
 export const HANDS = `{ 'X-Solvent-Request': '1', 'X-Solvent-Vault': (await import('/static/js/api.js')).vaultEpoch() }`;
 
 // The settled computed look of the dialog button `label` on `session`,
-// read against the design tokens (design-system.md, Buttons): whether it
+// read against the design tokens (design-system.md, Components): whether it
 // wears the disabled look (petrol-200 fill and border, ink-secondary
 // label, opacity 1), and whether any red shows on it.
 export const confirmLook = (label, session = page) =>
@@ -610,7 +610,7 @@ export const sitting = async (session, name) =>
 // in the DOM: a bar with `hidden` is present and not drawn. Outside the
 // shell (password and registration screens) there is no top bar, no
 // navigation, no Update values and no Lock, only the wordmark above the
-// card (product/app-shell.md, What must be true).
+// card (app-shell.md, Acceptance criteria).
 export const chromeState = async (session) =>
   JSON.parse(await session.eval(`(() => {
     const shown = (n) => n.getClientRects().length > 0 && getComputedStyle(n).visibility !== 'hidden';

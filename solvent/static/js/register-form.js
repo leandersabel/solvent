@@ -1,5 +1,5 @@
 // The registration form, for whichever kind the invite calls for
-// (spec/ui/register.md).
+// (spec/features/register.md, Register).
 //
 // The invite decides which of two forms renders. Nothing on either
 // form lets the person choose which kind of account they are making,

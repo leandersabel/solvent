@@ -1,6 +1,6 @@
-// Dimensions (spec/ui/dimensions.md): creating, renaming, reordering,
-// archiving and restoring the axes holdings are classified along, and
-// what each operation writes.
+// Dimensions (spec/features/account-settings.md, Dimensions): creating,
+// renaming, reordering, archiving and restoring the axes holdings are
+// classified along, and what each operation writes.
 // Templates: dashboard.html. Modules: view-dimensions.js, view-settings.js,
 // view-dashboard.js, writes.js, model.js, dom.js.
 import {

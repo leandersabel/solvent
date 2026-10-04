@@ -1,5 +1,5 @@
 // How figures and dates are written for one reader
-// (spec/ui/settings.md, Dates and numbers).
+// (spec/features/account-settings.md, Settings, Dates and numbers).
 //
 // The locale supplies defaults and the reader overrides what they
 // care about, because a locale is a coarse guess about taste: a Swiss

@@ -1,5 +1,5 @@
 /* Design tokens, app-shell chrome and every screen's styles
-   (spec/ui/design-system.md). The one stylesheet every page links. */
+   (spec/design-system.md). The one stylesheet every page links. */
 
 /* Before everything else. The UA rule behind the `hidden` attribute is
    a bare `display: none`, which any later rule setting a display wins
@@ -2060,9 +2060,10 @@ select {
 /* ---- The holding form ---- */
 
 /* The unit picker: a list that filters as you type, grouped by kind,
-   with its foot option opening the free-text field (account-form.md,
-   design-system.md, Combobox, searchable). One full-height list at
-   every width, so nothing about an option needs hover to be read. */
+   with its foot option opening the free-text field (manage-accounts.md,
+   Account form, and design-system.md, Combobox, searchable). One
+   full-height list at every width, so nothing about an option needs
+   hover to be read. */
 .unit-list {
   list-style: none;
   margin: 6px 0 0;

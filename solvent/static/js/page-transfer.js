@@ -1,4 +1,4 @@
-// Export and import (spec/ui/export-import.md).
+// Export and import (spec/features/export-import.md, Export / import).
 //
 // The file names nobody and opens with its own password, so it moves:
 // to a new machine, to a fresh install, or into another person's

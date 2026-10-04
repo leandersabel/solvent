@@ -1,5 +1,5 @@
 // The single-holding value form and the prompts it raises
-// (spec/ui/snapshot-entry.md).
+// (spec/features/record-snapshot.md, Snapshot entry).
 import * as decimal from './decimal.js';
 import * as writes from './writes.js';
 import { dialog, el, mount, resumable, today } from './dom.js';
@@ -11,7 +11,7 @@ import { describeConverted as showConverted, rateBlock, rateChangeCopy } from '.
  *  backfill. There is no rate field on it, because a price belongs to
  *  a unit rather than to a holding. Its prices line says what the save
  *  writes for the date, which is about the date rather than about this
- *  holding (ui/snapshot-entry.md). */
+ *  holding (record-snapshot.md, Snapshot entry). */
 export function snapshotDialog(vault, holding, existing, onSaved, onOpenRecording = null) {
   const value = el('input', {
     type: 'text',

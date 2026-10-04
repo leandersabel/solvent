@@ -8,7 +8,7 @@
 // One page holds all of them, settings and dimensions included,
 // because the keys live in this page's memory and nothing else. A
 // second server page would mean a second derivation, and the wait is
-// long by design (ui/unlock.md).
+// long by design (login.md, Unlock).
 import {
   clear,
   closeDialogsForLock,
@@ -41,7 +41,7 @@ import { transferView } from './page-transfer.js';
 const container = document.getElementById('app');
 // Who is signed in. The server writes it into a page it served with a
 // session, and a sign-in on a page served without one supplies it,
-// because the person just typed it (ui/settings.md, Profile).
+// because the person just typed it (account-settings.md, Settings, Profile).
 let username = container ? container.dataset.username || null : null;
 const kdfNode = document.getElementById('kdf-envelope');
 const kdf = kdfNode ? JSON.parse(kdfNode.textContent) : null;
@@ -49,7 +49,7 @@ const kdf = kdfNode ? JSON.parse(kdfNode.textContent) : null;
 // A vault owner's invite is served this page, in the outside frame,
 // with what the form needs. The keys the form makes are in this
 // document's memory, so this document draws the vault once they exist
-// (ui/register.md). Null everywhere else, and again once it is used.
+// (register.md, Register). Null everywhere else, and again once it is used.
 let registration = null;
 let registrationForm = null;
 if (container && container.dataset.kind === 'vault_owner') {
@@ -115,7 +115,7 @@ function leftUnsaved({ date, names }) {
   );
 }
 
-// Each screen's own content width (spec/ui/*.md, Layout), set on the
+// Each screen's own content width (spec/features/*.md, Screens), set on the
 // region every view mounts into.
 function width(name) {
   container.className = `app-${name}`;
@@ -152,7 +152,7 @@ async function registered(created) {
 /** Reads the new vault, in this document. The account exists, its
  *  session is live and the keys are held, so a read that fails is
  *  offered again here: loading a page, or locking, would ask for the
- *  password the person has just chosen (ui/register.md, States). */
+ *  password the person has just chosen (register.md, Register, States). */
 async function readRegistered(created) {
   let result;
   try {
@@ -375,7 +375,7 @@ else document.addEventListener('alpine:init', registerVaultStore);
 
 // A session that ran out mid-action is met by the lock: the card in its
 // unlocking-again shape, with what was typed held until it is answered
-// (ui/unlock.md, States).
+// (login.md, Unlock, States).
 whenUnauthorized(() => {
   if (isUnlocked()) lock();
 });

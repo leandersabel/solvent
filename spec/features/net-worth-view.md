@@ -1,492 +1,784 @@
 # Net worth view
 
-## What it does
+What a vault owner is worth now, how it got there and what it is made
+of: the total, a stacked trend chart, the list of holdings and a
+breakdown by dimension. Every figure is computed in the browser from
+decrypted records, so the server has nothing to template here.
 
-The core payoff: current total net worth in the user's main currency,
-per-holding balances, grouping by dimension, and a stacked trend chart
-over time. Every figure is computed client-side from decrypted records —
-the server has nothing to template here, because it has no plaintext.
+## What the client gets
 
-## Data flow
+What you are worth right now, and how it got there: the screen you
+open, and the only one you might open without meaning to change
+anything. It is assembled in your browser after you unlock, so the
+machine that stores your vault computes nothing and learns nothing from
+what you look at. It looks like the rest of the product, and on a phone
+dragging a span follows the phone rule (`app-shell.md`, What the client
+gets). The total is the largest thing in the product, and the chart is
+the one place color carries meaning, every band labeled so a reader who
+cannot tell two colors apart loses nothing.
+
+- **The total**, with the change over the span the chart shows, and
+  beside it gross assets and gross liabilities, because hiding a mortgage
+  inside one figure hides the most important thing about it.
+- **Two dates.** Each holding counts at its last recorded quantity,
+  valued at the most recent rate for its unit (your March dollars at this
+  month's rate), and states the date of its own last figure. The screen
+  states one date for the rates, the day you last recorded anything,
+  because recording anything refreshes every rate (`record-snapshot.md`,
+  What the client gets).
+- **Which rates**: latest rates, or rates as of each figure (your March
+  dollars at March's rate), which tells you how much of the move since
+  you last looked was your money and how much was the rates. It says
+  latest and not today's, because nothing here fetches anything.
+- **The chart** serves, in order: the shape of the last few years, what
+  one part of your money did over a span you drag across ("what did my
+  retirement do between 2019 and 2024"), composition drift, and shares
+  rather than amounts. It says how much of your money the grouping covers
+  and which holdings are unassigned, because a dimension filled in for
+  three holdings draws a correct and misleading chart.
+- **Mostly inferred, and it says so.** Between your entries quantities
+  and rates are interpolated, and after the last they are carried
+  forward, so a band moves on days you recorded nothing. Neither is
+  written down: they are the drawing. The dates you recorded something
+  are marked. The line is curves, not steps, because a decade of sparse
+  entries drawn as steps is a field of cliffs. Record a value on the day
+  something happened to get a sharp edge.
+- **The list of holdings** is the list of holdings, so the navigation has
+  no Holdings entry (`app-shell.md`, The chrome). Its as-of date sorts,
+  so you find what you have not touched in a while without the app
+  deciding what counts as too long.
+- **The breakdown** adds up to exactly your net worth, so it needs no
+  small print.
+- From the chart, the date picker and the list, any recording opens on
+  its own screen, which is how a wrong figure from last year gets put
+  right (`record-snapshot.md`, Recording detail).
+
+What it deliberately does not do:
+
+- **No warning that a figure is old.** No badge, color or threshold.
+  Holdings move at different speeds, so any single threshold flags the
+  slow ones until you learn to ignore it, then fails for the one that
+  really went quiet. Every figure states its age in words, next to the
+  action that records a new one. An older price is dated, which is a date
+  and not a warning.
+- **No rate lookup from this screen.** Rates move when you record
+  something.
+- No forecast, projection or target. The chart ends today.
+- No benchmark and no performance figure, which would need position
+  level data Solvent does not hold.
+- No income, spending or cash flow.
+- **No pie chart.** A pie cannot show a negative slice, and a mortgage is
+  one. Bars also compare lengths better and label directly.
+- **No fifth color.** Past four values the rest fold into "Other",
+  because beyond that no set of colors stays distinguishable, including
+  for color blind readers.
+
+## Screens
+
+### Dashboard
+
+Standard app shell (`app-shell.md`, The chrome). Regions top to bottom,
+each at the full content width and 32px apart. The hero sits on the
+ground, and every later region is a Card opening on its section heading
+(design-system.md, Components). It links to the account form and account
+detail (`manage-accounts.md`) and to snapshot entry, update values and
+recording detail (`record-snapshot.md`).
+
+#### Hero figure
+
+The total holds the left under the section label "Net worth", ink-primary,
+proportional figures (design-system.md, Typography), with the change
+beneath it. At the right, level with the foot of the total, sit gross
+assets and gross liabilities under their own section labels, each set off
+by a hairline rule at its left, then New recording. Which rates takes its
+own row beneath, at the left. Summary figures (the total, the change,
+gross assets and liabilities, the legend and the breakdown) are written
+by the formatter's `whole`. The holdings table and the data table carry
+the money places, because that is where a figure is checked against a
+statement.
+
+- **The change** over the selected range or selection: an arrow icon, the
+  signed amount and the percentage (one decimal place), in status good or
+  critical, the arrow carrying the sign so color is never the only
+  signal (The change).
+- **Which rates**, a segmented control with both positions named, neither
+  an unlabeled off state: **"Latest rates, 31 July"** (the vault's one
+  rate date) and **"Rates as of each figure"** (no date, because each
+  row's rate date is its own As of date or the price date it carries). It
+  reprices the total, the holdings table and the breakdown, leaves the
+  chart untouched and contacts nothing (Ranges and modes). Its label is
+  the only thing saying which position shows: no banner, no caveat,
+  nothing apologetic about the hero differing from the chart's edge.
+- **New recording**, the primary action, sits here because the total is
+  where somebody arrives meaning to update it. It opens the marked date
+  picker (design-system.md, Components) with today focused, future dates
+  not selectable, and every date holding a recording marked, one whose
+  figures were all cleared included, because its prices still stand and
+  the picker is the one route back to it. With nothing marked it is an
+  ordinary picker that explains nothing. A date with no recording goes
+  straight to the sweep at that date (`record-snapshot.md`, Update
+  values). A marked date opens that recording's screen
+  (`record-snapshot.md`, Recording detail), with no warning, question or
+  confirmation. Dismissing it writes and asks nothing. The top bar's
+  Update values is the other route and is not repeated here
+  (`app-shell.md`, The chrome).
+- No staleness chip and no warning. A figure's age belongs on the sweep,
+  beside the control that fixes it.
+
+#### Trend chart card
+
+A stacked area chart in SVG (Rules). The section heading holds the left
+of one row above the plot and the controls the right, in this order,
+wrapping beneath the heading when the row runs out:
+
+- **Range**: 1M / 6M / 1Y / All, segmented (Ranges and modes).
+- **Group by**: "Total" plus every configured dimension in the profile's
+  order, archived ones excluded (`account-settings.md`, Dimensions).
+  "Total" (one band) until a dimension exists. It also drives the
+  breakdown. Beside it the **coverage**, "7 of 10 holdings assigned", N
+  the active holdings (`account-settings.md`, Dimensions, owns what
+  coverage is for). While some are unassigned it is a link filtering the
+  holdings table to them. Otherwise, "10 of 10" and "0 of 0" included, it
+  is plain text, never a control, because there is nothing to filter to.
+- **Absolute / percentage**, segmented, captioned that each side is
+  measured against itself, because a reader would otherwise assume shares
+  of the net figure.
+- **"Just the line"**, a checkbox, off on load. Ticking it removes the
+  entry marks and changes nothing else. The name says what the control
+  does without claiming the marked chart is the untidy one, since the
+  marked chart is the accurate one.
+
+The plot spans the card, value ticks at the left. Beneath it, under a
+hairline rule, the legend runs as one row of swatch, band name and
+figure, with the key to the entry marks at its right end. "View as table"
+closes the card. A single band ("Total") has no legend box, and the
+section heading names it.
+
+Interaction, each reading one calendar day (Reading a date):
+
+- **Hover**: a dotted crosshair on the day and a tooltip pinned to the
+  top of the plot: the date, every visible band with its value, then the
+  net total on a separated row, value first and date second, because
+  the value is what the reader came for. The hero
+  follows. Leaving the plot removes the crosshair and returns the hero.
+- **Drag** selects a span that stays after release. The hero shows the
+  change across it and each legend entry its own. A plain click, or a
+  change of range or dimension, clears it.
+- **Legend** entries toggle a band, and hovering one highlights it and
+  dims the rest. With a band hidden, a line under the chart states that
+  the total covers only the visible bands.
+- **A click on a marked date, or on its tick, opens that date's
+  recording** (`record-snapshot.md`, Recording detail), and on any other
+  day nothing. A date with prices and no figures takes no tick and is
+  reached through the date picker.
+- **Archive annotations**: a marker on the x-axis at each `archivedAt`,
+  and a tooltip line naming the holding (Archived holdings).
+- **Keyboard**: the chart is focusable, and focus puts the crosshair on
+  the range's last day. Left and Right step one day. Shift+Left and
+  Shift+Right jump to the previous or next marked date, even with Just
+  the line on. Home and End reach the first and last day. Enter on a
+  marked date opens its recording, elsewhere nothing. No key moves past
+  either end, and a jump with no marked date ahead stays put. Each move
+  announces the tooltip's readout and the hero follows. Leaving removes
+  the crosshair. Nothing is reachable only by pointer.
+- **View as table**: a Table (design-system.md, Components) of "Date",
+  each band under its legend name in band order, then "Net worth" (under
+  "Total" only the first and last). Dates read as the tooltip writes
+  them, figures carry the places Decimals on money sets, and rows are The
+  data table's.
+- No control here issues a network request: range, dimension, mode,
+  pricing, band visibility, selection.
+
+#### Stacked areas
+
+One band per dimension value, in the dimension's configured order and
+never reordered by size, because a stack that reorders over time cannot
+be read. The adjacent-pairlist validation (design-system.md, Chart
+palette (validated)) is exactly this case, so the four slots apply
+unchanged.
+
+- Asset bands fill at 85% opacity. Liability bands mirror below the zero
+  line in the same group color at 45%: same hue means same group, and the
+  side of the axis carries the sign. The zero line is ink-muted, drawn
+  over the bands.
+- The net-worth line runs over the stack in ink-primary at 1.75px,
+  ending in a dot at the latest point. It summarizes the bands and takes
+  no chart slot.
+- Inferred stretches take the estimated marker, never a change to the
+  fills (design-system.md, Chart palette (validated), on pattern fills).
+
+#### The two neutral bands
+
+"Unassigned" and "Other" are not categories the user chose. They take no
+chart slot, must not read as one, and must not collide with each other:
+
+| Band | Fill | Meaning |
+|---|---|---|
+| Unassigned | rule gray `#c4cccf` | no value for this dimension, normal |
+| Other | ink-muted `#798285` | the fifth-and-beyond value, folded |
+
+Both always carry a direct label. A chart showing both is legible, and
+tells the user their dimension neither covers its holdings nor fits in
+four values.
+
+#### The estimated marker
+
+Inferred figures (every stretch between two snapshots, and everything
+after a holding's last one) are marked by ticks under the x-axis,
+ink-muted, at every date carrying at least one snapshot. Never a status
+color, because inferred data is not a warning, the same reason figure
+age is stated in words.
+
+- Under the axis rather than in the fill, because four dashed stacked
+  bands are unreadable and the distinction has to survive a decade of
+  history.
+- **A tick means a quantity, never a price.** It answers "when did I go
+  and look this holding up", the question the sweep is built around. A
+  tick per price entry would sit under every month for every holding.
+- The marks do not separate an interpolated quantity from an
+  interpolated price. A tick sits on a date every band shares, and a
+  per-factor mark would need one per band per date. Where one figure's
+  provenance matters, the sweep's row carries it.
+- **A row carries no mark.** On the sweep nearly every row is carried
+  forward, so a mark would say nothing its age in words does not
+  (`record-snapshot.md`, Update values).
+- **On when the chart loads**, with nothing turned on and no stored
+  preference read. The accurate drawing is the one nobody has to ask
+  for, and the tick is the click target that opens its date's recording,
+  so hiding it by default would hide that route too.
+- The ticks ship with wording, never as the mark alone: beside them the
+  name of the control that removes them (design-system.md,
+  Accessibility).
+
+#### Axes
+
+- Each value tick reads the value of its own gridline, and no two read
+  the same (Value ticks).
+- A mark at either edge of the plot is drawn whole at every width: the
+  net-worth line's dot, an entry mark, an archive marker. The plot keeps
+  half the widest mark clear inside its left and right edges.
+- Every value label lies inside the drawing at every width, a sign and a
+  unit included.
+- A one-day history draws one whole dot in the plot's horizontal middle
+  under every range, with its date beneath it on the date axis, at
+  desktop and phone width (Reading a date).
+
+#### Breakdown by dimension
+
+What the money is made of now, where the chart shows how it moved.
+Horizontal bars, one per band of the Group by dimension, in the same
+order as the stack, "Unassigned" a bar like any other and "Other" folding
+the fifth and beyond. Color, direct labels and the signed zero baseline
+are design-system.md's (Colors by chart job). The bars run the card's
+width less the room the labels take at the outboard ends. A band can be net negative
+(a mortgage under "Fixed"), so negative bands run leftward. When every
+band is positive the baseline sits at the left edge, and the layout never
+changes shape with the data. The bars sum to exactly the net-worth total,
+as a signed sum. Under "Total" the section is absent, because one bar
+equal to the hero says nothing.
+
+#### Holdings table
+
+The section heading holds the left of the card's head row and the "Show
+archived" toggle the right. Columns: Name, Dimensions, Latest value
+(native unit), In main currency, As of, row action.
+
+- **The table renders only when it lists at least one row.** A listed row
+  is an active holding with a figure in the selected mode, or an archived
+  holding while Show archived is on, narrowed to the unassigned while that
+  filter applies. Headings over nothing read as a fault, so otherwise the
+  "Not yet valued" and "Not priced" groups stand directly beneath the head
+  row, or the card holds the one line its state gives.
+- Dimensions shows one chip per assignment (`Liquidity: Cash`), omitting
+  dimensions the holding has no value for rather than printing
+  "Unassigned" on every row. With no dimensions configured
+  the column is absent.
+- Latest value and In main currency are figure columns
+  (design-system.md, Typography). The native figure shows the digits it
+  was entered with, and the converted figure follows Decimals on money.
+- Rows in creation order, oldest first. A row never moves because its
+  figure changed.
+- **As of is the date of the quantity, never of the rate**, shown plainly
+  at any age.
+- **A price date line** (design-system.md, Components) sits beneath the
+  converted figure of a row valued at an older price (Current net worth),
+  never as a column. A row priced at its own date, a main-currency row and
+  a not-priced row carry none.
+- **An archived holding is an archived row, whatever its figures**, and
+  never joins either group. Archived rows are hidden behind "Show
+  archived". Shown, each has an "Archived" chip and ink-secondary text,
+  never reduced opacity, which would drop text and chips below their
+  contrast floors (design-system.md, Ink and line).
+  - Its unit has no price in the selected mode: Latest value is its
+    latest quantity, and In main currency reads "not priced" with no price
+    date line.
+  - It has no readable snapshot: Latest value reads "not yet valued", and
+    In main currency and As of are empty.
+  - Its row action is **Unarchive** in place of Record a value
+    (`manage-accounts.md`, Account form).
+- The "Not yet valued" and "Not priced" groups sit below the table and
+  list active holdings only.
+- **Filtered to the unassigned**, from the coverage line here or on the
+  dimensions screen: the table and both groups list only holdings with no
+  value for the Group by dimension, archived ones included while Show
+  archived is on. A line in ink-secondary between the head row and the
+  table says so and ends in a **Show all holdings** link that clears the
+  filter. Setting Group by to "Total" clears it too.
+- A row click opens the holding (`manage-accounts.md`, Account detail).
+  "Record a value" on each active row opens the single-holding form at
+  that holding (`record-snapshot.md`, Snapshot entry). It is not a second
+  New recording: that one asks which date and sweeps every holding, this
+  one takes one holding to one date, for an odd date or a backfill.
+
+#### At phone width
+
+The regions keep their order and stack, 20px apart.
+
+- **Hero**: the total, the change, then gross assets and liabilities side
+  by side in two equal columns under a hairline rule. Which rates spans
+  the width beneath, and New recording beneath that, 48px tall.
+- **Trend chart**: Range spans the width across the top and the other
+  controls wrap beneath. Group by drops its visible label and keeps it as
+  the select's accessible name, because the section heading above
+  already says what it groups. The value ticks sit in a gutter left of
+  the plot, so none lies over a band or a mark. The legend runs in two
+  columns without each band's figure, with the mark key beneath it. The
+  table under View as table keeps every column and scrolls sideways
+  inside the card, never the page.
+- **Breakdown**: each bar's label moves above it, name left and amount
+  right, over the shared zero baseline.
+- **Holdings table**: a list with no column headings. Each row holds the
+  name with its chips beneath it at the left, and at the right the
+  main-currency figure with any price date line, then the as-of date,
+  preceded by the native figure where the unit is not the main currency.
+  An archived row reads as at desktop width. No row carries a row action:
+  a tap opens the holding's screen, which offers Record a value or
+  Unarchive.
+
+#### States
+
+- **Loading**: none, no skeleton. Records decrypt inside the unlock card's
+  working state (`login.md`, Unlock), and the dashboard draws only once
+  the total is final.
+- **Empty, no holdings**: one centered card, "Add your first holding",
+  primary button. No chart, table, zero total or New recording.
+- **Empty, holdings but no snapshots**: every active holding under "Not
+  yet valued" directly beneath the head row, no table, no column headings.
+  With Show archived on, each archived holding is an archived row reading
+  "not yet valued", so the table renders above the group with those rows
+  alone. Total `—`, not 0. No chart. New recording works, because
+  recording is how this state is left.
+- **A one-day history** (every snapshot, price and archive on one date):
+  one point at the plot's middle under every range, never a failure or a
+  flat line back to the beginning of time (Axes).
+- **All holdings archived**: total `—`, history still renders. Show
+  archived off: the card holds one ink-secondary line beneath its head
+  row and no table:
+
+  > Every holding is archived.
+
+  Show archived on: every holding is an archived row.
+- **Filtered to the unassigned**, with "Liquidity" as Group by:
+
+  > Showing the holdings with no Liquidity value. Show all holdings
+
+- **Filtered, nothing unassigned** (for example a filter opened from a
+  link made before the last holding was assigned): the line stands alone
+  beneath the head row, with no table and no groups, and keeps its way
+  back:
+
+  > Every holding has a Liquidity value. Show all holdings
+
+- **No dimensions configured**: Group by offers only "Total", with a link
+  to create one (`account-settings.md`, Dimensions). One band, no
+  breakdown, every other control works. This is a new vault's default and
+  must not nag.
+- **A dimension no holding carries**: one "Unassigned" band, coverage "0
+  of N". Correct, and the coverage stops it being read as a bug.
+- **Error, records failed to decrypt**: everything readable renders, under
+  a prominent, non-dismissible critical banner, "N records could not be
+  read.", linking to a list of the affected record ids. This is the
+  AAD-binding tripwire (architecture.md, Key management) and is never
+  swallowed, reduced to a console warning or allowed to crash the view.
+  An unreadable price entry drops out of its series and the neighbors
+  interpolate across it.
+- **Error, two entries on one date** (a holding with two values on one
+  date, or a unit with two entries on one date that are not
+  byte-identical): a critical banner names it and links to the date's
+  recording, where one is kept (`record-snapshot.md`, Recording detail).
+  Meanwhile the pair drops out of the series and the neighbors
+  interpolate across the date, rather than the chart picking a number
+  nobody chose (`record-rate.md`). When the pair is the symbol's only
+  entry, its active holdings are not priced rather than counted at either
+  figure.
+- **Error, session expired mid-action**: re-unlock in place, never
+  discarding unsaved input, unless the vault was replaced meanwhile.
+- **Replaced since last open**: the vault was replaced from a file while
+  this page was locked, or while it stayed open after its session ended
+  for its own reason, so the page learns it only at unlock (`login.md`, A
+  vault replaced elsewhere) and reaches this rather than the unlock card's
+  Replaced elsewhere. Every input and dialog kept through the lock is
+  dropped, and unlocking lands here rather than on the previous view,
+  which can name a record the restore removed.
+  - A Callout (design-system.md, Components) at the top of the content
+    region, above the hero, full content width, 32px above it, a polite
+    live region.
+  - Kept input was dropped: critical icon, and
+
+    > Your vault was replaced from a file since you last opened it
+    > here. What you had typed here and not saved is gone.
+
+  - None was: no icon, and
+
+    > Your vault was replaced from a file since you last opened it
+    > here. Nothing you had typed here was lost.
+
+  - No control. It stays until the person leaves the dashboard and is not
+    shown again, because it reports one event.
+  - A page that learned of the restore before unlocking says so on the
+    unlock card (`login.md`, Unlock) and shows no callout after it.
+
+## How it works
+
+### Data flow
 
 1. On unlock, fetch every record type
    (`GET /api/records?type=account|snapshot|rate|profile`) and decrypt
-   them with the session DEK.
+   with the session DEK.
 2. Build the model in memory: profile (main currency), holdings,
-   snapshots grouped by `account_id` and sorted by date, and prices
-   grouped by `symbol` and sorted by date (`record-rate.md`).
-3. Compute totals and series locally. Subsequent writes update this
-   model directly, with no refetch on every save. The one refetch in
-   the write path is the pre-create reload (`record-snapshot.md`,
-   Creating and reopening are distinct acts), which is what a stale
-   model cannot substitute for.
+   snapshots grouped by `account_id` and sorted by date, prices grouped by
+   `symbol` and sorted by date (`record-rate.md`).
+3. Compute totals and series locally. Later writes update the model
+   directly with no refetch. The one refetch in the write path is the
+   pre-create reload (`record-snapshot.md`, Creating and reopening are
+   distinct acts), which a stale model cannot stand in for.
 
-For the expected data volume (a household, manual snapshots, years of
-history) one fetch per session is the right call, and it is why there
-is no single-record `GET` (`record-api.md`, Endpoints).
+One fetch per session suits a household's volume, and is why there is no
+single-record `GET` (`record-api.md`, Endpoints).
 
-## Current net worth
+### Current net worth
 
-Every holding contributes its **last recorded quantity** at a price
-drawn from that unit's own timeline (`record-rate.md`). The two are
-looked up separately, which is the point of the split: a dollar holding
-last recorded in March is not stuck at March's exchange rate.
+Every holding contributes its **last recorded quantity** at a price from
+its unit's own timeline (`record-rate.md`), looked up separately, so a
+dollar holding last recorded in March is not stuck at March's rate.
 
 `total = Σ over active holdings of (latest snapshot.value × price)`
 
-The view has a **pricing mode**, and it selects the price:
+The **pricing mode** selects the price:
 
-- **Latest rates** (the default): the **latest price** for that
-  holding's unit (`record-rate.md`, Reading).
-- **Rates as of each figure**: the **price as recorded** for that
-  holding. This is what the holding was worth when it was last
-  recorded, which is a real question and a different number. It takes
-  the newest entry at or before the quantity's date for every symbol,
-  published ones included, rather than reading not priced where that
-  date has no entry, because every holding in the total must carry a
-  figure for the total to add up. The figure carries the entry's date
-  instead (below).
+- **Latest rates** (default): the latest price for the holding's unit
+  (`record-rate.md`, Reading).
+- **Rates as of each figure**: the price as recorded, the newest entry at
+  or before the quantity's date for every symbol, published ones
+  included. It never reads not priced where that date has no entry,
+  because every holding in the total must carry a figure for the total to
+  add up. The figure carries the entry's date instead.
 
-Both modes use the same quantity. The mode changes only which price is
-paired with it, and switching modes makes no network request, because
-both series are already in memory.
-
-**The mode reaches the total, the list of holdings and the breakdown,
-and nothing else.** It is not a chart control (Trend chart, Ranges and
-modes). It is named for the latest rate rather than today's rate
-because nothing on this screen fetches a price: the newest entry in the
-vault is whatever the last recording wrote.
+Both modes use the same quantity, and switching makes no request,
+because both series are in memory (Ranges and modes).
 
 - **Latest means the greatest `date`**, in either series, never the most
   recently written.
-- **A holding whose unit is the main currency** prices at `"1"` in
-  both modes (`record-rate.md`, Reading).
-- Each holding's figure carries its **quantity's as-of date** wherever
-  it appears, because that is the date the person acts on
-  (`ui/update-values.md`). A row whose price is older than the date it
-  is shown for also carries **its price's date**, so no figure passes
-  an older price off as the screen's. On latest rates that is a price
-  entry dated before the screen's rate date, the newest `date` of any
-  entry in the vault. On rates as of each figure it is a price entry
-  dated before the row's quantity date. Most often it is a holding with
-  no rate source, whose price moves only when its owner revisits it.
-- **There is no staleness threshold and no stale-holding warning.** No
-  single number fits a product built on uneven cadence — a current
-  holding moves monthly, unlisted property every few years — so any
-  threshold leaves the slow holdings permanently flagged until the user
-  learns to ignore it, at which point it fails for the holding that
-  genuinely went quiet. The age of each figure is stated in plain
-  language on `ui/update-values.md`, next to the control that acts on
-  it.
-- **Archived comes first.** An archived holding is a closed position,
-  excluded from the current total, and it is **never listed as not yet
-  valued or not priced**, because it is out of the total for being
-  archived and that is the reason the screen gives. It remains in
-  history before its `archivedAt` date (Trend chart, Archived
-  holdings). Its row, shown behind "Show archived"
-  (`ui/dashboard.md`, Holdings table), carries its latest quantity and
-  converted figure like any row, with "not priced" in place of the
-  converted figure where its unit has no price in the selected mode,
-  and "not yet valued" in place of both figures where it has no
-  readable snapshot.
+- A holding whose unit is the main currency prices at `"1"` in both
+  modes, from no entry, and is never reported as not priced
+  (`record-rate.md`, Reading).
+- Each figure carries its **quantity's as-of date**, the date the person
+  acts on, at any age (What the client gets). A row priced older than the
+  date it is shown for also carries **its price's date**: on latest
+  rates, a price dated before the screen's rate date (the newest `date` of
+  any entry in the vault), on rates as of each figure, a price dated
+  before the row's quantity date. Most often it is a holding with no rate
+  source.
+- **Archived comes first.** An archived holding is excluded from the
+  current total and never listed as not yet valued or not priced, because
+  being archived is the reason. It stays in history before `archivedAt`
+  (Archived holdings).
 - **An active holding with no snapshots contributes nothing** and is
-  listed separately as "not yet valued" rather than shown as 0. Zero is
-  a real value a user can record and means something different.
-- **An active holding with a quantity and no price for its unit
-  contributes nothing either**, and is listed separately as **not
-  priced**, with that as the stated reason rather than the other one.
-  It is never counted at its bare quantity, which would silently value
-  a holding as though its unit were the main currency. The state is
-  reached by a
-  recording whose price writes all failed (`record-rate.md`, The write
-  path), by a free-text unit nobody has priced yet, and by the deletion
-  or the flagged duplication of a symbol's only entry.
-- Negative balances (mortgages, loans) subtract. Net worth is a signed
-  sum, and the UI shows gross assets, gross liabilities, and the net
-  figure separately.
+  listed as "not yet valued", never 0, because zero is a real value a
+  user can record.
+- **An active holding with a quantity and no price contributes nothing**
+  and is listed as **not priced**, never counted at its bare quantity as
+  though its unit were the main currency. A recording whose price writes
+  all failed (`record-rate.md`, The write path), a free-text unit nobody
+  has priced, and the deletion or flagged duplication of a symbol's only
+  entry each lead here.
+- Negative balances subtract, and gross assets and gross liabilities are
+  shown beside the net figure.
 
-## Trend chart
+### Trend chart
 
-A **stacked area chart** over time: one band per group, the bands
-summing to net worth. It answers two questions at once — how the total
-moved, and what it was made of.
+A stacked area chart over time, one band per group, the bands summing to
+net worth.
 
-### Values between entries
-
-A holding's worth at a chart date is the product of two interpolated
-series:
+#### Values between entries
 
 `value(account, t) = quantity(account, t) × price(unit(account), t)`
 
-- **Quantity** is linearly interpolated between that holding's own
-  snapshots. It contributes nothing to dates **before its first
-  snapshot**, not backfilled with zero, which would show a false
-  jump when a long-held holding is first entered, and after the last
-  snapshot it is **carried forward**, because there is nothing to
-  interpolate toward.
-- **Price** is linearly interpolated between that symbol's own entries,
-  **carried forward** after the last and **carried backward** before the
-  first. The asymmetry with quantity is deliberate: a price series
-  samples something that existed before anyone started sampling it,
-  while a holding genuinely did not exist before its first entry.
-  Blanking a band before its symbol's first price would draw a holding
-  appearing out of nowhere on the day its owner first recorded a price,
-  which is the same false jump the no-zero-backfill rule exists to
-  prevent.
-- Interpolation is **per holding and then summed**, never interpolation
-  of an already-summed series, because holdings start at different dates
-  and summing first would smear one holding's first snapshot across the
-  rest.
+- **Quantity** is linearly interpolated between the holding's own
+  snapshots. It contributes nothing before its first snapshot, never
+  backfilled with zero, which would show a false jump when a long-held
+  holding is first entered. After the last snapshot it is carried
+  forward.
+- **Price** is linearly interpolated between the symbol's entries,
+  carried forward after the last and **carried backward** before the
+  first. The asymmetry is deliberate: a price samples something that
+  existed before anyone sampled it, while a holding did not exist before
+  its first entry. Blanking a band before its first price would draw the
+  same false jump.
+- Interpolation is **per holding and then summed**, never of a summed
+  series, because summing first smears one holding's first snapshot
+  across the rest.
 
 **A band bends between two quantity entries.** The product of two
-piecewise-linear series is piecewise quadratic, so a price entry falling
-between two snapshots pulls the band off the straight line between them.
-A holding recorded in January and again in July, priced monthly in
-between, follows the currency rather than running as a chord across six
-months.
+piecewise-linear series is piecewise quadratic, so a price entry between
+two snapshots pulls the band off the chord: a holding recorded in January
+and July, priced monthly, follows the currency.
 
-Two consequences for drawing it:
-
-- **Sample each holding at the union** of its own snapshot dates and its
+- Sample each holding at the **union** of its snapshot dates and its
   symbol's price dates within range, plus the range endpoints. Sampling
-  only the snapshot dates would cut every bend off, silently and
-  everywhere.
-- Between two samples the segment is drawn straight. Both factors are
-  linear there, so the error is the quadratic term alone, at most a
-  quarter of the product of the two deltas across that segment, which at
-  any realistic price cadence is below a pixel.
+  only snapshot dates cuts off every bend, silently.
+- Between two samples the segment is straight. Both factors are linear
+  there, so the error is the quadratic term, at most a quarter of the
+  product of the two deltas, below a pixel at any realistic cadence.
 
-**A change to one entry moves a bounded stretch, and only it.** Adding
-an entry to either series, changing one, and deleting one all affect
-the dates between that entry's neighbors in its own series, and no
-others:
+**A change to one entry moves a bounded stretch, and only it.** Adding,
+changing or deleting an entry in either series affects the dates between
+that entry's neighbors in its own series:
 
-- An entry with a neighbor on each side affects the open stretch
-  between them.
-- The **last** entry of a series affects everything from the previous
-  entry onward, because what follows it is carried forward.
-- The **first** entry of a price series affects everything up to the
-  next entry, because what precedes it is carried backward. A
-  holding's first snapshot instead moves where that holding's band
-  starts, since nothing precedes it.
+- An entry with a neighbor on each side: the open stretch between them.
+- The last entry of a series: everything from the previous entry on,
+  because what follows is carried forward.
+- The first entry of a price series: everything up to the next entry,
+  because what precedes is carried backward. A holding's first snapshot
+  moves where its band starts.
 
 This is what makes an edit safe to offer (`record-snapshot.md`,
-Reopening and editing a recording): correcting a figure from eight
-months ago cannot move last year, and cannot move today unless the
-figure was the newest one.
+Reopening and editing a recording): correcting a figure from eight months
+ago cannot move last year, and moves today only if it was the newest.
 
-**Deleting a whole recording moves more than its own holdings.** It
-takes the date's rate entries with it (`record-snapshot.md`, Deleting a
-recording), and each removed entry frees the stretch between its
-neighbors in its own symbol's series. Every band measured in those
-symbols moves across those stretches, including holdings that were
-never recorded that day. The bound is the one above, applied once per
-removed entry.
+**Deleting a whole recording** takes the date's rate entries with it
+(`record-snapshot.md`, Deleting a recording), so the bound applies once
+per removed entry, and every band in those symbols moves across those
+stretches, holdings not recorded that day included.
 
-**A recording with rates and no values still shapes the chart.** Its
-rate entries are ordinary knots: they anchor their symbols' series, and
-a band between two quantity entries bends over them exactly as it does
-over any other price entry. A date nobody recorded a quantity at is
-still a date somebody priced.
+**A recording with rates and no values still shapes the chart.** Its rate
+entries are ordinary knots that anchor their series, and bands bend over
+them. A date nobody recorded a quantity at is still a date somebody
+priced, and it takes no tick (The estimated marker).
 
-**The dates a quantity was recorded are marked from the moment the
-chart loads.** The entry marks are ticks under the x-axis, one at every
-date carrying at least one snapshot, so a stretch running between two
-ticks is a stretch that was drawn rather than recorded.
-`ui/design-system.md` owns the mark, `ui/dashboard.md` the one control
-that takes them off, **Just the line**. They are on by default because
-the accurate drawing is the one nobody should have to ask for, and
-because they are the chart's way into a recording
-(`record-snapshot.md`): hidden by default, they would hide that route
-with them.
+#### Grouping by dimension
 
-**A tick means a quantity, never a price.** It answers "when did I
-actually go and look this holding up", which is the question the sweep
-is built around, and a tick for every price entry would put one under
-every month for every holding and bury the ones that matter. A date
-carrying rate entries and no snapshots bends the bands and takes no
-tick.
+Bands come from a **dimension**, a named axis whose values partition the
+holdings (`manage-accounts.md`, Dimensions). A stack needs a partition,
+or the bands would not sum to net worth.
 
-**The marks do not separate an interpolated quantity from an
-interpolated price.** A tick sits on a date shared by every band, so a
-per-factor mark would need one per band per date, which is unreadable
-across a decade of history. Where one figure's own provenance matters,
-the row form of the mark carries it (`ui/update-values.md`).
+- Each holding falls in exactly one band per dimension, by the record
+  shape: `dims` is a map keyed by dimension id, so a second value cannot
+  be expressed, by the form, an import or a hand-edited export. There is
+  no "Ambiguous" band and no third neutral band.
+- Holdings with no entry for the dimension group under **"Unassigned"**,
+  a real band, never hidden. An entry naming an archived or unknown value
+  lands there too, and the entry is kept, so restoring the value restores
+  the band.
+- No dimension gives a single band: plain net worth.
+- Band order is fixed per dimension, from its configured value order
+  (`account-settings.md`), never by size.
+- Past four values, the first four in configured order take chart slots
+  and the rest fold into "Other" (design-system.md, Chart palette
+  (validated)).
+- Wherever a dimension is chosen, the UI shows its **coverage**, because a
+  dimension covering three of ten holdings draws a correct and useless
+  chart and the user needs to see why.
 
-### Grouping by dimension
+#### Assets and liabilities
 
-Bands come from a **dimension** — a named axis whose values partition
-the holdings (`manage-accounts.md`, Dimensions). A stacked chart
-requires a partition: if one holding could land in two bands, the bands
-would not sum to net worth.
+A negative balance cannot stack with positive ones, so liability bands
+mirror below zero in their own color (Stacked areas), which keeps the
+signed sum visible.
 
-- Each holding falls in **exactly one band per dimension**, guaranteed
-  by the record shape rather than by a check — `dims` is a map keyed by
-  dimension id, so a second value cannot be expressed
-  (`manage-accounts.md`). There is no "Ambiguous" band, because there is
-  no ambiguous state to display.
-- Holdings with no entry for the dimension group under
-  **"Unassigned"** — a real band, never hidden, or the bands would not
-  sum to the total. An entry naming an archived or unknown value lands
-  here too.
-- Grouping by **no dimension** gives a single band: plain net worth.
-- Band order is **fixed per dimension**, from the dimension's configured
-  value order (`account-settings.md`), never sorted by size. A stack
-  whose bands reorder over time cannot be read.
+#### Archived holdings
 
-Because a dimension only partitions the holdings that carry it, the UI
-must show its **coverage** — how many holdings are assigned — wherever a
-dimension is chosen. A dimension covering three of ten holdings produces
-a mostly-"Unassigned" chart that is correct and useless, and the user
-needs to see why.
-
-### Assets and liabilities
-
-A negative balance cannot be stacked with positive ones. Asset bands
-stack **upward** from zero, liability bands **mirror downward**, each
-band keeping its group's color on both sides, and the net-worth line
-runs over the top. This keeps the signed-sum rule above visible instead
-of hiding it in a single collapsed figure.
-
-### Archived holdings
-
-A holding archived on date D counts on **every chart date before D and
-on none from D on**, so its value at D is part of no total. The chart
-at D then agrees with the current total, which leaves the holding out.
+A holding archived on date D counts on every chart date before D and on
+none from D on, so the chart at D agrees with the current total.
 
 Archiving writes the holding's zero at D (`manage-accounts.md`,
-Archiving), so the band **interpolates into zero** as it does between
-any two snapshots. The run-down lies between two entry marks like any
-other inferred stretch, so the chart already says it was drawn rather
-than recorded. A person who wound a position down on one specific day
-records a figure on that day and gets the sharp edge honestly.
+Archiving), so the band interpolates into zero as between any two
+snapshots, a stretch between two entry marks like any inferred stretch.
+Someone who wound a position down on one day records a figure that day
+and gets the sharp edge honestly. The zero is the new last snapshot, and
+the archive's refresh may add price entries at D (`record-rate.md`, The
+refresh). Each moves what a new last entry moves (Values between
+entries), and nothing before it.
 
-The zero is the holding's new last snapshot, and the archive's refresh
-may add price entries at D (`record-rate.md`, The refresh). Each moves
-exactly what a new last entry moves (Values between entries): the
-dates after the previous entry in its own series, and nothing before
-it.
+The archive is a **step at D**. A day where a band starts or ends is a
+vertical edge at that day's x, from the value just before the day to the
+value at it. The range's first day has no side before it.
 
-The archive is a **step at D**. A day where a band starts or ends is
-drawn as a vertical edge at that day's x, from the band's value just
-before the day to its value at it. The first day of the range has no
-side before it.
-
-- A holding's **first snapshot** is absent just before its date and
-  present at it, which is the no-zero-backfill rule (Values between
-  entries) drawn as an edge.
-- A holding **archived on D** is present just before D, at D's
-  quantity and D's price, and absent at D. With the zero at D that side
-  is zero, so the step is no edge at all.
-- **The value at a date is the side at it.** The tooltip, the data
-  table, the hero under the crosshair and the change over a range all
-  read that side. The side just before shapes the drawing only.
+- A first snapshot is absent just before its date and present at it,
+  which is the no-zero-backfill rule drawn as an edge.
+- A holding archived on D is present just before D, at D's quantity and
+  D's price, and absent at D. With the zero at D that side is zero, so
+  there is no edge.
+- A holding first valued and archived on the same date is on no chart
+  date and on neither side of its step.
+- **The value at a date is the side at it.** The tooltip, the data table,
+  the hero under the crosshair and the change all read it. The side just
+  before shapes the drawing only.
 
 **A holding archived without a zero at D keeps a real step**
-(`manage-accounts.md`, A holding archived without a zero at D). It
-falls from D's figure, or from the last quantity carried forward when
-D has none, with nothing recorded to explain the drop.
-
+(`manage-accounts.md`, A holding archived without a zero at D), falling
+from D's figure, or the last quantity carried forward when D has none.
 D's price values the side just before the step, so a price entry at D
-moves a holding archived on D only where that side is non-zero. Only
+moves a holding archived on D only where that side is non-zero, and only
 then does the confirmation for a rate change on D count it
-(`ui/update-values.md`, Changing or clearing a rate says what it
-moves).
+(`record-snapshot.md`, Update values).
 
-Every archive date carries an **annotation** on the x-axis and a
-tooltip line naming the holding, with or without a zero. A band running
-out to nothing otherwise looks the same as a holding that lost its
-value or a bad entry, and an unexplained vertical edge in an otherwise
-smooth chart is indistinguishable from a bad snapshot.
+Every archive date carries its annotation, with or without a zero,
+because a band running out to nothing, or an unexplained vertical edge,
+otherwise looks like a lost value or a bad entry.
 
-### Ranges and modes
+#### Ranges and modes
 
-- Ranges: 1M, 6M, 1Y, All. Default: 1Y, or All if history is shorter.
-- **The chart's last day is the newest date carrying a snapshot, a
-  price entry or an `archivedAt`**, and every range counts back from
-  it. An archive whose D carries no snapshot still falls inside the
-  chart, which the right hand edge below depends on.
+- Ranges 1M, 6M, 1Y, All. Default 1Y, or All if history is shorter.
+- **The chart's last day is the newest date carrying a snapshot, a price
+  entry or an `archivedAt`**, and every range counts back from it. An
+  archive whose D carries no snapshot still falls inside the chart.
 - **A range starts no earlier than the oldest date carrying a
-  snapshot.** It counts back from the last day and stops there, so a
-  range longer than the history shows all of it, and a history of one
-  day is that one day under every range. No band has a value before
-  that date (Values between entries), so counting back past it would
-  draw an empty stretch ending in a jump, and on a one-day history
-  would push the only point to the right hand edge.
-- **Pricing mode is not a chart control.** Every chart point is already
-  drawn at the prices of its own date, so switching it moves no pixel.
-  On latest rates the chart's right hand edge **is** the total: the
-  edge carries each active holding's last quantity carried forward at
-  its symbol's last price carried forward, which is the total's own
-  definition, and no archived holding, because it lies at or after
-  every archive (Archived holdings). On rates as of each figure the
-  total is deliberately not the edge, and the gap between them is the
-  whole point of the mode. It
-  says how much of the move since the person last looked was their
-  money and how much was the rates, which is the one thing the default
-  mode cannot show. A chart that repriced with the control would close
-  that gap and answer nothing.
-- **Absolute / percentage** toggle. The percentage view normalizes each
-  side against itself — asset bands against total assets, liability
-  bands against total liabilities — because a share of a signed net
-  figure is meaningless when the net approaches zero.
+  snapshot.** No band has a value before it, so counting further back
+  would draw an empty stretch ending in a jump, and push a one-day
+  history's only point to the edge. A range longer than the history shows
+  all of it, and a one-day history is that day under every range.
+- **Pricing mode is not a chart control.** Every point is drawn at the
+  prices of its own date, so switching moves no pixel. On latest rates
+  the right hand edge **is** the total: each active holding's last
+  quantity carried forward at its symbol's last price carried forward,
+  and no archived holding, because the edge lies at or after every
+  archive. On rates as of each figure the total is deliberately not the
+  edge. The gap says how much of the move was money and how much rates,
+  and a chart that repriced with the control would close it.
+- **Absolute / percentage**: the percentage view normalizes asset bands
+  against total assets and liability bands against total liabilities,
+  because a share of a signed net figure is meaningless near zero.
 
-### Value ticks
+#### Value ticks
 
-The value axis carries a gridline and a label at each tick. Its
-**domain** runs from the lowest drawn value to the highest, zero
-always included, because the bands stack from zero. A domain with no
-extent, every value zero, runs from 0 to 1.
+The value axis carries a gridline and a label at each tick. Its domain
+runs from the lowest drawn value to the highest, zero always included. A
+domain with no extent runs from 0 to 1.
 
-- **The step is 1, 2 or 5 times a power of ten, and never below 1.** It
-  is the smallest such number at least the domain's span divided by the
-  target count: six at desktop width, three at phone width.
-- **Ticks are counted from zero.** They sit at `i × step` for every
-  integer `i` with `i × step` inside the domain, computed as that
-  product rather than by repeated addition, so every tick is an exact
-  integer. Zero is always a tick.
-- **A tick below a thousand reads as its exact whole number.**
-- **A tick from a thousand up reads in a short form**: its magnitude
-  divided by the largest of a thousand, a million and a billion that
-  does not exceed it, with at most one decimal and no trailing zero,
-  followed by that unit's suffix, `k`, `M` or `B` (`ui/design-system.md`,
-  which makes the value tick the one figure that abbreviates).
-- Every label is written by the formatter (`account-settings.md`, Dates
-  and numbers): `compact` writes the two forms above, so a tick at 1500
-  reads `1.5k` or `1,5k` by the configured decimal point, and a tick at
-  1500000000000 carries the configured group mark, `1’500B` under an
-  apostrophe.
+- **The step is 1, 2 or 5 times a power of ten, never below 1**: the
+  smallest such number at least the domain's span over the target count,
+  six at desktop width and three at phone width.
+- **Ticks are counted from zero**, at `i × step` for every integer `i`
+  inside the domain, computed as that product and never by repeated
+  addition, so every tick is an exact integer. Zero is always a tick.
+- Below a thousand a tick reads its exact whole number. From a thousand
+  up it reads in short form: its magnitude over the largest of a
+  thousand, a million and a billion not exceeding it, with at most one
+  decimal and no trailing zero, then `k`, `M` or `B` (design-system.md,
+  Figures).
+- Every label is written by the formatter's `compact`
+  (`account-settings.md`, Dates and numbers): 1500 reads `1.5k` or `1,5k`
+  by the decimal point, and 1500000000000 carries the group mark, `1’500B`
+  under an apostrophe.
 - **No two ticks read the same, because every label is exact.** The
   domain contains zero, so the step is at least a sixth of the largest
-  tick, and a multiple of a 1, 2 or 5 step that large is exact in one
-  decimal of the tick's unit. A label never rounds its tick.
-- The percentage view takes the same step rule and writes each tick
-  with `percent` at no places, exact because every tick is an integer.
+  tick, and a multiple of such a step is exact in one decimal of the
+  tick's unit.
+- The percentage view takes the same step rule and writes each tick with
+  `percent` at no places.
 
-Where the labels sit, inside the chart's drawing or in a gutter beside
-the plot, is `ui/dashboard.md`'s.
+Where the labels sit is the Dashboard's (Axes, At phone width).
 
-### Reading a date
+#### Reading a date
 
-**Every calendar day from the range's first day to its last is a date
-the chart reads.** The crosshair, its tooltip, the hero under the
-crosshair, both ends of a selection and the keyboard each resolve to
-one such day and read it through the value model (Values between
-entries), on the side at it (Archived holdings). None of them reads the
-drawing's samples or its downsampled points, which exist to draw the
-line. The line at a day between two samples may sit off the model by
-the sub-pixel bound above. The figure shown is the model's.
+**Every calendar day from the range's first to its last is a date the
+chart reads.** The crosshair, its tooltip, the hero under it, both ends of
+a selection and the keyboard each resolve to one day and read it through
+the value model, on the side at it, never from the drawing's samples or
+downsampled points. The line between two samples may sit off the model by
+the sub-pixel bound, and the figure shown is the model's.
 
-- **Days are evenly spaced.** In a range of days 0 to n, with n at
-  least 1, day k sits at `x0 + k × (x1 − x0) / n` across the plot, from
-  its left edge `x0` to its right edge `x1`.
-- **A range of one day draws its point at the middle of the plot**,
-  `(x0 + x1) / 2`, whole, at every width, and reads that day at every
-  x. Placing it at `x0` would put the only figure on the chart against
-  its edge and cut its mark in half where the plot meets the drawing's
-  edge. `ui/dashboard.md` owns how the point looks.
-- **The pointer reads the nearest day:**
+- **Days are evenly spaced**: in a range of days 0 to n, n at least 1, day
+  k sits at `x0 + k × (x1 − x0) / n`.
+- **A one-day range draws its point at `(x0 + x1) / 2`**, whole, at every
+  width, and reads that day at every x. At `x0` its mark would be cut in
+  half at the plot's edge.
+- **The pointer reads the nearest day**:
   `k = round((x − x0) × n / (x1 − x0))`, clamped to the range, a half
-  rounding to the later day. Every x on the plot reads exactly one day.
-  Where the plot has at least as many pixels as the range has days,
-  every day is read at some x. Where it has fewer, a pixel spans
-  several days, and the keyboard reaches the ones between.
-- **A selection's ends are the days under the press and the release**,
-  by the same rule, ordered earlier first whichever way the drag ran.
-  The change across it is the later day's value minus the earlier
-  day's, for the total and for every band. A press and release on the
-  same day is a click.
-- **The keyboard reaches every day.** One key steps the crosshair a
-  single day, and another moves it to the previous or next date
-  carrying a snapshot. `ui/dashboard.md` owns the keys. Each key's readout is the
-  tooltip's text, exposed to assistive technology, so a day the data
-  table does not list is readable without the pointer.
-- **Day arithmetic is on calendar dates, never on timestamps.** A day
-  is a `YYYY-MM-DD` and the next day is that date plus one, so a
-  daylight-saving change or the reader's time zone cannot skip or
-  repeat a day.
-- **A click opens a recording only on a date carrying a snapshot**,
-  the dates the entry marks sit on. A click or Enter there opens that
-  date's recording (`record-snapshot.md`). On any other day it opens
-  nothing. The tick under the axis is a click target of its own for
-  its date (`ui/design-system.md`, The estimated marker), so a
-  recording stays reachable by pointer where a day is narrower than a
-  pixel.
+  rounding to the later day. Every x reads exactly one day. Where the
+  plot has at least as many pixels as days, every day is read at some x.
+  Otherwise the keyboard reaches the days between.
+- **A selection's ends are the days under press and release**, ordered
+  earlier first whichever way the drag ran. The change is the later day's
+  value minus the earlier's, for the total and every band. A press and
+  release on one day is a click.
+- **The keyboard reaches every day** (Dashboard, Trend chart card). Each
+  readout is the tooltip's text, exposed to assistive technology.
+- **Day arithmetic is on calendar dates, never timestamps.** A day is a
+  `YYYY-MM-DD` and the next is that date plus one, so a daylight-saving
+  change or time zone cannot skip or repeat a day.
+- **Only a date carrying a snapshot opens a recording.** The tick under
+  the axis is a click target of its own, so a recording stays reachable
+  where a day is narrower than a pixel.
 
-### The change
+#### The change
 
-The hero states the change between two days: the range's first and
-last, or a selection's ends (Reading a date). Its **amount** is the
-later day's net worth minus the earlier day's, exact.
+The hero states the change between two days, the range's ends or a
+selection's. The **amount** is the later day's net worth minus the
+earlier's, exact.
 
-- **The percentage is the amount over the earlier net worth's
-  magnitude**: `amount × 100 / |earlier|`, divided in decimal at scale
-  12 with round-half-even (`record-snapshot.md`, Record shape), then
+- **The percentage is `amount × 100 / |earlier|`**, divided in decimal at
+  scale 12 with round-half-even (`record-snapshot.md`, Record shape), then
   written by `percent` at one place, half-even again. Dividing by the
   magnitude keeps a debt shrinking from −1000 to −500 a rise of 50%.
-- **There is no percentage when the earlier net worth is zero**,
-  because nothing is a share of zero. The amount stands alone.
-- **The sign is the amount's own**: `+` before a rise and `−` before a
-  fall, set before the amount and the percentage alike, each written
-  by the formatter from its magnitude. The arrow, the amount and the
-  percentage then never disagree, even where a figure rounds to zero.
-  A change of zero carries no sign.
+- **No percentage when the earlier net worth is zero**, because nothing
+  is a share of zero. The amount stands alone.
+- **The sign is the amount's own**: `+` before a rise, `−` before a fall,
+  on the amount and the percentage alike, each written from its
+  magnitude. So the arrow, amount and percentage never disagree, even
+  where a figure rounds to zero. A change of zero carries no sign.
 
-### The data table
+#### The data table
 
-"View as table" (`ui/dashboard.md`) lists the chart's figures as a real
-table. It stands in for the chart's numbers, not for its current view,
+"View as table" stands in for the chart's numbers, not its current view,
 so hiding a band and the percentage view leave it unchanged: every band
 is a column and every figure is absolute money.
 
-- **Rows are the days the chart samples**, oldest first, one per day:
-  the range's first and last day, and every day in the range carrying a
-  snapshot, a price entry for the unit of any holding, archived ones
-  included, or an `archivedAt` (Values between entries). Downsampling
-  removes no row. A day the table does not list is read through the
-  keyboard (Reading a date).
-- **The first column is the date, written by `longDate`**
-  (`account-settings.md`, Dates and numbers), the form the chart's
-  tooltip writes, so a day reads the same in both.
-- **Under a dimension the bands follow**, one column each, headed by
-  the band's label, in band order (Grouping by dimension), with
-  "Unassigned" and "Other" wherever the chart has them.
-- **"Net worth" is the last column**: the exact decimal sum of the
-  row's band values, rounded only for display. It is never read off the
-  drawing's stack, which is in floats. Under Total the single band
-  already is net worth, so "Net worth" is the only figure column.
-- Every figure is the value at the row's day, the side at it (Archived
-  holdings), written by `money`.
+- **Rows are the days the chart samples**, oldest first, one per day: the
+  range's first and last day, and every day carrying a snapshot, a price
+  entry for any holding's unit (archived ones included), or an
+  `archivedAt`. Downsampling removes no row. Other days are read through
+  the keyboard.
+- **The first column is the date, by `longDate`** (`account-settings.md`,
+  Dates and numbers), as the tooltip writes it.
+- Under a dimension the bands follow in band order, with "Unassigned" and
+  "Other" wherever the chart has them.
+- **"Net worth" is the last column**: the exact decimal sum of the row's
+  band values, rounded only for display, never read off the drawing's
+  float stack.
+- Every figure is the value at the row's day, the side at it, written by
+  `money`.
 
-## Inputs / outputs
+### Rules
 
-- In: ciphertext records fetched from the API, decrypted with the
-  session DEK: holdings, snapshots, prices, and the profile.
-- Out: current total in the selected pricing mode, per-holding balances
-  with as-of dates, a breakdown by the selected dimension, trend series.
-  Nothing computed here is ever sent back to the server.
-
-## Rules
-
-- All money arithmetic uses decimal, never floats (`record-snapshot.md`).
-  Sums are computed at full precision and rounded only for display. A
-  chart point costs two multiplications rather than one, and both round
-  half-even at scale 12 like every other.
-- Every decrypted string — holding name, note, dimension and value
-  label — is rendered with `x-text` / `textContent`. Never `x-html`,
-  never a chart library that takes an HTML string for labels or tooltips
-  (architecture.md, Application hardening).
-- **The chart is drawn directly in SVG with no charting library.** What a
-  library supplies here is scales, tick math, and path building. What
-  this chart needs — the partition rule, per-holding interpolation,
-  provenance tracking, per-band selection deltas, asset/liability
-  mirroring — is domain logic written either way. The full interactive
-  chart prototypes at ~200 lines of dependency-free JS. A production
-  version with real tick generation, decimal arithmetic, a keyboard path
-  and a table fallback is estimated at 350–450.
-  - SVG, not canvas: the direct labels, `tabular-nums` figures, and the
-    accessible fallback below all need real DOM.
-  - Any library added later inherits the constraints: self-hosted and
+- All money arithmetic is decimal, never floats (`record-snapshot.md`,
+  Record shape). Sums run at full precision and round only for display. A
+  chart point costs two multiplications, each rounding half-even at
+  scale 12.
+- Decrypted strings render as text (architecture.md, Application
+  hardening), so no chart library that takes an HTML string for labels or
+  tooltips is ever used.
+- **The chart is drawn directly in SVG with no charting library.** A
+  library supplies scales, tick math and path building. What this chart
+  needs (the partition rule, per-holding interpolation, provenance,
+  per-band selection deltas, asset and liability mirroring) is domain
+  logic either way. The interactive chart prototypes at about 200 lines
+  of dependency-free JS, and a production version at an estimated 350 to
+  450.
+  - SVG, not canvas: direct labels, `tabular-nums` figures and the
+    accessible fallback need real DOM.
+  - A library added later inherits the constraints: self-hosted,
     hash-pinned, CSP-safe with no `eval` or `new Function`, no CDN
     (architecture.md, Supply chain), and text-only labels and tooltips.
     Measured against the shipped bundles:
@@ -500,291 +792,315 @@ is a column and every figure is absolute money.
     | frappe-charts 1.6.2 | 17 KB | 0 | 17 |
     | chartist 1.5.0 | 11 KB | 0 | 1 |
 
-    ECharts, ApexCharts, and frappe-charts fail structurally: their label
-    and tooltip paths end in `innerHTML`, and in an app where XSS means
-    Master Key capture that is not a configuration problem. Chart.js and
-    uPlot pass the CSP tests cleanly and are both MIT.
-- The chart is **keyboard reachable** (Reading a date) **and has a
-  data-table fallback** (The data table). A static `aria-label` on the SVG is not
-  sufficient for the primary screen of the app.
-- Formatting follows the reader's settings (account-settings.md, Dates
+    ECharts, ApexCharts and frappe-charts fail structurally: their label
+    and tooltip paths end in `innerHTML`, and where XSS means Master Key
+    capture that is not a configuration problem. Chart.js and uPlot pass
+    the CSP tests cleanly and are both MIT.
+- The chart is keyboard reachable and has a data-table fallback. A static
+  `aria-label` on the SVG is not enough for the app's primary screen.
+- A very large history downsamples for drawing only. Totals and every
+  reading at a date use the full data.
+- Formatting follows the reader's settings (`account-settings.md`, Dates
   and numbers).
 
 ## Edge cases
 
-- **No holdings** → empty state pointing at "Add your first holding."
-- **Holdings but no snapshots** → active holdings listed as "not yet
-  valued" with no table headings above them (No listed row), total
-  shown as "—" rather than 0, no chart.
-- **No listed row** → the holdings table, headings included, is not
-  rendered, because a table of headings over nothing reads as a fault.
-  A listed row is an active holding with a figure in the selected
-  pricing mode, or an archived holding while "Show archived" is on,
-  narrowed to the unassigned ones while that filter applies, which
-  narrows the groups the same way. The "not yet valued" and "not
-  priced" groups stand alone under the section heading. `ui/dashboard.md`, States, owns what each case reads.
-- **A history of one day**, every snapshot, price entry and archive on
-  one date → under every range the chart shows a single point at the
-  middle of the plot (Ranges and modes, Reading a date) rather than
-  failing or drawing a flat line back to the beginning of time.
-- **All holdings archived** → total is "—", history still renders, and
-  with "Show archived" off there is no holdings table (No listed row).
-- **A holding first valued and archived on the same date** → it
-  appears on no chart date and on neither side of its step: absent just
-  before its first snapshot, and absent at its archive.
-- **A dimension no holding carries** → one "Unassigned" band covering
-  everything, with the coverage indicator reading 0 of N. Correct, and
-  the indicator is what stops it being read as a bug.
-- **A dimension every active holding carries** → the coverage reads N
-  of N as plain text, never a control, because filtering to the
-  unassigned ones would list nothing. Coverage offers that filter only
-  while it reads fewer than N, and 0 of 0 is plain text too. A filter
-  already applied that lists no row, such as one opened from a link
-  made before the last holding was assigned, renders no table (No
-  listed row) and keeps its way back to every holding.
-- **A holding whose `dims` names an archived or unknown value** →
-  "Unassigned", like any unclassified holding. The entry is preserved,
-  so restoring the value restores the band.
-- **A dimension with more than four values** → the first four in the
-  dimension's configured order take chart slots, and the remainder fold
-  into "Other" (`ui/design-system.md`).
-- **A holding not valued in a long time** → counted in the total at its
-  last known **quantity**, priced by the selected mode, with its "as of"
-  date shown and no warning at any age.
-- **A chart date before any price entry for a symbol** → priced at that
-  symbol's first entry, carried backward.
-- **Two entries for one (symbol, date) that are not byte-identical** →
-  the pair drops out of that symbol's series and the neighboring
-  entries interpolate across the date. The fault is named on screen and
-  resolved in that date's recording (`record-rate.md`). When the pair
-  is the symbol's only entry, its active holdings are listed as not priced
-  rather than counted at either figure.
-- **Decryption fails for one record** → that record is skipped, the rest
-  of the view renders, and a prominent warning names how many records
-  could not be read. An unreadable price entry drops out of its series,
-  which the neighboring entries interpolate across rather than leaving
-  a hole. This is the AAD-binding tripwire firing
-  (architecture.md, Data integrity) and must never be swallowed
-  silently or crash the whole view.
-- **A very large history** → the chart downsamples for display; totals
-  and every reading at a date are always computed on the full data.
+Each edge case is a state of the Dashboard (States, Holdings table) or a
+rule of the chart (Archived holdings, Ranges and modes).
 
 ## Acceptance criteria
 
-- With three holdings in different units and known snapshots and price
-  entries, the displayed total equals the hand-computed
-  `Σ value × price`, exactly, in decimal, in both pricing modes, and the
-  two modes differ.
-- A holding last recorded in March, with a price entry from this week,
-  contributes at this week's price in the default mode and at March's
-  price in the other. This is the regression test for the whole split.
-- Recording one franc holding changes the converted figure of every
-  dollar and gold holding, without any of them gaining a snapshot.
-- A change in the provider's published rate, with nothing recorded,
-  changes no figure anywhere: nothing was written, so there is nothing
-  to read differently.
-- Adding, changing, or deleting an interior entry in either series
-  changes only the stretch between that entry's neighbors. No point
-  outside it moves, asserted for all three operations.
-- Deleting the newest entry of a series moves every point after the
-  previous entry and none before it.
-- Deleting a whole recording moves every band measured in the symbols
-  it priced, across the stretches those entries anchored and no
-  further, including bands whose holdings had no entry at that date.
-- A date carrying rate entries and no snapshots still bends the bands
-  of the symbols it prices, asserted against the same date with those
-  entries removed.
-- A symbol with two differing entries on one date prices that date from
-  its neighboring entries, and the view names the fault.
-- An active holding whose unit has a quantity but no price entry is
-  listed as not priced, is excluded from the total, and its quantity
-  never appears in the total unconverted.
-- On rates as of each figure, a `USD` holding whose latest quantity is
-  at 2026-04-10, with `USD` entries at 2010-03-31 only, counts in the
-  total at the 2010-03-31 rate and its row carries 2010-03-31. A row
-  whose price entry sits at its quantity date carries no price date.
-- On latest rates, in a vault whose newest entry is at 2026-04-10, a
-  free-text holding priced only at 2024-01-15 carries 2024-01-15, and a
-  `USD` holding priced at 2026-04-10 carries no price date.
-- A holding last valued in March shows an "as of March" marker and
-  still contributes to the current total, with no warning attached at
-  any age.
-- A snapshot recorded in the future of the chart range does not appear
-  before its date.
-- A holding contributes nothing to chart dates before its first
-  snapshot; adding ten years of an old holding's history does not create
-  a step at the chart's left edge.
-- A holding with snapshots of 100 on 1 January 2026 and 200 on 31
-  January 2026, measured in the main currency, reads 150 on 16 January
-  2026, the midpoint by day, with 1 January and 31 January carrying an
-  entry mark and 16 January carrying none, and with nobody having
-  turned anything on.
-- The same holding measured in a unit whose price is 1.00 on 1 January
-  2026 and 2.00 on 31 January 2026 reads 150 × 1.50 on 16 January 2026,
-  not the chord between 100 and 400. This is the assertion that the
-  band bends.
-- A chart date before a symbol's first price entry is priced at that
-  first entry. The band does not start at zero and does not vanish.
-- The axis ticks mark quantity entries only: adding a price entry adds
-  no tick.
-- The chart loads with its entry marks showing, with nothing turned on
-  and no stored preference consulted. Just the line removes them and
-  changes nothing else about the drawing.
-- With recordings on 15 January, 10 April and 30 June 2026 and nothing
-  between, the pointer at the x of 5 February 2026 reads 5 February,
-  and at the x of 3 June reads 3 June. The tooltip and the hero show
-  the value model's bands and total for that day, exactly, in decimal,
-  and neither day is a drawing sample.
-- On that chart, a drag from 3 June back to 5 February selects 5
-  February to 3 June. The hero shows the total at 3 June minus the
-  total at 5 February, and each legend entry its band's value at 3 June
-  minus its value at 5 February, exactly, in decimal.
-- Moving the pointer across the plot one pixel column at a time reads
-  days that never go backward, starting at the range's first day and
-  ending at its last. On a range with no more days than the plot has
-  pixel columns, every day of the range is read.
-- From the range's first day, stepping the crosshair one day at a time
-  reads every day of the range once, in order, ending at its last, with
-  the same readout the pointer gives on each. This holds across a
-  daylight-saving change in the reader's time zone. The key that moves
-  between recorded dates lands on every date carrying a snapshot and on
-  no other.
-- A click or Enter on a day carrying no snapshot opens nothing. On a
-  day carrying one, and on that day's tick, it opens that date's
-  recording.
-- With a history long enough to downsample, the readout at a day whose
-  sample the downsampling dropped equals the value model at that day,
-  and the data table lists that day.
-- Under Total the data table's columns are Date and Net worth, and
-  nothing else. Under a dimension they are Date, the chart's bands in
-  the legend's order, then Net worth.
-- With snapshots on 2026-01-15 and 2026-06-30, a `USD` price entry on
-  2026-04-10 for a `USD` holding, and a holding in the main currency
-  archived on 2026-05-20 with no snapshot that day, loaded from a
-  fixture, and no other entry, the data table under
-  All lists 2026-01-15, 2026-04-10, 2026-05-20 and 2026-06-30, in that
-  order, and no other day. Under 1M it lists the range's first day and
-  2026-06-30 only.
-- Each data table row's band cells equal the value model's bands at its
-  day, and its Net worth equals their exact decimal sum. Two holdings in
-  the main currency, in different bands, each recorded at
-  `4503599627370496.25`, give a Net worth of
-  `9,007,199,254,740,992.50` under `en-US`, which a float sum cannot
-  write.
-- Each data table row's date equals `longDate` of its day and the
-  tooltip's date on that day: 2026-01-15 reads `Jan 15, 2026` under
-  `en-US` with no `dateStyle`, and `15.01.2026` under `dmy`.
-- Hiding a band, and switching to Percentage, leave the data table's
-  text unchanged.
-- Over a sweep of single-holding totals from 0.40 to 10^10, covering
-  each 1, 2, 2.5, 5 and 7.5 times a power of ten and the integers either
-  side, positive and negative, at a 1280px and a 390px viewport: no two
-  value tick labels read the same, every tick is a multiple of a 1, 2 or
-  5 step no smaller than 1, zero included, and each label read back
-  through its unit equals its gridline's value exactly.
-- With one holding recorded at 2500, at a 1280px viewport, the ticks
-  sit at 0, 500, 1000, 1500, 2000 and 2500. The tick at 1500 reads `1.5`
-  and the one at 2500 reads `2.5`, each before the thousands suffix, and
-  `1,5` and `2,5` under a comma decimal point.
-- With locale `de-DE` and `groupSeparator` `period`, one holding
-  recorded at 2500000, at a 1280px viewport, the ticks read `0`,
-  `500k`, `1M`, `1,5M`, `2M` and `2,5M`. With an asset and a
-  liability holding, the percentage view's ticks read `−100%`, `−50%`,
-  `0%`, `50%` and `100%`.
-- With locale `de-DE`, `groupSeparator` `period` and `moneyPlaces`
-  `0`, and net worth 1000 on the range's first day and 1368946 on its
-  last, the hero's change reads the amount `+1.367.946` and the
-  percentage `+136.794,6%`.
-- In the main currency under `en-US`, net worth from 2000 to 2005
-  gives a percentage of `+0.2%` and from 2000 to 1995 `−0.2%`, half-even
-  where a float rounds `0.25` up. From 2000 to 2001 it reads `+0.0%`
-  beside the rising arrow, from −1000 to −500 `+50.0%`, and from 0 to
-  500 the amount stands with no percentage.
-- With a single recording, at a 1280px and a 390px viewport, the
-  point's center sits at the plot's horizontal middle, within half a
-  pixel, and its mark's bounding box lies wholly inside the chart's
-  drawing, under 1M, 6M, 1Y and All alike. The pointer at either edge
-  of the plot and at its middle reads that day.
-- With snapshots only at 2026-03-01 and 2026-04-10 and a price entry at
-  2026-01-15, 6M, 1Y and All each start at 2026-03-01.
-- Switching the pricing mode changes the total, the list of holdings
-  and the breakdown, and changes no chart point. Asserted over every
-  sample of every band, not only the right hand edge.
-- On latest rates the chart's right hand edge equals the total exactly,
-  in decimal. With a holding last recorded in March and a price entry
-  from this week at a different figure, rates as of each figure gives
-  a total that is not the edge, and nothing on screen reports that
-  difference as a fault.
-- Two holdings whose histories start years apart produce a chart where
-  the later holding's first snapshot raises only its own band — summing
-  before interpolating would instead bend the whole series.
-- Archiving a holding on D removes it from the current total and from
-  the value at D and at every later date, with an archive annotation at
-  D. Every chart point up to and including the latest entry before D of
-  each series the archive wrote to is unchanged.
-- A holding measured in the main currency with a snapshot of 100 on 1
-  January 2026, archived on 31 January 2026, reads 50 on 16 January
-  2026, and the chart draws no vertical edge at 31 January: the side
-  just before it is zero.
-- A holding archived on the newest recorded date leaves the chart's
-  last point, the data table's last row and the end of the change over
-  the range each equal to the total on latest rates, exactly, in
-  decimal.
-- A holding archived on a date after the newest recording extends the
-  chart to the archive date through its zero, and the point there
-  equals the total on latest rates.
-- Changing the price at D of the unit a holding archived on D is
-  measured in leaves that holding's contribution at D and just before D
-  at zero, and the confirmation does not count it.
-- A holding archived on D with no snapshot at D, loaded from a fixture,
-  steps at D from its last quantity carried forward at D's price, with
-  the annotation at D. One archived with a non-zero snapshot at D steps
-  from that figure, and changing D's price moves the side just before
-  the step and is counted by the confirmation. Loading either writes
-  nothing.
-- An unarchived holding whose zero sits at D contributes zero from D
-  until its next snapshot and interpolates up to that snapshot.
-- For every date in the chart, the sum of the visible bands equals the
-  net-worth line at that date, in decimal.
-- A holding appears in exactly one band of the selected dimension, and
-  the holding count across all bands equals the total holding count.
-- An active holding with no snapshots is listed as "not yet valued"
-  and is not counted as 0.
-- At a 1280px viewport, in a vault whose only holdings are active and
-  have no snapshots, the dashboard renders no holdings table and no
-  column heading, and every one of those holdings is under "not yet
-  valued". Recording a value for one renders the table with that
-  holding as its only row.
-- At a 1280px viewport, with every holding archived, "Show archived"
-  off renders no holdings table and no column heading, and on renders
-  the table with each archived holding as a row.
-- Under a dimension every active holding carries, the coverage reads
-  "N of N holdings assigned" with N the active holding count, is
-  neither a link nor a button, and is not focusable. Clicking it leaves
-  the holdings table's rows unchanged. With exactly one active holding
-  unassigned, and that holding valued, the coverage is a control, and
-  activating it lists that holding as the table's only row.
-- With the unassigned filter applied and no unassigned active holding
-  left, the dashboard renders no holdings table and no column heading,
-  and the filter's way back renders the table with every listed row.
-- With "Show archived" on, in both pricing modes, an archived holding
-  in a unit with no price and an archived holding with no readable
-  snapshot each render as a row of the holdings table with the Archived
-  chip, and with Unarchive at desktop width (`spec/ui/dashboard.md`, At
-  phone width), the first reading its latest quantity and "not
-  priced", the second "not yet valued". Neither is listed under not
-  priced or not yet valued, while an active holding in the first one's
-  unit stays under not priced. With the toggle off, neither archived
-  holding appears anywhere on the dashboard.
-- A negative-balance holding reduces the net figure and appears under
-  liabilities.
-- The breakdown by dimension sums to exactly the net-worth total, with
-  no disclaimer needed.
-- With one record deliberately corrupted, the view renders the rest and
-  warns that 1 record could not be decrypted. With that record being a
-  price entry, its symbol still prices from the neighboring entries.
-- No network request is made when switching chart range, dimension,
-  absolute/percentage mode, pricing mode, or band visibility.
-- A holding named `<script>alert(1)</script>` renders as literal text
-  in the list, the chart legend, and any tooltip — as does a dimension
-  value labelled the same way.
+1. With three holdings in different units and known snapshots and
+   prices, the total equals the hand-computed `Σ value × price`, exactly
+   in decimal, to the cent, in both pricing modes, and the two modes
+   differ. Test: `tests/test_client.py::test_the_client_side_rules_hold`.
+2. A holding last recorded in March, with a price entry from this week,
+   contributes at this week's price on latest rates and at March's price
+   on rates as of each figure. Test:
+   `tests/test_client.py::test_the_client_side_rules_hold`.
+3. Recording one franc holding changes the converted figure of every
+   dollar and gold holding, and the band of every foreign unit on that
+   date and after, without any of them gaining a snapshot. Test: no
+   test.
+4. A rate written today adds a point at today and moves no earlier point
+   and no recorded quantity. Test: no test.
+5. Opening the dashboard asks no price source anything, and a revised
+   provider figure with nothing recorded changes no figure anywhere.
+   Test: `tests/browser/parts/dashboard-net-worth.mjs`.
+6. (blind) Adding, changing or deleting an interior entry in either
+   series changes only the stretch between its neighbors, asserted for
+   all three operations with every point outside the stretch compared.
+   Correcting a rate moves every band in that unit. Test:
+   `tests/test_client.py::test_the_client_side_rules_hold`.
+7. Deleting the newest entry of a series moves every point after the
+   previous entry and none before it. Test:
+   `tests/test_client.py::test_the_client_side_rules_hold`.
+8. Deleting a whole recording moves every band in the symbols it priced,
+   across the stretches those entries anchored and no further, including
+   bands with no entry at that date. Test:
+   `tests/test_client.py::test_the_client_side_rules_hold`.
+9. A date carrying rate entries and no snapshots, including a recording
+   whose figures were all cleared, still bends the bands of the symbols
+   it prices, compared with the same date with those entries removed.
+   Test: `tests/test_client.py::test_the_client_side_rules_hold`.
+10. A symbol with two differing entries on one date prices that date from
+    its neighbors, and the dashboard names the fault. Test:
+    `tests/browser/parts/dashboard.mjs`.
+11. When that pair is the symbol's only entry, its active holdings are
+    listed as not priced. Test: `tests/browser/parts/dashboard.mjs`.
+12. (blind) An active holding with a quantity and no price is listed as
+    not priced, is excluded from the total, and its bare quantity never
+    appears in the total. Test:
+    `tests/test_client.py::test_the_client_side_rules_hold`.
+13. (blind) On rates as of each figure, a `USD` holding whose latest
+    quantity is at 2026-04-10, with `USD` entries only at 2010-03-31,
+    counts at the 2010-03-31 rate and its row carries 2010-03-31. A row
+    whose price sits at its quantity date carries no price date. Test:
+    `tests/browser/parts/dashboard-net-worth.mjs`.
+14. (blind) On latest rates, in a vault whose newest entry is at
+    2026-04-10, a free-text holding priced only at 2024-01-15 carries
+    2024-01-15, and a `USD` holding priced at 2026-04-10 carries none.
+    The reference date moves between the two modes, so both are
+    asserted. Test: `tests/browser/parts/dashboard-net-worth.mjs`.
+15. (blind) The price date is a line in the converted figure's cell,
+    never a column, and is absent on a row priced at its own date, on a
+    main-currency row and on a not-priced row. Test:
+    `tests/browser/parts/dashboard-net-worth.mjs`.
+16. A holding last valued in March shows "as of" March and still counts
+    in the total, with no warning at any age. Every figure carries its
+    quantity's date and the screen carries one rate date. Test: no test.
+17. A snapshot after the chart range's start does not appear before its
+    date, and a holding contributes nothing before its first snapshot:
+    ten years of an old holding's history make no step at the left edge.
+    Test: `tests/test_client.py::test_the_client_side_rules_hold`,
+    `tests/browser/parts/dashboard.mjs`.
+18. A main-currency holding at 100 on 1 January 2026 and 200 on 31
+    January 2026 reads 150 on 16 January, with 1 and 31 January marked
+    and 16 January not, with nothing turned on. Nothing on screen treats
+    the months between two entries as an omission. Test:
+    `tests/test_client.py::test_the_client_side_rules_hold`.
+19. (blind) The same holding in a unit priced 1.00 on 1 January and 2.00
+    on 31 January reads 150 × 1.50 on 16 January, not the chord between
+    100 and 400. The price must change between the two snapshots, or an
+    implementation sampling only snapshot dates passes. Test:
+    `tests/test_client.py::test_the_client_side_rules_hold`.
+20. A chart date before a symbol's first price is priced at that entry.
+    The band neither starts at zero nor vanishes. Test:
+    `tests/test_client.py::test_the_client_side_rules_hold`.
+21. (blind) Adding a price entry adds no tick. Ticks mark quantity
+    entries only. Test:
+    `tests/test_client.py::test_the_client_side_rules_hold`.
+22. (blind) The chart loads with its entry marks showing, with nothing
+    turned on and no stored preference read. Just the line removes them
+    and changes nothing else. Test:
+    `tests/browser/parts/dashboard-net-worth.mjs`.
+23. (blind) With recordings on 15 January, 10 April and 30 June 2026 only,
+    the pointer at 5 February reads 5 February and at 3 June reads 3
+    June, and the tooltip and hero show the value model's bands and total
+    exactly in decimal, on days that are not drawing samples. Test:
+    `tests/browser/parts/dashboard-net-worth.mjs`.
+24. (blind) A drag from 3 June back to 5 February selects 5 February to 3
+    June, and the hero and each legend entry read the later day's value
+    minus the earlier's, exactly. Asserted in both drag directions. Test:
+    `tests/browser/parts/dashboard-net-worth.mjs`.
+25. (blind) Walking the pointer one pixel column at a time reads days that
+    never go backward, from the range's first day to its last, and reads
+    every day where the plot has at least as many columns as days. Test:
+    `tests/browser/parts/dashboard-net-worth.mjs`,
+    `tests/test_client.py::test_the_client_side_rules_hold`.
+26. (blind) Stepping one day at a time from the first day reads every day
+    once and in order to the last, with the pointer's readout on each,
+    across a daylight-saving change. The recorded-date key lands on every
+    date carrying a snapshot and on no other. Test:
+    `tests/browser/parts/dashboard-net-worth.mjs`,
+    `tests/test_client.py::test_the_client_side_rules_hold`.
+27. (blind) A click or Enter on a day with no snapshot opens nothing, and
+    on a snapshot day or its tick opens that date's recording. Test:
+    `tests/browser/parts/dashboard-net-worth.mjs`.
+28. (blind) In a history long enough to downsample, the readout at a day
+    whose sample was dropped equals the value model, and the data table
+    lists that day. Test: `tests/browser/parts/dashboard-fixtures.mjs`,
+    `tests/test_client.py::test_the_client_side_rules_hold`.
+29. Under Total the data table's columns are Date and Net worth only.
+    Under a dimension they are Date, the bands in legend order, then Net
+    worth. Test: `tests/browser/parts/dashboard-net-worth.mjs`.
+30. (blind) With snapshots on 2026-01-15 and 2026-06-30, a `USD` price on
+    2026-04-10 for a `USD` holding, and a main-currency holding archived
+    on 2026-05-20 with no snapshot that day, the table under All lists
+    exactly 2026-01-15, 2026-04-10, 2026-05-20 and 2026-06-30 in order,
+    and under 1M the range's first day and 2026-06-30 only. Test:
+    `tests/browser/parts/dashboard-fixtures.mjs`.
+31. (blind) Each table row's band cells equal the value model at its day
+    and Net worth their exact decimal sum. Two main-currency holdings in
+    different bands at `4503599627370496.25` give
+    `9,007,199,254,740,992.50` under `en-US`. Test:
+    `tests/browser/parts/dashboard-fixtures.mjs`.
+32. (blind) Each table row's date equals `longDate` of its day and the
+    tooltip's date: 2026-01-15 reads `Jan 15, 2026` under `en-US` with no
+    `dateStyle` and `15.01.2026` under `dmy`. Test:
+    `tests/browser/parts/dashboard-net-worth.mjs`.
+33. (blind) Hiding a band and switching to Percentage leave the table's
+    text unchanged. Test: `tests/browser/parts/dashboard-fixtures.mjs`.
+34. (blind) Over single-holding totals from 0.40 to 10^10 (each 1, 2, 2.5,
+    5 and 7.5 times a power of ten and the integers either side, both
+    signs) at 1280px and 390px, no two tick labels read the same, every
+    tick is a multiple of a 1, 2 or 5 step of at least 1, zero included,
+    and each label read back through its unit equals its gridline. Test:
+    `tests/test_client.py::test_the_client_side_rules_hold`.
+35. (blind) One holding at 2500, at 1280px, has ticks 0, 500, 1000, 1500,
+    2000 and 2500, with 1500 reading `1.5` and 2500 `2.5` before the
+    suffix, and `1,5` and `2,5` under a comma decimal point. Each tick is
+    an exact multiple of the step, never built by repeated addition.
+    Test: `tests/test_client.py::test_the_client_side_rules_hold`,
+    `tests/browser/parts/dashboard.mjs`.
+36. (blind) Under `de-DE` with `groupSeparator` `period`, one holding at
+    2500000 at 1280px reads `0`, `500k`, `1M`, `1,5M`, `2M`, `2,5M`. With
+    an asset and a liability holding the percentage ticks read `−100%`,
+    `−50%`, `0%`, `50%`, `100%`. Both are written by the formatter. Test:
+    `tests/browser/parts/dashboard-fixtures.mjs`.
+37. Under `de-DE`, `groupSeparator` `period` and `moneyPlaces` `0`, net
+    worth from 1000 to 1368946 gives a change of `+1.367.946` and
+    `+136.794,6%`. Test: `tests/browser/parts/dashboard-net-worth.mjs`.
+38. (blind) The change percentage rounds half-even: in the main currency
+    under `en-US`, 2000 to 2005 reads `+0.2%` and 2000 to 1995 `−0.2%`,
+    where a float or half-away rounding gives 0.3. Test:
+    `tests/test_client.py::test_the_client_side_rules_hold`.
+39. (blind) 2000 to 2001 reads `+0.0%` beside the rising arrow, −1000 to
+    −500 reads `+50.0%`, and 0 to 500 shows the amount with no
+    percentage. Test: no test.
+40. (blind) With a single recording, at 1280px and 390px, under 1M, 6M, 1Y
+    and All, the point's center is at the plot's horizontal middle within
+    half a pixel and its mark's bounding box lies wholly inside the
+    drawing. The pointer at either edge and the middle reads that day.
+    Test: `tests/browser/parts/dashboard.mjs`.
+41. Every recorded point is drawn whole on a computer and a phone,
+    including one at the chart's first or last date. Test:
+    `tests/browser/parts/dashboard.mjs`.
+42. (blind) With snapshots only at 2026-03-01 and 2026-04-10 and a price
+    entry at 2026-01-15, 6M, 1Y and All each start at 2026-03-01. Test:
+    `tests/test_client.py::test_the_client_side_rules_hold`,
+    `tests/browser/parts/dashboard.mjs`.
+43. (blind) Switching the pricing mode changes the total, the list and
+    the breakdown, and no chart point, asserted over every sample of
+    every band, not only the right hand edge. Test:
+    `tests/browser/parts/dashboard-net-worth.mjs`.
+44. (blind) On latest rates the right hand edge equals the total exactly.
+    With a March figure and a different price this week, rates as of each
+    figure gives a total that is not the edge, and nothing on screen
+    reports it as a fault. Test:
+    `tests/test_client.py::test_the_client_side_rules_hold`.
+45. Two holdings whose histories start years apart: the later one's first
+    snapshot raises only its own band. Test:
+    `tests/test_client.py::test_the_client_side_rules_hold`.
+46. (blind) Archiving on D removes the holding from the total and from
+    the value at D and after, with an annotation at D naming it. Every
+    point up to and including the latest entry before D of each series
+    the archive wrote to is unchanged, compared point by point. Test:
+    `tests/test_client.py::test_the_client_side_rules_hold`,
+    `tests/browser/parts/dashboard-net-worth.mjs`.
+47. (blind) A main-currency holding at 100 on 1 January 2026, archived on
+    31 January 2026, reads 50 on 16 January, and no vertical edge is
+    drawn at 31 January. Test:
+    `tests/test_client.py::test_the_client_side_rules_hold`.
+48. (blind) A holding archived on the newest recorded date leaves the
+    chart's last point, the table's last row and the end of the change
+    each equal to the total on latest rates, exactly. Test:
+    `tests/test_client.py::test_the_client_side_rules_hold`.
+49. (blind) A holding archived after the newest recording extends the
+    chart to the archive date through its zero, and the point there
+    equals the total on latest rates. Test:
+    `tests/test_client.py::test_the_client_side_rules_hold`.
+50. (blind) Changing the price at D of the unit of a holding archived on
+    D with its zero leaves its contribution at D and just before D at
+    zero, and the confirmation does not count it. Test:
+    `tests/test_client.py::test_the_client_side_rules_hold`.
+51. (blind) A holding archived on D with no snapshot at D, loaded from a
+    fixture, steps at D from its last quantity carried forward at D's
+    price, annotated at D. One loaded with a non-zero snapshot at D steps
+    from that figure, and changing D's price moves the side before the
+    step and is counted by the confirmation. Loading either writes
+    nothing. Test: `tests/test_client.py::test_the_client_side_rules_hold`.
+52. An unarchived holding whose zero sits at D contributes zero from D
+    until its next snapshot and interpolates up to it. Test:
+    `tests/test_client.py::test_the_client_side_rules_hold`.
+53. (blind) For every date in the chart, the visible bands sum to the net
+    worth line, in decimal, not at a sampled few. Test:
+    `tests/test_client.py::test_the_client_side_rules_hold`.
+54. Each holding appears in exactly one band of the selected dimension,
+    the bands together account for every holding, and holdings with no
+    value are in a visible, counted "Unassigned" band. Test:
+    `tests/test_client.py::test_the_client_side_rules_hold`.
+55. An active holding with no snapshots is listed as "not yet valued" and
+    not counted as 0. With holdings and no values the total reads `—` and
+    there is no chart. Test: `tests/browser/parts/dashboard.mjs`.
+56. At 1280px, in a vault whose only holdings are active with no
+    snapshots, no holdings table and no column heading render. Recording
+    one renders the table with that holding as its only row. Test: no
+    test.
+57. (blind) With every holding archived, Show archived off renders no
+    table, no column heading and the line "Every holding is archived.",
+    and on renders each archived holding as a row. The absence is
+    asserted on the rendered page, never as a table hidden by styling.
+    Test: `tests/browser/parts/dashboard-fixtures.mjs`.
+58. (blind) With holdings and no snapshots and an archived holding
+    present, the active holdings are under Not yet valued and the
+    archived one is an archived row reading "not yet valued" only with
+    Show archived on. Test: `tests/browser/parts/dashboard.mjs`.
+59. (blind) Under a dimension every active holding carries, the coverage
+    reads "N of N holdings assigned", is neither link nor button, is not
+    focusable, and a click leaves the rows unchanged. The same at 0 of 0.
+    With one valued active holding unassigned it is a control listing
+    exactly that holding. Test:
+    `tests/browser/parts/dashboard-net-worth.mjs`.
+60. (blind) With the unassigned filter applied and nothing unassigned
+    left, no table and no column heading render, the line reads "Every
+    holding has a Liquidity value. Show all holdings", and Show all
+    holdings renders every listed row. Test:
+    `tests/browser/parts/dashboard-net-worth.mjs`.
+61. (blind) The filter clears through Show all holdings and through Group
+    by "Total", lists archived unassigned holdings only while Show
+    archived is on, narrows the groups the same way, and its line reads
+    exactly "Showing the holdings with no Liquidity value. Show all
+    holdings". Test: `tests/browser/parts/dashboard-net-worth.mjs`.
+62. (blind) With Show archived on, in both pricing modes, an archived
+    holding in a unit with no price and one with no readable snapshot are
+    each a table row with the Archived chip and ink-secondary text, the
+    first reading its quantity and "not priced", the second "not yet
+    valued". Neither is in either group, while an active holding in the
+    first one's unit stays under not priced. With the toggle off neither
+    appears anywhere. Unarchive shows on the row at desktop width. Test:
+    `tests/browser/parts/dashboard.mjs`.
+63. (blind) At phone width no row, active or archived, carries a row
+    action. Tapping an archived row opens the holding's screen offering
+    Unarchive, and an active row's offering Record a value. Test:
+    `tests/browser/parts/dashboard.mjs`.
+64. (blind) The native-unit column shows an XAU-ozt holding stored as
+    "12.125" and an m² holding stored as "80" as typed, under
+    `moneyPlaces` 0 and 2, while the converted column follows
+    `moneyPlaces`. Test:
+    `tests/test_client.py::test_the_client_side_rules_hold`.
+65. A negative-balance holding reduces the net figure and appears under
+    liabilities. Test:
+    `tests/test_client.py::test_the_client_side_rules_hold`,
+    `tests/browser/parts/dashboard.mjs`.
+66. The breakdown sums to exactly the net worth total, with no
+    disclaimer. Test:
+    `tests/test_client.py::test_the_client_side_rules_hold`.
+67. (blind) With one record corrupted, the view renders the rest and
+    warns "1 record could not be read.". With the corrupted record a
+    price entry, its symbol still prices from the neighboring entries.
+    Asserted with a real corrupted record. Test:
+    `tests/browser/parts/dashboard-net-worth.mjs`.
+68. (blind) Switching range, dimension, absolute and percentage, pricing
+    mode or band visibility issues no network request and never waits,
+    captured as requests. Test:
+    `tests/browser/parts/dashboard-net-worth.mjs`.
+69. A holding and a dimension value named `<script>alert(1)</script>`
+    render as literal text in the list, the legend and every tooltip.
+    Test: `tests/browser/parts/dashboard-net-worth.mjs`.
+70. With no holdings the screen says so and offers to add one, with no
+    zero total. Test: `tests/browser/parts/register.mjs`.
+71. The chart can be driven from the keyboard, and the same numbers are
+    available as a plain table. Test:
+    `tests/browser/parts/dashboard-net-worth.mjs`,
+    `tests/browser/parts/dashboard.mjs`.

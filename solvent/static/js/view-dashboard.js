@@ -1,5 +1,5 @@
 // The core payoff screen: what you are worth right now, how it got
-// there, and how it splits (spec/ui/dashboard.md).
+// there, and how it splits (spec/features/net-worth-view.md, Dashboard).
 //
 // No control here issues a network request. Range, dimension, mode,
 // band visibility and selection all read a model already in memory.
@@ -20,7 +20,7 @@ const RANGES = [
 
 /** `unassignedOf` opens the screen grouped by that dimension with the
  *  table filtered to the holdings it leaves unassigned, which is where
- *  a coverage link elsewhere lands (ui/dimensions.md). */
+ *  a coverage link elsewhere lands (account-settings.md, Dimensions). */
 /** `replaced`, `{ dropped }`, adds the Replaced since last open notice
  *  above everything else: the vault was replaced from a file while this
  *  page was locked or its session had ended. */
@@ -236,7 +236,7 @@ function switchButton(label, active, onclick) {
  *  nothing else. Picking a day closes it and routes at once. A date
  *  holding no recording goes straight to the sweep; a marked one opens
  *  that recording's own screen, with no warning and nothing to confirm,
- *  because the picker can see what is there (ui/dashboard.md). */
+ *  because the picker can see what is there (net-worth-view.md, Dashboard). */
 export function datePicker(vault, actions) {
   const marked = new Set(vault.recordingDates());
   const host = el('div', { class: 'date-picker' });
@@ -658,7 +658,7 @@ function holdingsTable(vault, state, render, actions, grouping) {
               : value.state === 'unpriced' ? ['not priced'] : []),
             el('td', { class: 'cell-asof' }, value.state === 'unvalued' ? [] : [el('span', { text: vault.format.longDate(value.asOf) })]),
             // An archived row takes no new value, and unarchiving it is
-            // one action with no dialog (account-form.md, Rules).
+            // one action with no dialog (manage-accounts.md, Account form).
             el('td', { class: 'cell-action' }, [
               holding.payload.archivedAt
                 ? el('button', {

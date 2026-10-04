@@ -1,5 +1,5 @@
 // Everything about one holding: what it is, what it is worth, and its
-// own list of values (spec/ui/account-detail.md).
+// own list of values (spec/features/manage-accounts.md, Account detail).
 //
 // No request is issued by opening this screen, and no price is ever
 // looked up from it, at any age. Every figure comes from the model.

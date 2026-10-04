@@ -70,7 +70,7 @@ def dashboard():
     It loads locked, so it is served in the outside frame with the bar
     hidden: the password screen has no bar and no navigation, and the
     client shows the bar once the keys exist and hides it again on a
-    lock (ui/design-system.md, App shell).
+    lock (app-shell.md, The chrome).
     """
     return vault_page(locked=True)
 
@@ -82,7 +82,7 @@ def settings():
 
     The vault surface is one page, because the keys live in that
     page's memory and a second page would mean deriving them again
-    (ui/unlock.md). The address stays real so that a bookmark of it
+    (login.md, Unlock). The address stays real so that a bookmark of it
     lands on the screen it names.
     """
     return redirect("/dashboard#/settings")

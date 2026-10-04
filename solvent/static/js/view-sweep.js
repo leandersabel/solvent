@@ -1,5 +1,5 @@
 // The sweep: one date, every holding you could record against, on one
-// screen (spec/ui/update-values.md).
+// screen (spec/features/record-snapshot.md, Update values).
 //
 // Nothing counts what was left alone. A partial update is the ordinary
 // case, so the screen scores nothing, marks no row outstanding, and
@@ -802,7 +802,7 @@ function rateLine(vault, unit, date, { sit, readOnly: blockReadOnly, fillMissing
   });
   lookup.addEventListener('click', async () => {
     // Opening a recording fetches nothing. Pressing this is what
-    // issues the request (ui/update-values.md, Rate lines on a
+    // issues the request (record-snapshot.md, Update values, Rate lines on a
     // reopened recording).
     lookup.disabled = true;
     const proposals = await writes.fetchProposals(vault, date);
@@ -853,8 +853,8 @@ export function provenanceChip(payload, format) {
  *  those whose value that day actually changes, meaning holdings
  *  measured in the unit, not archived before the date, holding a
  *  figure at or before it, and whose quantity on it is not zero, the
- *  archive's zero included (ui/update-values.md, Changing or clearing a
- *  rate says what it moves). */
+ *  archive's zero included (record-snapshot.md, Update values,
+ *  Changing or clearing a rate says what it moves). */
 export function holdingsIn(vault, unit, date) {
   const day = dayNumber(date);
   return [...vault.holdings.values()].filter((h) => {
@@ -865,8 +865,8 @@ export function holdingsIn(vault, unit, date) {
 }
 
 /** The confirmation for a save of rate lines: one per save, naming each
- *  unit and how many holdings move (ui/update-values.md, Changing or
- *  clearing a rate says what it moves). */
+ *  unit and how many holdings move (record-snapshot.md, Update
+ *  values, Changing or clearing a rate says what it moves). */
 export function rateChangeCopy(vault, date, changes) {
   const on = vault.format.longDate(date);
   const lines = [];

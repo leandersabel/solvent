@@ -1,5 +1,5 @@
 """The registration forms in a real browser, against stubbed answers
-(spec/ui/register.md, spec/features/register.md, In the browser)."""
+(spec/features/register.md, Register and In the browser)."""
 from __future__ import annotations
 
 import os

@@ -1,6 +1,6 @@
-// The archive dialog once it shows its outcome (spec/ui/unlock.md,
-// Rules): what a lock keeps is a fill-in dialog with what was typed in
-// it, and an outcome message is not one.
+// The archive dialog once it shows its outcome (spec/features/login.md,
+// Unlock, Rules): what a lock keeps is a fill-in dialog with what was
+// typed in it, and an outcome message is not one.
 // Templates: dashboard.html. Modules: view-holding-form.js, dom.js, app.js.
 import {
   BACKDATE, VAULT_PASSWORD, check, click, enterPassword, failing, inDialog, openHolding, page, plant, reloadModel,

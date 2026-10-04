@@ -1,6 +1,7 @@
-// Settings (spec/ui/settings.md): the vault owner's own account. Their
-// password, how dates and numbers are written, how long the vault stays
-// unlocked, the sessions that are open, and deleting the whole vault.
+// Settings (spec/features/account-settings.md, Settings): the vault
+// owner's own account. Their password, how dates and numbers are written,
+// how long the vault stays unlocked, the sessions that are open, and
+// deleting the whole vault.
 // Templates: dashboard.html. Modules: view-settings.js, session.js,
 // format.js, api.js, crypto.js, dom.js.
 import {

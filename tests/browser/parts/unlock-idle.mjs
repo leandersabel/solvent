@@ -1,6 +1,6 @@
-// The idle lock (spec/ui/unlock.md, features/login.md): the vault locks
-// itself after its idle period, whatever is open, and what a person had
-// typed is the one thing a lock keeps.
+// The idle lock (spec/features/login.md, Unlock): the vault locks itself
+// after its idle period, whatever is open, and what a person had typed is
+// the one thing a lock keeps.
 // Templates: dashboard.html, shell/. Modules: session.js, unlock.js,
 // view-settings.js, app.js, dom.js.
 import {

@@ -1,619 +1,779 @@
 # Login
 
-## What it does
+One sign-in screen at one address opens a vault for a vault owner and
+signs an administrator in to the admin area. The password never leaves
+the browser: it derives the key that makes the vault readable.
 
-One flow signs in both kinds of account. The browser fetches the salt
-and KDF parameters, derives the Master Key and Auth Key, and sends only
-the Auth Key. The server verifies it against a stored hash and starts a
-session. For a vault owner it also returns the wrapped DEK, which the
-browser unwraps. Master Key and unwrapped DEK live in browser memory
-for the session only — never in localStorage or sessionStorage. For an
-administrator there is no wrapper, and the Master Key the browser
-derived is discarded.
+## What the client gets
 
-Every field this feature reads or writes belongs to the account's
-**`password` credential row** (architecture.md, Credentials and vault
-key wrappers): its `params` hold the salt and KDF envelope, its
-`verifier` holds the Auth Key hash. The `dek_wrappers` row keyed to
-that credential is the wrapper this flow returns when one exists. The
-`principals` table is touched for identity and `last_login_at` alone.
-v1 has no other credential method, and this feature specifies none.
+You type your password, wait a moment, and your holdings, figures and
+history appear. The password is not checked against something the
+server knows. It makes the vault readable, so a wrong password produces
+a key that opens nothing.
 
-**One sign-in screen at one address, for both kinds.** There is no
-administrator login page and no kind selector. The screen looks and
-behaves identically until a correct password has been supplied, and
-diverges only after: a vault owner unwraps their DEK and lands on the
-dashboard, an administrator unwraps nothing and lands in the admin
-area.
+- **One screen for everything** (Unlock): signing in, unlocking again,
+  and signing in to an administrator account, which opens nothing
+  (`admin-invites.md`). A username belongs to exactly one account, so it
+  decides the kind, and somebody holding both holds two usernames. A separate address
+  for administrators would be one more thing to know and would hide
+  nothing, and one screen means a probe cannot tell the kinds apart by
+  where a name was accepted. The cost is that the screen behaves
+  differently after a correct password without hinting at it before.
+- **The wait** takes about a sixth of a second on a computer and a
+  little under two seconds on a phone or tablet, whose browsers run this
+  work much more slowly. A strength that kept a computer at a fraction
+  of a second would leave a phone waiting eight to ten seconds at every
+  unlock, and two seconds costs roughly one character of password
+  strength against a stolen copy of the data (architecture.md, Key
+  management). Solvent raises the strength on its own as phone browsers
+  get faster, with no prompt and no extra wait (Stale-KDF upgrade).
+  Registration uses the same setting (`register.md`), and an
+  administrator pays the same wait (Rules).
+- **Locking** takes every key and everything decrypted, because the
+  threat is another household member at an unlocked machine with the
+  browser's developer tools (Rules). It happens after a stretch of no
+  activity you set (`account-settings.md`, Session and lock), with Lock
+  (`app-shell.md`, The chrome), on a reload, and on a restore made
+  elsewhere (`export-import.md`). Unlocking re-reads the vault, and that
+  pause is by design. **Whatever you were typing survives a lock**,
+  except after a restore made elsewhere. An administrator has nothing to
+  lock and leaves only by signing out.
+- **When it goes wrong**, the card never says whether a name exists or
+  which kind it is. Too many attempts slow and then lock sign-in for a
+  few minutes, for every username from that connection, administrators
+  included. Trying again during a lock does not lengthen it. Whoever
+  runs the instance sets the numbers, because a home-only install and
+  one facing the internet need different limits. No IP address is kept
+  readable and no device is recorded (architecture.md, Application
+  hardening).
 
-**Kind is invisible until the credential verifies.** Steps 1 and 2
-below are byte-identical for a vault owner, an administrator, and a
-username that does not exist, and step 2 takes the same wall-clock
-time in all three cases (Rules, The sign-in wait).
+What it deliberately does not do:
 
-## Flow
+- **No password recovery** (`register.md`), and no "forgot password"
+  link. A dead link that implies recovery is worse than none.
+- **No "remember me"** and no staying signed in across a browser
+  restart. The vault is readable only while the tab is open and
+  unlocked, so there is nowhere to remember it to.
+- **No way to turn the idle lock off.** It is the last defense against
+  somebody walking up to an unlocked screen.
+- **No second factor.** The vault's protection is the password itself,
+  so a second factor would guard the session, not the data. On an
+  administrator account the password is all that stands in front of the
+  power to delete every account, and that gap is a known one.
+- **No easier unlock for a device short of memory.** A weaker
+  derivation produces a key that opens nothing, and weakening it for
+  everybody undoes the one protection between a stolen copy of the data
+  and someone reading it. You close a tab and try again.
 
-1. `POST /api/auth/salt` `{ username }` → `{ salt, kdf }`, which is the
-   `password` credential's `params` and nothing else. Returns a real
-   salt + envelope for a known account **of either kind**, and a
-   **deterministic decoy** `HMAC(server_secret, normalized_username)`
-   truncated to 16 bytes, plus the server's current default KDF
-   envelope, for an unknown one. Responses must be identically shaped
-   and constant-time (architecture.md, Login enumeration). **The
-   response carries no field naming, implying, or derivable into the
-   account's kind.** This endpoint answers an unauthenticated caller,
-   which is why `params` carries nothing secret and the Auth Key hash
-   is a separate column.
-2. Client derives Master Key + Auth Key in a Web Worker. **Both
-   halves, always**, because the client does not yet know whether it
-   will need the Master Key (architecture.md, Administrator
-   credentials).
-3. `POST /api/auth/login` `{ username, authKey }` → on success, sets the
-   session cookie, writes `last_login_at`, and returns
-   `{ kind, kdfStale }` plus, for a vault owner only, `wrappedDek`,
-   `dekNonce` and `vaultEpoch`. That wrapper is the one belonging to the
-   credential the caller just authenticated with, never a list
-   (architecture.md, One key, N wrappers). The wrapper and
+## Screens
+
+### Unlock
+
+The only place a password is typed outside registration and the
+change-password forms, and the only place key derivation starts from
+cold. Password managers
+are supported on purpose: a manager-generated passphrase is the most
+realistic protection a vault with no recovery can have.
+
+Modes:
+
+- **Signing in.** No session. Username and password.
+- **Unlocking again**, a vault owner's mode only. The session is good
+  and the in-memory keys are gone (idle timer, Lock, reload, or a
+  restore in any other tab, window or device). The username is known.
+
+#### Layout
+
+The card outside the shell (`app-shell.md`, The chrome), max-width
+420px, padding 32px. The wordmark, the card and the line beneath it
+stack in the middle of the ground, centered both ways.
+
+- **Username** field, when signing in. When unlocking again, the
+  username is static ink-secondary text with a "Not you? Sign out" link
+  beside it, which ends the session and offers the full card.
+- **Password** field, `type=password`, with a show-and-hide toggle
+  inside the field at its right end.
+- Each field carries its label above it.
+- Primary button **Unlock**, spanning the card's width at the foot.
+- Beneath the card, 13px ink-muted: "Solvent cannot recover a lost
+  password."
+
+#### One card, both kinds
+
+Until a correct password, the card is identical for both kinds in
+fields, wording, layout, button, wait, failures and timing. Nothing
+hints that a username is an administrator's or that an admin area
+exists. Then a vault owner goes to the dashboard and an administrator to
+the admin area (`admin-invites.md`, Admin).
+
+#### The derivation wait
+
+Argon2id runs in a Web Worker (architecture.md, Key management). It must
+never look like a hang.
+
+- On submit the button becomes a working state reading "Deriving your
+  key", and the form goes quiet.
+- A 13px line beneath: "This takes a moment by design. It is what makes
+  your password hard to attack."
+- The tab stays responsive throughout, to touch on a phone too.
+- No spinner before the derivation starts.
+- The copy is the same for both kinds, which the screen cannot tell
+  apart.
+
+#### States
+
+- **Loading**: the card renders at once. Nothing to fetch, no skeleton.
+- **Deriving**: as above. Left only by navigating away.
+- **Wrong password or a username nobody has**: inline above the password
+  field, critical text with an icon: "Invalid username or password."
+  Identical wording, placement and speed for both cases and both kinds.
+- **The vault would not open**: the Auth Key verified and the DEK
+  unwrap failed. The same message, because it means corruption or
+  tampering, not a typo. Nothing is logged: the server already answered
+  OK and never sees the unwrap fail.
+- **Too many attempts**: "Too many attempts. Try again in a few
+  minutes." Same shape and words whether or not the account exists.
+- **This browser cannot run the encryption**: a hard stop, "This browser
+  cannot run the encryption Solvent needs. There is no weaker fallback."
+- **Not enough memory right now**: the browser can run the encryption
+  and the allocation was refused anyway. "This device does not have
+  enough memory available right now. Close some other tabs and try
+  again." A **Try again** button derives again, because closing tabs can
+  fix it. The copy names a moment, never a device class: it never says
+  a phone, tablet or any device cannot open a vault, and never suggests
+  moving to another one. No weaker unlock is offered (architecture.md,
+  Threat model).
+- **Already signed in**: a live session at `/login` is redirected to the
+  root path, which resolves by kind (`app-shell.md`, The two surfaces).
+  A vault owner is asked to unlock there if the keys are gone, never
+  shown an empty vault. An administrator is asked for nothing.
+- **The session ran out mid-action**: the card in its unlocking-again
+  shape, username known. Submitting signs in again from cold, and typed
+  input is kept unless the vault was replaced meanwhile (How it works,
+  A vault replaced elsewhere).
+- **Replaced elsewhere**: a restore in another tab, window or device
+  replaced the vault while this page held the old one, unlocked or
+  locked. The page closes the vault (How it works, A vault replaced
+  elsewhere) and shows the card in its unlocking-again shape.
+  - A Callout (design-system.md, Components) sits at the top of the
+    card, above the username. It is a polite live region, so a screen
+    reader hears why the card appeared.
+  - When the page dropped typed input, the callout carries the critical
+    icon and reads:
+
+    > Your vault was replaced from a file in another tab, window or
+    > device. What you had typed here and not saved is gone.
+
+  - When it dropped none, it carries no icon and reads:
+
+    > Your vault was replaced from a file in another tab, window or
+    > device. Nothing you had typed here was lost.
+
+  - Unlocking signs in on the live session and opens the restored vault
+    on the dashboard, not the view the page was on, because that view
+    can name a record the restore removed. The dashboard shows no notice
+    of its own.
+  - The callout stays until the card is left. A wrong password shows its
+    error above the password field, beneath the callout.
+- **Populated**: not applicable. Success navigates away.
+
+#### Rules
+
+- Autocomplete: `username` and `current-password`.
+- The page embeds the server's current default KDF envelope
+  (architecture.md, Key management).
+- Unlocking again returns to the previous view with unsaved input
+  intact. Everything else on it is re-read and re-decrypted.
+- **A dialog opened to fill in or choose something comes back** after
+  unlocking, destructive or not, over the restored view with what was
+  typed in it. A password field comes back empty, because a password
+  never outlives a lock.
+- **A confirmation that asks only yes or no does not come back**,
+  because it holds nothing typed. Where one was open over a form, the
+  form comes back alone, and the act waits for the form's own button.
+- **A vault replaced since the page last held it keeps nothing**: no
+  input, no view, no dialog, whether the page learned it before
+  unlocking (Replaced elsewhere) or at unlock (the Replaced since last
+  open notice, `net-worth-view.md`, Dashboard). Input typed against the
+  old vault would otherwise be saved into the new one.
+
+#### What it deliberately does not show
+
+- Nothing about a restore beyond that it happened: not which tab, file
+  or time. Solvent records no devices to name.
+- Nothing about what typed input was lost, only whether any was. Naming
+  it would mean keeping it.
+- No count of attempts left. A counter would say more than the lockout
+  message, which reads the same whether or not the account exists.
+
+## How it works
+
+### What it does
+
+The browser derives the Master Key and Auth Key and sends only the Auth
+Key (architecture.md, Key management). Every field this reads or writes belongs to the account's `password`
+credential row (architecture.md, Credentials and vault key wrappers):
+`params` holds the salt and envelope, `verifier` the Auth Key hash. The
+`dek_wrappers` row keyed to that credential is the wrapper returned. The
+`principals` row is touched for identity and `last_login_at` alone.
+There is no other credential method.
+
+### Flow
+
+1. `POST /api/auth/salt` `{ username }` returns `{ salt, kdf }`, the
+   credential's `params` and nothing else. A known account of either
+   kind gets its real salt and envelope. An unknown one gets the decoy
+   (architecture.md, Login enumeration) truncated to 16 bytes, plus the
+   server's current default envelope. No field names, implies or derives
+   the kind. It answers unauthenticated callers, which is why `params`
+   carries nothing secret.
+2. The client derives Master Key and Auth Key in a Web Worker, **both
+   halves, always**, because it does not yet know whether it needs the
+   Master Key (architecture.md, Administrator credentials).
+3. `POST /api/auth/login` `{ username, authKey }`. On success it sets
+   the session cookie, writes `last_login_at`, and returns
+   `{ kind, kdfStale }`, plus `wrappedDek`, `dekNonce` and `vaultEpoch`
+   for a vault owner only. The wrapper is the one of the credential just
+   used, never a list (architecture.md, Key management). The wrapper and
    `vaultEpoch` are read inside the transaction that writes the
-   session, so an import cannot land between them (architecture.md,
-   Vault epoch). An **unknown username still runs a full Argon2id
-   verification** against a fixed decoy hash and discards the result.
-   Without it the endpoint answers in microseconds for accounts that do
-   not exist and in tens of milliseconds for ones that do, which
-   reveals existence by timing and throws away the work the decoy salt
-   did one step earlier.
-4. **A vault owner** unwraps the DEK with the Master Key. **A failed
-   unwrap is itself an authentication failure** — treat it as a wrong
-   password and surface the same error, do not silently continue with
-   a dead key. **An administrator** discards the Master Key and lands
-   in the admin area.
-5. If `kdfStale` is true, run the KDF upgrade below.
+   session, so an import cannot land between them. **An unknown
+   username still runs a full Argon2id verification** against a fixed
+   decoy hash and discards the result. Without it the endpoint answers
+   in microseconds for missing accounts and tens of milliseconds for
+   real ones.
+4. **A vault owner** unwraps the DEK. **A failed unwrap is an
+   authentication failure** with the same error, and the client never
+   continues with a dead key. **An administrator** discards the Master
+   Key and lands in the admin area.
+5. If `kdfStale` is true, the client runs the Stale-KDF upgrade.
 
-`kind` is an explicit field rather than something the client infers
-from the presence of `wrappedDek`. A client that branches on a missing
-field treats a truncated or malformed response as an administrator
-login, which is the one wrong guess that must not be cheap to make.
-The field is safe to return because it is read only after the
-credential verified.
+`kind` is an explicit field, safe to return because it is read only
+after verification. Inferring it from a missing `wrappedDek` would treat
+a truncated response as an administrator login, the one wrong guess
+that must not be cheap. The wrapper lookup happens after verification,
+keyed on the credential id, so it is no timing signal.
 
-The wrapper lookup happens **after** verification, keyed on the
-credential id. An indexed read against a 64 MiB Argon2id verification
-is no timing signal, and it is not on the pre-authentication path.
-
-## Stale-KDF upgrade
+### Stale-KDF upgrade
 
 **This is the only path by which an account's KDF parameters are
-raised**, and therefore the path by which the Argon2id memory
-parameter is raised if Safari's WebAssembly engine gets faster
-(architecture.md, Why 64 MiB and not more). The operator raises the
-server's default envelope and every vault follows on its owner's next
-login, with no migration, no re-encryption, and no prompt. The envelope
-is stored per vault, not compiled in, so this path exists.
+raised** (architecture.md, Key management): the operator raises the
+server's default envelope and every account follows on its owner's next
+sign-in.
 
-When the stored envelope is weaker than the server's current default,
-the login response sets `kdfStale: true` and includes the target
-envelope. **Both kinds run this**, because both derive a password with
-Argon2id and both are attacked offline through `verifier`. After a
+When the stored envelope is weaker than the default, the login response
+sets `kdfStale: true` and carries the target envelope. **Both kinds run
+it**, because both are attacked offline through `verifier`. After a
 successful sign-in the client, without user interaction:
 
 1. Generates a fresh 128-bit salt.
-2. Re-derives Master Key' + Auth Key' from the still-in-memory password
-   using the target parameters.
-3. **A vault owner** re-wraps the existing DEK under Master Key'. An
-   administrator has nothing to re-wrap and skips this.
-4. `POST /api/auth/upgrade-kdf` `{ salt, kdf, authKey }`, plus
-   `wrappedDek` and `dekNonce` for a vault owner, against the
-   authenticated session. In one transaction the server replaces the
-   **`password` credential row** (its `params` and its `verifier`) and,
-   for a vault owner, that credential's **one `dek_wrappers` row**. No
-   other row changes, and no other credential is touched, because the
-   DEK is the same key afterwards and every other wrapper still opens
-   it (architecture.md, One key, N wrappers). A vault owner's request
-   carries the epoch sign-in returned, and the server compares it after
-   `BEGIN IMMEDIATE`, so an import landing between sign-in and upgrade
-   is never overwritten by a wrapper around the old DEK.
+2. Re-derives Master Key' and Auth Key' from the in-memory password at
+   the target parameters.
+3. A vault owner re-wraps the existing DEK under Master Key'. An
+   administrator skips this.
+4. Sends `POST /api/auth/upgrade-kdf` `{ salt, kdf, authKey }`, plus
+   `wrappedDek` and `dekNonce` for a vault owner, on the authenticated
+   session. In one transaction the server replaces the `password`
+   credential row (`params` and `verifier`) and, for a vault owner, that
+   credential's one `dek_wrappers` row. Nothing else changes, because
+   the DEK is the same key afterwards. A vault owner's request carries
+   the epoch sign-in returned, compared after `BEGIN IMMEDIATE`, so an
+   import landing between sign-in and upgrade is never overwritten by a
+   wrapper around the old DEK.
 
-The server discriminates on the session's principal kind, not on which
-fields the client sent: a vault owner's request without a wrapper is a
-Bad Request, and an administrator's with one is too. Letting the
-payload decide would let a client silently skip re-wrapping a real
-vault and leave its wrapper opening under a superseded Master Key.
+The server discriminates on the session's principal kind, not on the
+fields sent. A vault owner's request without a wrapper is a Bad Request,
+and so is an administrator's with one. Letting the payload decide would
+let a client skip re-wrapping a real vault and leave its wrapper under a
+superseded Master Key.
 
-The DEK itself does not change, so **no vault record is re-encrypted**.
-If the upgrade POST fails, the session continues normally on the old
-parameters and retries on the next sign-in — a failed upgrade must
-never lock anyone out. The one exception is a `vault-replaced`
-Conflict, which closes the vault like any other (A vault replaced
-elsewhere).
+If the upgrade fails, the session continues on the old parameters and
+retries at the next sign-in, because an upgrade that could lock somebody
+out would be worse than none. The one exception is a `vault-replaced`
+Conflict, which closes the vault like any other.
 
-## The session a sign-in issues
+### The session a sign-in issues
 
-A successful `POST /api/auth/login` always issues a new random token
-and sets it in the cookie. What it does to `sessions` rows depends on
-the session the request carried:
+A successful `POST /api/auth/login` always issues a new random token in
+the cookie. What it does to `sessions` rows depends on the session the
+request carried:
 
-- **A live session of the same account** → that row is updated in
-  place with the new `token_hash`. Its `id` and `issued_at` stay the
-  same, and the old token stops working at once.
+- **A live session of the same account**: that row is updated in place
+  with the new `token_hash`. Its `id` and `issued_at` stay, and the old
+  token stops working at once.
 - **No live session** (no cookie, a bad signature, a token matching no
-  row, or an expired row) → a new row.
-- **A live session of another account** → that row is deleted and a
-  new row is created, because one client holds one cookie and the
-  replaced one would otherwise sit unreachable until expiry.
+  row, an expired row): a new row.
+- **A live session of another account**: that row is deleted and a new
+  one created, because one client holds one cookie and the old row
+  would sit unreachable until expiry.
 
 In every case the signing-in account's expired rows are deleted in the
-same transaction. Live means not past the absolute expiry (Rules,
-Session lifetime). A failed login, a rate-limited or locked-out one
-included, writes no session row, leaves `last_login_at` as it was, and
-leaves the carried session working.
+same transaction. Live means not past the absolute expiry. A failed
+login, rate-limited or locked out included, writes no session row,
+leaves `last_login_at` as it was, and leaves the carried session
+working.
 
-**Starting a session writes the account's `last_login_at`** to the
-server clock, in the same transaction, and nothing else writes it. A
-sign-in, an unlock and a registration (register.md, Flow) all start a
-session this way, so the column records the last time the account
-proved its password, and an account that exists has one.
+**Starting a session writes `last_login_at`** to the server clock in the
+same transaction, and nothing else writes it. A sign-in, an unlock and a
+registration (`register.md`, Flow) all start a session this way, so the
+column records the last time the account proved its password, and an
+account that exists has one.
 
-The unlock prompt after an idle lock, the lock button or a refresh
-calls this endpoint on a server session that is still live. Updating
-that row keeps one row per signed-in client, so locking and unlocking
-adds nothing to the session list. The token still changes on every
-sign-in, so a token planted or captured before it (session fixation)
-is dead after it.
+**There is no separate unlock endpoint.** An unlock calls this one on a
+live session, because login is the one place that returns the wrapper,
+runs the decoy verification and is rate limited. The branch on the
+carried session runs only after the Auth Key verified. Updating the row
+in place keeps locking out of the session list, and the token still
+changes, so a token planted or captured before (session fixation) is
+dead after.
 
-**There is no separate unlock endpoint.** Login is the one place that
-returns the key wrapper (architecture.md, One key, N wrappers), runs
-the decoy verification and is rate limited, and an unlock endpoint
-would have to repeat all three. The branch on the carried session runs only after
-the Auth Key verified, so the pre-authentication path is unchanged
-(Rules, Nothing pre-authentication branches on kind).
+**Unlocking does not move `issued_at`**, so the absolute expiry counts
+from sign-in. Resetting it would make the limit sliding for anyone who
+unlocks more often than every twelve hours. Unlocking does move
+`last_login_at`, which no expiry reads.
 
-**Unlocking does not move `issued_at`.** The absolute expiry counts
-from sign-in. Resetting it on unlock would make the limit sliding for
-anyone who unlocks more often than every twelve hours. Unlocking does
-move `last_login_at`, which no expiry reads.
+### A vault replaced elsewhere
 
-## A vault replaced elsewhere
-
-A restore closes the vault in every other page where it is open
-(`product/export-import.md`, What must be true). The server's half is
-the vault epoch (architecture.md, Vault epoch). This is the page's
-half, and it binds every page that holds an epoch, the registration
-page after registering included.
+A restore closes the vault in every other page where it is open. This
+is the page's half of the vault epoch (architecture.md, Vault epoch). It
+binds every page that holds an epoch, the registration page after
+registering included.
 
 **A page learns its epoch was replaced** in one of four ways:
 
 - **A `vault-replaced` Conflict** answering any request. The API module
   handles it before any caller sees the response, so no screen's own
-  Conflict handling, the version reload, ever runs on it.
-- **A message on `BroadcastChannel("solvent-vault")`** naming the epoch
-  the page holds. The message is the JSON object
-  `{"replaced":"<epoch>"}`, the epoch that was replaced, and nothing
-  else: no key, no new epoch, nothing decrypted. A page ignores any
-  other message, and one naming an epoch it does not hold, so a message
-  about an older epoch never closes a page already on the new one. A
-  page holding no epoch acts on no message.
-- **Coming back into view.** When an unlocked page's
-  `visibilitychange` reports `visible`, it sends one
-  `GET /api/records?type=profile`, whose answer goes through the API
-  module like any other and whose body is discarded. This is how a page
-  in another browser, or on another device, notices before it is used.
+  Conflict handling (the version reload) ever runs on it.
+- **A message on `BroadcastChannel("solvent-vault")`**: the JSON object
+  `{"replaced":"<epoch>"}`, the replaced epoch and nothing else (no key,
+  no new epoch, nothing decrypted). A page ignores any other message,
+  one naming an epoch it does not hold, and every message while it
+  holds no epoch, so a message about an older epoch never closes a page
+  on the new one.
+- **Coming back into view.** When an unlocked page's `visibilitychange`
+  reports `visible`, it sends one `GET /api/records?type=profile`
+  through the API module and discards the body. This is how a page in
+  another browser or device notices before it is used.
 - **Signing in to another epoch**: the `vaultEpoch` a sign-in returns
-  differs from the one the page held. That sign-in is an unlock on a
-  live session, or a sign-in from the session-ran-out card after the
-  session ended for its own reason (expiry, log out everywhere, a
-  password change).
+  differs from the one held. That is an unlock on a live session, or a
+  sign-in from the session-ran-out card after the session ended for its
+  own reason (expiry, log out everywhere, a password change).
 
-**The page keeps its epoch until it signs in again.** It holds the
-epoch across a lock and across its session ending, because the next
-sign-in compares against it. Signing out discards it, and a reload has
-none, so neither compares anything.
+**The page keeps its epoch in memory until it signs in again**, across a
+lock and across its session ending, because the next sign-in compares
+it. Never in localStorage or sessionStorage. Signing out discards it and
+a reload has none, so neither compares anything.
 
 **A page that learns by Conflict or at sign-in posts
 `{"replaced":"<the epoch it held>"}`** on the channel before discarding
-that epoch, so every other page of this browser that holds it closes at
-once. A page that learned by message posts nothing, because every page
-on the channel received the same one. The channel reaches the pages of
-one browser profile and storage partition. A private window or another
+it, so every other page of this browser that holds it closes at once. A
+page that learned by message posts nothing, because every page on the
+channel received the same one. The channel reaches the pages of one
+browser profile and storage partition. A private window or another
 profile learns as another device does.
 
 **What it drops.** Whichever way it learned, the page discards
 everything a lock keeps: unsaved form input and every dialog that would
-come back after an unlock (`ui/unlock.md`, Rules). It was typed against
-a vault that no longer exists, and saving it could put a figure on a
-holding the restore does not hold. Before discarding, the page notes
-whether there was any, because the copy differs. A password field never
-counts, since no lock keeps one.
+come back after an unlock (Unlock, Rules). Before discarding, it notes
+whether there was any, because the copy differs. A kept dialog counts
+even with nothing typed in it. A password field never counts.
 
 **Learning by Conflict or message.** The page:
 
 1. discards the Master Key, the DEK and every decrypted value, as the
-   idle lock does (Rules);
-2. discards what a lock keeps, as above, and closes every dialog;
+   idle lock does,
+2. discards what a lock keeps and closes every dialog,
 3. discards the epoch it held, so the unlock that follows compares
-   nothing;
-4. draws the unlock card in its Replaced elsewhere state
-   (`ui/unlock.md`), in the wording for whether step 2 dropped
-   anything.
+   nothing,
+4. draws the Unlock card in its Replaced elsewhere state, in the wording
+   for whether step 2 dropped anything.
 
-A locked page holding the named epoch does the same, so its held input
-goes and its card turns to Replaced elsewhere. A request in flight when
-the vault closes draws nothing when it answers. Unlocking from Replaced
-elsewhere signs in on the live session as any unlock does, and opens
-the dashboard with no notice, rather than the view the page was on.
+A locked page holding the named epoch does the same. A request in flight
+when the vault closes draws nothing when it answers.
 
 **Learning at sign-in.** The page drops what a lock kept, opens the
 dashboard rather than the view it was on, and shows the Replaced since
-last open notice (`ui/dashboard.md`) in the wording for whether it
-dropped anything. This is how a page that was locked through the
+last open notice (`net-worth-view.md`, Dashboard) in the wording for
+whether it dropped anything. This is how a page locked through the
 restore finds it, and a page whose session ended. A page on another
-device that is never used again closes no later than its idle lock,
-which discards everything but what a lock keeps, and signing in drops
-that too.
+device that is never used again closes no later than its idle lock, and
+signing in drops what that lock kept.
 
 **Another device meets Replaced elsewhere, not the session-ran-out
-card.** Import revokes no session (architecture.md, Vault epoch), so a
-page elsewhere keeps a live session, and its next request, or coming
-back into view, answers `vault-replaced`. It asks for the password
-only. Such a page reaches the session-ran-out card (`ui/unlock.md`)
-only when its session ended for its own reason, and then learns at
-sign-in.
+card**, because import revokes no session (architecture.md, Vault
+epoch). It meets that card only when its session ended for its own
+reason, and then learns at sign-in.
 
-## Inputs / outputs
+### Rules
 
-- In (browser only): password.
-- In (over the wire): username, Auth Key.
-- Out: session cookie carrying an opaque session token only — no key
-  material of any kind, and no principal id (architecture.md,
-  Application hardening). Plus `kind` and `kdfStale`, and, for a vault
-  owner, wrapped DEK + nonce and the vault epoch.
-
-## Rules
-
-- **The sign-in wait is the same for both kinds, and that is what
-  costs.** Argon2id at 64 MiB takes about two seconds on an iPhone
-  and a fraction of a second on a desktop (architecture.md, Key
-  management). An administrator has no key to build, so that wait
-  buys them nothing and skipping it is the obvious optimization. **Do
-  not.** The wait happens in the browser before the Auth Key is sent,
-  so the only way to skip it is to know the kind before
-  authenticating, and the only thing that could say so is
-  `/api/auth/salt`, which answers anyone who asks. A fast sign-in for
-  administrators and a slow one for everybody else turns the sign-in
-  screen into a stopwatch that reads out which usernames are
-  administrators, to an attacker who never has to guess a password.
-  - The channel is wall-clock time at the keyboard, not response
-    timing on the wire, which is why the server-side constant-time
-    work does not close it. It is closed by the client doing the same
-    work for everyone.
-  - **What an administrator does save is the vault**: no DEK unwrap,
-    no record fetch, no decryption pass. Their sign-in is genuinely
-    shorter than a vault owner's, by everything after the
-    verification and by nothing before it. That is the only
-    divergence, and it is entirely post-authentication.
-  - The same rule binds registration (`register.md`), where the
-    derivation is likewise identical and the Master Key is likewise
-    discarded.
-- **Nothing pre-authentication branches on kind.** The salt response,
-  the client derivation, the Auth Key on the wire, the server-side
-  Argon2id over it, the rate-limit keying, and the lockout response
-  are the same operations in the same order for both kinds. There is
-  no point in the flow before a verified credential at which the
-  server needs to know the kind, and there must not become one. A
-  second credential method added later inherits this: its
-  pre-authentication step must be kind-blind as well as carrying its
-  own decoy (architecture.md, Credentials and vault key wrappers).
+- **The sign-in wait is the same for both kinds.** Skipping the
+  derivation for an administrator is the obvious optimization. **Do
+  not.** It would mean knowing the kind before authenticating, which
+  only `/api/auth/salt` could tell, to anyone, and the screen would
+  become a stopwatch that reads out administrators' usernames. The
+  channel is wall-clock time at the keyboard, so server-side
+  constant-time work does not close it. **What an administrator saves is
+  the vault**: no DEK unwrap, no record fetch, no decryption, everything
+  after verification and nothing before it. The same rule binds
+  registration (`register.md`).
+- **Kind is invisible until the credential verifies** (architecture.md,
+  Login enumeration). Flow steps 1 and 2 are byte-identical for a vault
+  owner, an administrator and an unknown username, and step 2 takes the
+  same wall-clock time for all three. The server-side Argon2id, the
+  rate-limit keying and the lockout response are also the same
+  operations in the same order for both kinds. A credential method
+  added later inherits this: its pre-authentication step is kind-blind
+  and carries its own decoy.
 - **Residual enumeration leak, accepted.** A decoy always carries the
-  server's *current default* KDF envelope, while a real account can
-  carry a stale one, so any account not yet upgraded is distinguishable
-  from a decoy by its envelope, and the defense only fully holds once
-  every user sits at current parameters. It is accepted rather than
-  closed: the audience is a small invited household, registration
-  already accepts enumeration (register.md), and closing it would mean
-  the server keeping every parameter set it has ever used, forever, for
-  a threat this deployment does not face. Do not write a test asserting
-  that a stale-envelope account is indistinguishable. It is not.
-  - **It leaks existence, never kind.** A stale envelope says an
-    account was registered before the current default and nothing
-    about whether it owns a vault, because both kinds carry an
-    envelope and the same flow upgrades both. Do not let this accepted
-    leak grow into a kind leak by, for instance, registering
-    administrators at a different envelope.
-- The Auth Key is stored server-side hashed with Argon2id at modest
-  server-side cost (starting point: 64 MiB, 2 iterations). The Auth Key
-  is already high-entropy, so this is defense in depth, not the primary
-  work factor — the expensive derivation happens client-side.
-- Auth Key comparison is constant-time.
-- Session cookie: `HttpOnly`, `Secure`, `SameSite=Lax`
-  (architecture.md, Application hardening).
-- **Idle lock, for a vault owner**: after the user's configured idle
-  period (5–60 minutes, default 15 — account-settings.md) the client
-  discards the Master Key,
-  the DEK, **and every decrypted value derived from them** — the whole
-  in-memory model, rendered figures, chart series, and any cached
-  plaintext — then shows a re-unlock prompt. Dropping the keys alone
-  would leave the lock cosmetic against the threat it exists for:
-  another household member at the unlocked machine, who can open
-  devtools. The server session may still be valid; unlocking signs in
-  on it (The session a sign-in issues), re-derives the keys and
-  **re-decrypts the vault from scratch**, so the reload
-  after an idle lock is by design, not a missed cache.
-  - **One named exception: unsaved form input the user typed**, which
-    survives so a lock mid-entry does not destroy work (`ui/unlock.md`).
-    It is what the user is about to commit, not vault content read back
-    from the server, and it is scoped to the open form — nothing else
-    decrypted is exempt. The same rule covers the manual lock button
-    (`ui/design-system.md`, App shell) and a session expiring
-    mid-request. A replaced vault is the one lock it does not cover (A
-    vault replaced elsewhere).
-- **No idle rule for an administrator** (account-settings.md, Session
-  and lock, which owns the reason). An administrator session is bounded
-  by the absolute expiry and by signing out.
-- **Session lifetime**: a server-side session expires 12 hours after
-  its `issued_at`, absolute, not sliding. `issued_at` is the sign-in
-  that created the row, and no later unlock moves it. Both kinds, and
-  for an administrator it is the only bound.
-- A page refresh discards in-memory keys by definition and requires
-  re-entering the password.
+  current default envelope, while a real account can carry a stale one,
+  so an account not yet upgraded is distinguishable from a decoy.
+  Closing it would mean the server keeping every parameter set it ever
+  used, forever, for a threat a small invited household does not face,
+  and registration already accepts enumeration (`register.md`). No test
+  asserts a stale-envelope account is indistinguishable, because it is
+  not. **It leaks existence, never
+  kind**: both kinds carry an envelope, the same flow upgrades both, and
+  administrators are never registered at a different envelope.
+- The Auth Key is stored hashed with Argon2id at modest server-side
+  cost (starting point 64 MiB, 2 iterations). The Auth Key is already
+  high-entropy, so this is defense in depth. Comparison is
+  constant-time.
+- **Idle lock, for a vault owner**: after the configured idle period
+  (`account-settings.md`, Session and lock) the client discards the
+  Master Key, the DEK **and every decrypted value derived from them**:
+  the in-memory model, rendered figures, chart series and any cached
+  plaintext. Dropping the keys alone would leave the lock cosmetic
+  against someone with devtools. Unlocking signs in on the live session
+  and **re-decrypts the vault from scratch**, so the reload is by
+  design, not a missed cache.
+  - **One named exception: unsaved input the user typed** survives
+    (Unlock, Rules). It is what the user is about to commit, not vault
+    content read back. The same rule covers Lock (`app-shell.md`, The
+    chrome), `pagehide` (architecture.md, Application hardening) and a
+    session expiring mid-request. A replaced vault is the one lock it
+    does not cover.
+- **No idle rule for an administrator** (`account-settings.md`, Session
+  and lock). Nothing is decrypted, so a lock takes nothing away.
+- **Session lifetime**: a session expires 12 hours after its
+  `issued_at`, absolute, not sliding, for both kinds. For an
+  administrator it is the only bound besides signing out.
+- A page refresh discards in-memory keys and requires the password.
 
 ## Edge cases
 
-- **Unknown username** → decoy salt; the client wastes the same
-  derivation time and gets the same-shaped failure at step 3. Timing of
-  the salt response must not vary with existence, nor with the kind of
-  an account that does exist.
-- **Wrong password** → derivation succeeds, Auth Key mismatches; generic
-  "Invalid username or password."
-- **Correct Auth Key but DEK unwrap fails** → treated as a failed login
-  with the same error. It indicates corruption or tampering, not a typo.
-  Nothing is logged: the unwrap happens in the browser after the login
-  already answered OK, so the server never sees it fail.
-- **Rate limiting**: per username and per client address, on both
-  `/api/auth/salt` and `/api/auth/login`, checked before the salt
-  lookup or the verification (architecture.md, Rate limiting). A
-  refusal is Too Many Requests, identical for every username and
-  kind.
-- **A correct password during a lock** → Too Many Requests. No
-  verification runs, so nothing distinguishes it from a wrong one.
-- **Retrying during a lock or a throttle**, on either endpoint → Too
-  Many Requests, and no `attempts` row is written, so the lock still
-  ends its configured length after the failure that tripped it.
-- **An administrator signing in from an address another username's
-  guesses locked** → Too Many Requests until the lock ends, then
-  signed in.
-- **A successful sign-in from an address with failures** → its
-  username's failures are deleted and the address's stay.
-- **The concurrency cap's wait runs out** → Too Many Requests, and no
-  row is written: no verification ran, so nothing failed.
-- **A vault owner whose credential verifies but who has no wrapper** →
+- **Unknown username or wrong password**: both derive fine, in the same
+  time, and fail at Flow step 3.
+- **Rate limits, locks and the concurrency cap** run as architecture.md,
+  Application hardening, states. So a correct password during a lock
+  gets Too Many Requests with no verification run, retrying never
+  lengthens a lock, and an administrator at an address another
+  username's guesses locked waits for the lock to end.
+- **A vault owner whose credential verifies but who has no wrapper**:
   Unauthorized, counted as no failure, because the password was right.
-- **Already-authenticated caller hits `/login`** → redirect to the
-  root path, which resolves by kind (app-shell.md, The two surfaces).
-  For a vault owner, keys are still only in memory, so if they were
-  lost to a refresh the client must prompt to unlock rather than
-  render an empty vault. For an administrator there is nothing to
-  prompt for and the admin area renders.
-- **A login response arrives with `kind` absent** → the client treats
-  it as a failed login rather than defaulting to either kind, so it
-  never has a "kind absent" branch to get wrong. So does a vault
-  owner's response without `vaultEpoch`, because a page without one
-  could send no vault request.
-- **A restore lands between sign-in and the stale-KDF upgrade** → the
-  upgrade answers `vault-replaced` and writes nothing, and the page
-  closes the vault (A vault replaced elsewhere).
-- **Clock skew / expired session mid-request** → API returns
-  Unauthorized, and the status alone is the signal, with no code in the
-  body, because Unauthorized has one meaning (architecture.md, Status
-  codes). The client prompts for re-unlock rather than discarding
-  unsaved input, unless that sign-in finds the vault replaced (A vault
-  replaced elsewhere).
+- **A login response without `kind`**: a failed login, never a default
+  to either kind. So is a vault owner's response without `vaultEpoch`,
+  because a page without one could send no vault request.
+- **A restore between sign-in and the stale-KDF upgrade**: the upgrade
+  answers `vault-replaced`, writes nothing, and the page closes the
+  vault.
+- **Clock skew or a session expired mid-request**: Unauthorized, the
+  status alone with no code in the body (architecture.md, Status
+  codes), and the card's session-ran-out state.
 
 ## Acceptance criteria
 
-- A valid vault owner username + password logs in, and the client
-  holds a working DEK proven by decrypting the profile record.
-- A valid administrator username + password logs in, the response
-  carries `kind: administrator` and **no `wrappedDek`, no `dekNonce`
-  and no `vaultEpoch`**, and the session reaches the admin area.
-- A vault owner's login response carries `vaultEpoch` equal to the
-  account's `vault_epochs` row, and after an import the next sign-in's
-  equals the epoch the import returned.
-- The login request body contains the Auth Key and nothing derived from
-  the Master Key; the password appears in no request.
-- The session cookie contains no key material, and carries `HttpOnly`,
-  `Secure`, `SameSite=Lax`.
-- `/api/auth/salt` returns the same response shape, same status, and
-  statistically indistinguishable timing for a known and an unknown
-  username; the decoy salt for a given username is stable across calls.
-  Asserted for an account **at current KDF parameters** — a
-  stale-envelope account is knowingly distinguishable (see Rules).
-- `/api/auth/salt` for an administrator's username, a vault owner's
-  username, and an unknown username are indistinguishable from each
-  other in body shape, field set, status, and timing, asserted as a
-  three-way comparison, with all three accounts at current KDF
-  parameters. This is the enumeration test that matters most in the
-  two-kind model, because it is the one an added field would break
-  silently.
-- `/api/auth/login` with a **wrong** Auth Key against an
-  administrator's username, a vault owner's username, and an unknown
-  username produce byte-identical responses and statistically
-  indistinguishable timing.
-- The client's key derivation is byte-identical for both kinds:
-  asserted by running the derivation against an administrator's salt
-  and envelope and a vault owner's and comparing the code path taken,
-  not only the output.
-- The wall-clock time from submitting the sign-in form to the Auth Key
-  leaving the browser is statistically indistinguishable for an
-  administrator username, a vault owner username, and an unknown one.
-  Measured in the browser, not on the server, because that is where
-  the channel is. This is the test that fails if somebody later makes
-  the administrator path skip the derivation.
-- An administrator's stored `verifier` is an Argon2id hash over an
-  Auth Key derived through the same HKDF split as a vault owner's, and
-  the raw Argon2id output is not what was hashed, asserted by
-  deriving both in a test and checking which one verifies.
-- No response from `/api/auth/salt` names, implies, or permits
-  deriving the kind of the account, asserted against the endpoint's
-  full response shape so the test fails if a field is added later.
-- Wrong password and unknown username produce identical client-visible
-  errors.
-- A vault owner whose stored KDF envelope is below the server default
-  is transparently upgraded on login: salt, envelope, Auth Key hash,
-  and wrapped DEK all change; the DEK is unchanged, proven by
-  decrypting a record written before the upgrade.
-- An administrator whose stored envelope is below the server default
-  is upgraded the same way: salt, envelope, and Auth Key hash change,
-  no `dek_wrappers` row is created, and the new password still signs
-  them in.
-- That upgrade writes the account's `password` credential row and, for
-  a vault owner, that credential's wrapper, and nothing else,
-  asserted by comparing every other row of `principals`,
-  `credentials`, and `dek_wrappers` before and after.
-- `POST /api/auth/upgrade-kdf` carrying a wrapper from an
-  administrator session is a Bad Request and writes nothing. The same
-  request from a vault owner session *without* a wrapper is also a Bad
-  Request and writes nothing.
-- Raising the server's default Argon2id memory parameter and logging in
-  leaves the vault stored at the new value, with every record still
-  decryptable. This is the test that the parameter has a live upgrade
-  path rather than a documented one.
-- `POST /api/auth/login` returns at most one wrapper and no field
-  naming, counting, or describing any other credential.
-- If `/api/auth/upgrade-kdf` returns Server Error, the caller stays
-  signed in and can still sign in afterwards with the old parameters.
-- From one client: sign in, sign in again, fail once with a wrong Auth
-  Key, sign in again, each request carrying the cookie the previous one
-  left. The account then has exactly one `sessions` row, whose `id` and
-  `issued_at` equal those after the first sign-in. Every cookie a later
-  sign-in replaced answers Unauthorized, and the cookie carried into the
-  failed attempt still worked after it.
-- A sign-in carrying a live session of another account deletes that
-  row, and the old cookie answers Unauthorized.
-- A sign-in with no cookie creates a new row and leaves the account's
-  other live rows untouched.
-- A sign-in deletes the signing-in account's expired rows, and only
-  those.
-- Signing in, then unlocking 11 hours later, leaves a session that
-  answers Unauthorized 12 hours after the first sign-in.
-- A sign-in sets the account's `last_login_at` to the time of the
-  request, and so does an unlock on a live session, while that
-  session's `issued_at` stays. Asserted for both kinds with the server
-  clock stubbed.
-- A wrong Auth Key, a rate-limited attempt and a locked-out attempt
-  each leave `last_login_at` unchanged.
-- Exceeding the per-username throttle, and separately the per-username
-  lock threshold, refuses that username with Too Many Requests on both
-  endpoints, byte-identical to the refusal for a nonexistent username
-  pushed over the same limit.
-- With the per-username limits set out of reach and the clock stubbed,
-  the configured number of failed sign-ins from one address, spread
-  over unknown usernames, locks the address. The next salt fetch and
-  sign-in for an administrator's username, a vault owner's and an
-  unknown one each answer Too Many Requests, byte-identical, and a
-  different address signs the administrator in.
-- **The lock ends on time despite retries.** With the clock stubbed,
-  trip an address lock, then retry from that address every minute
-  until the lock's end: a salt fetch, a wrong Auth Key and the
-  administrator's correct Auth Key, each Too Many Requests. The
-  `attempts` row count after the retries equals the count before them.
-  At the lock's configured length plus one second after the tripping
-  failure, the administrator's correct Auth Key signs in. The same
-  holds for a per-username lock.
-- A request refused by any limit, on either endpoint, leaves the
-  `attempts` table row for row as it was. So does a salt fetch that
-  answers OK, a Bad Request, and a sign-in the concurrency cap turned
-  away.
-- A wrong Auth Key, for a real or an unknown username, writes one
-  `failure` row in the username's bucket and one in the address's. A
-  correct Auth Key deletes the username's `login:` and `login-lock:`
-  rows and leaves the address's.
-- The failure that trips a per-username lock writes exactly one
-  `login-lock:` row, and the one that trips an address lock exactly one
-  `address-lock:` row, each in the same transaction as the failure's
-  own rows. A failure that trips neither writes neither.
-- **The username lock lasts its full length however its failures are
-  spread.** At the default limits, with the per-address limits set out
-  of reach and the clock stubbed: 10 wrong Auth Keys at 0:00, 9 at
-  15:01 and the 20th at 59:00. The username's correct Auth Key gets Too
-  Many Requests at 60:01, after the 0:00 failures left the lock window,
-  and at 74:00, and signs in at 74:01.
-- **No plaintext address is stored.** After failed sign-ins from
-  `203.0.113.7` and from `2001:db8:1:2::5` (set as the WSGI
-  `REMOTE_ADDR`), no value in any table contains either address or the
-  `/64` network, the database file's bytes contain none of them, and
-  no captured log line does. Each `address:` bucket's key equals the
-  value the test computes from architecture.md, Rate limiting, with the
-  test's `SECRET_KEY`, and changes when `SECRET_KEY` does.
-- The HKDF function returns RFC 5869 Test Case 1's OKM.
-- Failures from `2001:db8:1:2::5` and `2001:db8:1:2::6` share one
-  address key, `2001:db8:1:3::5` has another, `::ffff:203.0.113.7`
-  shares `203.0.113.7`'s, and two unparseable addresses share one.
-- With `TRUSTED_PROXY_HOPS` 0, failures from one peer carrying a
-  different `X-Forwarded-For` each time lock that peer, and the first
-  such request logs `config.proxy_header_ignored` once. With it 1,
-  two peers' requests whose last `X-Forwarded-For` entries differ
-  count apart, and a client-written entry left of the proxy's changes
-  nothing.
-- Tripping a lock logs exactly one `auth.lockout` line, and the
-  requests it refuses log none. The address line contains no address
-  and no address key. A username containing a newline and a quote is
-  logged as one line holding its JSON string.
-- `/api/auth/login` with an unknown username takes statistically
-  indistinguishable time from one with a known username and a wrong Auth
-  Key — asserted with the decoy-hash verification in place, since
-  removing it is the regression this catches.
-- After the configured idle period, an attempt to read vault data
-  prompts for re-unlock, the in-memory keys are gone, **and no decrypted
-  holding name, value, or snapshot remains reachable** — asserted
-  against the in-memory model, not only the key handles. Unsaved input
-  in an open form is the one thing still present.
-- Re-unlocking after an idle lock refetches and re-decrypts the vault;
-  it does not restore a model kept across the lock.
-- A test asserts no key material is written to `localStorage` or
-  `sessionStorage` at any point in the flow, and no vault epoch either.
-- `POST /api/auth/upgrade-kdf` from a vault owner session carrying the
-  epoch from before an import answers Conflict
-  `{"refused":"vault-replaced"}`, and the `credentials` and
-  `dek_wrappers` rows are byte-identical afterwards.
-- **Two pages, one browser.** Pages A and B of one browser context
-  are unlocked on one vault, and B has a holding form open with a name
-  typed. A restores a file. Before B sends any request, B holds no key,
-  no decrypted holding name or figure and no typed name, every dialog
-  is closed, and its unlock card is in the Replaced elsewhere state in
-  the wording for dropped input. A is still open on the restored vault.
-  Unlocking B opens the dashboard with the restored figures and no
-  Replaced since last open notice, and no record in the vault fails to
-  decrypt.
-- The same with B showing only the dashboard, nothing typed and no
-  dialog open, puts B's card in the Replaced elsewhere wording for
-  nothing dropped.
-- With B's `BroadcastChannel` stubbed so no message arrives, B's save
-  of the new holding answers Conflict `{"refused":"vault-replaced"}`,
-  B shows Replaced elsewhere, B posts `{"replaced":"<its epoch>"}`, and
-  the vault's records afterwards are exactly the restored set. That
-  Conflict never reaches the holding form's version-reload path.
-- **Another browser context.** A page in a second context, unlocked on
-  the same vault with its own session, stays drawn while hidden during
-  a restore made in the first. Made visible, it sends one
-  `GET /api/records?type=profile`, shows Replaced elsewhere, and sends
-  nothing else. Its session row still exists.
-- A page locked by the idle period in a second context unlocks after a
-  restore made in the first. With a form's input held, the held input
-  is gone and the dashboard shows the Replaced since last open notice
-  in the wording for dropped input. With a dialog kept and nothing
-  typed in it, the same, since a kept dialog counts. With nothing kept,
-  the notice is in the wording for nothing dropped. In each case the
-  page posted `{"replaced":"<the epoch it held>"}`.
-- **A session that ended for its own reason.** A page in a second
-  context holds a form's typed input when the first context logs out
-  everywhere, signs in again and restores a file. The
-  page's next request answers Unauthorized and the card shows the
-  session-ran-out state, with the input still held. Signing in drops
-  the input, opens the dashboard, and shows Replaced since last open in
-  the wording for dropped input. Signing in with no restore in between
-  returns the page to its view with the input, and shows no notice.
-- Signing out and signing in again, and reloading and signing in
-  again, after a restore show no Replaced since last open notice.
-- A page ignores a channel message naming an epoch it does not hold,
-  a message of any other shape, and every message while it holds no
-  epoch. Every message a page posts has `replaced` as its only key,
-  holding the replaced epoch.
+1. A valid vault owner username and password sign in, and the client
+   holds a working DEK proven by decrypting the profile record, so the
+   real figures appear. Test:
+   `tests/test_auth.py::test_a_vault_owner_login_returns_the_one_wrapper_and_the_kind`,
+   `tests/browser/parts/unlock.mjs`.
+2. A valid administrator username and password sign in, the response
+   carries `kind: administrator` and no `wrappedDek`, `dekNonce` or
+   `vaultEpoch`, and the session lands in the admin area with nothing
+   decrypted and no dashboard. Test:
+   `tests/test_auth.py::test_an_administrator_login_carries_no_wrapper`,
+   `tests/browser/parts/unlock.mjs`.
+3. A vault owner's username and password never reach the admin area,
+   however submitted. Test:
+   `tests/test_admin.py::test_a_vault_owner_gets_not_found_from_every_admin_route`.
+4. A vault owner's login response carries `vaultEpoch` equal to the
+   account's `vault_epochs` row, and after an import the next sign-in's
+   equals the epoch the import returned. Test:
+   `tests/test_vault_epoch.py::test_a_vault_owner_login_carries_the_epoch_and_an_administrators_none`,
+   `tests/test_vault_epoch.py::test_the_next_sign_in_after_an_import_carries_the_new_epoch`.
+5. The login body carries the Auth Key and nothing derived from the
+   Master Key, and the password appears in no request on any attempt.
+   Test: no test.
+6. The session cookie carries no key material and is `HttpOnly`,
+   `Secure`, `SameSite=Lax`. Test:
+   `tests/test_auth.py::test_a_login_cookie_carries_its_flags_and_no_key_material`.
+7. (blind) `/api/auth/salt` for an administrator, a vault owner and an
+   unknown username, all at current KDF parameters, is
+   indistinguishable three ways in body shape, full field set, status
+   and timing, so an added field fails it. Test:
+   `tests/test_auth.py::test_the_salt_response_is_identically_shaped_for_both_kinds_and_a_stranger`,
+   `tests/test_timing.py::test_the_salt_takes_the_same_time_for_either_kind_and_a_stranger`.
+8. The decoy salt for a username is stable across calls. Test:
+   `tests/test_auth.py::test_the_decoy_salt_for_a_username_is_stable_across_calls`.
+9. No `/api/auth/salt` response names, implies or permits deriving the
+   kind, asserted against the full response shape. Test:
+   `tests/test_auth.py::test_no_field_of_the_salt_response_names_or_implies_a_kind`.
+10. `/api/auth/login` with a wrong Auth Key against an administrator, a
+    vault owner and an unknown username gives byte-identical responses
+    and indistinguishable timing. Test:
+    `tests/test_auth.py::test_a_wrong_auth_key_against_either_kind_and_a_stranger_is_byte_identical`,
+    `tests/test_timing.py::test_a_wrong_login_takes_the_same_time_for_either_kind_and_a_stranger`.
+11. `/api/auth/login` for an unknown username takes indistinguishable
+    time from a known one with a wrong Auth Key, with the decoy-hash
+    verification in place. Test:
+    `tests/test_timing.py::test_a_wrong_login_takes_the_same_time_for_either_kind_and_a_stranger`.
+12. (blind) The client's derivation takes the same code path for both
+    kinds and an unknown username, compared as the path taken, not only
+    the output. Test:
+    `tests/test_client.py::test_the_client_side_rules_hold`.
+13. (blind) The wall-clock time from submitting the card to the Auth Key
+    leaving the browser is indistinguishable for an administrator, a
+    vault owner and an unknown username, measured in the browser. Test:
+    `tests/browser/parts/unlock-timing.mjs`.
+14. (blind) An administrator's stored `verifier` is an Argon2id hash
+    over the HKDF Auth Key, not the raw Argon2id output, shown by
+    deriving both and checking which verifies. Test:
+    `tests/test_browser.py::test_the_workflows_hold_in_a_browser`.
+15. A wrong password and an unknown username produce the same message on
+    the card, for either kind. Test: `tests/browser/parts/unlock.mjs`.
+16. A correct Auth Key whose DEK unwrap fails is a failed sign-in with
+    the same message and no keys held. Test:
+    `tests/browser/parts/unlock.mjs`.
+17. A vault owner below the default envelope is upgraded at sign-in:
+    salt, envelope, Auth Key hash and wrapped DEK change, and the DEK is
+    unchanged, proven by decrypting a record written before. Test:
+    `tests/test_auth.py::test_the_upgrade_replaces_the_credential_and_its_one_wrapper`,
+    `tests/browser/parts/unlock.mjs`.
+18. An administrator below the default envelope is upgraded the same
+    way, no `dek_wrappers` row is created, and the password still signs
+    in. Test:
+    `tests/test_auth.py::test_an_administrator_upgrade_creates_no_wrapper`.
+19. (blind) The upgrade writes the `password` credential row and, for a
+    vault owner, its wrapper, and nothing else, comparing every other
+    row of `principals`, `credentials` and `dek_wrappers`. Test:
+    `tests/test_auth.py::test_the_upgrade_replaces_the_credential_and_its_one_wrapper`.
+20. `POST /api/auth/upgrade-kdf` with a wrapper from an administrator
+    session, or without one from a vault owner session, is a Bad Request
+    and writes nothing. Test:
+    `tests/test_auth.py::test_the_server_discriminates_on_kind_not_on_which_fields_arrived`.
+21. Raising the server's default memory parameter and signing in leaves
+    the vault at the new value with every record decryptable. Test:
+    `tests/test_auth.py::test_raising_the_server_default_upgrades_an_account_at_the_old_one`.
+22. If `/api/auth/upgrade-kdf` answers Server Error, the caller stays
+    signed in and signs in afterwards on the old parameters. Test:
+    `tests/browser/parts/unlock.mjs`,
+    `tests/test_client.py::test_the_client_side_rules_hold`.
+23. `POST /api/auth/upgrade-kdf` from a vault owner carrying the epoch
+    from before an import answers Conflict
+    `{"refused":"vault-replaced"}` and leaves `credentials` and
+    `dek_wrappers` byte-identical. Test:
+    `tests/test_vault_epoch.py::test_the_stale_kdf_upgrade_with_a_replaced_epoch_changes_nothing`.
+24. `POST /api/auth/login` returns at most one wrapper and no field
+    naming, counting or describing another credential. Test:
+    `tests/test_auth.py::test_the_login_body_carries_no_field_describing_another_credential`.
+25. (blind) From one client: sign in, sign in again, fail once, sign in
+    again, each carrying the previous cookie. The account has exactly
+    one `sessions` row with the first `id` and `issued_at`, every
+    replaced cookie answers Unauthorized, and the cookie carried into
+    the failure still worked after it. Rows are compared, not cookies
+    alone. Test:
+    `tests/test_session.py::test_repeated_sign_ins_from_one_client_keep_one_row_and_a_failed_one_changes_nothing`.
+26. A sign-in carrying another account's live session deletes that row,
+    and the old cookie answers Unauthorized. Test:
+    `tests/test_session.py::test_a_sign_in_over_another_accounts_live_session_replaces_that_row`.
+27. (blind) A sign-in with no cookie creates a new row and leaves the
+    account's other live rows untouched. Test:
+    `tests/test_session.py::test_a_sign_in_with_no_cookie_leaves_the_accounts_other_live_rows_alone`.
+28. (blind) A sign-in deletes the signing-in account's expired rows, and
+    only those. Test:
+    `tests/test_session.py::test_a_sign_in_deletes_the_signing_in_accounts_expired_rows_and_only_those`.
+29. (blind) Signing in, then unlocking 11 hours later, leaves a session
+    that answers Unauthorized 12 hours after the first sign-in. Test:
+    `tests/test_session.py::test_unlocking_does_not_move_issued_at_so_the_expiry_counts_from_sign_in`.
+30. Everybody is signed out 12 hours after signing in, however busy.
+    Test:
+    `tests/test_session.py::test_a_session_past_the_absolute_lifetime_is_refused`,
+    `tests/test_session.py::test_the_absolute_expiry_binds_an_administrator_the_same_way`.
+31. (blind) A sign-in sets `last_login_at` to the request time, and so
+    does an unlock on a live session, while `issued_at` stays, for both
+    kinds with the clock stubbed. Test:
+    `tests/test_last_login.py::test_a_sign_in_and_an_unlock_set_last_login_at_and_an_unlock_leaves_issued_at`.
+32. (blind) A wrong Auth Key, a rate-limited attempt and a locked-out
+    attempt each leave `last_login_at` unchanged. Test:
+    `tests/test_last_login.py::test_a_wrong_auth_key_leaves_last_login_at`,
+    `tests/test_last_login.py::test_a_rate_limited_or_locked_out_attempt_leaves_last_login_at`.
+33. (blind) The per-username throttle and, separately, the per-username
+    lock refuse that username with Too Many Requests on both endpoints,
+    body and headers byte-identical to the refusal for a nonexistent
+    username over the same limit. Test:
+    `tests/test_auth.py::test_exceeding_the_account_limit_locks_it_the_same_way_for_a_stranger`,
+    `tests/test_attempts.py::test_every_refusal_is_byte_identical_to_the_one_for_a_username_nobody_has`.
+34. (blind) With per-username limits out of reach and the clock stubbed,
+    the configured failures from one address spread over unknown
+    usernames lock the address: the next salt fetch and sign-in for an
+    administrator, a vault owner and an unknown username each answer Too
+    Many Requests byte-identically, and a different address signs the
+    administrator in. Test:
+    `tests/test_attempts.py::test_an_address_lock_refuses_every_username_and_spares_other_addresses`.
+35. (blind) The lock ends on time despite retries. Trip an address lock,
+    retry every minute with a salt fetch, a wrong Auth Key and the
+    administrator's correct Auth Key, each Too Many Requests, with the
+    `attempts` row count unchanged. At the lock's length plus one second
+    the correct Auth Key signs in. The same holds for a per-username
+    lock. Test:
+    `tests/test_attempts.py::test_an_administrator_signs_in_when_the_lock_ends_despite_retries_during_it`,
+    `tests/test_attempts.py::test_a_username_lock_ends_on_time_despite_retries`.
+36. (blind) A request refused by any limit, on either endpoint, leaves
+    `attempts` row for row as it was, and so do a salt fetch that answers
+    OK, a Bad Request and a sign-in the concurrency cap turned away.
+    Test:
+    `tests/test_attempts.py::test_a_request_that_is_not_a_failure_or_is_refused_leaves_the_table_as_it_was`.
+37. A wrong Auth Key, for a real or unknown username, writes one
+    `failure` row in the username's bucket and one in the address's.
+    Test:
+    `tests/test_attempts.py::test_a_failure_writes_one_row_per_bucket_and_a_success_clears_only_the_username`.
+38. (blind) A correct Auth Key deletes the username's `login:` and
+    `login-lock:` rows and leaves the address's. Test:
+    `tests/test_attempts.py::test_a_success_deletes_the_username_lock_row_and_leaves_the_address_rows`.
+39. (blind) The failure that trips a per-username lock writes exactly
+    one `login-lock:` row, and one that trips an address lock exactly
+    one `address-lock:` row, each in the failure's own transaction. A
+    failure that trips neither writes neither. Test:
+    `tests/test_attempts.py::test_a_failure_writes_a_lock_row_only_when_it_trips_the_lock`.
+40. (blind) The username lock lasts its full length however its
+    failures are spread: at the defaults, with address limits out of
+    reach, 10 wrong Auth Keys at 0:00, 9 at 15:01 and the 20th at 59:00
+    give Too Many Requests at 60:01 and 74:00 and a sign-in at 74:01.
+    Test:
+    `tests/test_attempts.py::test_a_username_lock_runs_its_full_length_on_the_schedule_that_ages_failures_out`.
+41. A lock covers every username from that connection, a name nobody
+    has tried yet included, until it ends. Test:
+    `tests/test_attempts.py::test_an_address_lock_refuses_every_username_and_spares_other_addresses`.
+42. (blind) No plaintext address is stored. After failures from
+    `203.0.113.7` and `2001:db8:1:2::5`, no table value, no byte of the
+    database file and no captured log line contains either address or
+    the `/64` network. Test:
+    `tests/test_attempts.py::test_no_plaintext_address_is_kept_in_a_table_the_file_or_a_log`.
+43. (blind) Each `address:` bucket key equals the value the test
+    computes from architecture.md, Rate limiting, with the test's
+    `SECRET_KEY`, and changes when `SECRET_KEY` does. Test:
+    `tests/test_attempts.py::test_the_address_key_is_keyed_canonical_and_follows_the_secret`.
+44. The HKDF function returns RFC 5869 Test Case 1's OKM. Test:
+    `tests/test_attempts.py::test_hkdf_returns_rfc_5869_test_case_1`.
+45. `2001:db8:1:2::5` and `::6` share one address key,
+    `2001:db8:1:3::5` has another, `::ffff:203.0.113.7` shares
+    `203.0.113.7`'s, and two unparseable addresses share one. Test:
+    `tests/test_attempts.py::test_the_address_key_is_keyed_canonical_and_follows_the_secret`.
+46. (blind) With `TRUSTED_PROXY_HOPS` 0, failures from one peer with a
+    different `X-Forwarded-For` each time lock that peer, and the first
+    such request logs `config.proxy_header_ignored` once. With it 1,
+    requests whose last entries differ count apart, and a client-written
+    entry left of the proxy's changes nothing. Test:
+    `tests/test_attempts.py::test_without_trusted_proxies_a_forwarded_header_changes_nothing_and_is_logged_once`,
+    `tests/test_attempts.py::test_with_one_trusted_proxy_the_last_forwarded_entry_is_the_client`.
+47. (blind) Tripping a lock logs exactly one `auth.lockout` line and the
+    requests it refuses none. The address line has no address and no
+    address key. A username with a newline and a quote logs as one line
+    holding its JSON string. Test:
+    `tests/test_attempts.py::test_a_lock_logs_one_line_when_it_trips_and_the_requests_it_refuses_none`,
+    `tests/test_attempts.py::test_an_address_lock_logs_one_line_with_no_address`.
+48. The card shows "Too many attempts. Try again in a few minutes." past
+    the limit. Test: `tests/browser/parts/unlock.mjs`.
+49. A vault opens on a phone and a tablet in a little under two seconds,
+    showing the working state and staying responsive to touch
+    throughout. Test: no test.
+50. The card shows "Deriving your key" and goes quiet while the key is
+    derived. Test: `tests/browser/parts/unlock.mjs`.
+51. A browser that cannot run the encryption gets a hard stop with no
+    fallback. Not enough memory offers Try again, which derives again.
+    Test: `tests/browser/parts/unlock.mjs`.
+52. (blind) After the idle period, reading vault data prompts for
+    re-unlock, the keys are gone, and no decrypted holding name, value
+    or snapshot is reachable, asserted against the in-memory model, not
+    only the key handles. Unsaved form input is the one thing left.
+    Test: `tests/browser/parts/unlock-idle.mjs`.
+53. (blind) Re-unlocking after a lock refetches and re-decrypts the
+    vault rather than restoring a model kept across the lock. Test:
+    `tests/browser/parts/unlock-idle.mjs`.
+54. What was typed in an open form is there after unlocking, and the
+    person returns to the view the lock found. Test:
+    `tests/browser/parts/unlock-idle.mjs`.
+55. A fill-in dialog comes back after unlocking with what was typed in
+    it, a yes-or-no confirmation does not, and no password field is
+    refilled. Test: `tests/browser/parts/unlock-lock.mjs`,
+    `tests/browser/parts/unlock-idle.mjs`.
+56. Lock locks at once with no confirmation, keeps the server session,
+    and unlocking needs only the password. Test:
+    `tests/browser/parts/unlock.mjs`.
+57. A refresh asks for the password again. Test:
+    `tests/browser/parts/unlock.mjs`.
+58. (blind) No key material is written to `localStorage` or
+    `sessionStorage` at any step, upgrade, lock, unlock and restore
+    included. Test: `tests/browser/parts/unlock.mjs`.
+59. (blind) No vault epoch is written to `localStorage` or
+    `sessionStorage` at any step. An epoch kept in storage to survive a
+    lock passes every functional test. Test: no test.
+60. A signed-in vault owner at the sign-in address goes to the dashboard
+    and is asked only for the password. A signed-in administrator goes to
+    the admin area. Test:
+    `tests/test_auth.py::test_an_already_authenticated_caller_at_login_is_sent_to_the_root`,
+    `tests/browser/parts/unlock.mjs`.
+61. A session that ran out mid-action shows the card with the username
+    known, and signing in returns to the form with what was typed. Test:
+    `tests/browser/parts/unlock.mjs`.
+62. (blind) Two pages, one browser. Pages A and B are unlocked on one
+    vault and B has a holding form open with a name typed. A restores a
+    file. Before B sends any request, B holds no key, no decrypted name
+    or figure and no typed name, every dialog is closed, and its card is
+    in Replaced elsewhere for dropped input. A stays open on the
+    restored vault. Unlocking B opens the dashboard with the restored
+    figures, no notice and no unreadable record. Test:
+    `tests/browser/parts/export-import.mjs`.
+63. (blind) The same with B showing only the dashboard and nothing kept
+    puts B's card in the wording for nothing dropped. A kept dialog with
+    nothing typed counts as dropped. Test:
+    `tests/browser/parts/export-import.mjs`,
+    `tests/browser/parts/unlock-replaced.mjs`.
+64. (blind) With B's channel stubbed so no message arrives, B's save
+    answers Conflict `{"refused":"vault-replaced"}`, B shows Replaced
+    elsewhere and posts `{"replaced":"<its epoch>"}`, the records are
+    exactly the restored set, and the Conflict never reaches the holding
+    form's version reload. Test:
+    `tests/browser/parts/export-import.mjs`,
+    `tests/test_client.py::test_the_client_side_rules_hold`.
+65. (blind) A page in a second browser context, with its own session,
+    stays drawn and sends nothing while hidden during a restore. Made
+    visible, it sends one `GET /api/records?type=profile` and nothing
+    else and shows Replaced elsewhere. Its session row still exists.
+    Test: `tests/browser/parts/export-import.mjs`.
+66. (blind) A page idle-locked in a second context through a restore
+    shows, on unlocking, the Replaced since last open notice: for
+    dropped input with a form's input held, the same with a kept dialog
+    and nothing typed, and for nothing dropped with nothing kept. In
+    each case it posted `{"replaced":"<the epoch it held>"}`. Test:
+    `tests/browser/parts/export-import.mjs`.
+67. (blind) A page in a second context holding typed input when the
+    first logs out everywhere, signs in and restores: its next request
+    answers Unauthorized and the card shows the session-ran-out state
+    with the input held. Signing in drops the input, opens the dashboard
+    and shows Replaced since last open for dropped input. With no restore
+    in between, signing in returns to the view with the input and no
+    notice. Test: `tests/browser/parts/export-import.mjs`,
+    `tests/browser/parts/unlock.mjs`.
+68. (blind) Signing out and in again after a restore shows no Replaced
+    since last open notice. Test: `tests/browser/parts/export-import.mjs`.
+69. (blind) Reloading and signing in again after a restore shows no
+    Replaced since last open notice. Test: no test.
+70. (blind) A page ignores a channel message naming an epoch it does not
+    hold, a message of any other shape, and every message while it holds
+    no epoch. Every message a page posts has `replaced` as its only key,
+    holding the replaced epoch. Test:
+    `tests/test_client.py::test_the_client_side_rules_hold`,
+    `tests/browser/parts/export-import.mjs`.
+71. (blind) A page that learned by Conflict or at sign-in posts the
+    epoch it held, and a page that learned by message posts nothing.
+    Test: `tests/test_client.py::test_the_client_side_rules_hold`.

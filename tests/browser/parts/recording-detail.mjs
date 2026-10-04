@@ -1,6 +1,6 @@
-// A recording's own screen (spec/ui/recording-detail.md): one date and
-// everything recorded at it, the way back into a sitting, and deleting
-// the recording, whole or partway.
+// A recording's own screen (spec/features/record-snapshot.md, Recording
+// detail): one date and everything recorded at it, the way back into a
+// sitting, and deleting the recording, whole or partway.
 // Templates: dashboard.html. Modules: view-recording.js, view-sweep.js,
 // writes.js, model.js, datepicker.js, view-dashboard.js.
 import { BACKDATE, check, click, labels, page, proxyAsks, recording, run, story, text, unlockDashboard, vaultOwner } from '../harness.mjs';

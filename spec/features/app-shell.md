@@ -1,68 +1,244 @@
 # App shell
 
-## What it does
+The one Flask application every other feature runs inside. It sets the
+response headers, enforces the CSRF header, issues and reads the
+session cookie, opens the SQLite file, renders the chrome the
+authenticated screens sit in, and renders the error page. Each is
+stated once here and holds for every route.
 
-One Flask application wraps every other feature: it sets the response
-headers, enforces the CSRF header, issues and reads the session cookie,
-opens the SQLite file, renders the chrome the authenticated screens
-sit inside, and renders the error pages. Each is stated once here and
-holds for every route.
+## What the client gets
 
-The shell never handles plaintext financial data (architecture.md,
-Components). What it renders as text is nav labels, the wordmark, the
-error pages' fixed copy, and the current default KDF envelope
-(architecture.md, Key management).
+The frame every signed-in screen sits in: the bar across the top, the
+navigation, the controls at its right, and the width the page content
+is held to. With a vault it is identical on every screen, so you always
+know where you are and what you can reach. The admin area sits in a
+stripped-down version of the same frame. It serves the household
+members who use Solvent and the administrators who provision the
+instance. There is no public page and no signed-out landing page. The
+app's protections are applied here once, so no new screen can skip
+them.
 
-## Response headers
+### What "looks like a private bank" commits us to
 
-Set in one place and carried by every response, including error
-responses:
+The values behind each of these are design-system.md's.
 
-- **CSP** — as stated in architecture.md, Application hardening. It
-  does not vary by route. A route that would need a
-  looser policy is a design change, not a local override.
-- **HSTS** — as stated in architecture.md, Network & transport,
-  including the condition on `preload`.
+- **One structural color**, a deep petrol blue, and two accents used
+  sparingly: brass for the primary action, plum for secondary emphasis.
+  A screen that needs a third accent is over-designed.
+- **A warm off-white page, never pure white. Hairline rules instead of
+  boxes and shadows.** A soft shadow on a dialog only. Nothing fully
+  round but an avatar and a status dot.
+- **The money is the only loud thing on screen.** The net worth figure
+  is the largest thing anywhere, and nothing in the chrome competes.
+  Money columns are right-aligned, with digits of equal width.
+- **No marketing language**: no tagline, slogan, welcome tour,
+  promotional copy or explanation of why the product is good. Labels
+  name the thing and stop.
+- **Nothing moves for effect**: no entrance animation, sliding panel or
+  figure counting up from zero. Only a brief hover or focus change, and
+  not even that under reduced motion.
+- **A loading page shows the shape of what is coming**, never a spinner.
+- **Color never carries meaning alone.** A word or an icon says it too.
 
-No separate `X-Frame-Options` is served: `frame-ancestors 'none'` in
+### The bar
+
+- **The top bar**, deep petrol blue and full width, is on every
+  signed-in screen but the error page: the wordmark "Solvent", the
+  navigation, and at the right **Update values** and **Lock**.
+- **Navigation** is **Dashboard** and **Settings**, for everybody with a
+  vault, and never more. There is no **Holdings** entry, because the
+  dashboard's own table is the list of holdings, and a third entry
+  would lead back to it or to a thinner copy. There is no **Admin**
+  entry in any state, because the instance is administered from a
+  separate account with no vault (`admin-invites.md`).
+- **Update values** opens the update sweep for today from wherever you
+  are, asking nothing, so the sweep is reachable from deep inside one
+  holding (`record-snapshot.md`, Update values). The dashboard's **New
+  recording** asks for the date instead, because there you arrive
+  already meaning to record (`net-worth-view.md`, Dashboard). So no
+  screen carries two buttons for one thing.
+- **Lock** is the idle lock pressed by hand (`login.md`, Rules). One
+  press discards the keys and everything decrypted, closes any open
+  dialog and shows the password screen, with no "are you sure". It is
+  what you reach for when somebody walks into the room, and a
+  confirmation spends the seconds it exists to save. The session stays
+  alive, so only the password is asked. A form in a dialog comes back
+  after unlocking with what you typed. A confirmation holds nothing
+  typed, so it does not come back. Nothing else survives.
+- **While a dialog is open** the bar shows only the wordmark and Lock,
+  above the dialog, at every width. The navigation and Update values
+  cannot act then, so they are hidden rather than left looking
+  pressable.
+- **The administrator's frame** is the same bar with a single **Sign
+  out**: no navigation, Update values or Lock, because there is no
+  vault, no holding and nothing decrypted. Movement inside the admin
+  area is its own (`admin-invites.md`, Admin). The two bars differ by
+  what they carry, never by looking different, because a chrome of its
+  own would make the admin area feel like a second product bolted on.
+- **The password and registration screens sit outside the shell**: one
+  centered card, no bar, no navigation, no copy selling the product.
+- **The page below the bar** is centered at a width readable on a wide
+  monitor. Forms are narrower, and the update sweep and a single
+  holding's detail sit in between. A content region fills only once the
+  browser has decrypted it, so a screen shows its skeleton first and a
+  refresh costs a fresh decryption.
+
+### On a phone
+
+Every screen can be read and operated end to end on a phone without
+panning sideways, entering figures and the update sweep included. A
+screen may have two designs for one job, chosen by screen width. The
+update sweep is the example you gave: a wide table on a computer,
+possibly one holding per step on a phone, with the same figures
+recorded. A screen is described at each size wherever the two differ.
+No action exists only inside a wide table, and no screen has a single
+route to something a narrow screen could not offer.
+
+### What it deliberately does not do
+
+- **No sign-out button in a vault owner's top bar.** Locking is
+  frequent and signing out rare and deliberate, and two similar buttons
+  side by side invite the wrong one. Signing out, and signing out
+  everywhere, live in Settings (`account-settings.md`, Settings). An
+  administrator has no Lock, so Sign out is the only control in their
+  bar and there is nothing for it to be confused with.
+- **No dark theme**, because you asked for a light ground
+  (design-system.md, Dark mode).
+- **No custom typeface**, because a downloaded one has to be hosted and
+  pinned and flashes unstyled text on the password screen, the slowest
+  screen in the product (design-system.md, Typography).
+- **No financial data in the shell, and it could not show any.** Its
+  only words are the app's name and the navigation labels, and the
+  server that renders it holds no readable copy of the vault. Figures,
+  holding names and notes exist only inside the browser, after the
+  password.
+
+## Screens
+
+### Error page
+
+The page served wherever no screen can be: an address with no page
+behind it, an address the visitor may not open, and an unexpected
+failure. It says the page cannot be shown and offers the way back. The
+server renders it whole, the same for every visitor (How it works,
+Error pages).
+
+#### Layout
+
+The card outside the shell (How it works, The chrome), max-width 420px,
+padded 32px as the sign-in card is (`login.md`, Unlock).
+
+- The wordmark "Solvent" above the card, as on the sign-in card. It is
+  text, not a link, so the card's button is the one way on.
+- In the card, an `h1` in Section heading type carrying the sentence
+  (Copy).
+- Beneath it, **Go to Solvent**: a link to `/` styled as Button,
+  primary, spanning the card's width at the foot, as **Unlock** does.
+  It opens the screen Solvent starts on for whoever follows it.
+
+The wordmark and card stack centered horizontally and vertically, set
+in the app's own type, never the browser's default. The page title is
+"Solvent".
+
+At phone width the card fills the width inside the 16px gutter and pads
+16px, the heading steps down with Section heading, and the button is at
+least 44px tall (design-system.md, Spacing and shape, Typography).
+Nothing else changes shape.
+
+#### Copy
+
+| Variant | Heading |
+|---|---|
+| Missing, or refused | There is no page at this address. |
+| Unexpected failure | Something went wrong and this page could not be shown. |
+
+The button reads "Go to Solvent" in both.
+
+#### States
+
+The two variants above and no other. **A refused address shows the
+missing variant**, byte for byte, so nothing tells a refused address
+from one that does not exist. The admin area opened from inside a vault
+is one such address, and a vault screen opened by an administrator is
+another. Telling them apart would confirm which addresses exist, which
+this instance does not hand out (`admin-invites.md`, The admin
+boundary).
+
+#### What it deliberately does not show
+
+- **No top bar and no navigation**, because the bar depends on who is
+  signed in and this page does not.
+- **No status code and no technical name for the failure.** "Forbidden"
+  means nothing to the reader, and it would tell a refused address from
+  a missing one.
+- **No cause or detail of the failure.** The reader cannot act on it,
+  and it would hand internals to whoever triggered it.
+- **The address asked for is not repeated.** It adds nothing and puts
+  outside text on the page.
+- **No sign-in link, Back button or Try again.** Go to Solvent leads to
+  sign-in or to the reader's own starting screen, and the browser has
+  Back.
+
+## How it works
+
+### What it does
+
+Flask, Jinja2 and htmx. The shell never handles plaintext financial
+data (architecture.md, Components). It renders as text only nav labels,
+the wordmark, the error page's fixed copy and the current default KDF
+envelope (architecture.md, Key management). No key derivation,
+decryption or vault rendering happens here.
+
+### Response headers
+
+Set in one place and carried by every response, error responses
+included:
+
+- **CSP**, as architecture.md, Application hardening states it. It does
+  not vary by route. A route that would need a looser policy is a design
+  change, not a local override.
+- **HSTS**, as architecture.md, Network & transport states it, with its
+  condition on `preload`.
+
+No separate `X-Frame-Options` is served. `frame-ancestors 'none'` in
 the CSP covers framing, and a second header stating the same thing is a
-second thing to keep in sync.
+second thing to keep in sync. The Alpine build served is the CSP-safe
+one (architecture.md, Application hardening).
 
-## Configuration
+### Configuration
 
 - `SECRET_KEY` is read from the environment (architecture.md, Tech
-  stack).
-- **The app refuses to start when `SECRET_KEY` is absent or empty**,
+  stack). **The app refuses to start when it is absent or empty**,
   rather than generating one. A generated key is new on every restart
   and silently invalidates every session row. A committed default is
   forgeable.
 - No secret reaches a log line or an error page.
 
-Every other setting is an environment variable read once at start.
-Each default lives with the rule it tunes:
+Every other setting is an environment variable read once at start. Each
+default lives with the rule it tunes:
 
 | Variable | Sets |
 |---|---|
 | `DATABASE_PATH` | the SQLite file (Database) |
 | `HSTS_PRELOAD`, `HSTS_MAX_AGE` | HSTS (architecture.md, Network & transport) |
 | `TRUSTED_PROXY_HOPS` | how many proxies' `X-Forwarded-For` entries are trusted, default 0 (architecture.md, Network & transport) |
-| `LOGIN_ATTEMPTS_PER_ACCOUNT`, `LOGIN_ACCOUNT_WINDOW_MINUTES` | the per-username throttle (architecture.md, Rate limiting) |
+| `LOGIN_ATTEMPTS_PER_ACCOUNT`, `LOGIN_ACCOUNT_WINDOW_MINUTES` | the per-username throttle (architecture.md, Application hardening) |
 | `LOGIN_LOCKOUT_THRESHOLD`, `LOGIN_LOCKOUT_WINDOW_MINUTES`, `LOGIN_LOCKOUT_MINUTES` | the per-username lock |
 | `LOGIN_FAILURES_PER_ADDRESS`, `LOGIN_ADDRESS_WINDOW_MINUTES`, `LOGIN_ADDRESS_LOCK_MINUTES` | the per-address lock |
 | `VERIFY_CONCURRENCY`, `VERIFY_WAIT_SECONDS` | the concurrency cap (architecture.md, Application hardening) |
-| `RATE_REQUESTS_PER_HOUR`, `RATE_BREAKER_FAILURES`, `RATE_BREAKER_COOLOFF_MINUTES` | the rate lookup's limit, and the failure count and cool-off of each provider's breaker (rate-lookup.md) |
-| `EXPORTS_PER_USER_HOUR` | the export limit (export-import.md) |
+| `RATE_REQUESTS_PER_HOUR`, `RATE_BREAKER_FAILURES`, `RATE_BREAKER_COOLOFF_MINUTES` | the rate lookup's limit, and the failure count and cool-off of each provider's breaker (`rate-lookup.md`) |
+| `EXPORTS_PER_USER_HOUR` | the export limit (`export-import.md`) |
 
-- **A limit, a window, a lock, a wait or a concurrency is a whole
-  number of at least 1**, and `TRUSTED_PROXY_HOPS` a whole number of at
-  least 0. Anything else refuses to start.
+- **A limit, a window, a lock, a wait or a concurrency is a whole number
+  of at least 1**, and `TRUSTED_PROXY_HOPS` a whole number of at least
+  0. Anything else refuses to start.
 - **`LOGIN_REQUESTS_PER_IP_HOUR` refuses to start whenever it is set**,
-  empty included. Ignoring it would leave an operator believing a
-  limit holds that does not exist. The message names it and the
-  variables of the per-address lock.
+  empty included. Ignoring it would leave an operator believing a limit
+  holds that does not exist. The message names it and the variables of
+  the per-address lock.
 - Every refusal to start names the variable and never its value.
 
-## CSRF
+### CSRF
 
 The `X-Solvent-Request` header check (architecture.md, Application
 hardening) is step 1 of the request gate.
@@ -71,129 +247,113 @@ Exempt are the routes meant to be reached by navigation: the
 server-rendered shell pages and the static endpoint. An exemption is a
 named route, never a path pattern, so an endpoint added under an
 existing prefix cannot inherit one. The static endpoint is exempt
-because no subresource request carries a custom header.
+because no subresource request carries a custom header. What it serves
+is public by construction and holds nothing about any person: the
+design tokens, the client-side code, the vendored Alpine build and the
+app's icon.
 
-**Every page declares the app's icon from the static endpoint**, error
-pages included: `<link rel="icon" href="<static>/icon.png"
+**Every page declares the app's icon from the static endpoint**, the
+error page included: `<link rel="icon" href="<static>/icon.png"
 type="image/png">`, a transparent 1x1 PNG. A page that declares none
-makes the browser request `/favicon.ico`, which the request gate refuses
-like any invented path, and the refusal is a console error. There is no
+makes the browser request `/favicon.ico`, which the gate refuses like
+any invented path, and the refusal is a console error. There is no
 `/favicon.ico` route, because it would answer a path nothing links to.
 The icon is not a `data:` URL, because `img-src 'self'` blocks it.
 
-## Database
+### Database
 
 One place creates the schema and opens the SQLite file on its writable
 volume (architecture.md, Tech stack). Each table's columns are stated
-by the feature that owns them: records (record-api.md), principals and
-credentials (register.md), DEK wrappers (register.md), invites
-(admin-invites.md), sessions (architecture.md, Application hardening),
-attempts (architecture.md, Rate limiting), vault epochs
-(architecture.md, Vault epoch).
+by its owner: records (`record-api.md`), principals, credentials and DEK
+wrappers (architecture.md, Data model), invites (`admin-invites.md`),
+sessions and attempts (architecture.md, Application hardening), vault
+epochs (architecture.md, Vault epoch). **Every connection the app opens
+sets `PRAGMA secure_delete = ON`** (architecture.md, Storage & data
+handling).
 
-**Every connection the app opens sets `PRAGMA secure_delete = ON`**
-(architecture.md, Storage & data handling).
+A database at another schema version is refused at start, because this
+schema has no migration path beyond export and import. So every
+start-time repair below runs in the one write transaction that creates
+the schema, before any request is served, and keeps the schema version:
 
-`principals` carries identity and kind and nothing else, so the columns
-the shell needs to resolve a session and choose a nav are its whole
-column set: no key material is a column of `principals`
-(architecture.md, Accounts on this instance). Registration adds the
-separate `credentials` and `dek_wrappers` tables rather than extending
-this one.
+- **A null `principals.last_login_at` is filled with the row's
+  `created_at`.** Every account has signed in by the time it exists
+  (`login.md`, The session a sign-in issues), so the column is never
+  null where a request can read it, whichever build wrote the row. The
+  DDL leaves it nullable, because SQLite cannot add `NOT NULL` to an
+  existing column without rebuilding `principals`.
+- **Each vault owner without a `vault_epochs` row gets a fresh one**,
+  generated as registration generates it. The table is created `IF NOT
+  EXISTS`. A row that exists is never rewritten at start, because a page
+  already holds it.
+- **Expired `attempts` rows are deleted** (architecture.md, Application
+  hardening), together with every row whose bucket starts with `ip:`.
+  Such a row holds a plaintext address. No code writes one, so a file
+  any build wrote keeps none past its first start.
 
-**Every process start fills a null `principals.last_login_at` with the
-row's `created_at`**, in the one write transaction that creates the
-schema, before any request is served. Every account has signed in by
-the time it exists (login.md, The session a sign-in issues), so the
-column is never null where a request can read it, whichever build
-wrote the row. The DDL leaves the column nullable and the schema
-version unchanged: SQLite cannot add `NOT NULL` to an existing column
-without rebuilding `principals`, and a database at another schema
-version is refused at start, because this schema has no migration
-path beyond export and import.
+**Expired `attempts` rows are also deleted once every 60 seconds in
+each serving process**, by one daemon thread the app factory starts.
+Each pass opens its own connection as `file:<DATABASE_PATH>?mode=rw`,
+so it never creates a file, sets `secure_delete`, deletes in one
+transaction and closes. A failed pass, a vanished database file
+included, logs `attempts.prune_failed` with the exception's type and
+no message, and the next pass runs as usual. The deletion is one
+function taking the current time, which tests call directly.
 
-**Every process start gives each vault owner without a `vault_epochs`
-row a fresh one**, generated as registration generates it, in that same
-write transaction and before any request is served. So every vault
-owner has an epoch wherever a request can read one, whichever build
-wrote the file. The table is created `IF NOT EXISTS` and the schema
-version stays the same, for the reason above. A row that exists is
-never rewritten at start, because a page already holds it.
-
-**Expired `attempts` rows are deleted** (architecture.md, Rate
-limiting):
-
-- **At every process start**, in that same write transaction, together
-  with every row whose bucket starts with `ip:`. Such a row holds a
-  plaintext address. No code writes one, and the start deletes any it
-  finds, so a file any build wrote keeps none past its first start.
-- **Once every 60 seconds in each serving process**, by one daemon
-  thread the app factory starts. Each pass opens its own connection as
-  `file:<DATABASE_PATH>?mode=rw`, so it never creates a file, sets
-  `secure_delete`, deletes in one transaction and closes. A failed pass
-  logs `attempts.prune_failed` with the exception's type and no
-  message, and the next pass runs as usual. The deletion is one
-  function taking the current time, which tests call directly.
-
-The schema is created in one place, so its triggers live here:
-
-- a `BEFORE INSERT` on `records`,
-- a `BEFORE INSERT` on `dek_wrappers` and
-- a `BEFORE INSERT` on `vault_epochs`,
-
-each resolving the row's principal and aborting when its `kind` is
-`administrator`. They are the storage-layer half of "an administrator
-has no vault" (architecture.md, Credentials and vault key wrappers).
-A SQLite `CHECK` cannot reach another table, which is why this is a
-trigger and not a column constraint. Nothing in the application is
+**The schema's triggers**: a `BEFORE INSERT` on `records`, on
+`dek_wrappers` and on `vault_epochs`, each resolving the row's
+principal and aborting when its `kind` is `administrator`. They are the
+storage-layer half of "an administrator has no vault" (architecture.md,
+Credentials and vault key wrappers). They are triggers because a SQLite
+`CHECK` cannot reach another table. Nothing in the application is
 expected to hit them. They exist so that a future feature that would
 has to be written deliberately.
 
-## The two surfaces
+### The two surfaces
 
 There are two surfaces, the vault and the administration, and no
-session reaches both. Every route is in exactly one of the groups
-below. The request gate (below) checks the group against the session
-once per request, so no endpoint repeats it.
+session reaches both. Every route is in exactly one group below. The
+request gate checks the group against the session once per request, so
+no endpoint repeats it.
 
 - **Public**, the routes that answer without a session, to anyone:
-  - `GET /login` and `POST /api/auth/login` (login.md).
+  - `GET /login` and `POST /api/auth/login` (`login.md`).
   - `POST /api/auth/salt`, needed before there is anything to
-    authenticate with (login.md, Flow).
+    authenticate with (`login.md`, Flow).
   - `GET /register` and `POST /api/register`, gated by the invite
-    rather than a session (register.md).
+    rather than a session (`register.md`).
   - `POST /api/auth/logout`, which answers OK to an absent or expired
-    session (account-settings.md, Session and lock).
+    session (`account-settings.md`, Session and lock).
   - `GET /`, the root path (below).
   - The framework's `static` route, whose files every signed-out page
     loads and which depend on nobody.
 
-  Public lifts the session requirement and nothing else: a Public API
+  Public lifts the session requirement and nothing else. A Public API
   route still requires the header and keeps its own feature's checks
   and rate limits.
 - **Shared**, the routes every account needs to keep its credential
-  current: `/api/auth/upgrade-kdf` and `/api/auth/change-password`.
-  Both kinds reach these with a valid session.
-- **Vault**, the record store, the rate lookup including
-  `GET /api/rates/symbols`, export, import, `/api/sessions`,
+  current: `/api/auth/upgrade-kdf` and `/api/auth/change-password`. Both
+  kinds reach them with a valid session.
+- **Vault**: the record store, the rate lookup including `GET
+  /api/rates/symbols`, export, import, `/api/sessions`,
   `/api/auth/logout-all`, `DELETE /api/auth/account`, `/settings`,
-  `/settings/dimensions` and `/settings/export-import`, the dashboard, and every screen that renders
-  vault data. A vault owner reaches these. **An administrator gets Not
-  Found**, `/settings` included: settings exists only inside a vault
-  (`account-settings.md`). A route that redirects a vault owner still
-  answers an administrator Not Found.
-- **Administration**, the `/admin` shell page and **every**
-  `/api/admin/*` endpoint, including ones no feature file has been
-  written for yet. An administrator reaches these. **A vault owner
-  gets Not Found.**
+  `/settings/dimensions`, `/settings/export-import`, the dashboard, and
+  every screen that renders vault data. A vault owner reaches these.
+  **An administrator gets Not Found**, `/settings` included, because
+  settings exists only inside a vault. A route that redirects a vault
+  owner still answers an administrator Not Found.
+- **Administration**: the `/admin` shell page and **every**
+  `/api/admin/*` endpoint, including ones no feature has been written
+  for yet. An administrator reaches these. **A vault owner gets Not
+  Found.**
 
 The **root path** resolves by kind: the Dashboard for a vault owner,
-the Admin area for an administrator. It is the only route that
-resolves to different content per kind, and it does so because a
-bookmark of the bare host has to work for both. Without a session there
-is no kind to resolve by, so it sends the visitor to the Dashboard,
-whose sign-in card signs in both kinds and takes an administrator on to
-the Admin area (`ui/unlock.md`).
+the Admin area for an administrator. It is the only route that resolves
+to different content per kind, because a bookmark of the bare host has
+to work for both. Without a session there is no kind to resolve by, so
+it sends the visitor to the Dashboard, whose sign-in card signs in both
+kinds and takes an administrator on to the Admin area (`login.md`,
+Unlock).
 
 **Public is a list of named routes, never a path pattern**, and names
 nothing at `/admin` or under `/api/admin/`. The other groups are placed
@@ -202,399 +362,448 @@ administration and everything else that touches a vault is vault, so a
 route added later is placed by where it sits. A route matching no group
 is unreachable.
 
-### The request gate
+#### The request gate
 
-Every request passes these steps in order, before any handler runs.
-The first that refuses decides the response, at the status
-architecture.md, Refusals gives, or for step 7 the one it names.
+Every request passes these steps in order, before any handler runs. The
+first that refuses decides the response, at the status architecture.md,
+Refusals gives, or for step 7 the one it names.
 
-1. **Header.** An API request without `X-Solvent-Request: 1` is
-   refused. No API route is exempt, so this needs no routing.
+1. **Header.** An API request without `X-Solvent-Request: 1` is refused.
+   No API route is exempt, so this needs no routing.
 2. **Authentication.** The session cookie is read and looked up.
-3. **No session, API.** An API request with no valid session is
-   refused unless it resolved to a Public route.
+3. **No session, API.** An API request with no valid session is refused
+   unless it resolved to a Public route.
 4. **Unresolved.** A request that did not resolve is refused.
 5. **No session, page.** A Public page is served. A vault navigation
    page is served and renders its own sign-in card. Any other page is
    refused.
-6. **Surface.** A route whose group the session's kind does not reach
-   is refused.
+6. **Surface.** A route whose group the session's kind does not reach is
+   refused.
 7. **Vault epoch.** A vault owner's request to an API route outside
    Public needs `X-Solvent-Vault` holding exactly 32 lowercase hex
    characters, or it is a Bad Request with no `refused` member. A value
    other than the vault owner's `vault_epochs` row is Conflict
    `{"refused":"vault-replaced"}` (architecture.md, Vault epoch).
    Neither writes anything beyond `last_active_at`. An administrator's
-   request is not checked, and the header on it is ignored, as it is on
-   a Public route.
+   request is not checked and the header on it is ignored, as it is on a
+   Public route.
 
 Steps 1 to 6 are the refusals of architecture.md, Refusals. Step 7
 answers only a vault owner already let through to a route of their own
 surface, so it runs after them and teaches nothing about paths or
-kinds.
+kinds. A request refused at or before step 4 writes nothing at all, not
+even `last_active_at`.
 
 The URL map sets `merge_slashes = False` and turns off automatic
-`OPTIONS` responses. Any other redirect or Method Not Allowed the
-router would raise is refused at step 4.
+`OPTIONS` responses. Any other redirect or Method Not Allowed the router
+would raise is refused at step 4.
 
 A refusal carries only the headers every response carries (Response
 headers), and its body depends only on its status and namespace: no
 `Set-Cookie`, `Allow` or `Location`, and no header a route sets on its
-own response, such as `Cache-Control: no-store` or `Referrer-Policy`.
-A Forbidden or Not Found body is the one Error pages pins.
+own response, such as `Cache-Control: no-store` or `Referrer-Policy`. A
+Forbidden or Not Found body is the one Error pages pins.
 
-## Error pages
+### Error pages
 
 Forbidden, Not Found and Server Error answer with one HTML document,
-rendered from `error.html` (`product/app-shell.md`, A page that cannot
-be shown). Its layout, copy and document title are `ui/error-page.md`.
+rendered from `error.html`. Its layout and copy are the Error page
+screen above.
 
 - **Two bodies, not three.** The template takes one variant, `missing`
   or `failure`. Forbidden and Not Found render `missing` and are
-  byte-identical, so the body never tells a refused address from an
-  invented one. Server Error renders `failure`.
+  byte-identical. Server Error renders `failure`.
 - **The variant is the template's only input.** It reads no session,
   principal kind, path, query string, request header or database value,
   and no context processor hands it one. So the page is the same for
-  every visitor, and a Server Error caused by the database still
-  renders.
+  every visitor, signed out, vault owner or administrator, and a Server
+  Error caused by the database still renders.
 - **The head** is `<meta charset="utf-8">`, `<meta name="viewport"
   content="width=device-width, initial-scale=1">`, the title, the
   stylesheet `css/tokens.css` and the icon (CSRF), on `<html
-  lang="en">`. The page loads nothing else.
-- **Root-absolute URLs.** The stylesheet and icon are referenced as
-  the static endpoint builds them, `/static/...`, never relative. The
-  page answers paths of any depth, and a relative URL under an invented
-  path resolves to another invented path, whose refusal is a console
-  error and leaves the page unstyled.
+  lang="en">`. The page loads nothing else, so it has nothing to fetch
+  and nothing to fail on its own.
+- **Root-absolute URLs.** The stylesheet and icon are referenced as the
+  static endpoint builds them, `/static/...`, never relative. The page
+  answers paths of any depth, and a relative URL under an invented path
+  resolves to another invented path, whose refusal is a console error
+  and leaves the page unstyled.
 - **No script and no inline style.** No `<script>` element of any type,
-  so no KDF envelope either, unlike the pages outside the shell:
-  nothing on the page acts. No `<style>` element and no `style`
-  attribute, which `style-src 'self'` refuses.
+  so no KDF envelope either, unlike the pages outside the shell. No
+  `<style>` element and no `style` attribute, which `style-src 'self'`
+  refuses.
 - **One link.** Exactly one `<a>`, `href="/"`, which the root path
-  resolves by kind (The two surfaces). No form, and the wordmark is
-  text, not a link.
-- **No bar.** The chrome depends on the kind, which this page does not
-  read.
+  resolves by kind. No form and no bar.
 
-## The chrome
+### The chrome
 
-Layout, the nav, the global Update values action, the lock button, and
-the content max-width are specified in ui/design-system.md, App shell.
-This feature renders that shell; each screen spec describes only its
-own content region.
-
-The chrome differs by kind, and it differs by omission rather than by
-rearrangement:
+One server-rendered shell wraps every authenticated screen, and each
+screen describes only its own content region. What it carries is What
+the client gets, The bar. It differs by kind, by omission:
 
 | | Vault owner | Administrator |
 |---|---|---|
 | Nav | Dashboard, Settings | none |
-| Update values | shown | absent |
+| Update values | shown | absent, not disabled |
 | Right-hand control | Lock | Sign out |
 | Embedded KDF envelope | yes | yes |
 | Record and decryption layer | loaded | not loaded |
 | Argon2id worker | loaded | loaded |
 
-- **An administrator's bar carries a wordmark and Sign out and nothing
-  else.** No Dashboard, no Settings, no Admin entry: with one
-  destination there is nothing for a nav to navigate between, and
-  every other entry would answer Not Found. Movement inside the admin
-  area is that area's own business (`ui/admin.md`).
-- **The right-hand control is Lock for a vault owner and Sign out for
-  an administrator**, because Lock means "drop the keys and keep the
-  session" and an administrator has no keys to drop.
-- **Update values is absent, not disabled.** It opens a vault flow.
-- **The Argon2id worker still ships to an administrator**, because
-  changing their password derives at current parameters like any other
-  account, and because a stale-KDF upgrade can fire on any sign-in
-  (login.md).
-- **The current default KDF envelope is still embedded**
-  (architecture.md, Key management), for the same reason.
+- **An administrator's bar has no nav entry** because every one would
+  answer Not Found, and Sign out takes the place of Lock because Lock
+  means "drop the keys and keep the session" and an administrator has
+  no keys.
+- **Top bar** in petrol-800. Update values and Lock take the chrome
+  button variant (design-system.md, Components), not the secondary one,
+  which is for the light ground. The current nav entry is white with a
+  2px brass-500 rule beneath it and the others are petrol-200, so the
+  current one is marked by the rule as well as by hue.
+- **At phone width** the nav drops to a second row beneath the wordmark
+  and the two buttons, and Lock shows its icon alone, keeping "Lock" as
+  its accessible name.
+- **The Argon2id worker and the current default KDF envelope ship to an
+  administrator too** (architecture.md, Key management), because a
+  password change derives at current parameters for any account, and a
+  stale-KDF upgrade can fire on any sign-in (`login.md`, Stale-KDF
+  upgrade).
+- **Content max-width** is 1200px, and each screen states its own
+  narrower width.
+- **Outside the shell** sit the sign-in card (`login.md`, Unlock),
+  registration (`register.md`, Register) and the error page: one
+  centered card on the warm ground under the wordmark in petrol-800,
+  each setting its own width. Sign-in and registration, with no session
+  to fetch one, embed the server's current default KDF envelope in
+  their own page.
 
-### The bar above a dialog
+#### The bar above a dialog
 
 **While any dialog is open, a vault owner's Lock stays visible and
-operable above it**, at every width, so one press locks whatever is on
-screen (`product/app-shell.md`, Lock). An administrator's dialog covers
-the whole page, bar included: its scrim starts at the viewport's top
-and the bar is `inert` with the rest of the page, because nothing on
-that surface is decrypted and there is nothing for a control above the
-dialog to protect. Everything below describes the vault owner's bar.
+operable above it**, at every width. The dialog, its scrim, the focus
+cycle with Lock, Escape and the administrator's whole-page scrim are
+design-system.md, Components, Dialog. An administrator's bar is `inert`
+with the rest of the page, because nothing on that surface is decrypted
+for a control above the dialog to protect.
 
-- **Layering.** While a dialog is open the bar is `position: sticky;
-  top: 0` and stacks above every scrim. Each scrim, and the full-screen
-  sheet at phone width, starts at the bar's lower edge rather than at
-  the viewport's top: its top is `var(--chrome-height)`. Nothing a
-  scrim or sheet draws overlaps the bar.
-- **What the bar carries.** The nav and Update values take `hidden`
-  when the first dialog opens and lose it when the last one closes,
-  so the bar shows the wordmark and Lock alone. They
-  are hidden rather than made inert, because an inert control still
-  looks pressable.
+- **Layering.** While a dialog is open the bar is `position: sticky; top: 0`
+  and stacks above every scrim, pinned to the viewport's top however
+  far the page had scrolled, resized or rotated. Each scrim, and the
+  phone-width sheet, has its top at `var(--chrome-height)`.
+- **What the bar carries.** The nav and Update values take `hidden` when
+  the first dialog opens and lose it when the last one closes. Hidden,
+  not inert, because an inert control still looks pressable.
 - **`--chrome-height`** is the bar's rendered height, set on the root
   element through the CSSOM (`style.setProperty`, which `style-src
-  'self'` allows), measured after the nav is hidden and measured again
-  whenever the bar's size changes while a dialog is open. At phone
-  width the hidden nav takes its second row with it, so the sheet
-  starts below one row.
-- **Modality is `inert`, not `aria-modal`.** While a dialog is open,
-  everything outside the topmost dialog is `inert` except the bar:
-  the content region and every dialog beneath the topmost. A dialog
-  carries `role="dialog"` and no `aria-modal`, because `aria-modal`
-  hides everything outside the dialog from assistive technology, Lock
-  included. Closing the topmost dialog makes the one beneath it the
-  topmost, and closing the last removes every `inert` this rule set.
-- **The focus trap** cycles Lock and the topmost dialog's focusable
-  elements, in document order: Tab from the dialog's last element
-  reaches Lock, and Tab from Lock reaches the dialog's first. Focus
-  never leaves the two while a dialog is open.
-- **Escape closes the topmost dialog only**, wherever focus is inside
-  the cycle. A dialog beneath stays open. Closing a dialog lifts the
-  `inert` from what lies beneath before focus returns to what opened
-  it, because focus cannot land in an inert region.
+  'self'` allows), measured after the nav is hidden and again whenever
+  the bar's size changes while a dialog is open. At phone width the
+  hidden nav takes its second row with it, so the bar is one row.
+- **`inert` covers the content region and every dialog beneath the
+  topmost, never the bar.** A dialog carries `role="dialog"`. Closing
+  the last dialog removes every `inert` this rule set. Closing a dialog
+  lifts the `inert` beneath it before focus returns to what opened it,
+  because focus cannot land in an inert region. The focus cycle follows
+  document order.
 - **Lock with a dialog open** is the lock every other route takes
-  (login.md, Rules). Every dialog closes, and which come back after
-  unlock is `ui/unlock.md`, Rules. A dialog that comes back puts the
-  bar back in this state.
+  (`login.md`, Rules). Which dialogs come back after unlocking is
+  `login.md`, Unlock. A dialog that comes back puts the bar back in
+  this state.
 
-## Inputs / outputs
+### Rules
 
-- **In**: the session cookie (or none), the environment, and the
-  requested route.
-- **Out**: an HTML document for a shell route, or the wrapped response
-  of the JSON endpoint that handled the request — headers identical
-  either way.
-
-## Rules
-
-- The shell is Flask + Jinja2 + htmx (architecture.md, Components). No
-  key derivation, decryption, or vault rendering happens here; that is
-  the client-side data layer.
-- The Alpine build served is the CSP-safe one (architecture.md,
-  Application hardening).
-- The vault surface is **one shell page**. `/dashboard` carries every
-  screen behind the gate, settings and dimensions included, as
-  in-page addresses. The keys live in that page's memory and nowhere
-  else, so a second shell page would discard them and charge the
-  Argon2id derivation again in the same sitting (`ui/unlock.md`).
-  `/settings`, `/settings/dimensions` and `/settings/export-import`
-  remain routes on the vault surface, each redirecting to the view it names, so a bookmark or a
-  typed address still lands on that screen.
-- A screen's content region is never server-rendered from vault data,
-  because the server has no plaintext to render.
+- **The vault surface is one shell page.** `/dashboard` carries every
+  screen behind the gate, settings, dimensions and export and import
+  included, as in-page addresses. The keys live in that page's memory
+  and nowhere else, so a second shell page would discard them and charge
+  the Argon2id derivation again in the same sitting (`login.md`,
+  Unlock). `/settings`, `/settings/dimensions` and
+  `/settings/export-import` stay routes on the vault surface, each
+  redirecting to the view it names, so a bookmark or a typed address
+  still lands on that screen.
 
 ## Edge cases
 
-- **`SECRET_KEY` unset or empty** → the app does not start, and the
-  failure names the variable without printing any value.
-- **`LOGIN_REQUESTS_PER_IP_HOUR` set**, to any value or none → the app
-  does not start (Configuration).
-- **`TRUSTED_PROXY_HOPS` negative or not a whole number** → the app
-  does not start.
-- **The database file is removed while a process runs** → the pruning
-  pass fails, logs, and creates no file.
-- **Lock pressed with unsaved form input** → the one named exception in
-  login.md, Rules applies; the shell adds no confirmation of its own.
-- **The viewport is resized or rotated with a dialog open** → the bar
-  keeps its place, `--chrome-height` follows its new height, and the
-  scrim or sheet still starts below it.
-- **The page is scrolled when a dialog opens** → the bar sits at the
-  viewport's top, not where it was in the page.
-- **An administrator navigates to a vault route by typing it**
-  (`/settings`) → the Not Found an invented address gets, with nothing
-  about the kind.
-- **A browser opens an API path without the header** (`/api/export`)
-  → Forbidden, with the `missing` body.
-- **An invented path several segments deep** (`/a/b/c/`) → the
-  stylesheet and icon still load from `/static/`.
-- **A Server Error during a signed-in request** → the same `failure`
-  body a signed-out request gets.
+- Lock with unsaved form input: `login.md`, Rules, with no confirmation
+  added.
+- A browser opens an API path without the header (`/api/export`):
+  Forbidden, with the `missing` body.
+- An invented path several segments deep (`/a/b/c/`): the stylesheet and
+  icon still load from `/static/`.
 
 ## Acceptance criteria
 
-- Every response — a shell page, a JSON endpoint, a Not Found, and a
-  Server Error — carries the same CSP, and carries HSTS.
-- No screen, the error pages reached by navigation included, produces
-  any error in the browser console, and the Alpine build served is the
-  CSP-safe one.
-- Every shell page and every error page declares the app's icon from
-  the static endpoint, the icon is fetchable with no header and no
-  session, and `/favicon.ico` is refused exactly as an invented page
-  path is.
-- A state-changing JSON request without `X-Solvent-Request` returns
-  Forbidden and changes nothing; a shell navigation route loads without
-  it.
-- `GET /api/export` without the header returns Forbidden.
-- A shell page's stylesheet, `shell.js`, and the Alpine bundle are all
-  fetchable with no header and no session, and carry the same headers
-  as any other response.
-- **Refusal fingerprint matrix.** Under every session state (absent,
-  expired, vault owner, administrator) and header state (absent,
-  present), every refused request has the status architecture.md,
-  Refusals gives, and matches every other refusal of the same status,
-  API or page, on body and every header except `Date`.
-  The requests: every route in the route map under every method it
-  answers, an invented page path, `//admin`, an unanswered method on
-  a page and an API route, `/api/invented` and `/api/admin/invented`.
-  Each request steps 1 to 6 refuse under a vault owner session is sent
-  with and without `X-Solvent-Vault`, and the two answers are
-  identical, because step 7 runs only on what those steps let through.
-- **Vault epoch over the route map.** Under a vault owner session with
-  the CSRF header, every API route outside Public, each method it
-  answers:
-  - without `X-Solvent-Vault`, with an empty one, with 31 or 33 hex
-    characters, and with 32 uppercase ones: Bad Request with no
-    `refused` member;
-  - with another vault owner's epoch, and with this vault's epoch from
-    before an import: Conflict with the body
-    `{"refused":"vault-replaced"}`;
-  - each of those leaving every table but `sessions.last_active_at`
-    row for row as it was.
-  Under an administrator session, every shared route answers the same
-  with any `X-Solvent-Vault`, none included. Every Public API route
-  answers the same with and without it.
-- Over the route map, every route requiring the header is under
-  `/api/`, every other route is exempt and answers only `GET` and
-  `HEAD`, and no route answers `OPTIONS`.
-- In a real browser, `/admin` signed out and as a vault owner,
-  `/settings` as an administrator, and an invented page path render
-  the identical Not Found.
-- The body of `GET /api/export` without the header (Forbidden) equals
-  the body of an invented page path (Not Found) byte for byte, and
-  each is byte-identical with no session, a vault owner's and an
-  administrator's.
-- A stubbed Server Error has the same body with no session, a vault
-  owner's and an administrator's. It contains "Something went wrong and
-  this page could not be shown." and not "There is no page at this
-  address.", and the Not Found body the reverse.
-- In both bodies: the viewport meta above, exactly one
-  `<link rel="stylesheet">` with `href` `/static/css/tokens.css`, the
-  icon link, exactly one `<a>` with `href="/"`, and no `<script>`,
-  `<style>`, `style` attribute, `<form>` or `<nav>`.
-- In a real browser, at an invented path several segments deep and on a
-  stubbed Server Error: the body's computed background color equals
-  the root's `--ground`, the card text's computed `font-family` equals
-  the sign-in card's, every resource the page requests answers OK, and
-  the console has no error.
-- At a 390px-wide viewport, both bodies have no horizontal overflow:
-  the document's `scrollWidth` does not exceed its `clientWidth`.
-- Activating Go to Solvent navigates to `/`, which shows the sign-in
-  card with no session, the Dashboard for a vault owner and the Admin
-  area for an administrator.
-- Starting the app with `SECRET_KEY` unset fails, and the message
-  contains the variable name and no key material.
-- Starting the app with `LOGIN_REQUESTS_PER_IP_HOUR` set, to `60` and
-  to the empty string, fails, and the message names it,
-  `LOGIN_FAILURES_PER_ADDRESS`, `LOGIN_ADDRESS_WINDOW_MINUTES` and
-  `LOGIN_ADDRESS_LOCK_MINUTES`.
-- Starting the app with `TRUSTED_PROXY_HOPS` set to `-1`, or with any
-  rate-limit variable set to `0` or `ten`, fails, and the message names
-  the variable and not its value.
-- With `TRUSTED_PROXY_HOPS` unset, the app's WSGI callable is not
-  wrapped in `ProxyFix`. With it set to 2, it is wrapped with `x_for=2`
-  and every other `ProxyFix` count 0.
-- Starting the app on a database holding an `attempts` row in an `ip:`
-  bucket, an expired row in each other bucket, and an unexpired one in
-  each, leaves exactly the unexpired rows outside `ip:` buckets, and
-  the database file's bytes no longer contain the `ip:` row's address.
-- Calling the pruning function with the clock at a row's `at` plus its
-  bucket's retention leaves the row, and one second later deletes it,
-  for every bucket in architecture.md, Rate limiting.
-- The app factory starts one pruning thread, a daemon. A pass against
-  a `DATABASE_PATH` whose file is gone logs `attempts.prune_failed`,
-  raises nothing, and leaves no file at that path.
-- Every connection the app opens, the pruner's included, reads
-  `PRAGMA secure_delete` as 1.
-- The image's gunicorn command sets `--access-logformat` to exactly
-  the format in architecture.md, Storage & data handling, and
-  `--log-level` to `error`, asserted by reading the Dockerfile.
-- The Dockerfile copies `requirements.txt`, `app.py` and `solvent` and
-  nothing else, and `.dockerignore` lists `tests` and `tools`, asserted
-  by reading both files (architecture.md, Tech stack, Packaging).
-- **No server log line carries the peer's address.** gunicorn runs as
-  a subprocess with the Dockerfile's command arguments, bound to
-  `127.0.0.1` on a free port, and a client connects from source
-  address `127.0.0.2`. It sends a request with an invalid request
-  line, one with an invalid header name, one whose request line
-  exceeds gunicorn's limit, and a wrong Auth Key to
-  `/api/auth/login`. After gunicorn stops, neither its standard output
-  nor its standard error contains `127.0.0.2`. The same requests with
-  `--log-level warning` in place of `error` produce a line containing
-  `ip=127.0.0.2`, which proves the test sees the line the flag drops.
-- Nav shows Dashboard and Settings for a vault owner. An
-  administrator's bar shows no nav entries at all, and its only
-  control is Sign out. There is no Holdings entry and no Admin entry
-  in either bar.
-- An administrator session receives Not Found from `/settings`,
-  `/api/sessions`, and `/api/auth/logout-all`, and OK from
-  `/api/auth/change-password`.
-- An administrator session receives Not Found from every vault route
-  and a vault owner session receives Not Found from every
-  administration route, asserted by enumerating every registered route
-  and calling each with a session of both kinds. A route that answers
-  something other than Not Found to the wrong kind, or that appears in
-  no group, fails the test.
-- Over the route map, with no session, the gate passes exactly the
-  Public routes (with the header, for API routes) and the vault
-  navigation pages, and refuses every other route under every method.
-- An administrator's `GET /api/records` returns Not Found, not an
-  empty list, asserted specifically (`record-api.md`).
-- The root path renders the Dashboard for a vault owner and the Admin
-  area for an administrator, and neither session can reach the other's
-  through it.
-- An administrator session's page loads the Argon2id worker and does
-  not load the record or decryption layer.
-- An administrator session's chrome carries no Update values action,
-  no Lock button, and no nav entries.
-- Inserting a `records`, `dek_wrappers` or `vault_epochs` row whose
-  principal is an administrator is rejected by the database itself,
-  asserted against the schema with a direct SQL insert rather than
-  through an endpoint.
-- Starting the app on a database holding vault owners without a
-  `vault_epochs` row, one with a row, and an administrator gives each
-  vault owner without one a row of 32 lowercase hex characters, the
-  rows all distinct, leaves the existing row as it was, adds none for
-  the administrator, and leaves the file's schema version unchanged.
-  Starting it again changes nothing.
-- Starting the app on a database holding a `principals` row with a
-  null `last_login_at` leaves that row's `last_login_at` equal to its
-  `created_at`, leaves every non-null `last_login_at` as it was, and
-  leaves the file's schema version unchanged. Starting it again
-  changes nothing.
-- The lock button discards keys and decrypted state and shows
-  re-unlock with no confirmation dialog, and the server session
-  survives it (login.md, Rules).
-- **Every Lock assertion with a dialog open is driven by real input**:
-  a mouse click or a touch tap dispatched at the screen coordinates of
-  Lock's center, or key presses. None uses a scripted
-  `element.click()`, which skips hit-testing and so passes with Lock
-  covered.
-- With a Record a value dialog open, at desktop width and at phone
-  width with touch, the element at Lock's center point is Lock or a
-  descendant of it, and no scrim or sheet box intersects the bar's box.
-- With that dialog open and a figure typed into it, one mouse click on
-  Lock at desktop width, and one touch tap on it at phone width, each
-  leave no dialog, no figure and no vault plaintext in the DOM, and show
-  the password screen. Unlocking reopens the dialog with the typed
-  figure (`ui/unlock.md`, Rules).
-- With a confirmation open over a form dialog, one click on Lock closes
-  both, and unlocking restores what `ui/unlock.md`, Rules says comes
-  back.
-- With a dialog open, the bar's nav and Update values are hidden, and
-  the wordmark and Lock are visible. Closing the last dialog shows them
-  again.
-- With a dialog open, the content region and every dialog beneath the
-  topmost are `inert`, the bar is not, and no dialog carries
-  `aria-modal`. In the accessibility tree, Lock is exposed and the
-  content region is not.
-- With a dialog open, repeated Tab presses visit only Lock and the
-  topmost dialog's focusable elements, cycling in both directions, and
-  Tab then Enter on Lock locks as a click does.
-- With a confirmation open over a form dialog, Escape closes the
-  confirmation alone and focus returns to what opened it. A second
-  Escape closes the form.
-- At phone width with a dialog open, `--chrome-height` equals the bar's
-  rendered height and the sheet's top equals the bar's bottom, before
-  and after rotating the viewport.
-- No response body originating in the shell contains vault plaintext.
+1. A signed-in vault owner's every screen but the error page shows the
+   wordmark, the nav, Update values and Lock. Test:
+   `tests/test_chrome.py::test_a_vault_owners_bar_carries_update_values_and_lock`,
+   `tests/browser/parts/unlock.mjs`.
+2. A vault owner's nav is exactly Dashboard and Settings. Test:
+   `tests/test_chrome.py::test_nav_is_dashboard_and_settings_for_a_vault_owner`.
+3. Neither bar has a Holdings or an Admin entry, in any state. Test:
+   `tests/test_chrome.py::test_there_is_no_holdings_entry_and_no_admin_entry_in_either_bar`.
+4. An administrator's bar carries the wordmark and Sign out and nothing
+   else. Test:
+   `tests/test_chrome.py::test_an_administrators_bar_carries_the_wordmark_and_sign_out_and_nothing_else`,
+   `tests/test_chrome.py::test_an_administrator_has_no_nav_entries_at_all`.
+5. The password and registration screens show no top bar and no nav.
+   Test:
+   `tests/test_chrome.py::test_a_visitor_with_no_session_gets_the_vault_page_in_the_outside_frame`,
+   `tests/browser/parts/unlock.mjs`.
+6. Every top-bar control works from the keyboard alone and shows a white
+   focus outline. Test: no test.
+7. Update values opens the sweep for today from any screen, with nothing
+   in between, the same sweep New recording reaches once a date is
+   picked. Test: `tests/browser/parts/update-values.mjs`.
+8. One press of Lock discards keys and decrypted state and shows the
+   password screen with no confirmation, and the server session
+   survives. Test: `tests/browser/parts/unlock.mjs`.
+9. After a lock the password alone returns to the app, with no username
+   asked. Test: `tests/browser/parts/unlock.mjs`.
+10. (blind) With a Record a value dialog open, at desktop width and at
+    phone width with touch, the element at Lock's center is Lock or a
+    descendant, and no scrim or sheet box intersects the bar. Every Lock
+    assertion with a dialog open uses a real click, tap or key press at
+    Lock's center, never `element.click()`, which skips hit-testing.
+    Test: `tests/browser/parts/unlock-lock.mjs`.
+11. (blind) With that dialog open and a figure typed, one click (desktop)
+    or tap (phone) on Lock leaves no dialog, no figure and no vault
+    plaintext in the DOM, and shows the password screen. Test:
+    `tests/browser/parts/unlock-lock.mjs`.
+12. (blind) Unlocking then reopens the dialog with the typed figure.
+    Test: `tests/browser/parts/unlock-lock.mjs`.
+13. (blind) Lock over a confirmation over a form closes both, and
+    unlocking brings back the form alone. Test:
+    `tests/browser/parts/unlock-lock.mjs`.
+14. With a dialog open the nav and Update values are hidden and the
+    wordmark and Lock show. Closing the last dialog shows them again.
+    Test: `tests/browser/parts/unlock-lock.mjs`.
+15. (blind) With a dialog open, the content region and every dialog
+    beneath the topmost are `inert`, the bar is not, no dialog carries
+    `aria-modal`, and the accessibility tree exposes Lock and not the
+    content region. Test: `tests/browser/parts/unlock-lock.mjs`.
+16. (blind) With a dialog open, Tab and Shift+Tab visit only Lock and the
+    topmost dialog's controls, in both directions, and Tab then Enter on
+    Lock locks. Test: `tests/browser/parts/unlock-lock.mjs`.
+17. (blind) Escape over a confirmation on a form closes the confirmation
+    alone, with focus back on what opened it. A second Escape closes the
+    form. Test: `tests/browser/parts/unlock-lock.mjs`.
+18. (blind) At phone width with a dialog open, `--chrome-height` equals
+    the bar's height and the sheet's top the bar's bottom, before and
+    after rotating. Test: `tests/browser/parts/unlock-lock.mjs`.
+19. (blind) An administrator's dialog scrim covers the viewport from its
+    top, the bar is inert, and there is no Lock. Test:
+    `tests/browser/parts/admin.mjs`.
+20. (blind) No response body from the shell contains vault plaintext, and
+    the bar and nav never show a holding's name, a figure or a note.
+    Grepping templates proves nothing: no route wired to the shell may
+    receive decrypted content. Test:
+    `tests/test_chrome.py::test_no_shell_response_contains_vault_plaintext`.
+21. An administrator's page loads the Argon2id worker and not the record
+    or decryption layer. Test:
+    `tests/test_chrome.py::test_an_administrator_loads_the_worker_and_not_the_record_layer`.
+22. Every screen uses the warm off-white ground, never pure white, and
+    the one petrol bar. Test: no test.
+23. No screen carries a tagline, slogan, welcome tour or promotional
+    copy. Test: no test.
+24. No number animates and nothing slides or fades in. Under reduced
+    motion, hover and focus transitions stop too. Test: no test.
+25. Money columns are right-aligned with digits of equal width. Test: no
+    test.
+26. Wherever a color carries meaning, a word or icon beside it does too.
+    Test: no test.
+27. (blind) A shell page, a JSON endpoint, a Not Found and a Server Error
+    each carry the same CSP and carry HSTS. Test:
+    `tests/test_headers.py::test_every_response_shape_carries_the_policy_byte_identically`,
+    `tests/test_headers.py::test_every_response_shape_carries_hsts`.
+28. The CSP refuses framing and no `X-Frame-Options` is served. Test:
+    `tests/test_headers.py::test_no_separate_x_frame_options_is_served`.
+29. (blind) No screen, error pages reached by navigation included, logs a
+    console error. Test: `tests/browser/parts/error-page.mjs`.
+30. The Alpine build served is the CSP-safe one. Test:
+    `tests/test_chrome.py::test_the_alpine_build_served_is_the_csp_safe_one_at_its_pinned_hash`.
+31. (blind) Every shell page and every error page declares the icon from
+    the static endpoint. Test:
+    `tests/test_icon.py::test_every_shell_page_declares_the_icon`,
+    `tests/test_icon.py::test_every_error_page_declares_the_icon`.
+32. The icon is fetchable with no header and no session. Test:
+    `tests/test_icon.py::test_the_icon_loads_with_no_header_and_no_session`.
+33. (blind) `/favicon.ico` is refused exactly as an invented page path,
+    and no route or exemption answers it. Test:
+    `tests/test_icon.py::test_favicon_is_refused_exactly_as_an_invented_page_path`,
+    `tests/test_icon.py::test_there_is_no_favicon_route`.
+34. A shell page's stylesheet, `shell.js` and the Alpine bundle load with
+    no header and no session, carry the usual headers, and hold nothing
+    about any person. Test:
+    `tests/test_guard.py::test_static_assets_need_no_header_and_no_session`.
+35. A state-changing JSON request without `X-Solvent-Request` is
+    Forbidden and changes nothing. Test:
+    `tests/test_review_refusals.py::test_every_non_get_route_requires_header_and_changes_nothing`.
+36. A shell navigation route loads without the header. Test:
+    `tests/test_guard.py::test_shell_pages_load_without_the_header`.
+37. `GET /api/export` without the header is Forbidden. Test:
+    `tests/test_guard.py::test_export_requires_the_header_despite_being_a_get`.
+38. (blind) An exempt route and a non-exempt route under the same prefix
+    are told apart. Test:
+    `tests/test_guard.py::test_an_exemption_is_a_named_route_not_a_prefix`.
+39. (blind) Refusal fingerprint matrix: under each session state
+    (absent, expired, vault owner, administrator) and header state,
+    every refused request gets the status architecture.md, Refusals
+    gives and matches every other refusal of that status on body and
+    every header but `Date`. Requests: every route in the route map read
+    at test time under each method, an invented page path, `//admin`, an
+    unanswered method on a page and an API route, `/api/invented`,
+    `/api/admin/invented`. Test:
+    `tests/test_review_refusals.py::test_refusal_fingerprint_matrix`,
+    `tests/test_guard.py::test_every_registered_route_is_refused_like_every_other`.
+40. (blind) Without the header a refusal is identical across all four
+    session states, and with it an expired session's refusal equals an
+    absent one's. Test:
+    `tests/test_session.py::test_absent_tampered_expired_and_unsigned_cookies_are_all_refused`,
+    `tests/test_guard.py::test_a_page_probe_is_refused_identically_in_every_cell`.
+41. (blind) A refusal carries no `Set-Cookie`, `Allow`, `Location` or
+    route-set header. Test:
+    `tests/test_guard.py::test_a_refusal_carries_nothing_a_route_sets_for_itself`,
+    `tests/test_review_refusals.py::test_refusals_carry_no_route_headers`.
+42. (blind) An unanswered method and `//admin` are refused as invented,
+    never Method Not Allowed and never a redirect. Test:
+    `tests/test_guard.py::test_the_router_does_not_merge_slashes`,
+    `tests/test_review_refusals.py::test_refusal_fingerprint_matrix`.
+43. (blind) Over the route map read at test time, every route requiring
+    the header is under `/api/`, every other answers only `GET` and
+    `HEAD`, and none answers `OPTIONS`. Test:
+    `tests/test_guard.py::test_the_namespace_invariant_holds_over_the_route_map`,
+    `tests/test_review_refusals.py::test_namespace_invariant_over_route_map`.
+44. (blind) A vault owner's request to every API route outside Public,
+    read from the route map under each method, is a Bad Request with no
+    `refused` member when `X-Solvent-Vault` is missing, empty, 31 or 33
+    hex characters, or 32 uppercase ones. Test:
+    `tests/test_vault_epoch.py::test_a_malformed_or_missing_epoch_is_a_bad_request_with_no_reason`.
+45. (blind) The same requests with another vault's epoch or this vault's
+    from before an import are Conflict `{"refused":"vault-replaced"}`,
+    the body parsed and not only the status. Test:
+    `tests/test_vault_epoch.py::test_another_vaults_epoch_and_a_replaced_one_are_a_conflict_on_every_route`.
+46. (blind) Each of those leaves every table but `sessions.last_active_at`
+    row for row as it was. Test:
+    `tests/test_vault_epoch.py::test_a_malformed_or_missing_epoch_is_a_bad_request_with_no_reason`,
+    `tests/test_vault_epoch.py::test_another_vaults_epoch_and_a_replaced_one_are_a_conflict_on_every_route`.
+47. (blind) An administrator's shared-route request answers the same with
+    any `X-Solvent-Vault` or none, and so does every Public API route.
+    Test:
+    `tests/test_vault_epoch.py::test_an_administrator_and_a_public_route_ignore_the_header`.
+48. (blind) A vault owner's request that steps 1 to 6 refuse gets the
+    same answer with and without `X-Solvent-Vault`. Test:
+    `tests/test_vault_epoch.py::test_a_refusal_before_the_epoch_step_is_the_same_with_and_without_the_header`.
+49. (blind) In a real browser, `/admin` signed out and as a vault owner,
+    `/settings` as an administrator, and an invented path render the
+    identical Not Found. Test: `tests/browser/parts/error-page.mjs`.
+50. (blind) The Forbidden body of `GET /api/export` without the header
+    equals an invented path's Not Found body byte for byte, each the
+    same with no session, a vault owner's and an administrator's. Test:
+    `tests/test_chrome.py::test_forbidden_and_not_found_are_one_body_for_every_visitor`.
+51. (blind) A stubbed Server Error has one body for all three visitors
+    and with the database unavailable. Test:
+    `tests/test_chrome.py::test_a_server_error_is_one_body_for_every_visitor`,
+    `tests/test_chrome.py::test_a_server_error_with_the_database_unavailable_is_the_same_body`.
+52. (blind) The failure body holds its own sentence and not the missing
+    one, and the missing body the reverse, each with one button, Go to
+    Solvent. Test:
+    `tests/test_chrome.py::test_a_server_error_is_one_body_for_every_visitor`.
+53. (blind) Each body, parsed, has the viewport meta, exactly one
+    stylesheet link to `/static/css/tokens.css`, the icon link, exactly
+    one `<a href="/">`, and no `<script>`, `<style>`, `style` attribute,
+    `<form>` or `<nav>`. Test:
+    `tests/test_chrome.py::test_both_error_bodies_carry_the_head_and_the_one_link_and_nothing_else`.
+54. Neither body names a status code or repeats the address asked for.
+    Test:
+    `tests/test_chrome.py::test_an_error_body_names_no_code_and_repeats_no_address`.
+55. (blind) In a real browser, at a deep invented path and on a stubbed
+    Server Error, the background equals `--ground`, the card's font
+    equals the sign-in card's, every resource answers OK and the console
+    has no error. Test: `tests/browser/parts/error-page.mjs`.
+56. At a 390px viewport neither body overflows: `scrollWidth` does not
+    exceed `clientWidth`. Test: `tests/browser/parts/error-page.mjs`.
+57. (blind) Activating Go to Solvent, not reading its `href`, lands on the
+    sign-in card with no session, the Dashboard for a vault owner and
+    the Admin area for an administrator. Test:
+    `tests/browser/parts/error-page.mjs`.
+58. An administrator gets Not Found from `/settings`, `/api/sessions` and
+    `/api/auth/logout-all`, and OK from `/api/auth/change-password`.
+    Test:
+    `tests/test_guard.py::test_an_administrator_reaches_change_password_and_not_settings`.
+59. (blind) Calling every registered route, read at test time, with each
+    kind's session: each kind gets Not Found from the other's surface,
+    and a route in no group fails. Test:
+    `tests/test_guard.py::test_each_kind_gets_not_found_from_the_other_surface`,
+    `tests/test_guard.py::test_every_registered_route_is_placed_in_a_surface`.
+60. (blind) With no session the gate passes exactly the Public routes
+    (with the header, for API routes) and the vault navigation pages,
+    over the route map under every method. Test:
+    `tests/test_guard.py::test_with_no_session_the_gate_serves_exactly_the_public_routes_and_the_vault_pages`.
+61. (blind) An administrator's `GET /api/records` is Not Found, not an
+    empty list. Test:
+    `tests/test_guard.py::test_an_administrator_gets_not_found_from_records_not_an_empty_list`.
+62. The root path renders the Dashboard for a vault owner and the Admin
+    area for an administrator, and neither reaches the other's through
+    it. Test: `tests/test_guard.py::test_the_root_path_resolves_by_kind`.
+63. (blind) A real process start with `SECRET_KEY` unset or empty fails,
+    naming the variable and printing no key material. A unit test of the
+    loader alone is not this. Test:
+    `tests/test_config.py::test_process_fails_to_start_with_secret_key_unset`,
+    `tests/test_config.py::test_no_key_material_reaches_process_output`.
+64. (blind) `LOGIN_REQUESTS_PER_IP_HOUR` set to `60` or to the empty
+    string fails the start, naming it and the per-address lock's three
+    variables. Test:
+    `tests/test_config.py::test_the_removed_per_ip_limit_refuses_to_start_whenever_it_is_set`.
+65. `TRUSTED_PROXY_HOPS` at `-1`, or a rate-limit variable at `0` or
+    `ten`, fails the start, naming the variable and not its value. Test:
+    `tests/test_config.py::test_a_limit_below_its_minimum_or_not_a_number_refuses_to_start`,
+    `tests/test_config.py::test_a_refused_value_is_never_echoed`.
+66. (blind) With `TRUSTED_PROXY_HOPS` unset the WSGI callable is not
+    wrapped in `ProxyFix`, and at 2 it is wrapped with `x_for=2` and
+    every other count 0. Test:
+    `tests/test_attempts.py::test_trusted_proxy_hops_wraps_only_the_client_address`.
+67. (blind) A start on a pre-written file with an `ip:` row, an expired
+    row in each other bucket and an unexpired one in each keeps exactly
+    the unexpired non-`ip:` rows, and the file's bytes hold no trace of
+    the `ip:` address. Test:
+    `tests/test_attempts.py::test_starting_the_app_deletes_ip_rows_and_expired_rows_and_overwrites_them`.
+68. (blind) The pruning function keeps a row with the clock at its `at`
+    plus its bucket's retention and deletes it one second later, for
+    every bucket. Test:
+    `tests/test_attempts.py::test_each_bucket_is_kept_for_its_own_longest_window_to_the_second`.
+69. (blind) The app factory starts one daemon pruning thread, and a pass
+    on a vanished database file logs `attempts.prune_failed`, raises
+    nothing and creates no file. Test:
+    `tests/test_attempts.py::test_the_factory_starts_one_daemon_pruner_and_a_failed_pass_only_logs`.
+70. (blind) Every connection the app opens, the pruner's included, reads
+    `PRAGMA secure_delete` as 1. Test:
+    `tests/test_attempts.py::test_every_connection_the_app_opens_sets_secure_delete`.
+71. (blind) A start on a pre-written file gives each vault owner lacking
+    a `vault_epochs` row a distinct 32-lowercase-hex one, leaves an
+    existing row, adds none for an administrator, keeps the schema
+    version, and a second start changes nothing. Test:
+    `tests/test_vault_epoch.py::test_a_start_gives_each_vault_owner_without_an_epoch_a_fresh_one`.
+72. (blind) A start on a pre-written file sets a null `last_login_at` to
+    its `created_at`, leaves non-null ones, keeps the schema version, and
+    a second start changes nothing. Test:
+    `tests/test_last_login.py::test_starting_the_app_fills_null_last_login_at_with_created_at_and_only_those`.
+73. (blind) A direct SQL insert of a `records` or `dek_wrappers` row for
+    an administrator is rejected by the database. Test:
+    `tests/test_schema.py::test_the_schema_refuses_a_records_row_for_an_administrator`,
+    `tests/test_schema.py::test_the_schema_refuses_a_dek_wrapper_for_an_administrator`.
+74. (blind) A direct SQL insert of a `vault_epochs` row for an
+    administrator is rejected by the database. Test:
+    `tests/test_vault_epoch.py::test_an_administrator_cannot_be_given_an_epoch`.
+75. (blind) The Dockerfile's gunicorn command sets `--access-logformat`
+    to exactly the format in architecture.md, Storage & data handling,
+    and `--log-level` to `error`. Test:
+    `tests/test_deployment.py::test_gunicorn_logs_no_address_agent_referrer_or_query_and_only_errors`.
+76. (blind) The Dockerfile copies exactly `requirements.txt`, `app.py`
+    and `solvent`, with no wildcard or whole-context copy, and
+    `.dockerignore` lists `tests` and `tools`. Test:
+    `tests/test_deployment.py::test_the_image_holds_the_app_and_nothing_of_the_tests_or_tools`.
+77. (blind) gunicorn, run with the Dockerfile's arguments on `127.0.0.1`,
+    receives from `127.0.0.2` an invalid request line, an invalid header
+    name, an over-long request line and a wrong Auth Key to
+    `/api/auth/login`, and its output then holds no `127.0.0.2`. The same
+    run at `--log-level warning` logs `ip=127.0.0.2`, which proves the
+    test sees the line the flag drops. Test:
+    `tests/test_deployment.py::test_no_server_log_line_carries_the_peer_address`.

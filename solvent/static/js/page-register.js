@@ -1,4 +1,4 @@
-// An administrator's registration page (spec/ui/register.md).
+// An administrator's registration page (spec/features/register.md, Register).
 //
 // An administrator holds no keys, so nothing has to survive the move to
 // the admin area and it is an ordinary page load. A vault owner's

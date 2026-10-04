@@ -1,4 +1,5 @@
-// The axes holdings are classified along (spec/ui/dimensions.md).
+// The axes holdings are classified along
+// (spec/features/account-settings.md, Dimensions).
 //
 // Every operation here writes at most one record, the profile.
 // Nothing on this screen reads or writes an account record, so no

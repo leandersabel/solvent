@@ -19,6 +19,7 @@ import hashlib
 import hmac
 import json
 import os
+import re
 import secrets
 import shutil
 import sqlite3
@@ -37,8 +38,17 @@ from tests.helpers import REPO_ROOT, flask, serve
 
 BROWSER = REPO_ROOT / "tests" / "browser"
 PARTS = sorted((BROWSER / "parts").glob("*.mjs"))
-SCREENS = sorted(path.stem for path in (REPO_ROOT / "spec" / "ui").glob("*.md") if path.stem != "design-system")
 CHROME = Path(os.environ.get("CHROME", "/Applications/Google Chrome.app/Contents/MacOS/Google Chrome"))
+
+
+def screens(page: str) -> list[str]:
+    """The screens a feature page owns: each `###` heading under its
+    `## Screens`, as an id that names the screen's parts."""
+    section = page.split("\n## Screens\n", 1)[1].split("\n## ", 1)[0] if "\n## Screens\n" in page else ""
+    return [re.sub(r"[^a-z0-9]+", "-", line[4:].lower()).strip("-") for line in section.splitlines() if line.startswith("### ")]
+
+
+SCREENS = sorted(s for path in (REPO_ROOT / "spec" / "features").glob("*.md") for s in screens(path.read_text()))
 
 # The passwords the parts sign in with, handed to them here so the
 # verifiers they leave behind can be checked against them below.

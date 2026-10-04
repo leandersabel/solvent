@@ -1,5 +1,4 @@
-"""The authenticated chrome (spec/ui/design-system.md, App shell;
-spec/features/app-shell.md, The chrome).
+"""The authenticated chrome (spec/features/app-shell.md, The chrome).
 
 It differs by kind, and it differs by omission rather than by
 rearrangement.
@@ -355,8 +354,8 @@ def test_a_vault_owner_invite_opened_while_signed_in_draws_no_chrome(app):
 
 
 # The password screen is the vault page while it is locked, and it has
-# no top bar and no navigation (product/app-shell.md, What must be
-# true). The bar is in the markup for the moment the keys exist, and
+# no top bar and no navigation (app-shell.md, Acceptance
+# criteria). The bar is in the markup for the moment the keys exist, and
 # hidden until then.
 
 

@@ -1,9 +1,9 @@
 """Reviewer's independent tests for issue #14, written from
-spec/.compiled/app-shell.json and admin-invites.json, blind to the gate.
+spec/features/app-shell.md and admin-invites.md, blind to the gate.
 
-The gate is modelled here from the contract alone (requestGateOrder,
-refusalTable, publicRoutes, surface groups) and every request the model
-says is refused is sent and fingerprinted.
+The gate is modelled here from the spec alone (the request gate's
+order, the refusal table, the Public routes and the surface groups) and
+every request the model says is refused is sent and fingerprinted.
 """
 from __future__ import annotations
 

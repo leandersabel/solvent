@@ -368,7 +368,7 @@ export class Vault {
   /** The newest rate date anywhere in the vault, which is the date the
    *  hero's "Latest rates" label carries: recording anything refreshes
    *  every rate, so there is one such date rather than one per
-   *  holding (ui/dashboard.md). */
+   *  holding (net-worth-view.md, Dashboard). */
   newestRateDate() {
     let newest = null;
     for (const entries of this.rates.values()) {

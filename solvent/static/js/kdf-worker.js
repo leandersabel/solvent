@@ -1,5 +1,5 @@
 // The Argon2id derivation, in a Worker so the tab stays responsive
-// through it (spec/ui/unlock.md, The derivation wait).
+// through it (spec/features/login.md, Unlock, The derivation wait).
 //
 // It is the one expensive thing the browser does, about a sixth of a
 // second on a computer and a little under two seconds on a phone, and

@@ -11,12 +11,11 @@ talks to the client.
 | Stage | Agent | Owns |
 |---|---|---|
 | Requirements | `product-owner`, for the client | `spec/requirements.md` |
-| Spec | `product-owner` | `spec/product/*.md` |
-| | `architect` | `spec/architecture.md`, `spec/features/*.md`, `security/` |
-| | `designer` | `spec/ui/*.md`, the design system |
-| | `compiler` | `spec/.compiled/*.json`, `spec/status.md` |
+| Spec | `product-owner` | What the client gets, in `spec/features/*.md` |
+| | `architect` | `spec/architecture.md`, How it works, Edge cases and Acceptance criteria in `spec/features/*.md`, `security/` |
+| | `designer` | Screens in `spec/features/*.md`, `spec/design-system.md` |
 | Code | `engineer` | application code and its tests |
-| | `reviewer` | findings against the contract |
+| | `reviewer` | findings against the feature page |
 | | `release` | `Dockerfile`, a running instance |
 | | `qa` | findings against the client's intent, filed as `qa` issues |
 
@@ -50,39 +49,44 @@ when, is in the issues and the history.
   gave, with a reason only where the requirement would otherwise look
   arbitrary. No mechanics, screens or numbers the client never gave. It
   changes only with the client's approval.
-- `spec/product/*.md` holds the product owner's statement of the
-  product that meets the requirements: screens as a person sees them,
-  and a "What must be true" list observable from outside by someone who
-  cannot read code. No status codes, no columns, no libraries.
-- `spec/features/*.md` holds the technical derivation. Row shapes,
-  endpoints, byte encodings, and a technical acceptance list a test can
-  assert.
-- `spec/ui/*.md` holds one file per screen, plus the design system.
-  A screen's layout, every state it must handle, the exact copy, what
-  each control does, and the tokens and contrast floors. A change to
-  how anything looks is written here, from the design system's tokens
-  and components, and is judged on a nightly version.
+- `spec/architecture.md` holds what is true system-wide: the security
+  and threat model, key management, the data model, storage rules,
+  status codes and hardening. Nothing that belongs to one feature.
+  `spec/design-system.md` holds the shared visual rules: tokens,
+  palettes, type, spacing, components, states and accessibility.
+- `spec/features/<feature>.md` holds everything about one feature, each
+  fact once, in these sections:
+  - **What the client gets**: the product that meets the requirements,
+    observable from outside by someone who cannot read code. No status
+    codes, no columns, no libraries.
+  - **Screens**: each screen the feature owns under its own `###`
+    heading. Its layout, every state it must handle, the exact copy and
+    what each control does, from the design system's tokens and
+    components. The heading names the screen. In lowercase, with a
+    hyphen for each run of spaces and punctuation, it is the screen's
+    id, which names its browser parts in `tests/browser/parts/`. A
+    screen several features use belongs to the one that owns most of
+    it, and the others link to it.
+  - **How it works**: row shapes, endpoints, byte encodings, crypto,
+    errors.
+  - **Edge cases**.
+  - **Acceptance criteria**: a numbered list, each item a single
+    checkable statement followed by the test that asserts it, or "no
+    test". An item a passing test could fake is marked "(blind)", so a
+    reviewer writes their own test for it rather than trusting the one
+    beside it.
+
+  A feature the client cannot see has no What the client gets: the
+  record store, the record of prices and the nightly harness. Nightly QA
+  walks every page that has one. The nightly harness is pipeline
+  tooling, never in the image (The loop, Nightly and stable). A feature
+  with no screen of its own can still be one the client sees: the app
+  shell's chrome is where "looks like a private bank" is cashed out.
 
 `spec/design/` holds a copy of the Claude Design canvas at
 https://claude.ai/artifact/NFxzA1ngFuYB53FHnMizn3. It is outside the
 pipeline. No agent reads or edits it, so a drawing the app has moved
-past never overrules a screen file.
-
-`spec/architecture.md` sits above the product, feature and screen
-files and holds what is true system-wide. The same subject at two altitudes is the design, not
-duplication.
-
-Some features have no product file, because the client never asked for
-them and nothing about them is visible from outside: the record store,
-the client-side crypto layer and the nightly harness. The architect
-creates those and names which product features need them. The nightly
-harness is pipeline tooling, never in the image (The loop, Nightly and
-stable).
-
-A feature the client cannot see is not the same as a feature with no
-screen. The app shell has no screen of its own, but the chrome it
-renders is where "looks like a private bank" is cashed out, so it has a
-product file like any other.
+past never overrules a screen.
 
 ## Naming and voice
 
@@ -97,9 +101,9 @@ paths stay as they are. Where prose names the record type, "the
 `account` record" is right. A screen keeps the name it has, even where
 that name and its subject differ.
 
-`spec/requirements.md` and `spec/product/*.md` address the client as
-**you**. `spec/features/` and `spec/ui/` are written for a builder and
-stay third person.
+`spec/requirements.md` and each feature page's What the client gets
+address the client as **you**. Everything else is written for a builder
+and stays third person.
 
 ## Economy
 
@@ -123,21 +127,24 @@ reaches code as data, never written into its text.
 - Record a change by rewriting the statement it changes, not by
   appending what it replaced. An idea that was never built appears
   nowhere.
-- Rationale stays, history goes. "X, because Y" belongs; "X, which
+- Rationale stays, history goes. "X, because Y" belongs. "X, which
   replaced W" does not.
 - Keep rejected *external* options, providers and libraries, with the
   reason they fail. They constrain future choices. Our own discarded
   drafts are not the same thing.
 - Negative rules are target state and belong: "there is no separate
   rate-symbol field, because two fields could disagree."
-- One fact, one home. If a rule appears twice, the second is a pointer.
+- One fact, one home. A rule true system-wide lives in
+  `spec/architecture.md` or `spec/design-system.md`, a rule of one
+  feature in its page, and a screen in the page of the feature that
+  owns it. Anywhere else it is a pointer, written as "(`<feature>.md`,
+  <Section>)".
+- An acceptance criterion names a test that exists, by
+  `tests/<file>.py::<test>` or `tests/browser/parts/<part>.mjs`, or says
+  "no test". A change that adds or removes the test changes the line.
 - No counts in prose. A number of rows, screens or providers is true
   for one edit and wrong by the next.
 - No dates, no "owner's call", no "resolved".
-
-## Tracking files
-
-- `spec/status.md`: state only, compiled, implemented, verified.
 
 ## The loop
 

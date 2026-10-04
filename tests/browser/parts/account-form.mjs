@@ -1,6 +1,7 @@
-// The holding form (spec/ui/account-form.md): creating a holding, editing
-// it, and the archive or delete decision, with what each writes and
-// what a name, a note or a label carrying markup does on every screen.
+// The holding form (spec/features/manage-accounts.md, Account form):
+// creating a holding, editing it, and the archive or delete decision, with
+// what each writes and what a name, a note or a label carrying markup does
+// on every screen.
 // Templates: dashboard.html. Modules: view-holding-form.js, view-holding.js,
 // view-forms.js, view-dimensions.js, view-dashboard.js, writes.js, model.js.
 import {
