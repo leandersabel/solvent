@@ -302,6 +302,78 @@ await run(async () => {
   }, [...ramp, checking, flat]);
   await unlockDashboard('the dashboard after the ramp probes');
 
+  // ---- An archived holding is a row, whatever its figures ----------------
+  //
+  // Everything sits in 2018, before any other figure in the vault.
+  const archivedHolding = (name, unit) => {
+    const { payload } = holding(name, unit);
+    return { type: 'account', payload: { ...payload, archivedAt: '2018-06-01' } };
+  };
+  const [oldCellar, oldEmpty, cellar] = await plant([
+    archivedHolding('Archive cellar', 'PROBE-BOTTLES'),
+    archivedHolding('Archive empty', 'CHF'),
+    holding('Active cellar', 'PROBE-BOTTLES'),
+  ]);
+  const cellars = await plant([
+    figure(oldCellar, '2018-01-01', '12'),
+    figure(cellar, '2018-01-01', '7'),
+  ]);
+  await unlockDashboard('the dashboard over archived probes');
+  const archiveCard = () =>
+    page.eval(`(() => {
+      const card = document.querySelector('.holdings-card');
+      const group = (title) => [...card.querySelectorAll('.table-group')].find(g => g.textContent.includes(title));
+      const names = (node) => node ? [...node.querySelectorAll('.link-button')].map(b => b.textContent) : [];
+      return JSON.stringify({
+        text: card.textContent,
+        rows: [...card.querySelectorAll('.holdings-table tbody tr')].map(r => ({
+          name: r.querySelector('.row-name').textContent,
+          chip: Boolean(r.querySelector('.chip-archived')),
+          buttons: [...r.querySelectorAll('.cell-action button')].map(b => b.textContent),
+          figures: [r.querySelector('.cell-native').textContent, r.querySelector('.cell-converted').textContent, r.querySelector('.cell-asof').textContent],
+        })),
+        notPriced: names(group('Not priced')),
+        notValued: names(group('Not yet valued')),
+      });
+    })()`).then(JSON.parse);
+  const toggleArchived = async () => {
+    await page.eval("document.querySelector('.holdings-card .checkbox input').click()");
+    await page.frames();
+  };
+  await toggleArchived();
+  const shown = await archiveCard();
+  const rowOf = (name) => shown.rows.find((r) => r.name === name);
+  check(
+    'net-worth-view: an archived holding in a unit with no price is a table row with the Archived chip and Unarchive, reading its quantity and "not priced"',
+    rowOf('Archive cellar')?.chip === true && rowOf('Archive cellar').buttons.join() === 'Unarchive' &&
+      rowOf('Archive cellar').figures[0].includes('12') && rowOf('Archive cellar').figures[1] === 'not priced',
+    JSON.stringify(rowOf('Archive cellar')),
+  );
+  check(
+    'net-worth-view: an archived holding with no readable snapshot is a table row reading "not yet valued", with In main currency and As of empty',
+    rowOf('Archive empty')?.chip === true && rowOf('Archive empty').buttons.join() === 'Unarchive' &&
+      rowOf('Archive empty').figures.join('|') === 'not yet valued||',
+    JSON.stringify(rowOf('Archive empty')),
+  );
+  check(
+    'net-worth-view: neither group names an archived holding, and an active holding in the same unit stays under Not priced',
+    shown.notPriced.includes('Active cellar') && !shown.notPriced.includes('Archive cellar') &&
+      !shown.notValued.includes('Archive empty'),
+    JSON.stringify([shown.notPriced, shown.notValued]),
+  );
+  await toggleArchived();
+  const hidden = await archiveCard();
+  check(
+    'net-worth-view: with Show archived off, archived holdings appear nowhere in the holdings card',
+    !hidden.text.includes('Archive cellar') && !hidden.text.includes('Archive empty') && hidden.notPriced.includes('Active cellar'),
+    JSON.stringify(hidden.notPriced),
+  );
+  await page.call(async (ids) => {
+    const api = await import('/static/js/api.js');
+    for (const id of ids) await api.del('/api/records/' + id);
+  }, [...cellars, oldCellar, oldEmpty, cellar]);
+  await unlockDashboard('the dashboard after the archived probes');
+
   // ---- One recording, drawn whole ----------------------------------------
   //
   // The vault is emptied, then holds one holding recorded once at 2500,

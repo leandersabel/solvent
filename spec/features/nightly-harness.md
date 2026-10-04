@@ -355,7 +355,9 @@ record-rate.md, Reading, computed independently of the app in
   with no grouping and `-` for a negative.
 
 Archived holdings, holdings with no quantity and holdings with no price
-are listed by name under `excluded`, with the reason.
+are listed by name under `excluded`, with the reason. An archived
+holding's reason is `archived` whatever else is true of it
+(net-worth-view.md, Current net worth, Archived comes first).
 
 ### `fixtures.mjs`
 

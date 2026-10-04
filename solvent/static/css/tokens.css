@@ -1873,6 +1873,7 @@ select {
   .holdings-table .cell-asof { grid-column: 3; }
   .holdings-table .cell-native:not(.same-unit) ~ .cell-asof::before { content: "\00a0\00b7\00a0"; }
   .holdings-table .cell-native.same-unit { display: none; }
+  .holdings-table .cell-native ~ .cell-asof:empty::before { content: none; }
 
   .holdings-table .cell-action {
     grid-column: 2 / span 2;

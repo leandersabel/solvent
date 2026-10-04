@@ -203,10 +203,18 @@ a while without the app deciding for you what counts as too long. Each
 date in a holding's own list opens the screen of the recording that
 wrote it, which is how a wrong figure from last year gets put right
 (`record-snapshot.md`).
-Holdings you have never valued are listed separately as "not yet
-valued", never as zero, because zero is a real figure that means
-something else. Archived holdings are hidden behind a toggle. Clicking a
-row opens that holding.
+An active holding you have never valued is listed separately as "not
+yet valued", never as zero, because zero is a real figure that means
+something else. An active holding whose unit has no price is listed
+separately as "not priced", never counted at its bare quantity, because
+ten bottles are not ten of your main currency. Both lists say why an
+active holding is missing from the total.
+
+Archived holdings are hidden behind a toggle. Shown, each is listed
+among the archived, marked as archived and offering to unarchive it
+(`manage-accounts.md`), whatever its unit and whether or not any value
+of it can be read. It is out of the total because you archived it, so that is what
+the list says about it. Clicking a row opens that holding.
 
 There is no separate "Holdings" entry in the navigation, because this
 list is the list of holdings (`app-shell.md`, which owns the
@@ -275,8 +283,15 @@ the section needs no small print.
   3k.
 - Two holdings whose histories start years apart do not bend each
   other's shape. The later one's first entry lifts only its own band.
-- A holding you have never valued is listed as not yet valued and is not
-  counted as zero.
+- An active holding you have never valued is listed as not yet valued
+  and is not counted as zero.
+- An active holding measured in a unit with no price, such as bottles,
+  is listed as not priced and is not counted at its bare quantity.
+- With archived holdings shown, every archived holding is listed among
+  the archived, marked as archived and offering to unarchive it,
+  including one measured in a unit with no price and one with no value
+  that can be read.
+  None is listed as not priced or not yet valued.
 - With no holdings at all, the screen says so and offers to add one,
   rather than showing a zero total.
 - With holdings but no values, the total reads as a dash rather than

@@ -249,19 +249,32 @@ currency · As of · (row action).
 
     Most often it is a holding nobody publishes a price for, whose
     price moves only when its owner revisits it.
-- Holdings with no snapshots are listed in a separate "Not yet valued"
-  group below the table — **not shown as 0**, which is a real value
-  meaning something different.
-- Holdings whose unit has no price at all are listed in a separate
-  **"Not priced"** group, with that as the stated reason rather than
-  the other one, and excluded from the total. Never counted at their
-  bare quantity, which would value a holding as though its unit were
-  the main currency (`net-worth-view.md`).
+- **An archived holding is an archived row, whatever its figures**, and
+  never joins either group below. Being archived is why it is out of
+  the total, so a missing value or price is never given as the reason
+  (`net-worth-view.md`).
+- Active holdings with no snapshots are listed in a separate "Not yet
+  valued" group below the table — **not shown as 0**, which is a real
+  value meaning something different.
+- Active holdings whose unit has no price at all are listed in a
+  separate **"Not priced"** group, with that as the stated reason
+  rather than the other one, and excluded from the total. Never counted
+  at their bare quantity, which would value a holding as though its
+  unit were the main currency (`net-worth-view.md`).
 - Archived holdings are hidden by default behind a "Show archived"
-  toggle; when shown they are dimmed with an "Archived" chip.
+  toggle. When shown, each is a row in the table with an "Archived"
+  chip and its text in ink-secondary, never at reduced opacity, which
+  would take its text and chips below their contrast floors
+  (`design-system.md`, Ink and line).
+  - **Its unit has no price**: Latest value is its latest quantity, and
+    In main currency reads "not priced" with no price date line.
+  - **It has no readable snapshot**: Latest value reads "not yet
+    valued", and In main currency and As of are empty.
+  - Its row action is **Unarchive** in place of Record a value
+    (`account-form.md`, Rules).
 - Row click → the holding's detail screen (`account-detail.md`), which
-  owns that holding's own list of values. A "Record a value" action per
-  row opens the single-holding form at that holding
+  owns that holding's own list of values. A "Record a value" action on
+  each active row opens the single-holding form at that holding
   (`snapshot-entry.md`). It is not a second New recording: that button
   asks which date and sweeps every holding, this one takes one holding
   to one date, which is what an odd date or a backfill needs.
@@ -289,7 +302,12 @@ The regions keep their order and stack, 20px apart.
   headings. Each row holds the name with its dimension chips beneath
   it at the left, and at the right the main-currency figure with any
   price date line and then the as-of date beneath it, preceded by the
-  native figure where the unit is not the main currency.
+  native figure where the unit is not the main currency. An archived
+  row keeps its ink-secondary text, its "Archived" chip and Unarchive
+  in place of Record a value. Where its unit has no price, the right
+  side reads its quantity and then "not priced", with no price date
+  line. Where it has no readable snapshot, the right side reads "not yet
+  valued", with no as-of date.
 
 ## States
 
@@ -301,7 +319,9 @@ The regions keep their order and stack, 20px apart.
   holding", primary button. No chart, no table, no zero total, and no
   New recording: there is nothing to record against yet.
 - **Empty — holdings but no snapshots**: table renders with every
-  holding under "Not yet valued". Total shows "—", not 0. No chart.
+  active holding under "Not yet valued", and with "Show archived" on,
+  each archived one as an archived row reading "not yet valued"
+  (Holdings table). Total shows "—", not 0. No chart.
   New recording works, because this is the state somebody leaves by
   recording.
 - **Date picker open**: today is focused, dates holding a recording are

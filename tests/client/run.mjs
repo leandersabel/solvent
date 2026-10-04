@@ -1766,6 +1766,38 @@ await check('net-worth-view: the breakdown sums to the total exactly, in both mo
   }
 });
 
+await check('net-worth-view: an archived holding is a row whatever its figures, and both groups list active holdings only', async () => {
+  const { holdingGroups } = await load('view-dashboard.js');
+  const vault = model({
+    holdings: [
+      { name: 'cash', unit: 'CHF' },
+      { name: 'cellar', unit: 'bottles' },
+      { name: 'new', unit: 'CHF' },
+      { name: 'old cellar', unit: 'bottles', archivedAt: '2026-02-01' },
+      { name: 'old empty', unit: 'CHF', archivedAt: '2026-02-01' },
+    ],
+    figures: [
+      ['cash', '2026-01-01', '10'],
+      ['cellar', '2026-01-01', '12'],
+      ['old cellar', '2026-01-01', '6'],
+    ],
+  });
+  const names = (list) => list.map((r) => (r.holding || r).payload.name).sort();
+  for (const mode of ['latest', 'asRecorded']) {
+    const shown = holdingGroups(vault, { mode, showArchived: true }, null);
+    assert.deepEqual(names(shown.rows), ['cash', 'old cellar', 'old empty']);
+    assert.deepEqual(names(shown.unpriced), ['cellar']);
+    assert.deepEqual(names(shown.unvalued), ['new']);
+    const archived = Object.fromEntries(shown.rows.map((r) => [r.holding.payload.name, r.value.state]));
+    assert.deepEqual([archived['old cellar'], archived['old empty']], ['unpriced', 'unvalued']);
+
+    const hidden = holdingGroups(vault, { mode, showArchived: false }, null);
+    assert.deepEqual(names(hidden.rows), ['cash']);
+    assert.deepEqual(names(hidden.unpriced), ['cellar']);
+    assert.deepEqual(names(hidden.unvalued), ['new']);
+  }
+});
+
 // ---- Recording: the write path -----------------------------------------
 //
 // spec/features/record-rate.md and record-snapshot.md, Acceptance
