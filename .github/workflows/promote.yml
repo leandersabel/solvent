@@ -34,7 +34,7 @@ jobs:
       - id: walked
         run: |
           gh release view "$TAG" --json body --jq .body | tr -d '\r' | grep -qxF "QA walked every feature." || {
-            echo "::error::QA did not walk every feature of $TAG. Run 'gh workflow run nightly.yml -f full=true' and promote the version it builds."
+            echo "::error::QA did not walk every feature of $TAG. Run 'gh workflow run nightly.yml -f full=true' on a day without a version yet, and promote the version it builds."
             exit 1
           }
       # A nightly something now holds back is not made stable.

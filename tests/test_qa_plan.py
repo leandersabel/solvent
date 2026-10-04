@@ -115,8 +115,10 @@ def test_full_walks_every_feature(repo):
     assert plan(repo, record, full=True)["every"] is True
 
 
-def test_an_unknown_last_commit_walks_every_feature(repo):
-    assert plan(repo, {"commit": "0" * 40, "walked": {}})["every"] is True
+@pytest.mark.parametrize("commit", ["0" * 40, "--output=x", None])
+def test_an_unknown_last_commit_walks_every_feature(repo, commit):
+    assert plan(repo, {"commit": commit, "walked": {}})["every"] is True
+    assert not (repo / "x").exists()
 
 
 def test_the_record_carries_tonight_forward(repo):

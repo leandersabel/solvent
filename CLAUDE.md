@@ -210,8 +210,8 @@ Questions follow Who asks the client. A `bug` where a requirement is
 what is wrong becomes a `change`, and the reverse, with a comment
 saying so. A decision the client never made is asked, never settled on
 their behalf. No agent closes an issue. A merged pull request or the
-client does, and the workflow reopens an accepted issue anyone else
-closes, with a comment saying so.
+client does, and the workflow reopens, with a comment, an accepted
+issue anyone else closes.
 
 An issue holding several requests keeps the first. The loop files each
 of the rest as an issue of its own, in the client's words with a link
@@ -350,10 +350,10 @@ found.
   changed since the commit the last completed walk covered, each one a
   changed file of the image or the harness names by its page's path,
   and the one walked longest ago, so every feature is walked within as
-  many nights as there are features. A changed file naming none, or no
-  record of a last walk, walks every feature. The client can start the
-  same run by hand, and `gh workflow run nightly.yml -f full=true` walks
-  every feature.
+  many completed walks as there are features. A changed file naming
+  none, or no record of a last walk, walks every feature. The client can
+  start the same run by hand, and `gh workflow run nightly.yml -f
+  full=true` walks every feature, even when no code changed.
 - The walk is split into shards that run at once. Each shard starts its
   own instance of tonight's image, hardened on a network with no route
   out, beside a stand-in that answers as the price sources through a
@@ -419,11 +419,12 @@ found.
 - The loop never stops in silence. A run that leaves its issue open, in
   none of the states under Issue state other than New, and hands no
   work to a fresh run, labels the issue `stuck`, in a step that runs
-  even when the agent crashes or times out. Any comment by the client
-  starts the next run.
-- A run the subscription refused for its usage limit puts an issue in
-  line or being implemented back in line, without `stuck` or a comment,
-  and starts nothing more until there is headroom (Implementation).
+  even when the agent crashes, times out or hits the usage limit. Any
+  comment by the client starts the next run.
+- The exception is a run the subscription refused for its usage limit
+  on an issue in line or being implemented without a pull request: the
+  issue goes back in line, without `stuck` or a comment, and nothing
+  more starts until there is headroom (Implementation).
 - A failing check on an implementation pull request starts a run that
   fixes it on the same branch. After a bounded number of attempts, the
   pull request becomes a draft without auto-merge and the issue is

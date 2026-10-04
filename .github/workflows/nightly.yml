@@ -160,8 +160,8 @@ jobs:
       # What the last completed walk covered, kept by the night that
       # walked it. Without it, every feature is walked.
       - run: |
-          id=$(gh api "repos/$GITHUB_REPOSITORY/actions/artifacts?name=qa-walked&per_page=1" \
-            --jq '.artifacts[] | select(.expired | not) | .id') &&
+          id=$(gh api "repos/$GITHUB_REPOSITORY/actions/artifacts?name=qa-walked&per_page=30" \
+            --jq '[.artifacts[] | select((.expired | not) and .workflow_run.head_branch == "master" and .workflow_run.head_repository_id == .workflow_run.repository_id)][0].id // empty') &&
             [ -n "$id" ] &&
             gh api "repos/$GITHUB_REPOSITORY/actions/artifacts/$id/zip" > "$RUNNER_TEMP/walked.zip" &&
             unzip -o "$RUNNER_TEMP/walked.zip" qa-walked.json ||
@@ -421,11 +421,14 @@ jobs:
           SHARDS: ${{ needs.plan.outputs.shards }}
         run: '[ "$(find shards -name qa-done.txt | wc -l)" -eq "$(jq length <<< "$SHARDS")" ]'
 
-      # What the completed walk covered, for the next night's plan.
+      # What the completed walk covered, for the next night's plan. Without
+      # it, the next night walks every feature.
       - env:
           RECORD: ${{ needs.plan.outputs.record }}
+        continue-on-error: true
         run: printf '%s\n' "$RECORD" > qa-walked.json
       - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+        continue-on-error: true
         with:
           name: qa-walked
           path: qa-walked.json

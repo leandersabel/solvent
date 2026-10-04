@@ -31,6 +31,8 @@ pages = {path.stem: path.read_text() for path in pathlib.Path("spec/features").g
 features = {name: len(text.splitlines()) for name, text in pages.items() if CLIENT_FACING in text}
 saved = pathlib.Path("qa-walked.json")
 record = json.loads(saved.read_text()) if saved.exists() else {}
+if not re.fullmatch(r"[0-9a-f]{40}", str(record.get("commit"))):
+    record = {}
 walked = {name: day for name, day in record.get("walked", {}).items() if name in features}
 
 
