@@ -1261,7 +1261,8 @@ Editing an existing entry).
     reopened recording and offers Look it up, whichever way the recording
     is reached. A line holding a price never offers it, nor one dated
     before its unit's published prices.
-    Test: `tests/browser/parts/update-values.mjs`.
+    Test: `tests/browser/parts/update-values.mjs`,
+    `tests/browser/parts/update-values-review.mjs`.
 36. Pressing Look it up fills the line when the source answers, labeled
     with the day it is for, as a proposal to take, change or leave. Test:
     `tests/browser/parts/update-values.mjs`.
