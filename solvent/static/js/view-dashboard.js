@@ -258,13 +258,8 @@ function reopenDatePicker(context) {
 /** The series the chart draws over the selected range, or null before
  *  anything has been recorded. */
 function chartSeries(vault, state, dimension) {
-  const dates = vault.recordingDates();
-  if (!dates.length) return null;
-  const lastDay = dayNumber(vault.chartLastDate());
-  const firstRecorded = dayNumber(dates[0]);
-  const span = RANGES.find(([label]) => label === state.range)[1];
-  const fromDay = span === null ? firstRecorded : Math.max(firstRecorded, lastDay - span);
-  return vault.series(dimension, fromDay, lastDay);
+  const range = vault.chartRange(RANGES.find(([label]) => label === state.range)[1]);
+  return range && vault.series(dimension, range.fromDay, range.lastDay);
 }
 
 function chartSection(vault, state, render, dimension, actions, { days, bands }) {
@@ -351,6 +346,8 @@ function chartSection(vault, state, render, dimension, actions, { days, bands })
         percentage: state.percentage,
         justTheLine: state.justTheLine,
         locale: vault.format.locale,
+        group: vault.format.group,
+        decimalPoint: vault.format.point,
         formatDay: (iso) => vault.format.dayMonth(iso, 'short'),
         formatDate: vault.format.longDate,
         onPickDate: (date) => actions.openRecording(date),

@@ -297,6 +297,13 @@ smooth chart is indistinguishable from a bad snapshot.
   price entry or an `archivedAt`**, and every range counts back from
   it. An archive whose D carries no snapshot still falls inside the
   chart, which the right hand edge below depends on.
+- **A range starts no earlier than the oldest date carrying a
+  snapshot.** It counts back from the last day and stops there, so a
+  range longer than the history shows all of it, and a history of one
+  day is that one day under every range. No band has a value before
+  that date (Values between entries), so counting back past it would
+  draw an empty stretch ending in a jump, and on a one-day history
+  would push the only point to the right hand edge.
 - **Pricing mode is not a chart control.** Every chart point is already
   drawn at the prices of its own date, so switching it moves no pixel.
   On latest rates the chart's right hand edge **is** the total: the
@@ -315,6 +322,39 @@ smooth chart is indistinguishable from a bad snapshot.
   bands against total liabilities — because a share of a signed net
   figure is meaningless when the net approaches zero.
 
+### Value ticks
+
+The value axis carries a gridline and a label at each tick. Its
+**domain** runs from the lowest drawn value to the highest, zero
+always included, because the bands stack from zero. A domain with no
+extent, every value zero, runs from 0 to 1.
+
+- **The step is 1, 2 or 5 times a power of ten, and never below 1.** It
+  is the smallest such number at least the domain's span divided by the
+  target count: six at desktop width, three at phone width.
+- **Ticks are counted from zero.** They sit at `i × step` for every
+  integer `i` with `i × step` inside the domain, computed as that
+  product rather than by repeated addition, so every tick is an exact
+  integer. Zero is always a tick.
+- **A tick below a thousand reads as its exact whole number.**
+- **A tick from a thousand up reads in a short form**: its magnitude
+  divided by the largest of a thousand, a million and a billion that
+  does not exceed it, with at most one decimal and no trailing zero,
+  followed by that unit's suffix (`ui/design-system.md`, which makes the
+  value tick the one figure that abbreviates).
+- Every label is grouped, pointed and signed as money is
+  (`account-settings.md`, Dates and numbers), so a tick at 1500 reads
+  `1.5` or `1,5` before its suffix, by the configured decimal point.
+- **No two ticks read the same, because every label is exact.** The
+  domain contains zero, so the step is at least a sixth of the largest
+  tick, and a multiple of a 1, 2 or 5 step that large is exact in one
+  decimal of the tick's unit. A label never rounds its tick.
+- The percentage view takes the same step rule and reads each tick as
+  a whole percent, exact because every tick is an integer.
+
+Where the labels sit, inside the chart's drawing or in a gutter beside
+the plot, is `ui/dashboard.md`'s.
+
 ### Reading a date
 
 **Every calendar day from the range's first day to its last is a date
@@ -326,9 +366,14 @@ drawing's samples or its downsampled points, which exist to draw the
 line. The line at a day between two samples may sit off the model by
 the sub-pixel bound above. The figure shown is the model's.
 
-- **Days are evenly spaced.** In a range of days 0 to n, day k sits at
-  `x0 + k × (x1 − x0) / n` across the plot. A range of one day reads
-  that day at every x.
+- **Days are evenly spaced.** In a range of days 0 to n, with n at
+  least 1, day k sits at `x0 + k × (x1 − x0) / n` across the plot, from
+  its left edge `x0` to its right edge `x1`.
+- **A range of one day draws its point at the middle of the plot**,
+  `(x0 + x1) / 2`, whole, at every width, and reads that day at every
+  x. Placing it at `x0` would put the only figure on the chart against
+  its edge and cut its mark in half where the plot meets the drawing's
+  edge. `ui/dashboard.md` owns how the point looks.
 - **The pointer reads the nearest day:**
   `k = round((x − x0) × n / (x1 − x0))`, clamped to the range, a half
   rounding to the later day. Every x on the plot reads exactly one day.
@@ -414,7 +459,9 @@ the sub-pixel bound above. The figure shown is the model's.
 - **No holdings** → empty state pointing at "Add your first holding."
 - **Holdings but no snapshots** → holdings listed as "not yet valued,"
   total shown as "—" rather than 0, no chart.
-- **One snapshot total** → the chart shows a single point rather than
+- **A history of one day**, every snapshot, price entry and archive on
+  one date → under every range the chart shows a single point at the
+  middle of the plot (Ranges and modes, Reading a date) rather than
   failing or drawing a flat line back to the beginning of time.
 - **All holdings archived** → total is "—", history still renders.
 - **A holding first valued and archived on the same date** → it
@@ -535,6 +582,23 @@ the sub-pixel bound above. The figure shown is the model's.
   recording.
 - With a history long enough to downsample, the readout at a day whose
   sample the downsampling dropped equals the value model at that day.
+- Over a sweep of single-holding totals from 0.40 to 10^10, covering
+  each 1, 2, 2.5, 5 and 7.5 times a power of ten and the integers either
+  side, positive and negative, at a 1280px and a 390px viewport: no two
+  value tick labels read the same, every tick is a multiple of a 1, 2 or
+  5 step no smaller than 1, zero included, and each label read back
+  through its unit equals its gridline's value exactly.
+- With one holding recorded at 2500, at a 1280px viewport, the ticks
+  sit at 0, 500, 1000, 1500, 2000 and 2500. The tick at 1500 reads `1.5`
+  and the one at 2500 reads `2.5`, each before the thousands suffix, and
+  `1,5` and `2,5` under a comma decimal point.
+- With a single recording, at a 1280px and a 390px viewport, the
+  point's center sits at the plot's horizontal middle, within half a
+  pixel, and its mark's bounding box lies wholly inside the chart's
+  drawing, under 1M, 6M, 1Y and All alike. The pointer at either edge
+  of the plot and at its middle reads that day.
+- With snapshots only at 2026-03-01 and 2026-04-10 and a price entry at
+  2026-01-15, 6M, 1Y and All each start at 2026-03-01.
 - Switching the pricing mode changes the total, the list of holdings
   and the breakdown, and changes no chart point. Asserted over every
   sample of every band, not only the right hand edge.

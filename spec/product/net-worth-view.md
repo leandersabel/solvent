@@ -270,6 +270,9 @@ the section needs no small print.
 - Switching to rates as of each figure changes the total, the list and
   the breakdown, and leaves the chart pixel for pixel the same.
 - On latest rates, the chart's right hand edge is the total.
+- Each line of the chart's value scale is labeled with the value it
+  marks, and no two lines read the same. A line at 2,500 never reads
+  3k.
 - Two holdings whose histories start years apart do not bend each
   other's shape. The later one's first entry lifts only its own band.
 - A holding you have never valued is listed as not yet valued and is not
@@ -281,6 +284,8 @@ the section needs no small print.
 - With exactly one recorded value in the whole vault, the chart shows
   one point rather than a flat line running back to the beginning of
   time.
+- Every recorded point on the chart is drawn whole, on a computer and
+  on a phone, including one at the chart's first or last date.
 - A negative holding reduces the total and appears on the liabilities
   side.
 - An archived holding's band runs from its last recorded figure down to

@@ -171,6 +171,18 @@ reordered by size**, which would make the stack unreadable over time.
 - **Estimated stretches** take the estimated marker below — never a
   change to the fills.
 
+### Axes
+
+- **Each value tick reads the value of its own gridline, and no two
+  ticks read the same.** The step is one the tick's short form
+  (Typography, Figures) names exactly at every line, so a tick never
+  rounds to a neighbour's label or away from its own line. The step
+  rule is `net-worth-view.md`'s.
+- **A mark at either edge of the plot is drawn whole at every width**:
+  the net-worth line's dot, an entry mark, an archive marker. The plot
+  keeps half the widest mark clear inside its left and right edges, so
+  nothing on the first or last day is cut by the plot or the card.
+
 ### The two neutral bands
 
 "Unassigned" and "Other" (`net-worth-view.md`) are not categories the
@@ -325,6 +337,13 @@ Every figure is grouped and pointed as Settings sets it
   Decimals on money does not reach it, because rounding 12.5 ounces of
   gold to 13 loses part of the holding, and padding it to 12.50 claims
   a precision nobody recorded.
+- **A chart's value tick is the one figure that abbreviates.** From a
+  thousand up it reads in short form, "2.5k", pointed as Settings sets
+  it, so a reader with a decimal comma sees "2,5k". Below a thousand it
+  reads whole. The exact format is `net-worth-view.md`'s. Every other
+  figure, the chart's tooltip and legend included, shows in full,
+  because a tick only has to place a line and the readout is where a
+  value is read.
 
 ## Spacing and shape
 

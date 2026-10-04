@@ -434,6 +434,18 @@ export class Vault {
     return [...this.recordingDates(), ...archives].sort().at(-1);
   }
 
+  /** The days a range of `span` days shows, counted back from the
+   *  chart's last day and stopping at the oldest snapshot, whatever
+   *  price entry is older: no band has a value before it. Null while
+   *  no snapshot exists (net-worth-view.md, Ranges and modes). */
+  chartRange(span) {
+    const [oldest] = this.quantityDates();
+    if (!oldest) return null;
+    const lastDay = dayNumber(this.chartLastDate());
+    const firstDay = dayNumber(oldest);
+    return { fromDay: span === null ? firstDay : Math.max(firstDay, lastDay - span), lastDay };
+  }
+
   /** Whether any record carries this date. A recording exists exactly
    *  as long as one does (record-snapshot.md, A recording is a date). */
   holdsRecording(date) {

@@ -177,8 +177,8 @@ row's right end. The "View as table" disclosure closes the card.
 
   A "View as table" disclosure exposes the same series as a real table.
   Nothing the chart offers is reachable only by pointer.
-- Chart colors, band order and mark specs come from
-  `design-system.md`.
+- Chart colors, band order, mark specs and the axes come from
+  `design-system.md` (Chart palette, Axes).
 - **No control here issues a network request** — range, dimension, mode,
   band visibility, selection. The whole model is already in memory.
 
@@ -277,7 +277,9 @@ The regions keep their order and stack, 20px apart.
 - **Trend chart**: Range spans the width across the top of the
   controls, and the rest wrap in rows beneath it. Group by drops its
   visible label and keeps it as the select's accessible name, because
-  the section heading above already says what it groups. The legend
+  the section heading above already says what it groups. The value
+  ticks sit in a gutter at the plot's left, outside it, so no tick lies
+  over a band or a mark. The legend
   runs in two columns and drops each band's figure, which the breakdown
   below carries, and the key to the entry marks sits beneath it.
 - **Breakdown**: each bar's label moves above the bar, the band's name
@@ -311,8 +313,10 @@ The regions keep their order and stack, 20px apart.
   breakdown reprice and the chart is unchanged. The control's own label
   is the only thing on screen that says which position is showing. No
   banner, no caveat.
-- **Populated — one snapshot total**: the chart shows a single point,
-  not a flat line running back to the beginning of time.
+- **Populated — a one-day history**: every range is that one day
+  (`net-worth-view.md`, Ranges and modes). The plot draws one whole dot in its horizontal middle, with that day's
+  date beneath it on the date axis, at desktop and at phone width. No
+  line runs back to the beginning of time.
 - **Populated — all holdings archived**: total "—", history still
   renders.
 - **No dimensions configured**: "Group by" offers only "Total", with a

@@ -4,8 +4,8 @@
 // Templates: dashboard.html. Modules: view-dashboard.js, chart.js, model.js,
 // format.js, decimal.js.
 import {
-  check, fetchOff, fetchOn, importOwnExport, isRateAsk, labels, page, plant, run, story, text, unlockDashboard,
-  vaultOwner,
+  check, fetchOff, fetchOn, holdings, importOwnExport, isRateAsk, labels, page, plant, recording, reloadModel, run, setProfile,
+  story, text, unlockDashboard, vaultOwner,
 } from '../harness.mjs';
 
 await run(async () => {
@@ -301,4 +301,92 @@ await run(async () => {
     for (const id of ids) await api.del('/api/records/' + id);
   }, [...ramp, checking, flat]);
   await unlockDashboard('the dashboard after the ramp probes');
+
+  // ---- One recording, drawn whole ----------------------------------------
+  //
+  // The vault is emptied, then holds one holding recorded once at 2500,
+  // so the chart is one day long under every range and its value axis
+  // reads one known figure.
+  await page.call(async () => {
+    const api = await import('/static/js/api.js');
+    for (const type of ['snapshot', 'rate', 'account']) {
+      for (const row of await api.get('/api/records?type=' + type)) await api.del('/api/records/' + row.recordId);
+    }
+  });
+  await reloadModel();
+  const today = new Date().toISOString().slice(0, 10);
+  await holdings([['Solo', 'CHF']]);
+  await recording(today, { Solo: '2500' });
+
+  const redrawn = () =>
+    page.waitUntil(
+      "Number(document.querySelector('svg.trend').getAttribute('width')) === Math.floor(document.querySelector('.chart-frame').clientWidth)",
+      { label: 'the chart drawn at the card\'s width' },
+    );
+  // What the chart draws at one width and range, read off its markup.
+  const drawn = (range) =>
+    page.call(async (label) => {
+      [...document.querySelectorAll('.range-buttons button')].find((b) => b.textContent === label).click();
+      await new Promise((r) => requestAnimationFrame(() => requestAnimationFrame(r)));
+      const svg = document.querySelector('svg.trend');
+      const dot = svg.querySelector('.net-end');
+      const zero = svg.querySelector('.zero-line');
+      const ticks = [...svg.querySelectorAll('.axis-tick')];
+      const value = ticks.filter((t) => t.getAttribute('text-anchor') === 'end');
+      const half = Number(dot.getAttribute('r')) + parseFloat(getComputedStyle(dot).strokeWidth) / 2;
+      const centre = Number(dot.getAttribute('cx'));
+      return JSON.stringify({
+        width: Number(svg.getAttribute('width')),
+        left: centre - half,
+        right: centre + half,
+        offset: centre - (Number(zero.getAttribute('x1')) + Number(zero.getAttribute('x2'))) / 2,
+        plotLeft: Number(zero.getAttribute('x1')),
+        dateAt: ticks.filter((t) => t.getAttribute('text-anchor') === 'middle').map((t) => Number(t.getAttribute('x')) - centre),
+        values: value.map((t) => t.textContent),
+        valueRight: Math.max(...value.map((t) => t.getBBox().x + t.getBBox().width)),
+      });
+    }, range).then(JSON.parse);
+  const viewport = async (width) => {
+    await page.send('Emulation.setDeviceMetricsOverride', { width, height: 900, deviceScaleFactor: 1, mobile: false });
+    await page.idle();
+    await redrawn();
+  };
+  const soloReads = async (label) => {
+    for (const [width, values] of [[1280, ['0', '500', '1k', '1.5k', '2k', '2.5k']], [390, ['0', '1k', '2k']]]) {
+      await viewport(width);
+      for (const range of ['1M', '6M', '1Y', 'All']) {
+        const read = await drawn(range);
+        const where = `${label} at ${width}px under ${range}: ${JSON.stringify(read)}`;
+        check(
+          `net-worth-view: ${label} at ${width}px under ${range} draws its one point whole, in the plot's middle, with its date beneath`,
+          Math.abs(read.offset) <= 0.5 && read.left >= 0 && read.right <= read.width &&
+            read.dateAt.length === 1 && Math.abs(read.dateAt[0]) <= 0.5,
+          where,
+        );
+        check(
+          `net-worth-view: ${label} at ${width}px under ${range} reads its value ticks through their lines, in a gutter outside the plot`,
+          JSON.stringify(read.values) === JSON.stringify(values) && read.valueRight <= read.plotLeft,
+          where,
+        );
+      }
+    }
+  };
+  await unlockDashboard('the dashboard of one recording');
+  await soloReads('one recording');
+
+  // A price entry older than the oldest snapshot does not move a range's start.
+  const older = new Date(Date.parse(today) - 800 * 86400000).toISOString().slice(0, 10);
+  await plant([price('PROBE-OLD', older, '2.00')]);
+  await unlockDashboard('the dashboard of one recording and an older price');
+  await soloReads('one recording and an older price');
+
+  // A decimal comma reaches the value ticks, the one figure that abbreviates.
+  await setProfile({ groupSeparator: 'period' });
+  await unlockDashboard('the dashboard under a decimal comma');
+  await viewport(1280);
+  check(
+    'net-worth-view: under a decimal comma the ticks at 1500 and 2500 read 1,5k and 2,5k',
+    JSON.stringify((await drawn('1Y')).values) === JSON.stringify(['0', '500', '1k', '1,5k', '2k', '2,5k']),
+  );
+  await setProfile({ groupSeparator: 'locale' });
 });
