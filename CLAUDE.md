@@ -183,7 +183,8 @@ The client is `leandersabel`. No agent edits an issue body.
   issue is in the issue's language, following the `advance` skill's
   Writing section.
 - An issue starts the loop when `accepted` is added, or at once when
-  `github-actions[bot]` opened it. Adding a label takes triage access
+  `github-actions[bot]` opened it. A finding starts in line
+  (Findings). Adding a label takes triage access
   to the repository, and no form sets `accepted`. An agent adds it only
   to an issue it opens, as it opens it: a finding (Findings) or a
   request split off another issue (Clarify).
@@ -203,12 +204,12 @@ Each run on a new issue, or on a reply from the client, ends in one of:
 - `bug`, Solvent falls short of the requirements, or of
   `spec/product/` where no requirement covers it, in the code, the
   spec or both: the comment says what the requirement is and what
-  Solvent does, and implementation starts.
+  Solvent does, and the issue waits in line (Implementation).
 - `change`, the requirements change: the comment says what changes for
   the client, and the requirements pull request opens.
 - `maintenance`, nothing the client sees changes, in the code or the
-  agent-owned spec:
-  the comment says what changes and why, and implementation starts.
+  agent-owned spec: the comment says what changes and why, and the
+  issue waits in line.
 - Already met, a duplicate, or doubtful: the reasoning, and a question
   to the client.
 
@@ -228,22 +229,27 @@ takes it up at once.
 
 - A `change` becomes a pull request from `claude/spec-<issue>` that
   touches only `spec/requirements.md`, or for a pipeline change only
-  the pipeline, and links the issue without closing it. Its description
-  is the requirements it adds, changes or removes, in the issue's
-  language.
-- Approving merges it and starts implementation. Requesting changes
-  gets a revision on the same pull request. Closing it stops the loop
-  and leaves the issue to the client.
+  the pipeline, and links the issue. It closes the issue only when it
+  is a pipeline change that leaves nothing to implement and no workflow
+  file to change. Its description is the requirements it adds, changes
+  or removes, in the issue's language.
+- Approving merges it, and what is left to implement waits in line.
+  Requesting changes gets a revision on the same pull request. Closing
+  it stops the loop and leaves the issue to the client.
 
 ### Implementation
 
-- Starts when a requirements pull request merges, or when clarifying
-  finds a `bug` or `maintenance` with nothing to ask. One implementation runs at a time, holding
-  the `claude/slot` branch, which GitHub creates only once: its issue
-  carries `implementing`. An issue that is ready waits with `queued`
-  while another holds the slot or a queued issue ranks ahead of it. A
-  free slot always goes to the first in line: critical problems first,
-  then high ones, then the rest, each lowest number first (Severity).
+- An issue is ready when its requirements pull request merges, when
+  clarifying finds a `bug` or `maintenance` with nothing to ask, or
+  when an agent files it as a finding (Findings). A ready issue waits
+  in line with `queued`. One implementation runs at a time, and its
+  issue carries `implementing`.
+- The workflow hands out the slot, never an agent, in a step without a
+  model that runs one at a time. When no open issue carries
+  `implementing`, the first in line gets it and its run starts:
+  critical problems first, then high ones, then the rest, each lowest
+  number first (Severity). An issue that waits on the client holds
+  neither a place in line nor the slot.
 - When a problem rated `severity: low` takes the slot, every other
   `queued` problem rated low on the same feature or screen joins it in
   one batch: one implementation, one branch and one pull request, each
@@ -269,18 +275,18 @@ takes it up at once.
 
 - One ruleset on `master`: pull requests only, squash merges only, no
   force push or deletion. The `test`, `image` and `dependencies` checks
-  are required. No approval is required except the code owner's, and a
-  push dismisses an earlier approval. Nobody bypasses it.
-- `CODEOWNERS` makes `@leandersabel` the reviewer of
+  are required. Nobody bypasses it.
+- GitHub requires no approval, because the client is the only code
+  owner and cannot approve a pull request of their own. The loop holds
+  the gate instead: it merges a requirements pull request only at a
+  head commit the client approved, and an implementation never touches
+  the client's files. `CODEOWNERS` asks `@leandersabel` to review
   `spec/requirements.md`, `spec/design/`, `.claude/`, `CLAUDE.md`,
-  `SECURITY.md` and `.github/` outside `.github/workflows/`. So the
-  client approves every requirement, and no agent changes the pipeline
-  that gates it.
+  `SECURITY.md` and `.github/` outside `.github/workflows/`.
 - A pull request need not be up to date with `master`, because one
   implementation runs at a time and a requirements pull request touches
   no code. The nightly run tests `master` as a whole before any version.
-- Dependabot's updates pass the same gate and merge when green, except
-  one touching a file the client owns, which waits for their approval. A
+- Dependabot's updates pass the same gate and merge when green. A
   release is proposed only once it has aged: a week for a major or
   minor release and for an action, a few days for a patch or a base
   image. A compromised release is usually caught and pulled within
@@ -319,10 +325,13 @@ found.
   remark in a comment, a pull request or a reading.
 - A problem the work in hand causes, or its issue covers, is part of
   that work. Any other is filed by `claude[bot]` as a rated `bug`, or as
-  `maintenance` when nothing the client sees changes, with `accepted`
-  and where it was found, and the loop takes it up at once. An agent
-  never files a `change`, because a requirement is only ever the
-  client's request.
+  `maintenance` when nothing the client sees changes, with `accepted`,
+  `queued` and where it was found. An agent never files a `change`,
+  because a requirement is only ever the client's request.
+- A finding waits in line as filed, with no run of its own, because
+  whoever found it already said what is wrong. The run that implements
+  it tests the report first, and one that does not hold goes to the
+  client as a question.
 - A finding made while working on an issue is written in that issue's
   language.
 - What an open issue by `leandersabel`, `claude[bot]` or
@@ -374,8 +383,8 @@ found.
   installation's lookups.
 - Every finding becomes a `bug` issue as Findings says, labeled `qa` as
   well. Each feature with criteria QA could not check gets an issue
-  saying which and why, the same way. QA only records them during
-  the walk. Once every shard has finished, a short run merges what the
+  saying which and why, which the loop clarifies at once. QA only
+  records them during the walk. Once every shard has finished, a short run merges what the
   shards recorded, and another files it with a fresh token, so a long
   walk never outlasts the token. What that run could not file,
   the workflow files the same way, as `github-actions[bot]`, before the
@@ -435,10 +444,10 @@ found.
   fixes it on the same branch. When it still fails after a bounded
   number of attempts, or reviewer findings remain, the pull request
   becomes a draft without auto-merge and the issue is `stuck`.
-- A fix in a batch that cannot be finished, or whose rating rises above
-  low, leaves the batch for the queue, and the rest go on. One that
-  needs a requirement change goes back to clarifying. When the fix of
-  the issue that took the slot fails, the batch is `stuck`.
+- A fix in a batch that cannot be finished, whose rating rises above
+  low, or that needs a requirement change leaves the batch for the
+  queue, and the rest go on. When the fix of the issue that took the
+  slot fails, the batch is `stuck`.
 - Every merge to `master` rebases the loop's open pull requests.
 - A failing check on `master` opens a `bug` issue as
   `github-actions[bot]`, which starts at once and skips the
