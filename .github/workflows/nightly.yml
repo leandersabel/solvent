@@ -62,6 +62,10 @@ jobs:
           if [ "$last" = "$today" ] && [ "$FULL" = true ]; then
             echo "Version $today already exists, so QA walks it in full."
             git checkout -q "$today"
+            # Anyone who can push can push a tag, so only a reviewed
+            # commit is walked.
+            git merge-base --is-ancestor HEAD origin/master ||
+              { echo "::error::Version $today is not a commit on master."; exit 1; }
             echo "commit=$(git rev-parse HEAD)" >> "$GITHUB_OUTPUT"
             echo "existing=true" >> "$GITHUB_OUTPUT"
             echo "go=true" >> "$GITHUB_OUTPUT"; exit 0
@@ -167,14 +171,19 @@ jobs:
       record: ${{ steps.plan.outputs.record }}
       failed: ${{ steps.failed.outputs.failed }}
     steps:
+      # The planner runs from the workflow's own commit. Tonight's version
+      # is checked out beside it only to be read, so nothing in it runs.
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           ref: ${{ needs.build.outputs.commit }}
+          path: version
           fetch-depth: 0
 
       # What the last completed walk covered, kept by the night that
       # walked it. Without it, every feature is walked.
-      - run: |
+      - working-directory: version
+        run: |
           id=$(gh api "repos/$GITHUB_REPOSITORY/actions/artifacts?name=qa-walked&per_page=30" \
             --jq '[.artifacts[] | select((.expired | not) and .workflow_run.head_branch == "master" and .workflow_run.head_repository_id == .workflow_run.repository_id)][0].id // empty') &&
             [ -n "$id" ] &&
@@ -185,7 +194,8 @@ jobs:
         env:
           FULL: ${{ inputs.full }}
           TODAY: ${{ needs.build.outputs.today }}
-        run: python3 .github/actions/qa-plan/plan.py >> "$GITHUB_OUTPUT"
+        working-directory: version
+        run: python3 "$GITHUB_WORKSPACE/.github/actions/qa-plan/plan.py" >> "$GITHUB_OUTPUT"
 
       # Which steps failed, for the failure report.
       - if: failure() || cancelled()
