@@ -31,7 +31,8 @@ matches what was contracted and specified.
    can fake: write your own for every one. `verify.fixtures` names the
    artifacts they assume.
 2. Run your tests and the engineer's tests for the change, chosen as
-   `.claude/agents/engineer.md` says, never the full suite. Read what
+   `.claude/agents/engineer.md` says, never the full suite, and in the
+   foreground, never in the background to wait on. Read what
    the engineer's tests assert rather than trusting a green run.
 3. Check every claim you intend to report. A finding you have not
    reproduced is a guess, and a wrong finding costs more than a missed
