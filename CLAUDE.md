@@ -239,6 +239,10 @@ to where they asked, labeled `bug` or `change` and `accepted`.
   first in line gets it and its run starts: critical problems first,
   then high ones, then the rest, each lowest number first. An issue
   that waits on the client holds neither a place in line nor the slot.
+- No run starts from the line while the last run's usage of the
+  subscription stands at 90 percent of its five-hour window or 80
+  percent of its weekly one, until that window resets. An hourly run of
+  the workflow retries.
 - One run implements one issue, on `claude/issue-<issue>`. It
   reproduces the report, updates the issue's feature page where
   behavior or acceptance criteria change (`spec/design-system.md` when
@@ -407,8 +411,11 @@ found.
 - The loop never stops in silence. A run that leaves its issue open, in
   none of the states under Issue state other than New, and hands no
   work to a fresh run, labels the issue `stuck`, in a step that runs
-  even when the agent crashes, times out or hits the usage limit. Any
-  comment by the client starts the next run.
+  even when the agent crashes or times out. Any comment by the client
+  starts the next run.
+- A run the subscription refused for its usage limit puts an issue in
+  line or being implemented back in line, without `stuck` or a comment,
+  and starts nothing more until there is headroom (Implementation).
 - A failing check on an implementation pull request starts a run that
   fixes it on the same branch. After a bounded number of attempts, the
   pull request becomes a draft without auto-merge and the issue is
