@@ -707,7 +707,7 @@ On failure it prints `docker logs` of `solvent` and `standin`.
 41. (blind) No module under `solvent/` imports from `tools/`.
     Test: `tests/test_nightly_tools.py::test_nothing_in_the_app_imports_from_tools`.
 42. `clear` keeps the date's rates and leaves the expected figures as
-    they were, and `deleteRecording` writes its own op. Test: `tests/test_nightly_tools.py::test_a_cleared_date_keeps_its_prices_and_a_deleted_recording_keeps_nothing`.
+    they were, and `deleteRecording` leaves nothing at its date. Test: `tests/test_nightly_tools.py::test_clear_and_delete_write_their_ops_and_leave_the_expected_figures`, `tests/test_review_nightly_harness.py::test_the_cleared_date_keeps_its_rates_and_the_deleted_recording_keeps_nothing`.
 43. (blind) `prepare` refuses a cleared or deleted date outside the
     recorded dates, with no recording, or whose prices all lie on their
     neighbors' line. Test: `tests/test_nightly_tools.py::test_prepare_refuses_a_cleared_or_deleted_date_that_bends_nothing`, `tests/test_nightly_tools.py::test_prepare_refuses_a_cleared_date_whose_prices_lie_on_the_line`.

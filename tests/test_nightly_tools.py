@@ -637,7 +637,7 @@ def chart(plan: dict) -> dict:
     return next(a for a in plan["accounts"] if a["username"] == "chart.owner")
 
 
-def test_a_cleared_date_keeps_its_prices_and_a_deleted_recording_keeps_nothing():
+def test_clear_and_delete_write_their_ops_and_leave_the_expected_figures():
     script, _ = prices.prepare(full_plan(), date.today(), FIXTURES)
     ops = next(a for a in script["accounts"] if a["username"] == "chart.owner")["ops"]
     assert [op for op in ops if op["op"] in ("clear", "deleteRecording")] == [
