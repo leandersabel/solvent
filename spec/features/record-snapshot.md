@@ -317,18 +317,29 @@ screen names the unit whose price was left (States).
 - **A line that went in empty, for a unit with a rate source at this
   date**, says "No rate was recorded for XAU-ozt on this date." and
   carries its own **Look it up**. Opening fetches nothing. Pressing it
-  issues the request, and the answer is labeled with the day it is
-  for, like any proposal, to be taken, changed or left empty.
+  issues the request and **saves what comes back at once**, with no
+  further press and no confirmation, into this line and every other
+  empty line of a published unit the answer covers. A line holding an
+  entry or typed text is never touched. Each saved line reads as stored,
+  labeled with the day its price is for. One the answer left out stays
+  empty with its Look it up. One that did not save keeps the answer,
+  is named in the banner, and the lines' own save retries it.
 - **A line with no entry, dated before its unit's published prices
   begin**, reads as on a new sweep, offers no Look it up and never reads
   as an outage.
-- **A rate line on a reopened recording saves by itself**, through the
-  lines' own save. Filling in a missing price needs no holding touched.
+- **A rate line on a reopened recording saves by itself**, through Look
+  it up or the lines' own save. Filling in a missing price needs no
+  holding touched.
+- **A price another window filled in meanwhile** is left as stored, and
+  the banner says: "The USD rate was filled in another window, and the
+  line shows what is stored now."
 
 #### Changing or clearing a rate says what it moves
 
-One confirmation per save, before anything goes through, naming each
-unit and how many holdings move:
+One confirmation per save that changes or clears a stored price, before
+anything goes through, naming each such unit and how many holdings move.
+Filling in a missing price asks nothing and is never called changing
+one:
 
 > Changing the USD rate for 31 July moves 3 holdings measured in USD
 > on that date. Your net worth on that day changes with them.
@@ -932,7 +943,12 @@ session can cause.
   elsewhere or any slot it would create taken. Nothing is written, not
   even into free slots, because writing half a screen against a date
   the person has not seen is worse than writing none.
-- **The archive is the one narrower case** (`manage-accounts.md`,
+- **Look it up on a reopened recording is a narrower case too**
+  (`record-rate.md`, Saving an edited recording). It runs the same
+  reload of both types on every press, writes nothing at a date found
+  holding no record, and leaves a price slot taken since to the entry
+  there, while writing the free ones.
+- **The archive is the other narrower case** (`manage-accounts.md`,
   Archiving). It runs the same reload of both types once, and is
   refused only when the archived holding's own slot at the date is
   taken. A date recorded elsewhere is the recording its zero joins, and
@@ -1264,10 +1280,13 @@ Editing an existing entry).
     Test: `tests/browser/parts/update-values.mjs`,
     `tests/browser/parts/update-values-review.mjs`.
 36. Pressing Look it up fills the line when the source answers, labeled
-    with the day it is for, as a proposal to take, change or leave. Test:
-    `tests/browser/parts/update-values.mjs`.
-37. A price filled in on a reopened recording saves on its own, with no
-    holding row touched. Test: `tests/browser/parts/update-values.mjs`.
+    with the day it is for, and saves it. Test:
+    `tests/browser/parts/update-values-review.mjs`.
+37. (blind) A price filled in on a reopened recording saves on its own,
+    with no holding row touched: pressing Look it up writes the answer
+    for every empty published line it covers, as `proposed`, with no
+    further press and no confirmation, and leaving at once names no unit
+    as unsaved. Test: `tests/browser/parts/update-values.mjs`.
 38. Adding a figure for a holding silent at a reopened date creates one
     `snapshot` at `version: 1` and changes no other snapshot there. Test:
     `tests/browser/parts/update-values.mjs`.

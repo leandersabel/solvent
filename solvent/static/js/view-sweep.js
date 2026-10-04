@@ -112,7 +112,34 @@ export function sweepView(vault, date, actions = {}) {
       syncSave();
       for (const row of rows) row.describe();
     },
+    lookUp: (pressed) => lookUp(pressed),
   });
+  // One lookup fills every empty line it answers for and saves them at
+  // once, with no confirmation: a missing price filled in changes none
+  // (record-rate.md, Saving an edited recording). An answer arriving
+  // after the screen was left writes nothing.
+  const lookUp = async (pressed) => {
+    const proposals = await writes.fetchProposals(vault, date);
+    if (!element.isConnected) return false;
+    const filling = block.lines.filter((line) => line.fillable() && proposals[line.unit]);
+    for (const line of filling) line.lookedUpAs(proposals[line.unit]);
+    if (!filling.length) return false;
+    const restore = keepTyped();
+    const result = await writes.fillRates(vault, date, Object.fromEntries(filling.map((line) => [line.unit, line.part()])));
+    if (result.emptied) {
+      emptied(restore);
+    } else {
+      for (const line of filling) if (!result.failed.includes(line.unit)) line.reset();
+      syncSave();
+      for (const row of rows) row.describe();
+      const notes = [
+        ...result.taken.map((unit) => `The ${unit} rate was filled in another window, and the line shows what is stored now.`),
+        ...result.failed.map((unit) => `The ${unit} rate did not save. Save the rate lines to try again.`),
+      ];
+      if (notes.length) say(notes.join(' '), { critical: result.failed.length > 0 });
+    }
+    return Boolean(proposals[pressed.unit]);
+  };
   saveAll.addEventListener('click', () => saveRates(vault, sit, block, { say, refused, syncSave, emptied, keepTyped }));
 
   // A date holding nothing arrives with its rate lines filled in by the
@@ -477,8 +504,13 @@ function blockUnits(vault, date, also) {
  *  `fillMissing` shows a unit the date holds a price for read only and
  *  offers a proposal for each unit it is missing, as a date with no
  *  recording does, which is what the form shows when a figure it adds
- *  fills in the date's missing prices. */
-export function rateBlock(vault, date, { sit = null, readOnly = false, fillMissing = false, also = null, onChange = () => {} } = {}) {
+ *  fills in the date's missing prices. `lookUp(line)` is what a line's
+ *  Look it up runs, and resolves to whether an answer came back for it. */
+export function rateBlock(
+  vault,
+  date,
+  { sit = null, readOnly = false, fillMissing = false, also = null, onChange = () => {}, lookUp = async () => false } = {},
+) {
   // The wrapper is the container the lines' breakpoint measures, because
   // a container query cannot style the container itself.
   const grid = el('div', { class: 'rate-block' });
@@ -489,7 +521,7 @@ export function rateBlock(vault, date, { sit = null, readOnly = false, fillMissi
       el('p', { class: 'hint', text: 'Everything here is counted in your main currency, so there is nothing to convert.' }),
     );
   }
-  const lines = units.map((unit) => rateLine(vault, unit, date, { sit, readOnly, fillMissing, onChange }));
+  const lines = units.map((unit) => rateLine(vault, unit, date, { sit, readOnly, fillMissing, onChange, lookUp }));
   grid.append(...lines.map((line) => line.element));
 
   const lineFor = (unit) => lines.find((line) => line.unit === unit) || null;
@@ -528,7 +560,7 @@ export function rateBlock(vault, date, { sit = null, readOnly = false, fillMissi
   };
 }
 
-function rateLine(vault, unit, date, { sit, readOnly: blockReadOnly, fillMissing, onChange }) {
+function rateLine(vault, unit, date, { sit, readOnly: blockReadOnly, fillMissing, onChange, lookUp }) {
   const { format } = vault;
   const readOnly = blockReadOnly || (fillMissing && vault.entriesFor(unit).some((e) => e.payload.date === date));
   const described = vault.unitOf(unit);
@@ -800,21 +832,26 @@ function rateLine(vault, unit, date, { sit, readOnly: blockReadOnly, fillMissing
     const typed = format.parseFigure(field.value);
     if (typed !== null) field.value = format.editable(typed, 6);
   });
-  lookup.addEventListener('click', async () => {
-    // Opening a recording fetches nothing. Pressing this is what
-    // issues the request (record-snapshot.md, Update values, Rate lines on a
-    // reopened recording).
-    lookup.disabled = true;
-    const proposals = await writes.fetchProposals(vault, date);
-    lookup.disabled = false;
-    const proposal = proposals[unit] || null;
-    if (!proposal) {
-      explanation.textContent = `No market rate came back for ${unit}.`;
-      return;
-    }
+  /** An empty line Look it up may fill and save: published at this
+   *  date, holding no entry and nothing typed. */
+  line.fillable = () => !readOnly && reopened() && quotable && !line.stored && !line.rivals.length && !line.value();
+
+  /** What Look it up brought back for this line, shown as a proposal
+   *  that waits to be written. */
+  line.lookedUpAs = (proposal) => {
     line.lookedUp = true;
     line.typed = false;
     line.propose(proposal);
+  };
+
+  // Opening a recording fetches nothing. Pressing this is what issues
+  // the request (record-snapshot.md, Update values, Rate lines on a
+  // reopened recording).
+  lookup.addEventListener('click', async () => {
+    lookup.disabled = true;
+    const answered = await lookUp(line);
+    lookup.disabled = false;
+    if (!answered) explanation.textContent = `No market rate came back for ${unit}.`;
   });
 
   line.reset();
@@ -896,7 +933,8 @@ export function partialCopy(result) {
 
 /** A rate line on a reopened recording saves by itself: filling in the
  *  price that was missing is a complete act and needs no holding
- *  touched alongside it. One confirmation covers every changed line. */
+ *  touched alongside it. One confirmation covers every line it updates
+ *  or clears. */
 function saveRates(vault, sit, block, { say, refused, syncSave, emptied, keepTyped }) {
   const changed = block.lines.filter((line) => line.changed());
   if (changed.some((line) => line.invalid())) {
@@ -906,45 +944,53 @@ function saveRates(vault, sit, block, { say, refused, syncSave, emptied, keepTyp
   const planned = changed.map((line) => ({ line, change: line.change() })).filter(({ change }) => change);
   if (!planned.length) return;
 
+  const save = async () => {
+    const plan = {
+      rates: planned.filter(({ change }) => !change.remove).map(({ change }) => change),
+      deletes: planned
+        .filter(({ change }) => change.remove)
+        .map(({ line, change }) => ({ entry: change.remove, name: line.unit })),
+    };
+    const restore = keepTyped();
+    const result = await writes.saveRateLines(vault, sit, plan);
+    if (result.refused) {
+      if (result.emptied) emptied(restore);
+      else refused();
+      return;
+    }
+    const conflicts = result.failed.filter((f) => f.status === 409).map((f) => f.name);
+    if (conflicts.length) await writes.reloadType(vault, 'rate').catch(() => {});
+    const failed = new Set(result.failed.map((f) => f.name));
+    // What landed shows what is stored. What did not keeps what
+    // was typed, except after a Conflict, where the line shows the
+    // figure another window wrote.
+    for (const { line } of planned) {
+      if (!failed.has(line.unit) || conflicts.includes(line.unit)) line.reset();
+    }
+    syncSave();
+    const conflictCopy = conflicts.map((unit) => `The ${unit} rate was changed in another window, and the line shows what is stored now.`).join(' ');
+    say([partialCopy(result), conflictCopy].filter(Boolean).join(' '), { critical: result.failed.length > 0 });
+  };
+
+  // Filling a missing price changes none, so only an update or a clear
+  // asks first.
+  const moving = planned.filter(({ change }) => change.existing || change.remove);
+  if (!moving.length) return save();
   const close = dialog({
     heading: 'Changing a price moves the holdings measured in it',
     body: rateChangeCopy(
       vault,
       sit.date,
-      planned.map(({ line, change }) => ({ unit: line.unit, clearing: Boolean(change.remove) })),
+      moving.map(({ line, change }) => ({ unit: line.unit, clearing: Boolean(change.remove) })),
     ).map((text) => el('p', { text })),
     actions: [
       el('button', { class: 'btn-secondary', text: 'Cancel', onclick: () => close() }),
       el('button', {
         class: 'btn-primary',
         text: 'Save the prices',
-        onclick: async () => {
+        onclick: () => {
           close();
-          const plan = {
-            rates: planned.filter(({ change }) => !change.remove).map(({ change }) => change),
-            deletes: planned
-              .filter(({ change }) => change.remove)
-              .map(({ line, change }) => ({ entry: change.remove, name: line.unit })),
-          };
-          const restore = keepTyped();
-          const result = await writes.saveRateLines(vault, sit, plan);
-          if (result.refused) {
-            if (result.emptied) emptied(restore);
-            else refused();
-            return;
-          }
-          const conflicts = result.failed.filter((f) => f.status === 409).map((f) => f.name);
-          if (conflicts.length) await writes.reloadType(vault, 'rate').catch(() => {});
-          const failed = new Set(result.failed.map((f) => f.name));
-          // What landed shows what is stored. What did not keeps what
-          // was typed, except after a Conflict, where the line shows the
-          // figure another window wrote.
-          for (const { line } of planned) {
-            if (!failed.has(line.unit) || conflicts.includes(line.unit)) line.reset();
-          }
-          syncSave();
-          const conflictCopy = conflicts.map((unit) => `The ${unit} rate was changed in another window, and the line shows what is stored now.`).join(' ');
-          say([partialCopy(result), conflictCopy].filter(Boolean).join(' '), { critical: result.failed.length > 0 });
+          save();
         },
       }),
     ],

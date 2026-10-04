@@ -383,6 +383,39 @@ export async function saveRateLines(vault, sit, plan) {
   return { refused: false, saved, failed };
 }
 
+/** Look it up on a reopened recording: write what came back for each
+ *  unit in `parts` (unit to `ratePart`), each a create, with no
+ *  confirmation, since filling a missing price changes none
+ *  (record-rate.md, Saving an edited recording).
+ *
+ *  Always after a fresh read of both types, which the model then holds.
+ *  A date found holding no record writes nothing, because a price alone
+ *  never makes a recording. A unit another session priced meanwhile is
+ *  left alone and returned as `taken`. */
+export async function fillRates(vault, date, parts) {
+  const fresh = await reloadCreateTypes(vault);
+  vault.replaceType('snapshot', fresh.snapshot);
+  vault.replaceType('rate', fresh.rate);
+  if (!vault.holdsRecording(date)) return { emptied: true, saved: [], taken: [], failed: [] };
+  const missing = vault.missingUnits(date);
+  const saved = [];
+  const taken = [];
+  const failed = [];
+  for (const [unit, part] of Object.entries(parts)) {
+    if (!missing.includes(unit)) {
+      taken.push(unit);
+      continue;
+    }
+    try {
+      await saveRate(vault, null, rateEntry(vault, unit, date, part));
+      saved.push(unit);
+    } catch {
+      failed.push(unit);
+    }
+  }
+  return { emptied: false, saved, taken, failed };
+}
+
 /** Every record bearing one date, quantities first and rates after,
  *  except the zero of a holding archived on it, which stays and keeps
  *  the date a recording (record-snapshot.md, Deleting a recording). A
