@@ -4,7 +4,7 @@
 // Templates: dashboard.html. Modules: view-dimensions.js, view-settings.js,
 // view-dashboard.js, writes.js, model.js, dom.js.
 import {
-  check, click, expectedFailures, intercept, labels, page, run, setValue, sql, story, text, unlockDashboard,
+  VAULT_PASSWORD, check, click, enterPassword, expectedFailures, intercept, labels, page, run, setValue, sql, story, text, unlockDashboard,
   vaultOwner,
 } from '../harness.mjs';
 
@@ -61,7 +61,11 @@ await run(async () => {
     inputs[1].dispatchEvent(new Event('input', { bubbles: true }));
     [...document.querySelectorAll('.dialog button')].find(b => b.textContent === 'Create').click();
   })()`);
+  // The create's write has answered and its redraw is done, so neither can
+  // land on the rename below or in its PUT count.
+  const settled = "!document.querySelector('.dimension-list[aria-busy]') && !document.querySelector('.dialog')";
   await page.waitUntil("document.body.innerText.includes('holdings assigned')", { label: 'the coverage line' });
+  await page.waitUntil(settled, { label: 'the create to settle' });
   await page.frames();
   const coverage = await page.eval("[...document.querySelectorAll('.hint')].find(n => n.textContent.includes('assigned')).textContent");
   const model = await page.eval(`(async () => {
@@ -123,7 +127,6 @@ await run(async () => {
       const d = v.dimensions.find((x) => x.id === id);
       return JSON.stringify(Object.fromEntries(v.activeHoldings().map((h) => [h.payload.name, v.bandOf(h, d).label])));
     }, dimensionId).then(JSON.parse);
-  const settled = "!document.querySelector('.dimension-list[aria-busy]') && !document.querySelector('.dialog')";
   // One operation, and the PUTs it sent.
   const writesOf = async (label, act) => {
     const before = await page.eval('window.__puts');
@@ -376,14 +379,19 @@ await run(async () => {
   await page.frames();
   const whileSaving = await page.call((id) => {
     const card = [...document.querySelectorAll('.dimension-card')].find((c) => c.dataset.dimension === id);
+    const edits = [...card.querySelectorAll('button')].filter((b) => b.textContent === 'Edit');
     return {
       order: [...card.querySelectorAll('li.value-row .strong')].map((n) => n.textContent),
       disabled: [...card.querySelectorAll('li.value-row button')].filter((b) => /Move|Archive/.test(b.textContent)).every((b) => b.disabled),
+      // The card head's rename and one for each live value.
+      edits: edits.length,
+      editsDisabled: edits.every((b) => b.disabled),
     };
   }, liquidity.id);
   check(
     'a move is shown at once, with the controls disabled until it answers',
-    whileSaving.order.join(',') === 'Pension,Investments,Cash' && whileSaving.disabled,
+    whileSaving.order.join(',') === 'Pension,Investments,Cash' && whileSaving.disabled &&
+      whileSaving.edits === 4 && whileSaving.editsDisabled,
     JSON.stringify(whileSaving),
   );
   answer();
@@ -397,6 +405,136 @@ await run(async () => {
   );
   await releaseWrites();
   expectedFailures.delete('/api/records/');
+
+  // A rename is a write like any other: the screen waits for it, and no
+  // redraw costs the person what they typed in a field left open.
+  const typeIn = (name, next) =>
+    page.call((label, value) => {
+      const input = [...document.querySelectorAll('.dimension-list input')].find(
+        (i) => i.parentElement.previousElementSibling.querySelector('.strong').textContent === label,
+      );
+      input.closest('div').querySelector('button').click();
+      input.value = value;
+      input.dispatchEvent(new Event('input', { bubbles: true }));
+    }, name, next);
+  const openFields = () =>
+    page.call(() =>
+      [...document.querySelectorAll('.dimension-list input')]
+        .filter((i) => !i.parentElement.hidden)
+        .map((i) => ({
+          label: i.parentElement.previousElementSibling.querySelector('.strong').textContent,
+          value: i.value,
+          error: i.parentElement.nextElementSibling.hidden ? '' : i.parentElement.nextElementSibling.textContent,
+        }))
+        .sort((a, b) => a.label.localeCompare(b.label)),
+    );
+  const heldFailure = async (act) => {
+    let release;
+    const gate = new Promise((resolve) => (release = resolve));
+    let reached;
+    const reachedWrite = new Promise((resolve) => (reached = resolve));
+    expectedFailures.add('/api/records/');
+    const off = await intercept(page, '*/api/records/*', (request) => {
+      if (request.method !== 'PUT') return null;
+      reached();
+      return gate.then(() => ({ status: 500 }));
+    });
+    await act();
+    await reachedWrite;
+    await page.frames();
+    const during = await page.call(() => {
+      const named = (text) => [...document.querySelectorAll('.dimension-list button')].filter((b) => b.textContent === text);
+      return {
+        edit: named('Edit').every((b) => b.disabled),
+        save: named('Save').every((b) => b.disabled),
+        cancel: named('Cancel').every((b) => b.disabled),
+        archive: named('Archive').every((b) => b.disabled),
+      };
+    });
+    release();
+    await page.waitUntil(settled, { label: 'the held write to fail' });
+    await page.idle();
+    await off();
+    expectedFailures.delete('/api/records/');
+    return during;
+  };
+  const cancelAll = () =>
+    page.call(() =>
+      [...document.querySelectorAll('.dimension-list button')]
+        .filter((b) => b.textContent === 'Cancel' && !b.parentElement.hidden)
+        .forEach((b) => b.click()),
+    );
+
+  // Another control's write redraws the screen under two open fields.
+  await typeIn('Liquid assets', 'Liquid typed');
+  await typeIn('Cash', 'Savings');
+  await heldFailure(() => inRow('Pension', 'Move down'));
+  const afterOther = await openFields();
+  check(
+    "another control's write leaves an open rename open with what was typed",
+    JSON.stringify(afterOther.map((f) => [f.label, f.value])) === JSON.stringify([['Cash', 'Savings'], ['Liquid assets', 'Liquid typed']]),
+    JSON.stringify(afterOther),
+  );
+  await cancelAll();
+
+  // A rename in flight holds the other controls, and its failure keeps
+  // its own field open with the message, beside one left open elsewhere.
+  await typeIn('Cash', 'Savings');
+  await typeIn('Emergency fund', 'Safety net');
+  const duringRename = await heldFailure(() =>
+    page.call(() => {
+      const input = [...document.querySelectorAll('.dimension-list input')].find((i) => i.value === 'Safety net');
+      [...input.parentElement.querySelectorAll('button')].find((b) => b.textContent === 'Save').click();
+      // Escape is held with Cancel while the write is out.
+      input.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', bubbles: true }));
+    }),
+  );
+  check(
+    'a rename in flight disables Edit, Save, Cancel and Archive until it answers',
+    duringRename.edit && duringRename.save && duringRename.cancel && duringRename.archive,
+    JSON.stringify(duringRename),
+  );
+  const afterRename = await openFields();
+  check(
+    'a rename that fails stays open with what was typed and its message, beside another left open',
+    JSON.stringify(afterRename) === JSON.stringify([
+      { label: 'Cash', value: 'Savings', error: '' },
+      { label: 'Emergency fund', value: 'Safety net', error: 'That rename did not save.' },
+    ]),
+    JSON.stringify(afterRename),
+  );
+  await cancelAll();
+
+  // Archiving a value takes its open rename with it.
+  await typeIn('Investments', 'Typed then archived');
+  await writesOf('the archive of a value with an open rename', () => inRow('Investments', 'Archive'));
+  await writesOf('the restore of that value', () => restore('Investments'));
+  const afterArchive = await openFields();
+  check(
+    'a value archived with its rename open comes back with the rename closed',
+    afterArchive.length === 0,
+    JSON.stringify(afterArchive),
+  );
+
+  // A lock keeps no rename: a field opened and not typed in comes back
+  // closed, with no label copied out of the vault.
+  await page.call(() => {
+    document.querySelector('.dimension-list li.value-row button').click();
+  });
+  await page.eval("import('/static/js/session.js').then((s) => s.lock())");
+  await page.waitUntil("document.querySelector('#unlock-password')", { label: 'the password screen after Lock' });
+  await enterPassword(VAULT_PASSWORD);
+  await page.waitUntil("!document.querySelector('#unlock-password') && document.querySelector('.dimension-card')", {
+    timeout: 90000,
+    label: 'the dimensions screen after unlocking',
+  });
+  await page.idle();
+  const afterLock = await openFields();
+  check(
+    'a rename open before a lock is closed after the unlock, holding no label',
+    afterLock.length === 0,
+    JSON.stringify(afterLock),
+  );
 
   // Another tab writes the profile first, with the dimension renamed.
   const relabelElsewhere = (label) =>

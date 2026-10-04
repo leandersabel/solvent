@@ -410,6 +410,7 @@ document.addEventListener('visibilitychange', () => {
 onLock(() => {
   elsewhere = null;
   sinceOpen = null;
+  resetDimensionsState();
   if (container && vaultShown) {
     held = {
       hash: window.location.hash,

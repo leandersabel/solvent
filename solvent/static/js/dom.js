@@ -50,27 +50,32 @@ export function el(tag, props = {}, children = []) {
 // Save or Enter writes, so clicking away never does. A blank name is
 // refused, and a rejected `save` keeps the field open with what was
 // typed and the message `failed` gives for the failure.
-export function inlineRename(text, save, failed) {
+//
+// `disabled` holds Edit, Save, Cancel and the keys while a write the
+// caller started is outstanding, as a save of its own does. A caller
+// that redraws around the field passes the same `draft` object each
+// time, and the field is rebuilt open with what was typed and its
+// message. The draft holds only that, and nothing once the field closes.
+export function inlineRename(text, save, failed, { disabled = false, draft = {} } = {}) {
   const label = el('span', { class: 'strong', text });
   const input = el('input', { type: 'text', 'aria-label': 'Name' });
   const error = el('p', { class: 'field-error', hidden: true });
   const view = el('span', { class: 'value-row' }, [
     label,
-    el('button', { class: 'btn-inline', text: 'Edit', onclick: () => open(true) }),
+    el('button', { class: 'btn-inline', text: 'Edit', disabled, onclick: () => open(true) }),
   ]);
-  const saveButton = el('button', { class: 'btn-inline', text: 'Save', onclick: () => commit() });
-  const editor = el('span', { class: 'value-row', hidden: true }, [
-    input,
-    saveButton,
-    el('button', { class: 'btn-inline', text: 'Cancel', onclick: () => open(false) }),
-  ]);
+  const saveButton = el('button', { class: 'btn-inline', text: 'Save', disabled, onclick: () => commit() });
+  const cancelButton = el('button', { class: 'btn-inline', text: 'Cancel', disabled, onclick: () => open(false) });
+  const editor = el('span', { class: 'value-row', hidden: true }, [input, saveButton, cancelButton]);
 
-  function open(editing) {
+  function open(editing, typed = text) {
     view.hidden = editing;
     editor.hidden = !editing;
     error.hidden = true;
+    for (const key of Object.keys(draft)) delete draft[key];
     if (editing) {
-      input.value = text;
+      draft.open = true;
+      input.value = typed;
       input.select();
     }
   }
@@ -78,13 +83,15 @@ export function inlineRename(text, save, failed) {
   function refuse(message) {
     error.textContent = message;
     error.hidden = false;
+    draft.error = message;
   }
 
   async function commit() {
+    if (saveButton.disabled) return;
     const next = input.value.trim();
     if (!next) return refuse('A name cannot be blank.');
     if (next === text) return open(false);
-    saveButton.disabled = true;
+    saveButton.disabled = cancelButton.disabled = true;
     try {
       await save(next);
       text = next;
@@ -93,14 +100,21 @@ export function inlineRename(text, save, failed) {
     } catch (failure) {
       refuse(failed(failure));
     } finally {
-      saveButton.disabled = false;
+      saveButton.disabled = cancelButton.disabled = false;
     }
   }
 
+  input.addEventListener('input', () => (draft.value = input.value));
   input.addEventListener('keydown', (event) => {
     if (event.key === 'Enter') commit();
-    if (event.key === 'Escape') open(false);
+    if (event.key === 'Escape' && !cancelButton.disabled) open(false);
   });
+  if (draft.open) {
+    const { value, error: message } = draft;
+    open(true, value);
+    if (value !== undefined) draft.value = value;
+    if (message) refuse(message);
+  }
   return el('div', {}, [view, editor, error]);
 }
 
