@@ -89,8 +89,7 @@ A findings report in the client's terms. For each finding: the steps
 that reproduce it, what you expected from the product spec, what
 happened, which criterion it violates, and its rating (`CLAUDE.md`,
 The loop, Severity). Name the screen and the element, never a file or
-a function. Try its steps a second time from a fresh page, and say
-whether that reproduced it. A finding you saw once is still reported.
+a function.
 
 List every criterion you could not check, by feature, with its cause.
 That is only for what the app or the run blocks: a feature not built,

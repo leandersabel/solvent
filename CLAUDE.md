@@ -304,7 +304,7 @@ that counts wins. An issue for criteria QA could not check has no
 rating.
 
 A problem rated high or critical holds back a version, however it was
-found and even when QA saw it once.
+found.
 
 ### Nightly and stable
 
@@ -340,10 +340,11 @@ found and even when QA saw it once.
   a certificate authority, so nothing built for testing can redirect an
   installation's lookups.
 - Every finding becomes a `bug` issue by `claude[bot]` labeled `qa`,
-  `accepted` and its rating, which the loop takes up at once, or a
-  comment on the open one it repeats. A finding QA saw once says so in
-  its title. Each feature with criteria QA could not check gets an
-  issue saying which and why, the same way. QA only records them during
+  `accepted` and its rating, which the loop takes up at once. Each
+  feature with criteria QA could not check gets an issue saying which
+  and why, the same way. What is already reported and has not moved is
+  filed nowhere, and the client closing it as not planned holds. QA
+  only records them during
   the walk. Once every shard has finished, a short run merges what the
   shards recorded, and another files it with a fresh token, so a long
   walk never outlasts the token. What that run could not file,
