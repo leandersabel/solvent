@@ -237,6 +237,13 @@ and the order is the whole of the guarantee.
     therefore never creates a recording, and an empty recording is
     always one the person emptied (`product/record-snapshot.md`,
     Clearing one out, and deleting one).
+  - **A rate-lines save that creates an entry learns of a recording
+    deleted elsewhere from its pre-create reload.** When the reloaded
+    date holds no snapshot and no rate, the save is refused whole before
+    any write, the model takes the reloaded records, and every typed
+    price stays on screen for the first quantity to carry
+    (`ui/update-values.md`, States, The date was emptied while you were
+    working).
   - **Leaving first writes nothing.** The screen landed on names each
     unit whose typed price was left (`ui/update-values.md`, States,
     Closing with changes unsaved).
@@ -284,7 +291,8 @@ request under its own version check, and nothing spans two of them.
   confirmation naming what each moves (`ui/update-values.md`, Changing
   or clearing a rate says what it moves). Its order is fixed:
   0. If any line creates an entry, the pre-create reload. Any slot
-     taken refuses the whole save before a single write.
+     taken, or the date found holding nothing (The write path), refuses
+     the whole save before a single write.
   1. Rate writes, creates and updates alike.
   2. Deletions, for the lines cleared.
 
@@ -583,6 +591,11 @@ to win silently.
   date. The rate-lines save control shows from then on.
 - The client's rate-lines write, called at a date holding no record,
   issues no request and writes nothing.
+- With a sweep open on a recording and a second session then deleting
+  every record at that date, a rate-lines save that creates a price
+  issues its reload and no `PUT` or `DELETE`. Every typed price stays
+  on its line, no rate-lines save control shows, and the Callout saying
+  another window deleted the recording shows under the date heading.
 - A rate-lines save changing two rates and clearing a third issues both
   rate `PUT`s before the `DELETE`.
 - With the second rate `PUT` of that save stubbed to fail, the first

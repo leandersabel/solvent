@@ -819,6 +819,52 @@ await run(async () => {
   );
   await home();
 
+  // A rate-lines save that creates a price, after another window deleted
+  // every record at the date, writes nothing and keeps what was typed.
+  const DH = ago(46);
+  const planted = await plantHere([snap('Current account', DH, '10'), price('USD', DH, '0.9')]);
+  await reread();
+  await go(`#/recording/${DH}`);
+  await press('Update');
+  await typeLine('PAINT', '3.5');
+  await typeRow('Savings', '5001');
+  for (const recordId of planted) await rec.call(async (id) => (await import('/static/js/api.js')).del(`/api/records/${id}`), recordId);
+  traffic.length = 0;
+  await press('Save the rate lines');
+  await press('Save the prices', '.dialog');
+  const callout = await rec.call(() => ({
+    callout: document.querySelector('.sweep .callout').textContent.trim(),
+    critical: document.querySelector('.sweep .callout').classList.contains('callout-critical') &&
+      Boolean(document.querySelector('.sweep .callout svg.icon-alert')),
+    underHeading: document.querySelector('.sweep-head').nextElementSibling === document.querySelector('.sweep .callout'),
+    banner: document.querySelector('.sweep .banner').hidden,
+  }));
+  check(
+    'record-rate: a rate-lines save at a date another window emptied reloads, writes nothing and says so under the date heading',
+    writesSent().length === 0 && typeReads('snapshot').length === 1 && typeReads('rate').length === 1 && callout.banner && callout.critical && callout.underHeading &&
+      callout.callout === `Another window deleted the recording for ${await format('dayMonth', DH)}. Your prices were not saved. They are still here and are saved with the first holding you record for this date.`,
+    JSON.stringify(callout),
+  );
+  const emptiedStates = await ev("[...document.querySelectorAll('.row-state')].map(n => n.textContent)");
+  check(
+    'record-rate: the emptied date reads as nothing recorded, offers no rate-lines save and keeps every typed price and figure',
+    emptiedStates.every((state) => state === 'Nothing recorded for this date.') && !(await saveOffered()) &&
+      figure((await lineState('PAINT')).value) === 3.5 && (await rowState('Savings')).field === '5001' && !(await rowState('Savings')).error,
+    JSON.stringify({ emptiedStates, paint: await lineState('PAINT') }),
+  );
+  traffic.length = 0;
+  await typeRow('Current account', '13');
+  await pressRow('Current account');
+  const refilled = on(await stored('rate'), DH).map((r) => r.payload);
+  check(
+    'record-rate: the typed price goes in with the first row recorded, after its snapshot, beside the proposals',
+    writesSent().map((r) => bodyOf(r).recordType)[0] === 'snapshot' && on(await stored('snapshot'), DH).length === 1 &&
+      refilled.find((p) => p.symbol === 'PAINT')?.rate === '3.5' && refilled.find((p) => p.symbol === 'PAINT').rateSource === 'manual' &&
+      refilled.find((p) => p.symbol === 'USD')?.rateSource === 'proposed',
+    JSON.stringify(refilled),
+  );
+  await home();
+
   // The sweep keeps its columns while its block is 720px wide, under
   // one window width, and stacks one pixel under.
   await viewport(1280);

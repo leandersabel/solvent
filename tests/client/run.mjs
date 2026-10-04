@@ -2190,6 +2190,7 @@ await check('record-rate: a rate-lines save at a date another session emptied si
   const typed = { rate: '2700', rateSource: 'manual', rateAsOf: null, proposedRate: null };
   const result = await writes.saveRateLines(vault, sit, { rates: [{ existing: null, payload: writes.rateEntry(vault, 'XAU-ozt', '2026-07-31', typed) }] });
   assert.equal(result.refused, true);
+  assert.equal(result.emptied, true);
   assert.equal(server.writesIn().length, 0);
   assert.equal([...server.rows.values()].filter((r) => r.recordType === 'rate').length, 0);
   // The model now shows the date as it stands.

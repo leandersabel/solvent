@@ -186,20 +186,22 @@ export function sitting(vault, date) {
  *  model then takes the reloaded records, so the screen can show the
  *  recording as it now stands. `held` refuses a date the reload finds
  *  holding no record, for a write that must not make the recording
- *  itself. */
+ *  itself, and says `emptied` so the screen can tell it from a date
+ *  another session recorded. */
 export async function claimDate(vault, sit, { snapshots = [], rates = [], except = null, held = false }) {
   if (sit.claimed) return null;
   const fresh = await reloadCreateTypes(vault);
   const at = (list) => list.filter((record) => record.payload.date === sit.date);
+  const emptied = held && at(fresh.snapshot).length === 0 && at(fresh.rate).length === 0;
   const taken =
+    emptied ||
     (sit.dateWasEmpty && (at(fresh.snapshot).length > 0 || at(fresh.rate).length > 0)) ||
     at(fresh.snapshot).some((r) => snapshots.includes(r.accountId) && r.recordId !== except) ||
-    at(fresh.rate).some((r) => rates.includes(r.payload.symbol)) ||
-    (held && at(fresh.snapshot).length === 0 && at(fresh.rate).length === 0);
+    at(fresh.rate).some((r) => rates.includes(r.payload.symbol));
   if (taken) {
     vault.replaceType('snapshot', fresh.snapshot);
     vault.replaceType('rate', fresh.rate);
-    return { refused: true, date: sit.date };
+    return emptied ? { refused: true, date: sit.date, emptied: true } : { refused: true, date: sit.date };
   }
   sit.claimed = true;
   return null;
@@ -344,10 +346,11 @@ export async function saveRateLines(vault, sit, plan) {
   // A save that only changes and clears what is there claims nothing:
   // the version rule on each record is the check that catches another
   // session on exactly those records.
-  if (creates.length && (await claimDate(vault, sit, { rates: creates, held: true }))) {
+  const refusal = creates.length ? await claimDate(vault, sit, { rates: creates, held: true }) : null;
+  if (refusal) {
     // Refused whole, before a single write. The person is looking at
     // a screen that no longer describes the vault.
-    return { refused: true, date: sit.date, saved: [], failed: [] };
+    return { ...refusal, saved: [], failed: [] };
   }
 
   const saved = [];

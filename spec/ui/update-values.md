@@ -380,6 +380,17 @@ write.
   What was typed into the refused attempt is gone and is typed again
   there. The screen does not offer to carry it across, because a rescue
   that works only sometimes is worse than none.
+- **The date was emptied while you were working**: another window
+  deleted this recording before a rate-lines save. The save is refused
+  before anything is written, and the screen reloads to a date holding
+  nothing: every row reads as nothing recorded for this date (A row),
+  and the rate block has no save (The rates, at the foot of the sweep).
+  What was typed stays, on the lines and in the rows. A Callout under
+  the date heading, carrying the critical icon, says:
+
+  > Another window deleted the recording for 31 July. Your prices were
+  > not saved. They are still here and are saved with the first holding
+  > you record for this date.
 - **A rate-lines save that landed in part**: the screen **stays open**
   and every line keeps its own state, saved or not saved with what was
   typed still in front of the person. The message names both halves,
