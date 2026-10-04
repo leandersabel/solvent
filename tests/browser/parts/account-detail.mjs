@@ -546,6 +546,39 @@ await run(async () => {
     await inDialog('Cancel');
     await page.waitUntil("!document.querySelector('.dialog')", { label: 'the dialog to close' });
 
+    // A figure sitting on the archive date, planted as a stale session leaves
+    // it, keeps its own date when edited, and becomes the archive's zero when
+    // edited to zero. It still cannot move to another date from D on.
+    const [staleId] = await plant([
+      { type: 'account', payload: { name: 'Probe stale figure', unit: 'CHF', dims: {}, note: null, archivedAt: archivedDay, createdAt: new Date().toISOString() } },
+    ]);
+    await plant([
+      { type: 'snapshot', accountId: staleId, payload: { date: shiftDay(today, -20), value: '40', note: null } },
+      { type: 'snapshot', accountId: staleId, payload: { date: archivedDay, value: '7', note: null } },
+    ]);
+    await reloadModel();
+    await openHolding(staleId);
+    await page.eval("[...document.querySelectorAll('.card .data-table button')].find(b => b.textContent === 'Edit').click()");
+    await page.waitUntil("document.querySelector('#snapshot-value')", { label: 'the figure on the archive date' });
+    await writesSeen();
+    await typeDay(shiftDay(archivedDay, 2));
+    await inDialog('Save');
+    await page.idle();
+    const offArchive = await dateState();
+    check(
+      'a figure on the archive date cannot move to a later date, and the archive is the reason',
+      offArchive.line === pastReason && offArchive.invalid === 'true' && (await writesSeen()).length === 0,
+      JSON.stringify(offArchive),
+    );
+    await typeDay(archivedDay);
+    await setValue('#snapshot-value', '0');
+    await inDialog('Save');
+    await page.waitUntil("!document.querySelector('.dialog')", { label: 'the figure on the archive date to save' });
+    check(
+      'a figure on the archive date saves under its own date, edited to zero',
+      (await vaultValue((v, id, day) => v.snapshotsFor(id).filter((s) => s.payload.date === day).map((s) => s.payload.value).join(','), staleId, archivedDay)) === '0',
+    );
+
     await openHolding(poundId);
     await click('Archive');
     await page.waitUntil("document.body.innerText.includes('Records zero for this holding on')", { label: 'the pound archive dialog' });

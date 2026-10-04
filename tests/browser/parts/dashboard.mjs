@@ -378,6 +378,10 @@ await run(async () => {
   const older = new Date(Date.parse(today) - 800 * 86400000).toISOString().slice(0, 10);
   await plant([price('PROBE-OLD', older, '2.00')]);
   await unlockDashboard('the dashboard of one recording and an older price');
+  check(
+    'net-worth-view: history shorter than a year opens on All, whatever price entry is older',
+    (await page.eval("document.querySelector('.range-buttons .active').textContent")) === 'All',
+  );
   await soloReads('one recording and an older price');
 
   // A decimal comma reaches the value ticks, the one figure that abbreviates.
@@ -389,4 +393,38 @@ await run(async () => {
     JSON.stringify((await drawn('1Y')).values) === JSON.stringify(['0', '500', '1k', '1,5k', '2k', '2,5k']),
   );
   await setProfile({ groupSeparator: 'locale' });
+
+  // ---- Value labels of a negative total, drawn whole ----------------------
+  //
+  // Every label lies inside the drawing at every width: the gutter is
+  // sized from the widest one, so a sign and a unit never run off the edge.
+  for (const figure of ['-410000', '-500000000']) {
+    await page.call(async () => {
+      const api = await import('/static/js/api.js');
+      for (const type of ['snapshot', 'rate', 'account']) {
+        for (const row of await api.get('/api/records?type=' + type)) await api.del('/api/records/' + row.recordId);
+      }
+    });
+    await reloadModel();
+    await holdings([['Debt', 'CHF']]);
+    await recording(older, { Debt: figure });
+    await recording(today, { Debt: figure });
+    await unlockDashboard(`the dashboard of a total of ${figure}`);
+    for (const width of [390, 1280]) {
+      await viewport(width);
+      const outside = await page.eval(`(() => {
+        const svg = document.querySelector('svg.trend').getBoundingClientRect();
+        const labels = [...document.querySelectorAll('svg.trend .axis-tick')].filter((t) => t.getAttribute('text-anchor') === 'end');
+        return JSON.stringify({
+          count: labels.length,
+          cut: labels.filter((t) => t.getBoundingClientRect().left < svg.left - 0.01).map((t) => t.textContent),
+        });
+      })()`).then(JSON.parse);
+      check(
+        `net-worth-view: at ${width}px the value labels of a total of ${figure} lie inside the chart`,
+        outside.count > 1 && outside.cut.length === 0,
+        JSON.stringify(outside),
+      );
+    }
+  }
 });

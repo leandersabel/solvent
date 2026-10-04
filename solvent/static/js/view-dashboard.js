@@ -7,7 +7,7 @@ import * as decimal from './decimal.js';
 import { chartTable, fillFor, trendChart } from './chart.js';
 import { dialog, el, icon, mount, priceDateLine, resumable, today } from './dom.js';
 import { dateGrid } from './datepicker.js';
-import { dayNumber, isoFromDay } from './model.js';
+import { isoFromDay } from './model.js';
 import * as writes from './writes.js';
 import { snapshotDialog } from './view-forms.js';
 
@@ -24,9 +24,9 @@ const RANGES = [
 export function dashboardView(vault, actions, { unassignedOf = null } = {}) {
   const known = unassignedOf && vault.activeDimensions().some((d) => d.id === unassignedOf);
   // A year of history or more opens on a year, anything shorter on all
-  // of it.
-  const dates = vault.recordingDates();
-  const short = !dates.length || dayNumber(dates[dates.length - 1]) - dayNumber(dates[0]) < 365;
+  // of it. History is what the chart draws, from the oldest snapshot.
+  const history = vault.chartRange(null);
+  const short = !history || history.lastDay - history.fromDay < 365;
   const state = {
     range: short ? 'All' : '1Y',
     dimensionId: known ? unassignedOf : '',

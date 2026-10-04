@@ -114,12 +114,14 @@ export function snapshotDialog(vault, holding, existing, onSaved, onOpenRecordin
   };
   // An archived holding's entry moves only to a date before its archive
   // date: onto it the move would displace the archive's zero, and after
-  // it the entry would be a figure after the archive.
+  // it the entry would be a figure after the archive. A figure already
+  // on or after that date keeps its own date.
   const archivedAt = holding.payload.archivedAt;
   const archivedOn = archivedAt && `Archived on ${vault.format.fullDate(archivedAt)}.`;
   const date = dateField(vault.format, {
     id: 'snapshot-date',
     max: archivedAt ? isoFromDay(dayNumber(archivedAt) - 1) : today(),
+    keep: existing ? existing.payload.date : null,
     maxReason: archivedAt ? `${archivedOn} Enter an earlier date.` : undefined,
     hint: archivedOn || '',
     value: existing ? existing.payload.date : today(),

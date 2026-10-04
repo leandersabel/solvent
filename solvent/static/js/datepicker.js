@@ -12,13 +12,14 @@ import { el, mount, today } from './dom.js';
 
 const WEEK_START_MONDAY = 1;
 
-/** `value` is an ISO date or the empty string. `max` and `min` are ISO
- *  dates. A screen whose upper limit has a reason of its own gives it as
+/** `value` is an ISO date or the empty string. `max` is an ISO date. A
+ *  screen whose upper limit has a reason of its own gives it as
  *  `maxReason`, and `hint` is what the message line says until a date is
- *  refused. */
+ *  refused. `keep` is a date the field always accepts, so an entry
+ *  already past the limit can be edited under its own date. */
 export function dateField(
   format,
-  { id, value = '', min = null, max = null, maxReason = 'That date is in the future.', hint = '', onChange = null } = {},
+  { id, value = '', max = null, keep = null, maxReason = 'That date is in the future.', hint = '', onChange = null } = {},
 ) {
   let current = value;
 
@@ -60,8 +61,7 @@ export function dateField(
     if (!text.value.trim()) return 'Enter a date.';
     const iso = format.parseDate(text.value);
     if (!iso) return `Enter the date as ${format.datePlaceholder()}.`;
-    if (max && iso > max) return maxReason;
-    if (min && iso < min) return 'That date is out of range.';
+    if (max && iso > max && iso !== keep) return maxReason;
     return null;
   };
 
@@ -77,7 +77,7 @@ export function dateField(
     // reports no value rather than an old one. A refusal on show stays
     // until the value fits, and a new one waits for blur.
     if (line.classList.contains('field-error')) show(refusal());
-    settle(iso && inRange(iso, min, max) ? iso : '', { redraw: false });
+    settle(iso && inRange(iso, null, max, keep) ? iso : '', { redraw: false });
   });
 
   text.addEventListener('blur', () => {
@@ -112,8 +112,8 @@ export function dateField(
     open.setAttribute('aria-expanded', 'true');
     document.addEventListener('keydown', onKey);
     dateGrid(popover, format, current || today(), {
-      min,
       max,
+      keep,
       selected: current,
       onPick: (iso) => {
         settle(iso);
@@ -145,7 +145,8 @@ export function dateField(
   };
 }
 
-function inRange(iso, min, max) {
+function inRange(iso, min, max, keep = null) {
+  if (iso === keep) return true;
   if (min && iso < min) return false;
   if (max && iso > max) return false;
   return true;
@@ -169,9 +170,9 @@ function shiftDay(iso, days) {
  *  edge, and never onto a date outside `min` and `max`. Next month is
  *  disabled on the month holding `max`. Each day carries its ISO date
  *  as `data-date`. */
-export function dateGrid(host, format, anchor, { min = null, max = null, marked = null, selected = '', onPick, onClose = null }) {
+export function dateGrid(host, format, anchor, { min = null, max = null, keep = null, marked = null, selected = '', onPick, onClose = null }) {
   let [year, month] = anchor.split('-').map(Number);
-  const reaches = (iso) => inRange(iso, min, max);
+  const reaches = (iso) => inRange(iso, min, max, keep);
 
   const title = el('span', { class: 'date-title', 'aria-live': 'polite' });
   const grid = el('div', { class: 'date-grid', role: 'group' });

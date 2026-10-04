@@ -124,9 +124,10 @@ function drawChart({
   hidden = new Set(), selection = null,
 }) {
   // A phone-width card gets a shorter plot and fewer gridlines. The
-  // value labels sit in a gutter at the plot's left at every width, and
-  // the plot keeps half the widest mark, the net-worth dot, clear inside
-  // both edges (spec/ui/design-system.md, Axes).
+  // value labels sit in a gutter at the plot's left at every width, wide
+  // enough for the widest label, and the plot keeps half the widest
+  // mark, the net-worth dot, clear inside both edges
+  // (spec/ui/design-system.md, Axes).
   const narrow = width < 560;
   const height = narrow ? 206 : 352;
   const pad = narrow
@@ -135,14 +136,11 @@ function drawChart({
 
   if (!days.length) return el('p', { class: 'empty-line', text: 'No history yet.' });
 
-  const plotWidth = width - pad.left - pad.right;
   const plotHeight = height - pad.top - pad.bottom;
   const plotBottom = pad.top + plotHeight;
   const firstDay = days[0];
   const lastDay = days[days.length - 1];
   const spanDays = lastDay - firstDay;
-  // A range of one day draws its point in the middle of the plot, whole.
-  const x = (day) => pad.left + (spanDays ? (day - firstDay) / spanDays : 0.5) * plotWidth;
 
   const fills = new Map(bands.map((band, index) => [band, fillFor(band, index)]));
   // A day's samples are its value just before it and at it, so a
@@ -168,6 +166,17 @@ function drawChart({
   if (top === bottom) top = bottom + 1;
   const y = (value) => plotBottom - ((value - bottom) / (top - bottom)) * plotHeight;
 
+  const gridValues = valueTicks(bottom, top, narrow ? 3 : 6);
+  const valueLabels = gridValues.map((gridValue) => {
+    const tick = svg('text', { class: 'axis-tick', 'text-anchor': 'end' });
+    tick.textContent = tickLabel(gridValue, group, decimalPoint) + (percentage ? '%' : '');
+    return tick;
+  });
+  pad.left = Math.max(pad.left, Math.ceil(widest(valueLabels)) + 10);
+  const plotWidth = width - pad.left - pad.right;
+  // A range of one day draws its point in the middle of the plot, whole.
+  const x = (day) => pad.left + (spanDays ? (day - firstDay) / spanDays : 0.5) * plotWidth;
+
   const root = svg('svg', {
     viewBox: `0 0 ${width} ${height}`,
     width,
@@ -179,16 +188,14 @@ function drawChart({
   });
 
   // Gridlines under the fills, the value each one marks beside the plot.
-  const valueLabels = [];
-  for (const gridValue of valueTicks(bottom, top, narrow ? 3 : 6)) {
-    const at = y(gridValue);
+  gridValues.forEach((gridValue, at) => {
+    const line = y(gridValue);
     if (gridValue !== 0) {
-      root.append(svg('line', { x1: pad.left, x2: width - pad.right, y1: at, y2: at, class: 'gridline' }));
+      root.append(svg('line', { x1: pad.left, x2: width - pad.right, y1: line, y2: line, class: 'gridline' }));
     }
-    const tick = svg('text', { x: pad.left - 10, y: at + 4, class: 'axis-tick', 'text-anchor': 'end' });
-    tick.textContent = tickLabel(gridValue, group, decimalPoint) + (percentage ? '%' : '');
-    valueLabels.push(tick);
-  }
+    valueLabels[at].setAttribute('x', pad.left - 10);
+    valueLabels[at].setAttribute('y', line + 4);
+  });
 
   layers.forEach((layer, at) => {
     const fill = fills.get(layer.band);
@@ -402,6 +409,19 @@ function drawChart({
   });
 
   return root;
+}
+
+/** The widest of `labels` as the stylesheet sets them, measured in a
+ *  drawing of their own that is gone again before the chart's. */
+function widest(labels) {
+  const probe = svg('svg', { class: 'trend', width: 0, height: 0 });
+  probe.style.position = 'absolute';
+  probe.style.visibility = 'hidden';
+  probe.append(...labels.map((label) => label.cloneNode(true)));
+  document.body.append(probe);
+  const width = Math.max(...[...probe.children].map((label) => label.getBBox().width));
+  probe.remove();
+  return width;
 }
 
 /** Labels along the time axis: years over a long span, months over a
