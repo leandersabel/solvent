@@ -337,13 +337,20 @@ Every figure is grouped and pointed as Settings sets it
   Decimals on money does not reach it, because rounding 12.5 ounces of
   gold to 13 loses part of the holding, and padding it to 12.50 claims
   a precision nobody recorded.
+- **A percentage shows one decimal place**, grouped and pointed like
+  every other figure, so a change reads "+136,794.6%" by default and
+  "+136.794,6%" under German with a period as the thousands mark.
+  Decimals on money does not reach it, because a percentage is not
+  money.
 - **A chart's value tick is the one figure that abbreviates.** From a
-  thousand up it reads in short form, "2.5k", pointed as Settings sets
-  it, so a reader with a decimal comma sees "2,5k". Below a thousand it
-  reads whole. The exact format is `net-worth-view.md`'s. Every other
-  figure, the chart's tooltip and legend included, shows in full,
-  because a tick only has to place a line and the readout is where a
-  value is read.
+  thousand up it reads in short form, "2.5k" or "1.5M", grouped and
+  pointed as Settings sets it, so a reader with a decimal comma sees
+  "2,5k" and "1,5M". Below a thousand it reads whole, and in the
+  percentage view every tick reads as a whole percent, grouped the same
+  way. The exact format is `net-worth-view.md`'s. Every other figure,
+  the chart's tooltip and legend included, shows in full, because a
+  tick only has to place a line and the readout is where a value is
+  read.
 
 ## Spacing and shape
 

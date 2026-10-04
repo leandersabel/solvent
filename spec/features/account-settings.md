@@ -76,13 +76,27 @@ record as ciphertext like any other and never learns any of it.
 
 Every figure reaches the screen through one formatter built from the
 profile, so a setting cannot apply on one screen and not another.
-The formatter answers:
+`money`, `whole`, `percent`, `compact` and `rate` each take a value
+exact at scale 12 (`record-snapshot.md`, Record shape) and round it
+half-even, like every other rounding in the product. Every figure
+entry writes a negative with the true minus, `−`, decided on the
+figure as written, so a value that rounds to zero carries no sign. The
+formatter answers:
 
 - **money** — a figure in any currency at `moneyPlaces`, grouped and
   pointed as configured: the main currency, and a holding's own unit
   whose `kind` in the symbol table is `currency` (`rate-lookup.md`).
-  Rounding is half-even, like every other rounding in the product
-  (`net-worth-view.md`).
+- **whole** — a summary figure in the main currency, in whole units,
+  grouped and pointed as configured, where the screen file names one
+  (`ui/dashboard.md`).
+- **percent(value, places)** — a percentage at `places`, grouped and
+  pointed as configured, followed by `%` with no space. `value` is
+  already the percentage, so 12.5 writes `12.5%`. It does not follow
+  `moneyPlaces`, because Decimals on money covers money only: a
+  percentage keeps the places its caller asks for.
+- **compact** — a value tick on the trend chart, in the short form
+  `net-worth-view.md`, Value ticks, defines, grouped and pointed as
+  configured.
 - **quantity** — a stored `value` in any other unit, a metal or free
   text, shown digit for digit from its decimal string
   (`record-snapshot.md`, Record shape): never rounded, never padded,
@@ -131,6 +145,13 @@ The formatter answers:
   since a style has no yearless shape and a rate delay can cross New
   Year. `monthYear` keeps its spelling under every style, because a
   style has no shape for a month alone.
+
+**No screen writes a figure itself.** Its digits, group marks, decimal
+point, rounding, minus and percent sign are what an entry above
+returns. A screen adds only words, a unit or currency code, and the
+sign of a signed change (`net-worth-view.md`, The change). A figure
+written with `toFixed`, `toLocaleString`, `Intl.NumberFormat`,
+`String` of a number or a template string skips every setting at once.
 
 Defaults come from `Intl` for the chosen locale, read at run time
 rather than tabulated, so there is no second and staler copy of what
@@ -442,6 +463,17 @@ from an administrator removing an account (admin-invites.md).
 - Under that profile `parseQuantity` reads `1’234,50` as `"1234.50"`
   and `12.5` as `"12.5"`. With locale `de-DE` and `groupSeparator`
   `period` it reads `1.234,5` as `"1234.5"` and refuses `12.5`.
+- With locale `de-DE` and `groupSeparator` `period`, `percent` at one
+  place writes 136794.6 as `136.794,6%` under `moneyPlaces` `0` and
+  `2` alike. It writes 0.25 as `0,2%`, 0.35 as `0,4%`, −0.25 as
+  `−0,2%` and −0.04 as `0,0%`, and at no places writes −50 as `−50%`.
+- With locale `de-CH`, `groupSeparator` `apostrophe` and `moneyPlaces`
+  `0`, `percent` at one place writes 10957493 as `10’957’493.0%`.
+- With locale `de-DE` and `groupSeparator` `apostrophe`, `compact`
+  writes 999 as `999`, 1500 as `1,5k`, 2000000 as `2M`, −2500000 as
+  `−2,5M` and 1500000000000 as `1’500B`.
+- No client module but the formatter's calls `toFixed`,
+  `toLocaleString` or `Intl.NumberFormat`.
 - With locale `en-US` and no `dateStyle`, 2026-09-20 reads
   `09/20/2026` from `date`, `Sep 20, 2026` from `longDate`,
   `September 20, 2026` from `fullDate`, `September 20` and `Sep 20`

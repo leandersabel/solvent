@@ -40,6 +40,12 @@ export function multiply(a, b) {
   return rescale(a * b, UNIT);
 }
 
+// The quotient of two scale-12 values is a ratio, rescaled up by 10^12
+// before the division so it comes back at scale 12, round-half-even.
+export function divide(a, b) {
+  return rescale(a * UNIT, b);
+}
+
 function rescale(numerator, denominator) {
   const negative = numerator < 0n !== denominator < 0n;
   const n = numerator < 0n ? -numerator : numerator;
@@ -77,6 +83,21 @@ export function toDisplay(value, places, group = '\u2009', point = '.') {
   const whole = places ? digits.slice(0, -places) : digits;
   const fraction = places ? digits.slice(-places) : '';
   return (negative ? '\u2212' : '') + grouped(whole, group) + (fraction ? point + fraction : '');
+}
+
+// A chart's value tick: its magnitude over the largest of a thousand, a
+// million and a billion that does not exceed it, at most one decimal
+// and no trailing zero, then that unit's suffix
+// (spec/features/net-worth-view.md, Value ticks).
+const SHORT_UNITS = [[10n ** 9n, 'B'], [10n ** 6n, 'M'], [1000n, 'k']];
+
+export function toCompact(value, group, point) {
+  const magnitude = value < 0n ? -value : value;
+  const [size, suffix] = SHORT_UNITS.find(([unit]) => magnitude >= unit * UNIT) || [1n, ''];
+  const tenths = rescale(magnitude * 10n, UNIT * size);
+  const fraction = tenths % 10n;
+  return (value < 0n && tenths ? '\u2212' : '') + grouped(String(tenths / 10n), group) +
+    (fraction ? point + fraction : '') + suffix;
 }
 
 function grouped(whole, group) {

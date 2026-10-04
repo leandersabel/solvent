@@ -117,6 +117,14 @@ export function formatter(profile) {
      *  carry the exact amounts. */
     whole: (value) => decimal.toDisplay(value, 0, group, point),
 
+    /** A percentage at `places`, already a percentage: 12.5 writes
+     *  12.5%. It keeps the places its caller asks for, because Decimals
+     *  covers money only. */
+    percent: (value, places) => decimal.toDisplay(value, places, group, point) + '%',
+
+    /** A value tick on the trend chart, in its short form. */
+    compact: (value) => decimal.toCompact(value, group, point),
+
     /** A rate as a field shows it for editing: grouped, every stored
      *  digit kept, and read back exactly by `parseFigure`. */
     editable: (value, minPlaces = 2) => decimal.toEditable(value, minPlaces, group, point),

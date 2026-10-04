@@ -109,6 +109,18 @@ await check('interpolation is exact at the midpoint', () => {
   );
 });
 
+await check('division is exact at scale 12 and rounds half-even', () => {
+  const d = (a, b) => decimal.format(decimal.divide(decimal.parse(a), decimal.parse(b)));
+  assert.equal(d('500', '2000'), '0.25');
+  assert.equal(d('1', '3'), '0.333333333333');
+  assert.equal(d('2', '3'), '0.666666666667');
+  assert.equal(d('-1', '3'), '-0.333333333333');
+  assert.equal(d('1', '-4'), '-0.25');
+  // A half at the twelfth place goes to the even digit.
+  assert.equal(d('0.000000000001', '2'), '0');
+  assert.equal(d('0.000000000003', '2'), '0.000000000002');
+});
+
 // ---- The AAD ----------------------------------------------------------
 
 const encoder = new TextEncoder();
@@ -620,6 +632,44 @@ await check('a thousands separator never collides with the decimal point', async
   const shape = formatter({ locale: 'de-DE', groupSeparator: 'period' });
   assert.notEqual(shape.group, shape.point);
   assert.equal(shape.money(1234567890000000000n), '1.234.567,89');
+});
+
+await check('percent writes a percentage grouped, pointed and half-even at the places asked, whatever Decimals says', async () => {
+  const { formatter } = await load('format.js');
+  const p = (text) => decimal.parse(text);
+  for (const moneyPlaces of ['0', '2']) {
+    const german = formatter({ locale: 'de-DE', groupSeparator: 'period', moneyPlaces });
+    assert.equal(german.percent(p('136794.6'), 1), '136.794,6%');
+    assert.equal(german.percent(p('0.25'), 1), '0,2%');
+    assert.equal(german.percent(p('0.35'), 1), '0,4%');
+    assert.equal(german.percent(p('-0.25'), 1), '\u22120,2%');
+    assert.equal(german.percent(p('-0.04'), 1), '0,0%');
+    assert.equal(german.percent(p('-50'), 0), '\u221250%');
+    assert.equal(german.percent(p('12.5'), 1), '12,5%');
+  }
+  const swiss = formatter({ locale: 'de-CH', groupSeparator: 'apostrophe', moneyPlaces: '0' });
+  assert.equal(swiss.percent(p('10957493'), 1), '10\u2019957\u2019493.0%');
+});
+
+await check('compact writes a value tick in its short form, grouped and pointed as configured', async () => {
+  const { formatter } = await load('format.js');
+  const scaled = (n) => BigInt(n) * decimal.ONE;
+  const shape = formatter({ locale: 'de-DE', groupSeparator: 'apostrophe' });
+  for (const [value, want] of [
+    [999, '999'], [0, '0'], [1000, '1k'], [1500, '1,5k'], [2000000, '2M'], [-2500000, '\u22122,5M'],
+    [-1500, '\u22121,5k'], [3e9, '3B'], [1500000000000, '1\u2019500B'],
+  ]) {
+    assert.equal(shape.compact(scaled(value)), want, String(value));
+  }
+  assert.equal(formatter({ locale: 'en-US', groupSeparator: 'comma' }).compact(scaled(1500)), '1.5k');
+  assert.equal(formatter({ locale: 'en-US', groupSeparator: 'comma' }).compact(scaled(1500000000000)), '1,500B');
+});
+
+await check('no client module but the formatter writes a figure with toFixed, toLocaleString or Intl.NumberFormat', async () => {
+  const { readdirSync, readFileSync } = await import('node:fs');
+  const writers = readdirSync(JS).filter((name) => name.endsWith('.js') && name !== 'format.js')
+    .filter((name) => /\.toFixed\(|\.toLocaleString\(|Intl\.NumberFormat/.test(readFileSync(new URL(name, JS), 'utf8')));
+  assert.deepEqual(writers, []);
 });
 
 await check('a date round-trips through the format the reader types', async () => {
@@ -1622,7 +1672,8 @@ const readTick = (text, group, point) => {
 };
 
 await check('net-worth-view: value ticks over the sweep are exact, whole, counted from zero and never read alike', async () => {
-  const { valueTicks, tickLabel } = await load('chart.js');
+  const { valueTicks } = await load('chart.js');
+  const { formatter } = await load('format.js');
   const totals = new Set([0.4]);
   for (let e = -1; e <= 10; e += 1) {
     for (const m of [1, 2, 2.5, 5, 7.5]) {
@@ -1634,6 +1685,8 @@ await check('net-worth-view: value ticks over the sweep are exact, whole, counte
   }
   assert.ok(totals.size > 100);
   for (const [group, point] of [[',', '.'], ['.', ',']]) {
+    const shape = formatter({ locale: 'en-US', groupSeparator: group === ',' ? 'comma' : 'period' });
+    assert.equal(shape.point, point);
     for (const total of totals) {
       for (const signed of [total, -total]) {
         const bottom = Math.min(0, signed);
@@ -1641,7 +1694,7 @@ await check('net-worth-view: value ticks over the sweep are exact, whole, counte
         for (const count of [6, 3]) {
           const where = `${signed} in ${count}`;
           const ticks = valueTicks(bottom, top, count);
-          const labels = ticks.map((tick) => tickLabel(tick, group, point));
+          const labels = ticks.map((tick) => shape.compact(BigInt(tick) * decimal.ONE));
           assert.ok(ticks.includes(0), where);
           assert.equal(new Set(labels).size, labels.length, `${where}: ${labels}`);
           const step = niceAtLeast((top - bottom) / count);
@@ -1664,15 +1717,19 @@ await check('net-worth-view: value ticks over the sweep are exact, whole, counte
 });
 
 await check('net-worth-view: one holding at 2500 has ticks 0 to 2500 by 500, reading 1.5k and 2.5k, or 1,5k and 2,5k under a decimal comma', async () => {
-  const { valueTicks, tickLabel } = await load('chart.js');
+  const { valueTicks } = await load('chart.js');
+  const { formatter } = await load('format.js');
+  const english = formatter({ locale: 'en-US', groupSeparator: 'comma' });
+  const german = formatter({ locale: 'de-DE', groupSeparator: 'period' });
+  const tickLabel = (value, shape) => shape.compact(BigInt(value) * decimal.ONE);
   const ticks = valueTicks(0, 2500, 6);
   assert.deepEqual(ticks, [0, 500, 1000, 1500, 2000, 2500]);
-  assert.deepEqual(ticks.map((t) => tickLabel(t, ',', '.')), ['0', '500', '1k', '1.5k', '2k', '2.5k']);
-  assert.deepEqual(ticks.map((t) => tickLabel(t, '.', ',')), ['0', '500', '1k', '1,5k', '2k', '2,5k']);
+  assert.deepEqual(ticks.map((t) => tickLabel(t, english)), ['0', '500', '1k', '1.5k', '2k', '2.5k']);
+  assert.deepEqual(ticks.map((t) => tickLabel(t, german)), ['0', '500', '1k', '1,5k', '2k', '2,5k']);
   assert.deepEqual(valueTicks(0, 2500, 3), [0, 1000, 2000]);
-  assert.equal(tickLabel(-1500, ',', '.'), '−1.5k');
-  assert.equal(tickLabel(2500000, ',', '.'), '2.5M');
-  assert.equal(tickLabel(3e9, ',', '.'), '3B');
+  assert.equal(tickLabel(-1500, english), '−1.5k');
+  assert.equal(tickLabel(2500000, english), '2.5M');
+  assert.equal(tickLabel(3e9, english), '3B');
 });
 
 await check('net-worth-view: a range starts no earlier than the oldest snapshot, whatever price entry is older', () => {

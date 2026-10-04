@@ -40,7 +40,9 @@ Components).
 - Beneath it, the change over the selected chart range: an arrow icon,
   the signed absolute change, and the percentage — in status good or
   critical, **with the arrow icon carrying the sign, not the color
-  alone**.
+  alone**. The percentage keeps one decimal place while the amounts
+  beside it read whole, and is grouped and pointed as they are
+  (`design-system.md`, Figures).
 - Beside the total, two smaller figures under their own section
   labels: gross assets and gross liabilities. Net worth is a signed sum and the UI must show
   both sides (`net-worth-view.md`).

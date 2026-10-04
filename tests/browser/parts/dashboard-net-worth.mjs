@@ -862,4 +862,39 @@ await run(async () => {
   );
   await home();
 
+  // The change beside the net worth is written by the formatter, so it
+  // follows the thousands mark and the decimal point as the amounts do.
+  const profile = await model(({ v }) => ({ recordId: v.profileRecord.recordId, version: v.profileRecord.version, payload: v.profile }));
+  await plantHere([{
+    type: 'profile',
+    recordId: profile.recordId,
+    version: profile.version + 1,
+    payload: { ...profile.payload, locale: 'de-DE', groupSeparator: 'period', moneyPlaces: '0' },
+  }]);
+  await reread();
+  await go('#/');
+  await press('All');
+  const change = await model(({ v }) => {
+    const { fromDay, lastDay } = v.chartRange(null);
+    const net = (day) => v.valuesAt(null, day).reduce((sum, band) => sum + band.value, 0n);
+    return { start: String(net(fromDay)), end: String(net(lastDay)) };
+  });
+  const start = BigInt(change.start);
+  const amount = BigInt(change.end) - start;
+  // Tenths of a percent, half-even: amount * 100 / |start| * 10.
+  const dividend = amount * 1000n;
+  const divisor = start < 0n ? -start : start;
+  let tenths = dividend / divisor;
+  const twice = (dividend % divisor) * 2n;
+  if (twice > divisor || (twice === divisor && tenths % 2n === 1n)) tenths += 1n;
+  const grouped = (digits) => digits.replace(/\B(?=(\d{3})+(?!\d))/g, '.');
+  const sign = amount > 0n ? '+' : amount < 0n ? '\u2212' : '';
+  const magnitude = tenths < 0n ? -tenths : tenths;
+  const wantPercent = `${sign}${grouped(String(magnitude / 10n))},${magnitude % 10n}%`;
+  const shownDelta = await ev("document.querySelector('.hero-delta').textContent");
+  check(
+    'net-worth-view: the hero\'s change percentage is grouped and pointed as the settings say, beside the amount',
+    shownDelta.endsWith(` \u00b7 ${wantPercent}`),
+    JSON.stringify({ shownDelta, wantPercent }),
+  );
 }, { signsIn: false });

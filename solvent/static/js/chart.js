@@ -120,7 +120,7 @@ export function dayAt(x, x0, x1, firstDay, lastDay) {
  *  keeps its hue on both sides. A band in `hidden` is left out of the
  *  stack and the line, and keeps its color slot. */
 function drawChart({
-  days, bands, marks, annotations, percentage, justTheLine, onPickDate, onHover, onSelect, width = 900, locale, formatDay, formatDate, group = ',', decimalPoint = '.',
+  days, bands, marks, annotations, percentage, justTheLine, onPickDate, onHover, onSelect, width = 900, locale, formatDay, formatDate, format,
   hidden = new Set(), selection = null,
 }) {
   // A phone-width card gets a shorter plot and fewer gridlines. The
@@ -169,7 +169,8 @@ function drawChart({
   const gridValues = valueTicks(bottom, top, narrow ? 3 : 6);
   const valueLabels = gridValues.map((gridValue) => {
     const tick = svg('text', { class: 'axis-tick', 'text-anchor': 'end' });
-    tick.textContent = tickLabel(gridValue, group, decimalPoint) + (percentage ? '%' : '');
+    const exact = BigInt(gridValue) * decimal.ONE;
+    tick.textContent = percentage ? format.percent(exact, 0) : format.compact(exact);
     return tick;
   });
   pad.left = Math.max(pad.left, Math.ceil(widest(valueLabels)) + 10);
@@ -511,20 +512,6 @@ function niceStep(rough) {
   if (rough <= 1) return 1;
   const magnitude = 10 ** Math.floor(Math.log10(rough));
   return [1, 2, 5, 10].map((factor) => factor * magnitude).find((step) => step >= rough);
-}
-
-const UNITS = [[1e9, 'B'], [1e6, 'M'], [1e3, 'k']];
-
-/** A tick's label: whole below a thousand, else its magnitude in the
- *  largest of thousands, millions and billions that fits, to one
- *  decimal with no trailing zero. The step rule makes that exact, so a
- *  label never rounds its line (net-worth-view.md, Value ticks). */
-export function tickLabel(value, group, point) {
-  const abs = Math.abs(value);
-  const [size, suffix] = UNITS.find(([unit]) => abs >= unit) || [1, ''];
-  const tenths = Math.round((abs * 10) / size);
-  const mantissa = `${Math.floor(tenths / 10)}${tenths % 10 ? `.${tenths % 10}` : ''}`;
-  return decimal.toStoredDisplay(`${value < 0 ? '-' : ''}${mantissa}`, group, point) + suffix;
 }
 
 /** The table fallback. A static aria-label on the SVG is not

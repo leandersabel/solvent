@@ -349,17 +349,19 @@ extent, every value zero, runs from 0 to 1.
 - **A tick from a thousand up reads in a short form**: its magnitude
   divided by the largest of a thousand, a million and a billion that
   does not exceed it, with at most one decimal and no trailing zero,
-  followed by that unit's suffix (`ui/design-system.md`, which makes the
-  value tick the one figure that abbreviates).
-- Every label is grouped, pointed and signed as money is
-  (`account-settings.md`, Dates and numbers), so a tick at 1500 reads
-  `1.5` or `1,5` before its suffix, by the configured decimal point.
+  followed by that unit's suffix, `k`, `M` or `B` (`ui/design-system.md`,
+  which makes the value tick the one figure that abbreviates).
+- Every label is written by the formatter (`account-settings.md`, Dates
+  and numbers): `compact` writes the two forms above, so a tick at 1500
+  reads `1.5k` or `1,5k` by the configured decimal point, and a tick at
+  1500000000000 carries the configured group mark, `1’500B` under an
+  apostrophe.
 - **No two ticks read the same, because every label is exact.** The
   domain contains zero, so the step is at least a sixth of the largest
   tick, and a multiple of a 1, 2 or 5 step that large is exact in one
   decimal of the tick's unit. A label never rounds its tick.
-- The percentage view takes the same step rule and reads each tick as
-  a whole percent, exact because every tick is an integer.
+- The percentage view takes the same step rule and writes each tick
+  with `percent` at no places, exact because every tick is an integer.
 
 Where the labels sit, inside the chart's drawing or in a gutter beside
 the plot, is `ui/dashboard.md`'s.
@@ -410,6 +412,25 @@ the sub-pixel bound above. The figure shown is the model's.
   its date (`ui/design-system.md`, The estimated marker), so a
   recording stays reachable by pointer where a day is narrower than a
   pixel.
+
+### The change
+
+The hero states the change between two days: the range's first and
+last, or a selection's ends (Reading a date). Its **amount** is the
+later day's net worth minus the earlier day's, exact.
+
+- **The percentage is the amount over the earlier net worth's
+  magnitude**: `amount × 100 / |earlier|`, divided in decimal at scale
+  12 with round-half-even (`record-snapshot.md`, Record shape), then
+  written by `percent` at one place, half-even again. Dividing by the
+  magnitude keeps a debt shrinking from −1000 to −500 a rise of 50%.
+- **There is no percentage when the earlier net worth is zero**,
+  because nothing is a share of zero. The amount stands alone.
+- **The sign is the amount's own**: `+` before a rise and `−` before a
+  fall, set before the amount and the percentage alike, each written
+  by the formatter from its magnitude. The arrow, the amount and the
+  percentage then never disagree, even where a figure rounds to zero.
+  A change of zero carries no sign.
 
 ### The data table
 
@@ -665,6 +686,20 @@ is a column and every figure is absolute money.
   sit at 0, 500, 1000, 1500, 2000 and 2500. The tick at 1500 reads `1.5`
   and the one at 2500 reads `2.5`, each before the thousands suffix, and
   `1,5` and `2,5` under a comma decimal point.
+- With locale `de-DE` and `groupSeparator` `period`, one holding
+  recorded at 2500000, at a 1280px viewport, the ticks read `0`,
+  `500k`, `1M`, `1,5M`, `2M` and `2,5M`. With an asset and a
+  liability holding, the percentage view's ticks read `−100%`, `−50%`,
+  `0%`, `50%` and `100%`.
+- With locale `de-DE`, `groupSeparator` `period` and `moneyPlaces`
+  `0`, and net worth 1000 on the range's first day and 1368946 on its
+  last, the hero's change reads the amount `+1.367.946` and the
+  percentage `+136.794,6%`.
+- In the main currency under `en-US`, net worth from 2000 to 2005
+  gives a percentage of `+0.2%` and from 2000 to 1995 `−0.2%`, half-even
+  where a float rounds `0.25` up. From 2000 to 2001 it reads `+0.0%`
+  beside the rising arrow, from −1000 to −500 `+50.0%`, and from 0 to
+  500 the amount stands with no percentage.
 - With a single recording, at a 1280px and a 390px viewport, the
   point's center sits at the plot's horizontal middle, within half a
   pixel, and its mark's bounding box lies wholly inside the chart's
