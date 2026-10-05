@@ -133,3 +133,12 @@ def test_a_profile_schema_version_of_the_largest_is_stored(app, client):
     assert client.post("/api/register", json=body, headers=CSRF).status_code == 200
     stored = rows(app, "SELECT schema_version FROM records WHERE record_id = ?", (body["profileRecordId"],))
     assert stored == [{"schema_version": LARGEST}]
+
+
+@pytest.mark.parametrize("version", ["1", True, 1.5], ids=["a string", "true", "a fraction"])
+def test_a_profile_schema_version_that_is_not_an_integer_is_refused_writing_nothing(app, client, version):
+    """It goes through the record validator, where `schemaVersion` is an
+    integer and anything else is a Bad Request (record-api.md, Endpoints)."""
+    body = register_body(app, profileSchemaVersion=version)
+    response = client.post("/api/register", json=body, headers=CSRF)
+    assert_refused_writing_nothing(app, response, body["inviteToken"])
