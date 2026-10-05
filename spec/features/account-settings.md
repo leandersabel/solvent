@@ -204,8 +204,11 @@ theirs.
   responsive.
 - **Error, wrong current password**: inline above the first field:
   "That is not your current password." Every field is kept.
-- **Error, the new password is the current one, or fails the policy**:
-  inline, refused before anything is derived.
+- **Error, the new password is the current one**: inline above the
+  first field: "The new password is your current one." Every field is
+  kept, and nothing is derived or sent.
+- **Error, the new password fails the policy**: refused before anything
+  is derived.
 - **Error, the change failed after the slow part**: "Nothing was
   changed. Your current password still works." Every field is kept, so
   nothing is re-typed or re-derived.
@@ -1077,3 +1080,6 @@ from an administrator removing an account (`admin-invites.md`).
     Test:
     `tests/test_credential_changed.py::test_a_password_change_on_a_superseded_salt_writes_nothing_and_counts_no_failure`,
     `tests/test_credential_changed.py::test_an_administrator_on_a_superseded_salt_changes_nothing`.
+82. A new password equal to the current one shows "The new password is
+    your current one." above the first field, keeps every field and
+    sends nothing. Test: `tests/browser/parts/settings.mjs`.

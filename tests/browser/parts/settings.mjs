@@ -389,6 +389,26 @@ await run(async () => {
   const apiSince = (index, tail = '/api/') =>
     watched[0].requests.slice(index).filter((r) => r.url.includes(tail));
 
+  await fillPasswords(VAULT_PASSWORD, VAULT_PASSWORD);
+  const beforeSame = watched[0].requests.length;
+  await submitPasswords();
+  await page.waitUntil("document.body.innerText.includes('The new password is your current one.')", {
+    label: 'the new password that is the current one',
+  });
+  const same = await page.call((words) => {
+    const card = [...document.querySelectorAll('.card')].find((c) => c.textContent.includes(words));
+    const error = card.querySelector('.field-error:not([hidden])');
+    return {
+      above: Boolean(error.compareDocumentPosition(card.querySelector('input')) & Node.DOCUMENT_POSITION_FOLLOWING),
+      kept: [...card.querySelectorAll('input')].map((i) => i.value),
+    };
+  }, PASSWORD_CARD);
+  check(
+    'a new password that is the current one is refused above the first field, every field kept, and nothing is sent',
+    same.above && same.kept.every((v) => v === VAULT_PASSWORD) && apiSince(beforeSame).length === 0,
+    `${JSON.stringify(same)}, ${apiSince(beforeSame).map((r) => r.url).join(' | ')}`,
+  );
+
   await fillPasswords('not the password at all', NEW_PASSWORD);
   const beforeWrong = watched[0].requests.length;
   await submitPasswords();
