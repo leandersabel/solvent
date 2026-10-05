@@ -102,6 +102,14 @@ await run(async () => {
   await click('Your password');
   await page.waitUntil("document.body.innerText.includes('same bar as anybody')", { label: 'the password card' });
   check('an administrator can change their own password', (await labels('.card button')).includes('Change password'));
+  check(
+    "the password card's error sits above the current password field",
+    await page.eval(`(() => {
+      const card = document.querySelector('input[autocomplete=current-password]').closest('.card');
+      const first = card.querySelector('input[autocomplete=current-password]');
+      return Boolean(card.querySelector('.field-error').compareDocumentPosition(first) & Node.DOCUMENT_POSITION_FOLLOWING);
+    })()`),
+  );
 
   // ---- A dialog over the area --------------------------------------
 
