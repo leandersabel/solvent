@@ -114,3 +114,22 @@ def test_a_profile_record_the_validator_refuses_leaves_the_invite_pending(app, c
     assert response.status_code == 400
     assert refused(response) is None
     assert_nothing_written(app)
+
+
+@pytest.mark.parametrize("auth_key", ["AAAA", 31, 33, "not base64!"])
+@pytest.mark.parametrize("kind", ["vault_owner", "administrator"])
+def test_an_auth_key_that_is_not_thirty_two_bytes_is_refused(app, client, kind, auth_key):
+    if isinstance(auth_key, int):
+        auth_key = b64(auth_key)
+    response = post(client, payload(app, kind, authKey=auth_key))
+    assert response.status_code == 400
+    assert refused(response) is None
+    assert "Set-Cookie" not in response.headers
+    assert_nothing_written(app)
+
+
+def test_a_profile_schema_version_past_two_to_the_fifty_three_is_a_bad_request(app, client):
+    response = post(client, payload(app, profileSchemaVersion=2**53))
+    assert response.status_code == 400
+    assert refused(response) is None
+    assert_nothing_written(app)

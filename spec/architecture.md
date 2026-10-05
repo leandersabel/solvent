@@ -406,6 +406,17 @@ or kinds.
   - **Master Key**: never leaves the browser. Unwraps the vault's DEK.
   - **Auth Key**: sent to the server at login, stored server-side only
     as a hash. Can't derive the Master Key or decrypt anything.
+  - **The split** is HKDF-SHA256 over the Argon2id output with an empty
+    salt, info `solvent/master-key` for the Master Key and
+    `solvent/auth-key` for the Auth Key, 32 bytes each. The Auth Key
+    travels as padded base64, and its hash is over that text.
+  - **An Auth Key that becomes a verifier** (registration, a password
+    change, the stale-KDF upgrade) must decode as strict base64 to
+    exactly 32 bytes, or the request is a Bad Request that writes
+    nothing. A hand-built request could otherwise give its account a
+    credential weaker than the split makes. An Auth Key that is only
+    verified gets no shape check, so a sign-in has one answer for every
+    wrong key.
   - **Parameters**: 64 MiB memory, 3 iterations, parallelism 1, over a
     128-bit salt. This is RFC 9106's second recommended option with
     parallelism 1, because a single-threaded WASM build in a Worker

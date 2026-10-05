@@ -407,7 +407,8 @@ two callers rather than two record writers.
   set, a non-ASCII letter, the empty string, and `system:bootstrap`. Its
   whitespace is ASCII space and tab only, where Python's `str.strip` and
   JavaScript's `trim` agree.
-- The server validates: the salt is exactly 16 bytes, the KDF envelope's
+- The server validates: the Auth Key is 32 bytes (architecture.md, Key
+  management), the salt is exactly 16 bytes, the KDF envelope's
   parameters are at or above the server's configured minimum (a client
   must not be able to register itself a weak KDF), and the wrapped DEK
   and profile blobs are within the blob limits (architecture.md,
@@ -434,9 +435,9 @@ first that fails:
    here. Bad Request, no `refused` member.
 2. **The username** against the username rule. Bad Request
    `{"refused":"username"}`.
-3. **The rest of the input**: the salt and the KDF envelope (Rules),
-   and, where present, `dekNonce` as 96 bits of base64 and `wrappedDek`
-   as base64. Bad Request, no `refused` member.
+3. **The rest of the input**: the Auth Key, the salt and the KDF
+   envelope (Rules), and, where present, `dekNonce` as 96 bits of
+   base64 and `wrappedDek` as base64. Bad Request, no `refused` member.
 4. **The invite**: the token names a pending, unexpired invite
    (`admin-invites.md`, Invite lifecycle). Bad Request
    `{"refused":"invite"}`, byte-identical in status, headers and body
@@ -684,3 +685,10 @@ fixture prevents.
     same page loads the worker and sends the registration. Test:
     `tests/test_register_browser.py::test_the_registration_forms_answer_each_refusal_in_its_own_words`,
     `tests/browser/parts/register-review-worker.mjs`.
+47. (blind) A `POST /api/register` whose Auth Key is 3, 31 or 33 bytes,
+    or not base64, is a Bad Request with no `refused` member, for either
+    invite kind, and leaves no principal row and the invite `pending`.
+    Test: `tests/test_register_refusals.py::test_an_auth_key_that_is_not_thirty_two_bytes_is_refused`.
+48. A `POST /api/register` whose profile schema version is past
+    2^53 - 1 is a Bad Request that writes nothing. Test:
+    `tests/test_register_refusals.py::test_a_profile_schema_version_past_two_to_the_fifty_three_is_a_bad_request`.
