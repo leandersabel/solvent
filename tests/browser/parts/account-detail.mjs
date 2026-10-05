@@ -805,14 +805,17 @@ await run(async () => {
     // phone width: with the widest rows the list can hold, a long figure
     // with a note and two entries sharing a date, nothing pans sideways,
     // no box scrolls sideways, every control lies on the screen where a
-    // tap at its center lands on it, and no date wraps.
+    // tap at its center lands on it, and no date wraps. Its name has no
+    // point a line may break at and is wider than a phone.
     const goldId = (await idNamed('Gold bars'))[0];
-    await page.call(async (id, day) => {
+    await page.call(async (id, day, name) => {
       const writes = await import('/static/js/writes.js');
       const v = (await import('/static/js/session.js')).currentVault();
+      const h = v.holdings.get(id);
+      await writes.saveHolding(v, h, { ...h.payload, name });
       await writes.saveSnapshot(v, id, null, { date: day, value: '1234567.125', note: 'Counted at the bank vault' });
       await writes.saveSnapshot(v, id, null, { date: day, value: '1234567.250', note: null });
-    }, goldId, BACKDATE);
+    }, goldId, BACKDATE, 'ZKB_Vorsorgekonto_3a_CH9300762011623852957');
     await openHolding(goldId);
     await page.waitUntil("document.querySelectorAll('.values-table tbody tr.flagged').length === 2", { label: 'the gold with its widest rows' });
     for (const width of [320, 375, 601, 901]) {

@@ -1592,6 +1592,10 @@ th.numeric {
 
 .dialog-heading { font-size: 20px; margin-bottom: 20px; }
 
+/* A holding's name can be one word wider than the screen. */
+.screen-heading,
+.dialog-heading { overflow-wrap: anywhere; }
+
 .dialog-actions {
   display: flex;
   gap: 12px;

@@ -308,8 +308,8 @@ then the value at the left and the main-currency figure at the right,
 then its actions on a line of their own. A date never wraps. The two
 figures share a line when they fit and otherwise each takes one,
 never broken inside a figure. A note wraps wherever it must, inside
-an address too. Every action is a 44px target, and
-nothing on the screen pans sideways.
+an address too, and so does the holding's name in the heading. Every
+action is a 44px target, and nothing on the screen pans sideways.
 
 #### Deleting a snapshot
 
@@ -873,7 +873,8 @@ Unarchiving and archiving it again writes the zero at the new D.
     box sideways. Every control lies on screen and takes a tap at its
     center, each control in the list of values is at least 44px tall at
     phone width, and no date wraps. A note holding an email address
-    pans nothing either. Test: `tests/browser/parts/account-detail.mjs`,
+    pans nothing either, nor does a name without a space. Test:
+    `tests/browser/parts/account-detail.mjs`,
     `tests/browser/parts/account-detail-review-phone.mjs`.
 59. The permanent-delete dialog of a holding with no snapshots says
     there are no recorded values to delete and that past net worth
