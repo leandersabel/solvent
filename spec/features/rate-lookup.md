@@ -437,8 +437,8 @@ scope).
   prior close of a day not yet published. Weekends and holidays settle
   at D+2 like any other date.
 - Settling reads only when the entry was fetched, never its `asOf`,
-  because gold quoted in another currency can carry `asOf` D while its
-  currency leg still holds the prior close.
+  because an `asOf` before D reads the same whether D is a day nothing
+  is published or a day not yet published.
 - A cache hit issues no outbound request, so a household's entries on
   one day mostly hit cache.
 - Entries are public reference data: not per-user, holding nothing about
