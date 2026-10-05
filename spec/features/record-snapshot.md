@@ -1516,7 +1516,8 @@ Editing an existing entry).
 79. (blind) A move whose reload finds the holding's slot at the new date
     taken by a record its confirmation did not name writes nothing and
     names the date. Test:
-    `tests/test_client.py::test_the_client_side_rules_hold`.
+    `tests/test_client.py::test_the_client_side_rules_hold`,
+    `tests/browser/parts/snapshot-entry-review-move.mjs`.
 80. A move whose prices did not save leaves the entry moved, names every
     unit in the Dialog, leaves Save inert until something changes, and
     offers the recording. Test: `tests/browser/parts/snapshot-entry.mjs`.
@@ -1570,4 +1571,5 @@ Editing an existing entry).
     before Save, writes nothing, names the date and offers its
     recording, although no slot the move would take is taken. Test:
     `tests/browser/parts/snapshot-entry.mjs`,
+    `tests/browser/parts/snapshot-entry-review-move.mjs`,
     `tests/test_client.py::test_the_client_side_rules_hold`.
