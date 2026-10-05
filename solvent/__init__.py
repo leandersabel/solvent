@@ -17,6 +17,7 @@ from . import (
     admin,
     auth,
     cli,
+    crypto,
     db,
     errors,
     guard,
@@ -81,6 +82,7 @@ def create_app(config_overrides: dict | None = None) -> flask.Flask:
     db.init_db(app)
 
     ratelimit.init_app(app)
+    crypto.init_app(app)
     if app.config["TRUSTED_PROXY_HOPS"]:
         # Only the client address is read from a header: the cookie is
         # Secure and HSTS is sent whatever the scheme, so scheme, host,

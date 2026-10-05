@@ -599,6 +599,9 @@ or kinds.
   - After a verified credential the response does differ, because the
     caller has proven they are entitled to know. The size difference
     falls under the accepted request-size leak.
+  - Constant time holds from the first request: every decoy is built
+    when the app is created, never on first use, which would make the
+    first unknown username after a start slower than the rest.
   - Any future pre-authentication step needs the same decoy treatment.
 - **Rate limiting** guards `/api/auth/salt`, `/api/auth/login`,
   `POST /api/auth/change-password` and `DELETE /api/auth/account`. The
