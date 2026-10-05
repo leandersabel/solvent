@@ -18,6 +18,7 @@ from pathlib import Path
 
 FRANKFURTER_START = date(1999, 1, 4)
 NBP_START = date(2013, 1, 2)
+# The app's NBP_WINDOW, which a test compares.
 NBP_WINDOW = timedelta(days=14)
 GRAMS_PER_TROY_OUNCE = Decimal("31.1034768")
 

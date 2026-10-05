@@ -25,6 +25,7 @@ from solvent.rates import (
     FX_URL,
     MAX_RESPONSE_BYTES,
     NBP_URL,
+    NBP_WINDOW,
     SEEDED_SYMBOLS,
     USER_AGENT,
 )
@@ -83,7 +84,7 @@ def nbp_violation(body: object, day: date) -> "str | None":
     for entry in body:
         if not isinstance(entry, dict):
             return "an entry is not an object"
-        if not _within(entry.get("data"), day - timedelta(days=14), day):
+        if not _within(entry.get("data"), day - NBP_WINDOW, day):
             return "data outside the window"
         if entry["data"] < previous:
             return "entries are not ascending"
@@ -130,7 +131,7 @@ def check_all(today: date, opener=OPENER) -> "list[tuple[str, str, str]]":
     day = today - timedelta(days=7)
     urls = {
         "frankfurter": FX_URL.format(date=day.isoformat(), quote=QUOTE),
-        "nbp": NBP_URL.format(start=(day - timedelta(days=14)).isoformat(), end=day.isoformat()),
+        "nbp": NBP_URL.format(start=(day - NBP_WINDOW).isoformat(), end=day.isoformat()),
     }
     return [(source, *check_source(source, url, day, opener)) for source, url in urls.items()]
 

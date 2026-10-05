@@ -194,11 +194,11 @@ every process that asks gets the same answer.
 `prices.known_table(date, quote)` is what `/api/rates` must answer for
 the whole table on that date and quote, without `cached`: every
 currency but `quote` whose `start` the date has reached, and `XAU-g`
-and `XAU-ozt` where NBP published within the 14-day window, each
-`{rate, base, asOf, source}`, and nothing at all on a date before
-`start[quote]`. An empty table matches No Content. It applies
-rate-lookup.md's composition exactly as pinned there (Providers), so
-it is the oracle for every proposal `qa` sees.
+and `XAU-ozt` where NBP published within `NBP_WINDOW` (rate-lookup.md,
+Providers, Gold), each `{rate, base, asOf, source}`, and nothing at all
+on a date before `start[quote]`. An empty table matches No Content. It
+applies rate-lookup.md's composition exactly as pinned there
+(Providers), so it is the oracle for every proposal `qa` sees.
 
 #### What it answers
 
@@ -255,13 +255,13 @@ nothing.
 
 `python /harness/sources.py check|probe`, in a container of tonight's
 image with `PYTHONPATH=/app`, requests exactly what the app requests:
-it imports `FX_URL`, `NBP_URL`, `USER_AGENT`,
+it imports `FX_URL`, `NBP_URL`, `NBP_WINDOW`, `USER_AGENT`,
 `EGRESS_TIMEOUT_SECONDS`, `MAX_RESPONSE_BYTES` and `SEEDED_SYMBOLS`
 from `solvent.rates`, and opens each URL with the default context and
 redirects off, as the app does.
 
 Both send one request to each source, for quote `CHF` and the date `D`
-seven days before the current UTC date (NBP from `D − 14 days` to `D`),
+seven days before the current UTC date (NBP from `D − NBP_WINDOW` to `D`),
 and print one line per source:
 `<frankfurter|nbp> <ok|no-answer|changed> <reason>`. The reason names
 the status, exception class or first shape violation, never the body.
@@ -271,7 +271,7 @@ the status, exception class or first shape violation, never the body.
 three-letter upper-case codes to numbers above zero, every seeded
 currency but `CHF` among them. NBP answers a non-empty array, ascending
 by `data`, of objects whose `data` is an ISO date within
-`[D − 14 days, D]` and whose `cena` is a number above zero. A boolean
+`[D − NBP_WINDOW, D]` and whose `cena` is a number above zero. A boolean
 is not a number.
 
 **`check`** runs once a night against the real sources, in the build
@@ -633,7 +633,9 @@ On failure it prints `docker logs` of `solvent` and `standin`.
     the `CHF` table omits `BRL`, `CNY`, `ILS` and `INR`, and `BRL` answers
     No Content. Test: `tests/test_nightly_tools.py::test_known_table_is_what_the_app_answers_for_the_whole_table`.
 13. The currency list in `prices.py` equals the seeded currencies in
-    `solvent.rates`. Test: `tests/test_nightly_tools.py::test_the_currency_list_is_the_seeded_currencies`.
+    `solvent.rates`, and its `NBP_WINDOW` equals the app's. Test:
+    `tests/test_nightly_tools.py::test_the_currency_list_is_the_seeded_currencies`,
+    `tests/test_nightly_tools.py::test_the_gold_window_is_the_apps`.
 14. (blind) `sources.py` classifies a timeout, a refused connection,
     `429` and `503` as `no-answer`. Test: `tests/test_nightly_tools.py::test_a_throttled_or_failing_source_is_no_answer`, `tests/test_nightly_tools.py::test_the_requests_failures_are_classified`.
 15. (blind) `sources.py` classifies `301`, `404`, a non-JSON `200`, a
