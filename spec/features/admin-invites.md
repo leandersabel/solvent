@@ -372,7 +372,7 @@ Units:
 
 Your password:
 - **Error, the new password is the current one**: inline, refused before
-  anything is sent.
+  anything is sent: "The new password is your current one."
 - **Error, the change failed**: "Nothing was changed. Your current
   password still works." Every field is kept.
 
