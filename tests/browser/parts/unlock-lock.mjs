@@ -80,6 +80,7 @@ await run(async () => {
       return JSON.parse(await page.eval(`JSON.stringify({
         headings: [...document.querySelectorAll('.dialog-heading')].map((h) => h.textContent),
         figure: document.querySelector('#snapshot-value')?.value,
+        notice: document.body.innerText.includes('You left the entry'),
       })`));
     };
 
@@ -111,8 +112,8 @@ await run(async () => {
       );
       const after = left.password ? await comesBack(`the vault after Lock ${name}`) : { headings: [] };
       check(
-        `unlocking after Lock ${name} reopens the dialog with the typed figure`,
-        after.headings.length === 1 && after.headings[0].startsWith('Record a value') && after.figure === FIGURE,
+        `unlocking after Lock ${name} reopens the dialog with the typed figure and no notice of anything left`,
+        after.headings.length === 1 && after.headings[0].startsWith('Record a value') && after.figure === FIGURE && !after.notice,
         JSON.stringify(after),
       );
 

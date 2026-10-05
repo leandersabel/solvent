@@ -556,6 +556,34 @@ await run(async () => {
   );
   await closeDialogs();
 
+  // #292: closing the form with something typed writes nothing and says
+  // what was left, on the screen beneath or the recording it opens.
+  const DL = ago(70);
+  const shown = () => ev('document.body.innerText');
+  await openForm('Current account');
+  await set('#snapshot-date', await format('date', DL));
+  await quiet();
+  await set('#snapshot-value', '7');
+  await typeLine('USD', '0.5');
+  traffic.length = 0;
+  await press('Cancel', '.dialog');
+  check(
+    'record-snapshot: closing the form with a typed price and figure writes nothing and names both on the screen beneath',
+    !(await ev("Boolean(document.querySelector('.dialog'))")) && writesSent().length === 0 &&
+      on(await stored('snapshot'), DL).length === 0 && on(await stored('rate'), DL).length === 0 &&
+      (await shown()).includes(`You left the entry for ${await format('longDate', DL)} with changes that were not saved: Current account, the USD rate.`),
+  );
+  await openForm('Current account');
+  await set('#snapshot-value', '8');
+  await press('Open the recording, where they are changed', '.dialog');
+  await rec.waitUntil("location.hash.startsWith('#/recording/')", { label: 'the recording' });
+  await quiet();
+  check(
+    'record-snapshot: leaving the form for its recording names the figure left there',
+    writesSent().length === 0 &&
+      (await shown()).includes(`You left the entry for ${await format('longDate', T)} with changes that were not saved: Current account.`),
+  );
+
   // #229: a form opened before another window archived its holding.
   const DA = ago(65);
   await openForm('Fund 2');
