@@ -332,6 +332,60 @@ def test_a_gold_figure_that_is_not_a_usable_price_drops_only_gold(owner, opener,
     assert all(rates.breakers[name].failures == 0 for name in rates.breakers)
 
 
+# Each is a publication date no source may stamp a proposal with:
+# unreadable, not in the canonical form, not a string, after the
+# requested day, or before the 14-day window the gold query covers.
+NOT_A_DATE = [
+    "31.07.2026", "20260730", "2026-7-30", "", 20260730, None,
+    "2026-08-01", "2026-07-16",
+]
+
+
+@pytest.mark.parametrize("bad", NOT_A_DATE)
+@pytest.mark.parametrize("quote", ["CHF", "PLN"])
+def test_a_gold_date_that_is_not_usable_drops_only_gold(owner, opener, bad, quote):
+    _publish(opener)
+    opener.answers["nbp"] = lambda url: [{"data": bad, "cena": 251.37}]
+    response = owner.get(f"/api/rates?date={PAST}&quote={quote}", headers=CSRF)
+    assert response.status_code == 200
+    body = response.get_json()["rates"]
+    assert "XAU-g" not in body and "XAU-ozt" not in body
+    assert "USD" in body
+    assert all(rates.breakers[name].failures == 0 for name in rates.breakers)
+
+
+@pytest.mark.parametrize("bad", NOT_A_DATE[:-1])
+def test_a_currency_date_that_is_not_usable_drops_only_what_its_table_prices(
+    owner, opener, bad
+):
+    _publish(opener)
+    fx_answer = opener.answers["fx"]
+    opener.answers["fx"] = lambda url: {**fx_answer(url), "date": bad}
+    response = owner.get(f"/api/rates?date={PAST}&quote=PLN", headers=CSRF)
+    assert response.status_code == 200
+    assert set(response.get_json()["rates"]) == {"XAU-g", "XAU-ozt"}
+    assert owner.get(f"/api/rates?date={PAST}&quote=CHF", headers=CSRF).status_code == 204
+    assert all(rates.breakers[name].failures == 0 for name in rates.breakers)
+
+
+@pytest.mark.parametrize("bad", ["31.07.2026", "2026-08-01"])
+def test_a_cached_rate_with_an_unusable_date_is_fetched_again(app, owner, provider, bad):
+    conn = connect(app)
+    with conn:
+        conn.execute(
+            "INSERT INTO rate_cache (symbol, quote, date, rate, as_of, source, fetched_at) "
+            "VALUES ('USD', 'CHF', ?, '2', ?, 'frankfurter', ?)",
+            (PAST, bad, datetime.now(timezone.utc).isoformat()),
+        )
+    conn.close()
+    provider.answers["frankfurter"] = fx(PAST, {"USD": 0.8})
+    body = owner.get(f"/api/rates?date={PAST}&quote=CHF&symbol=USD", headers=CSRF).get_json()
+    assert body == {
+        "rate": "1.25", "base": "1 USD", "quote": "CHF", "asOf": PAST,
+        "source": "frankfurter", "cached": False,
+    }
+
+
 def test_a_cached_rate_of_zero_is_fetched_again(app, owner, provider):
     conn = connect(app)
     with conn:

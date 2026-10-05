@@ -360,6 +360,20 @@ def _positive(value: object) -> "Decimal | None":
     return number if number.is_finite() and 0 < number < _CEILING else None
 
 
+def _published(value: object, on: date, since: date = date.min) -> "str | None":
+    """A source's publication date, usable as `asOf` only as an ISO date
+    in its canonical form from `since` to `on`. Anything else means the
+    source gave no answer, never an error or a proposal dated a day it
+    is not for."""
+    if not isinstance(value, str):
+        return None
+    try:
+        day = date.fromisoformat(value)
+    except ValueError:
+        return None
+    return value if day.isoformat() == value and since <= day <= on else None
+
+
 def _fx_table(
     on: date, quote: str, egress: _Egress
 ) -> "dict[str, tuple[Decimal, str]] | None":
@@ -375,9 +389,9 @@ def _fx_table(
     )
     if not isinstance(payload, dict):
         return None
-    as_of = payload.get("date")
+    as_of = _published(payload.get("date"), on)
     rates = payload.get("rates")
-    if not isinstance(as_of, str) or not isinstance(rates, dict):
+    if as_of is None or not isinstance(rates, dict):
         return None
     if payload.get("base") != quote:
         # A rate in an unexpected currency is rejected rather than
@@ -408,8 +422,8 @@ def _gold_pln(on: date, egress: _Egress) -> "tuple[Decimal, str] | None":
     if not isinstance(last, dict):
         return None
     price = _positive(last.get("cena"))
-    as_of = last.get("data")
-    if price is None or not isinstance(as_of, str):
+    as_of = _published(last.get("data"), on, on - _PRIOR_CLOSE_WINDOW)
+    if price is None or as_of is None:
         return None
     return price, as_of
 
@@ -434,9 +448,13 @@ def _cache_get(symbol: str, quote: str, on: str) -> "dict | None":
         "SELECT * FROM rate_cache WHERE symbol = ? AND quote = ? AND date = ?",
         (symbol, quote, on),
     ).fetchone()
-    if row is None or not Decimal(row["rate"]):
-        # A "0" stored before rates were checked is a miss, so it is
-        # fetched again and replaced.
+    if (
+        row is None
+        or not Decimal(row["rate"])
+        or _published(row["as_of"], date.fromisoformat(on)) is None
+    ):
+        # A "0" or a bad `asOf` stored before either was checked is a
+        # miss, so it is fetched again and replaced.
         return None
     if on == _today().isoformat():
         fetched = datetime.fromisoformat(row["fetched_at"])
