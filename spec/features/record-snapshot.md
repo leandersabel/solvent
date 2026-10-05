@@ -524,6 +524,16 @@ Standard app shell, content max-width 900px.
 date. A screen that repriced March by being opened is the one thing it
 must not be.
 
+#### At phone width
+
+Up to 900px wide, the figures and the prices become lists. A line
+holds the holding or the unit first, then its own figure at the left
+and the converted figure or the provenance chip at the right, then any
+fault with Keep this one on a line of its own. The two figures share a
+line when they fit and otherwise each takes one, never broken inside a
+figure. Every control in the lists is a 44px target, and nothing on the
+screen pans sideways.
+
 #### Delete
 
 **Delete lives here and nowhere else**, so the screen somebody types
@@ -1580,3 +1590,9 @@ Editing an existing entry).
     holding's name for a new figure, and "Edit this value" for a stored
     one. Test: `tests/browser/parts/snapshot-entry.mjs`,
     `tests/browser/parts/snapshot-entry-review-heading.mjs`.
+94. At 320px, 375px, 601px and 901px wide, Recording detail holding two
+    seven-digit figures for one holding on its date pans no screen or
+    box sideways. Every control, Keep this one included, lies on screen
+    and takes a tap at its center, and each control in its lists is at
+    least 44px tall at phone width. Test:
+    `tests/browser/parts/recording-detail.mjs`.
