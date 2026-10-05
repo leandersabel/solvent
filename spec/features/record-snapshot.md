@@ -527,7 +527,7 @@ must not be.
 #### At phone width
 
 Up to 900px wide, the figures and the prices become lists. A line
-holds the holding or the unit first, then its own figure at the left
+holds the holding or the unit first, wrapping anywhere it must, then its own figure at the left
 and the converted figure or the provenance chip at the right, then any
 fault with Keep this one on a line of its own. The two figures share a
 line when they fit and otherwise each takes one, never broken inside a
@@ -1594,5 +1594,7 @@ Editing an existing entry).
     seven-digit figures for one holding on its date pans no screen or
     box sideways. Every control, Keep this one included, lies on screen
     and takes a tap at its center, and each control in its lists is at
-    least 44px tall at phone width. Test:
-    `tests/browser/parts/recording-detail.mjs`.
+    least 44px tall at phone width. A holding name with no break in it
+    wraps rather than pans. Test:
+    `tests/browser/parts/recording-detail.mjs`,
+    `tests/browser/parts/recording-detail-review-phone.mjs`.

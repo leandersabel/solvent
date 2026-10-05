@@ -1972,7 +1972,7 @@ select {
   }
 
   .recording-table tr.flagged td:first-child { border-left: 0; padding-left: 0; }
-  .recording-table td:first-child { flex-basis: 100%; }
+  .recording-table td:first-child { flex-basis: 100%; overflow-wrap: anywhere; }
   .recording-table td:nth-child(2) { white-space: nowrap; }
   .recording-table td:nth-child(3) { margin-left: auto; white-space: nowrap; }
   .recording-table td:last-child { flex-basis: 100%; }

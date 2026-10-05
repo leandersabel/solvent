@@ -87,7 +87,7 @@ await run(async () => {
         const name = n.textContent || n.getAttribute('aria-label');
         if (r.left < -0.5 || r.right > innerWidth + 0.5) problems.push('off the screen: ' + name);
         else if (!n.contains(document.elementFromPoint((r.left + r.right) / 2, (r.top + r.bottom) / 2))) problems.push('covered: ' + name);
-        if (innerWidth < 600 && n.closest('.recording tbody') && r.height < 44) problems.push('under 44px: ' + name);
+        if (innerWidth <= 900 && n.closest('.recording tbody') && r.height < 44) problems.push('under 44px: ' + name);
       }
       return problems;
     })()`);
