@@ -14,7 +14,10 @@ Request that reaches no provider (SSRF and egress hardening, criteria
 43 and 67). With every lookup slot sending, a lookup sends nothing,
 answers what needs no source and leaves the breakers alone, and the
 next one after a slot frees sends (Rate limiting and failure,
-criterion 69).
+criterion 69). Gold quoted in anything but PLN is priced at the gold
+day, the latest day on or before `date` both sources published, and
+both its halves are that day's (Providers, Gold, Edge cases, criteria
+7, 22, 23, 29, 47, 48, 56 and 70 to 72).
 
 Written from the spec alone. Each provider is reached on a loopback HTTP
 server through the app's own opener, so the app's real socket timeout
@@ -33,6 +36,7 @@ import time
 import urllib.parse
 import urllib.request
 from datetime import date, datetime, timedelta, timezone
+from decimal import ROUND_HALF_EVEN, Decimal
 
 import pytest
 
@@ -1557,3 +1561,341 @@ def test_with_every_slot_sending_a_lookup_sends_nothing_and_answers_only_what_ne
     assert freed.status_code == 200
     assert len(sources.opened) == sent_before + slots + 1
 
+
+
+# The gold day: gold quoted in anything but PLN is priced at the latest
+# day on or before `date` on which NBP published a price and Frankfurter
+# a table, both halves that day's (Providers, Gold, Rate limiting and
+# failure, Edge cases, criteria 7, 22, 23, 29, 47, 48, 56 and 70 to 72).
+
+GOOD_FRIDAY = "2026-04-03"
+
+
+def cena_on(on: str) -> float:
+    """A gold price of NBP's own for each day, so a figure from the wrong
+    day shows."""
+    return round(250 + date.fromisoformat(on).toordinal() % 97 / 100, 2)
+
+
+def pln_on(on: str) -> float:
+    """Frankfurter's PLN rate of each day, distinct per day."""
+    return round(4.2 + date.fromisoformat(on).toordinal() % 89 / 1000, 4)
+
+
+def nbp_publishing(*days: str):
+    """NBP's range query: every day of `days` in the window asked,
+    ascending, each at its own price, and Not Found for an empty one."""
+
+    def plan(url):
+        start, end = url.split("?")[0].rsplit("/", 2)[1:]
+        entries = [{"data": d, "cena": cena_on(d)} for d in sorted(days) if start <= d <= end]
+        return [answer(json.dumps(entries).encode(), 200 if entries else 404)], 0
+
+    return plan
+
+
+def fx_publishing(*days: str):
+    """Frankfurter's table for the day asked: the last of `days` on or
+    before it, dated that day, at that day's rates."""
+
+    def plan(url):
+        asked = url.split("/v1/")[1][:10]
+        on = max(d for d in days if d <= asked)
+        body = {"amount": 1, "base": url.rsplit("base=", 1)[1], "date": on,
+                "rates": {"PLN": pln_on(on), "USD": 1.0876}}
+        return [answer(json.dumps(body).encode())], 0
+
+    return plan
+
+
+def composed(on: str, symbol: str) -> str:
+    """The pinned composition (Providers, Gold) of `on`'s price and PLN
+    rate."""
+    figure = Decimal(str(cena_on(on))) * (1 / Decimal(str(pln_on(on))))
+    if symbol == "XAU-ozt":
+        figure *= Decimal("31.1034768")
+    return format(figure.quantize(Decimal("1e-8"), ROUND_HALF_EVEN).normalize(), "f")
+
+
+def fx_days_asked(urls: list[str]) -> list[str]:
+    return [u.split("/v1/")[1][:10] for u in urls if "frankfurter" in u]
+
+
+def offset(on: str, days: int) -> str:
+    return (date.fromisoformat(on) - timedelta(days=days)).isoformat()
+
+
+@pytest.mark.parametrize("symbol", sorted(GOLD))
+def test_gold_quoted_elsewhere_takes_both_halves_from_nbps_last_day(owner, sources, symbol):
+    """Criterion 47: NBP's last day is the day before, both sources
+    published it, each day has its own figures. Two requests, the leg at
+    NBP's last day, and the proposal that day's price at that day's PLN
+    rate."""
+    before = offset(PAST, 1)
+    sources.plans["nbp"] = nbp_publishing(offset(PAST, 2), before)
+    sources.plans["frankfurter"] = fx_publishing(offset(PAST, 2), before, PAST)
+    urls = asked_urls(sources)
+
+    response = owner.get(f"/api/rates?date={PAST}&quote=CHF&symbol={symbol}", headers=CSRF)
+
+    assert response.status_code == 200
+    body = response.get_json()
+    assert (body["asOf"], body["rate"], body["source"]) == (before, composed(before, symbol), "nbp+frankfurter")
+    assert len(urls) == 2
+    assert fx_days_asked(urls) == [before]
+
+
+@pytest.mark.parametrize("symbol", sorted(GOLD))
+def test_gold_on_good_friday_is_priced_at_the_day_before(owner, sources, symbol):
+    """Criterion 70 and Edge cases: NBP published Good Friday and the day
+    before, Frankfurter answers Good Friday with the day before's table.
+    Two requests, `asOf` the day before, and both halves that day's,
+    never Good Friday's price at Thursday's rate."""
+    thursday = offset(GOOD_FRIDAY, 1)
+    sources.plans["nbp"] = nbp_publishing(offset(GOOD_FRIDAY, 2), thursday, GOOD_FRIDAY)
+    sources.plans["frankfurter"] = fx_publishing(offset(GOOD_FRIDAY, 2), thursday)
+    urls = asked_urls(sources)
+
+    response = owner.get(f"/api/rates?date={GOOD_FRIDAY}&quote=CHF&symbol={symbol}", headers=CSRF)
+
+    assert response.status_code == 200
+    body = response.get_json()
+    assert (body["asOf"], body["rate"]) == (thursday, composed(thursday, symbol))
+    assert len(urls) == 2
+
+
+def test_the_whole_table_on_good_friday_prices_gold_at_the_day_before_from_the_one_table(owner, sources):
+    """Criteria 23 and 70: with a currency pending, the leg reuses the
+    table in flight for Good Friday, which is Thursday's, and gold is
+    Thursday's on both halves."""
+    thursday = offset(GOOD_FRIDAY, 1)
+    sources.plans["nbp"] = nbp_publishing(thursday, GOOD_FRIDAY)
+    sources.plans["frankfurter"] = fx_publishing(thursday)
+    urls = asked_urls(sources)
+
+    priced = table(owner, on=GOOD_FRIDAY)
+
+    for symbol in sorted(GOLD):
+        assert (priced[symbol]["asOf"], priced[symbol]["rate"]) == (thursday, composed(thursday, symbol))
+    assert priced["USD"]["asOf"] == thursday
+    assert len(urls) == 2
+    assert fx_days_asked(urls) == [GOOD_FRIDAY]
+
+
+@pytest.mark.parametrize("symbol", sorted(GOLD))
+def test_gold_steps_back_to_the_last_day_both_published(owner, sources, symbol):
+    """Criterion 71: Frankfurter's table for NBP's last day is of a day
+    NBP skipped, so the leg asks again for NBP's last day before it. Three
+    requests, priced at that day."""
+    sources.plans["nbp"] = nbp_publishing(offset(PAST, 2), PAST)
+    sources.plans["frankfurter"] = fx_publishing(offset(PAST, 2), offset(PAST, 1))
+    urls = asked_urls(sources)
+
+    response = owner.get(f"/api/rates?date={PAST}&quote=CHF&symbol={symbol}", headers=CSRF)
+
+    assert response.status_code == 200
+    body = response.get_json()
+    assert (body["asOf"], body["rate"]) == (offset(PAST, 2), composed(offset(PAST, 2), symbol))
+    assert len(urls) == 3
+    assert fx_days_asked(urls) == [PAST, offset(PAST, 2)]
+
+
+def test_gold_steps_back_as_often_as_the_sources_disagree(owner, sources):
+    """The gold day's definition and Rate limiting and failure: each
+    further request goes out after the one before has answered, until a
+    day both published. Here only the fifth day back is one."""
+    sources.plans["nbp"] = nbp_publishing(offset(PAST, 4), offset(PAST, 2), PAST)
+    sources.plans["frankfurter"] = fx_publishing(offset(PAST, 4), offset(PAST, 3), offset(PAST, 1))
+    urls = asked_urls(sources)
+
+    response = owner.get(f"/api/rates?date={PAST}&quote=CHF&symbol=XAU-g", headers=CSRF)
+
+    assert response.status_code == 200
+    assert (response.get_json()["asOf"], response.get_json()["rate"]) == (
+        offset(PAST, 4), composed(offset(PAST, 4), "XAU-g"))
+    assert fx_days_asked(urls) == [PAST, offset(PAST, 2), offset(PAST, 4)]
+    assert failures() == NONE_FAILED
+
+
+def test_the_whole_table_steps_back_for_gold_and_keeps_the_currencies_at_their_own_day(owner, sources):
+    """Criterion 71 in the whole-table form: the currencies keep the
+    table for `date`, and gold alone steps back."""
+    sources.plans["nbp"] = nbp_publishing(offset(PAST, 2), PAST)
+    sources.plans["frankfurter"] = fx_publishing(offset(PAST, 2), offset(PAST, 1))
+    urls = asked_urls(sources)
+
+    priced = table(owner)
+
+    assert priced["USD"]["asOf"] == offset(PAST, 1)
+    for symbol in sorted(GOLD):
+        assert (priced[symbol]["asOf"], priced[symbol]["rate"]) == (
+            offset(PAST, 2), composed(offset(PAST, 2), symbol))
+    assert fx_days_asked(urls) == [PAST, offset(PAST, 2)]
+
+
+@pytest.mark.parametrize("form", ["&symbol=XAU-ozt", ""], ids=["single", "whole table"])
+def test_gold_with_no_day_both_published_in_the_window_is_no_proposal(owner, sources, form):
+    """Criterion 72: NBP published only `date` in its window, and
+    Frankfurter's table for it is the day before's. No proposal, and
+    neither source failed, so no breaker counts it."""
+    sources.plans["nbp"] = nbp_publishing(PAST)
+    sources.plans["frankfurter"] = fx_publishing(offset(PAST, 1))
+
+    response = owner.get(f"/api/rates?date={PAST}&quote=CHF{form}", headers=CSRF)
+
+    if form:
+        assert response.status_code == 204
+    else:
+        assert response.status_code == 200
+        assert not GOLD & set(response.get_json()["rates"])
+        assert "USD" in response.get_json()["rates"]
+    assert failures() == NONE_FAILED
+
+
+def test_a_frankfurter_day_before_nbps_window_is_no_proposal(owner, sources):
+    """Criterion 72 at the window's edge: NBP's days are all after
+    Frankfurter's table, so no day before it is in the window."""
+    sources.plans["nbp"] = nbp_publishing(WINDOW_START, PAST)
+    sources.plans["frankfurter"] = fx_publishing(offset(PAST, 20))
+    urls = asked_urls(sources)
+
+    response = owner.get(f"/api/rates?date={PAST}&quote=CHF&symbol=XAU-g", headers=CSRF)
+
+    assert response.status_code == 204
+    assert fx_days_asked(urls) == [PAST]
+
+
+def test_gold_quoted_in_pln_ignores_frankfurters_days(owner, sources):
+    """Criterion 22 and Quoted in PLN: `asOf` is NBP's last day and one
+    request goes out, to NBP, whatever Frankfurter would publish."""
+    sources.plans["nbp"] = nbp_publishing(offset(GOOD_FRIDAY, 1), GOOD_FRIDAY)
+    sources.plans["frankfurter"] = fx_publishing(offset(GOOD_FRIDAY, 1))
+    urls = asked_urls(sources)
+
+    response = owner.get(f"/api/rates?date={GOOD_FRIDAY}&quote=PLN&symbol=XAU-g", headers=CSRF)
+
+    assert response.status_code == 200
+    body = response.get_json()
+    assert (body["asOf"], body["rate"], body["source"]) == (GOOD_FRIDAY, str(cena_on(GOOD_FRIDAY)), "nbp")
+    assert [_provider(u) for u in urls] == ["nbp"]
+
+
+def test_a_saturday_quoted_elsewhere_is_priced_at_fridays_both_halves(owner, sources):
+    """Criterion 7 quoted in CHF: NBP's last day is Friday, and the leg
+    asks Frankfurter for Friday, not Saturday."""
+    saturday = "2026-08-01"
+    sources.plans["nbp"] = nbp_publishing(offset(PAST, 1), PAST)
+    sources.plans["frankfurter"] = fx_publishing(offset(PAST, 1), PAST)
+    urls = asked_urls(sources)
+
+    response = owner.get(f"/api/rates?date={saturday}&quote=CHF&symbol=XAU-ozt", headers=CSRF)
+
+    assert response.status_code == 200
+    assert (response.get_json()["asOf"], response.get_json()["rate"]) == (PAST, composed(PAST, "XAU-ozt"))
+    assert fx_days_asked(urls) == [PAST]
+
+
+@pytest.mark.parametrize("status", [500, 404])
+def test_a_failing_step_back_is_no_proposal_and_counts_against_frankfurter(owner, sources, status):
+    """Criteria 29 and 48 on a further leg: either leg failing is No
+    Content, never a half-composed rate or the PLN figure, and the failure
+    is Frankfurter's alone."""
+    sources.plans["nbp"] = nbp_publishing(offset(PAST, 2), PAST)
+    first = fx_publishing(offset(PAST, 2), offset(PAST, 1))
+
+    def plan(url):
+        if url.split("/v1/")[1][:10] == PAST:
+            return first(url)
+        return [answer(b"{}", status)], 0
+
+    sources.plans["frankfurter"] = plan
+
+    response = owner.get(f"/api/rates?date={PAST}&quote=CHF&symbol=XAU-g", headers=CSRF)
+
+    assert response.status_code == 204
+    assert failures() == {"frankfurter": 1, "nbp": 0}
+
+
+def test_every_step_back_shares_the_one_deadline(owner, sources):
+    """Rate limiting and failure: each further request goes out within the
+    same deadline. Every answer takes 40% of it, so three requests in a
+    row outlast it."""
+    spread = rates.EGRESS_TIMEOUT_SECONDS * 0.4
+    nbp = nbp_publishing(offset(PAST, 2), PAST)
+    fx = fx_publishing(offset(PAST, 2), offset(PAST, 1))
+
+    def slow(plan):
+        def slowed(url):
+            (raw,), _ = plan(url)
+            cut = raw.index(b"\r\n\r\n") + 4
+            return [raw[:cut], raw[cut:]], spread
+
+        return slowed
+
+    sources.plans["nbp"] = slow(nbp)
+    sources.plans["frankfurter"] = slow(fx)
+
+    response, _, took = lookup(owner, f"/api/rates?date={PAST}&quote=CHF&symbol=XAU-g")
+
+    assert response.status_code == 204
+    assert took < BOUND
+
+
+def test_an_earlier_nbp_day_that_is_not_canonical_never_reaches_a_url(owner, sources):
+    """Criterion 56 and Edge cases on the step back: an earlier entry whose
+    `data` is not a usable day is dropped, so its text fills no outbound
+    URL, and the step back finds the usable day before it."""
+    good = offset(PAST, 4)
+    entries = [
+        {"data": good, "cena": cena_on(good)},
+        {"data": f"{offset(PAST, 3)}?base=EUR#", "cena": 250.0},
+        {"data": PAST, "cena": cena_on(PAST)},
+    ]
+    sources.plans["nbp"] = lambda url: ([answer(json.dumps(entries).encode())], 0)
+    sources.plans["frankfurter"] = fx_publishing(good, offset(PAST, 2))
+    urls = asked_urls(sources)
+
+    response = owner.get(f"/api/rates?date={PAST}&quote=CHF&symbol=XAU-g", headers=CSRF)
+
+    assert response.status_code == 200
+    assert (response.get_json()["asOf"], response.get_json()["rate"]) == (good, composed(good, "XAU-g"))
+    template = re.escape(rates.FX_URL).replace(re.escape("{date}"), r"\d{4}-\d{2}-\d{2}").replace(
+        re.escape("{quote}"), "CHF")
+    assert all(re.fullmatch(template, u) for u in urls if _provider(u) == "frankfurter")
+    assert fx_days_asked(urls) == [PAST, good]
+
+
+def test_an_earlier_nbp_price_that_is_not_usable_is_never_composed(owner, sources):
+    """Edge cases: an earlier entry with an unusable `cena` is dropped,
+    not a changed shape, and never priced. The step back passes over it to
+    a day both published."""
+    good = offset(PAST, 3)
+    entries = [
+        {"data": good, "cena": cena_on(good)},
+        {"data": offset(PAST, 1), "cena": "251.37"},
+        {"data": PAST, "cena": cena_on(PAST)},
+    ]
+    sources.plans["nbp"] = lambda url: ([answer(json.dumps(entries).encode())], 0)
+    sources.plans["frankfurter"] = fx_publishing(good, offset(PAST, 1))
+
+    response = owner.get(f"/api/rates?date={PAST}&quote=CHF&symbol=XAU-g", headers=CSRF)
+
+    assert response.status_code == 200
+    assert (response.get_json()["asOf"], response.get_json()["rate"]) == (good, composed(good, "XAU-g"))
+    assert failures() == NONE_FAILED
+
+
+def test_a_stepped_back_gold_rate_is_cached_under_the_requested_date(owner, sources):
+    """Caching: the stepped-back proposal is the answer for `date`, so a
+    repeat sends nothing and carries the same gold day."""
+    sources.plans["nbp"] = nbp_publishing(offset(PAST, 2), PAST)
+    sources.plans["frankfurter"] = fx_publishing(offset(PAST, 2), offset(PAST, 1))
+    url = f"/api/rates?date={PAST}&quote=CHF&symbol=XAU-g"
+    first = owner.get(url, headers=CSRF).get_json()
+    sent = len(sources.opened)
+
+    again = owner.get(url, headers=CSRF).get_json()
+
+    assert len(sources.opened) == sent
+    assert again["cached"] is True
+    assert (again["asOf"], again["rate"]) == (first["asOf"], first["rate"])

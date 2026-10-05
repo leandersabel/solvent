@@ -808,7 +808,8 @@ host's network are reachable.
     publishing on NBP's last day, makes exactly two outbound requests,
     and the FX leg is fetched for NBP's last day, not the requested
     date, asserted against a stub returning a different rate for each. Test:
-    `tests/test_rates.py::test_gold_converts_through_fx_at_the_as_of_date_not_the_requested_one`.
+    `tests/test_rates.py::test_gold_converts_through_fx_at_the_as_of_date_not_the_requested_one`,
+    `tests/test_review_rate_lookup.py::test_gold_quoted_elsewhere_takes_both_halves_from_nbps_last_day`.
 48. With the FX leg failing, the response is No Content and no rate
     carrying a PLN figure under another currency's label is returned.
     Test:
@@ -942,11 +943,17 @@ host's network are reachable.
     Frankfurter answers with the day before's table makes exactly two
     outbound requests, with `asOf` the day before and both `cena` and the
     PLN rate that day's, digit for digit. Test:
-    `tests/test_rates.py::test_gold_on_a_day_without_a_currency_table_is_priced_at_the_day_before`.
+    `tests/test_rates.py::test_gold_on_a_day_without_a_currency_table_is_priced_at_the_day_before`,
+    `tests/test_review_rate_lookup.py::test_gold_on_good_friday_is_priced_at_the_day_before`,
+    `tests/test_review_rate_lookup.py::test_the_whole_table_on_good_friday_prices_gold_at_the_day_before_from_the_one_table`.
 71. When Frankfurter's table is for a day NBP did not publish, the leg
     asks again for NBP's last day before it, making three outbound
     requests, and prices gold at that day. Test:
-    `tests/test_rates.py::test_gold_steps_back_to_a_day_both_sources_published`.
+    `tests/test_rates.py::test_gold_steps_back_to_a_day_both_sources_published`,
+    `tests/test_review_rate_lookup.py::test_gold_steps_back_to_the_last_day_both_published`,
+    `tests/test_review_rate_lookup.py::test_gold_steps_back_as_often_as_the_sources_disagree`.
 72. When no NBP day in the window is on or before Frankfurter's table's
     day, a gold request quoted in `CHF` is No Content. Test:
-    `tests/test_rates.py::test_gold_with_no_day_both_sources_published_is_no_content`.
+    `tests/test_rates.py::test_gold_with_no_day_both_sources_published_is_no_content`,
+    `tests/test_review_rate_lookup.py::test_gold_with_no_day_both_published_in_the_window_is_no_proposal`,
+    `tests/test_review_rate_lookup.py::test_a_frankfurter_day_before_nbps_window_is_no_proposal`.
