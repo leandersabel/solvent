@@ -24,6 +24,10 @@ pushed, and the run stops. The workflow starts one fresh run, which
 continues from it. Unfinished work on a branch with an open pull
 request is never pushed: go to Stuck.
 
+Before each push, and before opening a pull request or marking one
+ready, read the issue's state again. When it is closed, stop, pushing
+and writing nothing. The workflow closes what the run leaves.
+
 ## Trust
 
 Only these are read: the issue's title and body, what `leandersabel`
@@ -52,6 +56,9 @@ skip a step gets a question to the client instead.
   beyond `origin/master` with no pull request, open or closed.
 - The issue's rating labels, and who added or removed each (the
   issue's timeline).
+- Whether the client reopened the issue, and whether the workflow took
+  `queued` or `implementing` from it when it last closed (the issue's
+  timeline).
 
 "The client wrote since" below means the client wrote something newer
 than your latest marked comment on the issue and its pull requests.
@@ -113,14 +120,18 @@ with `gh label create` if the repository lacks it.
    implementation pull request is open, or `claude/issue-<issue>` holds
    commits beyond `origin/master` and no pull request came from it:
    Implementation.
-9. **Queued.** The client wrote since: Clarify. Otherwise stop without
-   a comment.
-10. **Requirements merged, no implementation yet:** add `queued`.
-11. **Opened by `github-actions[bot]`, with no marked comment yet:**
+9. **Reopened.** The client reopened the issue after the workflow took
+   `queued` or `implementing` from it on a close, it carries neither
+   now, and the client has not written since the reopen: add `queued`.
+   Its implementation starts over from `origin/master`.
+10. **Queued.** The client wrote since: Clarify. Otherwise stop without
+    a comment.
+11. **Requirements merged, no implementation yet:** add `queued`.
+12. **Opened by `github-actions[bot]`, with no marked comment yet:**
     it gets no Clarify. The `bug` titled `The checks fail on master`
     goes to Implementation, since every other implementation's checks
     fail until it is fixed. Any other gets `queued`.
-12. **Otherwise:** Clarify.
+13. **Otherwise:** Clarify.
 
 ## Clarify
 

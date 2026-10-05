@@ -239,10 +239,17 @@ to where they asked, labeled `bug` or `change` and `accepted`.
   requirements pull request, or a finding. One implementation runs at a
   time, and its issue carries `implementing`.
 - Only the workflow hands out the slot, in a step without a model that
-  runs one at a time. When no open issue carries `implementing`, the
+  runs one at a time. When no issue carries `implementing`, the
   first in line gets it and its run starts: critical problems first,
   then high ones, then the rest, each lowest number first. An issue
   that waits on the client holds neither a place in line nor the slot.
+- Closing an issue stops its implementation. No pull request opens for
+  it, and one already open loses auto-merge at once, then closes
+  without merging, with its branch. The closed issue keeps
+  `implementing` until the run on it has ended, so two implementations
+  never run at once. A step without a model frees the slot, because a
+  run can crash, time out or hit the usage limit. The client reopening
+  the issue puts it back in line, to start over from `master`.
 - No run starts from the line while the last run's usage of the
   subscription stands at 90 percent of its five-hour window or 80
   percent of its weekly one, until that window resets. The run's page
@@ -456,5 +463,6 @@ found.
 | Left to the client | its requirements pull request closed without a merge, and the client has not commented since |
 | Queued | `queued` |
 | Being implemented | `implementing`, and an open pull request closes it |
+| Stopping | closed by anything but its merge, still `implementing` until the run on it ends |
 | Done | closed by the merged pull request, shipped in the next nightly |
 | Not doing | closed as not planned by the client |
