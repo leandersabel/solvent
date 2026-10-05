@@ -13,8 +13,11 @@ await run(async () => {
   await page.eval("document.querySelector('.data-table tbody .link-button').click()");
   await page.waitUntil("location.hash.startsWith('#/holding/') && document.querySelector('.detail-header')", { label: "the holding's screen" });
 
+  const holdingName = await page.eval("document.querySelector('.screen-heading').textContent");
   await click('Record a value');
   await page.waitUntil("document.querySelector('#snapshot-date')", { label: 'the value form' });
+  const newHeading = await page.eval("document.querySelector('.dialog-heading').textContent");
+  check('record-snapshot: the form for a new figure is headed with the holding\'s name', newHeading === `Record a value for ${holdingName}`, newHeading);
   // Typed in the reader's own format, which is what the field accepts:
   // writing an ISO date into it would test a control nobody uses.
   const asWritten = await page.call(async (day) => {
@@ -397,6 +400,8 @@ await run(async () => {
   const ratesBeforeEdit = (await stored('rate')).length;
   traffic.length = 0;
   await editRow(D11);
+  const editHeading = await ev("document.querySelector('.dialog-heading').textContent");
+  check('record-snapshot: the form for a stored figure is headed Edit this value', editHeading === 'Edit this value', editHeading);
   await set('#snapshot-value', '27000');
   await set('.dialog textarea', 'from the statement');
   await formSave();

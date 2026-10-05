@@ -616,6 +616,9 @@ holding's row on the dashboard and from the holding's own screen. The
 same Dialog, prefilled, edits an existing entry (`manage-accounts.md`,
 Account detail).
 
+- **Heading**, naming the act: "Record a value for Savings", with the
+  holding's name, for a new figure, and "Edit this value" for a stored
+  one.
 - **Holding**: preselected when opened from a row, otherwise a select.
   Static when editing, because a value is denominated in one holding's
   unit.
@@ -1573,3 +1576,7 @@ Editing an existing entry).
     `tests/browser/parts/snapshot-entry.mjs`,
     `tests/browser/parts/snapshot-entry-review-move.mjs`,
     `tests/test_client.py::test_the_client_side_rules_hold`.
+93. The single-holding form's heading reads "Record a value for" and the
+    holding's name for a new figure, and "Edit this value" for a stored
+    one. Test: `tests/browser/parts/snapshot-entry.mjs`,
+    `tests/browser/parts/snapshot-entry-review-heading.mjs`.
