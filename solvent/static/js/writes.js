@@ -1,6 +1,6 @@
 // Everything that writes to the vault, and the order it writes in
-// (spec/features/record-rate.md, The write path and Saving an edited
-// recording).
+// (spec/features/record-rate.md, The write path and Saving at a date
+// that holds a recording).
 //
 // No transaction spans two records, so the order is the whole of the
 // guarantee: the quantity the person went and looked up goes before
@@ -362,7 +362,7 @@ export function confirmFigure(vault, holding, date) {
  *  order: the pre-create reload if any line creates an entry, then the
  *  rate writes, then the deletions of the lines cleared. A quantity is
  *  never part of it, because each row saves on its own
- *  (record-rate.md, Saving an edited recording).
+ *  (record-rate.md, Saving at a date that holds a recording).
  *
  *  No step is skipped because an earlier one failed. Each record is
  *  independent, and abandoning the rest would turn one failed write
@@ -414,7 +414,7 @@ export async function saveRateLines(vault, sit, plan) {
 /** Look it up on a reopened recording: write what came back for each
  *  unit in `parts` (unit to `ratePart`), each a create, with no
  *  confirmation, since filling a missing price changes none
- *  (record-rate.md, Saving an edited recording).
+ *  (record-rate.md, Saving at a date that holds a recording).
  *
  *  Always after a fresh read of both types, which the model then holds.
  *  A date found holding no record writes nothing, because a price alone

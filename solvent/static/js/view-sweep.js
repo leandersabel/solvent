@@ -116,8 +116,8 @@ export function sweepView(vault, date, actions = {}) {
   });
   // One lookup fills every empty line it answers for and saves them at
   // once, with no confirmation: a missing price filled in changes none
-  // (record-rate.md, Saving an edited recording). An answer arriving
-  // after the screen was left writes nothing.
+  // (record-rate.md, Saving at a date that holds a recording). An answer
+  // arriving after the screen was left writes nothing.
   const lookUp = async (pressed) => {
     const proposals = await writes.fetchProposals(vault, date);
     if (!element.isConnected) return false;
