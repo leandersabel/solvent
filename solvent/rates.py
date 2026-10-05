@@ -25,7 +25,7 @@ import urllib.error
 import urllib.request
 from concurrent.futures import ThreadPoolExecutor
 from datetime import date, datetime, timedelta, timezone
-from decimal import Decimal, InvalidOperation
+from decimal import Decimal
 from typing import Literal, NamedTuple, Optional
 
 from flask import Blueprint, abort, current_app, g, jsonify, request
@@ -119,6 +119,11 @@ _GOLD_FLOOR = date(2013, 1, 2)
 # NBP prices one gram of fine gold. XAU-g takes the figure directly and
 # XAU-ozt is the one conversion, composed at full precision.
 _GRAMS_PER_TROY_OUNCE = Decimal("31.1034768")
+
+# A proposal at or above this cannot keep 8 decimal places within the
+# default context's 28 significant digits, and no source figure reaches
+# it.
+_CEILING = Decimal(10) ** 20
 
 # rate-lookup.md, Caching: a historical rate does not change, so past
 # dates are kept indefinitely and only today expires.
@@ -331,7 +336,9 @@ def _fetch_json(provider: str, url: str, egress: _Egress) -> "object | None":
     if remaining <= 0:
         return None
     try:
-        payload = json.loads(_fetch_within(url, remaining))
+        # Integers as Decimal, which takes any length: an int over
+        # Python's digit limit would fail the whole answer for one figure.
+        payload = json.loads(_fetch_within(url, remaining), parse_int=Decimal)
     except Exception as error:
         # Logged with the target and the failure, never with the
         # requesting user beyond what the access log already holds.
@@ -343,13 +350,14 @@ def _fetch_json(provider: str, url: str, egress: _Egress) -> "object | None":
 
 
 def _positive(value: object) -> "Decimal | None":
-    """A zero, negative, or non-numeric rate is treated as no proposal
-    rather than passed through."""
-    try:
-        number = Decimal(str(value))
-    except (InvalidOperation, TypeError, ValueError):
+    """A figure is usable only as a JSON number above 0 and below the
+    ceiling. Anything else is no proposal rather than an error or a
+    price of 0. Past the ceiling no figure is a real price, and one of
+    a million digits would overflow the context once composed."""
+    if isinstance(value, bool) or not isinstance(value, (int, float, Decimal)):
         return None
-    return number if number > 0 else None
+    number = Decimal(str(value))
+    return number if number.is_finite() and 0 < number < _CEILING else None
 
 
 def _fx_table(
@@ -406,14 +414,19 @@ def _gold_pln(on: date, egress: _Egress) -> "tuple[Decimal, str] | None":
     return price, as_of
 
 
-def _round(value: Decimal) -> str:
-    """Composed at full precision and rounded once, at the end.
+def _round(value: Decimal) -> "str | None":
+    """Composed at full precision and rounded once, at the end, or None
+    when the result is no price: 0 once rounded, or too large to keep 8
+    places in the context's 28 digits.
 
     Formatted with `f` rather than `str`, because `normalize` renders a
     round figure in scientific notation ("3E+2") and the client parses
     a plain decimal string.
     """
-    return format(value.quantize(Decimal("0.00000001")).normalize(), "f")
+    if value >= _CEILING:
+        return None
+    rounded = value.quantize(Decimal("0.00000001"))
+    return format(rounded.normalize(), "f") if rounded else None
 
 
 def _cache_get(symbol: str, quote: str, on: str) -> "dict | None":
@@ -421,7 +434,9 @@ def _cache_get(symbol: str, quote: str, on: str) -> "dict | None":
         "SELECT * FROM rate_cache WHERE symbol = ? AND quote = ? AND date = ?",
         (symbol, quote, on),
     ).fetchone()
-    if row is None:
+    if row is None or not Decimal(row["rate"]):
+        # A "0" stored before rates were checked is a miss, so it is
+        # fetched again and replaced.
         return None
     if on == _today().isoformat():
         fetched = datetime.fromisoformat(row["fetched_at"])
@@ -540,7 +555,7 @@ def _resolve(symbols: list, quote: str, on: date) -> "dict[str, dict]":
                     "source": source,
                     "cached": False,
                 }
-        if entry is not None:
+        if entry is not None and entry["rate"] is not None:
             resolved[symbol] = entry
             _cache_put(symbol, quote, on_str, entry)
 
