@@ -129,8 +129,8 @@ doing nothing accepts and writes it.
   and a rate source there** (Reading). So opening an old recording is
   silent (`record-snapshot.md`, Reopening and editing a recording).
   Look it up on a line fills and saves a missing price without a
-  quantity, and that press, not opening, issues the request (Saving an
-  edited recording).
+  quantity, and that press, not opening, issues the request (Saving at
+  a date that holds a recording).
 - Per symbol, at that date:
   - **A proposal came back.** Left alone or changed, it is written.
   - **No proposal** (provider down, breaker open, No Content) and a

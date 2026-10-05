@@ -125,8 +125,8 @@ function render() {
 /** Leaving a sweep or the single-holding form with typed figures says
  *  so and names them, on the screen beneath or the one that replaced
  *  it. Nothing in the vault records them, because the unsaved half
- *  existed only in the screen that is gone (record-rate.md, Saving an
- *  edited recording). */
+ *  existed only in the screen that is gone (record-rate.md, Saving at
+ *  a date that holds a recording). */
 function leftUnsaved({ of = 'recording', date, names }) {
   if (!names.length || !isUnlocked()) return;
   const vault = currentVault();

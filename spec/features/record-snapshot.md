@@ -399,8 +399,8 @@ rule.
   rate lines included, whether the date was empty or held a recording,
   and even with a proposal on an untouched line.
 - **A reopened recording saves one control at a time**, and no save
-  spans a quantity, prices and deletions (`record-rate.md`, Saving an
-  edited recording).
+  spans a quantity, prices and deletions (`record-rate.md`, Saving at
+  a date that holds a recording).
 - No record shape changes for this screen. A confirmed figure is an
   ordinary entry.
 
@@ -452,8 +452,8 @@ rule.
 - **A rate-lines save that landed in part**: the screen stays open,
   every line keeps its own state with what was typed still there, and
   the message names by unit what landed and what did not. Retrying
-  reissues only what failed (`record-rate.md`, Saving an edited
-  recording).
+  reissues only what failed (`record-rate.md`, Saving at a date that
+  holds a recording).
 - **Closing with changes unsaved**: nothing blocks leaving, and there
   is no prompt to stay, because unsaved typing is the person's to
   abandon. The next screen carries a critical notice at its head naming
