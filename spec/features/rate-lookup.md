@@ -543,8 +543,18 @@ host's network are reachable.
 - **Weekend, holiday or pre-listing date**: the most recent prior close,
   `asOf` that earlier date, and the client shows "rate as of 29 Jul".
   No prior close within the window is No Content.
-- **A rate in an unexpected currency, or zero, negative or
-  non-numeric**: no proposal, never a mislabeled one.
+- **A rate in an unexpected currency**: no proposal, never a mislabeled
+  one.
+- **A figure that is not a usable price**: a source's rate or gold
+  price is usable only as a JSON number, not a string or a boolean,
+  finite and above 0. A proposal is served only when, rounded, it is
+  above 0 and below 10^20, the most that keeps 8 decimal places in 28
+  digits. Anything else is no proposal for the symbols built from that
+  figure, never an error or a price of 0, and the rest of the answer
+  stands. A bad NBP price drops both gold symbols, and a bad PLN rate
+  drops gold quoted in anything but PLN. The source answered, so its
+  breaker counts a success. A cached `"0"` is a miss, so it is fetched
+  again and replaced.
 - **Two holdings share a symbol**: one cache entry, one outbound
   request, one price entry in the vault (`record-rate.md`).
 - **Whole table, every symbol fails**: No Content rather than OK with an
@@ -809,3 +819,13 @@ host's network are reachable.
     whole-table request returns No Content within
     `EGRESS_TIMEOUT_SECONDS` plus one second. Test:
     `tests/test_rates.py::test_providers_sending_their_answer_slowly_give_no_content_within_the_bound`.
+61. A rate of 0, -1, a string, a boolean, NaN, plus or minus infinity,
+    `1e300` or `1e-25` is no proposal for its symbol, and the whole
+    table still answers OK with the other symbols. The same figure as
+    the NBP price or the PLN rate drops only the gold symbols and adds
+    no breaker failure. Test:
+    `tests/test_rates.py::test_a_rate_that_is_not_a_usable_price_is_no_proposal`,
+    `tests/test_rates.py::test_a_gold_figure_that_is_not_a_usable_price_drops_only_gold`.
+62. A cached rate of `"0"` for a past date is fetched again and
+    replaced. Test:
+    `tests/test_rates.py::test_a_cached_rate_of_zero_is_fetched_again`.

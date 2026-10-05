@@ -296,12 +296,56 @@ def test_a_failed_fx_leg_never_returns_a_pln_figure_under_another_label(owner, p
     assert response.status_code == 204
 
 
-@pytest.mark.parametrize("bad", [0, -1, "not-a-number"])
-def test_a_zero_negative_or_non_numeric_rate_is_no_proposal(owner, provider, bad):
-    provider.answers["frankfurter"] = fx(PAST, {"USD": bad})
+# Each is what `json.loads` makes of a figure a source could send:
+# `NaN`, `Infinity` and `1e400` parse to floats that are not finite,
+# `1e300` inverts to a price that rounds to 0, and `1e-25` to one too
+# large to round to 8 places.
+NOT_A_PRICE = [
+    0, -1, "not-a-number", "0.8", True,
+    float("nan"), float("inf"), float("-inf"), 1e300, 1e-25,
+]
+
+
+@pytest.mark.parametrize("bad", NOT_A_PRICE)
+def test_a_rate_that_is_not_a_usable_price_is_no_proposal(owner, provider, bad):
+    provider.answers["frankfurter"] = fx(PAST, {"USD": bad, "EUR": 0.95})
     assert owner.get(
         f"/api/rates?date={PAST}&quote=CHF&symbol=USD", headers=CSRF
     ).status_code == 204
+    table = owner.get(f"/api/rates?date={PAST}&quote=CHF", headers=CSRF)
+    assert table.status_code == 200
+    assert "USD" not in table.get_json()["rates"]
+    assert table.get_json()["rates"]["EUR"]["rate"] == "1.05263158"
+
+
+@pytest.mark.parametrize("bad", NOT_A_PRICE)
+@pytest.mark.parametrize("leg", ["cena", "pln"])
+def test_a_gold_figure_that_is_not_a_usable_price_drops_only_gold(owner, opener, bad, leg):
+    """A bad NBP price or a bad PLN rate drops the gold symbols built
+    from it, leaves the rest of the table, and is no provider failure."""
+    _publish(opener, **{leg: bad})
+    response = owner.get(f"/api/rates?date={PAST}&quote=CHF", headers=CSRF)
+    assert response.status_code == 200
+    body = response.get_json()["rates"]
+    assert "XAU-g" not in body and "XAU-ozt" not in body
+    assert body["USD"]["rate"] == "0.91945568"
+    assert all(rates.breakers[name].failures == 0 for name in rates.breakers)
+
+
+def test_a_cached_rate_of_zero_is_fetched_again(app, owner, provider):
+    conn = connect(app)
+    with conn:
+        conn.execute(
+            "INSERT INTO rate_cache (symbol, quote, date, rate, as_of, source, fetched_at) "
+            "VALUES ('USD', 'CHF', ?, '0', ?, 'frankfurter', ?)",
+            (PAST, PAST, datetime.now(timezone.utc).isoformat()),
+        )
+    conn.close()
+    provider.answers["frankfurter"] = fx(PAST, {"USD": 0.8})
+    body = owner.get(f"/api/rates?date={PAST}&quote=CHF&symbol=USD", headers=CSRF).get_json()
+    assert body["rate"] == "1.25"
+    assert body["cached"] is False
+    assert rows(app, "SELECT rate FROM rate_cache WHERE symbol = 'USD'") == [{"rate": "1.25"}]
 
 
 def test_a_rate_in_an_unexpected_currency_is_rejected(owner, provider):
@@ -604,12 +648,12 @@ def opener(monkeypatch):
     return type("Opener", (), {"requests": requests, "answers": answers})()
 
 
-def _publish(opener, *, pln="4.2537", usd="1.0876", cena=251.37, data=PAST):
+def _publish(opener, *, pln=4.2537, usd=1.0876, cena=251.37, data=PAST):
     opener.answers["fx"] = lambda url: {
         "amount": 1,
         "base": url.rsplit("base=", 1)[1],
         "date": data,
-        "rates": {"PLN": float(pln), "USD": float(usd)},
+        "rates": {"PLN": pln, "USD": usd},
     }
     opener.answers["nbp"] = lambda url: [{"data": data, "cena": cena}]
 
