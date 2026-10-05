@@ -180,6 +180,9 @@ The re-key (The re-key step) is the longest operation in the product.
   restored."
 - **Error, import failed server-side**: the screen says plainly that the
   original vault is intact and readable.
+- **Error, the password changed elsewhere**: the page locks and the
+  Unlock card says why (`login.md`, Unlock, Password changed
+  elsewhere).
 - **Populated**: on success the view reloads in place against the
   imported data and confirms what was restored, by kind. Where the main
   currency changed, the confirmation says the figures on screen are now
@@ -279,10 +282,13 @@ than at a check.
 5. The client wraps `DEK_new` under the **current session's Master
    Key**, so the login password keeps working. Salt, KDF envelope and
    Auth Key are untouched.
-6. `POST /api/import` carries the new wrapped DEK and the re-encrypted
-   records, with the page's vault epoch like every vault request. In one
+6. `POST /api/import` carries the new wrapped DEK, the re-encrypted
+   records and `currentSalt`, the salt the page's Master Key came from,
+   with the page's vault epoch like every vault request. In one
    transaction begun with `BEGIN IMMEDIATE`, the server checks that
-   epoch is still the vault's, deletes every record of the session user,
+   epoch is still the vault's, then that `currentSalt` is still the
+   `password` credential's salt (architecture.md, Credentials and vault
+   key wrappers), deletes every record of the session user,
    replaces their `password` credential's wrapper, inserts the new set,
    and **replaces the vault epoch** with a fresh one. It answers OK
    `{ records, vaultEpoch }`: the count it stored and the new epoch. No
@@ -366,6 +372,12 @@ There is no `formatVersion` below 1.
 - **Another page saves while the import runs**: the save commits first
   and is replaced with everything else, or answers `vault-replaced` and
   writes nothing (architecture.md, Vault epoch).
+- **The password changed, or its protection was strengthened, on
+  another page after this one was unlocked**: the import answers
+  Conflict `{"refused":"credential-changed"}` and writes nothing,
+  because step 5's wrapper is under a Master Key the current password no
+  longer gives. The page locks (`login.md`, A credential changed
+  elsewhere).
 - **The file's KDF envelope is below the server minimum**: the import
   still succeeds. The file's envelope only opens the file, and the
   vault's own envelope stays the account's.
@@ -527,3 +539,18 @@ There is no `formatVersion` below 1.
 48. A file already downloaded opens with its own password after a password
     change, and the change-password screen says so. Test:
     `tests/browser/parts/settings.mjs`.
+49. (blind) An import whose `currentSalt` is not the credential's salt,
+    after a password change or a stale-KDF upgrade on another page,
+    answers Conflict `{"refused":"credential-changed"}` and leaves every
+    table row for row as it was. Test:
+    `tests/test_credential_changed.py::test_an_import_after_a_password_change_elsewhere_writes_nothing`,
+    `tests/test_credential_changed.py::test_an_import_after_a_kdf_upgrade_elsewhere_writes_nothing`.
+50. An import carrying both a replaced epoch and a superseded salt
+    answers `vault-replaced`. Test:
+    `tests/test_credential_changed.py::test_a_replaced_vault_is_named_before_a_changed_credential`.
+51. The page that changed the password restores afterwards without
+    unlocking again. Test:
+    `tests/test_credential_changed.py::test_the_page_that_changed_the_password_still_restores`.
+52. A restore refused for a credential changed elsewhere locks the page
+    and says why, and unlocking returns to this screen. Test:
+    `tests/browser/parts/export-import.mjs`.

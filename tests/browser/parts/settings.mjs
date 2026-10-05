@@ -411,8 +411,8 @@ await run(async () => {
     `${JSON.stringify(wrongCurrent.above)}, ${changeRequests().length} sent`,
   );
   check(
-    'a wrong current password sends no request of any kind, a salt lookup included',
-    apiSince(beforeWrong).length === 0,
+    'a wrong current password sends one salt lookup and nothing else',
+    apiSince(beforeWrong).map((r) => new URL(r.url).pathname).join(' | ') === '/api/auth/salt',
     apiSince(beforeWrong).map((r) => r.url).join(' | '),
   );
   check(
@@ -462,9 +462,9 @@ await run(async () => {
   check('a password change leaves every record byte-identical', recordsOf(afterChange.principal) === recordsBeforeChange);
   const sentChange = changeRequests();
   check(
-    'the change-password request carries keys and a wrapper and nothing else',
+    'the change-password request carries keys, the held salt and a wrapper and nothing else',
     sentChange.length === 1 &&
-      Object.keys(JSON.parse(sentChange[0].body)).sort().join(',') === 'authKey,currentAuthKey,dekNonce,kdf,salt,wrappedDek',
+      Object.keys(JSON.parse(sentChange[0].body)).sort().join(',') === 'authKey,currentAuthKey,currentSalt,dekNonce,kdf,salt,wrappedDek',
     sentChange.map((r) => r.body).join(' | '),
   );
   check(

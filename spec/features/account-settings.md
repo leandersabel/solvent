@@ -553,9 +553,14 @@ Key wraps a DEK instead of encrypting records directly.
    least 3 (`register.md`). A new password equal to the current one, or
    one failing the policy, is refused before any derivation.
 2. The client derives `MK_old` and `AK_old` from the held salt and
-   envelope and unwraps the held wrapper (The held credential). A failed
-   unwrap means the current password is wrong: stop, and send nothing,
-   a salt lookup included.
+   envelope and unwraps the held wrapper (The held credential). On a
+   failed unwrap it looks the salt up once. The same salt means the
+   current password is wrong: stop, and send nothing more. A different
+   one means the password changed, or its protection was strengthened,
+   on another page after this one opened the vault (`login.md`, A
+   credential changed elsewhere): derive `AK_old` from the fresh salt
+   and envelope, and leave the check of the current password to the
+   server.
 3. The client generates a fresh 128-bit salt and derives `MK_new` and
    `AK_new` at the server's **current default** parameters, read from
    the envelope the app shell embeds (architecture.md, Key management).
@@ -563,9 +568,13 @@ Key wraps a DEK instead of encrypting records directly.
    redundant after it.
 4. The client re-wraps the same DEK under `MK_new` with a fresh nonce.
 5. `POST /api/auth/change-password`
-   `{ currentAuthKey, salt, kdf, authKey, wrappedDek, dekNonce }`.
+   `{ currentAuthKey, currentSalt, salt, kdf, authKey, wrappedDek,
+   dekNonce }`, where `currentSalt` is the salt `AK_old` came from.
 6. The server checks the sign-in limits for the session's username,
-   then verifies `currentAuthKey` against the stored hash. A mismatch
+   then compares `currentSalt` with the credential's salt, answering
+   Conflict `{"refused":"credential-changed"}` on a mismatch, which
+   counts as no failed sign-in, then verifies `currentAuthKey` against
+   the stored hash. A mismatch
    is a Bad Request with no `refused` member, counts as a failed
    sign-in and writes nothing else (architecture.md, Rate limiting). A
    new `authKey` that is not 32 bytes is a Bad Request that writes
@@ -577,7 +586,8 @@ Key wraps a DEK instead of encrypting records directly.
    IMMEDIATE` and before any write, because a page holding a DEK an
    import replaced would otherwise wrap the old key under the new
    password and leave every record unreadable (architecture.md, Vault
-   epoch). An administrator has no epoch, and the header on their
+   epoch). It compares `currentSalt` again after the epoch, because the
+   Auth Key is verified before the transaction begins. An administrator has no epoch, and the header on their
    request is ignored.
 7. The server invalidates **all other sessions** of the user and keeps
    the current one, because the key never changed and there is no
@@ -763,24 +773,24 @@ from an administrator removing an account (`admin-invites.md`).
 
 - **Wrong current password, an administrator**: nothing to unwrap, so
   the request is sent and answers Bad Request. Generic error, nothing
-  changed. A vault owner's is caught at the unwrap and sends nothing.
-- **Credential upgraded by another live session since this tab opened
-  the vault**: a sign-in elsewhere ran the stale-KDF upgrade, which ends
-  no session, so `AK_old` from the held salt fails with Bad Request. For
-  a vault owner the unwrap already proved the password against the held
-  set, so that Bad Request means a stale salt. The client looks up
-  `/api/auth/salt` once. When its salt or envelope differs from the
-  held one, it re-derives `currentAuthKey` from the fresh pair and
-  resends once, unchanged apart from `currentAuthKey`, since the new
-  salt, `authKey` and wrapper never depended on the old salt. The held
-  set stays as it was until the change succeeds, because the fresh salt
-  does not open the held wrapper. A Bad Request with an unchanged pair,
-  or a second Bad Request, is final: a vault owner sees the
-  change-failed error, an administrator the wrong-password one. One
-  retry, never a loop. The first Bad Request counts as a failed sign-in
-  (architecture.md, Rate limiting).
-- **Password changed on another session since this tab opened the
-  vault**: that change ended this session, so the request answers
+  changed. A vault owner's is caught at the unwrap and sends one salt
+  lookup.
+- **Credential changed by another page since this tab opened the
+  vault**: a password change in another tab of the same browser, or a
+  sign-in elsewhere that ran the stale-KDF upgrade, ends no session of
+  this one. A vault owner's unwrap fails when the password itself
+  changed, and step 2 takes the fresh salt. Otherwise the request
+  answers `credential-changed`, and the client looks up
+  `/api/auth/salt` once, re-derives `currentAuthKey` from the fresh
+  salt and envelope, and resends once, unchanged apart from
+  `currentAuthKey` and `currentSalt`, since the new salt, `authKey` and
+  wrapper never depended on the old salt. The held set stays as it was
+  until the change succeeds. A Bad Request, or a second Conflict, is
+  final: a vault owner sees the change-failed error, an administrator
+  the wrong-password one. One retry, never a loop.
+- **Password changed on another session, in another browser or
+  device, since this tab opened the vault**: that change ended this
+  session, so the request answers
   Unauthorized whatever it carries, and the client treats it as any
   expired session (`login.md`, Edge cases). The unlock that follows
   looks the new salt up, so the stale held set never reaches a request.
@@ -806,9 +816,11 @@ from an administrator removing an account (`admin-invites.md`).
 6. The change-password request carries neither password in any form.
    Test: `tests/browser/parts/settings.mjs`.
 7. (blind) A vault owner's wrong current password shows "That is not
-   your current password." above the first field and sends no request
-   between submit and the error, `/api/auth/salt` included, asserted
-   from the request log. Test: `tests/browser/parts/settings.mjs`.
+   your current password." above the first field and sends one
+   `/api/auth/salt` request and nothing else between submit and the
+   error, asserted from the request log. Test:
+   `tests/browser/parts/settings.mjs`,
+   `tests/test_client.py::test_the_client_side_rules_hold`.
 8. (blind) A successful change sends no `/api/auth/salt` request: the
    first after sign-in, a second from the same tab, one after that
    tab's stale-KDF upgrade, one after that tab's import, and one after a
@@ -818,8 +830,9 @@ from an administrator removing an account (`admin-invites.md`).
 9. (blind) After another session's stale-KDF upgrade, a change with the
    right current password from a tab that signed in before it succeeds
    with exactly one `/api/auth/salt` request and two change-password
-   requests differing only in `currentAuthKey`, and the new password
-   then signs in. Test: no test.
+   requests differing only in `currentAuthKey` and `currentSalt`, and
+   the new password then signs in. Test:
+   `tests/test_client.py::test_the_client_side_rules_hold`.
 10. A change-password request answers Unauthorized when another
     session's password change ended this session. Test: no test.
 11. (blind) A change-password request with a wrong `currentAuthKey`
@@ -1053,3 +1066,14 @@ from an administrator removing an account (`admin-invites.md`).
     password and a new Auth Key of 3, 31 or 33 bytes, or not base64, is
     a Bad Request, for either kind, and leaves every row as it was.
     Test: `tests/test_auth.py::test_a_rotation_to_an_auth_key_that_is_not_thirty_two_bytes_is_refused`.
+80. (blind) After the password changed in another tab of the same
+    browser, a change from this tab with the current password succeeds
+    with one `/api/auth/salt` request and one change-password request,
+    and the new password then opens the vault. Test:
+    `tests/test_client.py::test_the_client_side_rules_hold`.
+81. (blind) A change-password request whose `currentSalt` is not the
+    credential's salt answers Conflict `{"refused":"credential-changed"}`,
+    for either kind, and writes nothing, no failed sign-in included.
+    Test:
+    `tests/test_credential_changed.py::test_a_password_change_on_a_superseded_salt_writes_nothing_and_counts_no_failure`,
+    `tests/test_credential_changed.py::test_an_administrator_on_a_superseded_salt_changes_nothing`.

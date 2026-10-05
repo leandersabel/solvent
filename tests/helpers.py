@@ -31,6 +31,9 @@ CSRF = {"X-Solvent-Request": "1"}
 # The routes whose answer hands a page the vault epoch it then carries
 # (architecture.md, Vault epoch).
 _EPOCH_ANSWERS = ("/api/register", "/api/auth/login", "/api/import")
+# The routes that carry the salt the page's Master Key came from
+# (architecture.md, Credentials and vault key wrappers).
+_SALT_ROUTES = ("/api/import", "/api/auth/upgrade-kdf", "/api/auth/change-password")
 
 
 class EpochClient(FlaskClient):
@@ -38,11 +41,18 @@ class EpochClient(FlaskClient):
     last register, sign-in or import answered with and sends it on every
     request, as the page's API module does. Set `epoch` to a value to
     send another, or to None to send none. A request's own
-    `X-Solvent-Vault` header wins."""
+    `X-Solvent-Vault` header wins.
+
+    A JSON body to a route that carries `currentSalt` gets the session's
+    current salt when it has none, as a page that holds the credential
+    sends it. A body's own `currentSalt` wins."""
 
     epoch = None
 
     def open(self, *args, **kwargs):
+        body = kwargs.get("json")
+        if args and args[0] in _SALT_ROUTES and isinstance(body, dict) and "currentSalt" not in body:
+            kwargs["json"] = {**body, "currentSalt": self._session_salt()}
         if self.epoch is not None:
             headers = Headers(kwargs.get("headers") or {})
             if "X-Solvent-Vault" not in headers:
@@ -53,6 +63,26 @@ class EpochClient(FlaskClient):
             answered = response.get_json(silent=True) or {}
             self.epoch = answered.get("vaultEpoch", self.epoch)
         return response
+
+
+    def _session_salt(self):
+        from solvent.session import COOKIE_NAME, _signer, hash_token
+
+        cookie = self.get_cookie(COOKIE_NAME) if self._cookies is not None else None
+        if cookie is None:
+            return None
+        with self.application.app_context():
+            try:
+                token_hash = hash_token(_signer().unsign(cookie.value).decode())
+            except Exception:
+                return None
+        found = rows(
+            self.application,
+            "SELECT params FROM sessions JOIN credentials "
+            "ON credentials.principal_id = sessions.principal_id WHERE token_hash = ?",
+            (token_hash,),
+        )
+        return json.loads(found[0]["params"])["salt"] if found else None
 
 
 def b64(length: int = 32) -> str:

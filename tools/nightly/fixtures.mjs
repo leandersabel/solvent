@@ -178,19 +178,20 @@ async function inPage(op) {
 // through the upgrade endpoint with its salt, Auth Key and wrapper all
 // made at the weak memory parameter, as harness.mjs makeStale does.
 // patch.py then records that parameter.
-const makeOlder = (session, password, memory) =>
-  session.call(async (secret, m) => {
+const makeOlder = (session, username, password, memory) =>
+  session.call(async (name, secret, m) => {
     const api = await import('/static/js/api.js');
     const c = await import('/static/js/crypto.js');
     const s = await import('/static/js/session.js');
     const kdf = JSON.parse(document.getElementById('kdf-envelope').textContent);
     const salt = c.b64encode(c.randomBytes(16));
     const keys = await c.deriveKeys(secret, salt, { ...kdf, m });
-    const body = { salt, kdf, authKey: keys.authKey };
+    const { salt: currentSalt } = await api.post('/api/auth/salt', { username: name });
+    const body = { currentSalt, salt, kdf, authKey: keys.authKey };
     const vault = s.currentVault();
     if (vault) Object.assign(body, await c.wrapDek(vault.dek, keys.masterKey));
     await api.post('/api/auth/upgrade-kdf', body);
-  }, password, memory);
+  }, username, password, memory);
 
 const exportBody = (session) =>
   session.call(async () => {
@@ -245,7 +246,7 @@ async function run() {
         manifest.browserSession = { username: account.username, covers: ['aged-session'], about: account.about };
       }
       for (const op of account.ops) await session.call(inPage, op);
-      if (account.olderVault) await makeOlder(session, account.password, script.patches.credentials.find((c) => c.username === account.username).kdfMemory);
+      if (account.olderVault) await makeOlder(session, account.username, account.password, script.patches.credentials.find((c) => c.username === account.username).kdfMemory);
       if (account.backup) {
         const text = await exportBody(session);
         writeFileSync(join(args.out, `backup-${account.username}.json`), text);

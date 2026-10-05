@@ -348,18 +348,19 @@ export const landing = async (act) => {
 // as `username`, which for a vault owner must hold the unlocked vault.
 export const WEAK_MEMORY = 32768;
 export async function makeStale(session, username, password) {
-  await session.call(async (secret, memory) => {
+  await session.call(async (secret, memory, name) => {
     const api = await import('/static/js/api.js');
     const c = await import('/static/js/crypto.js');
     const s = await import('/static/js/session.js');
     const kdf = JSON.parse(document.getElementById('kdf-envelope').textContent);
     const salt = c.b64encode(c.randomBytes(16));
     const keys = await c.deriveKeys(secret, salt, { ...kdf, m: memory });
-    const body = { salt, kdf, authKey: keys.authKey };
+    const { salt: currentSalt } = await api.post('/api/auth/salt', { username: name });
+    const body = { currentSalt, salt, kdf, authKey: keys.authKey };
     const vault = s.currentVault();
     if (vault) Object.assign(body, await c.wrapDek(vault.dek, keys.masterKey));
     await api.post('/api/auth/upgrade-kdf', body);
-  }, password, WEAK_MEMORY);
+  }, password, WEAK_MEMORY, username);
   sql(
     `UPDATE credentials SET params = json_set(params, '$.kdf.m', ?)
      WHERE principal_id = (SELECT id FROM principals WHERE username = ?)`,
@@ -480,7 +481,7 @@ export const importOwnExport = () =>
     // Re-key: a freshly generated DEK, never the file's.
     const { dek: newDek, records: rekeyed } = await t.rekey(fileDek, file.records);
     const wrapper = await s.wrapForMaster(newDek);
-    const answered = await api.post('/api/import', { ...wrapper, records: rekeyed });
+    const answered = await api.post('/api/import', { ...wrapper, currentSalt: s.heldSalt(), records: rekeyed });
 
     // The page takes the new key and epoch and reads the vault back, as
     // the import screen does.

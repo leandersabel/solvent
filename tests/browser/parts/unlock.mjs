@@ -563,7 +563,7 @@ await run(async () => {
   check(
     "a vault owner's upgrade sends the new salt, envelope, Auth Key and wrapper",
     upgradeSent.length === 1 &&
-      Object.keys(JSON.parse(upgradeSent[0].body)).sort().join(',') === 'authKey,dekNonce,kdf,salt,wrappedDek',
+      Object.keys(JSON.parse(upgradeSent[0].body)).sort().join(',') === 'authKey,currentSalt,dekNonce,kdf,salt,wrappedDek',
   );
   check('the upgrade re-encrypts no record', recordsOf(upgradedOwner.principal) === staleRecords);
   await signInAgain('the vault at the new parameters');

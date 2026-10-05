@@ -16,7 +16,7 @@ import json
 from flask import Blueprint, abort, g, jsonify, request
 
 from . import ratelimit
-from .auth import credential_for
+from .auth import credential_for, verify_salt
 from .db import new_epoch, utcnow, write_transaction
 from .guard import verify_epoch
 from .records import (
@@ -120,6 +120,7 @@ class ImportRecord(RecordWrite):
 
 
 class ImportRequest(Payload):
+    currentSalt: str
     wrappedDek: str
     dekNonce: str
     records: list[ImportRecord]
@@ -155,6 +156,9 @@ def import_vault():
     epoch = new_epoch()
     with write_transaction() as conn:
         verify_epoch(conn)
+        # The new wrapper is under the page's Master Key, which opens
+        # nothing once the credential has moved on.
+        verify_salt(body.currentSalt)
         conn.execute(
             "DELETE FROM records WHERE principal_id = ?", (g.principal["id"],)
         )
