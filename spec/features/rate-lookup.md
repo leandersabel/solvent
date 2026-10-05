@@ -167,7 +167,7 @@ back to 1948 from other central banks is not the API the app calls.
   symbol table and is the adapter registry's currencies. It is a
   constant in the code, never fetched. A currency outside it has no
   adapter.
-- A weekend, holiday or pre-publication date resolves through the
+- A weekend, holiday or a day not yet published resolves through the
   prior-close rule (Edge cases), with `asOf` carrying the earlier date.
   This is the normal path, not an error.
 - No provider here has an API key. The key-redaction rule (SSRF and
@@ -616,9 +616,11 @@ host's network are reachable.
   than unanswerable. In the whole-table form the symbol is absent, and
   when every symbol is, the answer is No Content, never Bad Request,
   with no outbound request and no change to any breaker's count.
-- **Weekend, holiday or pre-listing date**: the most recent prior close,
-  `asOf` that earlier date, and the client shows "rate as of 29 Jul".
-  No prior close within the window is No Content.
+- **Weekend, holiday or a day not yet published**: the most recent
+  prior close, `asOf` that earlier date, and the client shows "rate as
+  of 29 Jul". A currency takes the prior close Frankfurter answers with,
+  with no window of its own. Gold takes the last day in NBP's fixed
+  14-day range (Providers, Gold), and an empty range is No Content.
 - **A rate in an unexpected currency**: a changed shape, so no proposal
   from that table, never a mislabeled one.
 - **A figure that is not a usable price**: a source's rate or gold
