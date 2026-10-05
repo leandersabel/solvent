@@ -252,7 +252,8 @@ reached by clicking a holding's row on the dashboard.
 
 #### Header
 
-- The holding's name, 20px/600, with one chip per dimension assignment
+- The holding's name as the screen heading (`design-system.md`,
+  Typography), with one chip per dimension assignment
   (`Liquidity: Cash`) and the note beneath.
 - The current value: the native quantity and beside it the
   main-currency figure at the latest price for the holding's unit
@@ -891,3 +892,6 @@ Unarchiving and archiving it again writes the zero at the new D.
     option but the main currency is marked "rate entered by hand". Test:
     `tests/browser/parts/account-form.mjs`,
     `tests/browser/parts/account-form-review-unquoted.mjs`.
+62. The holding's name is drawn at the screen heading's size and
+    weight (`design-system.md`, Typography). Test:
+    `tests/browser/parts/account-detail.mjs`.
