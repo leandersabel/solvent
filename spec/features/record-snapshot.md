@@ -1578,4 +1578,5 @@ Editing an existing entry).
     `tests/test_client.py::test_the_client_side_rules_hold`.
 93. The single-holding form's heading reads "Record a value for" and the
     holding's name for a new figure, and "Edit this value" for a stored
-    one. Test: `tests/browser/parts/snapshot-entry.mjs`.
+    one. Test: `tests/browser/parts/snapshot-entry.mjs`,
+    `tests/browser/parts/snapshot-entry-review-heading.mjs`.
