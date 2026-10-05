@@ -894,4 +894,5 @@ Unarchiving and archiving it again writes the zero at the new D.
     `tests/browser/parts/account-form-review-unquoted.mjs`.
 62. The holding's name is drawn at the screen heading's size and
     weight (`design-system.md`, Typography). Test:
-    `tests/browser/parts/account-detail.mjs`.
+    `tests/browser/parts/account-detail.mjs`,
+    `tests/browser/parts/account-detail-review-heading.mjs`.
