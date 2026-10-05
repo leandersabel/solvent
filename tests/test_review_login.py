@@ -241,9 +241,13 @@ def test_every_unknown_username_is_verified_against_one_decoy_shaped_as_a_fresh_
 
 
 def timed(request):
-    start = time.perf_counter()
+    """The CPU the request costs this process, Argon2id's threads
+    included. Wall-clock time would count the time the parallel suite
+    keeps the process descheduled, which drowns the extra Argon2id this
+    measures."""
+    start = time.process_time()
     response = request()
-    elapsed = time.perf_counter() - start
+    elapsed = time.process_time() - start
     assert response.status_code == 401
     return elapsed
 
