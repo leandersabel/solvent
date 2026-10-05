@@ -58,10 +58,10 @@ await run(async () => {
   );
   const rateValues = await page.eval("[...document.querySelectorAll('.rate-line input')].map(n => n.value)");
   check('the prices went in with the first row', rateValues.every(Boolean), rateValues.join(','));
-  const tabular = (selector) => page.eval(`(() => {
-    const nodes = [...document.querySelectorAll(${JSON.stringify(selector)})];
+  const tabular = (selector) => page.call((s) => {
+    const nodes = [...document.querySelectorAll(s)];
     return nodes.length > 0 && nodes.every((n) => getComputedStyle(n).fontVariantNumeric === 'tabular-nums');
-  })()`);
+  }, selector);
   check('the value fields have tabular digits', await tabular('.sweep-row input'));
   check('the converted lines have tabular digits', await tabular('.sweep-input .hint'));
   check('the rate fields have tabular digits', await tabular('.rate-line input'));

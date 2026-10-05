@@ -17,7 +17,7 @@ const CARD = 'same bar as anybody';
 await run(async () => {
   await administrator();
   await click('Your password');
-  await page.waitUntil(`document.body.innerText.includes(${JSON.stringify(CARD)})`, { label: 'the password card' });
+  await page.waitUntil((text) => document.body.innerText.includes(text), { args: [CARD], label: 'the password card' });
 
   const sent = [];
   provoked.push('/api/auth/change-password');
