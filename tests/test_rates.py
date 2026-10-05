@@ -668,6 +668,54 @@ def test_every_outbound_request_is_named(monkeypatch):
     assert seen[0].get_header("User-agent") == rates.USER_AGENT
 
 
+
+class _Answer:
+    def __init__(self, status=200, body=b"{}"):
+        self.status, self.body, self.headers = status, body, {}
+
+    def read(self, _size=None):
+        return self.body
+
+    def __enter__(self):
+        return self
+
+    def __exit__(self, *_):
+        return False
+
+
+def _raise(error):
+    raise error
+
+
+@pytest.mark.parametrize(
+    "answer, status",
+    [
+        (lambda url: _raise(urllib.error.HTTPError(url, 503, "secret-text", {}, None)), "503"),
+        (lambda url: _Answer(status=204), "204"),
+        (lambda url: _raise(TimeoutError("secret-text")), "timeout"),
+        (lambda url: _raise(urllib.error.URLError(ssl.SSLCertVerificationError("secret-text"))), "tls"),
+        (lambda url: _raise(urllib.error.URLError(ConnectionRefusedError("secret-text"))), "network"),
+        (lambda url: _Answer(body=b"<html>secret-text"), "body"),
+        (lambda url: _Answer(body=b" " * (rates.MAX_RESPONSE_BYTES + 1)), "body"),
+        (lambda url: _raise(RuntimeError("secret-text")), "other"),
+    ],
+)
+def test_a_failed_fetch_logs_its_source_and_status_and_nothing_of_the_request(
+    app, monkeypatch, caplog, answer, status
+):
+    monkeypatch.setattr(rates._opener, "open", lambda request, timeout=None: answer(request.full_url))
+    url = rates.FX_URL.format(date=PAST, quote="CHF")
+
+    with app.app_context(), caplog.at_level("WARNING"):
+        assert rates._fetch_json("frankfurter", url, rates._egress()) is None
+
+    assert [r.getMessage() for r in caplog.records] == [
+        f"rates.provider source=frankfurter status={status}"
+    ]
+    for leak in (PAST, "CHF", "frankfurter.dev", "secret-text"):
+        assert leak not in caplog.text
+
+
 # ---- The outbound request, composition, floors and settings ----------
 
 

@@ -19,6 +19,7 @@ import json
 import logging
 import re
 import socket
+import ssl
 import threading
 import time
 import urllib.error
@@ -307,10 +308,12 @@ def _fetch_within(url: str, seconds: float) -> bytes:
         try:
             with _opener.open(_request(url), timeout=seconds) as response:
                 if response.status != 200:
-                    raise urllib.error.URLError(f"status {response.status}")
+                    raise urllib.error.HTTPError(
+                        url, response.status, "not 200", response.headers, None
+                    )
                 body = response.read(MAX_RESPONSE_BYTES + 1)
             if len(body) > MAX_RESPONSE_BYTES:
-                raise urllib.error.URLError("body over the size cap")
+                raise ValueError("body over the size cap")
             outcome.append(body)
         except Exception as error:
             outcome.append(error)
@@ -328,6 +331,25 @@ def _fetch_within(url: str, seconds: float) -> bytes:
     return outcome[0]
 
 
+def _failure(error: Exception) -> str:
+    """How a fetch failed, for its log line: the status of an answer
+    that was not 200, else the kind of failure. Never the URL or the
+    error's text, which hold the date and quote asked for."""
+    if isinstance(error, urllib.error.HTTPError):
+        return str(error.code)
+    if isinstance(error, urllib.error.URLError) and isinstance(error.reason, Exception):
+        error = error.reason
+    for kind, types in (
+        ("timeout", TimeoutError),
+        ("tls", ssl.SSLError),
+        ("network", (OSError, http.client.HTTPException)),
+        ("body", ValueError),
+    ):
+        if isinstance(error, types):
+            return kind
+    return "other"
+
+
 def _fetch_json(provider: str, url: str, egress: _Egress) -> "object | None":
     breaker = breakers[provider]
     if breaker.is_open(egress.cooloff):
@@ -340,9 +362,7 @@ def _fetch_json(provider: str, url: str, egress: _Egress) -> "object | None":
         # Python's digit limit would fail the whole answer for one figure.
         payload = json.loads(_fetch_within(url, remaining), parse_int=Decimal)
     except Exception as error:
-        # Logged with the target and the failure, never with the
-        # requesting user beyond what the access log already holds.
-        egress.log.warning("rates.provider url=%s error=%s", url, error)
+        egress.log.warning("rates.provider source=%s status=%s", provider, _failure(error))
         breaker.record_failure(egress.failures)
         return None
     breaker.record_success()
