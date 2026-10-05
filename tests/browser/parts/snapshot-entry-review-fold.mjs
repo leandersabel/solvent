@@ -19,7 +19,7 @@ await run(async () => {
   // order, whether any rate line is painted, the colour and centre of
   // the run naming what the save writes, and any skeleton block painted
   // between the value field and Save.
-  const seen = () => ev(`(() => {
+  const seen = () => rec.call((petrol) => {
     const d = [...document.querySelectorAll('.dialog')].find((n) => n.querySelector('#snapshot-value'));
     if (!d) return null;
     const painted = (el, rects) => {
@@ -44,7 +44,7 @@ await run(async () => {
       const rects = [...range.getClientRects()];
       if (!painted(t.parentElement, rects)) continue;
       runs.push(t.textContent);
-      if (!says && /\\bprices\\b/i.test(t.textContent)) {
+      if (!says && /\bprices\b/i.test(t.textContent)) {
         const b = rects.find((x) => x.width > 0.5);
         says = { color: getComputedStyle(t.parentElement).color, x: b.left + Math.min(b.width / 2, 40), y: b.top + b.height / 2 };
       }
@@ -54,16 +54,16 @@ await run(async () => {
     const floor = save ? save.getBoundingClientRect().top : Infinity;
     const skeletons = [...d.querySelectorAll('*')].filter((n) => {
       const b = n.getBoundingClientRect();
-      return (getComputedStyle(n).backgroundColor === '${PETROL_100}' || /skeleton/i.test(n.className)) &&
+      return (getComputedStyle(n).backgroundColor === petrol || /skeleton/i.test(n.className)) &&
         painted(n, [b]) && b.top >= value.bottom - 0.5 && b.bottom <= floor + 0.5;
     }).length;
     return {
-      text: runs.join(' ').replace(/\\s+/g, ' ').replace(/ ([.,])/g, '$1').trim(),
+      text: runs.join(' ').replace(/\s+/g, ' ').replace(/ ([.,])/g, '$1').trim(),
       lines: [...d.querySelectorAll('.rate-line')].some((l) => painted(l, [...l.getClientRects()])),
       says,
       skeletons,
     };
-  })()`);
+  }, PETROL_100);
   // A real mouse press on the sentence, which is how the folded line is opened.
   const clickAt = async ({ x, y }) => {
     for (const type of ['mouseMoved', 'mousePressed', 'mouseReleased']) {
