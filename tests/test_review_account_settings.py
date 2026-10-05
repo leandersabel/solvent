@@ -2,13 +2,15 @@
 account is a failed sign-in, and a new Auth Key that is not 32 bytes
 changes nothing (spec/features/account-settings.md, criteria 11, 43, 77
 and 79; spec/architecture.md, Security, Rate limiting and Key
-management).
+management). `editable` keeps every digit of a rate and pads to the
+places asked (criterion 30).
 
 Written from the spec alone. Every limit is set through config and
 asserted at the configured value.
 """
 from __future__ import annotations
 
+import json
 import shutil
 import subprocess
 from pathlib import Path
@@ -425,3 +427,44 @@ def test_the_page_names_the_salt_it_holds_and_recovers_once_from_a_changed_one()
         ["node", str(CREDENTIAL_CHECKS)], capture_output=True, text=True, timeout=300
     )
     assert result.returncode == 0, result.stdout + result.stderr
+
+
+JS = Path(__file__).resolve().parent.parent / "solvent" / "static" / "js"
+EDITABLE = """
+const { formatter } = await import(process.argv[1]);
+const decimal = await import(process.argv[2]);
+const cases = JSON.parse(process.argv[3]);
+console.log(JSON.stringify(cases.map(([profile, stored, places]) => {
+  const shape = formatter(profile);
+  const shown = shape.editable(decimal.parse(stored), places);
+  return [shown, decimal.format(shape.parseFigure(shown))];
+})));
+"""
+
+
+@pytest.mark.skipif(shutil.which("node") is None, reason="node is not installed")
+@pytest.mark.parametrize("money_places", ["0", "2"])
+def test_editable_keeps_every_digit_of_a_rate_and_pads_to_six(money_places):
+    """Criterion 30: identical under either money setting, a short rate
+    is padded to six places and a rate of ten digits or twelve places
+    keeps every one, and each reads back as the stored figure."""
+    profile = {"locale": "en-GB", "groupSeparator": "apostrophe", "moneyPlaces": money_places}
+    shown = {
+        "0.797": "0.797000",
+        "0.93124567": "0.93124567",
+        "0.9194556822": "0.9194556822",
+        "0.000056640216": "0.000056640216",
+        "142857142900": "142\u2019857\u2019142\u2019900.000000",
+    }
+    result = subprocess.run(
+        [
+            "node", "--input-type=module", "-e", EDITABLE,
+            (JS / "format.js").as_uri(), (JS / "decimal.js").as_uri(),
+            json.dumps([[profile, stored, 6] for stored in shown]),
+        ],
+        capture_output=True,
+        text=True,
+        timeout=60,
+    )
+    assert result.returncode == 0, result.stderr
+    assert json.loads(result.stdout) == [[text, stored] for stored, text in shown.items()]

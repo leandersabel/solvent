@@ -23,6 +23,9 @@ Not Found is neither a failure nor a success (The symbol table, Rate
 limiting and failure, criteria 40 and 73 to 75). An entry for D is kept
 for good only once fetched at or after 00:00 UTC on D+2, and any other
 for an hour, whatever its `asOf` (Caching, criteria 13, 14, 76 and 77).
+Every proposal is the pinned composition rounded once, half to even, to
+10 significant digits but never past the twelfth place (Providers, What
+the client gets, criteria 57, 78 and 79).
 
 Written from the spec alone. Each provider is reached on a loopback HTTP
 server through the app's own opener, so the app's real socket timeout
@@ -53,6 +56,14 @@ PAST = "2026-07-31"
 SLACK = 0.3
 # Well inside any socket timeout the app could set below its deadline.
 TRICKLE = 0.8
+
+
+def round_proposal(figure: Decimal) -> str:
+    """Providers: rounded once, half to even, to 10 significant digits
+    but never past the twelfth decimal place, written plain with no
+    trailing zeros and no exponent."""
+    step = Decimal(1).scaleb(max(figure.adjusted() - 9, -12))
+    return format(figure.quantize(step, ROUND_HALF_EVEN).normalize(), "f")
 
 
 def _frankfurter(url: str) -> bytes:
@@ -607,17 +618,18 @@ def test_a_pln_rate_that_is_not_usable_drops_gold_quoted_elsewhere(owner, source
     priced = table(owner)
 
     assert not ({"PLN"} | GOLD) & set(priced)
-    assert priced["USD"]["rate"] == "0.91945568"
+    assert priced["USD"]["rate"] == "0.9194556822"
     assert failures() == NONE_FAILED
 
 
 @pytest.mark.parametrize(
     ("figure", "served"),
     [
-        (1.9e8, "0.00000001"),  # 5.26e-9 rounds up to the last place
-        (2e8, None),  # exactly 5e-9, half to even rounds to 0
+        (1.9e12, "0.000000000001"),  # 5.26e-13 rounds up to the twelfth place
+        (2e12, None),  # exactly 5e-13, half to even rounds to 0
         (1e-20, None),  # exactly 10^20, not below it
-        (1.0000001e-20, True),  # just below 10^20
+        (1.0000000001e-20, "99999999990000000000"),  # 10 digits below 10^20
+        (1.00000000001e-20, None),  # rounds to 10 digits as 10^20 itself
     ],
     ids=repr,
 )
@@ -631,8 +643,6 @@ def test_a_proposal_is_served_only_when_rounded_it_is_above_0_and_below_10_to_th
 
     if served is None:
         assert "USD" not in priced
-    elif served is True:
-        assert 0 < float(priced["USD"]["rate"]) < 1e20
     else:
         assert priced["USD"]["rate"] == served
 
@@ -641,10 +651,10 @@ def test_the_bounds_apply_to_each_gold_symbol_on_its_own(owner, sources):
     """A usable price can still make one symbol's proposal fall outside
     the bounds: grams round to 0 where ounces do not, and ounces pass
     10^20 where grams do not."""
-    sources.plans["nbp"] = at_once(gold_price(1e-9))
+    sources.plans["nbp"] = at_once(gold_price(1e-13))
     priced = table(owner, quote="PLN", on=day(0))
     assert "XAU-g" not in priced
-    assert priced["XAU-ozt"]["rate"] == "0.00000003"
+    assert priced["XAU-ozt"]["rate"] == "0.000000000003"
 
     sources.plans["nbp"] = at_once(gold_price(1e19))
     priced = table(owner, quote="PLN", on=day(1))
@@ -725,9 +735,9 @@ def test_a_cached_zero_is_fetched_again_and_replaced(app, owner, sources):
     first = owner.get(f"/api/rates?date={PAST}&quote=CHF&symbol=USD", headers=CSRF).get_json()
     again = owner.get(f"/api/rates?date={PAST}&quote=CHF&symbol=USD", headers=CSRF).get_json()
 
-    assert (first["rate"], first["cached"]) == ("0.91945568", False)
-    assert (again["rate"], again["cached"]) == ("0.91945568", True)
-    assert cached(app, "USD", "CHF", PAST) == [{"rate": "0.91945568"}]
+    assert (first["rate"], first["cached"]) == ("0.9194556822", False)
+    assert (again["rate"], again["cached"]) == ("0.9194556822", True)
+    assert cached(app, "USD", "CHF", PAST) == [{"rate": "0.9194556822"}]
     assert [p for p, _ in sources.opened] == ["frankfurter"]
 
 
@@ -735,7 +745,7 @@ def test_a_cached_zero_is_a_miss_in_the_whole_table(app, owner, sources):
     plant(app, "USD", "CHF", PAST, "0", "frankfurter")
     plant(app, "XAU-g", "PLN", PAST, "0", "nbp")
 
-    assert table(owner)["USD"]["rate"] == "0.91945568"
+    assert table(owner)["USD"]["rate"] == "0.9194556822"
     assert table(owner, quote="PLN")["XAU-g"]["rate"] == "251.37"
     assert cached(app, "XAU-g", "PLN", PAST) == [{"rate": "251.37"}]
 
@@ -990,10 +1000,10 @@ def test_a_cached_rate_with_an_unusable_date_is_fetched_again(app, owner, source
     again = owner.get(f"/api/rates?date={PAST}&quote=CHF&symbol=USD", headers=CSRF).get_json()
     gold = table(owner, quote="PLN")["XAU-g"]
 
-    assert (first["rate"], first["asOf"], first["cached"]) == ("0.91945568", PAST, False)
+    assert (first["rate"], first["asOf"], first["cached"]) == ("0.9194556822", PAST, False)
     assert again["cached"] is True
     assert (gold["rate"], gold["asOf"], gold["cached"]) == ("251.37", PAST, False)
-    assert cached_as_of(app, "USD", "CHF", PAST) == [{"rate": "0.91945568", "as_of": PAST}]
+    assert cached_as_of(app, "USD", "CHF", PAST) == [{"rate": "0.9194556822", "as_of": PAST}]
     assert cached_as_of(app, "XAU-g", "PLN", PAST) == [{"rate": "251.37", "as_of": PAST}]
 
 
@@ -1618,7 +1628,7 @@ def composed(on: str, symbol: str) -> str:
     figure = Decimal(str(cena_on(on))) * (1 / Decimal(str(pln_on(on))))
     if symbol == "XAU-ozt":
         figure *= Decimal("31.1034768")
-    return format(figure.quantize(Decimal("1e-8"), ROUND_HALF_EVEN).normalize(), "f")
+    return round_proposal(figure)
 
 
 def fx_days_asked(urls: list[str]) -> list[str]:
@@ -2102,8 +2112,7 @@ def usd_on(on: str) -> float:
 
 
 def usd_proposal(on: str) -> str:
-    figure = (1 / Decimal(str(usd_on(on)))).quantize(Decimal("1e-8"), ROUND_HALF_EVEN)
-    return format(figure.normalize(), "f")
+    return round_proposal(1 / Decimal(str(usd_on(on))))
 
 
 def at(on: str, days: int = 0, seconds: int = 0) -> datetime:
@@ -2385,3 +2394,134 @@ def test_gold_asks_nbp_for_the_window_solvent_rates_exposes(owner, sources, monk
     owner.get(f"/api/rates?date={PAST}&quote=PLN&symbol=XAU-g", headers=CSRF)
 
     assert urls == [f"https://api.nbp.pl/api/cenyzlota/{start}/{PAST}?format=json"]
+
+
+# The one rounding (Providers; What the client gets; criteria 57, 78, 79).
+CENA, PLN_RATE = Decimal("251.37"), Decimal("4.2537")
+OUNCE = Decimal("31.1034768")
+
+
+def test_a_proposal_is_the_pinned_composition_rounded_once():
+    """The oracle itself, against the page's own figures, so a slip in
+    it cannot pass the tests that lean on it."""
+    assert round_proposal(1 / Decimal("1.0876")) == "0.9194556822"
+    assert round_proposal(1 / Decimal("17655.3")) == "0.000056640216"
+
+
+def test_each_proposal_equals_the_pinned_composition_digit_for_digit(owner, sources):
+    """Criterion 57: in `Decimal` at 28 digits, the PLN leg before the
+    ounce factor, then rounded once."""
+    sources.plans["nbp"] = at_once(gold_price(float(CENA)))
+
+    priced = table(owner)
+
+    grams = CENA * (1 / PLN_RATE)
+    assert priced["USD"]["rate"] == "0.9194556822"
+    assert priced["XAU-g"]["rate"] == round_proposal(grams)
+    assert priced["XAU-ozt"]["rate"] == round_proposal(grams * OUNCE)
+
+
+def test_a_currency_worth_very_little_keeps_the_digits_its_source_published(owner, sources):
+    """Criterion 78 and What the client gets: the inverse reads the
+    published 17655.3 again, so a holding of ten billion rupiah comes to
+    the euro cent its source implies."""
+    sources.plans["frankfurter"] = at_once(fx_table(IDR=17655.3))
+
+    rate = Decimal(table(owner, quote="EUR")["IDR"]["rate"])
+
+    assert str(rate) == "0.000056640216"
+    assert round(1 / rate, 1) == Decimal("17655.3")
+    holding = Decimal(10_000_000_000)
+    assert (holding * rate).quantize(Decimal("0.01")) == (holding / Decimal("17655.3")).quantize(Decimal("0.01"))
+
+
+SWEEP = {
+    "AUD": 7e-12, "MXN": 3.3e-11, "CAD": 1.234567890123e-9, "CZK": 6.02e-7, "DKK": 0.000123,
+    "GBP": 0.0314159, "HKD": 0.9876543210987, "HUF": 4.2537, "IDR": 17655.3, "ISK": 123456.789,
+    "JPY": 9999999.99, "KRW": 1e7, "NOK": 3.0, "SEK": 7.0, "THB": 0.7,
+}
+
+
+def significant(rate: str) -> int:
+    return len(Decimal(rate).normalize().as_tuple().digits)
+
+
+def places(rate: str) -> int:
+    return len(rate.partition(".")[2])
+
+
+def test_no_currency_proposal_has_more_than_twelve_places_or_ten_significant_digits(owner, sources):
+    """Criterion 79, from a rate of 7e-12 to one of 10^7, each the
+    composition rounded once and written plain."""
+    sources.plans["frankfurter"] = at_once(fx_table(**SWEEP))
+
+    priced = table(owner)
+
+    for code, figure in SWEEP.items():
+        rate = priced[code]["rate"]
+        assert rate == round_proposal(1 / Decimal(str(figure))), code
+        assert places(rate) <= 12 and significant(rate) <= 10, (code, rate)
+        assert "e" not in rate.lower() and not (places(rate) and rate.endswith("0")), (code, rate)
+
+
+@pytest.mark.parametrize("cena", [7e-12, 1.2345e-9, 251.37, 251.3712345678901, 9999999.99, 1e7], ids=repr)
+def test_no_gold_proposal_has_more_than_twelve_places_or_ten_significant_digits(owner, sources, cena):
+    """Criterion 79 for gold, in PLN and in CHF, each rounded once."""
+    sources.plans["nbp"] = at_once(gold_price(cena))
+    exact = Decimal(str(cena))
+
+    in_pln, in_chf = table(owner, quote="PLN"), table(owner)
+
+    for symbol, factor in (("XAU-g", 1), ("XAU-ozt", OUNCE)):
+        assert in_pln[symbol]["rate"] == round_proposal(exact * factor), symbol
+        assert in_chf[symbol]["rate"] == round_proposal(exact * (1 / PLN_RATE) * factor), symbol
+        for rate in (in_pln[symbol]["rate"], in_chf[symbol]["rate"]):
+            assert places(rate) <= 12 and significant(rate) <= 10, (symbol, rate)
+
+
+@pytest.mark.parametrize(
+    ("cena", "proposed"),
+    [
+        (251.37000005, "251.37"),  # a tie at the tenth digit goes to the even one below
+        (251.37000015, "251.3700002"),  # and to the even one above
+        (1.2345e-9, "0.000000001234"),  # a tie at the twelfth place, short of ten digits
+        (1.2355e-9, "0.000000001236"),
+        (1.5e-12, "0.000000000002"),
+        (5e-13, None),  # half to even rounds it to 0
+    ],
+    ids=repr,
+)
+def test_the_rounding_is_half_to_even_at_ten_digits_or_twelve_places(owner, sources, cena, proposed):
+    """Providers: half to even, to 10 significant digits but never past
+    the twelfth place, on `XAU-g` in PLN, which is `cena` itself."""
+    sources.plans["nbp"] = at_once(gold_price(cena))
+
+    priced = table(owner, quote="PLN")
+
+    assert priced.get("XAU-g", {}).get("rate") == proposed
+    assert failures() == NONE_FAILED
+
+
+def restarted(app):
+    """A second start of the app on the same database file."""
+    from solvent import create_app
+
+    return create_app(config_overrides={"DATABASE_PATH": app.config["DATABASE_PATH"], "TESTING": True})
+
+
+def test_a_settled_entry_is_kept_until_the_app_next_starts(app, sources):
+    """Caching and criterion 77: a settled entry is a hit with no
+    request, until a start empties the cache and the next lookup goes
+    out again."""
+    owner, key = register(app, "keeper")
+    first = owner.get(f"/api/rates?date={PAST}&quote=CHF&symbol=USD", headers=CSRF).get_json()
+    again = owner.get(f"/api/rates?date={PAST}&quote=CHF&symbol=USD", headers=CSRF).get_json()
+    asked = len(sources.opened)
+
+    later = restarted(app)
+    signed_in, _ = sign_in(later, "keeper", key)
+    after = signed_in.get(f"/api/rates?date={PAST}&quote=CHF&symbol=USD", headers=CSRF).get_json()
+
+    assert (first["cached"], again["cached"], asked) == (False, True, 1)
+    assert (after["rate"], after["cached"]) == ("0.9194556822", False)
+    assert len(sources.opened) == 2

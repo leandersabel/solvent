@@ -1,9 +1,10 @@
 """The reviewer's own checks of the nightly harness's prepared data
 (spec/features/nightly-harness.md, Prepared data; Acceptance criteria
 20, 22, 24, 28, 42, 43 and 44; net-worth-view.md, Acceptance criteria
-69), and of the gold window it takes from the app (Known prices, The
-source checks; Acceptance criteria 13 and 40), written from the spec
-alone.
+69), of the gold window it takes from the app (Known prices, The
+source checks; Acceptance criteria 13 and 40), and of the composition
+its oracle applies (Known prices; rate-lookup.md, Providers), written
+from the spec alone.
 """
 from __future__ import annotations
 
@@ -14,6 +15,7 @@ import shutil
 import subprocess
 import sys
 from datetime import date, datetime, timedelta, timezone
+from decimal import ROUND_HALF_EVEN, Decimal
 from fractions import Fraction
 
 import pytest
@@ -569,3 +571,42 @@ def test_every_harness_python_file_imports_the_standard_library_and_only_what_fi
     }
 
     assert rest <= allowed, rest
+
+
+# ---- Known prices: the oracle applies rate-lookup.md's composition ----
+
+
+def spec_proposal(figure: Decimal) -> str:
+    """rate-lookup.md, Providers: once, half to even, to 10 significant
+    digits but never past the twelfth place, written plain."""
+    step = Decimal(1).scaleb(max(figure.adjusted() - 9, -12))
+    return format(figure.quantize(step, ROUND_HALF_EVEN).normalize(), "f")
+
+
+def spec_rate(code: str, quote: str, on: str) -> Decimal:
+    """Known prices, Frankfurter: `ref[C] / ref[Q] × f(p)` at 5
+    significant digits."""
+    p = date.fromisoformat(on)
+    figure = prices.REF[code] / prices.REF[quote] * (1 + (Decimal(p.toordinal() % 101) - 50) / 2000)
+    return figure.quantize(Decimal(1).scaleb(figure.adjusted() - 4), ROUND_HALF_EVEN)
+
+
+def spec_cena(on: str) -> Decimal:
+    p = date.fromisoformat(on)
+    return (250 * (1 + (Decimal(p.toordinal() % 89) - 44) / 1000)).quantize(Decimal("0.01"), ROUND_HALF_EVEN)
+
+
+@pytest.mark.parametrize("quote", ["EUR", "CHF", "PLN", "JPY", "IDR"])
+@pytest.mark.parametrize("on", ["2026-07-29", "2024-02-29", "2013-01-02"])
+def test_known_table_rounds_every_proposal_as_rate_lookup_pins_it(quote, on):
+    """On a weekday both sources published, every currency is `1 /
+    rates[C]` and gold `cena × (1 / rates["PLN"])`, the latter times
+    31.1034768, each rounded once."""
+    table = prices.known_table(on, quote)
+
+    for code in prices.REF:
+        if code != quote:
+            assert table[code]["rate"] == spec_proposal(1 / spec_rate(code, quote, on)), code
+    grams = spec_cena(on) if quote == "PLN" else spec_cena(on) * (1 / spec_rate("PLN", quote, on))
+    assert table["XAU-g"]["rate"] == spec_proposal(grams)
+    assert table["XAU-ozt"]["rate"] == spec_proposal(grams * Decimal("31.1034768"))
