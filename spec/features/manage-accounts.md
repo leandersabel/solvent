@@ -99,6 +99,9 @@ so it stacks at phone width.
     and not as a warning. It records the canonical symbol, so the holding
     gets proposals if a provider is added later, which free text would
     lose.
+  - **In a vault whose main currency no source quotes into**, every
+    option but the main currency is marked "rate entered by hand",
+    because none has a rate source there (`record-rate.md`, Reading).
   - **"Something else…"** takes free text (`m²`, `bottles`) and states
     the consequence at the point of choice: "You enter the price
     yourself each time you record a value." Typed text is trimmed and its
@@ -883,3 +886,7 @@ Unarchiving and archiving it again writes the zero at the new D.
     before Save is pressed again. Test:
     `tests/browser/parts/account-form.mjs`,
     `tests/browser/parts/account-form-review-refusals.mjs`.
+61. In a vault whose main currency no source quotes into, every unit
+    option but the main currency is marked "rate entered by hand". Test:
+    `tests/browser/parts/account-form.mjs`,
+    `tests/browser/parts/account-form-review-unquoted.mjs`.

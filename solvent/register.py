@@ -28,7 +28,7 @@ from .auth import AUTH_KEY_BYTES, SALT_BYTES
 from .db import get_db, new_epoch, utcnow, write_transaction
 from .guard import navigation, public
 from .pages import vault_page
-from .rates import table_rows
+from .rates import adapter_for, table_rows
 from .records import MAX_VERSION, NONCE_BYTES, RecordWrite, store
 from .validation import Payload, decode_b64, kdf_envelope_ok, normalize_username, parse
 
@@ -107,7 +107,7 @@ def _register_page():
         [
             {"symbol": s["symbol"], "label": s["label"]}
             for s in table_rows()
-            if s["kind"] == "currency"
+            if s["kind"] == "currency" and adapter_for(s["symbol"], s["kind"])
         ]
         if row["kind"] == "vault_owner"
         else []

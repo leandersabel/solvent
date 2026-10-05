@@ -114,6 +114,24 @@ await run(async () => {
     const BAND = `Band ${XSS}`;
     const accountsBefore = sql(`SELECT record_id FROM records ${OWN} AND record_type = 'account'`).length;
 
+    // #273: with no source quoting into the main currency, no rate is
+    // looked up, so every unit but the main currency is priced by hand.
+    const mainSince = "import('/static/js/session.js').then((s) => { const row = s.currentVault().symbols.get('CHF'); const was = row.since; row.since = %s; return was; })";
+    const since = await page.eval(mainSince.replace('%s', 'null'));
+    await click('Add a holding');
+    await page.waitUntil("document.querySelector('#holding-unit-list [data-symbol]')", { label: 'the unit list' });
+    const unquoted = JSON.parse(await page.eval(
+      "JSON.stringify([...document.querySelectorAll('#holding-unit-list [data-symbol]')].map(o => o.textContent))",
+    ));
+    await inDialog('Cancel');
+    await page.waitUntil("!document.querySelector('.dialog')", { label: 'the dialog to close' });
+    await page.eval(mainSince.replace('%s', JSON.stringify(since)));
+    check(
+      'with no source quoting into the main currency, every unit but it is marked rate entered by hand',
+      unquoted.filter((t) => !t.endsWith('rate entered by hand')).join() === 'Swiss Franc (CHF)',
+      unquoted.join(' | '),
+    );
+
     await click('Add a holding');
     await page.waitUntil("document.querySelector('#holding-unit-list [data-symbol]')", { label: 'the unit list' });
     const unitList = JSON.parse(await page.eval(`JSON.stringify({
@@ -136,7 +154,9 @@ await run(async () => {
     );
     check(
       'a unit with no lookup is listed and marked rate entered by hand',
-      unitList.texts.some((t) => t.includes('XAG-ozt') && t.endsWith('rate entered by hand')),
+      unitList.texts.some((t) => t.includes('XAG-ozt') && t.endsWith('rate entered by hand')) &&
+        unitList.texts.some((t) => t === 'United States Dollar (USD)'),
+      unitList.texts.join(' | '),
     );
     check('the form says what the unit commits you to', (await text()).includes('After that it is fixed'));
     check('the form offers no price, rate or symbol field', !(await page.eval("Boolean(document.querySelector('.dialog').textContent.match(/\\bRate\\b|Rate symbol|No price source/))")));

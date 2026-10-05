@@ -986,5 +986,19 @@ await run(async () => {
       (await rowState('Fund 5')) === undefined && on(await stored('snapshot'), DA).every((s) => s.accountId !== id['Fund 5']),
     archivedSaid,
   );
+
+  // #273: a vault whose main currency no source quotes into.
+  const since = await model(({ v }) => v.symbols.get('CHF').since);
+  await model(({ v }) => { v.symbols.get('CHF').since = null; return true; });
+  traffic.length = 0;
+  await go(`#/sweep/${ago(71)}`);
+  const unquoted = await lineState('USD');
+  await model(({ v }, from) => { v.symbols.get('CHF').since = from; return true; }, since);
+  check(
+    'record-rate: with no source quoting into the main currency, a line says so, offers no Look it up and nothing is asked',
+    unquoted.says.includes('No price source quotes in CHF, your main currency. This one is yours to set.') &&
+      !unquoted.lookup && rateAsks().length === 0,
+    JSON.stringify(unquoted),
+  );
   await home();
 });

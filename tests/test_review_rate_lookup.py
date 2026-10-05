@@ -17,7 +17,10 @@ next one after a slot frees sends (Rate limiting and failure,
 criterion 69). Gold quoted in anything but PLN is priced at the gold
 day, the latest day on or before `date` both sources published, and
 both its halves are that day's (Providers, Gold, Edge cases, criteria
-7, 22, 23, 29, 47, 48, 56 and 70 to 72).
+7, 22, 23, 29, 47, 48, 56 and 70 to 72). A currency no source serves
+is never a main currency on offer and, as a quote, asks nothing, and
+Not Found is neither a failure nor a success (The symbol table, Rate
+limiting and failure, criteria 40 and 73 to 75).
 
 Written from the spec alone. Each provider is reached on a loopback HTTP
 server through the app's own opener, so the app's real socket timeout
@@ -41,7 +44,7 @@ from decimal import ROUND_HALF_EVEN, Decimal
 import pytest
 
 import solvent.rates as rates
-from tests.helpers import CSRF, connect, register, rows, sign_in
+from tests.helpers import CSRF, connect, mint_invite, register, rows, sign_in
 
 PAST = "2026-07-31"
 # How late a receive may start after the deadline, for scheduling alone.
@@ -1048,7 +1051,6 @@ def silent(url):
 ANSWERS = {
     "503": (raw(b"HTTP/1.1 503 Leaky Reason\r\nConnection: close\r\n"
                 b"Content-Length: 11\r\n\r\nleaky body!"), {"503"}),
-    "404": (at_once(lambda url: b"leaky not found", status=404), {"404"}),
     "429": (at_once(lambda url: b"leaky slow down", status=429), {"429"}),
     "302": (raw(head(302, {"Location": "http://169.254.169.254/leaky", "Content-Length": 0})),
             {"302"}),
@@ -1795,8 +1797,7 @@ def test_a_saturday_quoted_elsewhere_is_priced_at_fridays_both_halves(owner, sou
     assert fx_days_asked(urls) == [PAST]
 
 
-@pytest.mark.parametrize("status", [500, 404])
-def test_a_failing_step_back_is_no_proposal_and_counts_against_frankfurter(owner, sources, status):
+def test_a_failing_step_back_is_no_proposal_and_counts_against_frankfurter(owner, sources):
     """Criteria 29 and 48 on a further leg: either leg failing is No
     Content, never a half-composed rate or the PLN figure, and the failure
     is Frankfurter's alone."""
@@ -1806,7 +1807,7 @@ def test_a_failing_step_back_is_no_proposal_and_counts_against_frankfurter(owner
     def plan(url):
         if url.split("/v1/")[1][:10] == PAST:
             return first(url)
-        return [answer(b"{}", status)], 0
+        return [answer(b"{}", 500)], 0
 
     sources.plans["frankfurter"] = plan
 
@@ -1899,3 +1900,186 @@ def test_a_stepped_back_gold_rate_is_cached_under_the_requested_date(owner, sour
     assert len(sources.opened) == sent
     assert again["cached"] is True
     assert (again["asOf"], again["rate"]) == (first["asOf"], first["rate"])
+
+
+# A quote no source serves, and Not Found as what a source does not
+# publish (The symbol table, Rate limiting and failure, Edge cases,
+# criteria 40 and 73 to 75).
+
+UNSERVED = "ARS"
+STORED = {"off": 0, "on": 1}
+
+
+@pytest.fixture(params=STORED, ids=lambda flag: f"stored-{flag}")
+def unserved(request, app, admin):
+    """A currency an administrator added, which Frankfurter does not
+    serve, with its `lookup` flag stored as the parameter says. The
+    server refuses the flag on, so a row stored that way is written as
+    an operator's shell would."""
+    response = admin.post(
+        "/api/admin/symbols",
+        json={"symbol": UNSERVED, "label": "Argentine Peso", "kind": "currency", "lookup": False},
+        headers=CSRF,
+    )
+    assert response.status_code in (200, 201), response.get_data(as_text=True)
+    conn = connect(app)
+    try:
+        conn.execute("UPDATE symbols SET lookup = ? WHERE symbol = ?", (STORED[request.param], UNSERVED))
+        conn.commit()
+    finally:
+        conn.close()
+    return UNSERVED
+
+
+def row_of(table: list[dict], symbol: str) -> dict:
+    (found,) = [row for row in table if row["symbol"] == symbol]
+    return found
+
+
+def test_a_currency_no_source_serves_reads_lookup_false_with_no_since_on_both_routes(owner, admin, unserved):
+    """Criterion 73."""
+    offered = row_of(owner.get("/api/rates/symbols", headers=CSRF).get_json(), unserved)
+    managed = row_of(admin.get("/api/admin/symbols", headers=CSRF).get_json(), unserved)
+
+    assert offered["kind"] == "currency"
+    assert offered["lookup"] is False
+    assert offered["since"] is None
+    assert managed["lookup"] is False
+    assert managed["hasAdapter"] is False
+
+
+def offered_currencies(page: str) -> set[str]:
+    return set(re.findall(r'"symbol":\s*"([A-Z]{3})"', page))
+
+
+def test_a_currency_no_source_serves_is_not_offered_at_registration(app, client, unserved):
+    """Criterion 40 and register.md, Rules: the list is the currency rows
+    with an adapter, whatever the flag stored on a row without one."""
+    page = client.get(f"/register?invite={mint_invite(app)}").get_data(as_text=True)
+
+    offered = offered_currencies(page)
+    assert {"CHF", "USD", "EUR"} <= offered
+    assert unserved not in offered
+
+
+def test_the_registration_list_is_exactly_the_currencies_the_registry_serves(app, client, admin):
+    """register.md, Rules: "exactly the provider-quotable currency set",
+    asserted against what the symbol routes say has an adapter."""
+    admin.post(
+        "/api/admin/symbols",
+        json={"symbol": UNSERVED, "label": "Argentine Peso", "kind": "currency", "lookup": False},
+        headers=CSRF,
+    )
+    served = {
+        row["symbol"] for row in admin.get("/api/admin/symbols", headers=CSRF).get_json()
+        if row["kind"] == "currency" and row["hasAdapter"] and not row["retired"]
+    }
+    page = client.get(f"/register?invite={mint_invite(app)}").get_data(as_text=True)
+
+    assert offered_currencies(page) == served
+
+
+def test_a_quote_no_source_serves_answers_no_content_and_asks_nothing(owner, sources, unserved):
+    """Criterion 74 and Edge cases, A quote with no adapter: whatever the
+    symbol and date, with each breaker's count where it was."""
+    for breaker in rates.breakers.values():
+        breaker.record_failure(100)
+        breaker.record_failure(100)
+    before = failures()
+    symbols = [row["symbol"] for row in owner.get("/api/rates/symbols", headers=CSRF).get_json()]
+    assert {"USD", "XAU-g", "XAU-ozt", "XAG-ozt", unserved} <= set(symbols)
+
+    answers = {}
+    for on in (PAST, "2012-12-31", "1998-12-31"):
+        answers[on, None] = owner.get(f"/api/rates?date={on}&quote={unserved}", headers=CSRF).status_code
+        for symbol in symbols:
+            answers[on, symbol] = owner.get(
+                f"/api/rates?date={on}&quote={unserved}&symbol={symbol}", headers=CSRF
+            ).status_code
+
+    assert {asked: status for asked, status in answers.items() if status != 204} == {}
+    assert sources.opened == []
+    assert failures() == before == {"frankfurter": 2, "nbp": 2}
+
+
+def not_found(url):
+    return [answer(b'{"message": "not found"}', 404)], 0
+
+
+NOT_FOUND_CASES = {
+    "frankfurter table": ("&quote=CHF&symbol=USD", {"frankfurter": not_found}, ["frankfurter"]),
+    "nbp range": ("&quote=PLN&symbol=XAU-g", {"nbp": not_found}, ["nbp"]),
+    "gold quote leg": ("&quote=CHF&symbol=XAU-ozt", {"frankfurter": not_found}, ["nbp", "frankfurter"]),
+    "whole table": ("&quote=CHF", {"frankfurter": not_found, "nbp": not_found}, ["frankfurter", "nbp"]),
+}
+
+
+@pytest.mark.parametrize("case", NOT_FOUND_CASES)
+def test_a_not_found_answer_past_the_count_leaves_the_breakers_alone(app, owner, sources, logged, case):
+    """Criterion 75: Not Found is neither a failure nor a success, logs
+    no provider line, and every request still goes out."""
+    query, plans, asked = NOT_FOUND_CASES[case]
+    app.config["RATE_BREAKER_FAILURES"] = 2
+    sources.plans.update(plans)
+    tries = 5
+
+    statuses = [
+        owner.get(f"/api/rates?date={day(n)}{query}", headers=CSRF).status_code for n in range(tries)
+    ]
+
+    assert statuses == [204] * tries
+    assert sorted(p for p, _ in sources.opened) == sorted(asked * tries)
+    assert failures() == NONE_FAILED
+    assert provider_lines(logged) == []
+
+
+def test_a_not_found_step_back_is_no_proposal_and_no_failure(owner, sources, logged):
+    """Criteria 72 and 75 on a further leg of the gold day: the table
+    for NBP's last day before Frankfurter's answers Not Found."""
+    sources.plans["nbp"] = nbp_publishing(offset(PAST, 2), PAST)
+    first = fx_publishing(offset(PAST, 2), offset(PAST, 1))
+
+    def plan(url):
+        if url.split("/v1/")[1][:10] == PAST:
+            return first(url)
+        return not_found(url)
+
+    sources.plans["frankfurter"] = plan
+    urls = asked_urls(sources)
+
+    response = owner.get(f"/api/rates?date={PAST}&quote=CHF&symbol=XAU-g", headers=CSRF)
+
+    assert response.status_code == 204
+    assert fx_days_asked(urls) == [PAST, offset(PAST, 2)]
+    assert failures() == NONE_FAILED
+    assert provider_lines(logged) == []
+
+
+def test_a_not_found_answer_neither_counts_nor_resets_a_failure_run(app, owner, sources):
+    """Rate limiting and failure: Not Found is "neither a failure nor a
+    success", so failures either side of it still add up to the count."""
+    app.config["RATE_BREAKER_FAILURES"] = 3
+    answers = iter([500, 500, 404, 500])
+    sources.plans["frankfurter"] = lambda url: ([answer(b"{}", next(answers))], 0)
+
+    for n in range(5):
+        owner.get(f"/api/rates?date={day(n)}&quote=CHF&symbol=USD", headers=CSRF)
+
+    assert [p for p, _ in sources.opened] == ["frankfurter"] * 4
+
+
+def test_a_currency_no_source_serves_as_a_symbol_asks_nothing_at_any_date(owner, sources, unserved):
+    """Edge cases, Symbol with `lookup: false`: one with no adapter is
+    No Content with no outbound request at every date, whatever flag its
+    row was stored with, and the whole table leaves it out."""
+    statuses = {
+        on: owner.get(f"/api/rates?date={on}&quote=CHF&symbol={unserved}", headers=CSRF).status_code
+        for on in (PAST, "2012-12-31", "1998-12-31")
+    }
+    sources.plans["frankfurter"] = at_once(fx_table(**{unserved: 1234.5}))
+
+    whole = table(owner)
+
+    assert statuses == {PAST: 204, "2012-12-31": 204, "1998-12-31": 204}
+    assert unserved not in whole and "USD" in whole
+    assert sorted(p for p, _ in sources.opened) == ["frankfurter", "nbp"]

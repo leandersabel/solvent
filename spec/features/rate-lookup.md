@@ -161,8 +161,10 @@ back to 1948 from other central banks is not the API the app calls.
   An answer with no usable rate is a changed shape (Rate limiting and
   failure).
   Nothing else in the body is read.
-- The currency half of the symbol table is seeded from the provider's
-  own currency list.
+- The provider's own currency list seeds the currency half of the
+  symbol table and is the adapter registry's currencies. It is a
+  constant in the code, never fetched. A currency outside it has no
+  adapter.
 - A weekend, holiday or pre-publication date resolves through the
   prior-close rule (Edge cases), with `asOf` carrying the earlier date.
   This is the normal path, not an error.
@@ -290,7 +292,9 @@ is also its rate symbol. An unknown symbol is a Bad Request at
 a symbol, and a free-text unit draws no proposal rather than an error.
 
 - `kind`: `currency` or `metal`. Display and grouping only.
-- `lookup`: whether the proxy can price this symbol **today**. `false`
+- `lookup`: whether the proxy can price this symbol **today**: the
+  stored flag and an adapter, read together wherever it is used, so a
+  row stored with the flag on and no adapter reads `false`. `false`
   means valid and canonical with no provider yet: the rate is entered by
   hand and `/api/rates` answers No Content, not Bad Request. A designed
   state, not a degraded one.
@@ -306,20 +310,27 @@ a symbol, and a free-text unit draws no proposal rather than an error.
 whose series starts later (Providers, FX). No adapter, no floor. The
 floor is a server-side constant from the adapter registry, like
 `hasAdapter`, never stored on the row or set through any route. A
-currency an administrator adds
-takes 1999-01-04, because the server knows no later start.
+currency an administrator adds has no adapter, because every currency
+Frankfurter serves is seeded, so it has no floor and its `lookup` reads
+`false`.
 `GET /api/admin/symbols` carries no `since`, because no administrator
 decision turns on it: `lookup` is refused only for want of an adapter.
 
 **A rate source applies to a date only on or after the later of the
 symbol's floor and the quote's.** A single-symbol request before it is a
 Bad Request that reaches no provider, and the whole-table form leaves
-the symbol out and asks no provider for it. The quote's counts because Frankfurter
-answers Not Found for a `base` before its start, which would count
-against its breaker. Before that date nobody published a price, so no
-provider is asked, and the
+the symbol out and asks no provider for it. The quote's counts because
+Frankfurter answers Not Found for a `base` before its start. Before that
+date nobody published a price, so no provider is asked, and the
 client treats the symbol as one its owner prices (`record-rate.md`,
 Reading), a designed state like `lookup: false`, never an outage.
+
+**A quote no source serves is asked nothing.** A `quote` that is a
+currency row with no adapter answers No Content, at any date and for
+any symbol, with no outbound request, because every rate into it needs
+Frankfurter to quote into it. Such a currency is never offered as a
+main currency (`register.md`, Rules), and a vault that has one asks
+nothing (`record-rate.md`, Reading).
 
 The table is platform configuration: identical for every account and
 revealing nothing about who holds what. **Maintaining it is an
@@ -333,7 +344,7 @@ Under `/api/admin/`, administrator session only, CSRF-protected, Not
 Found to a vault owner (`app-shell.md`, The two surfaces).
 
 - `GET /api/admin/symbols`: the full table including retired rows, each
-  with `symbol`, `label`, `kind`, `lookup`, `retired` and
+  with `symbol`, `label`, `kind`, `lookup` as it reads, `retired` and
   **`hasAdapter`**, whether this deployment has a provider adapter for
   it. `hasAdapter` is derived from the registry, read-only, and `POST`
   and `PATCH` reject it like any unknown field.
@@ -493,9 +504,16 @@ host's network are reachable.
   it gets no proposal. The
   breakers live in process memory, so a restart resets them.
 - A failure is an outbound request that cannot connect, times out,
-  answers anything but 200, answers a body that is not JSON, or answers
-  JSON in a changed shape. A success is an answer the adapter reads a
-  figure from, and resets its own provider's count and no other.
+  answers anything but 200 or Not Found, answers a body that is not
+  JSON, or answers JSON in a changed shape. A success is an answer the
+  adapter reads a figure from, and resets its own provider's count and
+  no other.
+- **Not Found is what the source does not publish**, such as a currency
+  before its series starts: no proposal, neither a failure nor a
+  success, and no log line. Counting it would let one vault asking about
+  such a day open the breaker for every other vault. A moved endpoint
+  still shows in the nightly source check (`nightly-harness.md`, The
+  source checks).
 - **A changed shape** is, for Frankfurter, anything but an object whose
   `base` equals `quote`, whose `date` is usable and whose `rates` is an
   object holding at least one usable rate. For NBP it is anything but a
@@ -568,6 +586,8 @@ host's network are reachable.
   trivial question into a provider error. The client never asks,
   because a main-currency holding has no rate line, but the server
   answers correctly regardless.
+- **A quote with no adapter**: No Content with no outbound request,
+  whatever the symbol and date (The symbol table).
 - **Symbol not in the table**: Bad Request. Adding one is an
   administrator action (`admin-invites.md`).
 - **Symbol with `lookup: false`** (`XAG-ozt` and the rest): No Content,
@@ -776,9 +796,11 @@ host's network are reachable.
     count, list or other indication of which holdings use a symbol,
     asserted against the full response shape. Test:
     `tests/test_rates.py::test_no_admin_symbol_response_counts_which_holdings_use_one`.
-40. An administrator adding a currency makes it available in the next
-    registration's main-currency picker with no restart. Test:
-    `tests/test_rates.py::test_an_administrator_adding_a_currency_reaches_the_next_registration`.
+40. A currency an administrator adds that no source serves is not
+    offered in the next registration's main-currency picker. Test:
+    `tests/test_rates.py::test_a_currency_no_source_serves_is_not_offered_at_registration`,
+    `tests/test_review_rate_lookup.py::test_a_currency_no_source_serves_is_not_offered_at_registration`,
+    `tests/test_review_rate_lookup.py::test_the_registration_list_is_exactly_the_currencies_the_registry_serves`.
 41. (blind) No log line, response body or error page contains a
     provider API key, checked against real output even though no
     provider has a key. Test:
@@ -957,3 +979,20 @@ host's network are reachable.
     `tests/test_rates.py::test_gold_with_no_day_both_sources_published_is_no_content`,
     `tests/test_review_rate_lookup.py::test_gold_with_no_day_both_published_in_the_window_is_no_proposal`,
     `tests/test_review_rate_lookup.py::test_a_frankfurter_day_before_nbps_window_is_no_proposal`.
+73. A currency row with no adapter reads `lookup: false` and `since:
+    null` on both symbol routes, even when stored with `lookup` on. Test:
+    `tests/test_rates.py::test_a_currency_no_source_serves_reads_lookup_false_with_no_since`,
+    `tests/test_review_rate_lookup.py::test_a_currency_no_source_serves_reads_lookup_false_with_no_since_on_both_routes`.
+74. (blind) Quoted in a currency with no adapter, the whole table and
+    every single symbol answer No Content with no outbound request and
+    no change to either breaker's count. Test:
+    `tests/test_rates.py::test_a_quote_no_source_serves_answers_no_content_and_asks_nothing`,
+    `tests/test_review_rate_lookup.py::test_a_quote_no_source_serves_answers_no_content_and_asks_nothing`,
+    `tests/test_review_rate_lookup.py::test_a_currency_no_source_serves_as_a_symbol_asks_nothing_at_any_date`.
+75. (blind) Either source answering Not Found past the configured count
+    leaves both breakers' counts at zero, logs no provider line, and
+    every request still goes out. Test:
+    `tests/test_rates.py::test_a_not_found_answer_leaves_the_breaker_alone`,
+    `tests/test_review_rate_lookup.py::test_a_not_found_answer_past_the_count_leaves_the_breakers_alone`,
+    `tests/test_review_rate_lookup.py::test_a_not_found_step_back_is_no_proposal_and_no_failure`,
+    `tests/test_review_rate_lookup.py::test_a_not_found_answer_neither_counts_nor_resets_a_failure_run`.

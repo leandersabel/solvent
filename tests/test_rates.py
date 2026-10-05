@@ -687,14 +687,69 @@ def test_no_admin_symbol_response_counts_which_holdings_use_one(admin):
         assert set(row) == {"symbol", "label", "kind", "lookup", "retired", "hasAdapter"}
 
 
-def test_an_administrator_adding_a_currency_reaches_the_next_registration(app, admin):
+def test_a_currency_no_source_serves_is_not_offered_at_registration(app, admin):
     admin.post(
         "/api/admin/symbols",
         json={"symbol": "ZZZ", "label": "Testland Dollar", "kind": "currency", "lookup": False},
         headers=CSRF,
     )
     page = app.test_client().get(f"/register?invite={mint_invite(app)}").get_data(as_text=True)
-    assert "Testland Dollar" in page
+    assert "Testland Dollar" not in page
+    assert "Swiss Franc" in page
+
+
+def _unserved_currency(app):
+    """A currency row no source serves, stored with `lookup` on as an
+    older instance could have stored it."""
+    conn = connect(app)
+    conn.execute(
+        "INSERT INTO symbols (symbol, label, kind, lookup) VALUES ('ZZZ', 'Testland Dollar', 'currency', 1)"
+    )
+    conn.commit()
+    conn.close()
+
+
+def test_a_currency_no_source_serves_reads_lookup_false_with_no_since(app, owner, admin):
+    _unserved_currency(app)
+    row = next(r for r in owner.get("/api/rates/symbols", headers=CSRF).get_json() if r["symbol"] == "ZZZ")
+    assert (row["lookup"], row["since"]) == (False, None)
+    row = next(r for r in admin.get("/api/admin/symbols", headers=CSRF).get_json() if r["symbol"] == "ZZZ")
+    assert (row["lookup"], row["hasAdapter"]) == (False, False)
+
+
+def test_a_quote_no_source_serves_answers_no_content_and_asks_nothing(app, owner, providers):
+    _unserved_currency(app)
+    for query in ("", "&symbol=USD", "&symbol=XAU-g", "&symbol=ZZZ"):
+        response = owner.get(f"/api/rates?date={PAST}&quote=ZZZ{query}", headers=CSRF)
+        assert response.status_code == 204, query
+    assert owner.get(f"/api/rates?date={PAST}&quote=CHF&symbol=ZZZ", headers=CSRF).status_code == 204
+    assert providers.requests == []
+    assert failures() == {"frankfurter": 0, "nbp": 0}
+
+
+@pytest.mark.parametrize("source", ["frankfurter", "nbp"])
+def test_a_not_found_answer_leaves_the_breaker_alone(app, owner, monkeypatch, caplog, source):
+    """A source answering Not Found for what it does not publish, such as
+    a currency before its series starts, never opens the breaker for
+    every other vault, and logs nothing."""
+    app.config["RATE_BREAKER_FAILURES"] = 2
+    attempts = []
+
+    def not_found(request, timeout=None):
+        attempts.append(request.full_url)
+        raise urllib.error.HTTPError(request.full_url, 404, "Not Found", {}, None)
+
+    monkeypatch.setattr(rates._opener, "open", not_found)
+    symbol = "USD" if source == "frankfurter" else "XAU-g"
+    with caplog.at_level("WARNING"):
+        for offset in range(4):
+            on = (date.fromisoformat(PAST) - timedelta(days=offset)).isoformat()
+            response = owner.get(f"/api/rates?date={on}&quote=PLN&symbol={symbol}", headers=CSRF)
+            assert response.status_code == 204
+
+    assert len(attempts) == 4
+    assert failures() == {"frankfurter": 0, "nbp": 0}
+    assert not [r for r in caplog.records if r.getMessage().startswith("rates.provider")]
 
 
 def test_every_outbound_request_is_named(monkeypatch):

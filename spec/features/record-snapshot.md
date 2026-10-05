@@ -271,7 +271,10 @@ Line states:
   (`record-rate.md`, The refresh). The copy names why and never borrows
   the outage wording. A symbol with no provider yet: "No market price
   for silver yet. This one is yours to set." A free-text unit: "Nobody
-  publishes a price for m2. This one is yours to set." With an earlier
+  publishes a price for m2. This one is yours to set." A sourced unit in
+  a vault whose main currency no source quotes into (`record-rate.md`,
+  Reading): "No price source quotes in ARS, your main currency. This
+  one is yours to set." With an earlier
   figure the sentence follows its age, "Estimated 14 months ago. Nobody
   publishes a price for m2. This one is yours to set.", and with none it
   follows "No price for m2 yet."
@@ -295,7 +298,12 @@ Line states:
   price is not a figure. The line moves to the head of the block: "What
   is 1 PAINT worth in CHF? Nothing prices PAINT yet. The figure records
   either way, and until a price exists the holding is listed as not
-  priced." **It never blocks the row.** Blocking would let a provider
+  priced." A sourced unit in a vault whose main currency no source
+  quotes into names that reason in place of "Nothing prices PAINT
+  yet.": "What is 1 CHF worth in ARS? No price source quotes in ARS,
+  your main currency. The figure records either way, and until a price
+  exists the holding is listed as not priced." **It never blocks the
+  row.** Blocking would let a provider
   outage stop somebody recording what they looked up, which this screen
   may never do.
 
@@ -1520,3 +1528,8 @@ Editing an existing entry).
 89. (blind) A sweep row of a holding archived in another window after
     the sweep claimed its date writes nothing, says so, and leaves the
     screen. Test: `tests/browser/parts/update-values.mjs`.
+90. In a vault whose main currency no source quotes into, a currency's
+    rate line says no price source quotes in that main currency, offers
+    no Look it up, and the sweep asks the proxy nothing. Test:
+    `tests/browser/parts/update-values.mjs`,
+    `tests/browser/parts/update-values-review-unquoted.mjs`.

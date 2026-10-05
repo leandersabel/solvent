@@ -678,8 +678,14 @@ function rateLine(vault, unit, date, { sit, readOnly: blockReadOnly, fillMissing
     return part ? { existing: null, payload: writes.rateEntry(vault, unit, date, part) } : null;
   };
 
+  // No source quotes into the main currency (record-rate.md, Reading).
+  const unquoted = () =>
+    vault.symbols.get(vault.mainCurrency)?.since === null && Boolean(vault.symbols.get(unit)?.lookup);
+  const unquotedCopy = `No price source quotes in ${vault.mainCurrency}, your main currency.`;
+
   const ownCopy = () => {
     const row = vault.symbols.get(unit);
+    if (unquoted()) return `${unquotedCopy} This one is yours to set.`;
     return row
       ? `No market price for ${described.name.toLowerCase()} yet. This one is yours to set.`
       : `Nobody publishes a price for ${unit}. This one is yours to set.`;
@@ -762,8 +768,10 @@ function rateLine(vault, unit, date, { sit, readOnly: blockReadOnly, fillMissing
     lookup.hidden = !reopened() || line.lookedUp;
   };
 
-  const askCopy = () =>
-    `What is ${described.one} worth in ${vault.mainCurrency}? Nothing prices ${unit} yet. The figure records either way, and until a price exists the holding is listed as not priced.`;
+  const askCopy = () => {
+    const why = unquoted() ? unquotedCopy : `Nothing prices ${unit} yet.`;
+    return `What is ${described.one} worth in ${vault.mainCurrency}? ${why} The figure records either way, and until a price exists the holding is listed as not priced.`;
+  };
 
   /** Back to what the vault holds for this date. */
   line.reset = () => {

@@ -32,8 +32,13 @@ function groupsOf(table, mainCurrency) {
   ];
 }
 
-const optionText = (row) =>
-  row.lookup ? `${row.label} (${row.symbol})` : `${row.label} (${row.symbol}), rate entered by hand`;
+/** A unit with no rate source in this vault says so: one with lookup
+ *  off, and every unit but the main currency when no source quotes
+ *  into it. */
+const optionText = (vault, row) =>
+  row.symbol === vault.mainCurrency || vault.publishedFrom(row.symbol) !== null
+    ? `${row.label} (${row.symbol})`
+    : `${row.label} (${row.symbol}), rate entered by hand`;
 
 /** Measured in: one searchable list over the symbol table, with
  *  "Something else…" at its foot opening a free-text field
@@ -85,7 +90,7 @@ function unitPicker(vault, current, locked) {
     (table || []).find((row) => row.symbol.toLowerCase() === text.toLowerCase());
   const describe = (symbol) => {
     const row = rowFor(symbol);
-    return row ? optionText(row) : symbol || '';
+    return row ? optionText(vault, row) : symbol || '';
   };
 
   const setValue = (next, announce = true) => {
@@ -194,7 +199,7 @@ function unitPicker(vault, current, locked) {
             'ul',
             { role: 'presentation' },
             rows.map((row) =>
-              option(optionText(row), () => {
+              option(optionText(vault, row), () => {
                 other = false;
                 setValue(row.symbol);
               }, !other && value === row.symbol, { dataset: { symbol: row.symbol } }),
