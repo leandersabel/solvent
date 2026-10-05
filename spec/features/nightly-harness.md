@@ -635,7 +635,8 @@ On failure it prints `docker logs` of `solvent` and `standin`.
 13. The currency list in `prices.py` equals the seeded currencies in
     `solvent.rates`, and its `NBP_WINDOW` equals the app's. Test:
     `tests/test_nightly_tools.py::test_the_currency_list_is_the_seeded_currencies`,
-    `tests/test_nightly_tools.py::test_the_gold_window_is_the_apps`.
+    `tests/test_nightly_tools.py::test_the_gold_window_is_the_apps`,
+    `tests/test_review_nightly_harness.py::test_prices_keeps_a_gold_window_equal_to_the_apps`.
 14. (blind) `sources.py` classifies a timeout, a refused connection,
     `429` and `503` as `no-answer`. Test: `tests/test_nightly_tools.py::test_a_throttled_or_failing_source_is_no_answer`, `tests/test_nightly_tools.py::test_the_requests_failures_are_classified`.
 15. (blind) `sources.py` classifies `301`, `404`, a non-JSON `200`, a
@@ -705,7 +706,7 @@ On failure it prints `docker logs` of `solvent` and `standin`.
 40. (blind) The imports of every file under `tools/nightly/`, Python and
     Node alike, read from its source, are the standard library, `node:`
     built-ins and exactly the imports listed under Files.
-    Test: `tests/test_nightly_tools.py::test_every_python_file_imports_the_standard_library_and_only_what_the_spec_lists`, `tests/test_nightly_tools.py::test_the_generator_imports_node_builtins_and_the_chrome_driver_alone`.
+    Test: `tests/test_nightly_tools.py::test_every_python_file_imports_the_standard_library_and_only_what_the_spec_lists`, `tests/test_nightly_tools.py::test_the_generator_imports_node_builtins_and_the_chrome_driver_alone`, `tests/test_review_nightly_harness.py::test_the_source_check_imports_from_the_app_exactly_the_constants_rate_lookup_names`.
 41. (blind) No module under `solvent/` imports from `tools/`.
     Test: `tests/test_nightly_tools.py::test_nothing_in_the_app_imports_from_tools`.
 42. `clear` keeps the date's rates and leaves the expected figures as

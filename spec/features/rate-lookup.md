@@ -687,6 +687,7 @@ host's network are reachable.
    `tests/test_review_rate_lookup.py::test_a_saturday_takes_fridays_close_for_every_class`,
    `tests/test_review_rate_lookup.py::test_a_currency_takes_frankfurters_prior_close_however_far_back`,
    `tests/test_review_rate_lookup.py::test_gold_asks_nbp_for_the_14_days_up_to_the_date`,
+   `tests/test_review_rate_lookup.py::test_gold_asks_nbp_for_the_window_solvent_rates_exposes`,
    `tests/test_review_rate_lookup.py::test_an_empty_gold_range_quoted_in_pln_is_no_content`.
 8. `XAU-g` and `XAU-ozt` for the same date and quote differ by exactly
    31.1034768, to the precision returned. Test:
