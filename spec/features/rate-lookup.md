@@ -742,7 +742,8 @@ host's network are reachable.
     `tests/test_rates.py::test_an_administrator_adding_a_currency_reaches_the_next_registration`.
 41. (blind) No log line, response body or error page contains a
     provider API key, checked against real output even though no
-    provider has a key. Test: no test.
+    provider has a key. Test:
+    `tests/test_review_rate_lookup.py::test_no_output_of_a_lookup_carries_a_provider_key`.
 42. (blind) Exceeding the per-user rate limit returns Too Many Requests
     and writes no `attempts` row, so the limit lifts an hour after the
     oldest lookup it let through however often the client retried,
@@ -867,4 +868,5 @@ host's network are reachable.
     status=<status>`, with the status for an answer that was not 200 and
     `timeout`, `tls`, `network`, `body` or `other` for each other
     failure, and no date, quote, provider host or error text. Test:
-    `tests/test_rates.py::test_a_failed_fetch_logs_its_source_and_status_and_nothing_of_the_request`.
+    `tests/test_rates.py::test_a_failed_fetch_logs_its_source_and_status_and_nothing_of_the_request`,
+    `tests/test_review_rate_lookup.py::test_a_failed_answer_logs_its_source_and_status_alone`.

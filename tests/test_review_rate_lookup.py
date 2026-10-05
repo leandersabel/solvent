@@ -4,6 +4,8 @@ has failed once it passes (spec/features/rate-lookup.md, SSRF and egress
 hardening, Rate limiting and failure, criteria 17 to 20 and 60). A
 figure that is not a usable price, or in an unexpected currency, is no
 proposal for the symbols built from it (Edge cases, criteria 61 and 62).
+A failed fetch logs its source and status and nothing of the request,
+and no output carries a provider key (criteria 41 and 66).
 
 Written from the spec alone. Each provider is reached on a loopback HTTP
 server through the app's own opener, so the app's real socket timeout
@@ -12,6 +14,8 @@ and read path apply, and the server decides how fast each byte goes.
 from __future__ import annotations
 
 import json
+import logging
+import re
 import socket
 import ssl
 import subprocess
@@ -182,12 +186,9 @@ def sources(monkeypatch):
     yield from _serving(monkeypatch, Sources())
 
 
-@pytest.fixture
-def secure_sources(monkeypatch, tmp_path):
-    """`sources` over HTTPS, so the read goes through the opener's own
-    HTTPS connection, the one every real provider is reached on. The
-    certificate is made for the test, and the opener's HTTPS handler is
-    handed a context trusting it and nothing else changed."""
+def _self_signed(tmp_path) -> tuple[ssl.SSLContext, str]:
+    """A server context with a certificate made for the test, and the
+    certificate's path."""
     key, cert = tmp_path / "key.pem", tmp_path / "cert.pem"
     subprocess.run(
         [
@@ -203,8 +204,18 @@ def secure_sources(monkeypatch, tmp_path):
     )
     served = ssl.create_default_context(ssl.Purpose.CLIENT_AUTH)
     served.load_cert_chain(cert, key)
+    return served, str(cert)
+
+
+@pytest.fixture
+def secure_sources(monkeypatch, tmp_path):
+    """`sources` over HTTPS, so the read goes through the opener's own
+    HTTPS connection, the one every real provider is reached on. The
+    opener's HTTPS handler is handed a context trusting the test's
+    certificate and nothing else changed."""
+    served, cert = _self_signed(tmp_path)
     (handler,) = [h for h in rates._opener.handlers if isinstance(h, urllib.request.HTTPSHandler)]
-    monkeypatch.setattr(handler, "_context", ssl.create_default_context(cafile=str(cert)))
+    monkeypatch.setattr(handler, "_context", ssl.create_default_context(cafile=cert))
     yield from _serving(monkeypatch, Sources(tls=served))
 
 
@@ -971,3 +982,261 @@ def test_a_cached_rate_with_a_usable_earlier_date_is_a_hit(app, owner, sources, 
 
     assert (response["rate"], response["asOf"], response["cached"]) == ("1.5", as_of, True)
     assert sources.opened == []
+
+
+# A failed fetch's log line (Rate limiting and failure, criteria 41 and 66).
+
+LINE = re.compile(
+    r"rates\.provider source=(frankfurter|nbp) status=(\d{3}|timeout|tls|network|body|other)"
+)
+FETCH = {
+    "frankfurter": f"/api/rates?date={PAST}&quote=CHF&symbol=USD",
+    "nbp": f"/api/rates?date={PAST}&quote=PLN&symbol=XAU-g",
+}
+# What a lookup asks for, where it goes and what came back, none of
+# which a line may carry.
+LEAKS = [
+    "api.frankfurter.dev", "api.nbp.pl", "cenyzlota", "127.0.0.1", "http", "base=",
+    "format=", "?", PAST, day(1), "CHF", "PLN", "USD", "Leaky", "leaky", "rror",
+]
+
+
+def raw(data: bytes):
+    """A plan sending `data` as the whole answer, as it is."""
+    return lambda url: ([data], 0)
+
+
+def silent(url):
+    """A plan accepting the request and never answering."""
+    return [b"", b""], 60
+
+
+ANSWERS = {
+    "503": (raw(b"HTTP/1.1 503 Leaky Reason\r\nConnection: close\r\n"
+                b"Content-Length: 11\r\n\r\nleaky body!"), {"503"}),
+    "404": (at_once(lambda url: b"leaky not found", status=404), {"404"}),
+    "429": (at_once(lambda url: b"leaky slow down", status=429), {"429"}),
+    "302": (raw(head(302, {"Location": "http://169.254.169.254/leaky", "Content-Length": 0})),
+            {"302"}),
+    "not json": (at_once(lambda url: b"<html>leaky</html>"), {"body"}),
+    "over the cap": (at_once(lambda url: b"[" + b" " * rates.MAX_RESPONSE_BYTES + b"1]"),
+                     {"body", "other"}),
+    "silent": (silent, {"timeout"}),
+}
+
+
+def provider_lines(caplog) -> list[logging.LogRecord]:
+    return [r for r in caplog.records if r.getMessage().startswith("rates.provider")]
+
+
+def assert_lines(caplog, expected: list[tuple[str, set]]):
+    """The provider lines are exactly one per `(source, statuses)`, each
+    a bare warning in the exact shape."""
+    lines = provider_lines(caplog)
+    shapes = [LINE.fullmatch(r.getMessage()) for r in lines]
+    assert all(shapes), [r.getMessage() for r in lines]
+    found = sorted(shape.groups() for shape in shapes)
+    expected = sorted(expected, key=lambda e: e[0])
+    assert len(found) == len(expected), found
+    for (source, status), (wanted, statuses) in zip(found, expected):
+        assert source == wanted and status in statuses, (source, status, statuses)
+    for line in lines:
+        assert line.levelno == logging.WARNING
+        assert line.exc_info is None and line.stack_info is None
+
+
+def assert_nothing_of_the_request(caplog, capsys, port):
+    """No line the app wrote, in the records or on stderr where its
+    handler prints them, carries what the request held."""
+    messages = [r.getMessage() for r in caplog.records if r.name != "tests"]
+    printed = capsys.readouterr().err
+    for leak in LEAKS:
+        assert not [m for m in messages if leak in m], (leak, messages)
+        assert not [m for m in printed.splitlines() if "rates" in m and leak in m], (leak, printed)
+    assert not [m for m in messages if str(port) in m], messages
+
+
+@pytest.fixture
+def logged(caplog):
+    caplog.set_level(logging.DEBUG)
+    return caplog
+
+
+@pytest.mark.parametrize("provider", FETCH)
+@pytest.mark.parametrize("answer", ANSWERS)
+def test_a_failed_answer_logs_its_source_and_status_alone(owner, sources, logged, capsys, provider, answer):
+    """Criterion 66: the status of an answer that was not 200, `body`
+    for one that is not JSON, `timeout` for none."""
+    sources.plans[provider], statuses = ANSWERS[answer]
+
+    response = owner.get(FETCH[provider], headers=CSRF)
+
+    assert response.status_code == 204, response.get_data(as_text=True)
+    assert_lines(logged, [(provider, statuses)])
+    assert_nothing_of_the_request(logged, capsys, sources.port)
+
+
+@pytest.fixture
+def untrusted_sources(monkeypatch, tmp_path):
+    """`sources` over HTTPS with a certificate nothing trusts."""
+    served, _ = _self_signed(tmp_path)
+    yield from _serving(monkeypatch, Sources(tls=served))
+
+
+@pytest.mark.parametrize("provider", FETCH)
+def test_an_untrusted_certificate_logs_tls(owner, untrusted_sources, logged, capsys, provider):
+    """Criterion 66."""
+    response = owner.get(FETCH[provider], headers=CSRF)
+
+    assert response.status_code == 204
+    assert_lines(logged, [(provider, {"tls"})])
+    assert_nothing_of_the_request(logged, capsys, untrusted_sources.port)
+
+
+def rerouted(sources, url_of):
+    """Every request goes where `url_of(port)` says instead."""
+
+    def route(request):
+        return urllib.request.Request(url_of(sources.port), headers=request.headers)
+
+    sources.route = route
+
+
+@pytest.fixture
+def plain_listener():
+    """A loopback server that answers plain HTTP the moment a
+    connection opens, before any TLS handshake can start."""
+    listener = socket.create_server(("127.0.0.1", 0))
+    listener.settimeout(0.05)
+    stop = threading.Event()
+
+    def accept():
+        while not stop.is_set():
+            try:
+                connection, _ = listener.accept()
+            except (TimeoutError, OSError):
+                continue
+            with connection:
+                connection.sendall(b"HTTP/1.1 200 OK\r\nContent-Length: 2\r\n\r\n[]")
+
+    thread = threading.Thread(target=accept, daemon=True)
+    thread.start()
+    yield listener.getsockname()[1]
+    stop.set()
+    thread.join(timeout=2)
+    listener.close()
+
+
+@pytest.mark.parametrize("provider", FETCH)
+def test_a_server_that_does_not_speak_tls_logs_tls(owner, sources, plain_listener, logged, capsys, provider):
+    """Criterion 66: a handshake that fails is `tls` before `network`."""
+    rerouted(sources, lambda _: f"https://127.0.0.1:{plain_listener}/leaky")
+
+    response = owner.get(FETCH[provider], headers=CSRF)
+
+    assert response.status_code == 204
+    assert_lines(logged, [(provider, {"tls"})])
+    assert_nothing_of_the_request(logged, capsys, plain_listener)
+
+
+@pytest.mark.parametrize("provider", FETCH)
+def test_a_refused_connection_logs_network(owner, sources, logged, capsys, provider):
+    """Criterion 66."""
+    closed = socket.create_server(("127.0.0.1", 0))
+    port = closed.getsockname()[1]
+    closed.close()
+    rerouted(sources, lambda _: f"http://127.0.0.1:{port}/leaky")
+
+    response = owner.get(FETCH[provider], headers=CSRF)
+
+    assert response.status_code == 204
+    assert_lines(logged, [(provider, {"network"})])
+    assert_nothing_of_the_request(logged, capsys, port)
+
+
+@pytest.mark.parametrize("provider", FETCH)
+def test_an_answer_that_is_not_http_logs_a_status_of_the_list(owner, sources, logged, capsys, provider):
+    """Criterion 66: a status line that is no status is no HTTP status,
+    so it is one of the named kinds. The page does not say which."""
+    sources.plans[provider] = raw(b"LEAKY NONSENSE\r\n\r\n")
+
+    response = owner.get(FETCH[provider], headers=CSRF)
+
+    assert response.status_code == 204
+    assert_lines(logged, [(provider, {"network", "other"})])
+    assert_nothing_of_the_request(logged, capsys, sources.port)
+
+
+def test_both_providers_failing_log_one_line_each(owner, sources, logged, capsys):
+    """Criterion 66, for the whole table: one line per failed fetch."""
+    sources.plans["frankfurter"] = ANSWERS["503"][0]
+    sources.plans["nbp"] = ANSWERS["not json"][0]
+
+    response = owner.get(f"/api/rates?date={PAST}&quote=CHF", headers=CSRF)
+
+    assert response.status_code == 204
+    assert_lines(logged, [("frankfurter", {"503"}), ("nbp", {"body"})])
+    assert_nothing_of_the_request(logged, capsys, sources.port)
+
+
+def test_a_failed_quote_leg_logs_its_line_without_its_date(owner, sources, logged, capsys):
+    """Criterion 66: the quote leg goes out at NBP's earlier `asOf`,
+    which its line does not name either."""
+    urls = asked_urls(sources)
+    sources.plans["nbp"] = at_once(lambda url: _nbp(url, lag_days=1))
+    sources.plans["frankfurter"] = ANSWERS["503"][0]
+
+    owner.get(f"/api/rates?date={PAST}&quote=CHF", headers=CSRF)
+
+    legs = [u for u in urls if "frankfurter" in u]
+    assert any(day(1) in u for u in legs), urls
+    assert_lines(logged, [("frankfurter", {"503"})] * len(legs))
+    assert_nothing_of_the_request(logged, capsys, sources.port)
+
+
+def test_a_fetch_the_open_breaker_skips_logs_nothing(app, owner, sources, logged):
+    """Rate limiting and failure: only a fetch that went out and failed
+    logs."""
+    sources.plans["frankfurter"] = ANSWERS["503"][0]
+    for _ in range(app.config["RATE_BREAKER_FAILURES"]):
+        owner.get(FETCH["frankfurter"], headers=CSRF)
+    sent = len(sources.opened)
+    logged.clear()
+
+    response = owner.get(FETCH["frankfurter"], headers=CSRF)
+
+    assert response.status_code == 204
+    assert len(sources.opened) == sent
+    assert provider_lines(logged) == []
+
+
+def test_a_successful_fetch_logs_no_provider_line(owner, sources, logged):
+    response = owner.get(f"/api/rates?date={PAST}&quote=CHF", headers=CSRF)
+
+    assert response.status_code == 200
+    assert provider_lines(logged) == []
+
+
+KEYS = re.compile(r"api[_-]?key|access[_-]?key|app[_-]?id|token|secret|apikey", re.IGNORECASE)
+
+
+def test_no_output_of_a_lookup_carries_a_provider_key(owner, sources, logged, capsys):
+    """Criterion 41, against what a lookup really prints and answers,
+    succeeding, failing and refused: no provider has a key, so no
+    key-shaped name or provider address appears anywhere."""
+    bodies = [
+        owner.get(f"/api/rates?date={PAST}&quote=CHF", headers=CSRF),
+        owner.get(f"/api/rates?date={PAST}&quote=CHF&symbol=NOPE", headers=CSRF),
+        owner.get("/api/rates?date=nonsense&quote=CHF", headers=CSRF),
+    ]
+    sources.plans["frankfurter"] = ANSWERS["503"][0]
+    sources.plans["nbp"] = silent
+    bodies.append(owner.get(f"/api/rates?date={day(2)}&quote=CHF", headers=CSRF))
+
+    assert [r.status_code for r in bodies] == [200, 400, 400, 204]
+    output = [r.get_data(as_text=True) for r in bodies]
+    output += [r.getMessage() for r in logged.records]
+    output += capsys.readouterr().err.splitlines()
+    for text in output:
+        assert not KEYS.search(text), text
+        assert "api.frankfurter.dev" not in text and "api.nbp.pl" not in text, text
