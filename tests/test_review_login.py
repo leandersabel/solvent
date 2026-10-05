@@ -301,3 +301,84 @@ def test_the_first_unknown_username_after_a_start_takes_no_longer_than_a_wrong_a
         ratios.append(measured["ratio"])
 
     assert statistics.median(ratios) < 1.5, ratios
+
+
+# ---- A credential changed elsewhere (criteria 81 and 82) -----------------
+#
+# login.md, Stale-KDF upgrade step 4 and A credential changed elsewhere;
+# architecture.md, Credentials and vault key wrappers.
+
+from tests import test_review_export_import as elsewhere  # noqa: E402
+
+
+@pytest.mark.parametrize("kind", ["vault_owner", "administrator"])
+def test_an_upgrade_after_a_password_change_on_another_page_writes_nothing(app, kind):
+    here, key = elsewhere.open_vault(app, "someone", kind)
+    elsewhere.make_stale(app, "someone")
+    assert here.sign_in("someone", key)["kdfStale"] is True
+    assert here.another().change(key)[0].status_code == 200
+
+    before = elsewhere.everything(app)
+    response, _ = here.upgrade()
+    assert elsewhere.refused(response, elsewhere.CHANGED), response.get_data(as_text=True)
+    assert elsewhere.everything(app) == before
+
+
+def test_a_password_change_landing_between_the_gate_and_the_upgrade_refuses_it(app, monkeypatch):
+    """Held after the gate and before the upgrade's transaction, where a
+    salt compared outside it would undo the change with a credential
+    made from the old password."""
+    import solvent.auth as auth_module
+
+    here, key = elsewhere.open_vault(app)
+    elsewhere.make_stale(app, "owner")
+    here.sign_in("owner", key)
+    there = here.another()
+    real = auth_module.write_transaction
+
+    def after_a_change(*args, **kwargs):
+        monkeypatch.setattr(auth_module, "write_transaction", real)
+        assert there.change(key)[0].status_code == 200
+        return real(*args, **kwargs)
+
+    monkeypatch.setattr(auth_module, "write_transaction", after_a_change)
+    response, _ = here.upgrade()
+    assert elsewhere.refused(response, elsewhere.CHANGED), response.get_data(as_text=True)
+    assert elsewhere.salt_of(app, "owner") == there.salt
+
+
+def test_an_upgrade_with_a_replaced_epoch_and_a_superseded_salt_names_the_vault(app):
+    here, key = elsewhere.open_vault(app)
+    elsewhere.make_stale(app, "owner")
+    here.sign_in("owner", key)
+    there = here.another()
+    assert there.change(key)[0].status_code == 200
+    assert there.restore().status_code == 200
+
+    before = elsewhere.everything(app)
+    response, _ = here.upgrade()
+    assert elsewhere.refused(response, elsewhere.REPLACED), response.get_data(as_text=True)
+    assert elsewhere.everything(app) == before
+
+
+@pytest.mark.parametrize("kind", ["vault_owner", "administrator"])
+@pytest.mark.parametrize("path", [elsewhere.UPGRADE, elsewhere.CHANGE, elsewhere.IMPORT])
+def test_a_request_without_the_current_salt_is_a_bad_request_and_writes_nothing(app, kind, path):
+    if kind == "administrator" and path == elsewhere.IMPORT:
+        pytest.skip("an administrator reaches no import")
+    page, key = elsewhere.open_vault(app, "someone", kind)
+    elsewhere.make_stale(app, "someone")
+    page.sign_in("someone", key)
+    if path == elsewhere.CHANGE:
+        body = page.change_body(key, b64(), page.salt)
+    elif path == elsewhere.UPGRADE:
+        body = {"currentSalt": page.salt, "salt": b64(16), "kdf": dict(DEFAULT_KDF_ENVELOPE), "authKey": b64(),
+                **page.wrapper()}
+    else:
+        body = {"currentSalt": page.salt, "records": [], **page.wrapper()}
+    del body["currentSalt"]
+
+    before = elsewhere.everything(app)
+    response = page.post(path, body)
+    assert response.status_code == 400, response.get_data(as_text=True)
+    assert elsewhere.everything(app) == before

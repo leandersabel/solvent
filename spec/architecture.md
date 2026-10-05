@@ -141,6 +141,18 @@ conditions, so two tables.
   deleting the account removes it. An export carries the password
   credential's wrapper (export-import.md), so without one a vault has
   no openable backup.
+- **A write made under a page's Master Key names the salt that key
+  came from.** Import, the stale-KDF upgrade and a password change carry
+  `currentSalt`, the salt of the `params` the page derived from. The
+  server compares it with the `password` credential's `params` inside
+  the write's transaction, after the vault epoch (Vault epoch), and on a
+  mismatch answers Conflict `{"refused":"credential-changed"}` and
+  writes nothing. A missing one is a Bad Request. Without it a page
+  opened before a password change or upgrade elsewhere stores a wrapper
+  beside `params` that no password opens, or undoes the change. The salt
+  is compared rather than a generation counter, because a second value
+  could fall out of step with `params`. The page's half is in login.md,
+  A credential changed elsewhere.
 - **The schema refuses a vault row attached to an administrator.** A
   `records` insert and a `dek_wrappers` insert each abort on an
   `administrator` principal (app-shell.md, Database).
@@ -272,7 +284,7 @@ contract pins one value and prose stays readable.
 | Unauthorized | 401 | a refusal of an API request with the `X-Solvent-Request` header and no valid session (Refusals) |
 | Forbidden | 403 | a refusal of an API request without the `X-Solvent-Request` header (Refusals) |
 | Not Found | 404 | the target does not exist **or** belongs to someone else, and every other refusal (Refusals) |
-| Conflict | 409 | the write lost an optimistic-concurrency check, the target's state forbids it, or the request's vault epoch is not the vault's (Vault epoch) |
+| Conflict | 409 | the write lost an optimistic-concurrency check, the target's state forbids it, the request's vault epoch is not the vault's (Vault epoch), or its salt is not the credential's (Credentials and vault key wrappers) |
 | Content Too Large | 413 | a storage cap would be exceeded (Storage & data handling) |
 | Too Many Requests | 429 | a rate limit engaged (Application hardening) |
 | Server Error | 500 | an unhandled failure. Never a designed answer. It appears in this spec only where a test stubs one |

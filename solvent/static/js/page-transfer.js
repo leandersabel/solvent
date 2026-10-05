@@ -5,7 +5,7 @@
 // account on the instance. Neither card treats that as a hazard.
 import * as api from './api.js';
 import { el, icon, mount } from './dom.js';
-import { replaceDek, wrapForMaster } from './session.js';
+import { heldSalt, lockForChangedCredential, replaceDek, wrapForMaster } from './session.js';
 import * as transfer from './transfer.js';
 import { passwordWithToggle } from './unlock.js';
 
@@ -305,8 +305,15 @@ function importCard(vault, reload) {
     try {
       progress('Uploading…');
       wrapper = await wrapForMaster(rekeyed.dek);
-      answered = await api.post('/api/import', { ...wrapper, records: rekeyed.records });
-    } catch {
+      answered = await api.post('/api/import', { ...wrapper, currentSalt: heldSalt(), records: rekeyed.records });
+    } catch (failure) {
+      // The new wrapper is under a Master Key the current password no
+      // longer gives, and nothing was written (login.md, A credential
+      // changed elsewhere).
+      if (failure.body?.refused === 'credential-changed') {
+        lockForChangedCredential();
+        return;
+      }
       phase.hidden = true;
       fail('The import did not go through, and it was undone whole. Your original vault is fully intact and readable.');
       replace.disabled = false;

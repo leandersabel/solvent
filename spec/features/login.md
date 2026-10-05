@@ -193,6 +193,24 @@ never look like a hang.
     of its own.
   - The callout stays until the card is left. A wrong password shows its
     error above the password field, beneath the callout.
+- **Password changed elsewhere**: a restore on this page was refused
+  because the password changed, or its protection was strengthened, in
+  another tab, window or device after this page was unlocked (How it
+  works, A credential changed elsewhere). The page locks as the idle
+  lock does and shows the card in its unlocking-again shape.
+  - A Callout without icon sits at the top of the card, above the
+    username, as a polite live region, and reads:
+
+    > Your password was changed, or its protection strengthened, in
+    > another tab, window or device after this page was unlocked.
+    > Nothing was restored, and your vault is unchanged. Unlock with
+    > your current password, then restore again.
+
+  - Unlocking returns to the view the page was on, as after any lock,
+    without the callout. The file chosen for the restore is not kept,
+    because a browser cannot set a file field again.
+  - Replaced elsewhere wins when both apply, since the restore it
+    reports already happened.
 - **Populated**: not applicable. Success navigates away.
 
 #### Rules
@@ -289,9 +307,10 @@ successful sign-in the client, without user interaction:
    the target parameters.
 3. A vault owner re-wraps the existing DEK under Master Key'. An
    administrator skips this.
-4. Sends `POST /api/auth/upgrade-kdf` `{ salt, kdf, authKey }`, plus
-   `wrappedDek` and `dekNonce` for a vault owner, on the authenticated
-   session. A new Auth Key that is not 32 bytes is a Bad Request that
+4. Sends `POST /api/auth/upgrade-kdf` `{ currentSalt, salt, kdf,
+   authKey }`, plus `wrappedDek` and `dekNonce` for a vault owner, on
+   the authenticated session. `currentSalt` is the salt the sign-in
+   derived from. A new Auth Key that is not 32 bytes is a Bad Request that
    writes nothing (architecture.md, Key management). In one transaction
    the server replaces the `password`
    credential row (`params` and `verifier`) and, for a vault owner, that
@@ -299,7 +318,10 @@ successful sign-in the client, without user interaction:
    the DEK is the same key afterwards. A vault owner's request carries
    the epoch sign-in returned, compared after `BEGIN IMMEDIATE`, so an
    import landing between sign-in and upgrade is never overwritten by a
-   wrapper around the old DEK.
+   wrapper around the old DEK. The salt is compared after it, so a
+   password change landing between sign-in and upgrade is never undone
+   by a credential made from the old password (architecture.md,
+   Credentials and vault key wrappers).
 
 The server discriminates on the session's principal kind, not on the
 fields sent. A vault owner's request without a wrapper is a Bad Request,
@@ -309,7 +331,8 @@ superseded Master Key.
 
 If the upgrade fails, the session continues on the old parameters and
 retries at the next sign-in, because an upgrade that could lock somebody
-out would be worse than none. The one exception is a `vault-replaced`
+out would be worse than none. A `credential-changed` Conflict is such a
+failure. The one exception is a `vault-replaced`
 Conflict, which closes the vault like any other.
 
 ### The session a sign-in issues
@@ -423,6 +446,30 @@ signing in drops what that lock kept.
 card**, because import revokes no session (architecture.md, Vault
 epoch). It meets that card only when its session ended for its own
 reason, and then learns at sign-in.
+
+### A credential changed elsewhere
+
+A page holds the salt its Master Key came from, with the rest of the
+held credential (`account-settings.md`, The held credential). A password
+change or stale-KDF upgrade made on another page moves the credential's
+salt on and leaves this page's Master Key behind. Two tabs of one
+browser share one session, so a password change in one ends neither.
+Every write that stores something under the Master Key carries the held
+salt as `currentSalt` (architecture.md, Credentials and vault key
+wrappers), and a `credential-changed` Conflict answers it:
+
+- **An import**: the page locks, discarding the keys and keeping what a
+  lock keeps, and draws the Unlock card in its Password changed
+  elsewhere state. The unlock derives from the current salt, after which
+  a restore goes through (`export-import.md`, The re-key step).
+- **A stale-KDF upgrade**: it failed, and the session continues
+  (Stale-KDF upgrade).
+- **A password change**: the page looks the salt up once and resends
+  (`account-settings.md`, Change password).
+
+A read, a record write and an export carry no salt, because they store
+nothing under the Master Key. The vault epoch is no help here: a
+password change and an upgrade keep the DEK, so they leave it alone.
 
 ### Rules
 
@@ -833,3 +880,20 @@ reason, and then learns at sign-in.
     of a fresh Auth Key verifier. Test:
     `tests/test_auth.py::test_the_first_unknown_username_login_hashes_nothing`,
     `tests/test_auth.py::test_the_decoy_hash_carries_the_parameters_of_a_fresh_one`.
+81. (blind) A `POST /api/auth/upgrade-kdf` whose `currentSalt` is not
+    the credential's salt, after a password change on another page of
+    the same session, answers Conflict
+    `{"refused":"credential-changed"}` and leaves every row as it was.
+    Test: `tests/test_credential_changed.py::test_an_upgrade_after_a_password_change_elsewhere_writes_nothing`.
+82. A `POST /api/auth/upgrade-kdf`, `POST /api/auth/change-password` or
+    `POST /api/import` without `currentSalt` is a Bad Request and writes
+    nothing. Test:
+    `tests/test_credential_changed.py::test_a_request_without_the_current_salt_is_a_bad_request`.
+83. The stale-KDF upgrade carries the salt the sign-in derived from.
+    Test: `tests/test_client.py::test_the_client_side_rules_hold`,
+    `tests/browser/parts/unlock.mjs`.
+84. (blind) A restore refused for a credential changed elsewhere locks
+    the page, draws the Unlock card with the Password changed elsewhere
+    callout, writes no vault row, and unlocking with the current
+    password returns to the export and import screen without the
+    callout. Test: `tests/browser/parts/export-import.mjs`.

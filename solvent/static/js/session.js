@@ -255,7 +255,7 @@ async function upgradeQuietly(password, targetKdf, dek) {
 async function upgradeKdf(password, targetKdf, dek) {
   const salt = crypto.b64encode(crypto.randomBytes(16));
   const keys = await crypto.deriveKeys(password, salt, targetKdf);
-  const body = { salt, kdf: targetKdf, authKey: keys.authKey };
+  const body = { currentSalt: held?.salt, salt, kdf: targetKdf, authKey: keys.authKey };
   const rewrapped = dek ? await crypto.wrapDek(dek, keys.masterKey) : null;
   Object.assign(body, rewrapped);
   await api.post('/api/auth/upgrade-kdf', body);
@@ -263,30 +263,34 @@ async function upgradeKdf(password, targetKdf, dek) {
   if (dek) masterKey = keys.masterKey;
 }
 
-const sameEnvelope = (a, b) =>
-  a.salt === b.salt && JSON.stringify(Object.entries(a.kdf).sort()) === JSON.stringify(Object.entries(b.kdf).sort());
-
 /** Change password: the DEK does not change, so no vault record is
  *  re-encrypted. Only the envelope around the key is rebuilt, which is
  *  the whole reason the Master Key wraps a DEK instead of encrypting
  *  records directly (account-settings.md).
  *
  *  The current password is checked against the credential this tab
- *  holds, so a vault owner's wrong one sends nothing, a salt lookup
- *  included. */
+ *  holds, so a vault owner's wrong one sends nothing beyond one salt
+ *  lookup. */
 export async function changePassword(username, currentPassword, newPassword, kdf) {
   const lookup = () => api.post('/api/auth/salt', { username });
-  const credential = held ?? (await lookup());
+  let credential = held ?? (await lookup());
   const derive = ({ salt, kdf: envelope }) => crypto.deriveKeys(currentPassword, salt, envelope);
-  const current = await derive(credential);
-  // For a vault owner the unwrap is the first of the two checks, and
-  // a failure stops here with nothing sent. An administrator has
-  // nothing to unwrap, so the server's check is their only one.
+  let current = await derive(credential);
+  // For a vault owner the unwrap is the first of the two checks. An
+  // administrator has nothing to unwrap, so the server's check is
+  // their only one.
   if (held?.wrappedDek) {
     try {
       await crypto.unwrapDek(held.wrappedDek, held.dekNonce, current.masterKey);
     } catch {
-      throw new WrongPasswordError();
+      // A password change or KDF upgrade elsewhere moved the salt on
+      // after this tab opened the vault, and the held wrapper opens
+      // only under the password from before. The server's check is
+      // then the only one.
+      const fresh = await lookup();
+      if (fresh.salt === credential.salt) throw new WrongPasswordError();
+      credential = fresh;
+      current = await derive(credential);
     }
   }
 
@@ -294,6 +298,7 @@ export async function changePassword(username, currentPassword, newPassword, kdf
   const next = await crypto.deriveKeys(newPassword, salt, kdf);
   const body = {
     currentAuthKey: current.authKey,
+    currentSalt: credential.salt,
     salt,
     kdf,
     authKey: next.authKey,
@@ -303,12 +308,11 @@ export async function changePassword(username, currentPassword, newPassword, kdf
   try {
     await api.post('/api/auth/change-password', body);
   } catch (failure) {
-    if (failure.status !== 400) throw failure;
-    // Another live session may have upgraded the credential since this
-    // tab opened the vault. One lookup, and one resend when it differs.
-    const fresh = await lookup();
-    if (sameEnvelope(fresh, credential)) throw failure;
-    body.currentAuthKey = (await derive(fresh)).authKey;
+    if (failure.body?.refused !== 'credential-changed') throw failure;
+    // The salt moved on since it was read. One lookup, and one resend.
+    credential = await lookup();
+    body.currentAuthKey = (await derive(credential)).authKey;
+    body.currentSalt = credential.salt;
     await api.post('/api/auth/change-password', body);
   }
   held = { salt, kdf, ...rewrapped };
@@ -320,6 +324,13 @@ export function authKeyFor(username, password) {
     .post('/api/auth/salt', { username })
     .then(({ salt, kdf }) => crypto.deriveKeys(password, salt, kdf))
     .then((keys) => keys.authKey);
+}
+
+/** The salt the page's Master Key came from, which a request writing a
+ *  wrapper under it carries (architecture.md, Credentials and vault key
+ *  wrappers). */
+export function heldSalt() {
+  return held?.salt;
 }
 
 export function wrapForMaster(dek) {
@@ -349,7 +360,16 @@ export async function replaceDek(dek, vaultEpoch, wrapped) {
  *  at the unlocked machine, who can open devtools. */
 export function lock() {
   discardKeys();
-  for (const listener of lockListeners) listener();
+  for (const listener of lockListeners) listener({ credentialChanged: false });
+}
+
+/** The lock after a write this page's Master Key can no longer make,
+ *  because the password changed, or its protection was strengthened,
+ *  elsewhere (login.md, A credential changed elsewhere). The unlock
+ *  that follows derives from the current salt. */
+export function lockForChangedCredential() {
+  discardKeys();
+  for (const listener of lockListeners) listener({ credentialChanged: true });
 }
 
 // The keys and the model, with nobody told: for a failure the screen

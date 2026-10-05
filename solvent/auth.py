@@ -15,7 +15,7 @@ from __future__ import annotations
 import json
 from typing import Optional
 
-from flask import Blueprint, abort, g, jsonify, request
+from flask import Blueprint, abort, g, jsonify, make_response, request
 
 from . import crypto, ratelimit
 from . import session as sessions
@@ -58,6 +58,7 @@ class CredentialRotation(Payload):
     current password again.
     """
 
+    currentSalt: str
     salt: str
     kdf: dict
     authKey: str
@@ -79,6 +80,20 @@ def credential_for(principal_id: str):
         "SELECT * FROM credentials WHERE principal_id = ? AND method = 'password'",
         (principal_id,),
     ).fetchone()
+
+
+def verify_salt(current_salt: str) -> None:
+    """Conflict `credential-changed` unless `current_salt` is the salt of
+    the password credential's `params`, the one the page's Master Key
+    came from (architecture.md, Credentials and vault key wrappers).
+
+    A page whose key predates a password change or KDF upgrade made
+    elsewhere would otherwise store a wrapper no current password opens,
+    or undo the change.
+    """
+    params = json.loads(credential_for(g.principal["id"])["params"])
+    if params["salt"] != current_salt:
+        abort(make_response(jsonify(refused="credential-changed"), 409))
 
 
 def _principal_by_username(username: str):
@@ -252,6 +267,7 @@ def _rotate_credential(conn, body: CredentialRotation) -> None:
         # After the lock is taken and before any write: a page holding a
         # DEK an import replaced would wrap the old key.
         verify_epoch(conn)
+    verify_salt(body.currentSalt)
 
     credential = credential_for(g.principal["id"])
     conn.execute(
@@ -293,6 +309,9 @@ def change_password():
     re-wrap."""
     body = parse(ChangePassword, request.get_json(silent=True))
     ratelimit.guard_auth(g.principal["username"])
+    # Before the Auth Key check, so a page holding a superseded salt is
+    # told so rather than charged a failed sign-in.
+    verify_salt(body.currentSalt)
     credential = credential_for(g.principal["id"])
     if not crypto.verify_auth_key(credential["verifier"], body.currentAuthKey):
         ratelimit.record_auth_failure(g.principal["username"])

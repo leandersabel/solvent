@@ -78,6 +78,10 @@ let vaultShown = false;
 // that learned only at unlock. Nothing is kept for either beyond that.
 let elsewhere = null;
 let sinceOpen = null;
+// Whether the page locked because a write found the password changed
+// elsewhere (login.md, A credential changed elsewhere). The unlock
+// card says so until it is left.
+let credentialChanged = false;
 
 // The address the vault was last drawn at. Arriving at a sweep from
 // another screen begins a new sitting, while a redraw of the sweep on
@@ -214,7 +218,9 @@ function draw() {
       unlockCard({
         knownUsername: username,
         replaced: elsewhere,
+        credentialChanged: credentialChanged && !elsewhere,
         onUnlocked: (result) => {
+          credentialChanged = false;
           if (result.kind === 'administrator') {
             window.location.href = '/admin';
             return;
@@ -416,7 +422,8 @@ document.addEventListener('visibilitychange', () => {
   }
 });
 
-onLock(() => {
+onLock((reason) => {
+  credentialChanged = reason.credentialChanged;
   elsewhere = null;
   sinceOpen = null;
   resetDimensionsState();

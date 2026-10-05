@@ -385,6 +385,32 @@ await run(async () => {
       await page.waitUntil("document.querySelector('#import-card .field-error').textContent.includes('fully intact')", { timeout: 60000, label: 'the refused upload' });
     });
     check('an import the server refuses says the original vault is intact, and it is', vaultRows() === rowsBefore);
+
+    // The password changes in another tab: the credential's salt moves on
+    // while this page holds the Master Key from before.
+    const ownCredential = 'principal_id = (SELECT id FROM principals WHERE username = ?)';
+    const [{ params: paramsBefore }] = sql(`SELECT params FROM credentials WHERE ${ownCredential}`, 'leander');
+    sql(`UPDATE credentials SET params = json_set(params, '$.salt', ?) WHERE ${ownCredential}`, 'AAAAAAAAAAAAAAAAAAAAAA==', 'leander');
+    await toScreen();
+    await chooseFile(exportedPath);
+    await openWith(VAULT_PASSWORD);
+    await page.waitUntil("!document.querySelector('.review').hidden", { timeout: 60000, label: 'the review after the password changed' });
+    await setValue('#import-erase', 'ERASE');
+    await replaceVault();
+    await page.waitUntil("document.querySelector('#unlock-password')", { timeout: 60000, label: 'the lock after the password changed' });
+    check(
+      'an import after the password changed elsewhere writes nothing, locks the page and says why',
+      vaultRows() === rowsBefore &&
+        (await page.eval("document.querySelector('.signin-card .callout')?.textContent ?? ''")).includes('Unlock with your current password, then restore again.'),
+      await page.eval('document.body.innerText'),
+    );
+    sql(`UPDATE credentials SET params = ? WHERE ${ownCredential}`, paramsBefore, 'leander');
+    await enterPassword(VAULT_PASSWORD);
+    await page.waitUntil("document.querySelector('#import-file')", { timeout: 90000, label: 'the import screen after unlocking' });
+    check(
+      'unlocking returns to the import screen without the notice',
+      !(await page.eval("Boolean(document.querySelector('.signin-card'))")),
+    );
     provoked.splice(provoked.indexOf('/api/import'), 1);
 
     // -- Import: the real thing -------------------------------------------------

@@ -13,9 +13,13 @@ import { LockedWhileOpeningError, SignInError, signIn, signOut } from './session
 export const WAIT_NOTE =
   'This takes a moment by design. It is what makes your password hard to attack.';
 
+export const CREDENTIAL_CHANGED =
+  'Your password was changed, or its protection strengthened, in another tab, window or device after this page was unlocked. Nothing was restored, and your vault is unchanged. Unlock with your current password, then restore again.';
+
 /** `replaced`, `{ dropped }`, draws the Replaced elsewhere state: the
- *  vault was replaced from a file while this page held it. */
-export function unlockCard({ knownUsername = null, replaced = null, onUnlocked }) {
+ *  vault was replaced from a file while this page held it.
+ *  `credentialChanged` draws the Password changed elsewhere state. */
+export function unlockCard({ knownUsername = null, replaced = null, credentialChanged = false, onUnlocked }) {
   const error = el('p', { class: 'field-error', role: 'alert', hidden: true });
   const password = el('input', {
     type: 'password',
@@ -61,6 +65,7 @@ export function unlockCard({ knownUsername = null, replaced = null, onUnlocked }
   // the shell, and in the top bar inside it.
   const form = el('form', { class: 'card signin-card', novalidate: true, 'aria-label': 'Unlock' }, [
     replaced ? replacedCallout(REPLACED_ELSEWHERE, replaced.dropped) : null,
+    credentialChanged ? el('p', { class: 'callout', role: 'status', text: CREDENTIAL_CHANGED }) : null,
     identity,
     error,
     el('div', { class: 'field' }, [

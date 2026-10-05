@@ -2900,6 +2900,7 @@ async function credentialServer(kind, password) {
       });
     }
     if (url === '/api/auth/upgrade-kdf' || url === '/api/auth/change-password') {
+      if (body.currentSalt !== server.salt) return reply(409, { refused: 'credential-changed' });
       if (body.currentAuthKey !== undefined && body.currentAuthKey !== server.authKey) return reply(400);
       Object.assign(server, { salt: body.salt, kdf: body.kdf, authKey: body.authKey });
       if (body.wrappedDek) server.wrapper = { wrappedDek: body.wrappedDek, dekNonce: body.dekNonce };
@@ -2913,13 +2914,40 @@ const only = (server, url) => server.log.filter((u) => u === url).length;
 const PASSWORD = 'a long enough password';
 const NEXT = 'another long enough password';
 
-await check('a vault owner who types the wrong current password sends no request at all', async () => {
+await check('a vault owner who types the wrong current password sends one salt lookup and no change', async () => {
   const session = await load('session.js');
   const server = await credentialServer('vault_owner', PASSWORD);
   await session.signIn('leander', PASSWORD);
   server.log.length = 0;
   await assert.rejects(session.changePassword('leander', 'not it', NEXT, KDF), session.WrongPasswordError);
-  assert.deepEqual(server.log, []);
+  assert.deepEqual(server.log, ['/api/auth/salt']);
+  session.lock();
+});
+
+await check('a vault owner whose password changed in another tab changes it with the current one', async () => {
+  const session = await load('session.js');
+  const server = await credentialServer('vault_owner', PASSWORD);
+  await session.signIn('leander', PASSWORD);
+  await server.rekey(NEXT, 22);
+  server.log.length = 0;
+  server.bodies.length = 0;
+  const THIRD = 'a third long enough password';
+  await session.changePassword('leander', NEXT, THIRD, KDF);
+  assert.deepEqual(server.log, ['/api/auth/salt', '/api/auth/change-password']);
+  assert.equal(server.authKey, (await cryptoModule.deriveKeys(THIRD, server.salt, server.kdf)).authKey);
+  const { masterKey } = await cryptoModule.deriveKeys(THIRD, server.salt, server.kdf);
+  await cryptoModule.unwrapDek(server.wrapper.wrappedDek, server.wrapper.dekNonce, masterKey);
+  session.lock();
+});
+
+await check('the stale-KDF upgrade carries the salt the sign-in derived from', async () => {
+  const session = await load('session.js');
+  const server = await credentialServer('vault_owner', PASSWORD);
+  server.kdfStale = true;
+  const signedInSalt = server.salt;
+  await session.signIn('leander', PASSWORD);
+  const upgrade = server.bodies[server.log.indexOf('/api/auth/upgrade-kdf')];
+  assert.equal(upgrade.currentSalt, signedInSalt);
   session.lock();
 });
 
@@ -2963,26 +2991,28 @@ await check('a credential another session upgraded costs one salt lookup and one
   const server = await credentialServer('vault_owner', PASSWORD);
   await session.signIn('leander', PASSWORD);
   await server.rekey(PASSWORD, 22, { ...KDF, m: KDF.m * 2 });
+  const upgradedSalt = server.salt;
   server.log.length = 0;
   server.bodies.length = 0;
   await session.changePassword('leander', PASSWORD, NEXT, KDF);
   assert.deepEqual(server.log, ['/api/auth/change-password', '/api/auth/salt', '/api/auth/change-password']);
   const [first, , second] = server.bodies;
   assert.notEqual(first.currentAuthKey, second.currentAuthKey);
-  assert.deepEqual({ ...first, currentAuthKey: 0 }, { ...second, currentAuthKey: 0 });
+  assert.equal(second.currentSalt, upgradedSalt);
+  assert.deepEqual({ ...first, currentAuthKey: 0, currentSalt: 0 }, { ...second, currentAuthKey: 0, currentSalt: 0 });
   const fresh = await cryptoModule.deriveKeys(NEXT, server.salt, server.kdf);
   assert.equal(server.authKey, fresh.authKey);
   session.lock();
 });
 
-await check('a refused change with an unchanged credential is final, after one salt lookup', async () => {
+await check('a refused change with an unchanged credential is final, with no salt lookup', async () => {
   const session = await load('session.js');
   const server = await credentialServer('vault_owner', PASSWORD);
   await session.signIn('leander', PASSWORD);
   server.authKey = 'changed under the same salt';
   server.log.length = 0;
   await assert.rejects(session.changePassword('leander', PASSWORD, NEXT, KDF), (e) => e.status === 400);
-  assert.deepEqual(server.log, ['/api/auth/change-password', '/api/auth/salt']);
+  assert.deepEqual(server.log, ['/api/auth/change-password']);
   session.lock();
 });
 
@@ -2993,7 +3023,7 @@ await check('an administrator with the wrong current password still has the serv
   server.log.length = 0;
   await assert.rejects(session.changePassword('root', 'not it', NEXT, KDF), (e) => e.status === 400);
   assert.equal(only(server, '/api/auth/change-password'), 1);
-  assert.equal(only(server, '/api/auth/salt'), 1);
+  assert.equal(only(server, '/api/auth/salt'), 0);
   server.log.length = 0;
   await session.changePassword('root', PASSWORD, NEXT, KDF);
   assert.deepEqual(server.log, ['/api/auth/change-password']);
