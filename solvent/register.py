@@ -20,15 +20,16 @@ from datetime import datetime, timezone
 from typing import Optional
 
 from flask import Blueprint, abort, jsonify, make_response, render_template, request
+from pydantic import Field
 
 from . import crypto
 from . import session as sessions
-from .auth import SALT_BYTES
+from .auth import AUTH_KEY_BYTES, SALT_BYTES
 from .db import get_db, new_epoch, utcnow, write_transaction
 from .guard import navigation, public
 from .pages import vault_page
 from .rates import table_rows
-from .records import NONCE_BYTES, RecordWrite, store
+from .records import MAX_VERSION, NONCE_BYTES, RecordWrite, store
 from .validation import Payload, decode_b64, kdf_envelope_ok, normalize_username, parse
 
 bp = Blueprint("register", __name__)
@@ -47,7 +48,7 @@ class RegisterRequest(Payload):
     wrappedDek: Optional[str] = None
     dekNonce: Optional[str] = None
     profileRecordId: Optional[str] = None
-    profileSchemaVersion: Optional[int] = None
+    profileSchemaVersion: Optional[int] = Field(None, ge=1, le=MAX_VERSION)
     profileCiphertext: Optional[str] = None
     profileNonce: Optional[str] = None
 
@@ -140,6 +141,8 @@ def register():
     if username is None:
         refuse("username")
     if decode_b64(body.salt, exact_bytes=SALT_BYTES) is None:
+        abort(400)
+    if decode_b64(body.authKey, exact_bytes=AUTH_KEY_BYTES) is None:
         abort(400)
     if not kdf_envelope_ok(body.kdf):
         abort(400)

@@ -98,6 +98,16 @@ def test_only_stored_version_plus_one_is_accepted(app, owner, version):
         assert stored(app, record_id) == before
 
 
+@pytest.mark.parametrize("field", ["schemaVersion", "version"])
+def test_a_version_past_two_to_the_fifty_three_is_a_bad_request(app, owner, field):
+    """Past it a browser rounds the number, and the AAD it builds no
+    longer matches the one the record was sealed under."""
+    _, response = put_record(owner, **{field: 2**53})
+    assert response.status_code == 400
+    _, response = put_record(owner, schemaVersion=2**53 - 1)
+    assert response.status_code == 200
+
+
 def test_two_successive_writes_produce_different_nonces(app, owner):
     record_id = account_of(owner)
     first = stored(app, record_id)["nonce"]

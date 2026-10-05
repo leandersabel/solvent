@@ -290,7 +290,9 @@ successful sign-in the client, without user interaction:
    administrator skips this.
 4. Sends `POST /api/auth/upgrade-kdf` `{ salt, kdf, authKey }`, plus
    `wrappedDek` and `dekNonce` for a vault owner, on the authenticated
-   session. In one transaction the server replaces the `password`
+   session. A new Auth Key that is not 32 bytes is a Bad Request that
+   writes nothing (architecture.md, Key management). In one transaction
+   the server replaces the `password`
    credential row (`params` and `verifier`) and, for a vault owner, that
    credential's one `dek_wrappers` row. Nothing else changes, because
    the DEK is the same key afterwards. A vault owner's request carries
@@ -821,3 +823,7 @@ reason, and then learns at sign-in.
     and Unlock in the same page then opens the vault. Test:
     `tests/browser/parts/unlock.mjs`,
     `tests/browser/parts/unlock-review-worker.mjs`.
+79. (blind) A `POST /api/auth/upgrade-kdf` whose new Auth Key is 3, 31
+    or 33 bytes, or not base64, is a Bad Request, for either kind, and
+    leaves every row as it was. Test:
+    `tests/test_auth.py::test_a_rotation_to_an_auth_key_that_is_not_thirty_two_bytes_is_refused`.

@@ -703,6 +703,28 @@ def test_the_change_password_wrapper_follows_the_session_kind(app):
     assert snapshot(app, EVERY_TABLE) == before
 
 
+@pytest.mark.parametrize("auth_key", ["AAAA", 31, 33, "not base64!"])
+@pytest.mark.parametrize("kind", ["vault_owner", "administrator"])
+def test_a_rotation_to_an_auth_key_that_is_not_thirty_two_bytes_is_refused(app, kind, auth_key):
+    """The upgrade and a password change both store the new Auth Key
+    as the verifier, so both refuse one shorter or longer than the
+    split makes."""
+    if isinstance(auth_key, int):
+        auth_key = b64(auth_key)
+    client, current = register(app, "someone", kind=kind)
+    wrapper = {"wrappedDek": b64(48), "dekNonce": b64(12)} if kind == "vault_owner" else {}
+    before = snapshot(app, EVERY_TABLE)
+    assert client.post(
+        "/api/auth/upgrade-kdf", json=rotation(authKey=auth_key, **wrapper), headers=CSRF
+    ).status_code == 400
+    assert client.post(
+        "/api/auth/change-password",
+        json=rotation(authKey=auth_key, currentAuthKey=current, **wrapper),
+        headers=CSRF,
+    ).status_code == 400
+    assert snapshot(app, EVERY_TABLE) == before
+
+
 @pytest.mark.usefixtures("frozen_clock")
 def test_a_wrong_current_auth_key_is_refused_server_side(app):
     """Called directly, with no client-side unwrap in front of it."""

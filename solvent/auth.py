@@ -35,6 +35,10 @@ from .validation import (
 bp = Blueprint("auth", __name__)
 
 SALT_BYTES = 16
+# The HKDF split's Auth Key. One that becomes a verifier is checked
+# against it, because a short one is a weaker credential than the
+# instance requires (architecture.md, Key management).
+AUTH_KEY_BYTES = 32
 
 
 class SaltRequest(Payload):
@@ -229,6 +233,8 @@ def _rotate_credential(conn, body: CredentialRotation) -> None:
     opening under a superseded Master Key.
     """
     if decode_b64(body.salt, exact_bytes=SALT_BYTES) is None:
+        abort(400)
+    if decode_b64(body.authKey, exact_bytes=AUTH_KEY_BYTES) is None:
         abort(400)
     if not kdf_envelope_ok(body.kdf):
         abort(400)

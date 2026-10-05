@@ -125,7 +125,9 @@ server a per-record access pattern it cannot see today.
   must be a known value, one type per request.
 - **`PUT /api/records/<record_id>`** creates or updates. The body
   carries `recordType`, `accountId`, `schemaVersion`, `version`, `nonce`
-  and `ciphertext`, where `version` is the version being written. A
+  and `ciphertext`, where `version` is the version being written.
+  `schemaVersion` and `version` are integers from 1 to 2^53 - 1, the
+  largest a browser holds exactly, and anything else is a Bad Request. A
   create carries 1 with no row present, an update exactly the stored
   version + 1. Anything else is a Conflict with no `refused` member and
   nothing written, so a stale tab never silently overwrites a newer
@@ -286,3 +288,6 @@ owns it.
 31. (blind) No log line contains a `ciphertext` value, checked on the
     captured log output of a real write, not by a grep of the source.
     Test: `tests/test_records.py::test_no_log_line_contains_a_ciphertext_value`.
+32. A `PUT` whose `schemaVersion` or `version` is 2^53 is a Bad Request,
+    and one at 2^53 - 1 is stored. Test:
+    `tests/test_records.py::test_a_version_past_two_to_the_fifty_three_is_a_bad_request`.

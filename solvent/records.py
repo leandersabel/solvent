@@ -34,6 +34,10 @@ MAX_BYTES_PER_USER = 32 * 1024 * 1024
 
 NONCE_BYTES = 12
 
+# The largest integer a browser holds exactly. A version past it would
+# be rounded there and its AAD would no longer match.
+MAX_VERSION = 2**53 - 1
+
 # record-api.md, The AAD encoding. Field order is Key management's, not
 # the storage table's, and the separator is required rather than
 # cosmetic: bare concatenation leaves field boundaries ambiguous, so two
@@ -67,8 +71,8 @@ def aad(
 class RecordWrite(Payload):
     recordType: Literal["account", "snapshot", "rate", "profile"]
     accountId: Optional[str]
-    schemaVersion: int = Field(ge=1)
-    version: int = Field(ge=1)
+    schemaVersion: int = Field(ge=1, le=MAX_VERSION)
+    version: int = Field(ge=1, le=MAX_VERSION)
     nonce: str
     ciphertext: str
 

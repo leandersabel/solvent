@@ -567,9 +567,10 @@ Key wraps a DEK instead of encrypting records directly.
 6. The server checks the sign-in limits for the session's username,
    then verifies `currentAuthKey` against the stored hash. A mismatch
    is a Bad Request with no `refused` member, counts as a failed
-   sign-in and writes nothing else (architecture.md, Rate limiting).
-   Otherwise it replaces the **`password` credential row**
-   (`params` and `verifier`) and, for a vault owner, that credential's
+   sign-in and writes nothing else (architecture.md, Rate limiting). A
+   new `authKey` that is not 32 bytes is a Bad Request that writes
+   nothing (architecture.md, Key management). Otherwise it replaces the
+   **`password` credential row** (`params` and `verifier`) and, for a vault owner, that credential's
    **one `dek_wrappers` row**, in one all-or-nothing transaction, and
    writes no other row (architecture.md, Key management). For a vault
    owner the transaction compares the vault epoch after `BEGIN
@@ -1048,3 +1049,7 @@ from an administrator removing an account (`admin-invites.md`).
     line and the page does not scroll sideways. Test:
     `tests/browser/parts/settings.mjs`,
     `tests/browser/parts/settings-review-phone.mjs`.
+79. (blind) A `POST /api/auth/change-password` with the right current
+    password and a new Auth Key of 3, 31 or 33 bytes, or not base64, is
+    a Bad Request, for either kind, and leaves every row as it was.
+    Test: `tests/test_auth.py::test_a_rotation_to_an_auth_key_that_is_not_thirty_two_bytes_is_refused`.
