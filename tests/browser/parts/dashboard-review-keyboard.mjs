@@ -162,7 +162,7 @@ await run(async () => {
     await key('ArrowRight', true);
     const onMarked = await reading();
     await key('Enter');
-    const opened = await page.holds(`location.hash === '#/recording/${MARKED[1]}'`, { timeout: 5000 });
+    const opened = await page.holds((date) => location.hash === `#/recording/${date}`, { args: [MARKED[1]], timeout: 5000 });
     check(
       `net-worth-view: Enter on a day with no snapshot opens nothing, and on a marked date opens that date's recording, ${where}`,
       onUnmarked === UNMARKED && afterUnmarked === '#/' && onMarked === MARKED[1] && opened,
@@ -207,7 +207,7 @@ await run(async () => {
   const afterClick = await page.eval('location.hash');
   const markedSpot = await spotOf(MARKED[1]);
   await page.mouseClick(markedSpot.x, markedSpot.y);
-  const clickedOpen = await page.holds(`location.hash === '#/recording/${MARKED[1]}'`, { timeout: 5000 });
+  const clickedOpen = await page.holds((date) => location.hash === `#/recording/${date}`, { args: [MARKED[1]], timeout: 5000 });
   await home();
   const tick = await page.call((long) => {
     const mark = [...document.querySelectorAll('svg.trend .entry-mark')].find((m) => m.textContent.includes(long));
@@ -216,7 +216,7 @@ await run(async () => {
     return { x: box.left + box.width / 2, y: box.top + box.height / 2 };
   }, dates[MARKED[2]]);
   if (tick) await page.mouseClick(tick.x, tick.y);
-  const tickOpen = Boolean(tick) && (await page.holds(`location.hash === '#/recording/${MARKED[2]}'`, { timeout: 5000 }));
+  const tickOpen = Boolean(tick) && (await page.holds((date) => location.hash === `#/recording/${date}`, { args: [MARKED[2]], timeout: 5000 }));
   check(
     'net-worth-view: a click on a day with no snapshot opens nothing, and a click on a marked day or its tick opens that date\'s recording',
     afterClick === '#/' && clickedOpen && tickOpen,
