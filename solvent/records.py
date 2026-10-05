@@ -71,8 +71,8 @@ def aad(
 class RecordWrite(Payload):
     recordType: Literal["account", "snapshot", "rate", "profile"]
     accountId: Optional[str]
-    schemaVersion: int = Field(ge=1, le=MAX_VERSION)
-    version: int = Field(ge=1, le=MAX_VERSION)
+    schemaVersion: int = Field(ge=1, le=MAX_VERSION, strict=True)
+    version: int = Field(ge=1, le=MAX_VERSION, strict=True)
     nonce: str
     ciphertext: str
 

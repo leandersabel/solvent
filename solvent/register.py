@@ -48,7 +48,7 @@ class RegisterRequest(Payload):
     wrappedDek: Optional[str] = None
     dekNonce: Optional[str] = None
     profileRecordId: Optional[str] = None
-    profileSchemaVersion: Optional[int] = Field(None, ge=1, le=MAX_VERSION)
+    profileSchemaVersion: Optional[int] = Field(None, ge=1, le=MAX_VERSION, strict=True)
     profileCiphertext: Optional[str] = None
     profileNonce: Optional[str] = None
 
