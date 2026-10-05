@@ -166,10 +166,20 @@ def _shut(sock: socket.socket) -> None:
         pass
 
 
+def _hand_over(sock: socket.socket) -> None:
+    sockets = getattr(_watch, "sockets", None)
+    if sockets is not None:
+        sockets.append(sock)
+        if _watch.expired.is_set():
+            _shut(sock)
+
+
 def _watched(connection_class):
     """`connection_class`, handing each socket it opens to the read
-    running on its thread. One opened after the deadline is shut at
-    once."""
+    running on its thread: the plain one as it opens, so a slow TLS
+    handshake can be ended, and the one it reads once connected, since
+    TLS moves the connection to a new socket. One handed over after the
+    deadline is shut at once."""
 
     class Watched(connection_class):
         def __init__(self, *args, **kwargs):
@@ -178,14 +188,14 @@ def _watched(connection_class):
 
             def watched_create(*args, **kwargs):
                 sock = create(*args, **kwargs)
-                sockets = getattr(_watch, "sockets", None)
-                if sockets is not None:
-                    sockets.append(sock)
-                    if _watch.expired.is_set():
-                        _shut(sock)
+                _hand_over(sock)
                 return sock
 
             self._create_connection = watched_create
+
+        def connect(self):
+            super().connect()
+            _hand_over(self.sock)
 
     return Watched
 

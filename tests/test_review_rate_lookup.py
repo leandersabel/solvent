@@ -11,6 +11,8 @@ from __future__ import annotations
 
 import json
 import socket
+import ssl
+import subprocess
 import threading
 import time
 import urllib.request
@@ -95,7 +97,8 @@ class Sources:
     connection's provider and time, and `receives` the start time of
     every receive the app makes on a connection to this server."""
 
-    def __init__(self):
+    def __init__(self, tls: ssl.SSLContext | None = None):
+        self.tls = tls
         self.plans = {
             "frankfurter": at_once(_frankfurter),
             "nbp": at_once(_nbp),
@@ -120,8 +123,9 @@ class Sources:
         with self._lock:
             self.opened.append((provider, time.monotonic()))
             self._pending[token] = self.plans[provider](url)
+        scheme = "https" if self.tls else "http"
         return urllib.request.Request(
-            f"http://127.0.0.1:{self.port}/{token}", headers=request.headers
+            f"{scheme}://127.0.0.1:{self.port}/{token}", headers=request.headers
         )
 
     def _accept(self):
@@ -135,8 +139,14 @@ class Sources:
             self._threads.append(worker)
 
     def _serve(self, connection: socket.socket):
+        connection.settimeout(5)
+        if self.tls:
+            try:
+                connection = self.tls.wrap_socket(connection, server_side=True)
+            except OSError:
+                connection.close()
+                return
         with connection:
-            connection.settimeout(5)
             head = b""
             try:
                 while b"\r\n\r\n" not in head:
@@ -167,7 +177,36 @@ class Sources:
 
 @pytest.fixture
 def sources(monkeypatch):
-    server = Sources()
+    yield from _serving(monkeypatch, Sources())
+
+
+@pytest.fixture
+def secure_sources(monkeypatch, tmp_path):
+    """`sources` over HTTPS, so the read goes through the opener's own
+    HTTPS connection, the one every real provider is reached on. The
+    certificate is made for the test, and the opener's HTTPS handler is
+    handed a context trusting it and nothing else changed."""
+    key, cert = tmp_path / "key.pem", tmp_path / "cert.pem"
+    subprocess.run(
+        [
+            "openssl", "req", "-x509", "-newkey", "ec", "-pkeyopt", "ec_paramgen_curve:P-256",
+            "-nodes", "-keyout", str(key), "-out", str(cert), "-days", "1",
+            "-subj", "/CN=127.0.0.1",
+            "-addext", "subjectAltName=IP:127.0.0.1",
+            "-addext", "basicConstraints=critical,CA:TRUE",
+            "-addext", "keyUsage=critical,digitalSignature,keyCertSign",
+        ],
+        check=True,
+        capture_output=True,
+    )
+    served = ssl.create_default_context(ssl.Purpose.CLIENT_AUTH)
+    served.load_cert_chain(cert, key)
+    (handler,) = [h for h in rates._opener.handlers if isinstance(h, urllib.request.HTTPSHandler)]
+    monkeypatch.setattr(handler, "_context", ssl.create_default_context(cafile=str(cert)))
+    yield from _serving(monkeypatch, Sources(tls=served))
+
+
+def _serving(monkeypatch, server):
     real_open = rates._opener.open
 
     def open_(request, timeout=None):
@@ -187,6 +226,18 @@ def sources(monkeypatch):
         return real_recv_into(sock, *args, **kwargs)
 
     monkeypatch.setattr(socket.socket, "recv_into", recv_into)
+    real_tls_recv_into = ssl.SSLSocket.recv_into
+
+    def tls_recv_into(sock, *args, **kwargs):
+        try:
+            peer = sock.getpeername()
+        except OSError:
+            peer = None
+        if peer == ("127.0.0.1", server.port):
+            server.receives.append(time.monotonic())
+        return real_tls_recv_into(sock, *args, **kwargs)
+
+    monkeypatch.setattr(ssl.SSLSocket, "recv_into", tls_recv_into)
     yield server
     server.close()
 
@@ -393,3 +444,37 @@ def test_a_redirect_toward_an_internal_address_is_not_followed(owner, sources):
     assert response.status_code == 204
     assert reached == []
     assert [p for p, _ in sources.opened] == ["frankfurter"]
+
+
+@pytest.mark.parametrize(
+    "plan",
+    [
+        pytest.param(lambda: trickle(_frankfurter), id="sized-body-a-byte-at-a-time"),
+        pytest.param(lambda: every_byte(lambda url: answer(_frankfurter(url))), id="head-a-byte-at-a-time"),
+        pytest.param(lambda: every_byte(lambda url: chunked(_frankfurter(url))), id="chunked-a-byte-at-a-time"),
+    ],
+)
+def test_over_https_no_receive_starts_past_the_deadline(owner, secure_sources, plan):
+    """SSRF and egress hardening, on the connection a provider is
+    actually reached on: the sockets the read opened are shut at the
+    deadline, so it receives nothing past it, however the answer is
+    framed."""
+    secure_sources.plans["frankfurter"] = plan()
+
+    response, started, took = lookup(owner, f"/api/rates?date={PAST}&quote=CHF&symbol=USD")
+    time.sleep(3 * TRICKLE)
+
+    assert response.status_code == 204
+    assert took < BOUND
+    assert secure_sources.receives
+    late = [t - started for t in secure_sources.receives if t > started + rates.EGRESS_TIMEOUT_SECONDS + SLACK]
+    assert late == []
+
+
+def test_over_https_an_answer_sent_at_once_is_read(owner, secure_sources):
+    """The test certificate is trusted, so a failure above is the
+    deadline's and not the handshake's."""
+    response = owner.get(f"/api/rates?date={PAST}&quote=CHF&symbol=USD", headers=CSRF)
+
+    assert response.status_code == 200
+    assert secure_sources.opened == [("frankfurter", secure_sources.opened[0][1])]
