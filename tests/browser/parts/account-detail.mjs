@@ -27,6 +27,13 @@ await run(async () => {
     (await labels('.form-actions button')).join(',') === 'Record a value,Edit,Archive,Delete',
   );
   check('there is no rate column on a holding', !(await text()).includes('Source'));
+  // design-system.md, Typography: the screen heading is 32px/600, 26px
+  // at phone width.
+  const nameFont = await page.eval(
+    "(() => { const s = getComputedStyle(document.querySelector('.detail-header h1')); return `${s.fontSize}/${s.fontWeight}`; })()",
+  );
+  const headingFont = (await page.eval('innerWidth')) <= 600 ? '26px/600' : '32px/600';
+  check("the holding's name is drawn as the screen heading", nameFont === headingFont, nameFont);
   check(
     'a figure recorded for today is aged "today" on the holding',
     (await labels('.hero-age')).some((age) => age.startsWith('as of ') && age.endsWith(', today')),
