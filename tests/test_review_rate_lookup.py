@@ -1,7 +1,9 @@
 """Reviewer's tests: egress has one deadline for connect and the whole
 read across a proxy request, and a provider sending its answer slowly
 has failed once it passes (spec/features/rate-lookup.md, SSRF and egress
-hardening, Rate limiting and failure, criteria 17 to 20 and 60).
+hardening, Rate limiting and failure, criteria 17 to 20 and 60). A
+figure that is not a usable price, or in an unexpected currency, is no
+proposal for the symbols built from it (Edge cases, criteria 61 and 62).
 
 Written from the spec alone. Each provider is reached on a loopback HTTP
 server through the app's own opener, so the app's real socket timeout
@@ -21,7 +23,7 @@ from datetime import date, timedelta
 import pytest
 
 import solvent.rates as rates
-from tests.helpers import CSRF
+from tests.helpers import CSRF, connect, rows
 
 PAST = "2026-07-31"
 # How late a receive may start after the deadline, for scheduling alone.
@@ -478,3 +480,236 @@ def test_over_https_an_answer_sent_at_once_is_read(owner, secure_sources):
 
     assert response.status_code == 200
     assert secure_sources.opened == [("frankfurter", secure_sources.opened[0][1])]
+
+
+# A figure that is not a usable price, and a rate in an unexpected
+# currency (Edge cases, criteria 61 and 62).
+
+NOT_USABLE = [0, -1, "1.0876", True, False, float("nan"), float("inf"), float("-inf"), 1e300, 1e-25]
+GOLD = {"XAU-g", "XAU-ozt"}
+
+
+def fx_table(base=None, **figures):
+    """Frankfurter's table for the URL asked, with `figures` replacing
+    or adding rates, and `base` replacing the base it was asked for."""
+
+    def body_of(url):
+        on = url.split("/v1/")[1][:10]
+        return json.dumps(
+            {
+                "amount": 1,
+                "base": base or url.rsplit("base=", 1)[1],
+                "date": on,
+                "rates": {"PLN": 4.2537, "USD": 1.0876, **figures},
+            }
+        ).encode()
+
+    return body_of
+
+
+def gold_price(cena, lag_days=0):
+    def body_of(url):
+        end = date.fromisoformat(url.split("?")[0].rsplit("/", 1)[1])
+        on = (end - timedelta(days=lag_days)).isoformat()
+        return json.dumps([{"data": on, "cena": cena}]).encode()
+
+    return body_of
+
+
+def day(offset: int) -> str:
+    return (date.fromisoformat(PAST) - timedelta(days=offset)).isoformat()
+
+
+def table(owner, quote="CHF", on=PAST):
+    response = owner.get(f"/api/rates?date={on}&quote={quote}", headers=CSRF)
+    assert response.status_code in (200, 204), response.get_data(as_text=True)
+    return response.get_json()["rates"] if response.status_code == 200 else {}
+
+
+@pytest.mark.parametrize("figure", NOT_USABLE, ids=repr)
+def test_a_currency_rate_that_is_not_a_usable_price_is_no_proposal(owner, sources, figure):
+    """Criterion 61: no proposal for that symbol, never an error or a 0,
+    and the rest of the table stands."""
+    sources.plans["frankfurter"] = at_once(fx_table(USD=figure))
+
+    priced = table(owner)
+
+    assert "USD" not in priced
+    assert {"PLN", *GOLD} <= set(priced)
+    single = owner.get(f"/api/rates?date={PAST}&quote=CHF&symbol=USD", headers=CSRF)
+    assert single.status_code == 204
+
+
+@pytest.mark.parametrize("figure", NOT_USABLE, ids=repr)
+def test_a_gold_price_that_is_not_usable_drops_both_gold_symbols_alone(owner, sources, figure):
+    """Edge cases: a bad NBP price drops both gold symbols, and the
+    currencies stand."""
+    sources.plans["nbp"] = at_once(gold_price(figure))
+
+    priced = table(owner)
+
+    assert not GOLD & set(priced)
+    assert {"USD", "PLN"} <= set(priced)
+    assert owner.get(f"/api/rates?date={PAST}&quote=PLN&symbol=XAU-g", headers=CSRF).status_code == 204
+
+
+@pytest.mark.parametrize("figure", NOT_USABLE, ids=repr)
+def test_a_pln_rate_that_is_not_usable_drops_gold_quoted_elsewhere(owner, sources, figure):
+    """Edge cases: a bad PLN rate drops gold quoted in anything but PLN,
+    and with it PLN itself, while the other currencies stand."""
+    sources.plans["frankfurter"] = at_once(fx_table(PLN=figure))
+
+    priced = table(owner)
+
+    assert not ({"PLN"} | GOLD) & set(priced)
+    assert priced["USD"]["rate"] == "0.91945568"
+
+
+@pytest.mark.parametrize(
+    ("figure", "served"),
+    [
+        (1.9e8, "0.00000001"),  # 5.26e-9 rounds up to the last place
+        (2e8, None),  # exactly 5e-9, half to even rounds to 0
+        (1e-20, None),  # exactly 10^20, not below it
+        (1.0000001e-20, True),  # just below 10^20
+    ],
+    ids=repr,
+)
+def test_a_proposal_is_served_only_when_rounded_it_is_above_0_and_below_10_to_the_20(
+    owner, sources, figure, served
+):
+    """Edge cases: the bounds apply to the rounded proposal."""
+    sources.plans["frankfurter"] = at_once(fx_table(USD=figure))
+
+    priced = table(owner)
+
+    if served is None:
+        assert "USD" not in priced
+    elif served is True:
+        assert 0 < float(priced["USD"]["rate"]) < 1e20
+    else:
+        assert priced["USD"]["rate"] == served
+
+
+def test_the_bounds_apply_to_each_gold_symbol_on_its_own(owner, sources):
+    """A usable price can still make one symbol's proposal fall outside
+    the bounds: grams round to 0 where ounces do not, and ounces pass
+    10^20 where grams do not."""
+    sources.plans["nbp"] = at_once(gold_price(1e-9))
+    priced = table(owner, quote="PLN", on=day(0))
+    assert "XAU-g" not in priced
+    assert priced["XAU-ozt"]["rate"] == "0.00000003"
+
+    sources.plans["nbp"] = at_once(gold_price(1e19))
+    priced = table(owner, quote="PLN", on=day(1))
+    assert priced["XAU-g"]["rate"] == "10000000000000000000"
+    assert "XAU-ozt" not in priced
+
+
+@pytest.mark.parametrize(
+    ("provider", "url", "bad"),
+    [
+        ("frankfurter", "quote=CHF&symbol=USD", at_once(fx_table(USD=0))),
+        ("nbp", "quote=PLN&symbol=XAU-g", at_once(gold_price("251.37"))),
+    ],
+)
+def test_a_bad_figure_counts_as_a_success_for_its_breaker(app, owner, sources, provider, url, bad):
+    """Edge cases: the source answered, so a bad figure resets its
+    breaker's count. Counted as a failure, the breaker opens on the
+    third request. Left uncounted, it opens on the fifth."""
+    app.config["RATE_BREAKER_FAILURES"] = 3
+    failing = at_once(lambda _: b"{}", 500)
+
+    for offset, plan in enumerate([failing, failing, bad, failing, failing, bad]):
+        sources.plans[provider] = plan
+        response = owner.get(f"/api/rates?date={day(offset)}&{url}", headers=CSRF)
+        assert response.status_code == 204
+
+    assert [p for p, _ in sources.opened] == [provider] * 6
+
+
+def test_a_table_in_another_currency_is_no_proposal(owner, sources):
+    """Edge cases, a rate in an unexpected currency: a table based on
+    another currency than the quote prices nothing, gold included."""
+    sources.plans["frankfurter"] = at_once(fx_table(base="EUR"))
+
+    response = owner.get(f"/api/rates?date={PAST}&quote=CHF", headers=CSRF)
+
+    assert response.status_code == 204
+
+
+def test_a_quote_leg_in_another_currency_drops_only_gold(owner, sources):
+    """NBP publishes the day before, so the quote leg is a table of its
+    own. Based on the wrong currency, it gives gold no proposal and
+    leaves the currencies of the requested day."""
+    asked = date.fromisoformat(PAST)
+    right, wrong = fx_table(), fx_table(base="EUR")
+    sources.plans["nbp"] = at_once(gold_price(251.37, lag_days=1))
+    sources.plans["frankfurter"] = at_once(
+        lambda url: (right if f"/v1/{PAST}" in url else wrong)(url)
+    )
+
+    priced = table(owner, on=asked.isoformat())
+
+    assert {"USD", "PLN"} <= set(priced)
+    assert not GOLD & set(priced)
+
+
+def plant(app, symbol, quote, on, rate, source):
+    from solvent.db import utcnow
+
+    with connect(app) as conn:
+        conn.execute(
+            "INSERT INTO rate_cache (symbol, quote, date, rate, as_of, source, fetched_at) "
+            "VALUES (?, ?, ?, ?, ?, ?, ?)",
+            (symbol, quote, on, rate, on, source, utcnow()),
+        )
+    conn.close()
+
+
+def cached(app, symbol, quote, on):
+    return rows(
+        app, "SELECT rate FROM rate_cache WHERE symbol = ? AND quote = ? AND date = ?", (symbol, quote, on)
+    )
+
+
+def test_a_cached_zero_is_fetched_again_and_replaced(app, owner, sources):
+    """Criterion 62, for a single symbol: the provider is asked, and the
+    zero is gone from the cache, so the repeat is a hit."""
+    plant(app, "USD", "CHF", PAST, "0", "frankfurter")
+
+    first = owner.get(f"/api/rates?date={PAST}&quote=CHF&symbol=USD", headers=CSRF).get_json()
+    again = owner.get(f"/api/rates?date={PAST}&quote=CHF&symbol=USD", headers=CSRF).get_json()
+
+    assert (first["rate"], first["cached"]) == ("0.91945568", False)
+    assert (again["rate"], again["cached"]) == ("0.91945568", True)
+    assert cached(app, "USD", "CHF", PAST) == [{"rate": "0.91945568"}]
+    assert [p for p, _ in sources.opened] == ["frankfurter"]
+
+
+def test_a_cached_zero_is_a_miss_in_the_whole_table(app, owner, sources):
+    plant(app, "USD", "CHF", PAST, "0", "frankfurter")
+    plant(app, "XAU-g", "PLN", PAST, "0", "nbp")
+
+    assert table(owner)["USD"]["rate"] == "0.91945568"
+    assert table(owner, quote="PLN")["XAU-g"]["rate"] == "251.37"
+    assert cached(app, "XAU-g", "PLN", PAST) == [{"rate": "251.37"}]
+
+
+def test_a_rate_with_more_digits_than_python_converts_is_no_proposal(owner, sources):
+    """A JSON number of 5000 digits is still a JSON number, finite and
+    above 0, whose proposal rounds to 0. Edge cases: no proposal for
+    that symbol, the rest of the table stands, and the source answered,
+    so its breaker counts a success."""
+
+    def body_of(url):
+        opening = fx_table()(url)[:-2]
+        return opening + b', "SEK": 1' + b"0" * 5000 + b"}}"
+
+    sources.plans["frankfurter"] = at_once(body_of)
+
+    priced = table(owner)
+
+    assert rates.breakers["frankfurter"].failures == 0
+    assert "SEK" not in priced
+    assert {"USD", "PLN", *GOLD} <= set(priced)

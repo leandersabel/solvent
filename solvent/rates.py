@@ -335,7 +335,9 @@ def _fetch_json(provider: str, url: str, egress: _Egress) -> "object | None":
     if remaining <= 0:
         return None
     try:
-        payload = json.loads(_fetch_within(url, remaining))
+        # Integers as Decimal, which takes any length: an int over
+        # Python's digit limit would fail the whole answer for one figure.
+        payload = json.loads(_fetch_within(url, remaining), parse_int=Decimal)
     except Exception as error:
         # Logged with the target and the failure, never with the
         # requesting user beyond what the access log already holds.
@@ -349,7 +351,7 @@ def _fetch_json(provider: str, url: str, egress: _Egress) -> "object | None":
 def _positive(value: object) -> "Decimal | None":
     """A figure is usable only as a finite JSON number above 0. Anything
     else is no proposal rather than an error or a price of 0."""
-    if isinstance(value, bool) or not isinstance(value, (int, float)):
+    if isinstance(value, bool) or not isinstance(value, (int, float, Decimal)):
         return None
     number = Decimal(str(value))
     return number if number.is_finite() and number > 0 else None
