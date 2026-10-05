@@ -1108,6 +1108,11 @@ prices behave as for a figure added there on the single-holding form:
   its `record_id` but takes the holding's slot at the new date as a
   create would, so that slot counts as one the move creates unless it
   holds the record the move's confirmation named for deletion.
+- **A move's sitting begins when the Dialog shows the new date.** A
+  date that held no record then is one the move would start, so a
+  reload finding any record there refuses the move, even with every
+  slot it would take free. A date that held records then is one the
+  move joins, and only its slots are judged.
 
 #### Moving the date onto an occupied date
 
@@ -1511,7 +1516,8 @@ Editing an existing entry).
 79. (blind) A move whose reload finds the holding's slot at the new date
     taken by a record its confirmation did not name writes nothing and
     names the date. Test:
-    `tests/test_client.py::test_the_client_side_rules_hold`.
+    `tests/test_client.py::test_the_client_side_rules_hold`,
+    `tests/browser/parts/snapshot-entry-review-move.mjs`.
 80. A move whose prices did not save leaves the entry moved, names every
     unit in the Dialog, leaves Save inert until something changes, and
     offers the recording. Test: `tests/browser/parts/snapshot-entry.mjs`.
@@ -1560,3 +1566,10 @@ Editing an existing entry).
     notice. Test: `tests/browser/parts/snapshot-entry.mjs`,
     `tests/browser/parts/snapshot-entry-review-leave.mjs`,
     `tests/browser/parts/unlock-lock.mjs`.
+92. A move to a date that held no record when the Dialog showed it,
+    where another window records a different holding's figure there
+    before Save, writes nothing, names the date and offers its
+    recording, although no slot the move would take is taken. Test:
+    `tests/browser/parts/snapshot-entry.mjs`,
+    `tests/browser/parts/snapshot-entry-review-move.mjs`,
+    `tests/test_client.py::test_the_client_side_rules_hold`.
