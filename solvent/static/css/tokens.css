@@ -1175,6 +1175,11 @@ th.numeric {
   padding: 0;
 }
 
+/* A name with no space breaks inside a word rather than widening the
+   page. */
+.holdings-table .row-name,
+.table-group .link-button { overflow-wrap: anywhere; }
+
 .holdings-table tr.dimmed .row-name { color: var(--ink-secondary); }
 
 .holdings-table .cell-asof,
