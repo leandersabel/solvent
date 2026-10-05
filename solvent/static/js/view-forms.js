@@ -23,7 +23,8 @@ export function snapshotDialog(vault, holding, existing, onSaved, onOpenRecordin
   const unit = holding.payload.unit;
   const converted = el('p', { class: 'hint numeric' });
   const error = el('p', { class: 'field-error', hidden: true });
-  const pricesLine = el('p', { class: 'hint prices-line' });
+  // The fold's summary, so the line reads without opening it.
+  const pricesLine = el('summary', { class: 'hint prices-line', text: 'Prices' });
   const pricesBody = el('div', { class: 'prices-body' });
   let block = null;
   let sit = null;
@@ -52,7 +53,7 @@ export function snapshotDialog(vault, holding, existing, onSaved, onOpenRecordin
   const describePrices = () => {
     const on = date.value;
     if (!on) {
-      pricesLine.textContent = '';
+      pricesLine.textContent = 'Prices';
       pricesBody.replaceChildren();
       block = null;
       return;
@@ -99,8 +100,13 @@ export function snapshotDialog(vault, holding, existing, onSaved, onOpenRecordin
     if (sit && writes.needsLookup(vault, on, unit)) {
       sit.proposals = writes.fetchProposals(vault, on);
       block.waiting();
+      // The rate lines' own skeletons sit inside the fold, so the folded
+      // line carries one too (record-snapshot.md, States).
+      const skeleton = el('span', { class: 'skeleton', 'aria-label': 'Looking up the prices' });
+      pricesLine.append(skeleton);
       const shownFor = block;
       sit.proposals.then((proposals) => {
+        skeleton.remove();
         if (block === shownFor) block.showProposals(proposals);
       });
     }
@@ -352,7 +358,7 @@ export function snapshotDialog(vault, holding, existing, onSaved, onOpenRecordin
         converted,
       ]),
       el('details', {}, [el('summary', { text: 'Add a note' }), note]),
-      el('details', { class: 'prices-fold' }, [el('summary', { text: 'Prices' }), pricesLine, pricesBody]),
+      el('details', { class: 'prices-fold' }, [pricesLine, pricesBody]),
       error,
     ],
     actions: [cancel, submit],
