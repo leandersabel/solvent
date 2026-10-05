@@ -222,8 +222,6 @@ h1, h2, h3 {
   letter-spacing: -0.01em;
   line-height: 1.2;
   margin-bottom: 24px;
-  /* A holding's name can be one word wider than the screen. */
-  overflow-wrap: anywhere;
 }
 
 .section-heading,
@@ -1593,6 +1591,10 @@ th.numeric {
 }
 
 .dialog-heading { font-size: 20px; margin-bottom: 20px; }
+
+/* A holding's name can be one word wider than the screen. */
+.screen-heading,
+.dialog-heading { overflow-wrap: anywhere; }
 
 .dialog-actions {
   display: flex;
