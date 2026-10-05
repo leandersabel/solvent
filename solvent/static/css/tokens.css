@@ -222,6 +222,8 @@ h1, h2, h3 {
   letter-spacing: -0.01em;
   line-height: 1.2;
   margin-bottom: 24px;
+  /* A holding's name can be one word wider than the screen. */
+  overflow-wrap: anywhere;
 }
 
 .section-heading,
