@@ -431,10 +431,17 @@ host's network are reachable.
   floor (The symbol table). A single global floor would reject valid FX
   dates or wave through gold dates with no data.
 - HTTP redirects are **disabled**, not followed to a validated target.
-- Egress has a hard timeout, `EGRESS_TIMEOUT_SECONDS` = 5, for connect
-  and read together across one proxy request (shared as in Rate
-  limiting and failure), and a response cap, `MAX_RESPONSE_BYTES` =
-  1 MiB.
+- Egress has a hard deadline, `EGRESS_TIMEOUT_SECONDS` = 5, for
+  connect and the whole read together across one proxy request (shared
+  as in Rate limiting and failure), and a response cap,
+  `MAX_RESPONSE_BYTES` = 1 MiB. A body over the cap fails rather than
+  being cut short. A socket timeout bounds each receive on its own, so
+  a provider sending its answer a byte at a time would outlast it: the
+  read runs on a daemon thread the request waits for only until the
+  deadline, and at the deadline the sockets that thread opened are shut
+  down, so it receives nothing past it, whether the headers, a chunked
+  body or a sized one is arriving. A provider that has not answered by
+  then has failed.
 - `solvent.rates` exposes `FX_URL`, `NBP_URL`, `USER_AGENT`,
   `EGRESS_TIMEOUT_SECONDS`, `MAX_RESPONSE_BYTES` and `SEEDED_SYMBOLS`
   under those names, because the nightly source check imports them to
@@ -797,3 +804,8 @@ host's network are reachable.
     table is a Bad Request, asserted with a code the FX provider does not
     serve. Test:
     `tests/test_rates.py::test_a_quote_the_provider_cannot_serve_is_refused`.
+60. (blind) With both providers answering at once but sending the body
+    one byte at a time, each well inside the socket timeout, a
+    whole-table request returns No Content within
+    `EGRESS_TIMEOUT_SECONDS` plus one second. Test:
+    `tests/test_rates.py::test_providers_sending_their_answer_slowly_give_no_content_within_the_bound`.
