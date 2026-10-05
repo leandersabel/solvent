@@ -812,3 +812,5 @@ administrator), and the lost sole password (Bootstrap). The rest:
     `account`, one `snapshot`, one `rate` and a second `profile` record
     reads 3. Test:
     `tests/test_admin.py::test_items_count_what_the_owner_added_and_no_profile`.
+49. The password card's error line sits above the Current password
+    field. Test: `tests/browser/parts/admin.mjs`.
