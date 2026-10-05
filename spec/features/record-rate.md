@@ -170,9 +170,9 @@ records (`record-api.md`), so the order is the whole guarantee.
   number the person went and looked up. The expensive half goes first.
 - **A typed price is written only at a date that holds a recording.**
   - **At a date holding a record**, the rate-lines save writes it alone
-    and triggers no refresh (Saving an edited recording). The refresh
-    waits on a quantity because it writes figures nobody asked for, and
-    a typed price is the person's own act.
+    and triggers no refresh (Saving at a date that holds a recording).
+    The refresh waits on a quantity because it writes figures nobody
+    asked for, and a typed price is the person's own act.
   - **At a date holding none**, nothing is written until the first
     quantity is. Its success writes the refresh and every typed price,
     each in its proposal's place with the `rateSource` Record shape
@@ -208,12 +208,12 @@ Against the concurrency rule in `record-api.md`:
   spends quota nobody asked to spend, which the caps' headroom is for
   (architecture.md, Storage & data handling).
 
-#### Saving an edited recording
+#### Saving at a date that holds a recording
 
-A reopened recording is saved one control at a time
-(`record-snapshot.md`, Update values). **No save spans a quantity,
-rates and deletions at once.** Each record is its own request under its
-own version check.
+A date that holds a recording, reopened or reached by a sweep's first
+row, is saved one control at a time (`record-snapshot.md`, Update
+values). **No save spans a quantity, rates and deletions at once.**
+Each record is its own request under its own version check.
 
 - **A row's save** writes that holding's quantity alone: an update in
   place, which ensures no price, a create for a holding silent at the

@@ -575,7 +575,7 @@ stays a recording holding it, and this screen reloads to it.
   two differing prices for one unit (Moving the date onto an occupied
   date, `record-rate.md`, Two entries on one date). Both are rendered,
   flagged critical, with a line naming the fault and **Keep this one**
-  on each. The client picks neither, and the chart leaves that date out
+  on each. The app picks neither, and the chart leaves that date out
   of its interpolated series until answered.
 - **Error, delete landed in part**: nothing is rolled back and nothing
   marks the date half deleted. The screen reloads to what is left,
@@ -917,8 +917,8 @@ Saving a reopened recording covers, in any combination:
    captured rate).
 
 Each is saved by its own control, and no save spans them. Write order
-and partial failure are `record-rate.md`'s (Saving an edited
-recording).
+and partial failure are `record-rate.md`'s (Saving at a date that holds
+a recording).
 
 **Opening a recording writes nothing and fetches nothing**: no version
 bump, no nonce, no price request, even with an empty rate line, which
@@ -997,10 +997,10 @@ session can cause.
   even into free slots, because writing half a screen against a date
   the person has not seen is worse than writing none.
 - **Look it up on a reopened recording is a narrower case too**
-  (`record-rate.md`, Saving an edited recording). It runs the same
-  reload of both types on every press, writes nothing at a date found
-  holding no record, and leaves a price slot taken since to the entry
-  there, while writing the free ones.
+  (`record-rate.md`, Saving at a date that holds a recording). It runs
+  the same reload of both types on every press, writes nothing at a
+  date found holding no record, and leaves a price slot taken since to
+  the entry there, while writing the free ones.
 - **The archive is the other narrower case** (`manage-accounts.md`,
   Archiving). It runs the same reload of both types once, and is
   refused only when the archived holding's own slot at the date is
@@ -1477,7 +1477,7 @@ Editing an existing entry).
     `tests/browser/parts/snapshot-entry.mjs`.
 73. With two snapshots for one (holding, date), the holding's history,
     the recording and the sweep show both flagged with Keep this one,
-    the client picks neither, and the date is left out of the
+    the app picks neither, and the date is left out of the
     interpolated series until resolved. Test:
     `tests/browser/parts/dashboard.mjs`,
     `tests/browser/parts/update-values.mjs`.
