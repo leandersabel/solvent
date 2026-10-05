@@ -699,10 +699,13 @@ host's network are reachable.
     `tests/test_rates.py::test_a_whole_table_request_omits_symbols_the_proxy_cannot_price`.
 13. (blind) A whole-table request followed by a single-symbol request for
     a symbol in it makes no second outbound request. Test:
-    `tests/test_rates.py::test_the_whole_table_and_a_single_symbol_share_one_cache`.
+    `tests/test_rates.py::test_the_whole_table_and_a_single_symbol_share_one_cache`,
+    `tests/test_review_rate_lookup.py::test_the_whole_table_and_a_single_symbol_share_one_unsettled_entry`.
 14. An entry fetched under an hour ago is served from cache whatever its
     date. Test:
-    `tests/test_rates.py::test_a_price_fetched_under_an_hour_ago_is_served_from_cache_whatever_its_date`.
+    `tests/test_rates.py::test_a_price_fetched_under_an_hour_ago_is_served_from_cache_whatever_its_date`,
+    `tests/test_review_rate_lookup.py::test_a_price_looked_up_under_an_hour_ago_is_served_from_cache_whatever_its_date`,
+    `tests/test_review_rate_lookup.py::test_a_price_looked_up_before_d_plus_2_is_looked_up_again_after_an_hour`.
 15. The app keeps no record of who asked about which rate: cache entries
     carry no user. Test: no test.
 16. `symbol=http://192.168.1.1/`, `symbol=../../etc/passwd`, and a
@@ -1008,7 +1011,10 @@ host's network are reachable.
     `tests/test_review_rate_lookup.py::test_a_not_found_answer_neither_counts_nor_resets_a_failure_run`.
 76. An entry for D fetched on D holding the prior close is fetched again
     at 00:30 UTC on D+1 and proposes D's own price. Test:
-    `tests/test_rates.py::test_a_price_fetched_before_its_day_was_published_is_fetched_again`.
+    `tests/test_rates.py::test_a_price_fetched_before_its_day_was_published_is_fetched_again`,
+    `tests/test_review_rate_lookup.py::test_a_price_looked_up_on_its_day_before_publication_is_looked_up_again_after_midnight`,
+    `tests/test_review_rate_lookup.py::test_the_whole_table_looked_up_before_publication_is_looked_up_again_after_midnight`.
 77. An entry fetched at or after 00:00 UTC on D+2 is served from cache a
     month later, for a Saturday and for gold quoted in `CHF`. Test:
-    `tests/test_rates.py::test_a_price_fetched_once_its_day_settled_is_served_from_cache_for_good`.
+    `tests/test_rates.py::test_a_price_fetched_once_its_day_settled_is_served_from_cache_for_good`,
+    `tests/test_review_rate_lookup.py::test_a_price_looked_up_at_00_utc_on_d_plus_2_is_served_from_cache_a_month_later`.
