@@ -446,20 +446,8 @@ def test_a_price_written_as_json_is_read_back_as_the_same_decimal(day):
     assert Decimal(str(json.loads(json.dumps(prices.json_number(prices.nbp_cena(day)))))) == prices.nbp_cena(day)
 
 
-class AppResponse:
+class AppResponse(io.BytesIO):
     status = 200
-
-    def __init__(self, body: bytes) -> None:
-        self.body = body
-
-    def read(self, _size=None):
-        return self.body
-
-    def __enter__(self):
-        return self
-
-    def __exit__(self, *_):
-        return False
 
 
 @pytest.fixture

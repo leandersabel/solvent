@@ -225,6 +225,47 @@ def _egress() -> _Egress:
     )
 
 
+def _read(url: str, deadline: float) -> bytes:
+    """The body of a 200 answer, one receive at a time, starting none
+    past the deadline. A socket timeout bounds each receive on its own,
+    so a source sending a byte now and then would otherwise hold the
+    read for as long as it keeps sending."""
+    with _opener.open(_request(url), timeout=deadline - time.monotonic()) as response:
+        if response.status != 200:
+            raise urllib.error.URLError(f"status {response.status}")
+        body = b""
+        while chunk := response.read1(MAX_RESPONSE_BYTES):
+            body += chunk
+            if len(body) > MAX_RESPONSE_BYTES:
+                raise urllib.error.URLError("body over the size cap")
+            if time.monotonic() >= deadline:
+                raise TimeoutError("deadline passed while reading")
+        return body
+
+
+def _fetch_within(url: str, seconds: float) -> bytes:
+    """The body of a 200 answer to `url`, or an error once `seconds`
+    have passed. The read runs on a daemon thread, because a receive
+    already waiting can outlast the deadline by up to the socket
+    timeout, and the caller must not wait for it."""
+    outcome: list = []
+
+    def read() -> None:
+        try:
+            outcome.append(_read(url, time.monotonic() + seconds))
+        except Exception as error:
+            outcome.append(error)
+
+    worker = threading.Thread(target=read, daemon=True)
+    worker.start()
+    worker.join(seconds)
+    if not outcome:
+        raise TimeoutError("no answer within the deadline")
+    if isinstance(outcome[0], Exception):
+        raise outcome[0]
+    return outcome[0]
+
+
 def _fetch_json(provider: str, url: str, egress: _Egress) -> "object | None":
     breaker = breakers[provider]
     if breaker.is_open(egress.cooloff):
@@ -233,10 +274,7 @@ def _fetch_json(provider: str, url: str, egress: _Egress) -> "object | None":
     if remaining <= 0:
         return None
     try:
-        with _opener.open(_request(url), timeout=remaining) as response:
-            if response.status != 200:
-                raise urllib.error.URLError(f"status {response.status}")
-            payload = json.loads(response.read(MAX_RESPONSE_BYTES))
+        payload = json.loads(_fetch_within(url, remaining))
     except Exception as error:
         # Logged with the target and the failure, never with the
         # requesting user beyond what the access log already holds.

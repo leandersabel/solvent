@@ -75,6 +75,47 @@ def hang_open(monkeypatch):
         connection.close()
 
 
+@pytest.fixture
+def trickle_open():
+    """Like `hang_open`, but the loopback server answers 200 at once
+    and then sends its body one byte every 0.2 seconds, so no single
+    receive ever waits long enough to time out."""
+    real_open = rates._opener.open
+    listener = socket.create_server(("127.0.0.1", 0))
+    listener.settimeout(0.05)
+    port = listener.getsockname()[1]
+    stop = threading.Event()
+
+    def serve(connection):
+        with connection:
+            connection.recv(65536)
+            connection.sendall(b"HTTP/1.1 200 OK\r\nContent-Length: 4096\r\n\r\n")
+            while not stop.wait(0.2):
+                try:
+                    connection.sendall(b" ")
+                except OSError:
+                    return
+
+    def accept():
+        while not stop.is_set():
+            try:
+                threading.Thread(target=serve, args=(listener.accept()[0],)).start()
+            except (TimeoutError, OSError):
+                pass
+
+    acceptor = threading.Thread(target=accept)
+    acceptor.start()
+
+    def open_(request, timeout=None):
+        slow = urllib.request.Request(f"http://127.0.0.1:{port}/", headers=request.headers)
+        return real_open(slow, timeout=timeout)
+
+    yield open_
+    stop.set()
+    acceptor.join()
+    listener.close()
+
+
 def fx(on: str, table: dict) -> dict:
     return {"amount": 1, "base": "CHF", "date": on, "rates": table}
 
@@ -501,9 +542,11 @@ def test_every_outbound_request_is_named(monkeypatch):
 
     class Response:
         status = 200
+        body = b"{}"
 
-        def read(self, _size=None):
-            return b"{}"
+        def read1(self, _size=-1):
+            body, self.body = self.body, b""
+            return body
 
         def __enter__(self):
             return self
@@ -544,8 +587,9 @@ def opener(monkeypatch):
         def __init__(self, payload):
             self.payload = json.dumps(payload).encode()
 
-        def read(self, _size=None):
-            return self.payload
+        def read1(self, _size=-1):
+            payload, self.payload = self.payload, b""
+            return payload
 
         def __enter__(self):
             return self
@@ -846,8 +890,9 @@ def providers(monkeypatch, hang_open):
         def __init__(self, body, status=200):
             self.body, self.status = body, status
 
-        def read(self, _size=None):
-            return self.body
+        def read1(self, _size=-1):
+            body, self.body = self.body, b""
+            return body
 
         def __enter__(self):
             return self
@@ -1044,6 +1089,18 @@ def test_nbp_hanging_leaves_the_currency_rates(owner, providers, short_timeout):
     symbols = set(response.get_json()["rates"])
     assert {"USD", "PLN"} <= symbols
     assert not symbols & {"XAU-g", "XAU-ozt"}
+    assert elapsed < short_timeout + HANG_BOUND
+
+
+def test_providers_sending_their_answer_slowly_give_no_content_within_the_bound(
+    owner, monkeypatch, short_timeout, trickle_open
+):
+    """The deadline bounds the whole read: a byte every 0.2 seconds
+    keeps each receive under the socket timeout."""
+    monkeypatch.setattr(rates._opener, "open", trickle_open)
+    response, elapsed = _timed(owner, f"/api/rates?date={PAST}&quote=CHF")
+
+    assert response.status_code == 204
     assert elapsed < short_timeout + HANG_BOUND
 
 
