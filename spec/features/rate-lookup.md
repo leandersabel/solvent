@@ -919,4 +919,5 @@ host's network are reachable.
     nothing, answers an identity symbol and gives a pending one no
     proposal, and leaves the breakers as they were. Once a slot frees,
     the next lookup sends. Test:
-    `tests/test_rates.py::test_a_lookup_finding_every_slot_taken_sends_nothing_and_answers_what_needs_no_source`.
+    `tests/test_rates.py::test_a_lookup_finding_every_slot_taken_sends_nothing_and_answers_what_needs_no_source`,
+    `tests/test_review_rate_lookup.py::test_with_every_slot_sending_a_lookup_sends_nothing_and_answers_only_what_needs_no_source`.

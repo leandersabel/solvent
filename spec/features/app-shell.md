@@ -809,8 +809,12 @@ for a control above the dialog to protect.
     `tests/test_deployment.py::test_no_server_log_line_carries_the_peer_address`.
 78. The Dockerfile's gunicorn command runs one `gthread` process with
     more request threads than `LOOKUP_CONCURRENCY`. Test:
-    `tests/test_deployment.py::test_one_gthread_process_serves_more_requests_than_lookups_can_hold`.
+    `tests/test_deployment.py::test_one_gthread_process_serves_more_requests_than_lookups_can_hold`,
+    `tests/test_review_app_shell.py::test_the_image_runs_one_gthread_process_with_more_threads_than_lookups`,
+    `tests/test_review_app_shell.py::test_the_image_starts_exactly_one_worker_process`.
 79. (blind) gunicorn, run with the Dockerfile's arguments, holding
     `LOOKUP_CONCURRENCY` requests stalled halfway, still serves the
     sign-in page. Test:
-    `tests/test_deployment.py::test_requests_held_open_as_long_as_lookups_can_be_leave_the_instance_answering`.
+    `tests/test_deployment.py::test_requests_held_open_as_long_as_lookups_can_be_leave_the_instance_answering`,
+    `tests/test_review_app_shell.py::test_requests_held_open_as_long_as_every_lookup_slot_leave_the_sign_in_page_answering`,
+    `tests/test_review_app_shell.py::test_the_control_holding_every_thread_does_stop_the_sign_in_page`.
