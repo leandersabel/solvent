@@ -298,6 +298,9 @@ archived" toggle the right. Columns: Name, Dimensions, Latest value
 - Latest value and In main currency are figure columns
   (design-system.md, Typography). The native figure shows the digits it
   was entered with, and the converted figure follows Decimals on money.
+- **A holding's name wraps wherever it must**, in the table and in both
+  groups, and is shown whole. A name with no space breaks inside the word
+  rather than widen the page, at any width.
 - Rows in creation order, oldest first. A row never moves because its
   figure changed.
 - **As of is the date of the quantity, never of the rate**, shown plainly
@@ -1111,3 +1114,8 @@ rule of the chart (Archived holdings, Ranges and modes).
 72. (blind) With the mouse resting anywhere on the chart, focus, Home,
     End, the arrow keys and Enter behave as they do with the mouse
     elsewhere. Test: `tests/browser/parts/dashboard-review-keyboard.mjs`.
+73. At 320px, 375px, 601px, 901px and 1280px wide, a holding in the
+    table and one under Not yet valued, each named with no space and
+    wider than the screen, are shown whole inside the screen, and the
+    page never pans sideways. Test:
+    `tests/browser/parts/dashboard-long-name.mjs`.
