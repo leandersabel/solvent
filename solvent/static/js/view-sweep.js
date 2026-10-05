@@ -162,7 +162,12 @@ export function sweepView(vault, date, actions = {}) {
     if (!sit.proposals && unanswered) sit.proposals = writes.fetchProposals(vault, date);
     if (sit.proposals) block.showProposals(await sit.proposals);
     const { failed } = await writes.refreshPrices(vault, date, {}, (unit) => block.partFor(unit));
-    block.refresh();
+    // A line that did not save keeps what it shows, for the lines' own
+    // save to retry.
+    for (const line of block.lines) {
+      if (failed.includes(line.unit)) line.unsaved = true;
+      else line.reset();
+    }
     syncSave();
     if (failed.length) {
       say(`Recorded. Prices were not updated for ${failed.join(', ')}.`, { critical: true });
@@ -614,6 +619,8 @@ function rateLine(vault, unit, date, { sit, readOnly: blockReadOnly, fillMissing
     prefilled: false,
     typed: false,
     lookedUp: false,
+    // Its write failed: what it shows waits for the lines' own save.
+    unsaved: false,
     asked: false,
     pending: false,
   };
@@ -633,7 +640,7 @@ function rateLine(vault, unit, date, { sit, readOnly: blockReadOnly, fillMissing
     if (readOnly || line.rivals.length) return false;
     if (line.stored) return !line.value() || line.figure() !== parsed(line.stored.payload.rate);
     if (!line.value()) return false;
-    if (line.invalid()) return true;
+    if (line.invalid() || line.unsaved) return true;
     if (line.proposal) return line.lookedUp || line.figure() !== parsed(line.proposal.rate);
     return !line.prefilled || line.figure() !== parsed(line.carried.payload.rate);
   };
@@ -780,6 +787,7 @@ function rateLine(vault, unit, date, { sit, readOnly: blockReadOnly, fillMissing
     line.stored = line.rivals.length ? null : entries[0] || null;
     line.carried = vault.carriedRate(unit, date);
     line.typed = false;
+    line.unsaved = false;
     // A unit only its owner can price shows its last figure as the
     // starting point. One somebody publishes stays empty until a
     // proposal fills it.

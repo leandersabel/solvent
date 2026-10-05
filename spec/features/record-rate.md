@@ -163,7 +163,8 @@ records (`record-api.md`), so the order is the whole guarantee.
   own request, and never changes the row's saved state.
 - **A price write failure is never silent.** The row reads as recorded
   with the price not updated, and names the symbol when the person typed
-  that price.
+  that price. A line whose write failed keeps what it showed, typed
+  figure included, for the lines' own save to retry.
 - **The order is not interchangeable.** Prices first and the quantity
   failing would reprice every holding in those symbols while losing the
   number the person went and looked up. The expensive half goes first.
@@ -452,7 +453,8 @@ silently.
    `tests/browser/parts/update-values.mjs`.
 8. With every price `PUT` stubbed to fail, the quantity record exists,
    reads back exactly, and the screen says the prices were not updated.
-   Nothing about the row is rolled back. Test:
+   Nothing about the row is rolled back, and a price typed on the sweep
+   stays in its line. Test:
    `tests/browser/parts/update-values.mjs`.
 9. With a rate update stubbed to Conflict, nothing is retried, the line
    reloads to the stored entry, and the message names the symbol. Test:

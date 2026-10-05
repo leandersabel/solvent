@@ -706,9 +706,11 @@ await run(async () => {
   check('record-rate: a failed quantity leaves the total where it was', (await hero()) === heroFailed);
   faults.push((r) => (r.method === 'PUT' && bodyOf(r).recordType === 'rate' ? 500 : null));
   await newRecording(D6);
+  await typeLine('USD', '0.95');
   await typeRow('Current account', '20.25');
   await pressRow('Current account');
   const reported = await ev("document.querySelector('.sweep .banner').textContent");
+  const typedLine = await lineState('USD');
   faults.length = 0;
   const kept = on(await stored('snapshot'), D6).find((s) => s.accountId === id['Current account']);
   check(
@@ -716,6 +718,11 @@ await run(async () => {
     kept && kept.payload.value === '20.25' && reported.includes('Prices were not updated for USD, XAU-ozt') &&
       (await rowState('Current account')).state === 'Recorded for this date.' && on(await stored('rate'), D6).length === 0,
     reported,
+  );
+  check(
+    'record-rate: a typed price whose write failed stays in its line',
+    figure(typedLine.value) === 0.95 && !(await ev("document.querySelector('.sweep .rate-section .btn-primary').hidden")),
+    JSON.stringify(typedLine),
   );
 
   proxy.mode = 'down';
