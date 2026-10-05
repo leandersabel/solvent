@@ -14,7 +14,28 @@ await run(async () => {
   const r = await startRecorder();
   await r.register();
   await r.seed();
-  const { rec, ago, proxy, rateAsks, traffic, stored, on, model, plantHere, reread, go, home, newRecording, typeRow, pressRow, rowState, lineState } = r;
+  const { rec, ago, id, proxy, rateAsks, traffic, stored, on, model, plantHere, reread, go, home, newRecording, typeRow, pressRow, rowState, lineState } = r;
+
+  // First in the vault as registered, in CHF, which a source quotes
+  // into: pounds have never been priced, and the source does not
+  // answer, so recording them asks for a price without the reason
+  // that belongs to an unquoted main currency.
+  [id.Pounds] = await plantHere([
+    { type: 'account', payload: { name: 'Pounds', unit: 'GBP', dims: {}, note: null, archivedAt: null, createdAt: '2020-01-02T00:00:00Z' } },
+  ]);
+  await reread();
+  await home();
+  proxy.mode = 'down';
+  await newRecording(ago(12));
+  await typeRow('Pounds', '700');
+  await pressRow('Pounds');
+  const outage = await lineState('GBP');
+  check(
+    'review 90 / rate 10: in a vault a source quotes into, a sourced unit asked for in an outage never reads as an unquoted main currency',
+    Boolean(outage) && outage.says !== '' && !outage.says.includes('No price source quotes in'),
+    JSON.stringify(outage),
+  );
+  await home();
 
   const profile = await model(({ v }) => ({ recordId: v.profileRecord.recordId, version: v.profileRecord.version, payload: v.profile }));
   await plantHere([{
