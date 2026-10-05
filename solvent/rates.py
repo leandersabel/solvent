@@ -444,18 +444,19 @@ def _fx_table(
     )
 
 
-def _gold_pln(on: date, egress: _Egress) -> "tuple[Decimal, str] | None":
-    """PLN per gram of fine gold, at the last published day on or
-    before `on`.
+def _gold_pln(on: date, egress: _Egress) -> "dict[str, Decimal] | None":
+    """PLN per gram of fine gold, by each day NBP published in the window
+    up to `on`, the last entry's day being the latest.
 
     A range query rather than a single date: NBP answers Not Found on
     every weekend and Polish holiday, so the range satisfies the
     prior-close rule in one request. It answers an empty window Not
-    Found too, so an empty list is a changed shape.
+    Found too, so an empty list is a changed shape. An unusable earlier
+    entry is dropped, since only the last one decides the shape.
     """
     start = on - _PRIOR_CLOSE_WINDOW
 
-    def read(payload: object) -> "tuple[Decimal, str] | None":
+    def read(payload: object) -> "dict[str, Decimal] | None":
         if not isinstance(payload, list) or not payload:
             return None
         last = payload[-1]
@@ -465,7 +466,15 @@ def _gold_pln(on: date, egress: _Egress) -> "tuple[Decimal, str] | None":
         as_of = _published(last.get("data"), on, start)
         if price is None or as_of is None:
             return None
-        return price, as_of
+        days = {
+            day: cena
+            for entry in payload[:-1]
+            if isinstance(entry, dict)
+            and (cena := _positive(entry.get("cena"))) is not None
+            and (day := _published(entry.get("data"), on, start)) is not None
+            and day < as_of
+        }
+        return {**days, as_of: price}
 
     url = NBP_URL.format(start=start.isoformat(), end=on.isoformat())
     return _fetch_json("nbp", url, egress, read)
@@ -584,23 +593,18 @@ def _send(pending: list, quote: str, on: date, egress: _Egress, resolved: dict) 
     # database nor Flask; caching and composing stay on this thread.
     # The table and NBP's query go out at once, so a provider that hangs
     # cannot use up the deadline before the other is asked. The quote leg
-    # needs NBP's asOf, so it waits for NBP, and reuses the table already
-    # going out when asOf is the requested date.
+    # needs NBP's days, so it waits for NBP.
     gold_pending = any(row["symbol"].startswith("XAU-") for row in pending)
-    with ThreadPoolExecutor(max_workers=3) as pool:
-        futures = {}
+    with ThreadPoolExecutor(max_workers=2) as pool:
+        table = None
         if any(row["kind"] == "currency" for row in pending):
-            futures[on_str] = pool.submit(_fx_table, on, quote, egress)
-        gold_pln = None
+            table = pool.submit(_fx_table, on, quote, egress)
+        gold = None
         if gold_pending:
-            gold_pln = pool.submit(_gold_pln, on, egress).result()
-            if gold_pln is not None and quote != "PLN" and gold_pln[1] not in futures:
-                as_of = gold_pln[1]
-                futures[as_of] = pool.submit(
-                    _fx_table, date.fromisoformat(as_of), quote, egress
-                )
-        tables = {day: future.result() for day, future in futures.items()}
-    fx = tables.get(on_str)
+            days = pool.submit(_gold_pln, on, egress).result()
+            if days is not None:
+                gold = _gold_day(days, quote, on_str, table, pool, egress)
+        fx = table.result() if table else None
 
     for row in pending:
         symbol = row["symbol"]
@@ -614,40 +618,51 @@ def _send(pending: list, quote: str, on: date, egress: _Egress, resolved: dict) 
                 "source": "frankfurter",
                 "cached": False,
             }
-        elif symbol.startswith("XAU-") and gold_pln is not None:
-            per_gram_pln, as_of = gold_pln
-            leg = _quote_leg(per_gram_pln, as_of, quote, tables)
-            if leg is not None:
-                per_gram, source = leg
-                if symbol == "XAU-ozt":
-                    per_gram *= _GRAMS_PER_TROY_OUNCE
-                entry = {
-                    "rate": _round(per_gram),
-                    "base": f"1 {symbol}",
-                    "asOf": as_of,
-                    "source": source,
-                    "cached": False,
-                }
+        elif symbol.startswith("XAU-") and gold is not None:
+            per_gram, as_of, source = gold
+            if symbol == "XAU-ozt":
+                per_gram *= _GRAMS_PER_TROY_OUNCE
+            entry = {
+                "rate": _round(per_gram),
+                "base": f"1 {symbol}",
+                "asOf": as_of,
+                "source": source,
+                "cached": False,
+            }
         if entry is not None and entry["rate"] is not None:
             resolved[symbol] = entry
             _cache_put(symbol, quote, on_str, entry)
 
 
-def _quote_leg(
-    pln: Decimal, as_of: str, quote: str, tables: "dict[str, dict | None]"
-) -> "tuple[Decimal, str] | None":
-    """Convert a PLN figure into `quote` at the **asOf** date, not the
-    requested one: pairing a rate with FX from a different day
-    misprices it. Either leg failing yields no proposal, because a
-    half-composed rate is never returned. `tables` holds the FX tables
-    fetched for this request, by date.
+def _gold_day(
+    days: "dict[str, Decimal]", quote: str, on_str: str, table, pool, egress: _Egress
+) -> "tuple[Decimal, str, str] | None":
+    """A gram of gold in `quote`, the gold day and the source chain.
+
+    Both halves are for one day, the latest on which NBP published a
+    price and Frankfurter a table, because pairing a price with FX from
+    a different day misprices it. The leg asks Frankfurter for NBP's
+    last day, reusing `table`, the one in flight for the requested
+    date, when that is it. A table for an earlier day NBP skipped means
+    asking again for NBP's last day before it. Either leg failing
+    yields no proposal, because a half-composed rate is never returned.
     """
+    day = max(days)
     if quote == "PLN":
-        return pln, "nbp"
-    leg = tables.get(as_of)
-    if not leg or "PLN" not in leg:
-        return None
-    return pln * leg["PLN"][0], "nbp+frankfurter"
+        return days[day], day, "nbp"
+    while True:
+        if table is None or day != on_str:
+            table = pool.submit(_fx_table, date.fromisoformat(day), quote, egress)
+        leg = table.result()
+        if not leg or "PLN" not in leg:
+            return None
+        pln, published = leg["PLN"]
+        if published in days:
+            return days[published] * pln, published, "nbp+frankfurter"
+        earlier = [d for d in days if d < published]
+        if not earlier:
+            return None
+        day = max(earlier)
 
 
 def _since(row) -> "date | None":
