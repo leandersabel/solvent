@@ -240,10 +240,26 @@ to where they asked, labeled `bug` or `change` and `accepted`.
   requirements pull request, or a finding. One implementation runs at a
   time, and its issue carries `implementing`.
 - Only the workflow hands out the slot, in a step without a model that
-  runs one at a time. When no issue carries `implementing`, the
-  first in line gets it and its run starts: critical problems first,
+  runs one at a time, on every event the loop receives. When no issue
+  carries `implementing`, the first in line gets it and its run starts:
+  the cause of a blocked implementation first, then the blocked
+  implementation once its causes are closed, then critical problems,
   then high ones, then the rest, each lowest number first. An issue
   that waits on the client holds neither a place in line nor the slot.
+- The slot belongs only to an issue with something in progress: a run
+  on it, or checks still running on its pull request. The same step
+  starts a fresh run for a holder with neither, because a run can
+  crash or stop with nothing left to wait on, and nobody may be
+  watching. That run fixes failed checks as a counted fix attempt,
+  continues the work left on its branch, or rebases a pull request
+  whose checks passed and turns auto-merge back on. A holder still
+  without a new commit after three such runs is `stuck` and gives up
+  the slot, so the next issue starts.
+- A check on an implementation that fails for a reason outside its
+  change blocks it. The run files the cause, or names the open issue
+  that reports it, and labels its issue `blocked`. The blocked issue
+  gives up the slot to the cause and goes back to the front of the
+  line behind it.
 - Closing an issue stops its implementation. No pull request opens for
   it, and one already open loses auto-merge at once, then closes
   without merging, with its branch. The closed issue keeps
@@ -254,8 +270,11 @@ to where they asked, labeled `bug` or `change` and `accepted`.
 - No run starts from the line while the last run's usage of the
   subscription stands at 90 percent of its five-hour window or 80
   percent of its weekly one, until that window resets. The run's page
-  in Actions says which window holds it and until when, and an hourly
-  run of the workflow retries.
+  in Actions says which window holds it and until when. A job then
+  waits until the window resets and starts the line, starting itself
+  again when the wait outlasts what one job can run. An hourly run of
+  the workflow is a backstop, because GitHub delays and drops scheduled
+  runs.
 - One run implements one issue, on `claude/issue-<issue>`. It
   reproduces the report, updates the issue's feature page where
   behavior or acceptance criteria change (`spec/design-system.md` when
@@ -473,7 +492,10 @@ found.
 - The exception is a run the subscription refused for its usage limit
   on an issue in line or being implemented without a pull request: the
   issue goes back in line, without `stuck` or a comment, and nothing
-  more starts until there is headroom (Implementation).
+  more starts until there is headroom (Implementation). Any other issue
+  holding the implementation slot gets no `stuck` from its run either:
+  the workflow starts a fresh one, and labels it `stuck` only past its
+  restarts (Implementation).
 - A failing check on an implementation pull request starts a run that
   fixes it on the same branch. After a bounded number of attempts, the
   pull request becomes a draft without auto-merge and the issue is

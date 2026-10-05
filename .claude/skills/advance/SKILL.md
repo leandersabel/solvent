@@ -85,12 +85,23 @@ with `gh label create` if the repository lacks it.
    ready again with auto-merge on. Then continue with the step below
    that applies.
 4. **Implementation pull request open.**
-   - A check failed: fix it on the branch as Implementation does, push,
-     and comment `Fix attempt <n>` on the pull request, counting
+   - A check failed for a reason outside the change, such as a test the
+     change does not touch that fails on the base commit too: when
+     `master` has fixed it since, rebase onto `origin/master` and push,
+     which is no fix attempt. Otherwise its cause blocks the change: the
+     open issue that reports it, or one you file (File a finding). Add
+     `blocked` to this issue, creating the label when missing, comment
+     on it naming the cause, with the line `<!-- blocked-by: #<cause> -->`
+     above `<!-- advance -->`, and stop. The workflow hands the slot to
+     the cause and puts this issue first in line behind it.
+   - Another check failed: fix it on the branch as Implementation does,
+     push, and comment `Fix attempt <n>` on the pull request, counting
      attempts since the pull request opened or the client last wrote on
      it. Past the third attempt, go to Stuck instead.
    - It conflicts with `master`: rebase it onto `origin/master`,
      resolve, run the tests on both sides of the conflict, and push.
+   - Every check passed and it is not merged: rebase it onto
+     `origin/master`, push, and turn auto-merge on.
    - The client wrote since: answer it on the issue (the change ships
      in the next nightly after the merge), or take a correction from it
      into the branch.
