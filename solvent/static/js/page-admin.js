@@ -278,11 +278,11 @@ async function accounts(body) {
               el('td', { text: shortDate(row.lastLoginAt.slice(0, 10)) }),
               // Zero and "there is nothing to count" are different
               // statements, and a zero invites the reader to think a
-              // vault is sitting there empty.
-              el('td', {
-                class: 'muted',
-                text: 'itemCount' in row ? String(row.itemCount) : 'No vault',
-              }),
+              // vault is sitting there empty. Only No vault is muted,
+              // because the Kind column says the same.
+              'itemCount' in row
+                ? el('td', { text: String(row.itemCount) })
+                : el('td', { class: 'muted', text: 'No vault' }),
               el('td', {}, [
                 row.kind === 'administrator' && administrators === 1
                   ? el('span', {
