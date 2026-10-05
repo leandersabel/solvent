@@ -106,6 +106,9 @@ SEEDED_SYMBOLS = [
 # hardening).
 FX_URL = "https://api.frankfurter.dev/v1/{date}?base={quote}"
 NBP_URL = "https://api.nbp.pl/api/cenyzlota/{start}/{end}?format=json"
+# The window the NBP range query covers, which satisfies the prior-close
+# rule in one request with no retry loop.
+NBP_WINDOW = timedelta(days=14)
 
 # NBP publishes from 2013-01-02 and Frankfurter from 1999-01-04, except
 # the currencies in `_FX_LATER_START`. A single global floor would either
@@ -131,10 +134,6 @@ _CEILING = Decimal(10) ** 20
 # because it may hold the prior close of a day not yet published.
 _UNSETTLED_TTL = timedelta(hours=1)
 _SETTLES_AFTER = timedelta(days=2)
-
-# The 14-day window the NBP range query covers, which satisfies the
-# prior-close rule in one request with no retry loop.
-_PRIOR_CLOSE_WINDOW = timedelta(days=14)
 
 EGRESS_TIMEOUT_SECONDS = 5
 MAX_RESPONSE_BYTES = 1 * 1024 * 1024
@@ -470,7 +469,7 @@ def _gold_pln(on: date, egress: _Egress) -> "dict[str, Decimal] | None":
     Found too, so an empty list is a changed shape. An unusable earlier
     entry is dropped, since only the last one decides the shape.
     """
-    start = on - _PRIOR_CLOSE_WINDOW
+    start = on - NBP_WINDOW
 
     def read(payload: object) -> "dict[str, Decimal] | None":
         if not isinstance(payload, list) or not payload:
@@ -517,7 +516,7 @@ def _cache_get(symbol: str, quote: str, on: str) -> "dict | None":
         (symbol, quote, on),
     ).fetchone()
     day = date.fromisoformat(on)
-    since = day - _PRIOR_CLOSE_WINDOW if symbol.startswith("XAU-") else date.min
+    since = day - NBP_WINDOW if symbol.startswith("XAU-") else date.min
     if (
         row is None
         or not Decimal(row["rate"])

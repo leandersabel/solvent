@@ -187,7 +187,7 @@ unwind.
 
 - Lookup is a **range query**: `NBP_URL`,
   `https://api.nbp.pl/api/cenyzlota/{start}/{end}?format=json`, `start`
-  14 days before `date`, `end` equal to it, the FX request's headers. It
+  14 days, `NBP_WINDOW`, before `date`, `end` equal to it, the FX request's headers. It
   returns only published days, ascending. The adapter reads each
   entry's `cena`, PLN per gram, and its `data`, its day, usable within
   the window (Edge cases, A publication date that is not usable). The
@@ -478,8 +478,8 @@ host's network are reachable.
   down, so it receives nothing past it, whether the headers, a chunked
   body or a sized one is arriving. A provider that has not answered by
   then has failed.
-- `solvent.rates` exposes `FX_URL`, `NBP_URL`, `USER_AGENT`,
-  `EGRESS_TIMEOUT_SECONDS`, `MAX_RESPONSE_BYTES` and `SEEDED_SYMBOLS`
+- `solvent.rates` exposes `FX_URL`, `NBP_URL`, `NBP_WINDOW`,
+  `USER_AGENT`, `EGRESS_TIMEOUT_SECONDS`, `MAX_RESPONSE_BYTES` and `SEEDED_SYMBOLS`
   under those names, because the nightly source check imports them to
   request exactly what the app does (`nightly-harness.md`, The source
   checks). Renaming one breaks that check.
@@ -687,6 +687,7 @@ host's network are reachable.
    `tests/test_review_rate_lookup.py::test_a_saturday_takes_fridays_close_for_every_class`,
    `tests/test_review_rate_lookup.py::test_a_currency_takes_frankfurters_prior_close_however_far_back`,
    `tests/test_review_rate_lookup.py::test_gold_asks_nbp_for_the_14_days_up_to_the_date`,
+   `tests/test_review_rate_lookup.py::test_gold_asks_nbp_for_the_window_solvent_rates_exposes`,
    `tests/test_review_rate_lookup.py::test_an_empty_gold_range_quoted_in_pln_is_no_content`.
 8. `XAU-g` and `XAU-ozt` for the same date and quote differ by exactly
    31.1034768, to the precision returned. Test:

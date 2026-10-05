@@ -415,6 +415,10 @@ def test_the_currency_list_is_the_seeded_currencies():
     assert prices.REF["EUR"] == 1
 
 
+def test_the_gold_window_is_the_apps():
+    assert prices.NBP_WINDOW == rates.NBP_WINDOW
+
+
 def test_publication_days_are_weekdays_from_each_sources_first_day_to_today():
     today = date(2026, 7, 31)
     assert prices.last_publication_day("frankfurter", "2026-07-26", today) == date(2026, 7, 24)
@@ -1226,7 +1230,7 @@ def test_every_python_file_imports_the_standard_library_and_only_what_the_spec_l
                 continue
             assert module in allowed.get(path.name, set()), f"{path.name} imports {module}"
             if module == "solvent.rates":
-                assert set(names) == {"EGRESS_TIMEOUT_SECONDS", "FX_URL", "MAX_RESPONSE_BYTES", "NBP_URL", "SEEDED_SYMBOLS", "USER_AGENT"}
+                assert set(names) == {"EGRESS_TIMEOUT_SECONDS", "FX_URL", "MAX_RESPONSE_BYTES", "NBP_URL", "NBP_WINDOW", "SEEDED_SYMBOLS", "USER_AGENT"}
 
 
 def test_the_generator_imports_node_builtins_and_the_chrome_driver_alone():
