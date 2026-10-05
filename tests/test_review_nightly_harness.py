@@ -2,9 +2,10 @@
 (spec/features/nightly-harness.md, Prepared data; Acceptance criteria
 20, 22, 24, 28, 42, 43 and 44; net-worth-view.md, Acceptance criteria
 69), of the gold window it takes from the app (Known prices, The
-source checks; Acceptance criteria 13 and 40), and of the composition
-its oracle applies (Known prices; rate-lookup.md, Providers), written
-from the spec alone.
+source checks; Acceptance criteria 13 and 40), of the source checks'
+exit codes and route-out test (Acceptance criteria 17 and 18), and of
+the composition its oracle applies (Known prices; rate-lookup.md,
+Providers), written from the spec alone.
 """
 from __future__ import annotations
 
@@ -610,3 +611,157 @@ def test_known_table_rounds_every_proposal_as_rate_lookup_pins_it(quote, on):
     grams = spec_cena(on) if quote == "PLN" else spec_cena(on) * (1 / spec_rate("PLN", quote, on))
     assert table["XAU-g"]["rate"] == spec_proposal(grams)
     assert table["XAU-ozt"]["rate"] == spec_proposal(grams * Decimal("31.1034768"))
+
+
+# ---- criteria 17 and 18 ------------------------------------------------
+
+import io  # noqa: E402
+import socket  # noqa: E402
+import urllib.error  # noqa: E402
+
+import sources  # noqa: E402
+
+PROBE_TODAY = date(2026, 7, 31)
+PROBE_DAY = PROBE_TODAY - timedelta(days=7)
+OK_FX = {
+    "amount": 1.0, "base": "CHF", "date": PROBE_DAY.isoformat(),
+    "rates": {row["symbol"]: 0.9 for row in rates.SEEDED_SYMBOLS if row["kind"] == "currency" and row["symbol"] != "CHF"},
+}
+OK_NBP = [{"data": (PROBE_DAY - timedelta(days=1)).isoformat(), "cena": 480.3}, {"data": PROBE_DAY.isoformat(), "cena": 481.0}]
+CHANGED_FX = {**OK_FX, "base": "EUR"}
+CHANGED_NBP: list = []
+PYTHON_IMAGE = "python:3.12-slim"
+
+
+class Answer:
+    def __init__(self, body: bytes) -> None:
+        self.status, self._body = 200, io.BytesIO(body)
+
+    def read(self, size: int = -1) -> bytes:
+        return self._body.read(size)
+
+    def __enter__(self):
+        return self
+
+    def __exit__(self, *_exc) -> None:
+        return None
+
+
+class Sources:
+    """Answers each source with a body, or with an HTTP status to raise."""
+
+    def __init__(self, fx, nbp) -> None:
+        self.fx, self.nbp = fx, nbp
+
+    def open(self, request, timeout=None):
+        answer = self.nbp if "api.nbp.pl" in request.full_url else self.fx
+        if isinstance(answer, int):
+            raise urllib.error.HTTPError(request.full_url, answer, "", {}, io.BytesIO(b""))
+        return Answer(json.dumps(answer).encode())
+
+
+class Route:
+    """Stands in for socket.create_connection, recording each attempt."""
+
+    def __init__(self, opens: bool) -> None:
+        self.opens, self.attempts = opens, []
+
+    def __call__(self, address, timeout=None, *_args, **_kwargs):
+        self.attempts.append((address, timeout))
+        if not self.opens:
+            raise OSError("Network is unreachable")
+        return socket.socket()
+
+
+def run_sources(monkeypatch, command: str, fx, nbp, route_opens: bool) -> "tuple[int, Route]":
+    route = Route(route_opens)
+    monkeypatch.setattr(sources, "OPENER", Sources(fx, nbp))
+    monkeypatch.setattr(socket, "create_connection", route)
+    return sources.main(["sources.py", command], PROBE_TODAY), route
+
+
+@pytest.mark.parametrize(
+    "fx, nbp, code",
+    [
+        (OK_FX, OK_NBP, 0), (503, OK_NBP, 0), (OK_FX, 429, 0), (503, 503, 0),
+        (CHANGED_FX, OK_NBP, 1), (OK_FX, CHANGED_NBP, 1), (404, OK_NBP, 1), (CHANGED_FX, 503, 1),
+    ],
+)
+def test_check_exits_1_exactly_when_a_line_is_changed_whatever_the_route_out(monkeypatch, capsys, fx, nbp, code):
+    # check runs on the default bridge, where a route out is expected.
+    assert run_sources(monkeypatch, "check", fx, nbp, route_opens=True)[0] == code
+    lines = capsys.readouterr().out.splitlines()
+    assert [line.split()[0] for line in lines] == ["frankfurter", "nbp"]
+    assert any(line.split()[1] == "changed" for line in lines) == (code == 1)
+
+
+@pytest.mark.parametrize(
+    "fx, nbp, code",
+    [(OK_FX, OK_NBP, 0), (503, OK_NBP, 1), (OK_FX, 429, 1), (CHANGED_FX, OK_NBP, 1), (OK_FX, CHANGED_NBP, 1)],
+)
+def test_probe_exits_0_only_when_both_sources_are_ok(monkeypatch, capsys, fx, nbp, code):
+    assert run_sources(monkeypatch, "probe", fx, nbp, route_opens=False)[0] == code
+    capsys.readouterr()
+
+
+def test_probe_fails_when_a_connection_to_the_public_address_opens(monkeypatch, capsys):
+    code, route = run_sources(monkeypatch, "probe", OK_FX, OK_NBP, route_opens=True)
+    assert code == 1
+    assert route.attempts == [(("1.1.1.1", 443), 3)]
+    capsys.readouterr()
+
+
+# Imports sources.py with solvent.rates standing in, so the container
+# needs nothing of the app to run the probe's own route test.
+ROUTE_OUT = """
+import sys, types
+rates = types.ModuleType("solvent.rates")
+for name in ("EGRESS_TIMEOUT_SECONDS", "FX_URL", "MAX_RESPONSE_BYTES", "NBP_URL", "NBP_WINDOW", "USER_AGENT"):
+    setattr(rates, name, None)
+rates.SEEDED_SYMBOLS = []
+sys.modules["solvent"] = types.ModuleType("solvent")
+sys.modules["solvent.rates"] = rates
+sys.path.insert(0, "/harness")
+import sources
+print(sources.route_out())
+"""
+
+
+@pytest.fixture
+def python_image() -> str:
+    if shutil.which("docker") is None:
+        pytest.skip("needs Docker")
+    if subprocess.run(["docker", "pull", "-q", PYTHON_IMAGE], capture_output=True, timeout=300).returncode:
+        pytest.skip(f"cannot pull {PYTHON_IMAGE}")
+    return PYTHON_IMAGE
+
+
+def route_out_on(image: str, network: str) -> str:
+    done = subprocess.run(
+        ["docker", "run", "--rm", "--network", network, "--read-only", "--cap-drop", "ALL",
+         "--security-opt", "no-new-privileges:true", "-v", f"{TOOLS}:/harness:ro", image,
+         "python", "-c", ROUTE_OUT],
+        capture_output=True, text=True, timeout=60,
+    )
+    assert done.returncode == 0, done.stderr
+    return done.stdout.strip()
+
+
+def host_has_a_route_out() -> bool:
+    try:
+        socket.create_connection(("1.1.1.1", 443), timeout=3).close()
+    except OSError:
+        return False
+    return True
+
+
+def test_the_probe_finds_no_route_out_on_an_internal_network_and_one_on_a_bridge(python_image):
+    network = "review-nightly-internal"
+    subprocess.run(["docker", "network", "rm", network], capture_output=True)
+    subprocess.run(["docker", "network", "create", "--internal", network], check=True, capture_output=True)
+    try:
+        assert route_out_on(python_image, network) == "False"
+    finally:
+        subprocess.run(["docker", "network", "rm", network], capture_output=True)
+    if host_has_a_route_out():
+        assert route_out_on(python_image, "bridge") == "True"

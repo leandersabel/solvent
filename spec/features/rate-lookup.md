@@ -488,7 +488,7 @@ host's network are reachable.
   then has failed.
 - `solvent.rates` exposes `FX_URL`, `NBP_URL`, `NBP_WINDOW`,
   `USER_AGENT`, `EGRESS_TIMEOUT_SECONDS`, `MAX_RESPONSE_BYTES` and `SEEDED_SYMBOLS`
-  under those names, because the nightly source check imports them to
+  under those names, because the source check imports them to
   request exactly what the app does (`nightly-harness.md`, The source
   checks). Renaming one breaks that check.
 - Outbound requests are HTTPS only, with certificate verification on.
@@ -529,7 +529,7 @@ host's network are reachable.
   before its series starts: no proposal, neither a failure nor a
   success, and no log line. Counting it would let one vault asking about
   such a day open the breaker for every other vault. A moved endpoint
-  still shows in the nightly source check (`nightly-harness.md`, The
+  still shows in the daily source check (`nightly-harness.md`, The
   source checks).
 - **A changed shape** is, for Frankfurter, anything but an object whose
   `base` equals `quote`, whose `date` is usable and whose `rates` is an

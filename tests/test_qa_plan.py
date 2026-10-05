@@ -103,7 +103,7 @@ def test_changed_code_naming_no_walked_feature_walks_every_one(repo, path):
     assert plan(repo, record)["record"]["every"] is True
 
 
-@pytest.mark.parametrize("path", ["tests/test_login.py", ".github/workflows/x.yml", "README.md", "spec/requirements.md", "tools/release-notes.py"])
+@pytest.mark.parametrize("path", ["tests/test_login.py", ".github/workflows/x.yml", "README.md", "spec/requirements.md", "tools/vendor-argon2id.py"])
 def test_a_file_outside_the_image_and_the_harness_walks_only_the_rotation(repo, path):
     record = last_walk(repo, login="2026-10-01", dashboard="2026-09-20", export="2026-09-25")
     commit(repo, {path: "changed\n"})
