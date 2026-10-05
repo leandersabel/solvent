@@ -1601,4 +1601,5 @@ Editing an existing entry).
 95. On the single-holding form, the folded prices line shows what the
     save writes, such as "Prices for 31 July will be recorded with
     this", without being opened. Test:
-    `tests/browser/parts/snapshot-entry.mjs`.
+    `tests/browser/parts/snapshot-entry.mjs`,
+    `tests/browser/parts/snapshot-entry-review-fold.mjs`.
