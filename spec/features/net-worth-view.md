@@ -1118,4 +1118,5 @@ rule of the chart (Archived holdings, Ranges and modes).
     table and one under Not yet valued, each named with no space and
     wider than the screen, are shown whole inside the screen, and the
     page never pans sideways. Test:
-    `tests/browser/parts/dashboard-long-name.mjs`.
+    `tests/browser/parts/dashboard-long-name.mjs`,
+    `tests/browser/parts/dashboard-review-long-name.mjs`.
