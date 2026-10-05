@@ -155,7 +155,8 @@ back to 1948 from other central banks is not the API the app calls.
   front that refuses an unnamed client. One request returns every
   currency against `quote`.
 - **Read**: `base`, which must equal `quote`, `date`, the publication
-  day, which becomes `asOf`, and `rates`, mapping each code to how many
+  day, which becomes `asOf` (Edge cases, A publication date that is not
+  usable), and `rates`, mapping each code to how many
   of it one `quote` buys. One unit of a code costs `1 / rates[code]`.
   Nothing else in the body is read.
 - The currency half of the symbol table is seeded from the provider's
@@ -183,7 +184,8 @@ unwind.
   14 days before `date`, `end` equal to it, the FX request's headers. It
   returns only published days, and the adapter takes the last entry on
   or before `date`, reading its `cena`, PLN per gram, and its `data`,
-  which becomes `asOf`. That is the prior-close rule in one request with
+  which becomes `asOf` when it falls within the window (Edge cases, A
+  publication date that is not usable). That is the prior-close rule in one request with
   no retry loop, and
   an empty window means No Content. A single-date query answers Not
   Found on every weekend and Polish holiday, so it is the wrong call.
@@ -555,6 +557,17 @@ host's network are reachable.
   drops gold quoted in anything but PLN. The source answered, so its
   breaker counts a success. A cached `"0"` is a miss, so it is fetched
   again and replaced.
+- **A publication date that is not usable**: Frankfurter's `date` or
+  NBP's `data` becomes `asOf` only as a string `s` for which
+  `date.fromisoformat(s).isoformat() == s`, no later than the requested
+  `date`, and for NBP no earlier than the start of its 14-day window.
+  Anything else means that source gave no answer: its symbols are
+  absent, never an error or a proposal dated a day it is not for, and
+  the rest of the answer stands. A bad Frankfurter date drops the
+  currencies and gold quoted in anything but PLN, and a bad NBP date
+  drops both gold symbols. The source answered, so its breaker counts a
+  success. A cached row whose `asOf` fails the same test against its
+  `date` is a miss, so it is fetched again and replaced.
 - **Two holdings share a symbol**: one cache entry, one outbound
   request, one price entry in the vault (`record-rate.md`).
 - **Whole table, every symbol fails**: No Content rather than OK with an
@@ -829,3 +842,18 @@ host's network are reachable.
 62. A cached rate of `"0"` for a past date is fetched again and
     replaced. Test:
     `tests/test_rates.py::test_a_cached_rate_of_zero_is_fetched_again`.
+63. An NBP `data` that is unreadable, not in canonical ISO form, not a
+    string, after the requested date or before its 14-day window, quoted
+    in `CHF` or `PLN`, drops only the gold symbols, the whole table
+    still answers OK with the currencies, and no breaker counts a
+    failure. Test:
+    `tests/test_rates.py::test_a_gold_date_that_is_not_usable_drops_only_gold`.
+64. A Frankfurter `date` that is not usable leaves only the gold symbols
+    in a table quoted in `PLN`, and No Content quoted in `CHF`, with no
+    breaker failure. Test:
+    `tests/test_rates.py::test_a_currency_date_that_is_not_usable_drops_only_what_its_table_prices`.
+65. A cached rate whose `asOf` is unreadable or after its date, or a
+    cached gold rate dated before its window, is fetched again and
+    replaced. Test:
+    `tests/test_rates.py::test_a_cached_rate_with_an_unusable_date_is_fetched_again`,
+    `tests/test_review_rate_lookup.py::test_a_cached_gold_rate_dated_before_its_window_is_fetched_again`.
