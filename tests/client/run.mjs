@@ -2118,6 +2118,18 @@ await check('record-rate: the main currency\'s since bounds every unit quoted in
   assert.equal(vault.quotable('USD', '1999-01-04'), true);
 });
 
+await check('record-rate: in a vault whose main currency no source quotes into, every unit is its owner\'s to price and nothing is asked', async () => {
+  const server = recordServer(() => PROPOSALS);
+  const vault = await storedVault(server, { holdings: [['Dollars', 'USD'], ['Gold', 'XAU-g']] });
+  vault.profile = { ...vault.profile, mainCurrency: 'ZZZ' };
+  vault.symbols.set('ZZZ', { symbol: 'ZZZ', label: 'Testland Dollar', kind: 'currency', lookup: false, since: null });
+  for (const unit of ['USD', 'XAU-g']) {
+    assert.equal(vault.publishedFrom(unit), null);
+    assert.equal(vault.quotable(unit, '2026-07-31'), false);
+  }
+  assert.equal(writes.needsLookup(vault, '2026-07-31'), false);
+});
+
 await check('record-snapshot: a date move writes the snapshot, then the new date\'s prices, then the displaced record\'s delete', async () => {
   const server = recordServer(() => PROPOSALS);
   const vault = await storedVault(server, {

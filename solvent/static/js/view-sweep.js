@@ -680,6 +680,10 @@ function rateLine(vault, unit, date, { sit, readOnly: blockReadOnly, fillMissing
 
   const ownCopy = () => {
     const row = vault.symbols.get(unit);
+    if (row && row.lookup) {
+      // Its own source is there, so it is the main currency that has none.
+      return `No price source quotes in ${vault.mainCurrency}, your main currency. This one is yours to set.`;
+    }
     return row
       ? `No market price for ${described.name.toLowerCase()} yet. This one is yours to set.`
       : `Nobody publishes a price for ${unit}. This one is yours to set.`;

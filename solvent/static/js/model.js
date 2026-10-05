@@ -242,12 +242,13 @@ export class Vault {
   /** The first date a published price exists for this unit in the main
    *  currency: the later of its `since` and the main currency's, which
    *  Frankfurter's Not Found before its start makes the quote's too.
-   *  Null for a unit with no rate source at any date, and '' for one
+   *  Null for a unit with no rate source at any date, which is every
+   *  unit when no source quotes into the main currency, and '' for one
    *  whose table row carries no date (record-rate.md, Reading). */
   publishedFrom(unit) {
     const row = this.symbols.get(unit);
-    if (!row || !row.lookup) return null;
     const main = this.symbols.get(this.mainCurrency);
+    if (!row || !row.lookup || (main && main.since === null)) return null;
     return [row.since, main && main.since].filter(Boolean).sort().pop() || '';
   }
 

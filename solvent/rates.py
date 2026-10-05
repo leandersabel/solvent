@@ -150,11 +150,18 @@ def adapter_for(symbol: str, kind: str) -> "str | None":
     `hasAdapter` on the admin table is derived from this rather than
     stored on the row, so the flag and the registry cannot drift.
     """
-    if kind == "currency":
+    if kind == "currency" and symbol in _CURRENCIES:
         return "frankfurter"
     if symbol in ("XAU-ozt", "XAU-g"):
         return "nbp"
     return None
+
+
+def looks_up(row) -> bool:
+    """Whether `lookup` reads true: the stored flag and an adapter,
+    because a row an administrator added for a code no provider serves
+    would otherwise send requests that can only fail."""
+    return bool(row["lookup"]) and adapter_for(row["symbol"], row["kind"]) is not None
 
 
 class _NoRedirect(urllib.request.HTTPRedirectHandler):
@@ -373,6 +380,13 @@ def _fetch_json(provider: str, url: str, egress: _Egress, read):
         # Integers as Decimal, which takes any length: an int over
         # Python's digit limit would fail the whole answer for one figure.
         result = read(json.loads(_fetch_within(url, remaining), parse_int=Decimal))
+    except urllib.error.HTTPError as error:
+        if error.code == 404:
+            # What the source does not publish, such as a currency
+            # before its series starts, leaves the breaker alone: one
+            # vault asking it must not stop lookups for every other.
+            return None
+        status = _failure(error)
     except Exception as error:
         status = _failure(error)
     else:
@@ -549,7 +563,7 @@ def _resolve(symbols: list, quote: str, on: date) -> "dict[str, dict]":
     proxy cannot price. Absence from the map is what No Content means
     for a single symbol.
     """
-    wanted = [row for row in symbols if row["lookup"]]
+    wanted = [row for row in symbols if looks_up(row)]
     egress = _egress()
 
     on_str = on.isoformat()
@@ -715,10 +729,12 @@ def get_rates():
     ratelimit.guard_rates(g.principal["id"])
 
     if symbol is None:
+        if _since(quote_row) is None:
+            return "", 204
         rows = [
             row
             for row in table_rows()
-            if row["lookup"]
+            if looks_up(row)
             and row["symbol"] != quote
             and on >= (_floor_for(row, quote_row) or on)
         ]
@@ -736,6 +752,9 @@ def get_rates():
     ).fetchone()
     if row is None:
         abort(400)
+    if _since(quote_row) is None:
+        # No source quotes into it, so nothing is asked of any.
+        return "", 204
     floor = _floor_for(row, quote_row)
     if floor is not None and on < floor:
         # Out of range, rather than merely unanswerable.
@@ -759,7 +778,7 @@ def list_symbols():
                 "symbol": row["symbol"],
                 "label": row["label"],
                 "kind": row["kind"],
-                "lookup": bool(row["lookup"]),
+                "lookup": looks_up(row),
                 "since": since.isoformat() if (since := _since(row)) else None,
             }
             for row in table_rows()
@@ -778,7 +797,7 @@ def admin_list_symbols():
                 "symbol": row["symbol"],
                 "label": row["label"],
                 "kind": row["kind"],
-                "lookup": bool(row["lookup"]),
+                "lookup": looks_up(row),
                 "retired": bool(row["retired"]),
                 "hasAdapter": adapter_for(row["symbol"], row["kind"]) is not None,
             }

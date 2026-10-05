@@ -414,8 +414,9 @@ two callers rather than two record writers.
   and profile blobs are within the blob limits (architecture.md,
   Storage & data handling).
 - **The main-currency list is exactly the provider-quotable currency
-  set**: the `kind: currency` rows of the symbol table (`rate-lookup.md`),
-  not the full ISO 4217 set. The main currency is the `quote` on every
+  set**: the `kind: currency` rows of the symbol table that have an
+  adapter (`rate-lookup.md`, The symbol table), not the full ISO 4217
+  set and not a currency an administrator added. The main currency is the `quote` on every
   rate lookup the vault will ever make, and it is immutable outside
   import (`account-settings.md`), so a code the provider cannot quote
   into means no proposal ever resolves, a fault found years later with

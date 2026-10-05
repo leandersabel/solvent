@@ -137,8 +137,8 @@ doing nothing accepts and writes it.
     previous entry exists. **Nothing is written** and the previous entry
     stays the latest. A figure at the date reads not priced (Reading)
     until an entry is written there.
-  - **No rate source at the date** (free text, `lookup: false`, or before
-    the symbol's `since`) and a previous entry exists. **Nothing is
+  - **No rate source at the date** (free text, `lookup: false`, before
+    the symbol's `since`, or a main currency no source quotes into) and a previous entry exists. **Nothing is
     written unless the person edits it.** The estimate's age stays on
     screen ("estimated 14 months ago", `record-snapshot.md`, Update
     values). Re-dating an unreviewed estimate would launder a guess into
@@ -299,8 +299,10 @@ other way than these:
   `lookup: true` and the date is on or after the later of its `since`
   and the main currency's row's `since` (`rate-lookup.md`, The symbol
   table). Free text, a `lookup: false` symbol and any symbol before that
-  date have none. The main currency is always a `kind: currency` row with a
-  `since` whatever its `lookup` (`register.md`). The client computes
+  date have none. A main currency is a `kind: currency` row with a
+  `since` whatever its `lookup` (`register.md`). One whose row carries
+  `since: null` has no source quoting into it, so no symbol in that
+  vault has a rate source at any date. The client computes
   this from its table with no request. This one test decides the price
   at a date, whether a recording asks the proxy (The refresh), and
   whether a line offers Look it up.
@@ -615,3 +617,6 @@ silently.
     in the profile record at entry time. Test:
     `tests/test_client.py::test_the_client_side_rules_hold`,
     `tests/browser/parts/update-values.mjs`.
+42. In a vault whose main currency's row carries `since: null`, no unit
+    has a rate source at any date and a recording asks the proxy
+    nothing. Test: `tests/test_client.py::test_the_client_side_rules_hold`.
