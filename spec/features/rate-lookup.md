@@ -547,7 +547,7 @@ host's network are reachable.
   one.
 - **A figure that is not a usable price**: a source's rate or gold
   price is usable only as a JSON number, not a string or a boolean,
-  finite and above 0. A proposal is served only when, rounded, it is
+  above 0 and below 10^20. A proposal is served only when, rounded, it is
   above 0 and below 10^20, the most that keeps 8 decimal places in 28
   digits. Anything else is no proposal for the symbols built from that
   figure, never an error or a price of 0, and the rest of the answer

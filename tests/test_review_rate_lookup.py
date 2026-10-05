@@ -713,3 +713,21 @@ def test_a_rate_with_more_digits_than_python_converts_is_no_proposal(owner, sour
     assert rates.breakers["frankfurter"].failures == 0
     assert "SEK" not in priced
     assert {"USD", "PLN", *GOLD} <= set(priced)
+
+
+def test_a_gold_price_whose_ounce_figure_passes_any_decimal_is_no_proposal(owner, sources):
+    """A gold price of a million digits fits under the response cap, is a
+    JSON number, finite and above 0. Edge cases: both gold proposals are
+    out of bounds, so neither is served, never an error, and the
+    currencies stand."""
+    sources.plans["nbp"] = at_once(
+        lambda url: b'[{"data": "' + url.split("?")[0].rsplit("/", 1)[1].encode()
+        + b'", "cena": 1' + b"0" * 1_000_000 + b"}]"
+    )
+
+    response = owner.get(f"/api/rates?date={PAST}&quote=PLN", headers=CSRF)
+
+    assert response.status_code == 200
+    priced = response.get_json()["rates"]
+    assert not GOLD & set(priced)
+    assert "USD" in priced

@@ -121,7 +121,8 @@ _GOLD_FLOOR = date(2013, 1, 2)
 _GRAMS_PER_TROY_OUNCE = Decimal("31.1034768")
 
 # A proposal at or above this cannot keep 8 decimal places within the
-# default context's 28 significant digits.
+# default context's 28 significant digits, and no source figure reaches
+# it.
 _CEILING = Decimal(10) ** 20
 
 # rate-lookup.md, Caching: a historical rate does not change, so past
@@ -349,12 +350,14 @@ def _fetch_json(provider: str, url: str, egress: _Egress) -> "object | None":
 
 
 def _positive(value: object) -> "Decimal | None":
-    """A figure is usable only as a finite JSON number above 0. Anything
-    else is no proposal rather than an error or a price of 0."""
+    """A figure is usable only as a JSON number above 0 and below the
+    ceiling. Anything else is no proposal rather than an error or a
+    price of 0. Past the ceiling no figure is a real price, and one of
+    a million digits would overflow the context once composed."""
     if isinstance(value, bool) or not isinstance(value, (int, float, Decimal)):
         return None
     number = Decimal(str(value))
-    return number if number.is_finite() and number > 0 else None
+    return number if number.is_finite() and 0 < number < _CEILING else None
 
 
 def _fx_table(
