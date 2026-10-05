@@ -1082,4 +1082,5 @@ from an administrator removing an account (`admin-invites.md`).
     `tests/test_credential_changed.py::test_an_administrator_on_a_superseded_salt_changes_nothing`.
 82. A new password equal to the current one shows "The new password is
     your current one." above the first field, keeps every field and
-    sends nothing. Test: `tests/browser/parts/settings.mjs`.
+    sends nothing. Test: `tests/browser/parts/settings.mjs`,
+    `tests/browser/parts/settings-review-reuse.mjs`.
