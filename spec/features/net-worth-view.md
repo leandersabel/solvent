@@ -88,7 +88,9 @@ recording detail (`record-snapshot.md`).
 
 The total holds the left under the section label "Net worth", ink-primary,
 proportional figures (design-system.md, Typography), with the change
-beneath it. At the right, level with the foot of the total, sit gross
+beneath it, then a line that keeps its height while empty for the date
+the chart reads, so reading a day never moves the chart under the
+pointer. At the right, level with the foot of the total, sit gross
 assets and gross liabilities under their own section labels, each set off
 by a hairline rule at its left, then New recording. Which rates takes its
 own row beneath, at the left. Summary figures (the total, the change,
@@ -1106,3 +1108,6 @@ rule of the chart (Archived holdings, Ranges and modes).
     available as a plain table. Test:
     `tests/browser/parts/dashboard-net-worth.mjs`,
     `tests/browser/parts/dashboard.mjs`.
+72. (blind) With the mouse resting anywhere on the chart, focus, Home,
+    End, the arrow keys and Enter behave as they do with the mouse
+    elsewhere. Test: `tests/browser/parts/dashboard-review-keyboard.mjs`.
