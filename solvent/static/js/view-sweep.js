@@ -162,7 +162,9 @@ export function sweepView(vault, date, actions = {}) {
     if (!sit.proposals && unanswered) sit.proposals = writes.fetchProposals(vault, date);
     if (sit.proposals) block.showProposals(await sit.proposals);
     const { failed } = await writes.refreshPrices(vault, date, {}, (unit) => block.partFor(unit));
-    block.refresh();
+    // A line that did not save keeps what it shows, for the lines' own
+    // save to retry.
+    for (const line of block.lines) if (!failed.includes(line.unit)) line.reset();
     syncSave();
     if (failed.length) {
       say(`Recorded. Prices were not updated for ${failed.join(', ')}.`, { critical: true });
