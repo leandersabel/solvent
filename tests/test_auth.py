@@ -313,6 +313,35 @@ def test_a_wrong_auth_key_against_either_kind_and_a_stranger_is_byte_identical(a
     assert len({r.get_data() for r in answers.values()}) == 1
 
 
+def test_the_first_unknown_username_login_hashes_nothing(app, client, monkeypatch):
+    """The decoy is built with the app, so the first unknown username
+    after a start pays no hash the later ones skip."""
+    from argon2 import PasswordHasher
+
+    hashes = []
+    hash_once = PasswordHasher.hash
+
+    def counted(hasher, secret, **kwargs):
+        hashes.append(secret)
+        return hash_once(hasher, secret, **kwargs)
+
+    monkeypatch.setattr(PasswordHasher, "hash", counted)
+    response = client.post(
+        "/api/auth/login", json={"username": "nobody-at-all", "authKey": b64()}, headers=CSRF
+    )
+    assert response.status_code == 401
+    assert hashes == []
+
+
+def test_the_decoy_hash_carries_the_parameters_of_a_fresh_one(app):
+    import solvent.crypto as crypto
+
+    with app.app_context():
+        decoy, fresh = crypto.decoy_verifier(), crypto.hash_auth_key(b64())
+    # $argon2id$v=19$m=...,t=...,p=...$salt$hash: all but the last two
+    assert decoy.rsplit("$", 2)[0] == fresh.rsplit("$", 2)[0]
+
+
 def test_login_writes_last_login_at_and_rotates_the_session(app):
     owner, auth_key = register(app, "owner")
     created = rows(app, "SELECT created_at, last_login_at FROM principals")[0]

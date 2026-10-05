@@ -258,7 +258,8 @@ There is no other credential method.
    username still runs a full Argon2id verification** against a fixed
    decoy hash and discards the result. Without it the endpoint answers
    in microseconds for missing accounts and tens of milliseconds for
-   real ones.
+   real ones. The decoy hash is built when the app is created, in each
+   worker, with the hasher an Auth Key's verifier gets.
 4. **A vault owner** unwraps the DEK. **A failed unwrap is an
    authentication failure** with the same error, and the client never
    continues with a dead key. **An administrator** discards the Master
@@ -827,3 +828,8 @@ reason, and then learns at sign-in.
     or 33 bytes, or not base64, is a Bad Request, for either kind, and
     leaves every row as it was. Test:
     `tests/test_auth.py::test_a_rotation_to_an_auth_key_that_is_not_thirty_two_bytes_is_refused`.
+80. The first `/api/auth/login` for an unknown username after the app is
+    created hashes nothing, and the decoy hash carries the parameters
+    of a fresh Auth Key verifier. Test:
+    `tests/test_auth.py::test_the_first_unknown_username_login_hashes_nothing`,
+    `tests/test_auth.py::test_the_decoy_hash_carries_the_parameters_of_a_fresh_one`.

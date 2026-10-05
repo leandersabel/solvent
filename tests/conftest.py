@@ -106,7 +106,6 @@ def cheap_argon2(monkeypatch):
         "_hasher",
         PasswordHasher(memory_cost=64, time_cost=1, parallelism=1, type=Type.ID),
     )
-    monkeypatch.setattr(crypto, "_DECOY_VERIFIER", None)
 
 
 @pytest.fixture(autouse=True)

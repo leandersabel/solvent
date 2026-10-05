@@ -1,9 +1,10 @@
 """Reviewer's tests: an Auth Key that becomes a verifier is 32 bytes of
 strict base64, an Auth Key that is only verified gets no shape check,
-and the browser splits the Argon2id output as the spec says
-(spec/features/login.md, Stale-KDF upgrade, criterion 79;
-spec/architecture.md, Key management, The split and An Auth Key that
-becomes a verifier).
+the browser splits the Argon2id output as the spec says, and an unknown
+username is verified against a decoy that exists before the first
+request (spec/features/login.md, Stale-KDF upgrade and Flow step 3,
+criteria 10, 11, 79 and 80; spec/architecture.md, Key management, The
+split and An Auth Key that becomes a verifier, and Login enumeration).
 
 Written from the spec alone.
 """
@@ -13,18 +14,25 @@ import base64
 import hashlib
 import hmac
 import json
+import os
+import secrets
 import shutil
+import statistics
 import subprocess
+import sys
+import time
 from pathlib import Path
 
 import pytest
+from argon2 import PasswordHasher, extract_parameters
 from argon2.low_level import Type, hash_secret_raw
 
-from solvent.config import DEFAULT_KDF_ENVELOPE
-from tests.helpers import CSRF, b64, connect, register, sign_in
+from solvent.config import DEFAULT_KDF_ENVELOPE, SERVER_VERIFY_PARAMS
+from tests.helpers import CSRF, b64, connect, credential, register, sign_in
 from tests.test_review_register import BAD_KEYS
 
-SPLIT = Path(__file__).resolve().parent / "client" / "review-split.mjs"
+ROOT = Path(__file__).resolve().parent.parent
+SPLIT = ROOT / "tests" / "client" / "review-split.mjs"
 
 TABLES = {
     "principals": "*",
@@ -181,3 +189,115 @@ def test_the_browser_splits_the_argon2id_output_with_hkdf_sha256():
     assert len(derived["authKey"]) == 44 and derived["authKey"].endswith("=")
     assert derived["authKey"] == expected_auth
     assert derived["masterKey"] == expected_master
+
+
+@pytest.fixture
+def argon2_calls(monkeypatch):
+    """Every Argon2id hash and verification the app runs, in order, with
+    the hash each verification checks against."""
+    calls = []
+    real_hash, real_verify = PasswordHasher.hash, PasswordHasher.verify
+
+    def counted_hash(self, password, *args, **kwargs):
+        calls.append(("hash", None))
+        return real_hash(self, password, *args, **kwargs)
+
+    def counted_verify(self, hash, password):
+        calls.append(("verify", hash))
+        return real_verify(self, hash, password)
+
+    monkeypatch.setattr(PasswordHasher, "hash", counted_hash)
+    monkeypatch.setattr(PasswordHasher, "verify", counted_verify)
+    return calls
+
+
+def stranger_login(client, username="nobody"):
+    return client.post("/api/auth/login", json={"username": username, "authKey": b64()}, headers=CSRF)
+
+
+def test_the_first_unknown_username_after_a_start_runs_one_verification_and_no_hash(argon2_calls, app, client):
+    argon2_calls.clear()
+    assert stranger_login(client).status_code == 401
+    assert [kind for kind, _ in argon2_calls] == ["verify"]
+
+
+def test_every_unknown_username_is_verified_against_one_decoy_shaped_as_a_fresh_verifier(argon2_calls, app, client):
+    argon2_calls.clear()
+    for username in ("nobody", "nobody-else", "nobody"):
+        assert stranger_login(client, username).status_code == 401
+    assert [kind for kind, _ in argon2_calls] == ["verify"] * 3
+    decoys = {hash for _, hash in argon2_calls}
+    assert len(decoys) == 1
+
+    register(app, "someone")
+    (decoy,) = decoys
+    assert extract_parameters(decoy) == extract_parameters(credential(app, "someone")["verifier"])
+
+
+def timed(request):
+    start = time.perf_counter()
+    response = request()
+    elapsed = time.perf_counter() - start
+    assert response.status_code == 401
+    return elapsed
+
+
+def shape(hash):
+    parameters = extract_parameters(hash)
+    return [getattr(parameters, field) for field in
+            ("memory_cost", "time_cost", "parallelism", "type", "version", "salt_len", "hash_len")]
+
+
+def first_start(database_path):
+    """Run in a fresh interpreter, which is what a start is: the app is
+    created as production creates it, its one-time request costs are paid
+    on a wrong Auth Key, and then the first unknown username is timed
+    against wrong Auth Keys. Prints the ratio, and the parameters of the
+    decoy and of a fresh verifier."""
+    from solvent import create_app
+
+    app = create_app(config_overrides={"DATABASE_PATH": database_path, "TESTING": True})
+    register(app, "someone")
+    client = app.test_client()
+
+    def wrong():
+        return client.post("/api/auth/login", json={"username": "someone", "authKey": b64()}, headers=CSRF)
+
+    timed(wrong)
+    first_stranger = timed(lambda: stranger_login(client))
+    wrong_key = statistics.median(timed(wrong) for _ in range(5))
+
+    checked = []
+    real_verify = PasswordHasher.verify
+
+    def recorded_verify(self, hash, password):
+        checked.append(hash)
+        return real_verify(self, hash, password)
+
+    PasswordHasher.verify = recorded_verify
+    stranger_login(client)
+    (decoy,) = checked
+    fresh = credential(app, "someone")["verifier"]
+    print(json.dumps(
+        {"ratio": first_stranger / wrong_key, "decoy": shape(decoy), "fresh": shape(fresh)}, default=str
+    ))
+
+
+def test_the_first_unknown_username_after_a_start_takes_no_longer_than_a_wrong_auth_key(tmp_path):
+    """Building the decoy on the first unknown username costs a second
+    Argon2id at production cost, about twice a wrong Auth Key."""
+    ratios = []
+    for start in range(3):
+        result = subprocess.run(
+            [sys.executable, "-c", "import sys; from tests.test_review_login import first_start; first_start(sys.argv[1])",
+             str(tmp_path / f"start-{start}.db")],
+            capture_output=True, text=True, timeout=120, cwd=ROOT,
+            env={**os.environ, "SECRET_KEY": secrets.token_urlsafe(32)},
+        )
+        assert result.returncode == 0, result.stderr
+        measured = json.loads(result.stdout.splitlines()[-1])
+        assert measured["decoy"] == measured["fresh"]
+        assert measured["fresh"][:3] == [SERVER_VERIFY_PARAMS[k] for k in ("m", "t", "p")]
+        ratios.append(measured["ratio"])
+
+    assert statistics.median(ratios) < 1.5, ratios

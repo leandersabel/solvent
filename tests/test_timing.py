@@ -47,11 +47,12 @@ def unthrottled(app):
 
 
 @pytest.fixture
-def server_argon2(cheap_argon2, monkeypatch):
+def server_argon2(app, monkeypatch):
     """Server-side Argon2id at the cost production runs, because the
     regression the login test exists for is skipping a verification
-    that takes tens of milliseconds there. Accounts registered after
-    this carry the same parameters as the decoy hash."""
+    that takes tens of milliseconds there. The decoy is rebuilt under
+    it, so it and the accounts registered after carry the same
+    parameters."""
     from argon2 import PasswordHasher, Type
 
     import solvent.crypto as crypto
@@ -66,13 +67,13 @@ def server_argon2(cheap_argon2, monkeypatch):
             type=Type.ID,
         ),
     )
-    monkeypatch.setattr(crypto, "_DECOY_VERIFIER", None)
+    crypto.init_app(app)
 
 
 def sample(client, path, bodies, rounds, status):
     """Seconds per request for each named case, one request per case per
     round in a fresh random order. The first round is discarded: it
-    pays one-time costs such as building the decoy hash."""
+    pays the test client's one-time costs."""
     times = {name: [] for name in bodies}
     names = list(bodies)
     for round_number in range(rounds + 1):

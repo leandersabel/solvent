@@ -80,14 +80,14 @@ def verify_auth_key(verifier: str, auth_key: str) -> bool:
 # against this and discards the result. Without it the endpoint answers
 # in microseconds for accounts that do not exist and in tens of
 # milliseconds for ones that do, which reveals existence by timing.
-_DECOY_VERIFIER: "str | None" = None
+# It is built with the app, so the first unknown username after a start
+# pays no hash the later ones skip (architecture.md, Login enumeration).
+def init_app(app) -> None:
+    app.extensions["solvent.decoy_verifier"] = _hasher.hash(secrets.token_urlsafe(32))
 
 
 def decoy_verifier() -> str:
-    global _DECOY_VERIFIER
-    if _DECOY_VERIFIER is None:
-        _DECOY_VERIFIER = _hasher.hash(secrets.token_urlsafe(32))
-    return _DECOY_VERIFIER
+    return current_app.extensions["solvent.decoy_verifier"]
 
 
 def decoy_salt(normalized_username: str) -> str:
