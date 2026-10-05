@@ -505,11 +505,11 @@ def _round(value: Decimal) -> "str | None":
     round figure in scientific notation ("3E+2") and the client parses
     a plain decimal string.
     """
-    if value >= _CEILING:
-        return None
     places = min(_PLACES, _SIGNIFICANT - 1 - value.adjusted())
     rounded = value.quantize(Decimal(1).scaleb(-places))
-    return format(rounded.normalize(), "f") if rounded else None
+    if not rounded or rounded >= _CEILING:
+        return None
+    return format(rounded.normalize(), "f")
 
 
 def _cache_get(symbol: str, quote: str, on: str) -> "dict | None":
