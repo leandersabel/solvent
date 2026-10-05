@@ -765,8 +765,8 @@ owning holding. Decrypted payload, with no price field of any kind:
   fixed scale of 12 decimal places**, computed on as an integer, and
   formatted back to a string. No IEEE-754 float touches one, and no
   decimal library is used.
-  - **One scale for every quantity.** Scale 12 covers a price at eight
-    significant decimals, a holding in troy ounces or m², and money at
+  - **One scale for every quantity.** Scale 12 covers a looked-up price
+    (`rate-lookup.md`, Providers), a holding in troy ounces or m², and money at
     two. "Integer minor units" means nothing for a price or for 12.5
     troy ounces, and a scale factor per quantity would be a worse
     decimal library written here.

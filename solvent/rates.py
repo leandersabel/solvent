@@ -124,13 +124,15 @@ _GOLD_FLOOR = date(2013, 1, 2)
 # XAU-ozt is the one conversion, composed at full precision.
 _GRAMS_PER_TROY_OUNCE = Decimal("31.1034768")
 
-# A proposal at or above this cannot keep 8 decimal places within the
-# default context's 28 significant digits, and no source figure reaches
-# it.
+# rate-lookup.md, Providers: a proposal keeps 10 significant digits,
+# never past the vault's scale of 12 places, and is below the bound a
+# source figure has.
+_SIGNIFICANT = 10
+_PLACES = 12
 _CEILING = Decimal(10) ** 20
 
 # rate-lookup.md, Caching: an entry fetched once its date has settled is
-# kept indefinitely. Any other expires an hour after it was fetched,
+# kept until the next start. Any other expires an hour after it was fetched,
 # because it may hold the prior close of a day not yet published.
 _UNSETTLED_TTL = timedelta(hours=1)
 _SETTLES_AFTER = timedelta(days=2)
@@ -497,17 +499,17 @@ def _gold_pln(on: date, egress: _Egress) -> "dict[str, Decimal] | None":
 
 def _round(value: Decimal) -> "str | None":
     """Composed at full precision and rounded once, at the end, or None
-    when the result is no price: 0 once rounded, or too large to keep 8
-    places in the context's 28 digits.
+    when the result is no price: 0 once rounded, or at the ceiling.
 
     Formatted with `f` rather than `str`, because `normalize` renders a
     round figure in scientific notation ("3E+2") and the client parses
     a plain decimal string.
     """
-    if value >= _CEILING:
+    places = min(_PLACES, _SIGNIFICANT - 1 - value.adjusted())
+    rounded = value.quantize(Decimal(1).scaleb(-places))
+    if not rounded or rounded >= _CEILING:
         return None
-    rounded = value.quantize(Decimal("0.00000001"))
-    return format(rounded.normalize(), "f") if rounded else None
+    return format(rounded.normalize(), "f")
 
 
 def _cache_get(symbol: str, quote: str, on: str) -> "dict | None":

@@ -290,6 +290,9 @@ the schema, before any request is served, and keeps the schema version:
   hardening), together with every row whose bucket starts with `ip:`.
   Such a row holds a plaintext address. No code writes one, so a file
   any build wrote keeps none past its first start.
+- **The rate cache is emptied** (`rate-lookup.md`, Caching), because an
+  entry may hold a proposal an earlier build rounded otherwise, and a
+  settled one would never be fetched again.
 
 **Expired `attempts` rows are also deleted once every 60 seconds in
 each serving process**, by one daemon thread the app factory starts.
@@ -818,3 +821,5 @@ for a control above the dialog to protect.
     `tests/test_deployment.py::test_requests_held_open_as_long_as_lookups_can_be_leave_the_instance_answering`,
     `tests/test_review_app_shell.py::test_requests_held_open_as_long_as_every_lookup_slot_leave_the_sign_in_page_answering`,
     `tests/test_review_app_shell.py::test_the_control_holding_every_thread_does_stop_the_sign_in_page`.
+80. A start empties the rate cache and keeps the schema version. Test:
+    `tests/test_rates.py::test_starting_the_app_empties_the_rate_cache`.

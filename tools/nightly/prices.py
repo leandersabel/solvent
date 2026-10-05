@@ -122,8 +122,10 @@ def json_number(value: Decimal) -> float:
     return float(value)
 
 
-def _eight_places(value: Decimal) -> str:
-    return format(value.quantize(Decimal("0.00000001"), ROUND_HALF_EVEN).normalize(), "f")
+def _proposal(value: Decimal) -> str:
+    """Ten significant digits, never past the twelfth place."""
+    exponent = Decimal(1).scaleb(max(-12, value.adjusted() - 9))
+    return format(value.quantize(exponent, ROUND_HALF_EVEN).normalize(), "f")
 
 
 def known_table(on: "date | str", quote: str, today: "date | None" = None) -> "dict[str, dict]":
@@ -139,7 +141,7 @@ def known_table(on: "date | str", quote: str, today: "date | None" = None) -> "d
     if day >= START[quote] and published is not None:
         for code, rate in frankfurter_rates(published, quote).items():
             table[code] = {
-                "rate": _eight_places(Decimal(1) / rate),
+                "rate": _proposal(Decimal(1) / rate),
                 "base": f"1 {code}",
                 "asOf": published.isoformat(),
                 "source": "frankfurter",
@@ -154,7 +156,7 @@ def known_table(on: "date | str", quote: str, today: "date | None" = None) -> "d
             source = "nbp+frankfurter"
         for symbol, figure in (("XAU-g", per_gram), ("XAU-ozt", per_gram * GRAMS_PER_TROY_OUNCE)):
             table[symbol] = {
-                "rate": _eight_places(figure),
+                "rate": _proposal(figure),
                 "base": f"1 {symbol}",
                 "asOf": gold.isoformat(),
                 "source": source,

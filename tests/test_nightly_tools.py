@@ -26,7 +26,7 @@ import threading
 import time
 import urllib.error
 from datetime import date, datetime, timedelta, timezone
-from decimal import Decimal
+from decimal import ROUND_HALF_EVEN, Decimal
 from pathlib import Path
 from urllib.parse import urlsplit
 
@@ -744,7 +744,7 @@ def test_the_out_of_range_idle_lock_is_written_as_zero_by_one_vault_that_covers_
     assert ops[0] == {"op": "profile", "patch": covering[0]["profile"]}
 
 
-def test_the_older_backup_and_its_plan_and_figures_are_committed():
+def test_the_older_backup_and_its_plan_and_figures_are_committed(monkeypatch):
     backup = json.loads((FIXTURES / "backup-format-1.json").read_text())
     assert backup["formatVersion"] == 1
     assert backup["kdf"] == {"alg": "argon2id", "v": 19, "m": 65536, "t": 3, "p": 1}
@@ -758,7 +758,13 @@ def test_the_older_backup_and_its_plan_and_figures_are_committed():
     counts = {kind: sum(r["recordType"] == kind for r in backup["records"]) for kind in ("account", "snapshot", "rate", "profile")}
     assert counts["account"] == len(owner["holdings"]) and counts["profile"] == 1
     # The figures kept with it are what the plan's vault works out to. The
-    # plan is no full nightly plan, so it is built, not prepared.
+    # plan is no full nightly plan, so it is built, not prepared, under
+    # the 8-place rounding of the build that made the file.
+    monkeypatch.setattr(
+        prices,
+        "_proposal",
+        lambda value: format(value.quantize(Decimal("0.00000001"), ROUND_HALF_EVEN).normalize(), "f"),
+    )
     assert prices.build_vault(owner, date(2026, 10, 3))[1] == expected
 
 

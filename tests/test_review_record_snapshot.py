@@ -43,3 +43,36 @@ def test_multiplying_rounds_half_even_at_the_twelfth_decimal():
     )
     assert result.returncode == 0, result.stderr
     assert json.loads(result.stdout) == list(cases.values())
+
+
+ROUND_TRIP = """
+const decimal = await import(process.argv[1]);
+const rates = JSON.parse(process.argv[2]);
+const holding = decimal.parse(process.argv[3]);
+console.log(JSON.stringify(rates.map((rate) => [
+  decimal.format(decimal.parse(rate)),
+  decimal.format(decimal.multiply(holding, decimal.parse(rate))),
+])));
+"""
+
+
+@pytest.mark.skipif(shutil.which("node") is None, reason="node is not installed")
+def test_scale_12_holds_every_digit_a_proposal_carries():
+    """Record shape, One scale for every quantity: a proposal at ten
+    significant digits or twelve places reads back whole, and ten billion
+    of a holding priced at it is the exact product."""
+    proposals = ["0.000056640216", "0.9194556822", "0.000000000001", "142857142900", "3142.751234"]
+    result = subprocess.run(
+        ["node", "--input-type=module", "-e", ROUND_TRIP, DECIMAL, json.dumps(proposals), "10000000000"],
+        capture_output=True,
+        text=True,
+        timeout=60,
+    )
+    assert result.returncode == 0, result.stderr
+    assert json.loads(result.stdout) == [
+        ["0.000056640216", "566402.16"],
+        ["0.9194556822", "9194556822"],
+        ["0.000000000001", "0.01"],
+        ["142857142900", "1428571429000000000000"],
+        ["3142.751234", "31427512340000"],
+    ]

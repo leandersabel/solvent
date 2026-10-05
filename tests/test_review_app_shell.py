@@ -2,7 +2,8 @@
 request threads than lookups can hold, so requests held open as long
 as every lookup slot can be leave the instance answering
 (spec/features/app-shell.md, criteria 78 and 79; spec/architecture.md,
-Tech stack, WSGI server).
+Tech stack, WSGI server). A start empties the rate cache and keeps the
+schema version and everything else (Database, criterion 80).
 
 Written from the spec alone. gunicorn runs with the Dockerfile's own
 arguments, on loopback.
@@ -20,6 +21,7 @@ from contextlib import ExitStack, contextmanager
 from gunicorn.config import Config
 
 import solvent.rates as rates
+from tests.helpers import connect, register, rows
 from tests.test_deployment import REPO_ROOT, image_command
 
 
@@ -145,3 +147,32 @@ def test_the_control_holding_every_thread_does_stop_the_sign_in_page(tmp_path):
                 status = None
             assert status is None
         assert sign_in_page(port, timeout=10) == 200
+
+
+def started_again(app):
+    from solvent import create_app
+
+    return create_app(config_overrides={"DATABASE_PATH": app.config["DATABASE_PATH"], "TESTING": True})
+
+
+def test_a_start_empties_the_rate_cache_and_keeps_everything_else(app):
+    """Criterion 80: an entry an earlier build settled, at the rounding
+    it used then, is gone after a start, while the schema version, the
+    accounts and their sessions stay, and a second start changes
+    nothing more."""
+    register(app, "owner")
+    conn = connect(app)
+    with conn:
+        conn.execute(
+            "INSERT INTO rate_cache (symbol, quote, date, rate, as_of, source, fetched_at) "
+            "VALUES (?, ?, ?, ?, ?, ?, ?)",
+            ("USD", "CHF", "2026-07-31", "0.91945568", "2026-07-31", "frankfurter", "2026-08-02T00:00:00+00:00"),
+        )
+    conn.close()
+    kept = ["PRAGMA user_version", "SELECT * FROM principals", "SELECT * FROM sessions", "SELECT * FROM vault_epochs"]
+    before = [rows(app, sql) for sql in kept]
+
+    for _ in range(2):
+        started_again(app)
+        assert rows(app, "SELECT * FROM rate_cache") == []
+        assert [rows(app, sql) for sql in kept] == before
