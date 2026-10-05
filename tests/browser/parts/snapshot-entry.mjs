@@ -213,6 +213,8 @@ await run(async () => {
   await rec.waitUntil((query) => { const l = document.querySelector(query); return l && l.querySelector('input').value !== ''; }, { args: [line('USD')], label: 'the form proposals' });
   const formLine = await ev("document.querySelector('.prices-line').textContent");
   const formBody = await ev("document.querySelector('.dialog .prices-body').textContent");
+  // innerText, which leaves out what a closed fold hides.
+  const folded = await ev("(f => !f.open && f.innerText)(document.querySelector('.dialog .prices-fold'))");
   await set('#snapshot-value', '31415.92');
   await formSave();
   check(
@@ -221,6 +223,7 @@ await run(async () => {
       on(await stored('rate'), D11).map((r) => r.payload.symbol).sort().join(',') === 'USD,XAU-ozt',
     formLine,
   );
+  check('record-snapshot: the folded prices line shows what the save writes without being opened', folded === formLine, folded);
   check(
     'record-snapshot: no request during the form carries the entered figure, in any field or encoding',
     traffic.every((r) => !['31415.92', 'MzE0MTUuOTI='].some((s) => (r.url + JSON.stringify(r.headers) + r.body).includes(s))),
