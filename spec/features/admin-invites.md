@@ -190,8 +190,8 @@ One table, every account, both kinds. Columns: **Username**, **Kind**,
 - **Items** is how many things the owner added to the vault: one for
   each holding, one for each holding in each recording, and one for each
   price. The vault's own settings are not counted, so a vault nobody has
-  added anything to reads 0.
-  For an administrator it
+  added anything to reads 0. The count is drawn in the row's ink,
+  because nothing else in the row says it. For an administrator it
   reads an ink-muted **No vault**, never a zero, because a zero invites
   the reader to think a vault sits there empty. Ink-muted is allowed
   because the Kind column says the same in the same row
@@ -711,8 +711,10 @@ administrator), and the lost sole password (Bootstrap). The rest:
 19. The admin area shows the boundary callout and the sections Invites,
     Accounts, Units and Your password, in that order. Test:
     `tests/browser/parts/admin.mjs`.
-20. The created link is shown once, and an administrator's account row
-    reads No vault, never a zero. Test: `tests/browser/parts/admin.mjs`.
+20. The created link is shown once, an administrator's account row
+    reads No vault, never a zero, and only No vault is drawn in
+    ink-muted. Test: `tests/browser/parts/admin.mjs`,
+    `tests/browser/parts/admin-review-ink.mjs`.
 21. (blind) `GET /api/admin/accounts` lists both kinds, and an
     administrator's row has no `itemCount` key, asserted against the
     row's full key set, not its value. Test:

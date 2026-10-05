@@ -3,7 +3,8 @@
 // Templates: admin.html. Modules: page-admin.js, dom.js, shell.js.
 import {
   ADMIN_PASSWORD, BASE, CLOCK, MINUTE, SECOND_PASSWORD, administrator, check, click, confirmLook, labels, looksDisabled,
-  looksEnabledRed, mintInvite, openBrowser, register, setValue, signInOn, text, page, run, watched,
+  intoVault, looksEnabledRed, mintInvite, openBrowser, register, setValue, signInOn, text, page, run, VAULT_PASSWORD,
+  watched,
 } from '../harness.mjs';
 
 await run(async () => {
@@ -36,9 +37,27 @@ await run(async () => {
   const inviteUrl = await page.eval("document.querySelector('input[readonly]').value");
   check('the invite link is shown once', inviteUrl.includes('/register?invite='));
 
+  // A user account, so the list holds a count beside the No vault.
+  const { session: owner, close: closeOwner } = await openBrowser();
+  await register(owner, mintInvite('vault-owner'), 'leander', VAULT_PASSWORD);
+  await intoVault(owner, 'the user account');
+  closeOwner();
   await click('Accounts');
-  await page.waitUntil("document.body.innerText.includes('ops.leander')", { label: 'the account list' });
+  await page.waitUntil("document.body.innerText.includes('ops.leander') && [...document.querySelectorAll('td')].some((td) => td.textContent === 'leander')", {
+    label: 'the account list',
+  });
   check('an administrator row reads No vault, never a zero', (await text()).includes('No vault'));
+  const itemsInk = JSON.parse(await page.eval(`JSON.stringify((() => {
+    const row = (name) => [...document.querySelectorAll('tr')].find((r) => r.cells[0]?.textContent === name);
+    const ink = (name) => [...row(name).cells].map((td) => getComputedStyle(td).color);
+    const items = [...document.querySelectorAll('th')].findIndex((th) => th.textContent === 'Items');
+    return { owner: ink('leander'), admin: ink('ops.leander'), items };
+  })())`));
+  check(
+    "a user account's Items count is as dark as its username, and only No vault is ink-muted",
+    itemsInk.owner[itemsInk.items] === itemsInk.owner[0] && itemsInk.admin[itemsInk.items] !== itemsInk.admin[0],
+    JSON.stringify(itemsInk),
+  );
   check(
     'the only administrator has no Remove control',
     (await text()).includes('The only administrator'),
