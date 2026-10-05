@@ -145,7 +145,9 @@ function hero(vault, state, render, actions, history, dimension) {
       el('p', { class: 'eyebrow', text: 'Net worth' }),
       figure,
       history ? heroChange(vault, history, state.range, state.selection, dimension) : null,
-      el('p', { class: 'hero-at', hidden: true }),
+      // The line keeps its height while empty, so the date the chart
+      // reads never moves the chart under the pointer.
+      el('p', { class: 'hero-at-line' }, [el('span', { class: 'hero-at', hidden: true })]),
     ]),
     el('div', { class: 'hero-parts' }, [
       heroPart('Assets', vault.mainWhole(totals.assets)),
