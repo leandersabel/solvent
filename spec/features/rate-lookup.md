@@ -511,8 +511,14 @@ host's network are reachable.
 - The request limit, the failure count and the cool-off are operator
   config with those defaults, the last two applying to each breaker
   alike (`app-shell.md`, Configuration).
-- Provider errors are logged with the symbol and status, never with the
-  requesting user's identity beyond what the access log holds.
+- A failed fetch logs one warning, `rates.provider source=<source>
+  status=<status>`. `source` is `frankfurter` or `nbp`. `status` is the
+  HTTP status of an answer that was not 200, else the first that fits
+  of `timeout`, `tls`, `network`, `body` and `other`. The line holds no
+  URL, date, quote or error text, because the URL carries the quote and
+  date asked for, which the access log, recording the path without its
+  query, does not. A fetch the breaker or the spent deadline skips logs
+  nothing.
 
 ## Edge cases
 
@@ -736,7 +742,8 @@ host's network are reachable.
     `tests/test_rates.py::test_an_administrator_adding_a_currency_reaches_the_next_registration`.
 41. (blind) No log line, response body or error page contains a
     provider API key, checked against real output even though no
-    provider has a key. Test: no test.
+    provider has a key. Test:
+    `tests/test_review_rate_lookup.py::test_no_output_of_a_lookup_carries_a_provider_key`.
 42. (blind) Exceeding the per-user rate limit returns Too Many Requests
     and writes no `attempts` row, so the limit lifts an hour after the
     oldest lookup it let through however often the client retried,
@@ -857,3 +864,9 @@ host's network are reachable.
     replaced. Test:
     `tests/test_rates.py::test_a_cached_rate_with_an_unusable_date_is_fetched_again`,
     `tests/test_review_rate_lookup.py::test_a_cached_gold_rate_dated_before_its_window_is_fetched_again`.
+66. (blind) A failed fetch logs exactly `rates.provider source=<source>
+    status=<status>`, with the status for an answer that was not 200 and
+    `timeout`, `tls`, `network`, `body` or `other` for each other
+    failure, and no date, quote, provider host or error text. Test:
+    `tests/test_rates.py::test_a_failed_fetch_logs_its_source_and_status_and_nothing_of_the_request`,
+    `tests/test_review_rate_lookup.py::test_a_failed_answer_logs_its_source_and_status_alone`.
