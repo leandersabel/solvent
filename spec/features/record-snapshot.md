@@ -298,7 +298,12 @@ Line states:
   price is not a figure. The line moves to the head of the block: "What
   is 1 PAINT worth in CHF? Nothing prices PAINT yet. The figure records
   either way, and until a price exists the holding is listed as not
-  priced." **It never blocks the row.** Blocking would let a provider
+  priced." A sourced unit in a vault whose main currency no source
+  quotes into names that reason in place of "Nothing prices PAINT
+  yet.": "What is 1 CHF worth in ARS? No price source quotes in ARS,
+  your main currency. The figure records either way, and until a price
+  exists the holding is listed as not priced." **It never blocks the
+  row.** Blocking would let a provider
   outage stop somebody recording what they looked up, which this screen
   may never do.
 
@@ -1526,4 +1531,5 @@ Editing an existing entry).
 90. In a vault whose main currency no source quotes into, a currency's
     rate line says no price source quotes in that main currency, offers
     no Look it up, and the sweep asks the proxy nothing. Test:
-    `tests/browser/parts/update-values.mjs`.
+    `tests/browser/parts/update-values.mjs`,
+    `tests/browser/parts/update-values-review-unquoted.mjs`.

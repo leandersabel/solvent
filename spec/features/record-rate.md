@@ -619,4 +619,5 @@ silently.
     `tests/browser/parts/update-values.mjs`.
 42. In a vault whose main currency's row carries `since: null`, no unit
     has a rate source at any date and a recording asks the proxy
-    nothing. Test: `tests/test_client.py::test_the_client_side_rules_hold`.
+    nothing. Test: `tests/test_client.py::test_the_client_side_rules_hold`,
+    `tests/browser/parts/update-values-review-unquoted.mjs`.

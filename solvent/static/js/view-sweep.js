@@ -766,8 +766,14 @@ function rateLine(vault, unit, date, { sit, readOnly: blockReadOnly, fillMissing
     lookup.hidden = !reopened() || line.lookedUp;
   };
 
-  const askCopy = () =>
-    `What is ${described.one} worth in ${vault.mainCurrency}? Nothing prices ${unit} yet. The figure records either way, and until a price exists the holding is listed as not priced.`;
+  const askCopy = () => {
+    const row = vault.symbols.get(unit);
+    // A unit with its own source asks only when the main currency has none.
+    const why = row && row.lookup
+      ? `No price source quotes in ${vault.mainCurrency}, your main currency.`
+      : `Nothing prices ${unit} yet.`;
+    return `What is ${described.one} worth in ${vault.mainCurrency}? ${why} The figure records either way, and until a price exists the holding is listed as not priced.`;
+  };
 
   /** Back to what the vault holds for this date. */
   line.reset = () => {

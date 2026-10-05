@@ -888,4 +888,5 @@ Unarchiving and archiving it again writes the zero at the new D.
     `tests/browser/parts/account-form-review-refusals.mjs`.
 61. In a vault whose main currency no source quotes into, every unit
     option but the main currency is marked "rate entered by hand". Test:
-    `tests/browser/parts/account-form.mjs`.
+    `tests/browser/parts/account-form.mjs`,
+    `tests/browser/parts/account-form-review-unquoted.mjs`.

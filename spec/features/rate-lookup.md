@@ -798,7 +798,9 @@ host's network are reachable.
     `tests/test_rates.py::test_no_admin_symbol_response_counts_which_holdings_use_one`.
 40. A currency an administrator adds that no source serves is not
     offered in the next registration's main-currency picker. Test:
-    `tests/test_rates.py::test_a_currency_no_source_serves_is_not_offered_at_registration`.
+    `tests/test_rates.py::test_a_currency_no_source_serves_is_not_offered_at_registration`,
+    `tests/test_review_rate_lookup.py::test_a_currency_no_source_serves_is_not_offered_at_registration`,
+    `tests/test_review_rate_lookup.py::test_the_registration_list_is_exactly_the_currencies_the_registry_serves`.
 41. (blind) No log line, response body or error page contains a
     provider API key, checked against real output even though no
     provider has a key. Test:
@@ -979,12 +981,18 @@ host's network are reachable.
     `tests/test_review_rate_lookup.py::test_a_frankfurter_day_before_nbps_window_is_no_proposal`.
 73. A currency row with no adapter reads `lookup: false` and `since:
     null` on both symbol routes, even when stored with `lookup` on. Test:
-    `tests/test_rates.py::test_a_currency_no_source_serves_reads_lookup_false_with_no_since`.
+    `tests/test_rates.py::test_a_currency_no_source_serves_reads_lookup_false_with_no_since`,
+    `tests/test_review_rate_lookup.py::test_a_currency_no_source_serves_reads_lookup_false_with_no_since_on_both_routes`.
 74. (blind) Quoted in a currency with no adapter, the whole table and
     every single symbol answer No Content with no outbound request and
     no change to either breaker's count. Test:
-    `tests/test_rates.py::test_a_quote_no_source_serves_answers_no_content_and_asks_nothing`.
+    `tests/test_rates.py::test_a_quote_no_source_serves_answers_no_content_and_asks_nothing`,
+    `tests/test_review_rate_lookup.py::test_a_quote_no_source_serves_answers_no_content_and_asks_nothing`,
+    `tests/test_review_rate_lookup.py::test_a_currency_no_source_serves_as_a_symbol_asks_nothing_at_any_date`.
 75. (blind) Either source answering Not Found past the configured count
     leaves both breakers' counts at zero, logs no provider line, and
     every request still goes out. Test:
-    `tests/test_rates.py::test_a_not_found_answer_leaves_the_breaker_alone`.
+    `tests/test_rates.py::test_a_not_found_answer_leaves_the_breaker_alone`,
+    `tests/test_review_rate_lookup.py::test_a_not_found_answer_past_the_count_leaves_the_breakers_alone`,
+    `tests/test_review_rate_lookup.py::test_a_not_found_step_back_is_no_proposal_and_no_failure`,
+    `tests/test_review_rate_lookup.py::test_a_not_found_answer_neither_counts_nor_resets_a_failure_run`.
