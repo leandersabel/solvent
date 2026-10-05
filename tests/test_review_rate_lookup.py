@@ -731,3 +731,243 @@ def test_a_gold_price_whose_ounce_figure_passes_any_decimal_is_no_proposal(owner
     priced = response.get_json()["rates"]
     assert not GOLD & set(priced)
     assert "USD" in priced
+
+
+# A publication date that is not usable (Edge cases, criteria 63 to 65).
+
+class _Missing:
+    """A key the source left out of its answer."""
+
+    def __repr__(self):
+        return "missing"
+
+
+MISSING = _Missing()
+WINDOW_START = day(14)
+NOT_A_USABLE_DAY = [
+    "31.07.2026",
+    "2026-13-01",
+    "20260731",
+    "2026-W31-5",
+    "2026-07-31T00:00:00",
+    "2026-07-31 ",
+    20260731,
+    None,
+    True,
+    ["2026-07-31"],
+    MISSING,
+]
+LATER = (date.fromisoformat(PAST) + timedelta(days=1)).isoformat()
+
+
+def dated(entry: dict, key: str, on):
+    if on is not MISSING:
+        entry[key] = on
+    return entry
+
+
+def gold_on(on, cena=251.37):
+    return lambda url: json.dumps([dated({"cena": cena}, "data", on)]).encode()
+
+
+def fx_on(on_for):
+    """Frankfurter's table whose `date` is `on_for(day asked)`."""
+
+    def body_of(url):
+        asked = url.split("/v1/")[1][:10]
+        body = {"amount": 1, "base": url.rsplit("base=", 1)[1], "rates": {"PLN": 4.2537, "USD": 1.0876}}
+        return json.dumps(dated(body, "date", on_for(asked))).encode()
+
+    return body_of
+
+
+def asked_urls(sources) -> list[str]:
+    urls = []
+    route = sources.route
+
+    def recording(request):
+        urls.append(request.full_url)
+        return route(request)
+
+    sources.route = recording
+    return urls
+
+
+def no_breaker_failure():
+    return {name: breaker.failures for name, breaker in rates.breakers.items()} == {
+        name: 0 for name in rates.breakers
+    }
+
+
+@pytest.mark.parametrize("quote", ["CHF", "PLN"])
+@pytest.mark.parametrize("on", [*NOT_A_USABLE_DAY, LATER, day(15)], ids=repr)
+def test_a_gold_date_that_is_not_usable_drops_only_gold(owner, sources, on, quote):
+    """Criterion 63."""
+    sources.plans["nbp"] = at_once(gold_on(on))
+
+    response = owner.get(f"/api/rates?date={PAST}&quote={quote}", headers=CSRF)
+
+    assert response.status_code == 200
+    priced = response.get_json()["rates"]
+    assert not GOLD & set(priced)
+    assert "USD" in priced
+    assert no_breaker_failure()
+    for symbol in sorted(GOLD):
+        single = owner.get(f"/api/rates?date={PAST}&quote={quote}&symbol={symbol}", headers=CSRF)
+        assert single.status_code == 204
+
+
+@pytest.mark.parametrize("on", [WINDOW_START, PAST])
+def test_a_gold_date_at_either_end_of_the_window_is_its_as_of(owner, sources, on):
+    """Edge cases: the window's first day and the requested date are both
+    usable, and the quote leg is fetched at that day (criterion 47)."""
+    sources.plans["nbp"] = at_once(gold_on(on))
+    urls = asked_urls(sources)
+
+    chf = owner.get(f"/api/rates?date={PAST}&quote=CHF&symbol=XAU-g", headers=CSRF)
+    pln = owner.get(f"/api/rates?date={PAST}&quote=PLN&symbol=XAU-g", headers=CSRF)
+
+    assert (chf.status_code, chf.get_json()["asOf"]) == (200, on)
+    assert (pln.status_code, pln.get_json()["asOf"]) == (200, on)
+    assert rates.FX_URL.format(date=on, quote="CHF") in urls
+
+
+@pytest.mark.parametrize(
+    "on", ["2026-07-30?base=EUR#", "../2026-07-30", "2026-07-30/../../latest", "20260730", "2026-W31-4"]
+)
+def test_a_gold_date_that_is_not_usable_never_reaches_the_quote_legs_url(owner, sources, on):
+    """Criterion 56 and Edge cases: NBP's `data` fills the quote leg's
+    date only once it is a canonical day, so no other text reaches an
+    outbound URL, and no leg goes out for a date that is no answer."""
+    sources.plans["nbp"] = at_once(gold_on(on))
+    urls = asked_urls(sources)
+
+    owner.get(f"/api/rates?date={PAST}&quote=CHF", headers=CSRF)
+
+    assert urls
+    assert set(u for u in urls if "frankfurter" in u) == {rates.FX_URL.format(date=PAST, quote="CHF")}
+
+
+@pytest.mark.parametrize(
+    ("provider", "url", "bad"),
+    [
+        ("nbp", "quote=PLN&symbol=XAU-g", at_once(gold_on("not a day"))),
+        ("frankfurter", "quote=CHF&symbol=USD", at_once(fx_on(lambda asked: "not a day"))),
+    ],
+)
+def test_a_bad_date_counts_as_a_success_for_its_breaker(app, owner, sources, provider, url, bad):
+    """Edge cases: the source answered, so a bad date resets its
+    breaker's count. Counted as a failure, the breaker opens on the
+    third request. Left uncounted, it opens on the fifth."""
+    app.config["RATE_BREAKER_FAILURES"] = 3
+    failing = at_once(lambda _: b"{}", 500)
+
+    for offset, plan in enumerate([failing, failing, bad, failing, failing, bad]):
+        sources.plans[provider] = plan
+        response = owner.get(f"/api/rates?date={day(offset)}&{url}", headers=CSRF)
+        assert response.status_code == 204
+
+    assert [p for p, _ in sources.opened] == [provider] * 6
+
+
+@pytest.mark.parametrize("on", [*NOT_A_USABLE_DAY, LATER], ids=repr)
+def test_a_currency_date_that_is_not_usable_drops_what_its_table_prices(owner, sources, on):
+    """Criterion 64."""
+    sources.plans["frankfurter"] = at_once(fx_on(lambda asked: on))
+
+    pln = owner.get(f"/api/rates?date={PAST}&quote=PLN", headers=CSRF)
+    chf = owner.get(f"/api/rates?date={PAST}&quote=CHF", headers=CSRF)
+    usd = owner.get(f"/api/rates?date={PAST}&quote=CHF&symbol=USD", headers=CSRF)
+
+    assert pln.status_code == 200
+    assert set(pln.get_json()["rates"]) == GOLD
+    assert chf.status_code == 204
+    assert usd.status_code == 204
+    assert no_breaker_failure()
+
+
+def test_an_earlier_currency_date_is_its_as_of(owner, sources):
+    """Edge cases: Frankfurter's `date` before the requested one is the
+    prior close, not a bad date."""
+    sources.plans["frankfurter"] = at_once(fx_on(lambda asked: day(2)))
+
+    response = owner.get(f"/api/rates?date={PAST}&quote=CHF&symbol=USD", headers=CSRF)
+
+    assert (response.status_code, response.get_json()["asOf"]) == (200, day(2))
+
+
+def test_a_quote_leg_with_a_bad_date_drops_only_gold(owner, sources):
+    """Edge cases: NBP publishes the day before, so the quote leg is a
+    table of its own. Its bad date drops gold quoted in CHF and leaves
+    the currencies of the requested day."""
+    sources.plans["nbp"] = at_once(gold_on(day(1)))
+    sources.plans["frankfurter"] = at_once(fx_on(lambda asked: asked if asked == PAST else "not a day"))
+
+    priced = table(owner)
+
+    assert {"USD", "PLN"} <= set(priced)
+    assert not GOLD & set(priced)
+
+
+def plant_as_of(app, symbol, quote, on, as_of, rate, source):
+    from solvent.db import utcnow
+
+    with connect(app) as conn:
+        conn.execute(
+            "INSERT INTO rate_cache (symbol, quote, date, rate, as_of, source, fetched_at) "
+            "VALUES (?, ?, ?, ?, ?, ?, ?)",
+            (symbol, quote, on, rate, as_of, source, utcnow()),
+        )
+    conn.close()
+
+
+def cached_as_of(app, symbol, quote, on):
+    return rows(
+        app,
+        "SELECT rate, as_of FROM rate_cache WHERE symbol = ? AND quote = ? AND date = ?",
+        (symbol, quote, on),
+    )
+
+
+@pytest.mark.parametrize("as_of", ["not a day", "2026-13-01", "20260731", "2026-W31-5", LATER], ids=repr)
+def test_a_cached_rate_with_an_unusable_date_is_fetched_again(app, owner, sources, as_of):
+    """Criterion 65, for a single symbol and the whole table: the
+    provider is asked, the row is replaced, and the repeat is a hit."""
+    plant_as_of(app, "USD", "CHF", PAST, as_of, "0.9", "frankfurter")
+    plant_as_of(app, "XAU-g", "PLN", PAST, as_of, "250", "nbp")
+
+    first = owner.get(f"/api/rates?date={PAST}&quote=CHF&symbol=USD", headers=CSRF).get_json()
+    again = owner.get(f"/api/rates?date={PAST}&quote=CHF&symbol=USD", headers=CSRF).get_json()
+    gold = table(owner, quote="PLN")["XAU-g"]
+
+    assert (first["rate"], first["asOf"], first["cached"]) == ("0.91945568", PAST, False)
+    assert again["cached"] is True
+    assert (gold["rate"], gold["asOf"], gold["cached"]) == ("251.37", PAST, False)
+    assert cached_as_of(app, "USD", "CHF", PAST) == [{"rate": "0.91945568", "as_of": PAST}]
+    assert cached_as_of(app, "XAU-g", "PLN", PAST) == [{"rate": "251.37", "as_of": PAST}]
+
+
+def test_a_cached_gold_rate_dated_before_its_window_is_fetched_again(app, owner, sources):
+    """Edge cases: a cached row's `asOf` is held to the same test as a
+    fresh one, which for NBP includes the 14-day window."""
+    plant_as_of(app, "XAU-g", "PLN", PAST, day(15), "250", "nbp")
+
+    response = owner.get(f"/api/rates?date={PAST}&quote=PLN&symbol=XAU-g", headers=CSRF).get_json()
+
+    assert (response["rate"], response["asOf"], response["cached"]) == ("251.37", PAST, False)
+    assert [p for p, _ in sources.opened] == ["nbp"]
+
+
+@pytest.mark.parametrize(("symbol", "quote", "as_of", "source"), [
+    ("USD", "CHF", day(3), "frankfurter"),
+    ("XAU-g", "PLN", WINDOW_START, "nbp"),
+])
+def test_a_cached_rate_with_a_usable_earlier_date_is_a_hit(app, owner, sources, symbol, quote, as_of, source):
+    """The miss is for a date that is not usable, not for any prior
+    close."""
+    plant_as_of(app, symbol, quote, PAST, as_of, "1.5", source)
+
+    response = owner.get(f"/api/rates?date={PAST}&quote={quote}&symbol={symbol}", headers=CSRF).get_json()
+
+    assert (response["rate"], response["asOf"], response["cached"]) == ("1.5", as_of, True)
+    assert sources.opened == []
