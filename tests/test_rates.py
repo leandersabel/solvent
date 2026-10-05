@@ -220,6 +220,60 @@ def test_a_supported_symbol_resolves_and_then_serves_from_cache(owner, provider)
     assert len(provider.calls) == calls
 
 
+def _cache(app, symbol: str, on: str, as_of: str, fetched: datetime) -> None:
+    conn = connect(app)
+    with conn:
+        conn.execute(
+            "INSERT INTO rate_cache (symbol, quote, date, rate, as_of, source, fetched_at) "
+            "VALUES (?, 'CHF', ?, '2', ?, 'frankfurter', ?)",
+            (symbol, on, as_of, fetched.isoformat(timespec="seconds")),
+        )
+    conn.close()
+
+
+def _at(day: str, hour: int, minute: int = 0) -> datetime:
+    return datetime.fromisoformat(day).replace(hour=hour, minute=minute, tzinfo=timezone.utc)
+
+
+def test_a_price_fetched_before_its_day_was_published_is_fetched_again(
+    app, owner, provider, monkeypatch
+):
+    _cache(app, "USD", PAST, "2026-07-30", _at(PAST, 12))
+    monkeypatch.setattr(rates, "now", lambda: _at("2026-08-01", 0, 30))
+    provider.answers["frankfurter"] = fx(PAST, {"USD": 0.8})
+    body = owner.get(f"/api/rates?date={PAST}&quote=CHF&symbol=USD", headers=CSRF).get_json()
+    assert body == {
+        "rate": "1.25", "base": "1 USD", "quote": "CHF", "asOf": PAST,
+        "source": "frankfurter", "cached": False,
+    }
+
+
+def test_a_price_fetched_under_an_hour_ago_is_served_from_cache_whatever_its_date(
+    app, owner, provider, monkeypatch
+):
+    _cache(app, "USD", PAST, "2026-07-30", _at(PAST, 12))
+    monkeypatch.setattr(rates, "now", lambda: _at(PAST, 12, 59))
+    body = owner.get(f"/api/rates?date={PAST}&quote=CHF&symbol=USD", headers=CSRF).get_json()
+    assert body["asOf"] == "2026-07-30"
+    assert body["cached"] is True
+    assert provider.calls == []
+
+
+@pytest.mark.parametrize("symbol", ["USD", "XAU-g"])
+def test_a_price_fetched_once_its_day_settled_is_served_from_cache_for_good(
+    app, owner, provider, monkeypatch, symbol
+):
+    saturday = "2026-08-01"
+    _cache(app, symbol, saturday, PAST, _at("2026-08-03", 0))
+    monkeypatch.setattr(rates, "now", lambda: _at("2026-09-03", 0))
+    body = owner.get(
+        f"/api/rates?date={saturday}&quote=CHF&symbol={symbol}", headers=CSRF
+    ).get_json()
+    assert body["asOf"] == PAST
+    assert body["cached"] is True
+    assert provider.calls == []
+
+
 def test_the_whole_table_and_a_single_symbol_share_one_cache(owner, provider):
     provider.answers["frankfurter"] = fx(PAST, {"USD": 0.8, "EUR": 0.95})
     provider.answers["cenyzlota"] = [{"data": PAST, "cena": 300.0}]
