@@ -2370,3 +2370,18 @@ def test_an_empty_gold_range_quoted_in_pln_is_no_content(owner, sources, publish
 
     assert response.status_code == 204
     assert failures() == NONE_FAILED
+
+
+@pytest.mark.parametrize("days", [7, 30])
+def test_gold_asks_nbp_for_the_window_solvent_rates_exposes(owner, sources, monkeypatch, days):
+    """Providers, Gold and SSRF and egress hardening: the range starts
+    `NBP_WINDOW` before `date`, the constant the nightly source check
+    imports to request exactly what the app does, so the app's request
+    moves with it."""
+    monkeypatch.setattr(rates, "NBP_WINDOW", timedelta(days=days))
+    start = (date.fromisoformat(PAST) - timedelta(days=days)).isoformat()
+    urls = asked_urls(sources)
+
+    owner.get(f"/api/rates?date={PAST}&quote=PLN&symbol=XAU-g", headers=CSRF)
+
+    assert urls == [f"https://api.nbp.pl/api/cenyzlota/{start}/{PAST}?format=json"]

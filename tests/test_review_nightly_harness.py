@@ -1,7 +1,9 @@
 """The reviewer's own checks of the nightly harness's prepared data
 (spec/features/nightly-harness.md, Prepared data; Acceptance criteria
 20, 22, 24, 28, 42, 43 and 44; net-worth-view.md, Acceptance criteria
-69), written from the spec alone.
+69), and of the gold window it takes from the app (Known prices, The
+source checks; Acceptance criteria 13 and 40), written from the spec
+alone.
 """
 from __future__ import annotations
 
@@ -11,7 +13,7 @@ import re
 import shutil
 import subprocess
 import sys
-from datetime import date, timedelta
+from datetime import date, datetime, timedelta, timezone
 from fractions import Fraction
 
 import pytest
@@ -389,3 +391,181 @@ def test_code_like_names_read_as_literal_text_in_the_list_the_legend_and_the_too
     (username,) = covering_names(generated.manifest, "code-like-names")
     literal = shown[username]["literal"]
     assert literal == {"row": True, "legend": True, "tooltip": True, "scriptsAdded": 0, "alerted": False}, literal
+
+
+# The gold window comes from the app (The source checks; Known prices;
+# Acceptance criteria 13 and 40). The source check runs as the workflow
+# runs it, with HTTPS answered in-process by `SOURCES_STAND_IN`, which a
+# `sitecustomize` loads before the script, so nothing leaves the runner.
+
+import ast  # noqa: E402
+
+import solvent.rates as rates  # noqa: E402
+
+RATE_LOOKUP = (REPO_ROOT / "spec" / "features" / "rate-lookup.md").read_text()
+EXPOSED = RATE_LOOKUP.split("- `solvent.rates` exposes ", 1)[1].split("\n  under those names", 1)[0]
+SPEC_CONSTANTS = set(re.findall(r"`([A-Z_]+)`", EXPOSED))
+
+SOURCES_STAND_IN = '''
+import http.client
+import io
+import json
+import os
+from datetime import date, timedelta
+
+import solvent.rates
+
+if os.environ.get("REVIEW_WINDOW_DAYS"):
+    solvent.rates.NBP_WINDOW = timedelta(days=int(os.environ["REVIEW_WINDOW_DAYS"]))
+
+
+def frankfurter(target):
+    on = target.split("/v1/", 1)[1].split("?", 1)[0]
+    codes = [s["symbol"] for s in solvent.rates.SEEDED_SYMBOLS if s["kind"] == "currency"]
+    return {"amount": 1.0, "base": "CHF", "date": on, "rates": {c: 1.5 for c in codes if c != "CHF"}}
+
+
+def nbp(target):
+    end = date.fromisoformat(target.split("?", 1)[0].rstrip("/").rsplit("/", 1)[1])
+    backs = sorted((int(b) for b in os.environ["REVIEW_NBP_BACK"].split(",")), reverse=True)
+    return [{"data": (end - timedelta(days=b)).isoformat(), "cena": 250.0} for b in backs]
+
+
+class _Socket:
+    def __init__(self, raw):
+        self.raw = raw
+
+    def makefile(self, mode):
+        return io.BytesIO(self.raw)
+
+    def close(self):
+        pass
+
+
+def request(self, method, url, body=None, headers=None, **_):
+    self.target = url
+    with open(os.environ["REVIEW_LOG"], "a") as log:
+        log.write(json.dumps([self.host, url]) + "\\n")
+
+
+def getresponse(self):
+    body = json.dumps(frankfurter(self.target) if "frankfurter" in self.host else nbp(self.target)).encode()
+    head = f"HTTP/1.1 200 OK\\r\\nContent-Type: application/json\\r\\nContent-Length: {len(body)}\\r\\n\\r\\n"
+    response = http.client.HTTPResponse(_Socket(head.encode() + body), method="GET")
+    response.begin()
+    return response
+
+
+http.client.HTTPSConnection.request = request
+http.client.HTTPSConnection.getresponse = getresponse
+'''
+
+
+def check_sources(tmp_path, nbp_back: "list[int]", window_days: "int | None" = None):
+    """`sources.py check` against the in-process stand-in: NBP answers
+    one entry `b` days before the range's end for each `b`. Returns the
+    printed lines by source and the hosts and targets asked."""
+    tmp_path.mkdir(parents=True, exist_ok=True)
+    (tmp_path / "sitecustomize.py").write_text(SOURCES_STAND_IN)
+    log = tmp_path / "asked.jsonl"
+    env = {
+        **os.environ,
+        "PYTHONPATH": os.pathsep.join([str(tmp_path), str(REPO_ROOT)]),
+        "REVIEW_LOG": str(log),
+        "REVIEW_NBP_BACK": ",".join(map(str, nbp_back)),
+        "REVIEW_WINDOW_DAYS": "" if window_days is None else str(window_days),
+    }
+    run = subprocess.run(
+        [sys.executable, str(TOOLS / "sources.py"), "check"],
+        env=env, capture_output=True, text=True, timeout=30,
+    )
+    lines = dict(line.split(" ", 1) for line in run.stdout.splitlines())
+    asked = [json.loads(line) for line in log.read_text().splitlines()] if log.exists() else []
+    return lines, asked, run
+
+
+@pytest.mark.parametrize("window_days", [None, 30], ids=["the app's window", "a changed app window"])
+def test_the_source_check_asks_nbp_for_the_apps_window_up_to_d(tmp_path, window_days):
+    """The source checks: NBP from `D − NBP_WINDOW` to `D`, the window
+    read from `solvent.rates`, so a change to the app's moves it."""
+    window = rates.NBP_WINDOW if window_days is None else timedelta(days=window_days)
+    lines, asked, run = check_sources(tmp_path, [0], window_days)
+
+    (target,) = [t for host, t in asked if host == "api.nbp.pl"]
+    end = datetime.now(timezone.utc).date() - timedelta(days=7)
+    assert target == "/api/cenyzlota/{start}/{end}?format=json".format(start=end - window, end=end), run
+    assert lines["nbp"].startswith("ok"), run
+
+
+@pytest.mark.parametrize("window_days", [None, 30], ids=["the app's window", "a changed app window"])
+def test_the_nbp_shape_holds_days_from_d_minus_the_apps_window_to_d(tmp_path, window_days):
+    """The source checks, Shape: `data` within `[D − NBP_WINDOW, D]`, so
+    the window's first day is in it and the day before is a change."""
+    days = (rates.NBP_WINDOW if window_days is None else timedelta(days=window_days)).days
+
+    at_edge, _, run = check_sources(tmp_path / "edge", [days, 0], window_days)
+    before, _, _ = check_sources(tmp_path / "before", [days + 1, 0], window_days)
+
+    assert at_edge["nbp"].startswith("ok"), run
+    assert before["nbp"].startswith("changed")
+
+
+def test_prices_keeps_a_gold_window_equal_to_the_apps():
+    """Criterion 13: `prices.py` keeps its own `NBP_WINDOW`, and it is
+    the app's."""
+    assert prices.NBP_WINDOW == rates.NBP_WINDOW
+
+
+def test_the_oracle_offers_gold_only_where_nbp_published_within_its_window(monkeypatch):
+    """Known prices: `XAU-g` and `XAU-ozt` where NBP published within
+    `NBP_WINDOW`. A Sunday's last publication is the Friday two days
+    back, inside the app's window and outside a one-day one."""
+    sunday = date(2026, 7, 26)
+    assert {"XAU-g", "XAU-ozt"} <= prices.known_table(sunday, "PLN").keys()
+
+    monkeypatch.setattr(prices, "NBP_WINDOW", timedelta(days=1))
+
+    assert not {"XAU-g", "XAU-ozt"} & prices.known_table(sunday, "PLN").keys()
+
+
+def python_imports(path) -> "dict[str, set[str]]":
+    """Each module a Python file imports, with the names it takes from it."""
+    found: dict[str, set[str]] = {}
+    for node in ast.walk(ast.parse(path.read_text())):
+        if isinstance(node, ast.Import):
+            for alias in node.names:
+                found.setdefault(alias.name, set())
+        elif isinstance(node, ast.ImportFrom):
+            found.setdefault("." * node.level + (node.module or ""), set()).update(a.name for a in node.names)
+    return found
+
+
+def test_the_spec_names_the_gold_window_among_what_the_source_check_imports():
+    assert "NBP_WINDOW" in SPEC_CONSTANTS
+    assert {name for name in SPEC_CONSTANTS if not hasattr(rates, name)} == set()
+
+
+def test_the_source_check_imports_from_the_app_exactly_the_constants_rate_lookup_names():
+    """Criterion 40 for `sources.py`: from `solvent.rates`, exactly the
+    names rate-lookup.md lists (SSRF and egress hardening), and from
+    `solvent` nothing else."""
+    imports = python_imports(TOOLS / "sources.py")
+
+    assert imports.get("solvent.rates") == SPEC_CONSTANTS
+    assert {m for m in imports if m.split(".")[0] == "solvent"} == {"solvent.rates"}
+
+
+@pytest.mark.parametrize("path", sorted(TOOLS.glob("*.py")), ids=lambda p: p.name)
+def test_every_harness_python_file_imports_the_standard_library_and_only_what_files_lists(path):
+    """Criterion 40, blind: beyond the standard library, the sibling
+    `prices` for `standin.py`, `mcp.py` and `prices.py`, and
+    `solvent.rates` for `sources.py`."""
+    allowed = {"prices"} if path.name in {"standin.py", "mcp.py", "prices.py"} else set()
+    if path.name == "sources.py":
+        allowed = {"solvent.rates"}
+    rest = {
+        module for module in python_imports(path)
+        if module.split(".")[0] not in sys.stdlib_module_names | {"__future__"}
+    }
+
+    assert rest <= allowed, rest
