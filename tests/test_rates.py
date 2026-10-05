@@ -544,9 +544,8 @@ def test_every_outbound_request_is_named(monkeypatch):
         status = 200
         body = b"{}"
 
-        def read1(self, _size=-1):
-            body, self.body = self.body, b""
-            return body
+        def read(self, _size=None):
+            return self.body
 
         def __enter__(self):
             return self
@@ -587,9 +586,8 @@ def opener(monkeypatch):
         def __init__(self, payload):
             self.payload = json.dumps(payload).encode()
 
-        def read1(self, _size=-1):
-            payload, self.payload = self.payload, b""
-            return payload
+        def read(self, _size=None):
+            return self.payload
 
         def __enter__(self):
             return self
@@ -890,9 +888,8 @@ def providers(monkeypatch, hang_open):
         def __init__(self, body, status=200):
             self.body, self.status = body, status
 
-        def read1(self, _size=-1):
-            body, self.body = self.body, b""
-            return body
+        def read(self, _size=None):
+            return self.body
 
         def __enter__(self):
             return self

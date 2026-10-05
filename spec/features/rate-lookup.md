@@ -438,8 +438,10 @@ host's network are reachable.
   being cut short. A socket timeout bounds each receive on its own, so
   a provider sending its answer a byte at a time would outlast it: the
   read runs on a daemon thread the request waits for only until the
-  deadline, and that thread starts no receive past it. A provider that
-  has not answered by then has failed.
+  deadline, and at the deadline the sockets that thread opened are shut
+  down, so it receives nothing past it, whether the headers, a chunked
+  body or a sized one is arriving. A provider that has not answered by
+  then has failed.
 - `solvent.rates` exposes `FX_URL`, `NBP_URL`, `USER_AGENT`,
   `EGRESS_TIMEOUT_SECONDS`, `MAX_RESPONSE_BYTES` and `SEEDED_SYMBOLS`
   under those names, because the nightly source check imports them to

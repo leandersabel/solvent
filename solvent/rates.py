@@ -14,9 +14,11 @@ reachable.
 """
 from __future__ import annotations
 
+import http.client
 import json
 import logging
 import re
+import socket
 import threading
 import time
 import urllib.error
@@ -152,7 +154,57 @@ class _NoRedirect(urllib.request.HTTPRedirectHandler):
         return None
 
 
-_opener = urllib.request.build_opener(_NoRedirect)
+# The sockets the read on this thread opens, for `_fetch_within` to shut
+# down at its deadline.
+_watch = threading.local()
+
+
+def _shut(sock: socket.socket) -> None:
+    try:
+        sock.shutdown(socket.SHUT_RDWR)
+    except OSError:
+        pass
+
+
+def _watched(connection_class):
+    """`connection_class`, handing each socket it opens to the read
+    running on its thread. One opened after the deadline is shut at
+    once."""
+
+    class Watched(connection_class):
+        def __init__(self, *args, **kwargs):
+            super().__init__(*args, **kwargs)
+            create = self._create_connection
+
+            def watched_create(*args, **kwargs):
+                sock = create(*args, **kwargs)
+                sockets = getattr(_watch, "sockets", None)
+                if sockets is not None:
+                    sockets.append(sock)
+                    if _watch.expired.is_set():
+                        _shut(sock)
+                return sock
+
+            self._create_connection = watched_create
+
+    return Watched
+
+
+class _HTTPS(urllib.request.HTTPSHandler):
+    connection = _watched(http.client.HTTPSConnection)
+
+    def https_open(self, req):
+        return self.do_open(self.connection, req, context=self._context)
+
+
+class _HTTP(urllib.request.HTTPHandler):
+    connection = _watched(http.client.HTTPConnection)
+
+    def http_open(self, req):
+        return self.do_open(self.connection, req)
+
+
+_opener = urllib.request.build_opener(_NoRedirect, _HTTPS, _HTTP)
 
 # Named outbound requests. Both providers front their public instance
 # with a CDN that refuses urllib's default agent outright, so an
@@ -225,34 +277,26 @@ def _egress() -> _Egress:
     )
 
 
-def _read(url: str, deadline: float) -> bytes:
-    """The body of a 200 answer, one receive at a time, starting none
-    past the deadline. A socket timeout bounds each receive on its own,
-    so a source sending a byte now and then would otherwise hold the
-    read for as long as it keeps sending."""
-    with _opener.open(_request(url), timeout=deadline - time.monotonic()) as response:
-        if response.status != 200:
-            raise urllib.error.URLError(f"status {response.status}")
-        body = b""
-        while chunk := response.read1(MAX_RESPONSE_BYTES):
-            body += chunk
-            if len(body) > MAX_RESPONSE_BYTES:
-                raise urllib.error.URLError("body over the size cap")
-            if time.monotonic() >= deadline:
-                raise TimeoutError("deadline passed while reading")
-        return body
-
-
 def _fetch_within(url: str, seconds: float) -> bytes:
     """The body of a 200 answer to `url`, or an error once `seconds`
-    have passed. The read runs on a daemon thread, because a receive
-    already waiting can outlast the deadline by up to the socket
-    timeout, and the caller must not wait for it."""
+    have passed. A socket timeout bounds each receive on its own, so a
+    source sending a byte now and then would outlast it: the read runs
+    on a daemon thread, and at the deadline the sockets it opened are
+    shut down, which ends the receive it is in and every later one."""
     outcome: list = []
+    sockets: list = []
+    expired = threading.Event()
 
     def read() -> None:
+        _watch.sockets, _watch.expired = sockets, expired
         try:
-            outcome.append(_read(url, time.monotonic() + seconds))
+            with _opener.open(_request(url), timeout=seconds) as response:
+                if response.status != 200:
+                    raise urllib.error.URLError(f"status {response.status}")
+                body = response.read(MAX_RESPONSE_BYTES + 1)
+            if len(body) > MAX_RESPONSE_BYTES:
+                raise urllib.error.URLError("body over the size cap")
+            outcome.append(body)
         except Exception as error:
             outcome.append(error)
 
@@ -260,6 +304,9 @@ def _fetch_within(url: str, seconds: float) -> bytes:
     worker.start()
     worker.join(seconds)
     if not outcome:
+        expired.set()
+        for sock in list(sockets):
+            _shut(sock)
         raise TimeoutError("no answer within the deadline")
     if isinstance(outcome[0], Exception):
         raise outcome[0]
