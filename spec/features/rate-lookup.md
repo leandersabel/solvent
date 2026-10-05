@@ -888,7 +888,8 @@ host's network are reachable.
     or `other` for each other failure, and no date, quote, provider
     host, error text or anything of the answer's body. Test:
     `tests/test_rates.py::test_a_failed_fetch_logs_its_source_and_status_and_nothing_of_the_request`,
-    `tests/test_review_rate_lookup.py::test_a_failed_answer_logs_its_source_and_status_alone`.
+    `tests/test_review_rate_lookup.py::test_a_failed_answer_logs_its_source_and_status_alone`,
+    `tests/test_review_rate_lookup.py::test_a_changed_shape_logs_shape_and_counts_against_its_breaker_alone`.
 67. A date written other than `YYYY-MM-DD`, such as `20260731`,
     `2026-W31-5` or `2026W315`, is a Bad Request that reaches no
     provider. Test:
@@ -903,4 +904,7 @@ host's network are reachable.
     with one usable rate among bad ones logs nothing and leaves the
     count at zero. Test:
     `tests/test_rates.py::test_a_changed_shape_logs_shape_and_counts_against_its_breaker`,
-    `tests/test_rates.py::test_one_usable_rate_among_bad_ones_is_a_success`.
+    `tests/test_rates.py::test_one_usable_rate_among_bad_ones_is_a_success`,
+    `tests/test_review_rate_lookup.py::test_a_changed_shape_logs_shape_and_counts_against_its_breaker_alone`,
+    `tests/test_review_rate_lookup.py::test_a_changed_shape_opens_its_breaker_like_an_outage`,
+    `tests/test_review_rate_lookup.py::test_one_usable_rate_among_bad_ones_logs_nothing_and_counts_no_failure`.

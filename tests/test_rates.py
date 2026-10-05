@@ -1050,7 +1050,7 @@ def test_a_changed_shape_logs_shape_and_counts_against_its_breaker(
     opener.answers["fx" if source == "frankfurter" else "nbp"] = answer
     symbol = "USD" if source == "frankfurter" else "XAU-g"
     with caplog.at_level("WARNING"):
-        response = owner.get(f"/api/rates?date={PAST}&quote=PLN&symbol={symbol}", headers=CSRF)
+        response = owner.get(f"/api/rates?date={PAST}&quote=CHF&symbol={symbol}", headers=CSRF)
     assert response.status_code == 204
     assert [r.getMessage() for r in caplog.records if r.getMessage().startswith("rates.")] == [
         f"rates.provider source={source} status=shape"
