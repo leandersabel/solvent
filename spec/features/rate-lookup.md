@@ -184,21 +184,31 @@ unwind.
 - Lookup is a **range query**: `NBP_URL`,
   `https://api.nbp.pl/api/cenyzlota/{start}/{end}?format=json`, `start`
   14 days before `date`, `end` equal to it, the FX request's headers. It
-  returns only published days, and the adapter takes the last entry on
-  or before `date`, reading its `cena`, PLN per gram, and its `data`,
-  which becomes `asOf` when it falls within the window (Edge cases, A
-  publication date that is not usable). That is the prior-close rule in
-  one request with no retry loop. NBP answers an empty window Not Found,
+  returns only published days, ascending. The adapter reads each
+  entry's `cena`, PLN per gram, and its `data`, its day, usable within
+  the window (Edge cases, A publication date that is not usable). The
+  last entry is NBP's last day, and an unusable earlier entry is
+  dropped. That is the prior-close rule in one request with no retry
+  loop. NBP answers an empty window Not Found,
   which is No Content, so an empty array is a changed shape (Rate
   limiting and failure). A single-date query answers Not
   Found on every weekend and Polish holiday, so it is the wrong call.
   The API caps a range at 93 days.
+- **Quoted in PLN**, `asOf` is NBP's last day and the price its `cena`.
 - **The quote conversion is a second leg.** A non-PLN `quote` is
-  converted PLN to quote through Frankfurter **at the `asOf` date, not
-  the requested date**, because FX from a different day misprices the
-  rate. Either leg failing yields No Content, never a half-composed
-  rate. `source` names the chain: `"nbp+frankfurter"`, or `"nbp"` when
-  the quote is PLN.
+  converted PLN to quote through Frankfurter, with both halves for one
+  day, the **gold day**: the latest day on or before `date` on which
+  NBP published a price and Frankfurter a table. FX from a different
+  day misprices the rate. The leg asks Frankfurter for NBP's last day.
+  When the table's `date` is a day NBP published, that is the gold day,
+  so a day the ECB skips, such as Good Friday, prices gold at the day
+  before. Otherwise the leg asks again for NBP's last day before the
+  table's `date`, and with no such day in the window there is no
+  proposal. The gold day becomes `asOf`, and both `cena` and the PLN
+  rate are that day's. Both sources answering is never No Content only
+  because their days differ. Either leg failing yields No Content,
+  never a half-composed rate. `source` names the chain:
+  `"nbp+frankfurter"`, or `"nbp"` when the quote is PLN.
 - **Unit conversion is exact**: `XAU-g` takes NBP's figure, `XAU-ozt`
   multiplies by 31.1034768. Compose in this order: `cena × (1 /
   rates["PLN"])` from the `asOf` table (`cena` alone for PLN), then `×
@@ -520,9 +530,12 @@ host's network are reachable.
   the deadline per provider avoids that too, but fails a slow provider
   that answers within the whole deadline.
 - **The gold quote leg goes out once NBP has answered**, because it is
-  fetched at NBP's `asOf`, with what is left of the deadline. When
-  `asOf` is the requested date and the table for `date` is already
-  going out, the leg waits for that request instead of sending a second.
+  fetched at NBP's last day, with what is left of the deadline. When
+  that is the requested date and the table for `date` is already going
+  out, the leg waits for that request instead of sending a second. Each
+  further request toward the gold day goes out after the one before
+  has answered, within the same deadline, and counts against
+  Frankfurter's breaker.
 - Outbound requests run on threads of their own, each handed its
   provider, URL and deadline as values. They touch no database
   connection and no Flask context: caching and composing happen on the
@@ -565,6 +578,10 @@ host's network are reachable.
   config change and nothing more.
 - **Gold, non-PLN quote, FX leg fails**: No Content, never the PLN
   figure under the requested quote's label.
+- **Gold, non-PLN quote, on a day NBP published and the ECB did not**,
+  such as Good Friday, or before Frankfurter's table for the day is
+  out: priced at the gold day (Providers, Gold), never NBP's day paired
+  with an earlier table.
 - **A date before the symbol's or the quote's floor**, gold before
   2013-01-02: Bad Request, because the request is out of range rather
   than unanswerable. In the whole-table form the symbol is absent, and
@@ -787,10 +804,10 @@ host's network are reachable.
 46. The table holds all eight seeded metal symbols, with `lookup: true`
     on exactly `XAU-ozt` and `XAU-g`. Test:
     `tests/test_rates.py::test_the_seeded_table_holds_all_eight_metals_with_lookup_on_gold_alone`.
-47. (blind) A gold request with a non-PLN quote makes exactly two
-    outbound requests, and the FX leg is fetched for the `asOf` date, not
-    the requested date, asserted against a stub returning a different
-    rate for each. Test:
+47. (blind) A gold request with a non-PLN quote, both sources
+    publishing on NBP's last day, makes exactly two outbound requests,
+    and the FX leg is fetched for NBP's last day, not the requested
+    date, asserted against a stub returning a different rate for each. Test:
     `tests/test_rates.py::test_gold_converts_through_fx_at_the_as_of_date_not_the_requested_one`.
 48. With the FX leg failing, the response is No Content and no rate
     carrying a PLN figure under another currency's label is returned.
@@ -921,3 +938,15 @@ host's network are reachable.
     the next lookup sends. Test:
     `tests/test_rates.py::test_a_lookup_finding_every_slot_taken_sends_nothing_and_answers_what_needs_no_source`,
     `tests/test_review_rate_lookup.py::test_with_every_slot_sending_a_lookup_sends_nothing_and_answers_only_what_needs_no_source`.
+70. (blind) A gold request quoted in `CHF` on a day NBP published and
+    Frankfurter answers with the day before's table makes exactly two
+    outbound requests, with `asOf` the day before and both `cena` and the
+    PLN rate that day's, digit for digit. Test:
+    `tests/test_rates.py::test_gold_on_a_day_without_a_currency_table_is_priced_at_the_day_before`.
+71. When Frankfurter's table is for a day NBP did not publish, the leg
+    asks again for NBP's last day before it, making three outbound
+    requests, and prices gold at that day. Test:
+    `tests/test_rates.py::test_gold_steps_back_to_a_day_both_sources_published`.
+72. When no NBP day in the window is on or before Frankfurter's table's
+    day, a gold request quoted in `CHF` is No Content. Test:
+    `tests/test_rates.py::test_gold_with_no_day_both_sources_published_is_no_content`.

@@ -265,6 +265,56 @@ def test_gold_converts_through_fx_at_the_as_of_date_not_the_requested_one(owner,
     assert body["rate"] == "75"
 
 
+GOOD_FRIDAY = "2026-04-03"
+
+
+def test_gold_on_a_day_without_a_currency_table_is_priced_at_the_day_before(
+    owner, provider
+):
+    """NBP publishes on Good Friday and the ECB does not, so Frankfurter
+    answers its Thursday table: both figures are Thursday's."""
+    provider.answers["cenyzlota"] = [
+        {"data": "2026-04-02", "cena": 290.0},
+        {"data": GOOD_FRIDAY, "cena": 300.0},
+    ]
+    provider.answers["frankfurter"] = fx("2026-04-02", {"PLN": 4.0})
+
+    body = owner.get(
+        f"/api/rates?date={GOOD_FRIDAY}&quote=CHF&symbol=XAU-g", headers=CSRF
+    ).get_json()
+    assert body["asOf"] == "2026-04-02"
+    assert body["rate"] == "72.5"
+    assert len(provider.calls) == 2
+
+
+def test_gold_steps_back_to_a_day_both_sources_published(owner, provider):
+    """Frankfurter's table is for a day NBP skipped, so the leg asks
+    again for NBP's last day before it."""
+    provider.answers["cenyzlota"] = [
+        {"data": "2026-04-01", "cena": 280.0},
+        {"data": GOOD_FRIDAY, "cena": 300.0},
+    ]
+    provider.answers["frankfurter"] = lambda url: (
+        fx("2026-04-01", {"PLN": 4.0}) if "2026-04-01" in url else fx("2026-04-02", {"PLN": 8.0})
+    )
+
+    body = owner.get(
+        f"/api/rates?date={GOOD_FRIDAY}&quote=CHF&symbol=XAU-g", headers=CSRF
+    ).get_json()
+    assert body["asOf"] == "2026-04-01"
+    assert body["rate"] == "70"
+    assert len(provider.calls) == 3
+
+
+def test_gold_with_no_day_both_sources_published_is_no_content(owner, provider):
+    provider.answers["cenyzlota"] = [{"data": GOOD_FRIDAY, "cena": 300.0}]
+    provider.answers["frankfurter"] = fx("2026-04-02", {"PLN": 4.0})
+
+    assert owner.get(
+        f"/api/rates?date={GOOD_FRIDAY}&quote=CHF&symbol=XAU-g", headers=CSRF
+    ).status_code == 204
+
+
 def test_gold_in_grams_and_troy_ounces_differ_by_exactly_the_conversion(owner, provider):
     provider.answers["cenyzlota"] = [{"data": PAST, "cena": 300.0}]
     body = owner.get(f"/api/rates?date={PAST}&quote=PLN", headers=CSRF).get_json()
