@@ -1,11 +1,11 @@
 """Checks of the price sources (spec/features/nightly-harness.md, The
 source checks).
 
-Runs in tonight's image with PYTHONPATH=/app, so it requests exactly
+Runs in the app's image with PYTHONPATH=/app, so it requests exactly
 what the app requests: the same URLs, headers, default TLS context, no
 redirects, timeout and size cap.
 
-    python sources.py check   # the real sources, once a night
+    python sources.py check   # the real sources, once a day
     python sources.py probe   # the stand-in, per shard
 """
 from __future__ import annotations

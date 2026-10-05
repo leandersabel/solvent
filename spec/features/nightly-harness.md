@@ -11,17 +11,18 @@ take hours to come due, and the server's own log.
 
 It is pipeline tooling under `tools/nightly/`, never in the image, and
 nothing in the image knows it exists (CLAUDE.md, The loop, Nightly and
-stable). Every harness container runs the walked image by its digest,
-unchanged, with its entrypoint overridden and `tools/nightly/` mounted
-read-only. No step builds, commits or tags an image, so the image a
-nightly or a candidate publishes is the one every shard walked.
+stable). Every harness container of a walk runs the walked image by
+its digest, unchanged, with its entrypoint overridden and
+`tools/nightly/` mounted read-only. No step of a walk builds, commits
+or tags an image, so the image a nightly or a candidate publishes is
+the one every shard walked. The daily source check is the one part
+outside the walk (The source checks).
 
 ### Which features it serves
 
 | Harness part | Features it lets `qa` check |
 |---|---|
 | The stand-in, its request list and failure modes, the known prices | `rate-lookup`, `record-snapshot`, `net-worth-view`, `manage-accounts` |
-| The source check | `rate-lookup` |
 | Prepared vaults, expected totals | `net-worth-view`, `record-snapshot`, `manage-accounts`, `account-settings`, `login` |
 | Prepared backup files | `export-import` |
 | The older vault and the aged session | `login`, `account-settings` |
