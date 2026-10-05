@@ -33,7 +33,7 @@ from flask import Blueprint, abort, current_app, g, jsonify, request
 from pydantic import Field
 
 from . import ratelimit
-from .db import get_db, utcnow, write_transaction
+from .db import get_db, now, utcnow, write_transaction
 from .validation import Payload, parse
 
 bp = Blueprint("rates", __name__)
@@ -126,9 +126,11 @@ _GRAMS_PER_TROY_OUNCE = Decimal("31.1034768")
 # it.
 _CEILING = Decimal(10) ** 20
 
-# rate-lookup.md, Caching: a historical rate does not change, so past
-# dates are kept indefinitely and only today expires.
-_TODAY_TTL = timedelta(hours=1)
+# rate-lookup.md, Caching: an entry fetched once its date has settled is
+# kept indefinitely. Any other expires an hour after it was fetched,
+# because it may hold the prior close of a day not yet published.
+_UNSETTLED_TTL = timedelta(hours=1)
+_SETTLES_AFTER = timedelta(days=2)
 
 # The 14-day window the NBP range query covers, which satisfies the
 # prior-close rule in one request with no retry loop.
@@ -524,10 +526,10 @@ def _cache_get(symbol: str, quote: str, on: str) -> "dict | None":
         # A "0" or a bad `asOf` stored before either was checked is a
         # miss, so it is fetched again and replaced.
         return None
-    if on == _today().isoformat():
-        fetched = datetime.fromisoformat(row["fetched_at"])
-        if datetime.now(timezone.utc) - fetched >= _TODAY_TTL:
-            return None
+    fetched = datetime.fromisoformat(row["fetched_at"])
+    settled = datetime.fromisoformat(on).replace(tzinfo=timezone.utc) + _SETTLES_AFTER
+    if fetched < settled and now() - fetched >= _UNSETTLED_TTL:
+        return None
     return {
         "rate": row["rate"],
         "base": f"1 {symbol}",

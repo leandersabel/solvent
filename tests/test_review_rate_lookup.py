@@ -20,7 +20,9 @@ both its halves are that day's (Providers, Gold, Edge cases, criteria
 7, 22, 23, 29, 47, 48, 56 and 70 to 72). A currency no source serves
 is never a main currency on offer and, as a quote, asks nothing, and
 Not Found is neither a failure nor a success (The symbol table, Rate
-limiting and failure, criteria 40 and 73 to 75).
+limiting and failure, criteria 40 and 73 to 75). An entry for D is kept
+for good only once fetched at or after 00:00 UTC on D+2, and any other
+for an hour, whatever its `asOf` (Caching, criteria 13, 14, 76 and 77).
 
 Written from the spec alone. Each provider is reached on a loopback HTTP
 server through the app's own opener, so the app's real socket timeout
@@ -2083,3 +2085,220 @@ def test_a_currency_no_source_serves_as_a_symbol_asks_nothing_at_any_date(owner,
     assert statuses == {PAST: 204, "2012-12-31": 204, "1998-12-31": 204}
     assert unserved not in whole and "USD" in whole
     assert sorted(p for p, _ in sources.opened) == ["frankfurter", "nbp"]
+
+
+# When a cached price is final (Caching, criteria 13, 14, 76 and 77).
+# The server clock is `clock`, and both sources publish the days in
+# `published`, which a test adds to as the sources would.
+
+TUESDAY = "2026-08-04"
+SATURDAY = "2026-08-08"
+HOUR = 3600
+
+
+def usd_on(on: str) -> float:
+    """Frankfurter's USD rate of each day, distinct per day."""
+    return round(1.05 + date.fromisoformat(on).toordinal() % 83 / 1000, 4)
+
+
+def usd_proposal(on: str) -> str:
+    figure = (1 / Decimal(str(usd_on(on)))).quantize(Decimal("1e-8"), ROUND_HALF_EVEN)
+    return format(figure.normalize(), "f")
+
+
+def at(on: str, days: int = 0, seconds: int = 0) -> datetime:
+    """`days` after 00:00 UTC on `on`, plus `seconds`."""
+    return datetime.fromisoformat(on).replace(tzinfo=timezone.utc) + timedelta(days=days, seconds=seconds)
+
+
+@pytest.fixture
+def published(sources):
+    """The days both sources have published, which the stubs read on
+    every request."""
+    days: set[str] = set()
+
+    def nbp(url):
+        start, end = url.split("?")[0].rsplit("/", 2)[1:]
+        entries = [{"data": d, "cena": cena_on(d)} for d in sorted(days) if start <= d <= end]
+        return [answer(json.dumps(entries).encode(), 200 if entries else 404)], 0
+
+    def fx(url):
+        asked = url.split("/v1/")[1][:10]
+        on = max(d for d in days if d <= asked)
+        body = {"amount": 1, "base": url.rsplit("base=", 1)[1], "date": on,
+                "rates": {"PLN": pln_on(on), "USD": usd_on(on)}}
+        return [answer(json.dumps(body).encode())], 0
+
+    sources.plans.update(nbp=nbp, frankfurter=fx)
+    return days
+
+
+def publish_up_to(published: set, on: str):
+    """Every weekday up to and including `on`, from three weeks before."""
+    last = date.fromisoformat(on)
+    for back in range(21):
+        d = last - timedelta(days=back)
+        if d.weekday() < 5:
+            published.add(d.isoformat())
+
+
+PRICES = {
+    "USD-CHF": ("USD", "CHF", usd_proposal),
+    "XAU-g-PLN": ("XAU-g", "PLN", lambda on: format(Decimal(str(cena_on(on))).normalize(), "f")),
+    "XAU-ozt-CHF": ("XAU-ozt", "CHF", lambda on: composed(on, "XAU-ozt")),
+}
+
+
+def priced(owner, symbol, quote, on):
+    response = owner.get(f"/api/rates?date={on}&quote={quote}&symbol={symbol}", headers=CSRF)
+    assert response.status_code == 200, response.get_data(as_text=True)
+    body = response.get_json()
+    return body["rate"], body["asOf"], body["cached"]
+
+
+@pytest.mark.parametrize("price", PRICES)
+def test_a_price_looked_up_on_its_day_before_publication_is_looked_up_again_after_midnight(
+    owner, clock, sources, published, price
+):
+    """Criterion 76 and What the client gets: on D the sources still
+    hold D-1, so the proposal is D-1's. At 00:30 UTC on D+1 they have
+    published D, and the lookup goes out again and proposes D's own
+    price, which the next lookup then serves from cache."""
+    symbol, quote, proposal = PRICES[price]
+    before = offset(TUESDAY, 1)
+    publish_up_to(published, before)
+    clock.now = at(TUESDAY, seconds=15 * HOUR)
+
+    early = priced(owner, symbol, quote, TUESDAY)
+    asked_on_d = len(sources.opened)
+    published.add(TUESDAY)
+    clock.now = at(TUESDAY, days=1, seconds=HOUR // 2)
+    late = priced(owner, symbol, quote, TUESDAY)
+    again = priced(owner, symbol, quote, TUESDAY)
+
+    assert early == (proposal(before), before, False)
+    assert late == (proposal(TUESDAY), TUESDAY, False)
+    assert again == (proposal(TUESDAY), TUESDAY, True)
+    assert asked_on_d > 0 and len(sources.opened) == 2 * asked_on_d
+
+
+def test_the_whole_table_looked_up_before_publication_is_looked_up_again_after_midnight(
+    owner, clock, sources, published
+):
+    """Criterion 76 for the whole table: every symbol of it moves to D."""
+    before = offset(TUESDAY, 1)
+    publish_up_to(published, before)
+    clock.now = at(TUESDAY, seconds=15 * HOUR)
+    early = table(owner, on=TUESDAY)
+    published.add(TUESDAY)
+    clock.now = at(TUESDAY, days=1, seconds=HOUR // 2)
+
+    late = table(owner, on=TUESDAY)
+
+    assert {early[s]["asOf"] for s in ("USD", "XAU-g", "XAU-ozt")} == {before}
+    assert {late[s]["asOf"] for s in ("USD", "XAU-g", "XAU-ozt")} == {TUESDAY}
+    assert (late["USD"]["rate"], late["XAU-g"]["rate"]) == (usd_proposal(TUESDAY), composed(TUESDAY, "XAU-g"))
+    assert not any(entry["cached"] for entry in late.values())
+
+
+@pytest.mark.parametrize(
+    ("on", "fetched"),
+    [
+        pytest.param(TUESDAY, at(TUESDAY, seconds=15 * HOUR), id="on-d"),
+        pytest.param(TUESDAY, at(TUESDAY, days=2, seconds=-HOUR // 2), id="half-an-hour-before-settling"),
+        pytest.param(TUESDAY, at(TUESDAY, days=40), id="settled"),
+    ],
+)
+@pytest.mark.parametrize("price", PRICES)
+def test_a_price_looked_up_under_an_hour_ago_is_served_from_cache_whatever_its_date(
+    owner, clock, sources, published, price, on, fetched
+):
+    """Criterion 14: under an hour after the fetch, a lookup is a hit
+    whether or not the entry has settled, the hour running across
+    00:00 UTC on D+2 too."""
+    symbol, quote, _ = PRICES[price]
+    publish_up_to(published, on)
+    clock.now = fetched
+    first = priced(owner, symbol, quote, on)
+    asked = len(sources.opened)
+    clock.now = fetched + timedelta(seconds=HOUR - 1)
+
+    again = priced(owner, symbol, quote, on)
+
+    assert again == (*first[:2], True)
+    assert len(sources.opened) == asked
+
+
+@pytest.mark.parametrize(
+    ("on", "fetched"),
+    [
+        pytest.param(TUESDAY, at(TUESDAY, seconds=15 * HOUR), id="on-d"),
+        pytest.param(TUESDAY, at(TUESDAY, days=1, seconds=10 * HOUR), id="on-d-plus-1"),
+        pytest.param(TUESDAY, at(TUESDAY, days=2, seconds=-1), id="a-second-before-settling"),
+        pytest.param(SATURDAY, at(SATURDAY, days=1, seconds=10 * HOUR), id="saturday-on-sunday"),
+    ],
+)
+@pytest.mark.parametrize("price", PRICES)
+def test_a_price_looked_up_before_d_plus_2_is_looked_up_again_after_an_hour(
+    owner, clock, sources, published, price, on, fetched
+):
+    """Caching: every entry not fetched at or after 00:00 UTC on D+2 is
+    cached for an hour, then fetched again, whatever its `asOf`. On
+    D+1 both sources have published D, so `asOf` is D and still does
+    not settle it."""
+    symbol, quote, _ = PRICES[price]
+    publish_up_to(published, (fetched.date() - timedelta(days=1)).isoformat())
+    if on == TUESDAY and fetched.date() > date.fromisoformat(on):
+        published.add(on)
+    clock.now = fetched
+    priced(owner, symbol, quote, on)
+    asked = len(sources.opened)
+    clock.now = fetched + timedelta(seconds=HOUR + 1)
+
+    again = priced(owner, symbol, quote, on)
+
+    assert again[2] is False
+    assert len(sources.opened) == 2 * asked
+
+
+@pytest.mark.parametrize(
+    "on",
+    [pytest.param(TUESDAY, id="weekday"), pytest.param(SATURDAY, id="saturday")],
+)
+@pytest.mark.parametrize("price", PRICES)
+def test_a_price_looked_up_at_00_utc_on_d_plus_2_is_served_from_cache_a_month_later(
+    owner, clock, sources, published, price, on
+):
+    """Criterion 77, at the boundary itself: "at or after" 00:00 UTC on
+    D+2. A Saturday's entry carries Friday as `asOf` and settles alike."""
+    symbol, quote, proposal = PRICES[price]
+    publish_up_to(published, offset(on, -1))
+    clock.now = at(on, days=2)
+    first = priced(owner, symbol, quote, on)
+    asked = len(sources.opened)
+    clock.now = at(on, days=32)
+
+    again = priced(owner, symbol, quote, on)
+
+    friday = offset(SATURDAY, 1)
+    assert first[:2] == ((proposal(on), on) if on == TUESDAY else (proposal(friday), friday))
+    assert again == (*first[:2], True)
+    assert len(sources.opened) == asked
+
+
+def test_the_whole_table_and_a_single_symbol_share_one_unsettled_entry(owner, clock, sources, published):
+    """Criterion 13 while the entry is unsettled: the single symbol is a
+    hit inside the hour, and once the hour is out it goes out again."""
+    publish_up_to(published, offset(TUESDAY, 1))
+    clock.now = at(TUESDAY, seconds=15 * HOUR)
+    table(owner, on=TUESDAY)
+    asked = len(sources.opened)
+    clock.now += timedelta(minutes=30)
+
+    hit = priced(owner, "USD", "CHF", TUESDAY)
+    hits = len(sources.opened)
+    clock.now += timedelta(minutes=31)
+    miss = priced(owner, "USD", "CHF", TUESDAY)
+
+    assert hit[2] is True and hits == asked
+    assert miss[2] is False and len(sources.opened) == asked + 1

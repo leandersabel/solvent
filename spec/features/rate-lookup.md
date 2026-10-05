@@ -31,7 +31,9 @@ everything you own is in your main currency, you never meet this.
   gold from the Polish central bank directly. No account, no fee, no
   contract. Gold is usually a day old, because the Polish central bank
   publishes one business day behind the London market. The app shows
-  the day a price is for, and overriding it is one edit. Gold does not
+  the day a price is for, and overriding it is one edit. A price looked
+  up before the source published that day is looked up again an hour
+  later, so the day's own price replaces it once published. Gold does not
   reach before 2013, so older gold entries take a price you type, and
   the app says so rather than reporting a failed lookup. If a source
   stops or changes, prices are typed by hand until the app is changed.
@@ -428,8 +430,15 @@ scope).
 ### Caching
 
 - Cache key `(symbol, quote, date)`, in SQLite.
-- **Past dates are cached indefinitely**, because a historical rate does
-  not change. **Today's date is cached for 1 hour**, then refetched.
+- **An entry for date D fetched at or after 00:00 UTC on D+2 is cached
+  indefinitely**, because by then both sources have published D and a
+  published rate does not change. **Every other entry is cached for 1
+  hour** after it was fetched, then refetched, because it may hold the
+  prior close of a day not yet published. Weekends and holidays settle
+  at D+2 like any other date.
+- Settling reads only when the entry was fetched, never its `asOf`,
+  because an `asOf` before D reads the same whether D is a day nothing
+  is published or a day not yet published.
 - A cache hit issues no outbound request, so a household's entries on
   one day mostly hit cache.
 - Entries are public reference data: not per-user, holding nothing about
@@ -690,9 +699,13 @@ host's network are reachable.
     `tests/test_rates.py::test_a_whole_table_request_omits_symbols_the_proxy_cannot_price`.
 13. (blind) A whole-table request followed by a single-symbol request for
     a symbol in it makes no second outbound request. Test:
-    `tests/test_rates.py::test_the_whole_table_and_a_single_symbol_share_one_cache`.
-14. Today's rate is refetched after the 1-hour TTL and not before. Test:
-    no test.
+    `tests/test_rates.py::test_the_whole_table_and_a_single_symbol_share_one_cache`,
+    `tests/test_review_rate_lookup.py::test_the_whole_table_and_a_single_symbol_share_one_unsettled_entry`.
+14. An entry fetched under an hour ago is served from cache whatever its
+    date. Test:
+    `tests/test_rates.py::test_a_price_fetched_under_an_hour_ago_is_served_from_cache_whatever_its_date`,
+    `tests/test_review_rate_lookup.py::test_a_price_looked_up_under_an_hour_ago_is_served_from_cache_whatever_its_date`,
+    `tests/test_review_rate_lookup.py::test_a_price_looked_up_before_d_plus_2_is_looked_up_again_after_an_hour`.
 15. The app keeps no record of who asked about which rate: cache entries
     carry no user. Test: no test.
 16. `symbol=http://192.168.1.1/`, `symbol=../../etc/passwd`, and a
@@ -996,3 +1009,12 @@ host's network are reachable.
     `tests/test_review_rate_lookup.py::test_a_not_found_answer_past_the_count_leaves_the_breakers_alone`,
     `tests/test_review_rate_lookup.py::test_a_not_found_step_back_is_no_proposal_and_no_failure`,
     `tests/test_review_rate_lookup.py::test_a_not_found_answer_neither_counts_nor_resets_a_failure_run`.
+76. An entry for D fetched on D holding the prior close is fetched again
+    at 00:30 UTC on D+1 and proposes D's own price. Test:
+    `tests/test_rates.py::test_a_price_fetched_before_its_day_was_published_is_fetched_again`,
+    `tests/test_review_rate_lookup.py::test_a_price_looked_up_on_its_day_before_publication_is_looked_up_again_after_midnight`,
+    `tests/test_review_rate_lookup.py::test_the_whole_table_looked_up_before_publication_is_looked_up_again_after_midnight`.
+77. An entry fetched at or after 00:00 UTC on D+2 is served from cache a
+    month later, for a Saturday and for gold quoted in `CHF`. Test:
+    `tests/test_rates.py::test_a_price_fetched_once_its_day_settled_is_served_from_cache_for_good`,
+    `tests/test_review_rate_lookup.py::test_a_price_looked_up_at_00_utc_on_d_plus_2_is_served_from_cache_a_month_later`.
