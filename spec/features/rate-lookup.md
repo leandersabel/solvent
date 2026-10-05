@@ -167,7 +167,7 @@ back to 1948 from other central banks is not the API the app calls.
   symbol table and is the adapter registry's currencies. It is a
   constant in the code, never fetched. A currency outside it has no
   adapter.
-- A weekend, holiday or pre-publication date resolves through the
+- A weekend, holiday or a day not yet published resolves through the
   prior-close rule (Edge cases), with `asOf` carrying the earlier date.
   This is the normal path, not an error.
 - No provider here has an API key. The key-redaction rule (SSRF and
@@ -616,9 +616,12 @@ host's network are reachable.
   than unanswerable. In the whole-table form the symbol is absent, and
   when every symbol is, the answer is No Content, never Bad Request,
   with no outbound request and no change to any breaker's count.
-- **Weekend, holiday or pre-listing date**: the most recent prior close,
-  `asOf` that earlier date, and the client shows "rate as of 29 Jul".
-  No prior close within the window is No Content.
+- **Weekend, holiday or a day not yet published**: the most recent
+  prior close, `asOf` that earlier date, and the client shows "rate as
+  of 29 Jul". A currency takes the prior close Frankfurter answers with,
+  with no window of its own. Gold quoted in PLN takes the last day in
+  NBP's fixed 14-day range, and gold quoted in anything else the gold
+  day within it (Providers, Gold). No such day is No Content.
 - **A rate in an unexpected currency**: a changed shape, so no proposal
   from that table, never a mislabeled one.
 - **A figure that is not a usable price**: a source's rate or gold
@@ -673,12 +676,18 @@ host's network are reachable.
    `tests/test_rates.py::test_the_accepted_parameter_set_is_exactly_symbol_date_and_quote`.
 6. A proposal for a date with nothing published shows the earlier day
    it is for, never the recording date. Test:
-   `tests/browser/parts/update-values.mjs`.
+   `tests/browser/parts/update-values.mjs`,
+   `tests/browser/parts/update-values-review-prior-close.mjs`.
 7. With NBP publishing nothing for a requested Saturday, the proposal
    carries the preceding published day as `asOf`, and with nothing in
-   the whole 14-day window the answer is No Content. Test:
+   the whole 14-day window the answer is No Content. A currency takes
+   Frankfurter's prior close however far back it lies. Test:
    `tests/test_rates.py::test_the_nbp_range_query_takes_the_last_published_day_on_or_before`,
-   `tests/test_rates.py::test_nothing_published_in_the_window_is_no_content`.
+   `tests/test_rates.py::test_nothing_published_in_the_window_is_no_content`,
+   `tests/test_review_rate_lookup.py::test_a_saturday_takes_fridays_close_for_every_class`,
+   `tests/test_review_rate_lookup.py::test_a_currency_takes_frankfurters_prior_close_however_far_back`,
+   `tests/test_review_rate_lookup.py::test_gold_asks_nbp_for_the_14_days_up_to_the_date`,
+   `tests/test_review_rate_lookup.py::test_an_empty_gold_range_quoted_in_pln_is_no_content`.
 8. `XAU-g` and `XAU-ozt` for the same date and quote differ by exactly
    31.1034768, to the precision returned. Test:
    `tests/test_rates.py::test_gold_in_grams_and_troy_ounces_differ_by_exactly_the_conversion`.

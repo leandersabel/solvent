@@ -2302,3 +2302,71 @@ def test_the_whole_table_and_a_single_symbol_share_one_unsettled_entry(owner, cl
 
     assert hit[2] is True and hits == asked
     assert miss[2] is False and len(sources.opened) == asked + 1
+
+
+# The prior close (Edge cases, Weekend, holiday or a day not yet
+# published, criteria 6 and 7): a currency takes the prior close
+# Frankfurter answers with, however far back, and gold the last day of
+# NBP's fixed 14-day range, with an empty range No Content.
+
+
+@pytest.mark.parametrize("price", PRICES)
+def test_a_saturday_takes_fridays_close_for_every_class(owner, sources, published, price):
+    """A weekend is the normal path: `asOf` is Friday and the rate is
+    Friday's, never the Saturday asked."""
+    symbol, quote, proposal = PRICES[price]
+    friday = offset(SATURDAY, 1)
+    publish_up_to(published, friday)
+
+    assert priced(owner, symbol, quote, SATURDAY) == (proposal(friday), friday, False)
+
+
+@pytest.mark.parametrize("gap", [1, 14, 15, 40])
+def test_a_currency_takes_frankfurters_prior_close_however_far_back(owner, sources, published, logged, gap):
+    """A currency has no window of its own, so a close `gap` days back
+    is its proposal at any gap, from one request for the day asked.
+    Gold has NBP's 14 days, past which it is absent, with no failure."""
+    close = offset(PAST, gap)
+    published.add(close)
+    urls = asked_urls(sources)
+
+    whole = table(owner)
+    usd = priced(owner, "USD", "CHF", PAST)
+    gold = owner.get(f"/api/rates?date={PAST}&quote=PLN&symbol=XAU-g", headers=CSRF)
+
+    assert (whole["USD"]["asOf"], whole["USD"]["rate"]) == (close, usd_proposal(close))
+    assert usd == (usd_proposal(close), close, True)
+    assert fx_days_asked(urls)[0] == PAST
+    if gap <= 14:
+        assert {whole[s]["asOf"] for s in GOLD} == {close}
+        assert (gold.status_code, gold.get_json()["asOf"]) == (200, close)
+    else:
+        assert not GOLD & set(whole)
+        assert gold.status_code == 204
+    assert failures() == NONE_FAILED
+    assert provider_lines(logged) == []
+
+
+@pytest.mark.parametrize("on", [PAST, "2026-01-05", "2024-03-10", "2013-01-02"])
+def test_gold_asks_nbp_for_the_14_days_up_to_the_date(owner, sources, on):
+    """Providers, Gold: one range query from 14 days before `date` to
+    `date`, across a month, a year and a leap day alike."""
+    start = (date.fromisoformat(on) - timedelta(days=14)).isoformat()
+    urls = asked_urls(sources)
+
+    owner.get(f"/api/rates?date={on}&quote=PLN&symbol=XAU-g", headers=CSRF)
+
+    assert urls == [f"https://api.nbp.pl/api/cenyzlota/{start}/{on}?format=json"]
+
+
+@pytest.mark.parametrize("form", ["&symbol=XAU-g", "&symbol=XAU-ozt", ""], ids=["XAU-g", "XAU-ozt", "whole table"])
+def test_an_empty_gold_range_quoted_in_pln_is_no_content(owner, sources, published, form):
+    """Criterion 7: nothing published in the 14 days is No Content, never
+    an OK with an empty map or a figure from before the range."""
+    published.add(offset(PAST, 15))
+    sources.plans["frankfurter"] = not_found
+
+    response = owner.get(f"/api/rates?date={PAST}&quote=PLN{form}", headers=CSRF)
+
+    assert response.status_code == 204
+    assert failures() == NONE_FAILED
