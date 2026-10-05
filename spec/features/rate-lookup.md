@@ -753,7 +753,8 @@ host's network are reachable.
     `tests/test_rates.py::test_exceeding_the_per_user_limit_is_too_many_requests`,
     `tests/test_rates.py::test_a_refused_lookup_writes_no_row_and_the_limit_lifts_an_hour_after_the_oldest`.
 43. A future date is a Bad Request. Test:
-    `tests/test_rates.py::test_a_future_date_is_a_bad_request`.
+    `tests/test_rates.py::test_a_future_date_is_a_bad_request`,
+    `tests/test_review_rate_lookup.py::test_a_future_date_reaches_no_provider`.
 44. (blind) `GET /api/rates/symbols` returns exactly the symbols
     `/api/rates` accepts, asserted by querying every returned symbol and
     getting no Bad Request, `lookup: false` symbols included and
@@ -874,4 +875,5 @@ host's network are reachable.
 67. A date written other than `YYYY-MM-DD`, such as `20260731`,
     `2026-W31-5` or `2026W315`, is a Bad Request that reaches no
     provider. Test:
-    `tests/test_rates.py::test_a_date_not_written_yyyy_mm_dd_is_a_bad_request`.
+    `tests/test_rates.py::test_a_date_not_written_yyyy_mm_dd_is_a_bad_request`,
+    `tests/test_review_rate_lookup.py::test_a_date_not_written_as_isoformat_writes_it_reaches_no_provider`.

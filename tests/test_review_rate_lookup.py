@@ -5,7 +5,10 @@ hardening, Rate limiting and failure, criteria 17 to 20 and 60). A
 figure that is not a usable price, or in an unexpected currency, is no
 proposal for the symbols built from it (Edge cases, criteria 61 and 62).
 A failed fetch logs its source and status and nothing of the request,
-and no output carries a provider key (criteria 41 and 66).
+and no output carries a provider key (criteria 41 and 66). A date not
+written as `date.isoformat()` writes it, or in the future, is a Bad
+Request that reaches no provider (SSRF and egress hardening, criteria
+43 and 67).
 
 Written from the spec alone. Each provider is reached on a loopback HTTP
 server through the app's own opener, so the app's real socket timeout
@@ -21,8 +24,9 @@ import ssl
 import subprocess
 import threading
 import time
+import urllib.parse
 import urllib.request
-from datetime import date, timedelta
+from datetime import date, datetime, timedelta, timezone
 
 import pytest
 
@@ -1240,3 +1244,66 @@ def test_no_output_of_a_lookup_carries_a_provider_key(owner, sources, logged, ca
     for text in output:
         assert not KEYS.search(text), text
         assert "api.frankfurter.dev" not in text and "api.nbp.pl" not in text, text
+
+
+# Forms `date.fromisoformat` reads as a day but `date.isoformat()` never
+# writes, forms a looser parser reads, and days no calendar has.
+NOT_YYYY_MM_DD = [
+    "20260731", "2026-W31-5", "2026W315", "2026-W31", "2026W31",
+    "2026-7-31", "2026-07-1", "26-07-31", "2026/07/31", "2026-07-31T00:00",
+    " 2026-07-31", "2026-07-31 ", "2026-07-31\n", "+2026-07-31",
+    "２０２６-07-31", "2026-02-30", "2026-13-01", "",
+]
+WHOLE_AND_SINGLE = ["", "&symbol=USD", "&symbol=XAU-ozt"]
+
+
+@pytest.mark.parametrize("form", WHOLE_AND_SINGLE)
+@pytest.mark.parametrize("on", NOT_YYYY_MM_DD, ids=repr)
+def test_a_date_not_written_as_isoformat_writes_it_reaches_no_provider(owner, sources, on, form):
+    """Criterion 67 and SSRF and egress hardening, `date`."""
+    response = owner.get(
+        "/api/rates", query_string=f"date={urllib.parse.quote(on)}&quote=CHF{form}", headers=CSRF
+    )
+
+    assert response.status_code == 400
+    assert sources.opened == []
+
+
+@pytest.mark.parametrize("form", WHOLE_AND_SINGLE)
+def test_the_same_day_written_yyyy_mm_dd_is_priced(owner, sources, form):
+    """Criterion 67's other side: the refusal is of the form, not the day."""
+    response = owner.get(f"/api/rates?date={PAST}&quote=CHF{form}", headers=CSRF)
+
+    assert response.status_code == 200
+    assert sources.opened
+
+
+# The spec names no time zone for "today", so these are today's date at
+# the ends of the zones in use: any later day is future everywhere, and
+# the earlier one is future nowhere.
+def latest_today() -> date:
+    return (datetime.now(timezone.utc) + timedelta(hours=14)).date()
+
+
+def earliest_today() -> date:
+    return (datetime.now(timezone.utc) - timedelta(hours=12)).date()
+
+
+@pytest.mark.parametrize("form", WHOLE_AND_SINGLE)
+@pytest.mark.parametrize("ahead", [1, 400])
+def test_a_future_date_reaches_no_provider(owner, sources, ahead, form):
+    """Criterion 43."""
+    on = (latest_today() + timedelta(days=ahead)).isoformat()
+
+    response = owner.get(f"/api/rates?date={on}&quote=CHF{form}", headers=CSRF)
+
+    assert response.status_code == 400
+    assert sources.opened == []
+
+
+def test_today_is_not_a_future_date(owner, sources):
+    """Criterion 43's other side."""
+    response = owner.get(f"/api/rates?date={earliest_today().isoformat()}&quote=CHF", headers=CSRF)
+
+    assert response.status_code != 400
+    assert sources.opened
