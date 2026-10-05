@@ -475,6 +475,26 @@ await run(async () => {
   );
   await closeDialogs();
 
+  // #294: a move onto a date that was free when the form showed it,
+  // which another window then recorded with another holding's figure.
+  // No slot the move takes is taken, and it is still refused.
+  const DN = ago(52);
+  await editRow(DX);
+  await set('#snapshot-date', await format('date', DN));
+  await quiet();
+  await plantHere([snap('Fund 1', DN, '1')]);
+  traffic.length = 0;
+  await formSave();
+  const freeTaken = await formError();
+  check(
+    'record-snapshot: a move onto a date another window recorded since the form showed it free writes nothing and offers that recording',
+    freeTaken.startsWith(`${await format('longDate', DN)} already has a recording. Another window got there first.`) &&
+      (await ev("[...document.querySelectorAll('.dialog button')].some(b => b.textContent === 'Open the recording')")) &&
+      writesSent().length === 0 && on(await stored('snapshot'), DX).some((s) => s.recordId === firstEntry.recordId),
+    freeTaken,
+  );
+  await closeDialogs();
+
   // Savings holds figures at the first recording, the refused one, the
   // backdate and No Content's date. Moving two of them onto the
   // backdate displaces its figure.
