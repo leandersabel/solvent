@@ -246,6 +246,11 @@ to where they asked, labeled `bug` or `change` and `accepted`.
   implementation once its causes are closed, then critical problems,
   then high ones, then the rest, each lowest number first. An issue
   that waits on the client holds neither a place in line nor the slot.
+- The step reads each holder's own labels to decide whether the slot is
+  taken, never a list filtered by label, which can still show a label
+  just removed. An issue the step has just freed never holds the slot.
+  Every way the step ends without starting a run says why on the run's
+  page.
 - The slot belongs only to an issue with something in progress: a run
   on it, or checks still running on its pull request. The same step
   starts a fresh run for a holder with neither, because a run can
