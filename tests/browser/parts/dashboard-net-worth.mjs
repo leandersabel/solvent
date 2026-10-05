@@ -476,6 +476,10 @@ await run(async () => {
 
   // A tap: the finger comes up and leaves before the focus arrives, and
   // the crosshair stays on the day it touched.
+  // The mouse an earlier real click left on the page leaves the chart
+  // first, or a tap and a scroll send it a leave that takes the
+  // crosshair away.
+  await rec.send('Input.dispatchMouseEvent', { type: 'mouseMoved', x: 0, y: 0 });
   await rec.send('Emulation.setTouchEmulationEnabled', { enabled: true });
   const tapY = await ev("(() => { const s = document.querySelector('svg.trend'); s.scrollIntoView({ block: 'center' }); return s.getBoundingClientRect().top + 40; })()");
   await rec.tap(xOf(unrecorded[0]), tapY);
