@@ -3,7 +3,7 @@
 // sitting, and deleting the recording, whole or partway.
 // Templates: dashboard.html. Modules: view-recording.js, view-sweep.js,
 // writes.js, model.js, datepicker.js, view-dashboard.js.
-import { BACKDATE, check, click, labels, page, proxyAsks, recording, run, story, text, unlockDashboard, vaultOwner } from '../harness.mjs';
+import { BACKDATE, check, click, idNamed, labels, page, proxyAsks, recording, run, story, text, unlockDashboard, vaultOwner } from '../harness.mjs';
 import { startRecorder } from '../recorder.mjs';
 
 await run(async () => {
@@ -53,6 +53,49 @@ await run(async () => {
     'the date is gone from the chart',
     (await page.eval("document.querySelectorAll('.entry-mark').length")) === marksBefore - 1,
   );
+
+  // ---- On a phone ---------------------------------------------------------
+
+  // app-shell.md, On a phone, and Recording detail, At phone width: with
+  // the widest lines it can hold, two seven-digit figures for one holding
+  // on one date, nothing pans or scrolls sideways and every control lies
+  // on the screen where a tap at its center lands on it.
+  const goldId = (await idNamed('Gold bars'))[0];
+  await page.call(async (id, day) => {
+    const writes = await import('/static/js/writes.js');
+    const v = (await import('/static/js/session.js')).currentVault();
+    await writes.saveSnapshot(v, id, null, { date: day, value: '1234567.125', note: null });
+    await writes.saveSnapshot(v, id, null, { date: day, value: '1234567.250', note: null });
+  }, goldId, BACKDATE);
+  await page.call((day) => { location.hash = `#/recording/${day}`; }, BACKDATE);
+  await page.waitUntil("document.querySelectorAll('.recording tr.flagged').length === 2", { label: 'the recording with its widest lines' });
+  for (const width of [320, 375, 601, 901]) {
+    await page.send('Emulation.setDeviceMetricsOverride', { width, height: 800, deviceScaleFactor: 2, mobile: false });
+    await page.send('Emulation.setTouchEmulationEnabled', { enabled: width < 600 });
+    await page.frames();
+    const fit = await page.eval(`(() => {
+      const problems = [];
+      const doc = document.documentElement;
+      if (doc.scrollWidth > doc.clientWidth) problems.push('the page pans: ' + doc.scrollWidth);
+      for (const n of document.querySelectorAll('#app *')) {
+        if (getComputedStyle(n).overflowX !== 'visible' && n.scrollWidth > n.clientWidth + 0.5) problems.push('scrolls sideways: ' + n.className);
+      }
+      for (const n of document.querySelectorAll('#app button, #app a')) {
+        n.scrollIntoView({ block: 'center', behavior: 'instant' });
+        const r = n.getBoundingClientRect();
+        if (!r.width) continue;
+        const name = n.textContent || n.getAttribute('aria-label');
+        if (r.left < -0.5 || r.right > innerWidth + 0.5) problems.push('off the screen: ' + name);
+        else if (!n.contains(document.elementFromPoint((r.left + r.right) / 2, (r.top + r.bottom) / 2))) problems.push('covered: ' + name);
+        if (innerWidth <= 900 && n.closest('.recording tbody') && r.height < 44) problems.push('under 44px: ' + name);
+      }
+      return problems;
+    })()`);
+    check(`at ${width}px the recording fits the screen, Keep this one included, each control tappable`, fit.length === 0, fit.join(' | '));
+  }
+  await page.send('Emulation.setTouchEmulationEnabled', { enabled: false });
+  await page.send('Emulation.clearDeviceMetricsOverride');
+  await page.frames();
 
 
   // ---- A recording that stops partway, in a vault of its own --------

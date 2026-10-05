@@ -37,7 +37,7 @@ export function recordingView(vault, date, { onUpdate, onOpenHolding, onDeleted,
       el('section', { class: 'card' }, [
         el('h2', { class: 'section-heading', text: 'Figures' }),
         figures.length
-          ? el('table', { class: 'data-table' }, [
+          ? el('table', { class: 'data-table recording-table' }, [
               el('tbody', {}, figures.map((figure) => figureRow(vault, figure, onOpenHolding, onChanged))),
             ])
           : el('p', { class: 'empty-line', text: 'No figures recorded on this date' }),
@@ -45,7 +45,7 @@ export function recordingView(vault, date, { onUpdate, onOpenHolding, onDeleted,
       el('section', { class: 'card' }, [
         el('h2', { class: 'section-heading', text: 'Prices' }),
         prices.length
-          ? el('table', { class: 'data-table' }, [
+          ? el('table', { class: 'data-table recording-table' }, [
               el('tbody', {}, prices.map((entry) => priceRow(vault, entry, onChanged))),
             ])
           : el('p', { class: 'empty-line', text: 'No prices were captured at this date.' }),

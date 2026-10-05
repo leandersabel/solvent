@@ -1946,6 +1946,40 @@ select {
   .values-table .btn-icon { min-height: 44px; }
 
   .values-table .btn-icon { min-width: 44px; justify-content: center; }
+
+  /* A recording's figures and prices as a list: the holding or unit on
+     the first line, its two figures beneath it, each wrapping whole to
+     a line of its own when they do not fit side by side, and any Keep
+     this one beneath them. */
+  .recording-table,
+  .recording-table tbody { display: block; }
+
+  .recording-table tr {
+    display: flex;
+    flex-wrap: wrap;
+    column-gap: 16px;
+    padding: 10px 0;
+    border-bottom: 1px solid var(--hairline);
+  }
+
+  .recording-table tr:last-child { border-bottom: 0; }
+  .recording-table tr.flagged { border-left: 3px solid var(--status-critical); padding-left: 12px; }
+
+  .recording-table td {
+    display: block;
+    padding: 0;
+    border: 0;
+  }
+
+  .recording-table tr.flagged td:first-child { border-left: 0; padding-left: 0; }
+  .recording-table td:first-child { flex-basis: 100%; overflow-wrap: anywhere; }
+  .recording-table td:nth-child(2) { white-space: nowrap; }
+  .recording-table td:nth-child(3) { margin-left: auto; white-space: nowrap; }
+  .recording-table td:last-child { flex-basis: 100%; }
+  .recording-table td:last-child:empty { display: none; }
+
+  .recording-table .link-button,
+  .recording-table .btn-inline { min-height: 44px; }
 }
 
 /* ---- At phone width ---- */
