@@ -713,7 +713,8 @@ administrator), and the lost sole password (Bootstrap). The rest:
     `tests/browser/parts/admin.mjs`.
 20. The created link is shown once, an administrator's account row
     reads No vault, never a zero, and only No vault is drawn in
-    ink-muted. Test: `tests/browser/parts/admin.mjs`.
+    ink-muted. Test: `tests/browser/parts/admin.mjs`,
+    `tests/browser/parts/admin-review-ink.mjs`.
 21. (blind) `GET /api/admin/accounts` lists both kinds, and an
     administrator's row has no `itemCount` key, asserted against the
     row's full key set, not its value. Test:
