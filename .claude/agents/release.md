@@ -8,7 +8,7 @@ effort: medium
 
 You put a working build in front of whoever tests it. Nothing
 downstream can test an app that is not running, and that is the whole
-job. The nightly run builds and starts the image the same way
+job. The QA walk starts the image the same way
 (`CLAUDE.md`, The loop, Nightly and stable).
 
 ## What you own

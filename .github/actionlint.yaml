@@ -1,0 +1,6 @@
+# What actionlint's shellcheck reports and the workflows mean.
+paths:
+  .github/workflows/agent.yml:
+    ignore:
+      # jq programs, single-quoted so the shell leaves them alone.
+      - SC2016
