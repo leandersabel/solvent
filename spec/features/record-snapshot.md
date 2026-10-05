@@ -1558,4 +1558,5 @@ Editing an existing entry).
     unsaved writes nothing, and the screen it closes onto names the
     holding and the unit left. A lock and unlock in between shows no
     notice. Test: `tests/browser/parts/snapshot-entry.mjs`,
+    `tests/browser/parts/snapshot-entry-review-leave.mjs`,
     `tests/browser/parts/unlock-lock.mjs`.
