@@ -345,9 +345,22 @@ or kinds.
   generated docs don't pay for their ceremony, and Django's admin,
   settings and migrations are more structure than needed. Pydantic
   validates the JSON endpoints directly inside Flask.
-- **WSGI server**: gunicorn, serving `app:app`. Its worker heartbeat
-  needs a writable directory, which the read-only root filesystem has
-  to make room for.
+- **WSGI server**: gunicorn, serving `app:app` from one `gthread`
+  process with 8 request threads. A request waiting on a price source
+  holds one thread, and at most 4 lookups send at once (rate-lookup.md,
+  Rate limiting and failure), so a slow source never holds every
+  thread and everyone else carries on. One process keeps every bound
+  held in memory instance-wide: the concurrency cap, the lookup cap and
+  the breakers. A second process would double the cap's memory, a
+  semaphore across processes is machinery one process does not need,
+  and gevent or eventlet would patch the standard library under the
+  outbound requests' deadline. gunicorn's `--timeout` does not bound a
+  request in this worker class, so `EGRESS_TIMEOUT_SECONDS`,
+  `VERIFY_WAIT_SECONDS` and SQLite's busy wait do. A client sending its
+  request headers slowly holds a thread while it sends, so a TLS
+  terminator in front reads whole request headers before it forwards.
+  The worker heartbeat needs a writable directory, which the read-only
+  root filesystem has to make room for.
 - **Storage**: SQLite, for operational simplicity: a single file and no
   separate service. The server holds no plaintext, so confidentiality
   does not depend on encrypting the file, and no SQLCipher layer is
@@ -672,8 +685,7 @@ or kinds.
   - **Rows**: the `attempts` table is `(bucket, outcome, at)`, indexed
     on `(bucket, at)`, with `outcome` one of `request` and `failure`
     and `at` from the server clock. It is SQLite rather than process
-    memory, so every gunicorn worker shares one budget and a restart
-    hands an attacker no fresh one. A row is deleted once it is older
+    memory, so a restart hands an attacker no fresh budget. A row is deleted once it is older
     than the longest window any check reads its bucket over:
 
     | Bucket | One row per | Deleted once older than |

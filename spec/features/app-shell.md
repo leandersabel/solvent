@@ -807,3 +807,10 @@ for a control above the dialog to protect.
     run at `--log-level warning` logs `ip=127.0.0.2`, which proves the
     test sees the line the flag drops. Test:
     `tests/test_deployment.py::test_no_server_log_line_carries_the_peer_address`.
+78. The Dockerfile's gunicorn command runs one `gthread` process with
+    more request threads than `LOOKUP_CONCURRENCY`. Test:
+    `tests/test_deployment.py::test_one_gthread_process_serves_more_requests_than_lookups_can_hold`.
+79. (blind) gunicorn, run with the Dockerfile's arguments, holding
+    `LOOKUP_CONCURRENCY` requests stalled halfway, still serves the
+    sign-in page. Test:
+    `tests/test_deployment.py::test_requests_held_open_as_long_as_lookups_can_be_leave_the_instance_answering`.

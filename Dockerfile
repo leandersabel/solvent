@@ -29,6 +29,10 @@ VOLUME ["/data"]
 
 EXPOSE 8000
 
+# One gthread process with 8 request threads (architecture.md, WSGI
+# server): a lookup waiting on a slow price source holds one thread, not
+# the whole instance, and one process keeps every in-process bound
+# instance-wide.
 # --worker-tmp-dir /dev/shm: the worker heartbeat file needs a writable
 # directory, and /dev/shm is the one tmpfs a read-only container always
 # has. --no-control-socket: the control socket would be the second such
@@ -40,7 +44,9 @@ EXPOSE 8000
 # peer's address, at WARNING (architecture.md, Storage & data handling).
 CMD ["gunicorn", \
      "--bind", "0.0.0.0:8000", \
-     "--workers", "2", \
+     "--worker-class", "gthread", \
+     "--workers", "1", \
+     "--threads", "8", \
      "--worker-tmp-dir", "/dev/shm", \
      "--no-control-socket", \
      "--access-logfile", "-", \

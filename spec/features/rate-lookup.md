@@ -501,6 +501,13 @@ host's network are reachable.
   currency lookups still go out. A shared breaker would let one
   provider's outage silence the other, and the other's successes keep
   resetting the count.
+- **At most `LOOKUP_CONCURRENCY` = 4 proxy requests send at once.**
+  One that finds 4 already sending answers what needs no source,
+  cached and identity symbols, sends nothing and leaves the breakers
+  as they were. Its other symbols get no proposal, as for a provider
+  that is down. Waiting for a turn would hold a request thread for the
+  lookups ahead of it, which is what the cap prevents
+  (architecture.md, WSGI server).
 - **A proxy request sends only what its pending symbols need**, a
   pending symbol being one neither cached nor the identity case:
   Frankfurter's table for `date` when a currency symbol is pending,
@@ -908,3 +915,8 @@ host's network are reachable.
     `tests/test_review_rate_lookup.py::test_a_changed_shape_logs_shape_and_counts_against_its_breaker_alone`,
     `tests/test_review_rate_lookup.py::test_a_changed_shape_opens_its_breaker_like_an_outage`,
     `tests/test_review_rate_lookup.py::test_one_usable_rate_among_bad_ones_logs_nothing_and_counts_no_failure`.
+69. With `LOOKUP_CONCURRENCY` lookups already sending, a lookup sends
+    nothing, answers an identity symbol and gives a pending one no
+    proposal, and leaves the breakers as they were. Once a slot frees,
+    the next lookup sends. Test:
+    `tests/test_rates.py::test_a_lookup_finding_every_slot_taken_sends_nothing_and_answers_what_needs_no_source`.

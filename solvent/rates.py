@@ -137,6 +137,12 @@ _PRIOR_CLOSE_WINDOW = timedelta(days=14)
 EGRESS_TIMEOUT_SECONDS = 5
 MAX_RESPONSE_BYTES = 1 * 1024 * 1024
 
+# At most this many proxy requests send at once, so lookups waiting on a
+# slow provider never hold every request thread (architecture.md, WSGI
+# server). One more sends nothing and answers from what needs no source.
+LOOKUP_CONCURRENCY = 4
+_lookup_slots = threading.BoundedSemaphore(LOOKUP_CONCURRENCY)
+
 
 def adapter_for(symbol: str, kind: str) -> "str | None":
     """Which provider chain can price this symbol today, or None.
@@ -561,9 +567,19 @@ def _resolve(symbols: list, quote: str, on: date) -> "dict[str, dict]":
         else:
             pending.append(row)
 
-    if not pending:
+    if not pending or not _lookup_slots.acquire(blocking=False):
         return resolved
+    try:
+        _send(pending, quote, on, egress, resolved)
+    finally:
+        _lookup_slots.release()
+    return resolved
 
+
+def _send(pending: list, quote: str, on: date, egress: _Egress, resolved: dict) -> None:
+    """Fetch what `pending` needs from the providers and add each symbol
+    they price to `resolved`, caching it."""
+    on_str = on.isoformat()
     # Outbound requests run on worker threads that touch neither the
     # database nor Flask; caching and composing stay on this thread.
     # The table and NBP's query go out at once, so a provider that hangs
@@ -615,8 +631,6 @@ def _resolve(symbols: list, quote: str, on: date) -> "dict[str, dict]":
         if entry is not None and entry["rate"] is not None:
             resolved[symbol] = entry
             _cache_put(symbol, quote, on_str, entry)
-
-    return resolved
 
 
 def _quote_leg(
