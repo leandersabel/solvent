@@ -428,7 +428,8 @@ host's network are reachable.
   a main currency (`register.md`). "A known ISO 4217 code" is the looser
   check and the wrong one: ISO 4217 has codes the FX provider cannot
   quote into.
-- `date` must be a calendar date, not in the future, and for a symbol
+- `date` must be a calendar date written `YYYY-MM-DD` exactly as
+  `date.isoformat()` writes it, not in the future, and for a symbol
   with an adapter, whatever its `lookup`, on or after its applicable
   floor (The symbol table). A single global floor would reject valid FX
   dates or wave through gold dates with no data.
@@ -870,3 +871,7 @@ host's network are reachable.
     failure, and no date, quote, provider host or error text. Test:
     `tests/test_rates.py::test_a_failed_fetch_logs_its_source_and_status_and_nothing_of_the_request`,
     `tests/test_review_rate_lookup.py::test_a_failed_answer_logs_its_source_and_status_alone`.
+67. A date written other than `YYYY-MM-DD`, such as `20260731`,
+    `2026-W31-5` or `2026W315`, is a Bad Request that reaches no
+    provider. Test:
+    `tests/test_rates.py::test_a_date_not_written_yyyy_mm_dd_is_a_bad_request`.
