@@ -852,6 +852,8 @@ host's network are reachable.
     in a table quoted in `PLN`, and No Content quoted in `CHF`, with no
     breaker failure. Test:
     `tests/test_rates.py::test_a_currency_date_that_is_not_usable_drops_only_what_its_table_prices`.
-65. A cached rate whose `asOf` is unreadable or after its date is
-    fetched again and replaced. Test:
-    `tests/test_rates.py::test_a_cached_rate_with_an_unusable_date_is_fetched_again`.
+65. A cached rate whose `asOf` is unreadable or after its date, or a
+    cached gold rate dated before its window, is fetched again and
+    replaced. Test:
+    `tests/test_rates.py::test_a_cached_rate_with_an_unusable_date_is_fetched_again`,
+    `tests/test_review_rate_lookup.py::test_a_cached_gold_rate_dated_before_its_window_is_fetched_again`.

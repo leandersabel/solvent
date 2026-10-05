@@ -448,10 +448,12 @@ def _cache_get(symbol: str, quote: str, on: str) -> "dict | None":
         "SELECT * FROM rate_cache WHERE symbol = ? AND quote = ? AND date = ?",
         (symbol, quote, on),
     ).fetchone()
+    day = date.fromisoformat(on)
+    since = day - _PRIOR_CLOSE_WINDOW if symbol.startswith("XAU-") else date.min
     if (
         row is None
         or not Decimal(row["rate"])
-        or _published(row["as_of"], date.fromisoformat(on)) is None
+        or _published(row["as_of"], day, since) is None
     ):
         # A "0" or a bad `asOf` stored before either was checked is a
         # miss, so it is fetched again and replaced.
