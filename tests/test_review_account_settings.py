@@ -9,6 +9,10 @@ asserted at the configured value.
 """
 from __future__ import annotations
 
+import shutil
+import subprocess
+from pathlib import Path
+
 import pytest
 
 from solvent.config import DEFAULT_KDF_ENVELOPE
@@ -331,3 +335,93 @@ def test_a_password_change_to_an_auth_key_that_is_not_thirty_two_bytes_changes_n
     assert "refused" not in (response.get_json(silent=True) or {})
     assert snapshot(app) == before
     sign_in(app, "someone", old_key)
+
+
+# ---- A credential changed elsewhere (criteria 9, 80 and 81) --------------
+#
+# account-settings.md, Change password steps 2, 5 and 6, and Edge
+# cases; architecture.md, Credentials and vault key wrappers.
+
+from tests import test_review_export_import as elsewhere  # noqa: E402
+
+
+@pytest.mark.parametrize("kind", ["vault_owner", "administrator"])
+@pytest.mark.parametrize("sent", ["the old key", "the current key", "a wrong key"])
+def test_a_change_on_a_superseded_salt_writes_nothing_and_counts_no_failure(app, kind, sent):
+    """Whatever Auth Key it carries, a change naming a salt that is no
+    longer the credential's is refused for the salt, before the key is
+    checked, and is no failed sign-in."""
+    here, key = elsewhere.open_vault(app, "someone", kind)
+    there = here.another()
+    changed, current_key = there.change(key)
+    assert changed.status_code == 200
+    carried = {"the old key": key, "the current key": current_key, "a wrong key": b64()}[sent]
+
+    before = elsewhere.everything(app)
+    response, _ = here.change(carried)
+    assert elsewhere.refused(response, elsewhere.CHANGED), response.get_data(as_text=True)
+    assert elsewhere.everything(app) == before
+
+
+def test_conflicts_over_the_failure_limit_never_lock_the_account(app):
+    """No failed sign-in is counted, so a page that keeps meeting the
+    Conflict still changes the password with the current salt."""
+    limits(app, lock=2, per_address=2)
+    here, key = elsewhere.open_vault(app)
+    _, current_key = here.another().change(key)
+    for _ in range(5):
+        assert elsewhere.refused(here.change(key)[0], elsewhere.CHANGED)
+    here.salt = elsewhere.salt_of(app, "owner")
+    assert here.change(current_key)[0].status_code == 200
+
+
+def test_the_resend_with_the_fresh_salt_and_the_current_key_goes_through(app):
+    """Criterion 9's server half: after an upgrade made elsewhere, the
+    resend differing only in currentAuthKey and currentSalt changes the
+    password."""
+    here, key = elsewhere.open_vault(app)
+    elsewhere.make_stale(app, "owner")
+    there = here.another()
+    there.sign_in("owner", key)
+    _, upgraded_key = there.upgrade()
+
+    body = here.change_body(key, b64(), here.salt)
+    assert elsewhere.refused(here.post(elsewhere.CHANGE, body), elsewhere.CHANGED)
+    body.update(currentAuthKey=upgraded_key, currentSalt=elsewhere.salt_of(app, "owner"))
+    assert here.post(elsewhere.CHANGE, body).status_code == 200
+    assert elsewhere.salt_of(app, "owner") == body["salt"]
+
+
+def test_a_change_landing_between_the_gate_and_another_change_refuses_the_second(app, monkeypatch):
+    """The Auth Key is verified before the transaction begins, so the
+    salt is compared again inside it: a change committed in that gap
+    leaves the second refused, and the first standing."""
+    import solvent.auth as auth_module
+
+    here, key = elsewhere.open_vault(app)
+    there = here.another()
+    real = auth_module.write_transaction
+
+    def after_a_change(*args, **kwargs):
+        monkeypatch.setattr(auth_module, "write_transaction", real)
+        assert there.change(key)[0].status_code == 200
+        return real(*args, **kwargs)
+
+    monkeypatch.setattr(auth_module, "write_transaction", after_a_change)
+    response, _ = here.change(key)
+    assert elsewhere.refused(response, elsewhere.CHANGED), response.get_data(as_text=True)
+    assert elsewhere.salt_of(app, "owner") == there.salt
+
+
+CREDENTIAL_CHECKS = Path(__file__).resolve().parent / "client" / "review-credential.mjs"
+
+
+@pytest.mark.skipif(shutil.which("node") is None, reason="node is not installed")
+def test_the_page_names_the_salt_it_holds_and_recovers_once_from_a_changed_one():
+    """Criteria 7, 9 and 80 here and login.md criterion 83, in the
+    page's own session module against a server answering as the spec
+    says."""
+    result = subprocess.run(
+        ["node", str(CREDENTIAL_CHECKS)], capture_output=True, text=True, timeout=300
+    )
+    assert result.returncode == 0, result.stdout + result.stderr

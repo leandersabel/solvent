@@ -567,7 +567,9 @@ function passwordCard() {
       done.hidden = false;
     } catch (failure) {
       error.textContent =
-        failure.status === 400
+        // A second credential-changed Conflict is final, and reads as
+        // a wrong password (account-settings.md, Edge cases).
+        failure.status === 400 || failure.body?.refused === 'credential-changed'
           ? 'That is not your current password.'
           : 'Nothing was changed. Your current password still works.';
       error.hidden = false;
