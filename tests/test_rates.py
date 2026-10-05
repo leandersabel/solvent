@@ -121,7 +121,6 @@ def fx(on: str, table: dict) -> dict:
     return {"amount": 1, "base": "CHF", "date": on, "rates": table}
 
 
-TODAY = date.today().isoformat()
 PAST = "2026-07-31"
 
 
@@ -139,7 +138,7 @@ def test_the_accepted_parameter_set_is_exactly_symbol_date_and_quote(owner):
 
 
 def test_a_future_date_is_a_bad_request(owner):
-    tomorrow = (date.today() + timedelta(days=1)).isoformat()
+    tomorrow = (datetime.now(timezone.utc).date() + timedelta(days=1)).isoformat()
     assert owner.get(
         f"/api/rates?date={tomorrow}&quote=CHF", headers=CSRF
     ).status_code == 400
