@@ -653,7 +653,9 @@ def get_rates():
         on = date.fromisoformat(raw_date)
     except ValueError:
         abort(400)
-    if on > _today():
+    # fromisoformat also takes 20260731 and 2026-W31-5. Only the
+    # promised YYYY-MM-DD is accepted.
+    if on.isoformat() != raw_date or on > _today():
         abort(400)
 
     quote_row = get_db().execute(

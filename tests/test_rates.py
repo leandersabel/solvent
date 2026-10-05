@@ -144,6 +144,14 @@ def test_a_future_date_is_a_bad_request(owner):
     ).status_code == 400
 
 
+@pytest.mark.parametrize("spelling", ["20260731", "2026-W31-5", "2026W315"])
+def test_a_date_not_written_yyyy_mm_dd_is_a_bad_request(owner, provider, spelling):
+    """Each is a spelling of 2026-07-31 that date.fromisoformat accepts."""
+    response = owner.get(f"/api/rates?date={spelling}&quote=CHF", headers=CSRF)
+    assert response.status_code == 400
+    assert provider.calls == []
+
+
 def test_a_quote_the_provider_cannot_serve_is_refused(owner):
     """Asserted with a valid ISO 4217 code absent from the symbol
     table, since that is the case a plain ISO check waves through."""
