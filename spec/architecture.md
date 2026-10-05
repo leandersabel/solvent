@@ -326,8 +326,9 @@ or kinds.
   `app.py`, `solvent/` and the dependencies `requirements.txt` pins, on
   the base image, and nothing else: no test, no tool and nothing of the
   nightly harness. The Dockerfile copies those paths by name, so the
-  build context's contents cannot widen it. The nightly tests that
-  image unchanged and publishes the one it tested (nightly-harness.md).
+  build context's contents cannot widen it. Every stage takes that
+  image by its digest, unchanged, and publishes the one it walked
+  (nightly-harness.md).
   It has no setting that names a price source or a certificate
   authority (rate-lookup.md, SSRF and egress hardening), so nothing
   built for testing can redirect an installation's lookups.
