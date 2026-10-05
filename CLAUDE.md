@@ -496,6 +496,11 @@ found.
   holding the implementation slot gets no `stuck` from its run either:
   the workflow starts a fresh one, and labels it `stuck` only past its
   restarts (Implementation).
+- A run the model service failed, overloaded or erroring, is no reason
+  to stop, because the failure passes on its own. Its issue stays where
+  it was, without `stuck` or a comment, and the workflow
+  starts the run again fifteen minutes later. The third failure in a row
+  labels the issue `stuck`.
 - A failing check on an implementation pull request starts a run that
   fixes it on the same branch. After a bounded number of attempts, the
   pull request becomes a draft without auto-merge and the issue is
