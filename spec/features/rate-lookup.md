@@ -39,6 +39,10 @@ everything you own is in your main currency, you never meet this.
   stops or changes, prices are typed by hand until the app is changed.
   That is survivable, because a price is only a proposal and no entry
   is ever blocked by a failed lookup.
+- **Every digit the source published, as far as your vault holds
+  them.** A currency worth very little, such as the Indonesian rupiah
+  in euros, keeps the digits its source gave, so a large holding's
+  total is not a few euros off.
 
 What it deliberately does not do:
 
@@ -130,9 +134,12 @@ never influenced by client input or any setting (SSRF and egress
 hardening).
 
 **Every proposal is composed in `Decimal` at the default context's 28
-significant digits and rounded once**, to 8 decimal places, half to
-even, written as a plain decimal string with no trailing zeros and no
-exponent. The steps before that rounding are pinned per provider below,
+significant digits and rounded once**, half to even, to 10
+significant digits but never past the twelfth decimal place, the scale
+a vault holds (`record-snapshot.md`, Record shape). It is written as a
+plain decimal string with no trailing zeros and no exponent. Ten digits
+keep every digit a source publishes, and a flat twelve places would
+put digits nobody published on every ordinary rate. The steps before that rounding are pinned per provider below,
 so an independent computation in the same order reaches the same digits
 (`nightly-harness.md`, Known prices).
 
@@ -431,7 +438,8 @@ scope).
 
 - Cache key `(symbol, quote, date)`, in SQLite.
 - **An entry for date D fetched at or after 00:00 UTC on D+2 is cached
-  indefinitely**, because by then both sources have published D and a
+  until the app next starts**, which empties the cache (`app-shell.md`,
+  Database), because by then both sources have published D and a
   published rate does not change. **Every other entry is cached for 1
   hour** after it was fetched, then refetched, because it may hold the
   prior close of a day not yet published. Weekends and holidays settle
@@ -627,8 +635,7 @@ host's network are reachable.
 - **A figure that is not a usable price**: a source's rate or gold
   price is usable only as a JSON number, not a string or a boolean,
   above 0 and below 10^20. A proposal is served only when, rounded, it is
-  above 0 and below 10^20, the most that keeps 8 decimal places in 28
-  digits. Anything else is no proposal for the symbols built from that
+  above 0 and below 10^20, the bound a source figure has. Anything else is no proposal for the symbols built from that
   figure, never an error or a price of 0, and the rest of the answer
   stands. A bad PLN rate drops gold quoted in anything but PLN. A bad
   NBP price, or a Frankfurter table with no usable rate, is a changed
@@ -903,9 +910,10 @@ host's network are reachable.
     `tests/test_rates.py::test_every_outbound_request_is_named`.
 57. (blind) A proposal equals the pinned composition digit for digit:
     with `rates["USD"] = 1.0876` and `rates["PLN"] = 4.2537` against CHF
-    and `cena = 251.37`, `USD` is `0.91945568`, and `XAU-g` and `XAU-ozt`
-    each equal `cena × (1 / 4.2537)`, the latter times 31.1034768,
-    computed in `Decimal` and rounded half-even to 8 places. Not
+    and `cena = 251.37`, `USD` is `0.9194556822`, and `XAU-g` and
+    `XAU-ozt` each equal `cena × (1 / 4.2537)`, the latter times
+    31.1034768, computed in `Decimal` and rounded half-even to 10
+    significant digits. Not
     approximate equality, because rounding early or applying the ounce
     factor before the PLN leg differs in the last places. Test:
     `tests/test_rates.py::test_a_proposal_equals_the_pinned_composition_digit_for_digit`.
@@ -1028,3 +1036,10 @@ host's network are reachable.
     month later, for a Saturday and for gold quoted in `CHF`. Test:
     `tests/test_rates.py::test_a_price_fetched_once_its_day_settled_is_served_from_cache_for_good`,
     `tests/test_review_rate_lookup.py::test_a_price_looked_up_at_00_utc_on_d_plus_2_is_served_from_cache_a_month_later`.
+78. `IDR` quoted in `EUR` at a published 17655.3 is proposed as
+    `0.000056640216`, whose inverse reads 17655.3 again at six
+    significant digits. Test:
+    `tests/test_rates.py::test_a_currency_worth_very_little_keeps_the_digits_its_source_published`.
+79. No proposal has more than twelve decimal places or ten significant
+    digits, asserted from a rate of 7e-12 to one of 10^7. Test:
+    `tests/test_rates.py::test_no_proposal_has_more_than_twelve_places_or_ten_significant_digits`.

@@ -89,6 +89,9 @@ def init_db(app: flask.Flask) -> None:
             _seed_symbols(conn)
             _prune_attempts(conn, app)
             _fill_epochs(conn)
+            # app-shell.md, Database: an entry may hold a proposal an
+            # earlier build rounded otherwise.
+            conn.execute("DELETE FROM rate_cache")
             conn.execute(
                 "UPDATE principals SET last_login_at = created_at "
                 "WHERE last_login_at IS NULL"

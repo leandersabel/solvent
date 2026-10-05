@@ -477,7 +477,7 @@ the reasons design-system.md, Figures, gives. The entries:
   is kept, never rounded, and the fraction is padded to at least
   `places`, grouped, pointed and signed as money is. A rate takes six,
   because a currency pair moves in the fourth. `0.797` writes
-  `0.797000`, and a proposal at eight places writes all eight, because
+  `0.797000`, and a proposal at ten places writes all ten, because
   rounding it would name a figure nobody proposed.
 - **parseFigure**: the reverse, for a rate field. It reads as
   `parseQuantity` does and returns the exact value at scale 12, or

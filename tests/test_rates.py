@@ -15,11 +15,13 @@ import time
 import urllib.error
 import urllib.request
 from datetime import date, datetime, timedelta, timezone
+from decimal import Decimal
 
 import pytest
 from flask import has_app_context
 
 import solvent.rates as rates
+from solvent import create_app
 from tests.helpers import CSRF, connect, mint_invite, register, rows
 
 
@@ -410,8 +412,8 @@ def test_a_failed_fx_leg_never_returns_a_pln_figure_under_another_label(owner, p
 
 # Each is what `json.loads` makes of a figure a source could send:
 # `NaN`, `Infinity` and `1e400` parse to floats that are not finite,
-# `1e300` inverts to a price that rounds to 0, and `1e-25` to one too
-# large to round to 8 places.
+# `1e300` inverts to a price that rounds to 0, and `1e-25` to one at
+# or above the ceiling.
 NOT_A_PRICE = [
     0, -1, "not-a-number", "0.8", True,
     float("nan"), float("inf"), float("-inf"), 1e300, 1e-25,
@@ -427,7 +429,7 @@ def test_a_rate_that_is_not_a_usable_price_is_no_proposal(owner, provider, bad):
     table = owner.get(f"/api/rates?date={PAST}&quote=CHF", headers=CSRF)
     assert table.status_code == 200
     assert "USD" not in table.get_json()["rates"]
-    assert table.get_json()["rates"]["EUR"]["rate"] == "1.05263158"
+    assert table.get_json()["rates"]["EUR"]["rate"] == "1.052631579"
 
 
 @pytest.mark.parametrize("bad", NOT_A_PRICE)
@@ -441,7 +443,7 @@ def test_a_gold_figure_that_is_not_a_usable_price_drops_only_gold(owner, opener,
     assert response.status_code == 200
     body = response.get_json()["rates"]
     assert "XAU-g" not in body and "XAU-ozt" not in body
-    assert body["USD"]["rate"] == "0.91945568"
+    assert body["USD"]["rate"] == "0.9194556822"
     # `1e-25` is a usable NBP price whose proposal rounds to 0.
     shape = leg == "cena" and bad != 1e-25
     assert failures() == {"frankfurter": 0, "nbp": int(shape)}
@@ -519,6 +521,50 @@ def test_a_cached_rate_of_zero_is_fetched_again(app, owner, provider):
     assert body["rate"] == "1.25"
     assert body["cached"] is False
     assert rows(app, "SELECT rate FROM rate_cache WHERE symbol = 'USD'") == [{"rate": "1.25"}]
+
+
+def test_starting_the_app_empties_the_rate_cache(app, provider):
+    _cache(app, "USD", PAST, PAST, _at(PAST, 12))
+    version = rows(app, "PRAGMA user_version")[0]["user_version"]
+    create_app({"DATABASE_PATH": app.config["DATABASE_PATH"], "TESTING": True})
+    assert rows(app, "SELECT * FROM rate_cache") == []
+    assert rows(app, "PRAGMA user_version")[0]["user_version"] == version
+
+
+def test_a_currency_worth_very_little_keeps_the_digits_its_source_published(owner, provider):
+    provider.answers["frankfurter"] = {
+        "amount": 1, "base": "EUR", "date": PAST, "rates": {"IDR": 17655.3},
+    }
+    rate = owner.get(
+        f"/api/rates?date={PAST}&quote=EUR&symbol=IDR", headers=CSRF
+    ).get_json()["rate"]
+    assert rate == "0.000056640216"
+    assert format(1 / Decimal(rate), ".6g") == "17655.3"
+
+
+@pytest.mark.parametrize(
+    "published, proposal",
+    [
+        (0.8, "1.25"),
+        (1.0876, "0.9194556822"),
+        (3, "0.3333333333"),
+        (17655.3, "0.000056640216"),
+        (1e7, "0.0000001"),
+        (3e-7, "3333333.333"),
+        (7e-12, "142857142900"),
+    ],
+)
+def test_no_proposal_has_more_than_twelve_places_or_ten_significant_digits(
+    owner, provider, published, proposal
+):
+    provider.answers["frankfurter"] = fx(PAST, {"USD": published})
+    rate = owner.get(
+        f"/api/rates?date={PAST}&quote=CHF&symbol=USD", headers=CSRF
+    ).get_json()["rate"]
+    assert rate == proposal
+    digits = Decimal(rate).normalize().as_tuple()
+    assert -digits.exponent <= 12
+    assert len(digits.digits) <= 10
 
 
 def test_a_rate_in_an_unexpected_currency_is_rejected(owner, provider):
@@ -983,18 +1029,19 @@ def test_every_outbound_request_is_a_template_with_only_its_placeholders_filled(
 
 
 def test_a_proposal_equals_the_pinned_composition_digit_for_digit(owner, opener):
-    from decimal import ROUND_HALF_EVEN, Decimal
+    from decimal import ROUND_HALF_EVEN
 
     _publish(opener)
     body = owner.get(f"/api/rates?date={PAST}&quote=CHF", headers=CSRF).get_json()["rates"]
 
-    def eight(value):
-        return format(value.quantize(Decimal("0.00000001"), ROUND_HALF_EVEN).normalize(), "f")
+    def ten(value):
+        exponent = Decimal(1).scaleb(max(-12, value.adjusted() - 9))
+        return format(value.quantize(exponent, ROUND_HALF_EVEN).normalize(), "f")
 
     gram = Decimal("251.37") * (Decimal(1) / Decimal("4.2537"))
-    assert body["USD"]["rate"] == "0.91945568" == eight(Decimal(1) / Decimal("1.0876"))
-    assert body["XAU-g"]["rate"] == eight(gram)
-    assert body["XAU-ozt"]["rate"] == eight(gram * Decimal("31.1034768"))
+    assert body["USD"]["rate"] == "0.9194556822" == ten(Decimal(1) / Decimal("1.0876"))
+    assert body["XAU-g"]["rate"] == ten(gram)
+    assert body["XAU-ozt"]["rate"] == ten(gram * Decimal("31.1034768"))
 
 
 @pytest.mark.parametrize(
