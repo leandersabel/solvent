@@ -4,8 +4,11 @@ has failed once it passes (spec/features/rate-lookup.md, SSRF and egress
 hardening, Rate limiting and failure, criteria 17 to 20 and 60). A
 figure that is not a usable price, or in an unexpected currency, is no
 proposal for the symbols built from it (Edge cases, criteria 61 and 62).
-A failed fetch logs its source and status and nothing of the request,
-and no output carries a provider key (criteria 41 and 66). A date not
+An answer in a changed shape is a failure of its provider, and one bad
+rate in a usable table is not (Rate limiting and failure, criteria 61,
+63, 64 and 68). A failed fetch logs its source and status and nothing
+of the request, and no output carries a provider key (criteria 41 and
+66). A date not
 written as `date.isoformat()` writes it, or in the future, is a Bad
 Request that reaches no provider (SSRF and egress hardening, criteria
 43 and 67).
@@ -541,6 +544,13 @@ def table(owner, quote="CHF", on=PAST):
     return response.get_json()["rates"] if response.status_code == 200 else {}
 
 
+def failures() -> dict[str, int]:
+    return {name: breaker.failures for name, breaker in rates.breakers.items()}
+
+
+NONE_FAILED = {"frankfurter": 0, "nbp": 0}
+
+
 @pytest.mark.parametrize("figure", NOT_USABLE, ids=repr)
 def test_a_currency_rate_that_is_not_a_usable_price_is_no_proposal(owner, sources, figure):
     """Criterion 61: no proposal for that symbol, never an error or a 0,
@@ -551,33 +561,42 @@ def test_a_currency_rate_that_is_not_a_usable_price_is_no_proposal(owner, source
 
     assert "USD" not in priced
     assert {"PLN", *GOLD} <= set(priced)
+    assert failures() == NONE_FAILED
     single = owner.get(f"/api/rates?date={PAST}&quote=CHF&symbol=USD", headers=CSRF)
     assert single.status_code == 204
 
 
 @pytest.mark.parametrize("figure", NOT_USABLE, ids=repr)
 def test_a_gold_price_that_is_not_usable_drops_both_gold_symbols_alone(owner, sources, figure):
-    """Edge cases: a bad NBP price drops both gold symbols, and the
-    currencies stand."""
+    """Criterion 61: a bad NBP price drops both gold symbols, the
+    currencies stand, and it counts one NBP failure, except `1e-25`, a
+    usable price whose proposal rounds to 0."""
     sources.plans["nbp"] = at_once(gold_price(figure))
 
     priced = table(owner)
 
     assert not GOLD & set(priced)
     assert {"USD", "PLN"} <= set(priced)
+    assert failures() == {"frankfurter": 0, "nbp": 0 if figure == 1e-25 else 1}
     assert owner.get(f"/api/rates?date={PAST}&quote=PLN&symbol=XAU-g", headers=CSRF).status_code == 204
 
 
+@pytest.mark.parametrize("lag_days", [0, 1], ids=["one table", "a quote leg of its own"])
 @pytest.mark.parametrize("figure", NOT_USABLE, ids=repr)
-def test_a_pln_rate_that_is_not_usable_drops_gold_quoted_elsewhere(owner, sources, figure):
-    """Edge cases: a bad PLN rate drops gold quoted in anything but PLN,
-    and with it PLN itself, while the other currencies stand."""
+def test_a_pln_rate_that_is_not_usable_drops_gold_quoted_elsewhere(owner, sources, figure, lag_days):
+    """Criterion 61: a bad PLN rate drops gold quoted in anything but
+    PLN, and with it PLN itself, while the other currencies stand. It is
+    one bad rate in a usable table, so it adds no breaker failure,
+    whether the quote leg reuses the requested day's table or has its
+    own."""
     sources.plans["frankfurter"] = at_once(fx_table(PLN=figure))
+    sources.plans["nbp"] = at_once(gold_price(251.37, lag_days=lag_days))
 
     priced = table(owner)
 
     assert not ({"PLN"} | GOLD) & set(priced)
     assert priced["USD"]["rate"] == "0.91945568"
+    assert failures() == NONE_FAILED
 
 
 @pytest.mark.parametrize(
@@ -622,25 +641,23 @@ def test_the_bounds_apply_to_each_gold_symbol_on_its_own(owner, sources):
 
 
 @pytest.mark.parametrize(
-    ("provider", "url", "bad"),
-    [
-        ("frankfurter", "quote=CHF&symbol=USD", at_once(fx_table(USD=0))),
-        ("nbp", "quote=PLN&symbol=XAU-g", at_once(gold_price("251.37"))),
-    ],
+    "bad",
+    [at_once(fx_table(USD=0)), at_once(fx_table(PLN=0)), at_once(fx_table(SEK="1.5"))],
+    ids=["the rate asked for", "the PLN rate", "another rate"],
 )
-def test_a_bad_figure_counts_as_a_success_for_its_breaker(app, owner, sources, provider, url, bad):
-    """Edge cases: the source answered, so a bad figure resets its
-    breaker's count. Counted as a failure, the breaker opens on the
-    third request. Left uncounted, it opens on the fifth."""
+def test_one_bad_rate_in_a_usable_table_counts_as_a_success(app, owner, sources, bad):
+    """Rate limiting and failure: the table holds a usable rate, so one
+    bad code resets Frankfurter's count rather than opening its breaker.
+    Counted as a failure, the breaker opens on the third request and the
+    sixth is never sent."""
     app.config["RATE_BREAKER_FAILURES"] = 3
     failing = at_once(lambda _: b"{}", 500)
 
     for offset, plan in enumerate([failing, failing, bad, failing, failing, bad]):
-        sources.plans[provider] = plan
-        response = owner.get(f"/api/rates?date={day(offset)}&{url}", headers=CSRF)
-        assert response.status_code == 204
+        sources.plans["frankfurter"] = plan
+        owner.get(f"/api/rates?date={day(offset)}&quote=CHF&symbol=USD", headers=CSRF)
 
-    assert [p for p, _ in sources.opened] == [provider] * 6
+    assert [p for p, _ in sources.opened] == ["frankfurter"] * 6
 
 
 def test_a_table_in_another_currency_is_no_proposal(owner, sources):
@@ -808,16 +825,10 @@ def asked_urls(sources) -> list[str]:
     return urls
 
 
-def no_breaker_failure():
-    return {name: breaker.failures for name, breaker in rates.breakers.items()} == {
-        name: 0 for name in rates.breakers
-    }
-
-
 @pytest.mark.parametrize("quote", ["CHF", "PLN"])
 @pytest.mark.parametrize("on", [*NOT_A_USABLE_DAY, LATER, day(15)], ids=repr)
 def test_a_gold_date_that_is_not_usable_drops_only_gold(owner, sources, on, quote):
-    """Criterion 63."""
+    """Criterion 63: a changed shape, so only NBP's breaker counts it."""
     sources.plans["nbp"] = at_once(gold_on(on))
 
     response = owner.get(f"/api/rates?date={PAST}&quote={quote}", headers=CSRF)
@@ -826,7 +837,7 @@ def test_a_gold_date_that_is_not_usable_drops_only_gold(owner, sources, on, quot
     priced = response.get_json()["rates"]
     assert not GOLD & set(priced)
     assert "USD" in priced
-    assert no_breaker_failure()
+    assert failures() == {"frankfurter": 0, "nbp": 1}
     for symbol in sorted(GOLD):
         single = owner.get(f"/api/rates?date={PAST}&quote={quote}&symbol={symbol}", headers=CSRF)
         assert single.status_code == 204
@@ -867,38 +878,50 @@ def test_a_gold_date_that_is_not_usable_never_reaches_the_quote_legs_url(owner, 
     ("provider", "url", "bad"),
     [
         ("nbp", "quote=PLN&symbol=XAU-g", at_once(gold_on("not a day"))),
+        ("nbp", "quote=PLN&symbol=XAU-g", at_once(gold_price("251.37"))),
         ("frankfurter", "quote=CHF&symbol=USD", at_once(fx_on(lambda asked: "not a day"))),
+        ("frankfurter", "quote=CHF&symbol=USD", at_once(fx_table(base="EUR"))),
+        ("frankfurter", "quote=CHF&symbol=USD", at_once(fx_table(USD=0, PLN=-1))),
     ],
+    ids=["nbp date", "nbp price", "frankfurter date", "frankfurter base", "frankfurter no usable rate"],
 )
-def test_a_bad_date_counts_as_a_success_for_its_breaker(app, owner, sources, provider, url, bad):
-    """Edge cases: the source answered, so a bad date resets its
-    breaker's count. Counted as a failure, the breaker opens on the
-    third request. Left uncounted, it opens on the fifth."""
+def test_a_changed_shape_opens_its_breaker_like_an_outage(app, owner, sources, provider, url, bad):
+    """Rate limiting and failure: a changed shape is a failure, so mixed
+    with outages it opens the breaker on the configured count, and the
+    next request sends nothing within the cool-off."""
     app.config["RATE_BREAKER_FAILURES"] = 3
     failing = at_once(lambda _: b"{}", 500)
 
-    for offset, plan in enumerate([failing, failing, bad, failing, failing, bad]):
+    for offset, plan in enumerate([failing, bad, failing]):
         sources.plans[provider] = plan
         response = owner.get(f"/api/rates?date={day(offset)}&{url}", headers=CSRF)
         assert response.status_code == 204
+    sources.plans = {"frankfurter": at_once(_frankfurter), "nbp": at_once(_nbp)}
+    response = owner.get(f"/api/rates?date={day(3)}&{url}", headers=CSRF)
 
-    assert [p for p, _ in sources.opened] == [provider] * 6
+    assert response.status_code == 204
+    assert [p for p, _ in sources.opened] == [provider] * 3
 
 
 @pytest.mark.parametrize("on", [*NOT_A_USABLE_DAY, LATER], ids=repr)
 def test_a_currency_date_that_is_not_usable_drops_what_its_table_prices(owner, sources, on):
-    """Criterion 64."""
+    """Criterion 64: each request counts one Frankfurter failure and
+    none for NBP."""
     sources.plans["frankfurter"] = at_once(fx_on(lambda asked: on))
+    counts = []
 
     pln = owner.get(f"/api/rates?date={PAST}&quote=PLN", headers=CSRF)
+    counts.append(failures())
     chf = owner.get(f"/api/rates?date={PAST}&quote=CHF", headers=CSRF)
+    counts.append(failures())
     usd = owner.get(f"/api/rates?date={PAST}&quote=CHF&symbol=USD", headers=CSRF)
+    counts.append(failures())
 
     assert pln.status_code == 200
     assert set(pln.get_json()["rates"]) == GOLD
     assert chf.status_code == 204
     assert usd.status_code == 204
-    assert no_breaker_failure()
+    assert counts == [{"frankfurter": n, "nbp": 0} for n in (1, 2, 3)]
 
 
 def test_an_earlier_currency_date_is_its_as_of(owner, sources):
@@ -991,7 +1014,7 @@ def test_a_cached_rate_with_a_usable_earlier_date_is_a_hit(app, owner, sources, 
 # A failed fetch's log line (Rate limiting and failure, criteria 41 and 66).
 
 LINE = re.compile(
-    r"rates\.provider source=(frankfurter|nbp) status=(\d{3}|timeout|tls|network|body|other)"
+    r"rates\.provider source=(frankfurter|nbp) status=(\d{3}|shape|timeout|tls|network|body|other)"
 )
 FETCH = {
     "frankfurter": f"/api/rates?date={PAST}&quote=CHF&symbol=USD",
@@ -1212,6 +1235,173 @@ def test_a_fetch_the_open_breaker_skips_logs_nothing(app, owner, sources, logged
     assert response.status_code == 204
     assert len(sources.opened) == sent
     assert provider_lines(logged) == []
+
+
+def frankfurter_answer(change):
+    """Frankfurter's answer for the URL asked, as `change(body, day,
+    quote)` returns it."""
+
+    def body_of(url):
+        on, quote = url.split("/v1/")[1][:10], url.rsplit("base=", 1)[1]
+        body = {"amount": 1, "base": quote, "date": on, "rates": {"PLN": 4.2537, "USD": 1.0876}}
+        return json.dumps(change(body, on, quote)).encode()
+
+    return at_once(body_of)
+
+
+def nbp_answer(change):
+    """NBP's answer for the URL asked, as `change(entry, day)` returns
+    it, `entry` being the one published day."""
+
+    def body_of(url):
+        on = url.split("?")[0].rsplit("/", 1)[1]
+        return json.dumps(change({"data": on, "cena": 251.37}, on)).encode()
+
+    return at_once(body_of)
+
+
+def without(entry, key):
+    return {k: v for k, v in entry.items() if k != key}
+
+
+# Each answer is 200 and JSON, and carries "leaky" where a line that
+# quoted the body would show it.
+CHANGED_SHAPES = {
+    "frankfurter": {
+        "a list": frankfurter_answer(lambda b, on, q: [b, "leaky"]),
+        "null": frankfurter_answer(lambda b, on, q: None),
+        "a string": frankfurter_answer(lambda b, on, q: "leaky"),
+        "rates a list": frankfurter_answer(lambda b, on, q: {**b, "rates": [["USD", 1.0876], "leaky"]}),
+        "rates missing": frankfurter_answer(lambda b, on, q: {**without(b, "rates"), "leaky": 1}),
+        "rates empty": frankfurter_answer(lambda b, on, q: {**b, "rates": {}}),
+        "no usable rate": frankfurter_answer(
+            lambda b, on, q: {**b, "rates": {"USD": "leaky", "PLN": 0, "SEK": None, "NOK": [1.2]}}
+        ),
+        "base other than quote": frankfurter_answer(lambda b, on, q: {**b, "base": "EUR"}),
+        "base lower case": frankfurter_answer(lambda b, on, q: {**b, "base": q.lower()}),
+        "base missing": frankfurter_answer(lambda b, on, q: without(b, "base")),
+        "date not a day": frankfurter_answer(lambda b, on, q: {**b, "date": "leaky"}),
+        "date missing": frankfurter_answer(lambda b, on, q: without(b, "date")),
+        "date after the day asked": frankfurter_answer(lambda b, on, q: {**b, "date": LATER}),
+    },
+    "nbp": {
+        "an object": nbp_answer(lambda e, on: {**e, "leaky": 1}),
+        "null": nbp_answer(lambda e, on: None),
+        "an empty array": nbp_answer(lambda e, on: []),
+        "last entry not an object": nbp_answer(lambda e, on: [e, "leaky"]),
+        "last entry a list": nbp_answer(lambda e, on: [e, [on, 251.37]]),
+        "cena missing": nbp_answer(lambda e, on: [without(e, "cena")]),
+        "cena a string": nbp_answer(lambda e, on: [{**e, "cena": "leaky"}]),
+        "cena 0": nbp_answer(lambda e, on: [{**e, "cena": 0}]),
+        "data missing": nbp_answer(lambda e, on: [without(e, "data")]),
+        "data not a day": nbp_answer(lambda e, on: [{**e, "data": "leaky"}]),
+        "data before the window": nbp_answer(lambda e, on: [{**e, "data": day(15)}]),
+        "data after the day asked": nbp_answer(lambda e, on: [{**e, "data": LATER}]),
+    },
+}
+# A table quoted in each provider's own terms, and what is left of it
+# when that provider's answer is a changed shape.
+SHAPE_TABLES = {
+    "frankfurter": ("PLN", lambda priced: set(priced) == GOLD),
+    "nbp": ("CHF", lambda priced: "USD" in priced and not GOLD & set(priced)),
+}
+OTHER = {"frankfurter": "nbp", "nbp": "frankfurter"}
+
+
+@pytest.mark.parametrize(
+    ("provider", "shape"), [(p, s) for p, shapes in CHANGED_SHAPES.items() for s in shapes]
+)
+def test_a_changed_shape_logs_shape_and_counts_against_its_breaker_alone(
+    owner, sources, logged, capsys, provider, shape
+):
+    """Criteria 66 and 68: in a whole table, that provider's symbols get
+    no proposal and the rest stands, one `status=shape` line is logged
+    with nothing of the request or the answer, and one failure counts
+    against that provider alone."""
+    sources.plans[provider] = CHANGED_SHAPES[provider][shape]
+    quote, left = SHAPE_TABLES[provider]
+
+    response = owner.get(f"/api/rates?date={PAST}&quote={quote}", headers=CSRF)
+
+    assert response.status_code == 200, response.get_data(as_text=True)
+    assert left(response.get_json()["rates"]), response.get_json()
+    assert_lines(logged, [(provider, {"shape"})])
+    assert failures() == {provider: 1, OTHER[provider]: 0}
+    assert_nothing_of_the_request(logged, capsys, sources.port)
+
+
+@pytest.mark.parametrize("provider", FETCH)
+def test_a_changed_shape_for_one_symbol_is_no_content_and_logs_shape(owner, sources, logged, capsys, provider):
+    """Criteria 66 and 68, for the single-symbol form."""
+    sources.plans[provider] = CHANGED_SHAPES[provider]["null"]
+
+    response = owner.get(FETCH[provider], headers=CSRF)
+
+    assert response.status_code == 204
+    assert_lines(logged, [(provider, {"shape"})])
+    assert failures() == {provider: 1, OTHER[provider]: 0}
+    assert_nothing_of_the_request(logged, capsys, sources.port)
+
+
+def test_a_quote_leg_in_a_changed_shape_logs_shape_against_frankfurter(owner, sources, logged, capsys):
+    """Criterion 68: the quote leg is a Frankfurter request, so its
+    changed shape counts against Frankfurter. Gold quoted in CHF has no
+    proposal, and the requested day's currencies stand."""
+    sources.plans["nbp"] = at_once(gold_price(251.37, lag_days=1))
+    sources.plans["frankfurter"] = at_once(
+        lambda url: (fx_table() if f"/v1/{PAST}" in url else fx_table(base="EUR"))(url)
+    )
+
+    priced = table(owner)
+
+    assert {"USD", "PLN"} <= set(priced)
+    assert not GOLD & set(priced)
+    assert_lines(logged, [("frankfurter", {"shape"})])
+    assert failures() == {"frankfurter": 1, "nbp": 0}
+    assert_nothing_of_the_request(logged, capsys, sources.port)
+
+
+@pytest.mark.parametrize(
+    ("rates_sent", "priced_as"),
+    [
+        ({"USD": 1.0876, "PLN": "4.25", "SEK": 0, "NOK": None, "DKK": -1}, {"USD"}),
+        ({"USD": 1e-25, "PLN": "4.25"}, set()),
+        ({"ZZZ": 1.5, "USD": False, "PLN": float("inf")}, set()),
+    ],
+    ids=["one priced rate", "one usable rate out of bounds once inverted", "one usable rate of no symbol"],
+)
+def test_one_usable_rate_among_bad_ones_logs_nothing_and_counts_no_failure(
+    owner, sources, logged, rates_sent, priced_as
+):
+    """Criterion 68: a table holding a usable rate is a success, whatever
+    else it holds and whether that rate becomes a proposal. Usable is a
+    JSON number above 0 and below 10^20 (Edge cases)."""
+
+    def body_of(url):
+        on, quote = url.split("/v1/")[1][:10], url.rsplit("base=", 1)[1]
+        text = json.dumps({"amount": 1, "base": quote, "date": on, "rates": rates_sent})
+        return text.replace("Infinity", "1e999").encode()
+
+    sources.plans["frankfurter"] = at_once(body_of)
+
+    response = owner.get(f"/api/rates?date={PAST}&quote=CHF", headers=CSRF)
+
+    priced = response.get_json()["rates"] if response.status_code == 200 else {}
+    assert set(priced) - GOLD == priced_as
+    assert provider_lines(logged) == []
+    assert failures() == NONE_FAILED
+
+
+def test_an_earlier_entry_nbp_sends_badly_is_not_a_changed_shape(owner, sources, logged):
+    """Rate limiting and failure: NBP's shape turns on its last entry
+    alone."""
+    sources.plans["nbp"] = nbp_answer(lambda e, on: ["junk", {"cena": "x"}, e])
+
+    priced = table(owner, quote="PLN")
+
+    assert priced["XAU-g"]["rate"] == "251.37"
+    assert provider_lines(logged) == []
+    assert failures() == NONE_FAILED
 
 
 def test_a_successful_fetch_logs_no_provider_line(owner, sources, logged):

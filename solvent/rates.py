@@ -350,7 +350,13 @@ def _failure(error: Exception) -> str:
     return "other"
 
 
-def _fetch_json(provider: str, url: str, egress: _Egress) -> "object | None":
+def _fetch_json(provider: str, url: str, egress: _Egress, read):
+    """What `read` makes of the provider's answer to `url`, or None.
+
+    `read` returns None for an answer in a shape it cannot read, which
+    counts as a failure like any other: a source that keeps answering
+    in a changed shape opens its breaker and leaves a line in the log.
+    """
     breaker = breakers[provider]
     if breaker.is_open(egress.cooloff):
         return None
@@ -360,13 +366,17 @@ def _fetch_json(provider: str, url: str, egress: _Egress) -> "object | None":
     try:
         # Integers as Decimal, which takes any length: an int over
         # Python's digit limit would fail the whole answer for one figure.
-        payload = json.loads(_fetch_within(url, remaining), parse_int=Decimal)
+        result = read(json.loads(_fetch_within(url, remaining), parse_int=Decimal))
     except Exception as error:
-        egress.log.warning("rates.provider source=%s status=%s", provider, _failure(error))
-        breaker.record_failure(egress.failures)
-        return None
-    breaker.record_success()
-    return payload
+        status = _failure(error)
+    else:
+        if result is not None:
+            breaker.record_success()
+            return result
+        status = "shape"
+    egress.log.warning("rates.provider source=%s status=%s", provider, status)
+    breaker.record_failure(egress.failures)
+    return None
 
 
 def _positive(value: object) -> "Decimal | None":
@@ -404,26 +414,28 @@ def _fx_table(
     the provider does not publish resolves to its prior close, which is
     what the `date` field in the response carries.
     """
-    payload = _fetch_json(
-        "frankfurter", FX_URL.format(date=on.isoformat(), quote=quote), egress
-    )
-    if not isinstance(payload, dict):
-        return None
-    as_of = _published(payload.get("date"), on)
-    rates = payload.get("rates")
-    if as_of is None or not isinstance(rates, dict):
-        return None
-    if payload.get("base") != quote:
-        # A rate in an unexpected currency is rejected rather than
-        # silently mislabelled.
-        return None
 
-    table: "dict[str, tuple[Decimal, str]]" = {quote: (Decimal(1), as_of)}
-    for code, value in rates.items():
-        inverse = _positive(value)
-        if inverse is not None:
-            table[code] = (Decimal(1) / inverse, as_of)
-    return table
+    def read(payload: object) -> "dict[str, tuple[Decimal, str]] | None":
+        # A rate in an unexpected currency is a changed shape rather
+        # than silently mislabelled.
+        if not isinstance(payload, dict) or payload.get("base") != quote:
+            return None
+        as_of = _published(payload.get("date"), on)
+        rates = payload.get("rates")
+        if as_of is None or not isinstance(rates, dict):
+            return None
+        # An unusable entry is dropped and the rest stands, so one bad
+        # code cannot open the breaker on every currency.
+        table = {
+            code: (Decimal(1) / inverse, as_of)
+            for code, value in rates.items()
+            if (inverse := _positive(value)) is not None
+        }
+        return {quote: (Decimal(1), as_of), **table} if table else None
+
+    return _fetch_json(
+        "frankfurter", FX_URL.format(date=on.isoformat(), quote=quote), egress, read
+    )
 
 
 def _gold_pln(on: date, egress: _Egress) -> "tuple[Decimal, str] | None":
@@ -432,20 +444,25 @@ def _gold_pln(on: date, egress: _Egress) -> "tuple[Decimal, str] | None":
 
     A range query rather than a single date: NBP answers Not Found on
     every weekend and Polish holiday, so the range satisfies the
-    prior-close rule in one request.
+    prior-close rule in one request. It answers an empty window Not
+    Found too, so an empty list is a changed shape.
     """
-    start = (on - _PRIOR_CLOSE_WINDOW).isoformat()
-    payload = _fetch_json("nbp", NBP_URL.format(start=start, end=on.isoformat()), egress)
-    if not isinstance(payload, list) or not payload:
-        return None
-    last = payload[-1]
-    if not isinstance(last, dict):
-        return None
-    price = _positive(last.get("cena"))
-    as_of = _published(last.get("data"), on, on - _PRIOR_CLOSE_WINDOW)
-    if price is None or as_of is None:
-        return None
-    return price, as_of
+    start = on - _PRIOR_CLOSE_WINDOW
+
+    def read(payload: object) -> "tuple[Decimal, str] | None":
+        if not isinstance(payload, list) or not payload:
+            return None
+        last = payload[-1]
+        if not isinstance(last, dict):
+            return None
+        price = _positive(last.get("cena"))
+        as_of = _published(last.get("data"), on, start)
+        if price is None or as_of is None:
+            return None
+        return price, as_of
+
+    url = NBP_URL.format(start=start.isoformat(), end=on.isoformat())
+    return _fetch_json("nbp", url, egress, read)
 
 
 def _round(value: Decimal) -> "str | None":

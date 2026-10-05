@@ -25,15 +25,16 @@ from tests.helpers import CSRF, connect, mint_invite, register, rows
 
 @pytest.fixture
 def provider(monkeypatch):
-    """A stubbed provider recording every URL the proxy would fetch."""
+    """A stubbed provider recording every URL the proxy would fetch,
+    its answers read by the adapter as the real fetch reads them."""
     calls = []
     answers = {}
 
-    def fetch(_provider, url, _egress):
+    def fetch(_provider, url, _egress, read):
         calls.append(url)
         for fragment, payload in answers.items():
             if fragment in url:
-                return payload(url) if callable(payload) else payload
+                return read(payload(url) if callable(payload) else payload)
         return None
 
     monkeypatch.setattr(rates, "_fetch_json", fetch)
@@ -330,14 +331,21 @@ def test_a_rate_that_is_not_a_usable_price_is_no_proposal(owner, provider, bad):
 @pytest.mark.parametrize("leg", ["cena", "pln"])
 def test_a_gold_figure_that_is_not_a_usable_price_drops_only_gold(owner, opener, bad, leg):
     """A bad NBP price or a bad PLN rate drops the gold symbols built
-    from it, leaves the rest of the table, and is no provider failure."""
+    from it and leaves the rest of the table. A bad PLN rate is one
+    entry of a usable table, a bad NBP price a changed shape."""
     _publish(opener, **{leg: bad})
     response = owner.get(f"/api/rates?date={PAST}&quote=CHF", headers=CSRF)
     assert response.status_code == 200
     body = response.get_json()["rates"]
     assert "XAU-g" not in body and "XAU-ozt" not in body
     assert body["USD"]["rate"] == "0.91945568"
-    assert all(rates.breakers[name].failures == 0 for name in rates.breakers)
+    # `1e-25` is a usable NBP price whose proposal rounds to 0.
+    shape = leg == "cena" and bad != 1e-25
+    assert failures() == {"frankfurter": 0, "nbp": int(shape)}
+
+
+def failures() -> dict:
+    return {name: breaker.failures for name, breaker in rates.breakers.items()}
 
 
 # Each is a publication date no source may stamp a proposal with:
@@ -359,7 +367,7 @@ def test_a_gold_date_that_is_not_usable_drops_only_gold(owner, opener, bad, quot
     body = response.get_json()["rates"]
     assert "XAU-g" not in body and "XAU-ozt" not in body
     assert "USD" in body
-    assert all(rates.breakers[name].failures == 0 for name in rates.breakers)
+    assert failures() == {"frankfurter": 0, "nbp": 1}
 
 
 @pytest.mark.parametrize("bad", NOT_A_DATE[:-1])
@@ -373,7 +381,7 @@ def test_a_currency_date_that_is_not_usable_drops_only_what_its_table_prices(
     assert response.status_code == 200
     assert set(response.get_json()["rates"]) == {"XAU-g", "XAU-ozt"}
     assert owner.get(f"/api/rates?date={PAST}&quote=CHF", headers=CSRF).status_code == 204
-    assert all(rates.breakers[name].failures == 0 for name in rates.breakers)
+    assert failures() == {"frankfurter": 2, "nbp": 0}
 
 
 @pytest.mark.parametrize("bad", ["31.07.2026", "2026-08-01"])
@@ -671,6 +679,7 @@ def test_every_outbound_request_is_named(monkeypatch):
             "frankfurter",
             "https://api.frankfurter.dev/v1/2026-01-01?base=CHF",
             rates._egress(),
+            lambda payload: payload,
         )
 
     assert seen[0].get_header("User-agent") == rates.USER_AGENT
@@ -706,6 +715,7 @@ def _raise(error):
         (lambda url: _Answer(body=b"<html>secret-text"), "body"),
         (lambda url: _Answer(body=b" " * (rates.MAX_RESPONSE_BYTES + 1)), "body"),
         (lambda url: _raise(RuntimeError("secret-text")), "other"),
+        (lambda url: _Answer(body=b'{"secret-text": 1}'), "shape"),
     ],
 )
 def test_a_failed_fetch_logs_its_source_and_status_and_nothing_of_the_request(
@@ -715,7 +725,8 @@ def test_a_failed_fetch_logs_its_source_and_status_and_nothing_of_the_request(
     url = rates.FX_URL.format(date=PAST, quote="CHF")
 
     with app.app_context(), caplog.at_level("WARNING"):
-        assert rates._fetch_json("frankfurter", url, rates._egress()) is None
+        # A reader that finds no figure in any answer, as in a changed shape.
+        assert rates._fetch_json("frankfurter", url, rates._egress(), lambda _: None) is None
 
     assert [r.getMessage() for r in caplog.records] == [
         f"rates.provider source=frankfurter status={status}"
@@ -1018,6 +1029,45 @@ def test_the_only_environment_the_app_reads_is_its_configuration_and_none_of_it_
     assert [(h._context.verify_mode, h._context.check_hostname) for h in https] == [
         (ssl.CERT_REQUIRED, True)
     ]
+
+
+@pytest.mark.parametrize(
+    "source, answer",
+    [
+        ("frankfurter", lambda url: {"base": "CHF", "date": PAST, "rates": [1.0876]}),
+        ("frankfurter", lambda url: {"base": "EUR", "date": PAST, "rates": {"USD": 1.0876}}),
+        ("frankfurter", lambda url: {"base": "CHF", "date": PAST, "rates": {"USD": "1.0876"}}),
+        ("frankfurter", lambda url: {"base": "CHF", "date": PAST, "rates": {}}),
+        ("nbp", lambda url: {"data": PAST, "cena": 251.37}),
+        ("nbp", lambda url: []),
+        ("nbp", lambda url: [[PAST, 251.37]]),
+    ],
+)
+def test_a_changed_shape_logs_shape_and_counts_against_its_breaker(
+    owner, opener, caplog, source, answer
+):
+    _publish(opener)
+    opener.answers["fx" if source == "frankfurter" else "nbp"] = answer
+    symbol = "USD" if source == "frankfurter" else "XAU-g"
+    with caplog.at_level("WARNING"):
+        response = owner.get(f"/api/rates?date={PAST}&quote=CHF&symbol={symbol}", headers=CSRF)
+    assert response.status_code == 204
+    assert [r.getMessage() for r in caplog.records if r.getMessage().startswith("rates.")] == [
+        f"rates.provider source={source} status=shape"
+    ]
+    assert failures() == {name: int(name == source) for name in rates.breakers}
+
+
+def test_one_usable_rate_among_bad_ones_is_a_success(owner, opener, caplog):
+    opener.answers["fx"] = lambda url: {
+        "base": "CHF", "date": PAST, "rates": {"USD": 0, "EUR": "0.95", "GBP": 0.8},
+    }
+    rates.breakers["frankfurter"].failures = 1
+    with caplog.at_level("WARNING"):
+        response = owner.get(f"/api/rates?date={PAST}&quote=CHF&symbol=GBP", headers=CSRF)
+    assert response.get_json()["rate"] == "1.25"
+    assert not [r for r in caplog.records if r.getMessage().startswith("rates.")]
+    assert failures() == {name: 0 for name in rates.breakers}
 
 
 # ---- One breaker per provider ------------------------------------------
