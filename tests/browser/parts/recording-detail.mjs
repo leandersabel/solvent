@@ -67,7 +67,7 @@ await run(async () => {
     await writes.saveSnapshot(v, id, null, { date: day, value: '1234567.125', note: null });
     await writes.saveSnapshot(v, id, null, { date: day, value: '1234567.250', note: null });
   }, goldId, BACKDATE);
-  await page.eval(`location.hash = '#/recording/${BACKDATE}'`);
+  await page.call((day) => { location.hash = `#/recording/${day}`; }, BACKDATE);
   await page.waitUntil("document.querySelectorAll('.recording tr.flagged').length === 2", { label: 'the recording with its widest lines' });
   for (const width of [320, 375, 601, 901]) {
     await page.send('Emulation.setDeviceMetricsOverride', { width, height: 800, deviceScaleFactor: 2, mobile: false });
