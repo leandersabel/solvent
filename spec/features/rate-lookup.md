@@ -158,6 +158,8 @@ back to 1948 from other central banks is not the API the app calls.
   day, which becomes `asOf` (Edge cases, A publication date that is not
   usable), and `rates`, mapping each code to how many
   of it one `quote` buys. One unit of a code costs `1 / rates[code]`.
+  An answer with no usable rate is a changed shape (Rate limiting and
+  failure).
   Nothing else in the body is read.
 - The currency half of the symbol table is seeded from the provider's
   own currency list.
@@ -185,9 +187,10 @@ unwind.
   returns only published days, and the adapter takes the last entry on
   or before `date`, reading its `cena`, PLN per gram, and its `data`,
   which becomes `asOf` when it falls within the window (Edge cases, A
-  publication date that is not usable). That is the prior-close rule in one request with
-  no retry loop, and
-  an empty window means No Content. A single-date query answers Not
+  publication date that is not usable). That is the prior-close rule in
+  one request with no retry loop. NBP answers an empty window Not Found,
+  which is No Content, so an empty array is a changed shape (Rate
+  limiting and failure). A single-date query answers Not
   Found on every weekend and Polish holiday, so it is the wrong call.
   The API caps a range at 93 days.
 - **The quote conversion is a second leg.** A non-PLN `quote` is
@@ -480,8 +483,18 @@ host's network are reachable.
   it gets no proposal. The
   breakers live in process memory, so a restart resets them.
 - A failure is an outbound request that cannot connect, times out,
-  answers anything but 200, or answers a body that is not JSON. A
-  success resets its own provider's count and no other.
+  answers anything but 200, answers a body that is not JSON, or answers
+  JSON in a changed shape. A success is an answer the adapter reads a
+  figure from, and resets its own provider's count and no other.
+- **A changed shape** is, for Frankfurter, anything but an object whose
+  `base` equals `quote`, whose `date` is usable and whose `rates` is an
+  object holding at least one usable rate. For NBP it is anything but a
+  non-empty array whose last entry is an object with a usable `cena`
+  and a usable `data`. Usable means as Edge cases says for a figure and
+  a publication date. An unusable rate in an otherwise usable table is
+  dropped and the rest stands, because one bad code must not open the
+  breaker on every currency. A source that keeps answering in a changed
+  shape opens its breaker like one that is down, and the log says why.
 - The gold lookup's currency leg is a Frankfurter request and counts
   against Frankfurter. So while Frankfurter is down, NBP requests still
   go out and gold quoted in PLN still resolves, and while NBP is down,
@@ -514,8 +527,9 @@ host's network are reachable.
   alike (`app-shell.md`, Configuration).
 - A failed fetch logs one warning, `rates.provider source=<source>
   status=<status>`. `source` is `frankfurter` or `nbp`. `status` is the
-  HTTP status of an answer that was not 200, else the first that fits
-  of `timeout`, `tls`, `network`, `body` and `other`. The line holds no
+  HTTP status of an answer that was not 200, `shape` for a changed
+  shape, else the first that fits of `timeout`, `tls`, `network`, `body`
+  and `other`. The line holds nothing of the answer's body, and no
   URL, date, quote or error text, because the URL carries the quote and
   date asked for, which the access log, recording the path without its
   query, does not. A fetch the breaker or the spent deadline skips logs
@@ -552,28 +566,28 @@ host's network are reachable.
 - **Weekend, holiday or pre-listing date**: the most recent prior close,
   `asOf` that earlier date, and the client shows "rate as of 29 Jul".
   No prior close within the window is No Content.
-- **A rate in an unexpected currency**: no proposal, never a mislabeled
-  one.
+- **A rate in an unexpected currency**: a changed shape, so no proposal
+  from that table, never a mislabeled one.
 - **A figure that is not a usable price**: a source's rate or gold
   price is usable only as a JSON number, not a string or a boolean,
   above 0 and below 10^20. A proposal is served only when, rounded, it is
   above 0 and below 10^20, the most that keeps 8 decimal places in 28
   digits. Anything else is no proposal for the symbols built from that
   figure, never an error or a price of 0, and the rest of the answer
-  stands. A bad NBP price drops both gold symbols, and a bad PLN rate
-  drops gold quoted in anything but PLN. The source answered, so its
-  breaker counts a success. A cached `"0"` is a miss, so it is fetched
+  stands. A bad PLN rate drops gold quoted in anything but PLN. A bad
+  NBP price, or a Frankfurter table with no usable rate, is a changed
+  shape: it drops what that source prices and counts as a failure. A
+  cached `"0"` is a miss, so it is fetched
   again and replaced.
 - **A publication date that is not usable**: Frankfurter's `date` or
   NBP's `data` becomes `asOf` only as a string `s` for which
   `date.fromisoformat(s).isoformat() == s`, no later than the requested
   `date`, and for NBP no earlier than the start of its 14-day window.
-  Anything else means that source gave no answer: its symbols are
-  absent, never an error or a proposal dated a day it is not for, and
-  the rest of the answer stands. A bad Frankfurter date drops the
-  currencies and gold quoted in anything but PLN, and a bad NBP date
-  drops both gold symbols. The source answered, so its breaker counts a
-  success. A cached row whose `asOf` fails the same test against its
+  Anything else is a changed shape: that source's symbols are absent,
+  never an error or a proposal dated a day it is not for, and the rest
+  of the answer stands. A bad Frankfurter date drops the currencies and
+  gold quoted in anything but PLN, and a bad NBP date drops both gold
+  symbols. A cached row whose `asOf` fails the same test against its
   `date` is a miss, so it is fetched again and replaced.
 - **Two holdings share a symbol**: one cache entry, one outbound
   request, one price entry in the vault (`record-rate.md`).
@@ -844,8 +858,10 @@ host's network are reachable.
 61. A rate of 0, -1, a string, a boolean, NaN, plus or minus infinity,
     `1e300` or `1e-25` is no proposal for its symbol, and the whole
     table still answers OK with the other symbols. The same figure as
-    the NBP price or the PLN rate drops only the gold symbols and adds
-    no breaker failure. Test:
+    the PLN rate drops only the gold symbols and adds no breaker
+    failure. As the NBP price it drops only the gold symbols and counts
+    one NBP failure, except `1e-25`, a usable price whose proposal
+    rounds to 0. Test:
     `tests/test_rates.py::test_a_rate_that_is_not_a_usable_price_is_no_proposal`,
     `tests/test_rates.py::test_a_gold_figure_that_is_not_a_usable_price_drops_only_gold`.
 62. A cached rate of `"0"` for a past date is fetched again and
@@ -854,12 +870,12 @@ host's network are reachable.
 63. An NBP `data` that is unreadable, not in canonical ISO form, not a
     string, after the requested date or before its 14-day window, quoted
     in `CHF` or `PLN`, drops only the gold symbols, the whole table
-    still answers OK with the currencies, and no breaker counts a
-    failure. Test:
+    still answers OK with the currencies, and only NBP's breaker counts
+    a failure. Test:
     `tests/test_rates.py::test_a_gold_date_that_is_not_usable_drops_only_gold`.
 64. A Frankfurter `date` that is not usable leaves only the gold symbols
-    in a table quoted in `PLN`, and No Content quoted in `CHF`, with no
-    breaker failure. Test:
+    in a table quoted in `PLN`, and No Content quoted in `CHF`, each
+    counting a Frankfurter failure and none for NBP. Test:
     `tests/test_rates.py::test_a_currency_date_that_is_not_usable_drops_only_what_its_table_prices`.
 65. A cached rate whose `asOf` is unreadable or after its date, or a
     cached gold rate dated before its window, is fetched again and
@@ -867,9 +883,10 @@ host's network are reachable.
     `tests/test_rates.py::test_a_cached_rate_with_an_unusable_date_is_fetched_again`,
     `tests/test_review_rate_lookup.py::test_a_cached_gold_rate_dated_before_its_window_is_fetched_again`.
 66. (blind) A failed fetch logs exactly `rates.provider source=<source>
-    status=<status>`, with the status for an answer that was not 200 and
-    `timeout`, `tls`, `network`, `body` or `other` for each other
-    failure, and no date, quote, provider host or error text. Test:
+    status=<status>`, with the status for an answer that was not 200,
+    `shape` for a changed shape, and `timeout`, `tls`, `network`, `body`
+    or `other` for each other failure, and no date, quote, provider
+    host, error text or anything of the answer's body. Test:
     `tests/test_rates.py::test_a_failed_fetch_logs_its_source_and_status_and_nothing_of_the_request`,
     `tests/test_review_rate_lookup.py::test_a_failed_answer_logs_its_source_and_status_alone`.
 67. A date written other than `YYYY-MM-DD`, such as `20260731`,
@@ -877,3 +894,13 @@ host's network are reachable.
     provider. Test:
     `tests/test_rates.py::test_a_date_not_written_yyyy_mm_dd_is_a_bad_request`,
     `tests/test_review_rate_lookup.py::test_a_date_not_written_as_isoformat_writes_it_reaches_no_provider`.
+68. Each changed shape of each provider, such as Frankfurter's `rates`
+    as a list, a `base` other than `quote`, a table with no usable rate,
+    or NBP's answer as an object, an empty array or a last entry that is
+    not an object, gives that provider's symbols no proposal, logs one
+    `rates.provider source=<source> status=shape` line and counts one
+    failure against that provider's breaker alone. A Frankfurter table
+    with one usable rate among bad ones logs nothing and leaves the
+    count at zero. Test:
+    `tests/test_rates.py::test_a_changed_shape_logs_shape_and_counts_against_its_breaker`,
+    `tests/test_rates.py::test_one_usable_rate_among_bad_ones_is_a_success`.
