@@ -102,25 +102,38 @@ function dropKept() {
   return Boolean(kept && (kept.fields.length || kept.dialogs.length));
 }
 
+// What a form closed with unsaved while navigating away, for the screen
+// it went to. A form that navigates does so before it closes.
+let leftOnForm = null;
+document.addEventListener('leftunsaved', ({ detail }) => {
+  if (window.location.hash === drawnHash) leftUnsaved(detail);
+  else leftOnForm = detail;
+});
+
 function render() {
   const left = unsavedOnSweep();
+  const fromForm = leftOnForm;
+  leftOnForm = null;
   draw();
   leftUnsaved(left);
+  if (fromForm) leftUnsaved(fromForm);
   markCurrentNav();
   vaultShown = isUnlocked();
   if (vaultShown) trackEdits(container);
 }
 
-/** Leaving a sweep with typed figures says so and names them, on the
- *  screen that replaced it. Nothing in the vault records them, because
- *  the unsaved half existed only in the screen that is gone
- *  (record-rate.md, Saving an edited recording). */
-function leftUnsaved({ date, names }) {
+/** Leaving a sweep or the single-holding form with typed figures says
+ *  so and names them, on the screen beneath or the one that replaced
+ *  it. Nothing in the vault records them, because the unsaved half
+ *  existed only in the screen that is gone (record-rate.md, Saving an
+ *  edited recording). */
+function leftUnsaved({ of = 'recording', date, names }) {
   if (!names.length || !isUnlocked()) return;
   const vault = currentVault();
+  const on = date ? ` for ${vault.format.longDate(date)}` : '';
   container.prepend(
     el('p', { class: 'banner banner-critical', role: 'status' }, [
-      `You left the recording for ${vault.format.longDate(date)} with changes that were not saved: ${names.join(', ')}.`,
+      `You left the ${of}${on} with changes that were not saved: ${names.join(', ')}.`,
     ]),
   );
 }

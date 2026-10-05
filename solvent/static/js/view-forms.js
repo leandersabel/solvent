@@ -30,8 +30,12 @@ export function snapshotDialog(vault, holding, existing, onSaved, onOpenRecordin
   // Set once a move whose prices did not save has been reported: Save
   // waits for the next change.
   let spent = false;
+  // Set once the form has said what became of a save: closing then
+  // names nothing as left unsaved, because that message already did.
+  let settled = false;
   const changed = () => {
     spent = false;
+    settled = false;
     submit.disabled = false;
   };
 
@@ -86,8 +90,8 @@ export function snapshotDialog(vault, holding, existing, onSaved, onOpenRecordin
             class: 'link-button',
             text: 'Open the recording, where they are changed',
             onclick: () => {
-              close();
               onOpenRecording(on);
+              close();
             },
           })
         : null,
@@ -146,8 +150,8 @@ export function snapshotDialog(vault, holding, existing, onSaved, onOpenRecordin
             class: 'link-button',
             text: 'Open the recording',
             onclick: () => {
-              close();
               onOpenRecording(on);
+              close();
             },
           })
         : null,
@@ -155,6 +159,7 @@ export function snapshotDialog(vault, holding, existing, onSaved, onOpenRecordin
   // Saved, with something the person must still be told: the dialog
   // stays up with the message until they close it.
   const finishWith = (text) => {
+    settled = true;
     fail(text);
     submit.hidden = true;
     cancel.textContent = 'Done';
@@ -187,6 +192,7 @@ export function snapshotDialog(vault, holding, existing, onSaved, onOpenRecordin
   };
 
   const done = () => {
+    settled = true;
     close();
     onSaved();
   };
@@ -240,6 +246,7 @@ export function snapshotDialog(vault, holding, existing, onSaved, onOpenRecordin
     // inert until something changes, and the date's own screen is where
     // the empty lines are filled.
     spent = true;
+    settled = true;
     cancel.textContent = 'Done';
     cancel.onclick = done;
     describePrices();
@@ -250,8 +257,8 @@ export function snapshotDialog(vault, holding, existing, onSaved, onOpenRecordin
             class: 'link-button',
             text: 'Open the recording',
             onclick: () => {
-              close();
               onOpenRecording(on);
+              close();
             },
           })
         : null,
@@ -320,8 +327,19 @@ export function snapshotDialog(vault, holding, existing, onSaved, onOpenRecordin
   });
   const cancel = el('button', { class: 'btn-secondary', text: 'Cancel', onclick: () => close() });
 
+  const opened = { value: value.value, note: note.value };
   const close = dialog({
     heading: existing ? 'Edit this value' : `Record a value for ${holding.payload.name}`,
+    unsaved: () => ({
+      of: 'entry',
+      date: existing ? existing.payload.date : date.value,
+      names: settled
+        ? []
+        : [
+            ...(value.value !== opened.value || note.value !== opened.note || moving() ? [holding.payload.name] : []),
+            ...(block ? block.lines.filter((line) => line.changed()).map((line) => `the ${line.unit} rate`) : []),
+          ],
+    }),
     resume: resumable(reopenSnapshot, holding.recordId, existing ? existing.recordId : null),
     body: [
       el('div', { class: 'field' }, [

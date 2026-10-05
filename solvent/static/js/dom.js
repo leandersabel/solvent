@@ -278,13 +278,17 @@ function onKey(event) {
 /** A focus-trapping dialog with the Escape and restore behaviour every
  *  one in the product shares (spec/design-system.md, Components).
  *
+ *  `unsaved` returns `{ of, date, names }`, what the dialog holds typed
+ *  and not saved. Closing it with any names announces them on the
+ *  screen it closes onto (app.js).
+ *
  *  `resume`, from `resumable` below, reopens the same form against the
  *  vault a later unlock builds. A dialog without one is closed by a
  *  lock and not reopened, which is right for a confirmation: it holds
  *  nothing the person typed. A dialog that has come to show an outcome
  *  rather than a form calls `close.stopResuming()`, so a lock no longer
  *  keeps it. */
-export function dialog({ heading, body, actions, resume = null }) {
+export function dialog({ heading, body, actions, resume = null, unsaved = null }) {
   const opener = document.activeElement;
   // No `aria-modal`: it hides everything outside the dialog from a
   // screen reader, Lock included. `inert` does the modal's work.
@@ -296,13 +300,17 @@ export function dialog({ heading, body, actions, resume = null }) {
   const scrim = el('div', { class: 'scrim' }, [panel]);
 
   const entry = { panel, scrim, resume, close: null };
-  const close = ({ refocus = true } = {}) => {
+  const close = ({ refocus = true, locking = false } = {}) => {
+    // Read before focus leaves the form, whose blur handlers may redraw
+    // it. A lock is not leaving: the form comes back after the unlock.
+    const left = !locking && unsaved ? unsaved() : null;
     openDialogs.delete(entry);
     scrim.remove();
     // Before focus returns: it cannot land in an inert region.
     syncPage();
     if (!openDialogs.size) document.removeEventListener('keydown', onKey);
     if (refocus && opener && opener.focus) opener.focus();
+    if (left && left.names.length) document.dispatchEvent(new CustomEvent('leftunsaved', { detail: left }));
   };
   entry.close = close;
   close.stopResuming = () => {
@@ -408,7 +416,7 @@ export function closeDialogsForLock() {
   const kept = [];
   for (const entry of [...openDialogs]) {
     if (entry.resume) kept.push({ resume: entry.resume, fields: editedFields(entry.panel) });
-    entry.close({ refocus: false });
+    entry.close({ refocus: false, locking: true });
   }
   return kept;
 }

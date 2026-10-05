@@ -744,6 +744,27 @@ The same Dialog, prefilled with the stored value, date and note.
   date.
 - **Saved**: the Dialog closes and the dashboard updates from local
   state with no refetch.
+- **Closing with changes unsaved**: by Cancel, by Escape, or by a link
+  that opens a recording. Nothing blocks leaving and nothing is
+  written, as on the sweep. The screen the form closes onto, or the
+  recording it opens, carries a critical notice at its head naming
+  what was left:
+
+  > You left the entry for 31 July 2026 with changes that were not
+  > saved: Current account, the USD rate.
+
+  - The holding is named when its value or note differs from what the
+    form opened with, or when an existing entry's date was changed.
+  - A unit is named, as "the USD rate", when its line was changed.
+  - The date is the one on the form, or an existing entry's stored
+    date. A new figure whose date does not read reads "You left the
+    entry with changes that were not saved: ...".
+  - Once a save writes the figure, closing names nothing, because the
+    form's own message already named what did not save.
+  - A lock is not leaving: the form comes back after the unlock with
+    what was typed and no notice (`login.md`, Rules).
+
+  The notice is shown once and never stored.
 
 ## How it works
 
@@ -1533,3 +1554,8 @@ Editing an existing entry).
     no Look it up, and the sweep asks the proxy nothing. Test:
     `tests/browser/parts/update-values.mjs`,
     `tests/browser/parts/update-values-review-unquoted.mjs`.
+91. Closing the single-holding form with a typed price or figure
+    unsaved writes nothing, and the screen it closes onto names the
+    holding and the unit left. A lock and unlock in between shows no
+    notice. Test: `tests/browser/parts/snapshot-entry.mjs`,
+    `tests/browser/parts/unlock-lock.mjs`.
