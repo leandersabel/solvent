@@ -1,6 +1,8 @@
 """Reviewer's tests: a wrong password on Change password or Delete my
-account is a failed sign-in (spec/features/account-settings.md, criteria
-11, 43 and 77; spec/architecture.md, Security, Rate limiting).
+account is a failed sign-in, and a new Auth Key that is not 32 bytes
+changes nothing (spec/features/account-settings.md, criteria 11, 43, 77
+and 79; spec/architecture.md, Security, Rate limiting and Key
+management).
 
 Written from the spec alone. Every limit is set through config and
 asserted at the configured value.
@@ -10,7 +12,8 @@ from __future__ import annotations
 import pytest
 
 from solvent.config import DEFAULT_KDF_ENVELOPE
-from tests.helpers import CSRF, b64, connect, register
+from tests.helpers import CSRF, b64, connect, register, sign_in
+from tests.test_review_register import BAD_KEYS
 
 LOGIN = "/api/auth/login"
 CHANGE = "/api/auth/change-password"
@@ -306,3 +309,25 @@ def test_the_throttle_lifts_and_the_right_password_then_works(app, clock, accoun
     assert delete(owner, owner_key).status_code == 429
     clock.advance(app.config["LOGIN_ACCOUNT_WINDOW_MINUTES"] * 60 + 1)
     assert change(owner, owner_key).status_code == 200
+
+
+# ---- Criterion 79: the new Auth Key is 32 bytes of strict base64 ----
+
+
+@pytest.mark.parametrize("kind", ["vault_owner", "administrator"])
+@pytest.mark.parametrize("key", BAD_KEYS.values(), ids=BAD_KEYS.keys())
+def test_a_password_change_to_an_auth_key_that_is_not_thirty_two_bytes_changes_nothing(app, kind, key):
+    if kind == "administrator":
+        register(app, "root", kind="administrator")
+    client, old_key = register(app, "someone", kind=kind)
+
+    body = {"currentAuthKey": old_key, "salt": b64(16), "kdf": dict(DEFAULT_KDF_ENVELOPE), "authKey": key}
+    if kind == "vault_owner":
+        body.update(wrappedDek=b64(48), dekNonce=b64(12))
+
+    before = snapshot(app)
+    response = client.post(CHANGE, json=body, headers=CSRF)
+    assert response.status_code == 400, response.get_data(as_text=True)
+    assert "refused" not in (response.get_json(silent=True) or {})
+    assert snapshot(app) == before
+    sign_in(app, "someone", old_key)
