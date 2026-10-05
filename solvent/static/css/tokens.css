@@ -1388,6 +1388,8 @@ th.numeric {
   background: var(--petrol-100);
 }
 
+.prices-line .skeleton { margin-left: 8px; vertical-align: middle; }
+
 .rate-line > .rate-pair,
 .rate-line > .field-error { grid-column: 1 / -1; margin: 0; }
 .rate-figure { flex: 1; text-align: right; font-variant-numeric: tabular-nums; }

@@ -100,8 +100,13 @@ export function snapshotDialog(vault, holding, existing, onSaved, onOpenRecordin
     if (sit && writes.needsLookup(vault, on, unit)) {
       sit.proposals = writes.fetchProposals(vault, on);
       block.waiting();
+      // The rate lines' own skeletons sit inside the fold, so the folded
+      // line carries one too (record-snapshot.md, States).
+      const skeleton = el('span', { class: 'skeleton', 'aria-label': 'Looking up the prices' });
+      pricesLine.append(skeleton);
       const shownFor = block;
       sit.proposals.then((proposals) => {
+        skeleton.remove();
         if (block === shownFor) block.showProposals(proposals);
       });
     }
