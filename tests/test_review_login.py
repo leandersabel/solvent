@@ -5,6 +5,9 @@ username is verified against a decoy that exists before the first
 request (spec/features/login.md, Stale-KDF upgrade and Flow step 3,
 criteria 10, 11, 79 and 80; spec/architecture.md, Key management, The
 split and An Auth Key that becomes a verifier, and Login enumeration).
+A forwarded header ignored by a server of concurrent request threads is
+logged once (login.md, criterion 47; architecture.md, Where the client
+address comes from).
 
 Written from the spec alone.
 """
@@ -20,6 +23,7 @@ import shutil
 import statistics
 import subprocess
 import sys
+import threading
 import time
 from pathlib import Path
 
@@ -29,7 +33,9 @@ from argon2.low_level import Type, hash_secret_raw
 
 from solvent.config import DEFAULT_KDF_ENVELOPE, SERVER_VERIFY_PARAMS
 from tests.helpers import CSRF, b64, connect, credential, register, sign_in
+from tests.test_review_app_shell import gunicorn, parsed, sign_in_page
 from tests.test_review_register import BAD_KEYS
+from tests.test_deployment import image_command
 
 ROOT = Path(__file__).resolve().parent.parent
 SPLIT = ROOT / "tests" / "client" / "review-split.mjs"
@@ -382,3 +388,46 @@ def test_a_request_without_the_current_salt_is_a_bad_request_and_writes_nothing(
     response = page.post(path, body)
     assert response.status_code == 400, response.get_data(as_text=True)
     assert elsewhere.everything(app) == before
+
+
+# gunicorn, with every log call for the notice slowed, so requests
+# arriving together all reach it before any could have finished it.
+SLOW_NOTICE = """
+import logging, sys, time
+handle = logging.Logger.callHandlers
+def slowed(self, record):
+    if record.getMessage().startswith("config.proxy_header_ignored"):
+        time.sleep(0.5)
+    handle(self, record)
+logging.Logger.callHandlers = slowed
+sys.argv[0] = "gunicorn"
+from gunicorn.app.wsgiapp import run
+run()
+"""
+
+
+@pytest.mark.parametrize("launcher", [None, ["-c", SLOW_NOTICE]], ids=["as-shipped", "notice-slowed"])
+def test_forwarded_headers_arriving_together_log_the_ignored_notice_once(tmp_path, launcher):
+    """Criterion 47, under the image's gunicorn: every request thread
+    carries `X-Forwarded-For` at once, and the process logs
+    `config.proxy_header_ignored` once, naming the setting and no
+    header value."""
+    threads = parsed(image_command()[1:]).threads
+    with gunicorn(tmp_path, launcher) as (port, process):
+        together = threading.Barrier(threads)
+        statuses = []
+
+        def forwarded(n):
+            together.wait()
+            statuses.append(sign_in_page(port, timeout=30, headers={"X-Forwarded-For": f"198.51.100.{n}"}))
+
+        senders = [threading.Thread(target=forwarded, args=(n,)) for n in range(threads)]
+        for sender in senders:
+            sender.start()
+        for sender in senders:
+            sender.join()
+        assert statuses == [200] * threads
+    lines = [line for line in process.output.splitlines() if "config.proxy_header_ignored" in line]
+    assert len(lines) == 1, process.output
+    assert "TRUSTED_PROXY_HOPS" in lines[0]
+    assert "198.51.100" not in process.output

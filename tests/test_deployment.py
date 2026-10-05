@@ -20,6 +20,7 @@ import time
 from datetime import datetime, timedelta, timezone
 from pathlib import Path
 
+import solvent.rates as rates
 from tests.helpers import CSRF, register_body
 
 REPO_ROOT = Path(__file__).resolve().parent.parent
@@ -73,6 +74,62 @@ def test_gunicorn_logs_no_address_agent_referrer_or_query_and_only_errors():
         '%(t)s "%(m)s %(U)s" %(s)s %(b)s %(M)s'
     )
     assert command[command.index("--log-level") + 1] == "error"
+
+
+def test_one_gthread_process_serves_more_requests_than_lookups_can_hold():
+    command = image_command()
+    assert command[command.index("--worker-class") + 1] == "gthread"
+    assert command[command.index("--workers") + 1] == "1"
+    assert int(command[command.index("--threads") + 1]) > rates.LOOKUP_CONCURRENCY
+
+
+def test_requests_held_open_as_long_as_lookups_can_be_leave_the_instance_answering(tmp_path):
+    """The real gunicorn, started with the image's arguments, with as
+    many requests stalled halfway as lookups can send at once. Each holds
+    a request thread as a lookup waiting on a slow source does, and the
+    sign-in page still answers at once."""
+    with socket.socket() as probe:
+        probe.bind(("127.0.0.1", 0))
+        port = probe.getsockname()[1]
+    argv = image_command()[1:]
+    argv[argv.index("--bind") + 1] = f"127.0.0.1:{port}"
+    env = dict(
+        os.environ,
+        SECRET_KEY="deployment-test-key",
+        DATABASE_PATH=str(tmp_path / "solvent.db"),
+    )
+    server = subprocess.Popen(
+        [sys.executable, "-m", "gunicorn", *argv],
+        cwd=REPO_ROOT, env=env, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL,
+    )
+
+    def sign_in_page() -> int:
+        connection = http.client.HTTPConnection("127.0.0.1", port, timeout=3)
+        try:
+            connection.request("GET", "/login")
+            return connection.getresponse().status
+        finally:
+            connection.close()
+
+    stalled = []
+    try:
+        for _ in range(200):
+            try:
+                sign_in_page()
+                break
+            except OSError:
+                time.sleep(0.1)
+        for _ in range(rates.LOOKUP_CONCURRENCY):
+            held = socket.create_connection(("127.0.0.1", port))
+            held.sendall(b"GET /api/rates HTTP/1.1\r\nHost: x\r\n")
+            stalled.append(held)
+        time.sleep(0.5)
+        assert sign_in_page() == 200
+    finally:
+        for held in stalled:
+            held.close()
+        server.terminate()
+        server.communicate(timeout=60)
 
 
 PEER = "127.0.0.2"

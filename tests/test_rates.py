@@ -1390,3 +1390,24 @@ def test_a_breaker_count_changed_from_many_threads_loses_no_update():
     for thread in threads:
         thread.join()
     assert breaker.failures == 8 * 2000
+
+
+def test_a_lookup_finding_every_slot_taken_sends_nothing_and_answers_what_needs_no_source(
+    owner, provider, monkeypatch
+):
+    slots = threading.BoundedSemaphore(rates.LOOKUP_CONCURRENCY)
+    monkeypatch.setattr(rates, "_lookup_slots", slots)
+    provider.answers["frankfurter"] = fx(PAST, {"USD": 1.0876})
+    for _ in range(rates.LOOKUP_CONCURRENCY):
+        slots.acquire()
+
+    single = owner.get(f"/api/rates?date={PAST}&quote=CHF&symbol=USD", headers=CSRF)
+    identity = owner.get(f"/api/rates?date={PAST}&quote=CHF&symbol=CHF", headers=CSRF)
+    assert single.status_code == 204
+    assert identity.get_json()["rate"] == "1"
+    assert provider.calls == []
+    assert rates.breakers["frankfurter"].failures == 0
+
+    slots.release()
+    assert owner.get(f"/api/rates?date={PAST}&quote=CHF&symbol=USD", headers=CSRF).status_code == 200
+    assert provider.calls

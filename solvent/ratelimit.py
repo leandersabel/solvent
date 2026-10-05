@@ -230,12 +230,13 @@ def init_app(app) -> None:
 
     if app.config["TRUSTED_PROXY_HOPS"]:
         return
-    noticed = threading.Event()
+    # Taken by the first request that carries the header and never
+    # released, so of request threads arriving at once only one logs.
+    noticed = threading.Lock()
 
     @app.before_request
     def _note_ignored_proxy_header():
-        if "X-Forwarded-For" in request.headers and not noticed.is_set():
-            noticed.set()
+        if "X-Forwarded-For" in request.headers and noticed.acquire(blocking=False):
             app.logger.warning(
                 "config.proxy_header_ignored X-Forwarded-For is ignored while "
                 "TRUSTED_PROXY_HOPS is 0. Set it to the number of proxies in "

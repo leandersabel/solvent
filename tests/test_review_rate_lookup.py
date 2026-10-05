@@ -11,7 +11,10 @@ of the request, and no output carries a provider key (criteria 41 and
 66). A date not
 written as `date.isoformat()` writes it, or in the future, is a Bad
 Request that reaches no provider (SSRF and egress hardening, criteria
-43 and 67).
+43 and 67). With every lookup slot sending, a lookup sends nothing,
+answers what needs no source and leaves the breakers alone, and the
+next one after a slot frees sends (Rate limiting and failure,
+criterion 69).
 
 Written from the spec alone. Each provider is reached on a loopback HTTP
 server through the app's own opener, so the app's real socket timeout
@@ -34,7 +37,7 @@ from datetime import date, datetime, timedelta, timezone
 import pytest
 
 import solvent.rates as rates
-from tests.helpers import CSRF, connect, rows
+from tests.helpers import CSRF, connect, register, rows, sign_in
 
 PAST = "2026-07-31"
 # How late a receive may start after the deadline, for scheduling alone.
@@ -1497,3 +1500,60 @@ def test_today_is_not_a_future_date(owner, sources):
 
     assert response.status_code != 400
     assert sources.opened
+
+
+def breaker_states():
+    return {name: (b.failures, b.opened_at) for name, b in rates.breakers.items()}
+
+
+def test_with_every_slot_sending_a_lookup_sends_nothing_and_answers_only_what_needs_no_source(app, sources):
+    """Criterion 69. The held lookups each come from a session of their
+    own, as from separate people, and each asks for a date of its own."""
+    owner, key = register(app, "holder")
+    cached_day = "2026-07-01"
+    assert owner.get(f"/api/rates?date={cached_day}&quote=CHF&symbol=USD", headers=CSRF).status_code == 200
+    sources.plans["frankfurter"] = trickle(_frankfurter, interval=60)
+    sent_before = len(sources.opened)
+
+    slots = rates.LOOKUP_CONCURRENCY
+    held = [sign_in(app, "holder", key)[0] for _ in range(slots)]
+    answers = []
+
+    def hold(client, day):
+        answers.append(client.get(f"/api/rates?date=2026-07-{day:02d}&quote=CHF&symbol=USD", headers=CSRF))
+
+    holders = [threading.Thread(target=hold, args=(c, 2 + n)) for n, c in enumerate(held)]
+    for holder in holders:
+        holder.start()
+    deadline = time.monotonic() + rates.EGRESS_TIMEOUT_SECONDS / 2
+    while len(sources.opened) < sent_before + slots and time.monotonic() < deadline:
+        time.sleep(0.01)
+    assert len(sources.opened) == sent_before + slots
+    breakers_before = breaker_states()
+
+    pending = owner.get(f"/api/rates?date={PAST}&quote=CHF&symbol=USD", headers=CSRF)
+    identity = owner.get(f"/api/rates?date={PAST}&quote=CHF&symbol=CHF", headers=CSRF)
+    cached = owner.get(f"/api/rates?date={cached_day}&quote=CHF&symbol=USD", headers=CSRF)
+    gold = owner.get(f"/api/rates?date={PAST}&quote=CHF&symbol=XAU-ozt", headers=CSRF)
+    table = owner.get(f"/api/rates?date={PAST}&quote=CHF", headers=CSRF)
+
+    assert len(sources.opened) == sent_before + slots
+    assert breaker_states() == breakers_before
+    assert pending.status_code == 204
+    assert gold.status_code == 204
+    assert identity.status_code == 200
+    assert identity.get_json()["rate"] == "1"
+    assert identity.get_json()["source"] == "identity"
+    assert cached.status_code == 200
+    assert cached.get_json()["cached"] is True
+    assert table.status_code == 204
+
+    for holder in holders:
+        holder.join()
+    assert [a.status_code for a in answers] == [204] * slots
+
+    sources.plans["frankfurter"] = at_once(_frankfurter)
+    freed = owner.get(f"/api/rates?date={PAST}&quote=CHF&symbol=USD", headers=CSRF)
+    assert freed.status_code == 200
+    assert len(sources.opened) == sent_before + slots + 1
+

@@ -752,7 +752,8 @@ password change and an upgrade keep the DEK, so they leave it alone.
     requests whose last entries differ count apart, and a client-written
     entry left of the proxy's changes nothing. Test:
     `tests/test_attempts.py::test_without_trusted_proxies_a_forwarded_header_changes_nothing_and_is_logged_once`,
-    `tests/test_attempts.py::test_with_one_trusted_proxy_the_last_forwarded_entry_is_the_client`.
+    `tests/test_attempts.py::test_with_one_trusted_proxy_the_last_forwarded_entry_is_the_client`,
+    `tests/test_review_login.py::test_forwarded_headers_arriving_together_log_the_ignored_notice_once`.
 48. (blind) Tripping a lock logs exactly one `auth.lockout` line and the
     requests it refuses none. The address line has no address and no
     address key. A username with a newline and a quote logs as one line
