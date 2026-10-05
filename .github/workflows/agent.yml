@@ -1,7 +1,7 @@
 name: Agent
 
 # A run started for one issue is named after it.
-run-name: "${{ github.event.inputs.issue && format('Agent: {0}', github.event.inputs.issue) || '' }}"
+run-name: "${{ github.event.inputs.issue && format('Agent: {0}{1}', github.event.inputs.issue, github.event.inputs.restart == 'true' && ' (restart)' || '') || '' }}"
 
 # Every event that can move an issue along the loop runs the `advance`
 # skill for that issue (CLAUDE.md, The loop). The route job decides which
@@ -18,7 +18,8 @@ on:
     types: [completed]
   push:
     branches: [master]
-  # Hourly, the queue starts what usage held back.
+  # Hourly, a backstop for the queue, because GitHub delays and drops
+  # scheduled runs.
   schedule:
     - cron: "17 * * * *"
   workflow_dispatch:
@@ -30,6 +31,14 @@ on:
         description: Set by a run that left work for a fresh run to continue
         type: boolean
         default: false
+      restart:
+        description: Set by the queue for an issue holding the slot with nothing in progress
+        type: boolean
+        default: false
+      retry:
+        description: How many runs in a row the model service failed on this issue
+        type: number
+        default: 0
 
 permissions: {}
 
@@ -45,7 +54,6 @@ jobs:
       security-events: read
     outputs:
       issue: ${{ steps.route.outputs.issue }}
-      queue: ${{ steps.route.outputs.queue }}
     steps:
       - id: route
         env:
@@ -78,7 +86,6 @@ jobs:
                 gh issue create --label code-scanning --label "$rating" --label queued \
                   --title "Code scanning alert $n: $(jq -r .rule.description <<<"$alert")" \
                   --body "$(jq -r '"\(.rule.security_severity_level // .rule.severity) severity, rule `\(.rule.id)`, in `\(.most_recent_instance.location.path)` line \(.most_recent_instance.location.start_line).\n\n> \(.most_recent_instance.message.text)\n\n\(.html_url)"' <<<"$alert")"
-                queue=true
               elif [ "$state" = CLOSED ] && [ "$reason" = COMPLETED ]; then
                 # Until master is scanned after the fix, the alert is
                 # still open on the scan before it.
@@ -93,7 +100,6 @@ jobs:
                 if [ "$(gh api --paginate "repos/$GH_REPO/issues/$number/timeline" --jq '.[] | select(.event == "reopened") | 1' | wc -l)" -eq 0 ]; then
                   gh issue reopen "$number" --comment "The alert is still open on master after this issue's fix merged."
                   gh issue edit "$number" --add-label queued
-                  queue=true
                 else
                   gh issue reopen "$number"
                   gh issue edit "$number" --add-label stuck
@@ -104,9 +110,6 @@ jobs:
           }
           sender=$(jqe .sender.login)
           issue=
-          # Set when the event can free the implementation slot or fill
-          # the queue, so the queue job looks.
-          queue=
           case "$EVENT" in
             issues)
               label=$(jqe .label.name)
@@ -121,7 +124,6 @@ jobs:
                   for n in $(gh issue list --state closed --label implementing --json number --jq '.[].number'); do
                     gh issue edit "$n" --remove-label implementing
                   done
-                  queue=true
                 fi
               elif [[ "$label" == "severity: "* ]] && ! counts "$sender"; then
                 # A rating that does not count is removed, so the line
@@ -131,8 +133,6 @@ jobs:
                 # A finding is filed in line and has no run of its own
                 # (CLAUDE.md, The loop, Findings).
                 jq -e '.issue.labels | any(.name == "queued")' "$GITHUB_EVENT_PATH" >/dev/null || issue=$(jqe .issue.number)
-              elif [ "$label" = queued ] && [ "$sender" = "$OWNER" ]; then
-                queue=true
               fi ;;
             issue_comment)
               if [ "$sender" = "$OWNER" ] && [ "$(jqe .issue.state)" = open ]; then
@@ -174,11 +174,9 @@ jobs:
               issue=$(jqe .inputs.issue)
               case "$issue" in
                 alerts) issue=; file_alerts ;;
-                queue) issue=; queue=true ;;
+                queue) issue= ;;
                 *) [[ "$issue" =~ ^[0-9]+$ ]] || { echo "Not an issue number: $issue"; exit 1; } ;;
               esac ;;
-            schedule)
-              queue=true ;;
             push)
               # A merge frees the implementation slot and can leave the
               # loop's other pull requests conflicting. Each of those
@@ -195,8 +193,7 @@ jobs:
               done
               runs=$(jq -r '.[] | select(.mergeable == "CONFLICTING") | .headRefName' <<<"$prs" \
                 | while read -r b; do from_branch "$b"; done)
-              for n in $runs; do dispatch "$n"; done
-              queue=true ;;
+              for n in $runs; do dispatch "$n"; done ;;
           esac
           # Not started (advance skill, step 1): no agent runs on an
           # issue that is closed, or that lacks `accepted` unless the
@@ -208,9 +205,10 @@ jobs:
             [ "$started" = true ] || issue=
           fi
           echo "issue=$issue" >> "$GITHUB_OUTPUT"
-          echo "queue=$queue" >> "$GITHUB_OUTPUT"
 
   advance:
+    # Named after its issue, so the queue job sees a run under way on it.
+    name: advance ${{ needs.route.outputs.issue }}
     needs: route
     if: needs.route.outputs.issue != ''
     runs-on: ubuntu-latest
@@ -222,6 +220,7 @@ jobs:
       group: issue-${{ needs.route.outputs.issue }}
     outputs:
       refused: ${{ steps.usage.outputs.refused }}
+      failed: ${{ steps.usage.outputs.failed }}
       usage: ${{ steps.usage.outputs.usage }}
     permissions:
       contents: write
@@ -264,9 +263,10 @@ jobs:
           claude_args: |
             --model claude-opus-5-5
             --permission-mode bypassPermissions
-      # What the subscription had left as the run ended, and whether it
-      # refused the run. A rejection while overage is in use is no refusal,
-      # and a run that ended well only quoted the words.
+      # What the subscription had left as the run ended, whether it
+      # refused the run, and whether the model service failed it. A
+      # rejection while overage is in use is no refusal, and a run that
+      # ended well only quoted the words.
       - id: usage
         if: always() && steps.claude.outputs.execution_file
         env:
@@ -276,6 +276,8 @@ jobs:
             | ([.[] | select(.type == "result")][-1].result // "" | tostring) as $said
             | "refused=\(($limit.status // "allowed" | IN("allowed", "allowed_warning") | not) and $limit.isUsingOverage != true
                 or ([.[] | select(.type == "result")][-1].is_error == true and ($said | test("usage limit"; "i"))))",
+              "failed=\([.[] | select(.type == "result")][-1].is_error == true
+                and ($said | test("API Error|overloaded"; "i")) and ($said | test("usage limit"; "i") | not))",
               "usage=\($limit.unifiedWindows // {})"' "$SESSION" >> "$GITHUB_OUTPUT"
       - if: always() && steps.claude.outputs.execution_file
         uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
@@ -296,8 +298,9 @@ jobs:
           ISSUE: ${{ needs.route.outputs.issue }}
           RESUME: ${{ github.event.inputs.resume }}
           REFUSED: ${{ steps.usage.outputs.refused }}
+          FAILED: ${{ steps.usage.outputs.failed }}
         run: |
-          [ "$RESUME" != true ] && [ "$REFUSED" != true ] || exit 0
+          [ "$RESUME" != true ] && [ "$REFUSED" != true ] && [ "$FAILED" != true ] || exit 0
           [ "$(gh api "repos/$GH_REPO/issues/$ISSUE" \
             --jq '.state == "open" and all(.labels[]; .name != "needs-answer" and .name != "stuck")')" = true ] || exit 0
           for kind in spec issue; do
@@ -321,11 +324,18 @@ jobs:
           OWNER: ${{ github.repository_owner }}
           FINISHED: ${{ steps.claude.outcome == 'success' }}
           REFUSED: ${{ steps.usage.outputs.refused }}
+          FAILED: ${{ steps.usage.outputs.failed }}
+          RETRY: ${{ github.event.inputs.retry || 0 }}
           RUN: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
         run: |
           issue=$(gh api "repos/$GH_REPO/issues/$ISSUE")
           [ "$(jq -r .state <<<"$issue")" = open ] || exit 0
-          if [ "$FINISHED" = true ]; then
+          # A failure of the model service passes on its own: the retry
+          # job starts the run again, up to the third failure in a row.
+          if [ "$FAILED" = true ]; then
+            [ "$RETRY" -ge 2 ] || exit 0
+            why="The model service failed three runs in a row, the last"
+          elif [ "$FINISHED" = true ]; then
             why="The run ended without a pull request or a question"
             # Waiting on the client or the queue, or not started.
             jq -e '[.labels[].name] as $l
@@ -356,26 +366,59 @@ jobs:
             fi
             why="The subscription's usage limit stopped the run"
           fi
+          # The queue job tends an issue holding the slot (CLAUDE.md, The
+          # loop, Implementation).
+          jq -e 'any(.labels[]; .name == "implementing")' <<<"$issue" >/dev/null && exit 0
           gh issue edit "$ISSUE" --add-label stuck
           gh issue comment "$ISSUE" --body "@$OWNER $why: $RUN. Any comment here starts the next one."
 
+  # A run the model service failed starts again fifteen minutes later,
+  # with its issue where it was (CLAUDE.md, The loop, When something
+  # fails). The third failure in a row leaves it stuck.
+  retry:
+    needs: [route, advance]
+    if: always() && needs.advance.outputs.failed == 'true' && (github.event.inputs.retry || 0) < 2
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    permissions:
+      issues: read
+      actions: write
+    steps:
+      - env:
+          GH_TOKEN: ${{ github.token }}
+          GH_REPO: ${{ github.repository }}
+          ISSUE: ${{ needs.route.outputs.issue }}
+          RESUME: ${{ github.event.inputs.resume || false }}
+          RETRY: ${{ github.event.inputs.retry || 0 }}
+        run: |
+          sleep 900
+          [ "$(gh api "repos/$GH_REPO/issues/$ISSUE" \
+            --jq '.state == "open" and all(.labels[]; .name != "needs-answer" and .name != "stuck")')" = true ] || exit 0
+          gh workflow run agent.yml --ref master -f issue="$ISSUE" -f resume="$RESUME" -f retry=$((RETRY + 1))
+
   # One implementation runs at a time (CLAUDE.md, The loop,
-  # Implementation). This job alone hands out the slot, and only one of
-  # it runs at a time, so two issues never both get it. A later one
-  # waiting replaces an earlier one waiting, and sees all that one would.
+  # Implementation). This job alone hands out the slot and tends its
+  # holder, on every event, and only one of it runs at a time, so two
+  # issues never both get it. A later one waiting replaces an earlier
+  # one waiting, and sees all that one would.
   queue:
     needs: [route, advance]
-    if: always() && (needs.route.outputs.queue == 'true' || needs.advance.result != 'skipped')
+    if: always() && needs.route.result == 'success'
     runs-on: ubuntu-latest
-    timeout-minutes: 5
+    timeout-minutes: 15
     concurrency:
       group: queue
+    outputs:
+      until: ${{ steps.queue.outputs.until }}
     permissions:
       issues: write
       pull-requests: read
       actions: write
+      checks: read
+      contents: read
     steps:
-      - env:
+      - id: queue
+        env:
           GH_TOKEN: ${{ github.token }}
           GH_REPO: ${{ github.repository }}
           OWNER: ${{ github.repository_owner }}
@@ -383,6 +426,7 @@ jobs:
           ISSUE: ${{ needs.route.outputs.issue }}
           REFUSED: ${{ needs.advance.outputs.refused }}
           USAGE: ${{ needs.advance.outputs.usage }}
+          RUN: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
         run: |
           # Open issues carrying label $1, read from the issues
           # themselves, because a search can lag behind a label just set.
@@ -390,35 +434,54 @@ jobs:
             gh api --paginate "repos/$GH_REPO/issues?state=open&labels=$1&per_page=100" \
               --jq '.[] | select(.pull_request | not)'
           }
+          # Issues holding the slot, each read on its own, because a list
+          # filtered by label can still show a label just removed. One
+          # this job freed never holds it. One that still carries
+          # `queued` was only half handed it, and is picked again below.
+          freed=
+          holders() {
+            open_with implementing | jq -r .number | while read -r n; do
+              [[ " $freed " == *" $n "* ]] ||
+                gh api "repos/$GH_REPO/issues/$n" --jq '[.labels[].name] as $l
+                  | select(.state == "open" and ($l | index("implementing")) and ($l | index("queued") | not)) | .number'
+            done
+          }
+          # Every way the job ends without starting a run says why on
+          # the run's page.
+          idle() {
+            echo "::notice title=Nothing started::$1"
+            echo "Nothing started: $1" >> "$GITHUB_STEP_SUMMARY"
+            exit 0
+          }
 
-          # The slot is only for an implementation under way. An issue
-          # the agent left waiting on the client, or stuck, gives it up.
-          if [ -n "$ISSUE" ]; then
-            read -r has waits < <(gh api "repos/$GH_REPO/issues/$ISSUE" --jq '[.labels[].name] as $l
-              | "\(.state == "open" and ($l | index("implementing")) != null) \(($l | index("needs-answer")) != null or ($l | index("stuck")) != null)"')
-            if [ "$has" = true ] && { [ "$waits" = true ] ||
-              [ -n "$(gh api "repos/$GH_REPO/pulls?state=open&head=$OWNER:claude/spec-$ISSUE" --jq '.[].number')" ]; }; then
-              gh issue edit "$ISSUE" --remove-label implementing
+          # The slot is only for an implementation that can move. An
+          # issue waiting on the client, or returned to its requirements,
+          # gives it up. One blocked by another issue goes back in line
+          # behind its cause.
+          for n in $(holders); do
+            labels=$(gh api "repos/$GH_REPO/issues/$n" --jq '[.labels[].name]')
+            if jq -e 'index("blocked")' <<<"$labels" >/dev/null; then
+              gh issue edit "$n" --remove-label implementing --add-label queued
+              freed="$freed $n"
+            elif jq -e 'index("needs-answer") or index("stuck")' <<<"$labels" >/dev/null ||
+              [ -n "$(gh pr list --head "claude/spec-$n" --state open --json number --jq '.[].number')" ]; then
+              gh issue edit "$n" --remove-label implementing
+              freed="$freed $n"
             fi
-          fi
-
-          # The slot is free once no open issue carries `implementing`.
-          # One that still carries `queued` was only half handed the
-          # slot, and is picked again below.
-          holding=$(open_with implementing | jq -r 'select(any(.labels[]; .name == "queued") | not) | .number')
-          [ -z "$holding" ] || exit 0
+          done
 
           # Nothing starts while usage lacks headroom: a run just
           # refused, or a window near its limit that has not reset yet
           # (CLAUDE.md, The loop, Implementation). Without this run's
           # usage, the newest run's is read, and none lets the run start.
-          # A hold shows on the run's page.
+          # A hold shows on the run's page, and the wait job starts the
+          # queue again once the window resets.
           hold() {
             echo "::notice title=Queue held::$1"
             echo "Queue held: $1" >> "$GITHUB_STEP_SUMMARY"
+            [ -z "$2" ] || echo "until=$2" >> "$GITHUB_OUTPUT"
             exit 0
           }
-          [ "$REFUSED" != true ] || hold "the subscription refused the run on #$ISSUE for its usage limit."
           if [ -z "$USAGE" ] || [ "$USAGE" = "{}" ]; then
             USAGE=$(id=$(gh api "repos/$GH_REPO/actions/artifacts?name=session&per_page=30" \
                 --jq '[.artifacts[] | select((.expired | not) and .workflow_run.head_branch == "master" and .workflow_run.head_repository_id == .workflow_run.repository_id)][0].id // empty') &&
@@ -427,25 +490,123 @@ jobs:
               unzip -p "$RUNNER_TEMP/session.zip" claude-execution-output.json |
               jq -c '[.[] | select(.type == "rate_limit_event")][-1].rate_limit_info.unifiedWindows // {}') || USAGE="{}"
           fi
-          full=$(jq -r --argjson now "$(date +%s)" '[{name: "five-hour", limit: 0.9} + (.five_hour // empty),
-              {name: "weekly", limit: 0.8} + (.seven_day // empty)][]
-            | select(.utilization >= .limit and .resetsAt > $now)
-            | "the \(.name) window is at \(.utilization * 100 | round) percent until \(.resetsAt | todate)"' <<<"$USAGE" | paste -sd, - | sed 's/,/, and /g')
-          [ -z "$full" ] || hold "$full."
-          # First in line: the lowest-numbered critical issue, then high,
-          # then any (CLAUDE.md, The loop, Severity), among those a run
-          # would start on and nothing waits on the client for.
-          next=$(open_with queued | jq -c '(.labels | map(.name)) as $l
+          # The windows yet to reset, and those of them near their limit.
+          windows=$(jq -c --argjson now "$(date +%s)" '[{name: "five-hour", limit: 0.9} + (.five_hour // empty),
+              {name: "weekly", limit: 0.8} + (.seven_day // empty)] | map(select(.resetsAt > $now))' <<<"$USAGE")
+          full=$(jq -c 'map(select(.utilization >= .limit))' <<<"$windows")
+          # A refused run waits for the windows near their limit, or else
+          # the first to reset.
+          [ "$REFUSED" != true ] || hold "the subscription refused the run on #$ISSUE for its usage limit." \
+            "$(jq --argjson full "$full" '($full | max_by(.resetsAt)) // min_by(.resetsAt) | .resetsAt // empty' <<<"$windows")"
+          [ "$full" = "[]" ] || hold "$(jq -r 'map("the \(.name) window is at \(.utilization * 100 | round) percent until \(.resetsAt | todate)") | join(", and ")' <<<"$full")." \
+            "$(jq 'max_by(.resetsAt).resetsAt' <<<"$full")"
+
+          # Something is in progress on issue $1: a run on it, or checks
+          # on its pull request. Checks that finished, or a commit pushed,
+          # in the last five minutes count too, while GitHub starts the
+          # checks or the merge, and the job waits that out.
+          under_way() {
+            local runs id sha checks wait
+            runs=$(gh api "repos/$GH_REPO/actions/workflows/agent.yml/runs?per_page=100" |
+              jq -c --argjson self "$GITHUB_RUN_ID" '[.workflow_runs[] | select(.status != "completed" and .id != $self)]')
+            jq -e --arg t "Agent: $1" 'any(.[]; .display_title == $t or .display_title == $t + " (restart)")' <<<"$runs" >/dev/null && return 0
+            for id in $(jq -r '.[].id' <<<"$runs"); do
+              gh api --paginate "repos/$GH_REPO/actions/runs/$id/jobs" --jq '.jobs[] | select(.status != "completed") | .name' |
+                grep -qx "advance $1" && return 0
+            done
+            sha=$(gh pr list --head "claude/issue-$1" --state open --json headRefOid --jq '.[0].headRefOid // empty')
+            [ -n "$sha" ] || return 1
+            checks=$(gh api --paginate "repos/$GH_REPO/commits/$sha/check-runs?per_page=100" --jq '.check_runs[]' | jq -s .)
+            jq -e 'any(.[]; .status != "completed")' <<<"$checks" >/dev/null && return 0
+            wait=$(jq -r --arg pushed "$(gh api "repos/$GH_REPO/commits/$sha" --jq .commit.committer.date)" \
+              '[$pushed] + map(.completed_at) | max | fromdate + 300 - now | floor' <<<"$checks")
+            [ "$wait" -gt 0 ] || return 1
+            sleep "$wait"
+            under_way "$1"
+          }
+
+          # A holder with nothing in progress gets a fresh run, which
+          # takes its next step (advance skill). Three of them without a
+          # new commit on its branch since it got the slot, and it is
+          # stuck and gives the slot up.
+          holder=$(holders | head -n 1)
+          if [ -n "$holder" ]; then
+            under_way "$holder" && idle "#$holder holds the slot, with a run or checks in progress."
+            since=$({
+              gh api --paginate "repos/$GH_REPO/issues/$holder/timeline" \
+                --jq '.[] | select(.event == "labeled" and .label.name == "implementing") | .created_at'
+              gh api "repos/$GH_REPO/commits/claude/issue-$holder" --jq .commit.committer.date 2>/dev/null || true
+            } | sort | tail -n 1)
+            restarts=$(gh api -X GET "repos/$GH_REPO/actions/workflows/agent.yml/runs" \
+              -f event=workflow_dispatch -f created=">=$since" -F per_page=100 |
+              jq --arg t "Agent: $holder (restart)" '[.workflow_runs[] | select(.display_title == $t)] | length')
+            if [ "$restarts" -lt 3 ]; then
+              gh workflow run agent.yml --ref master -f issue="$holder" -f restart=true
+              exit 0
+            fi
+            gh issue edit "$holder" --add-label stuck --remove-label implementing
+            gh issue comment "$holder" --body "@$OWNER This issue held the implementation slot with nothing in progress, and three fresh runs brought no new commit: $RUN. It gave the slot up. Any comment here starts the next run."
+          fi
+
+          # Each open blocked issue, with the causes it names that are
+          # still open, from the loop's comments on it (advance skill,
+          # step 4).
+          blocked=$(open_with blocked | jq -r .number | while read -r n; do
+            gh api --paginate "repos/$GH_REPO/issues/$n/comments" \
+              --jq '.[] | select(.user.login == "claude[bot]") | .body' |
+              sed -nE 's/^<!-- blocked-by: #([0-9]+) -->\r?$/\1/p' | sort -u |
+              while read -r c; do gh api "repos/$GH_REPO/issues/$c" --jq 'select(.state == "open") | .number'; done |
+              jq -s --argjson n "$n" '{number: $n, open: .}'
+          done | jq -s -c .)
+          # First in line: the cause of a blocked issue, then a blocked
+          # issue whose causes are closed, then the lowest-numbered
+          # critical issue, then high, then any (CLAUDE.md, The loop,
+          # Implementation), among those a run would start on and nothing
+          # waits on the client for.
+          next=$(open_with queued | jq -c --argjson blocked "$blocked" '(.labels | map(.name)) as $l | .number as $n
             | select(($l | index("accepted")) or .user.login == "github-actions[bot]")
             | select($l | index("stuck") or index("needs-answer") | not)
-            | [(if $l | index("severity: critical") then 0 elif $l | index("severity: high") then 1 else 2 end), .number]' |
+            | ($blocked | map(select(.number == $n))[0]) as $b
+            | select($b == null or ($b.open | length) == 0)
+            | [(if any($blocked[]; any(.open[]; . == $n)) then 0 elif $b then 1
+                elif $l | index("severity: critical") then 2 elif $l | index("severity: high") then 3 else 4 end), $n]' |
             jq -s 'min // empty | .[1]')
-          [ -n "$next" ] || exit 0
+          [ -n "$next" ] || idle "no issue is in line."
           gh issue edit "$next" --add-label implementing --remove-label queued
           for _ in 1 2 3; do
-            if gh workflow run agent.yml --ref master -f issue="$next"; then exit 0; fi
+            if gh workflow run agent.yml --ref master -f issue="$next"; then
+              if jq -e --argjson n "$next" 'any(.[]; .number == $n)' <<<"$blocked" >/dev/null; then
+                gh issue edit "$next" --remove-label blocked
+              fi
+              exit 0
+            fi
             sleep 5
           done
           # An issue with the slot and no run would hold up the queue.
           gh issue edit "$next" --add-label queued --remove-label implementing
+          echo "::error title=Nothing started::The run on #$next could not be started, and it went back in line."
           exit 1
+
+  # A queue the usage limit holds starts again once the window resets,
+  # because the hourly schedule is delayed and dropped. A job runs at
+  # most six hours, so a longer wait ends early, and the queue, still
+  # held, starts the next. A later hold replaces this one.
+  wait:
+    needs: queue
+    if: always() && needs.queue.outputs.until != ''
+    runs-on: ubuntu-latest
+    timeout-minutes: 330
+    concurrency:
+      group: wait
+      cancel-in-progress: true
+    permissions:
+      actions: write
+    steps:
+      - env:
+          GH_TOKEN: ${{ github.token }}
+          GH_REPO: ${{ github.repository }}
+          UNTIL: ${{ needs.queue.outputs.until }}
+        run: |
+          left=$(( UNTIL + 60 - $(date +%s) ))
+          sleep $(( left > 18000 ? 18000 : left > 0 ? left : 0 ))
+          gh workflow run agent.yml --ref master -f issue=queue
