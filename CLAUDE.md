@@ -246,6 +246,11 @@ to where they asked, labeled `bug` or `change` and `accepted`.
   implementation once its causes are closed, then critical problems,
   then high ones, then the rest, each lowest number first. An issue
   that waits on the client holds neither a place in line nor the slot.
+- The step reads each holder's own labels to decide whether the slot is
+  taken, never a list filtered by label, which can still show a label
+  just removed. An issue the step has just freed never holds the slot.
+  Every way the step ends without starting a run says why on the run's
+  page.
 - The slot belongs only to an issue with something in progress: a run
   on it, or checks still running on its pull request. The same step
   starts a fresh run for a holder with neither, because a run can
@@ -496,6 +501,11 @@ found.
   holding the implementation slot gets no `stuck` from its run either:
   the workflow starts a fresh one, and labels it `stuck` only past its
   restarts (Implementation).
+- A run the model service failed, overloaded or erroring, is no reason
+  to stop, because the failure passes on its own. Its issue stays where
+  it was, without `stuck` or a comment, and the workflow
+  starts the run again fifteen minutes later. The third failure in a row
+  labels the issue `stuck`.
 - A failing check on an implementation pull request starts a run that
   fixes it on the same branch. After a bounded number of attempts, the
   pull request becomes a draft without auto-merge and the issue is
