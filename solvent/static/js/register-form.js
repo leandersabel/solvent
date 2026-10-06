@@ -243,6 +243,7 @@ export function registerForm({ kind, token: inviteToken, currencies, kdf, onCrea
     // a field or a variable while the vault is drawn.
     password.value = '';
     confirm.value = '';
+    gauge.evaluate();
     token = null;
     await onCreated(created);
   });
