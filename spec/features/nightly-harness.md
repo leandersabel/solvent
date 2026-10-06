@@ -387,7 +387,9 @@ app's own code did not produce:
   replaces another's. `--invite` is a CLI-minted administrator invite,
   which registers `harness-admin`. Every other invite is made through
   `POST /api/admin/invites` from that administrator's page, the
-  expired one with the plan's label.
+  expired one with the plan's label. Each account waits for its
+  registration form, and a form that never shows fails the run naming
+  the address and the text the page shows instead.
 - **Records** are written only through the served modules
   `/static/js/session.js`, `writes.js`, `crypto.js` and `api.js`:
   `saveProfile`, `saveHolding`, `saveSnapshot`, `refreshPrices` with
@@ -723,3 +725,5 @@ On failure it prints `docker logs` of `solvent` and `standin`.
     neighbors' line. Test: `tests/test_nightly_tools.py::test_prepare_refuses_a_cleared_or_deleted_date_that_bends_nothing`, `tests/test_nightly_tools.py::test_prepare_refuses_a_cleared_date_whose_prices_lie_on_the_line`.
 44. With no holding valued the expected total is `null` and `assets` and
     `debts` are zero. Test: `tests/test_nightly_tools.py::test_with_nothing_valued_the_total_is_none_and_the_sides_are_zero`.
+45. A registration form that never shows, as for a refused invite,
+    fails the generator with the text the page shows. Test: `tests/test_nightly_browser.py::test_a_registration_form_that_never_shows_fails_naming_what_the_page_shows`.

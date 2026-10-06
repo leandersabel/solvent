@@ -432,6 +432,7 @@ export async function startRecorder() {
   // an empty vault.
   const register = async () => {
     await rec.goto(`${BASE}/register?invite=${mintInvite('vault-owner')}`);
+    await rec.waitUntil("document.querySelector('input[type=password]')", { label: 'the registration form' });
     await set('input[type=text]', 'recorder');
     await set('input[type=password]', RECORDER_PASSWORD, 0);
     await set('input[type=password]', RECORDER_PASSWORD, 1);

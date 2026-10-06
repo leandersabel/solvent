@@ -173,8 +173,10 @@ export class Session {
 
   async goto(url) {
     const loaded = this.waitFor('Page.loadEventFired');
-    await this.send('Page.navigate', { url });
+    const { errorText } = await this.send('Page.navigate', { url });
+    // A navigation that failed still loads, Chrome's own error page.
     await loaded;
+    if (errorText) throw new Error(`${url} did not load: ${errorText}`);
     await this.idle();
   }
 
@@ -356,6 +358,8 @@ export class Session {
       }
     }
     const thrown = await this.eval('globalThis.__waitFailure ?? null').catch(() => null);
-    throw new Error(`timed out waiting for ${label}${failure || thrown ? ` (${failure ?? thrown})` : ''}`);
+    // What was showing instead, which is what explains most timeouts.
+    const shown = await this.eval("`${location.href} ${document.readyState}: ${document.body?.innerText.slice(0, 500)}`").catch(() => null);
+    throw new Error(`timed out waiting for ${label}${failure || thrown ? ` (${failure ?? thrown})` : ''}\nshowing ${shown}`);
   }
 }

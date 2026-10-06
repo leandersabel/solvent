@@ -76,8 +76,7 @@ async function openBrowser() {
 // The registration form, filled and submitted as a person does.
 async function register(session, path, account) {
   await session.goto(`${base}${path}`);
-  const refused = await session.eval("Boolean(document.querySelector('.error, .callout-critical')) && !document.querySelector('input[type=password]')");
-  if (refused) throw new Error(`the invite for ${account.username} was refused`);
+  await session.waitUntil("document.querySelector('input[type=password]')", { label: `the registration form of ${account.username}` });
   await session.call((name, secret, money) => {
     const set = (selector, value, index = 0) => {
       const node = document.querySelectorAll(selector)[index];

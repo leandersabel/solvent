@@ -189,3 +189,22 @@ def test_the_out_of_range_idle_lock_is_stored_as_zero_and_shown_as_five_minutes(
     owner = next(a["username"] for a in generated.manifest["accounts"] if "idle-lock-out-of-range" in a["covers"])
     assert (dashboards[owner]["storedIdleLock"], dashboards[owner]["shownIdleLock"]) == (0, "5")
     assert [u for u, entry in dashboards.items() if "storedIdleLock" in entry] == [owner]
+
+
+def test_a_registration_form_that_never_shows_fails_naming_what_the_page_shows(tmp_path):
+    """The nightly of #390 died on `Cannot set properties of undefined`,
+    which says nothing of the page the form was missing from."""
+    env = dict(os.environ, SECRET_KEY=secrets.token_hex(32), DATABASE_PATH=str(tmp_path / "solvent.db"))
+    plan = TOOLS / "fixtures" / "plan.json"
+    prepared = subprocess.run(
+        [sys.executable, str(TOOLS / "prices.py"), "prepare", str(plan), str(tmp_path)], capture_output=True, text=True
+    )
+    assert prepared.returncode == 0, prepared.stderr
+    with serve(env, tmp_path / "server.log") as base:
+        ran = subprocess.run(
+            ["node", str(TOOLS / "fixtures.mjs"), "--base", base, "--invite", "/register?invite=refused",
+             "--plan", str(plan), "--out", str(tmp_path)],
+            cwd=REPO_ROOT, env=env, capture_output=True, text=True, timeout=120,
+        )
+    assert ran.returncode != 0
+    assert "the registration form of" in ran.stderr and "This invite link is not valid." in ran.stderr, ran.stderr
