@@ -1864,6 +1864,17 @@ await check('net-worth-view: the shown bars and the shown assets and liabilities
     figures: [['cash', '2026-01-01', '100.6'], ['loan', '2026-01-01', '-50.6']],
   });
   assert.deepEqual(heroParts(debt.totals('latest')), [whole(101), whole(-51)]);
+
+  // A holding alone in its band shows one figure in the list and the bar.
+  const small = model({
+    dimensions: [dimension],
+    holdings: values.map((v) => ({ name: v.id, unit: 'CHF', dims: { d: v.id } })),
+    figures: [['a', '2026-01-01', '0.4'], ['b', '2026-01-01', '0.4'], ['c', '2026-01-01', '0.4'], ['e', '2026-01-01', '0']],
+  });
+  small.profile = { ...small.profile, moneyPlaces: '0' };
+  assert.deepEqual([...small.shownFigures('latest').values()], [1, 0, 0, 0].map(whole));
+  assert.deepEqual(breakdownTotals(small, dimension, 'latest').map((b) => b.shown), [1, 0, 0, 0, 0].map(whole));
+  assert.deepEqual(heroParts(small.totals('latest')), [whole(1), 0n]);
 });
 
 await check('decimal: apportion rounds the total once and shares its units out by largest remainder, ties to the earlier part', () => {

@@ -97,8 +97,20 @@ own row beneath, at the left. Summary figures (the total, the change,
 gross assets and liabilities, the legend and the breakdown) are written
 by the formatter's `whole`. The holdings table and the data table carry
 the money places, because that is where a figure is checked against a
-statement. Gross assets and gross liabilities as shown add up to the
-total as shown (Breakdown by dimension says how).
+statement.
+
+Every set of figures shown as the parts of a figure adds up to that
+figure as shown: gross assets and liabilities to the total, the bars to
+the total, the holdings table's converted figures to the total at the
+money places, the legend to the chart's right hand edge, the legend's
+changes over a span to the change, and the readout's rows to its net.
+Rounding each part alone misses, because three parts of 0.40 make 1 and
+would each show 0. The whole rounds once, half-even. Each part rounds
+toward minus infinity, and the units still missing go to the parts with
+the largest remainders, ties to the earlier part in screen order, so a
+part never moves a whole unit from its exact value. Each set is shared
+out from exact figures, so a band's bar can differ by a unit from the
+sum of its holdings as the table shows them.
 
 - **The change** over the selected range or selection: an arrow icon, the
   signed amount and the percentage (one decimal place), in status good or
@@ -278,13 +290,8 @@ width less the room the labels take at the outboard ends. A band can be net nega
 band is positive the baseline sits at the left edge, and the layout never
 changes shape with the data. The bars sum to exactly the net-worth total,
 as a signed sum, and their amounts as shown add up to the total as
-shown, because rounding each alone misses it: three bands of 0.40 make
-a total of 1 and would each show 0. The total rounds once, half-even.
-Each bar rounds toward minus infinity, and the units still missing go
-to the bars with the largest remainders, ties to the earlier bar, so a
-bar's amount never moves a whole unit from its exact value. Under
-"Total" the section is absent, because one bar equal to the hero says
-nothing.
+shown (Hero figure). Under "Total" the section is absent, because one
+bar equal to the hero says nothing.
 
 #### Holdings table
 
@@ -1101,7 +1108,8 @@ rule of the chart (Archived holdings, Ranges and modes).
     read 1'235, 4'133, 41'373 and 340'000 under a total of 386'741.
     Gross assets and liabilities as shown add up to the total as shown.
     Test:
-    `tests/test_client.py::test_the_client_side_rules_hold`.
+    `tests/test_client.py::test_the_client_side_rules_hold`,
+    `tests/browser/parts/dashboard-review-rounding.mjs`.
 67. (blind) With one record corrupted, the view renders the rest and
     warns "1 record could not be read.". With the corrupted record a
     price entry, its symbol still prices from the neighboring entries.
@@ -1130,3 +1138,10 @@ rule of the chart (Archived holdings, Ranges and modes).
     page never pans sideways. Test:
     `tests/browser/parts/dashboard-long-name.mjs`,
     `tests/browser/parts/dashboard-review-long-name.mjs`.
+74. With no decimals on money, three holdings of 0.40 alone in their
+    bands read 1, 0 and 0 in the holdings table and in the breakdown,
+    under a total of 1. Test:
+    `tests/test_client.py::test_the_client_side_rules_hold`.
+75. (blind) The legend adds up to the chart's right hand edge as shown,
+    the legend's changes over a selected span to the change as shown,
+    and the readout's rows to its net as shown. Test: no test.

@@ -408,6 +408,17 @@ export class Vault {
     };
   }
 
+  /** Each valued active holding's converted figure as shown, at the
+   *  money places, shared out so the figures add up to the net as
+   *  shown (net-worth-view.md, Shown figures). Keyed by holding. */
+  shownFigures(mode = 'latest') {
+    const valued = this.activeHoldings()
+      .map((holding) => [holding, this.valueOf(holding, mode)])
+      .filter(([, value]) => value.state === 'valued');
+    const shown = decimal.apportion(valued.map(([, value]) => value.converted), this.format.places);
+    return new Map(valued.map(([holding], i) => [holding, shown[i]]));
+  }
+
   /** A signed sum. Gross assets and gross liabilities are carried
    *  separately, because net worth hides both sides in one figure. */
   totals(mode = 'latest') {
