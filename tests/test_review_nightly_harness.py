@@ -3,15 +3,17 @@
 20, 22, 24, 28, 42, 43 and 44; net-worth-view.md, Acceptance criteria
 69), of the gold window it takes from the app (Known prices, The
 source checks; Acceptance criteria 13 and 40), of the source checks'
-exit codes and route-out test (Acceptance criteria 17 and 18), and of
-the composition its oracle applies (Known prices; rate-lookup.md,
-Providers), written from the spec alone.
+exit codes and route-out test (Acceptance criteria 17 and 18), of the
+composition its oracle applies (Known prices; rate-lookup.md,
+Providers), and of a registration form that never shows (fixtures.mjs;
+Acceptance criterion 45), written from the spec alone.
 """
 from __future__ import annotations
 
 import json
 import os
 import re
+import secrets
 import shutil
 import subprocess
 import sys
@@ -765,3 +767,32 @@ def test_the_probe_finds_no_route_out_on_an_internal_network_and_one_on_a_bridge
         subprocess.run(["docker", "network", "rm", network], capture_output=True)
     if host_has_a_route_out():
         assert route_out_on(python_image, "bridge") == "True"
+
+
+# ---- criterion 45: a registration form that never shows ---------------
+
+from solvent.register import INVALID_INVITE  # noqa: E402
+from tests.helpers import serve  # noqa: E402
+
+
+@needs_browser
+def test_a_refused_invite_fails_the_generator_naming_the_address_and_what_the_page_shows(tmp_path):
+    out = tmp_path / "out"
+    env = dict(os.environ, SECRET_KEY=secrets.token_hex(32), DATABASE_PATH=str(tmp_path / "solvent.db"))
+    plan = FIXTURES / "plan.json"
+    done = subprocess.run(
+        [sys.executable, str(TOOLS / "prices.py"), "prepare", str(plan), str(out)], capture_output=True, text=True
+    )
+    assert done.returncode == 0, done.stderr
+    invite = f"/register?invite={secrets.token_urlsafe(32)}"
+    with serve(env, tmp_path / "server.log") as base:
+        ran = subprocess.run(
+            ["node", str(TOOLS / "fixtures.mjs"), "--base", base, "--invite", invite, "--plan", str(plan), "--out", str(out)],
+            cwd=REPO_ROOT, env=env, capture_output=True, text=True, timeout=300,
+        )
+    said = ran.stdout + ran.stderr
+    assert ran.returncode != 0, said
+    assert f"{base}/register?invite=" in said, said
+    assert INVALID_INVITE in said, said
+    assert "Cannot set properties of undefined" not in said, said
+    assert not (out / "manifest.json").exists()

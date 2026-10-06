@@ -732,6 +732,7 @@ export const backFromAway = async (session) => {
 // submits it once its button has unlocked.
 export async function register(session, invite, username, password, currency = 'CHF') {
   await session.goto(`${BASE}/register?invite=${invite}`);
+  await session.waitUntil("document.querySelector('input[type=password]')", { label: 'the registration form' });
   await session.call((name, secret, money) => {
     const set = (selector, value, index = 0) => {
       const node = document.querySelectorAll(selector)[index];
