@@ -40,9 +40,13 @@ EXPOSE 8000
 # --access-logformat: no peer address, user agent or referrer, and the
 # path without its query, so no invite token reaches the log
 # (architecture.md, Storage & data handling).
-# --log-level error: gunicorn logs a request it cannot parse, with the
-# peer's address, at WARNING (architecture.md, Storage & data handling).
+# --config python:solvent.server: Solvent answers a request gunicorn
+# cannot read with its own page and headers, and logs no address or URI
+# for it (app-shell.md, Error pages).
+# --log-level error: gunicorn's own lines below ERROR can carry the
+# peer's address (architecture.md, Storage & data handling).
 CMD ["gunicorn", \
+     "--config", "python:solvent.server", \
      "--bind", "0.0.0.0:8000", \
      "--worker-class", "gthread", \
      "--workers", "1", \

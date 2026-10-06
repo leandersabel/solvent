@@ -757,14 +757,18 @@ or kinds.
     address (`%(h)s`), the user agent (`%(a)s`) and the referrer
     (`%(f)s`), and the full request line (`%(r)s`) would log a live
     invite token from `/register?invite=` (admin-invites.md, Rules).
-  - gunicorn's error log runs at `--log-level error`. gunicorn logs a
-    request it cannot parse as `Invalid request from ip=<peer>` at
-    WARNING, in the request error handler every worker class shares.
-    In the pinned release no line at ERROR or above carries a client's
-    address, only the server's own bind address. The app's own lines
-    are unaffected: they go through the app's logger, which the flag
-    does not set. gunicorn's INFO and WARNING lines (boot, worker
-    exits, malformed requests) are what the deployment gives up. A
+  - gunicorn's own request error handler logs a request it cannot
+    parse as `Invalid request from ip=<peer>` at WARNING, and any other
+    failure with the full URI at ERROR, which can hold an invite token.
+    Solvent replaces that handler (app-shell.md, Error pages): it logs
+    nothing for a request it cannot read and only the exception's class
+    for anything else. gunicorn's error log runs at `--log-level error`
+    as a second bound. In the pinned release no other line at ERROR or
+    above carries a client's address, only the server's own bind
+    address. The app's own lines are unaffected: they go through the
+    app's logger, which the flag does not set. gunicorn's INFO and
+    WARNING lines (boot, worker exits) are what the deployment gives
+    up. A
     logging filter that strips addresses is rejected, because it has to
     recognise every address form in every message, and a level drops
     the whole line. The image test sends malformed requests and fails

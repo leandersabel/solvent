@@ -22,6 +22,13 @@ def _page(code: int):
     return render_template("error.html", variant=_VARIANTS[code]), code
 
 
+def page_bytes(app: flask.Flask, code: int) -> bytes:
+    """The body Flask answers `code` with, for an answer outside any
+    request (solvent/server.py)."""
+    with app.test_request_context():
+        return _page(code)[0].encode()
+
+
 def init_app(app: flask.Flask) -> None:
     @app.errorhandler(Exception)
     def handle_unhandled_error(error: Exception):

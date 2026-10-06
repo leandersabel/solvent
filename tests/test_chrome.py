@@ -9,11 +9,14 @@ import base64
 import hashlib
 import json
 import re
+import socket
 from html.parser import HTMLParser
 from pathlib import Path
+from types import SimpleNamespace
 
 import pytest
 
+from solvent import server
 from solvent.config import DEFAULT_KDF_ENVELOPE
 from solvent.crypto import ARGON2ID_SRI, ZXCVBN_SRI, ZXCVBN_VERSION
 from solvent.guard import navigation
@@ -451,6 +454,23 @@ def test_a_server_error_with_the_database_unavailable_is_the_same_body(app, visi
         response = visitor.get("/static/__boom")
         assert response.status_code == 500
         assert response.get_data() == with_database
+
+
+def test_a_failure_before_flask_answers_with_the_failure_body_and_logs_only_its_class(app, visitors):
+    """gunicorn hands the worker's error handler what fails outside the
+    app. The address and the URI stay out of the log."""
+    logged = []
+    worker = SimpleNamespace(wsgi=app, log=SimpleNamespace(error=lambda *a: logged.append(a)))
+    server.post_worker_init(worker)
+    ours, theirs = socket.socketpair()
+    with ours, theirs:
+        worker.handle_error(None, ours, ("127.0.0.2", 1), RuntimeError("/register?invite=secret"))
+        ours.close()
+        answer = theirs.makefile("rb").read()
+    head, _, body = answer.partition(b"\r\n\r\n")
+    assert head.startswith(b"HTTP/1.1 500 Internal Server Error\r\n")
+    assert body == visitors[0].get("/static/__boom").get_data()
+    assert logged == [("Error handling request: %s", "RuntimeError")]
 
 
 def test_both_error_bodies_carry_the_head_and_the_one_link_and_nothing_else(visitors):

@@ -127,8 +127,8 @@ route to something a narrow screen could not offer.
 ### Error page
 
 The page served wherever no screen can be: an address with no page
-behind it, an address the visitor may not open, and an unexpected
-failure. It says the page cannot be shown and offers the way back. The
+behind it, an address the visitor may not open, a request too long or
+malformed to read, and an unexpected failure. It says the page cannot be shown and offers the way back. The
 server renders it whole, the same for every visitor (How it works,
 Error pages).
 
@@ -158,7 +158,7 @@ Nothing else changes shape.
 
 | Variant | Heading |
 |---|---|
-| Missing, or refused | There is no page at this address. |
+| Missing, refused or unreadable | There is no page at this address. |
 | Unexpected failure | Something went wrong and this page could not be shown. |
 
 The button reads "Go to Solvent" in both.
@@ -463,6 +463,19 @@ screen above.
   refuses.
 - **One link.** Exactly one `<a>`, `href="/"`, which the root path
   resolves by kind. No form and no bar.
+- **Requests Flask never sees.** gunicorn refuses a request it cannot
+  read, such as a request line or header over its limit, before the app
+  runs. Its own page names the limit, carries neither CSP nor HSTS, and
+  no setting changes it. So the image runs gunicorn with
+  `--config python:solvent.server`, whose `post_worker_init` replaces
+  each worker's error handler once the app has loaded. An unreadable
+  request is a Bad Request with the `missing` body, and any other
+  failure there a Server Error with the `failure` body, each with the
+  headers every response carries, `Connection: close` and no
+  `Set-Cookie`. An address of any length or shape that reaches Solvent
+  is answered by Solvent. The worker class stays `gthread`
+  (architecture.md, WSGI server). A proxy in front of Solvent answers
+  with its own pages.
 
 ### The chrome
 
@@ -601,6 +614,8 @@ dashboard.
   Forbidden, with the `missing` body.
 - An invented path several segments deep (`/a/b/c/`): the stylesheet and
   icon still load from `/static/`.
+- An address too long to read (`/?a=` and 9000 characters): Bad Request
+  with the `missing` body and every header.
 
 ## Acceptance criteria
 
@@ -879,11 +894,11 @@ dashboard.
     `.dockerignore` lists `tests` and `tools`. Test:
     `tests/test_deployment.py::test_the_image_holds_the_app_and_nothing_of_the_tests_or_tools`.
 77. (blind) gunicorn, run with the Dockerfile's arguments on `127.0.0.1`,
-    receives from `127.0.0.2` an invalid request line, an invalid header
-    name, an over-long request line and a wrong Auth Key to
-    `/api/auth/login`, and its output then holds no `127.0.0.2`. The same
-    run at `--log-level warning` logs `ip=127.0.0.2`, which proves the
-    test sees the line the flag drops. Test:
+    receives from `127.0.0.2` requests it cannot read and a wrong Auth
+    Key to `/api/auth/login`, and its output then holds no `127.0.0.2`,
+    at `--log-level error` and at `warning`. The same run without
+    `--config` at `warning` logs `ip=127.0.0.2`, which proves the test
+    sees the line Solvent's handler drops. Test:
     `tests/test_deployment.py::test_no_server_log_line_carries_the_peer_address`.
 78. The Dockerfile's gunicorn command runs one `gthread` process with
     more request threads than `LOOKUP_CONCURRENCY`. Test:
@@ -898,6 +913,17 @@ dashboard.
     `tests/test_review_app_shell.py::test_the_control_holding_every_thread_does_stop_the_sign_in_page`.
 80. A start empties the rate cache and keeps the schema version. Test:
     `tests/test_rates.py::test_starting_the_app_empties_the_rate_cache`.
+81. (blind) gunicorn, run with the Dockerfile's arguments, answers an
+    over-long request line, an over-long invite address, an over-long
+    header, too many headers, an invalid request line and an invalid
+    header name each with Bad Request, `Connection: close`, no
+    `Set-Cookie`, and the CSP, HSTS and body of an invented path's Not
+    Found, and its output holds neither gunicorn's reason nor the
+    address. Test:
+    `tests/test_deployment.py::test_a_request_gunicorn_cannot_read_gets_the_missing_card_with_every_protection`.
+82. A failure before the app answers is a Server Error with the
+    `failure` body, and the log names only the exception's class. Test:
+    `tests/test_chrome.py::test_a_failure_before_flask_answers_with_the_failure_body_and_logs_only_its_class`.
 81. At a 390px phone viewport, a real click on Settings in the bar with
     the dashboard scrolled down, and on a holding's row far down the
     dashboard, each opens its screen with `scrollY` 0 and the bar's top
