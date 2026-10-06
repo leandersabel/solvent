@@ -153,19 +153,25 @@ export class Vault {
     return `${this.mainCurrency} ${this.format.whole(value)}`;
   }
 
-  /** How a unit reads, from the symbol table. A currency is written
-   *  by its code ahead of a figure, anything else by its short unit
-   *  after it: the part of the canonical symbol after the hyphen
-   *  ("XAU-ozt" reads "ozt"). The table's label names it, the part
-   *  before a comma being the thing and the part after the unit it is
-   *  counted in ("Gold, troy ounce"). A unit the table does not list
-   *  is free text and reads exactly as typed. */
+  /** How a unit reads, from the symbol table (design-system.md,
+   *  Units). A currency is named by its code, written ahead of a
+   *  figure. Any other listed unit is named by its whole label ("Gold,
+   *  troy ounce"), so grams and troy ounces never read alike, and
+   *  written after a figure by the part of the symbol after the hyphen
+   *  ("12.5 ozt"). A unit the table does not list is free text and
+   *  reads exactly as typed. */
   unitOf(symbol) {
     const row = this.symbols.get(symbol);
     const currency = row ? row.kind === 'currency' : symbol === this.mainCurrency;
-    const [name, counted] = row ? row.label.split(', ') : [symbol];
+    const counted = row && row.label.split(', ')[1];
     const short = row && !currency && symbol.includes('-') ? symbol.split('-').pop() : symbol;
+    const name = row && !currency ? row.label : symbol;
     return { symbol, currency, name, short, one: currency ? `1 ${symbol}` : `1 ${counted || short}` };
+  }
+
+  /** A unit as a sentence names it. */
+  unitName(symbol) {
+    return this.unitOf(symbol).name;
   }
 
   /** A stored value as its unit shows it: money places for a currency,

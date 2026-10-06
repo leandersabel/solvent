@@ -142,7 +142,7 @@ export function holdingView(vault, accountId, { editing = false, onOpenRecording
             el('thead', {}, [
               el('tr', {}, [
                 el('th', { text: 'Date' }),
-                el('th', { class: 'numeric', text: `Value (${holding.payload.unit})` }),
+                el('th', { class: 'numeric', text: 'Value' }),
                 el('th', { class: 'numeric', text: `In ${vault.mainCurrency}` }),
                 el('th', { text: '' }),
               ]),
@@ -226,7 +226,7 @@ function historyRow(vault, holding, snapshot, flagged, { onOpenRecording, onChan
           })
         : null,
     ]),
-    el('td', { class: 'numeric', text: vault.figure(snapshot.payload.value, holding.payload.unit) }),
+    el('td', { class: 'numeric', text: vault.amount(snapshot.payload.value, holding.payload.unit) }),
     el('td', { class: 'numeric' }, price
       ? [vault.format.money(decimal.multiply(quantity, price.rate)), priceDateLine(vault, price.date, snapshot.payload.date)]
       : 'not priced'),

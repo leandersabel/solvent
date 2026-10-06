@@ -2287,9 +2287,9 @@ await check('record-rate: the rate-lines save writes the rates, then deletes, an
   assert.equal(back.prices.some((e) => e.payload.symbol === 'XAG-ozt'), false);
   // The figure beside them is not part of the save.
   assert.equal(back.figures.find((f) => f.holding.payload.name === 'Dollars').snapshot.version, 1);
-  const copy = views.partialCopy(result);
-  assert.ok(copy.includes('Not saved: XAU-ozt'), copy);
-  assert.ok(copy.includes('Saved: USD, XAG-ozt'), copy);
+  const copy = views.partialCopy(vault, result);
+  assert.ok(copy.includes('Not saved: Gold, troy ounce'), copy);
+  assert.ok(copy.includes('Saved: USD, Silver, troy ounce'), copy);
 });
 
 await check('record-rate: the rate-lines save at a date holding no recording issues no request and writes nothing', async () => {
@@ -2804,11 +2804,26 @@ await check('record-rate: the confirmation names each unit, how many holdings mo
     ],
   });
   vault.profile.locale = 'en-GB';
+  vault.symbols = new Map(SYMBOLS.map((row) => [row.symbol, row]));
   const copy = views.rateChangeCopy(vault, '2026-07-31', [{ unit: 'USD' }, { unit: 'XAU-ozt', clearing: true }]);
   assert.ok(copy[0].includes('moves 3 holdings measured in USD on that date'), copy[0]);
-  assert.ok(copy[1].includes('Clearing the XAU-ozt price'), copy[1]);
-  assert.ok(copy[1].endsWith('1 holding measured in XAU-ozt moves on that date.'), copy[1]);
-  assert.ok(copy[2].startsWith('This is the only price recorded for XAU-ozt.'), copy[2]);
+  assert.ok(copy[1].includes('Clearing the Gold, troy ounce price'), copy[1]);
+  assert.ok(copy[1].endsWith('1 holding measured in Gold, troy ounce moves on that date.'), copy[1]);
+  assert.ok(copy[2].startsWith('This is the only price recorded for Gold, troy ounce.'), copy[2]);
+});
+
+await check('design-system: a unit is named in full, carried in short after a figure, and grams never read as troy ounces', () => {
+  const vault = new Vault(null);
+  vault.profile = { mainCurrency: 'CHF', locale: 'en-US' };
+  vault.symbols = new Map(SYMBOLS.map((row) => [row.symbol, row]));
+  assert.equal(vault.unitName('XAU-ozt'), 'Gold, troy ounce');
+  assert.equal(vault.unitName('XAU-g'), 'Gold, gram');
+  assert.equal(vault.unitName('USD'), 'USD');
+  assert.equal(vault.unitName('bottles'), 'bottles');
+  assert.equal(vault.amount('12.5', 'XAU-ozt'), '12.5 ozt');
+  assert.equal(vault.amount('80', 'XAU-g'), '80 g');
+  assert.equal(vault.amount('3', 'bottles'), '3 bottles');
+  assert.ok(vault.amount('12450', 'USD').startsWith('USD '));
 });
 
 // ---- Age in words ------------------------------------------------------

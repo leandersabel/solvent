@@ -111,7 +111,7 @@ function duplicateBanner(vault, actions) {
   }
   for (const [symbol] of vault.rates) {
     for (const date of vault.duplicateRateDates(symbol)) {
-      faults.push({ date, label: symbol });
+      faults.push({ date, label: vault.unitName(symbol) });
     }
   }
   if (!faults.length) return null;

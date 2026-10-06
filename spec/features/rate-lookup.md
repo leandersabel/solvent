@@ -700,7 +700,7 @@ host's network are reachable.
    31.1034768, to the precision returned. Test:
    `tests/test_rates.py::test_gold_in_grams_and_troy_ounces_differ_by_exactly_the_conversion`.
 9. A unit with no price source reads as one ("No market price for
-   silver yet", "Nobody publishes a price for m2"), and reads as normal,
+   Silver, troy ounce yet", "Nobody publishes a price for m2"), and reads as normal,
    not broken. Test: `tests/browser/parts/update-values.mjs`.
 10. A date before a source's prices begin reads as that, and an outage
     reads as an outage, each worded differently from the other and from

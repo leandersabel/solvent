@@ -21,6 +21,14 @@ await run(async () => {
   check('the recording lists what went in that day', (await page.eval("document.querySelectorAll('.card tbody tr').length")) >= 4);
   const chips = await labels('.chip');
   check('each price says where it came from', chips.some((chip) => chip.startsWith('Market rate')), chips.join(','));
+  // design-system.md, Units: a price line names its unit in full.
+  const priceUnits = await page.eval("JSON.stringify([...document.querySelectorAll('tr[data-unit]')].map((r) => [r.dataset.unit, r.cells[0].textContent]))").then(JSON.parse);
+  check(
+    'a price line names its unit in full, never by its symbol',
+    priceUnits.some(([symbol, name]) => symbol === 'XAU-ozt' && name === 'Gold, troy ounce') &&
+      priceUnits.every(([symbol, name]) => !/^X[A-Z]{2}-/.test(name) && (symbol.includes('-') || name === symbol)),
+    JSON.stringify(priceUnits),
+  );
   check('the recording offers Update and Delete', (await labels('.form-actions button')).join(',') === 'Update,Delete');
   const beforeOpen = rateCalls();
   await page.eval("location.hash = '#/'");

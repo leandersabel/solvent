@@ -287,6 +287,26 @@ Every figure is grouped and pointed as Settings sets it
   because a tick only has to place a line and the readout is where a
   value is read.
 
+### Units
+
+A unit reads the same way on every screen that names it, from the
+symbol table (`rate-lookup.md`, Seeded symbols).
+
+- **A sentence, a label or a price line names a unit in full**: a
+  currency by its code, "USD", and any other listed unit by its whole
+  label, "Gold, troy ounce", so grams and troy ounces never read alike.
+  A unit the table does not list is free text and reads exactly as
+  typed.
+- **A figure carries a unit in short**: a currency's code ahead of it,
+  "USD 12,450.00", a price included, "CHF 2,500.000000", and any
+  other unit after it, by the part of the
+  symbol after the hyphen or the free text as typed, "12.5 ozt".
+- **No screen outside the unit picker and the administrator's symbol
+  table shows a symbol such as `XAU-ozt` in place of a unit's name.**
+- **A table header names no unit but a currency**, by its code, "In
+  CHF", because a header is set in capitals and "OZT" is no unit's
+  name. Any other unit sits in each cell, with its figure.
+
 ## Spacing and shape
 
 - 8px base scale: 4, 8, 12, 16, 24, 32, 48, 64.

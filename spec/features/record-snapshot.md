@@ -270,7 +270,7 @@ Line states:
   "estimated 14 months ago", and writes nothing unless changed
   (`record-rate.md`, The refresh). The copy names why and never borrows
   the outage wording. A symbol with no provider yet: "No market price
-  for silver yet. This one is yours to set." A free-text unit: "Nobody
+  for Silver, troy ounce yet. This one is yours to set." A free-text unit: "Nobody
   publishes a price for m2. This one is yours to set." A sourced unit in
   a vault whose main currency no source quotes into (`record-rate.md`,
   Reading): "No price source quotes in ARS, your main currency. This
@@ -285,13 +285,13 @@ Line states:
   outage wording. The copy names when published prices begin (the later
   of the unit's first published date and the main currency's), as
   Settings writes dates (`account-settings.md`, Dates and numbers) and
-  always with its year: "Published prices for XAU-g begin on 2 January
-  2013. This one is yours to set." Where its starting price is from an
-  earlier day: "Set on 30 June 2011. Published prices for XAU-g begin
-  on 2 January 2013. This one is yours to set." With no price at or
-  before this date the line asks, in its own words: "What was 1 XAU-g
-  worth in CHF on 31 December 2012? Published prices for XAU-g begin on
-  2 January 2013. The figure records either way, and until a price
+  always with its year: "Published prices for Gold, gram begin on 2
+  January 2013. This one is yours to set." Where its starting price is from an
+  earlier day: "Set on 30 June 2011. Published prices for Gold, gram
+  begin on 2 January 2013. This one is yours to set." With no price at or
+  before this date the line asks, in its own words: "What was 1 gram
+  worth in CHF on 31 December 2012? Published prices for Gold, gram
+  begin on 2 January 2013. The figure records either way, and until a price
   exists the holding is listed as not priced."
 - **A unit with no price at all, where this sitting records a quantity
   in it.** A price is asked for, because twelve troy ounces with no gold
@@ -323,7 +323,7 @@ screen names the unit whose price was left (States).
   source about nothing it already holds a price for**
   (`record-rate.md`, Editing a captured rate).
 - **A line that went in empty, for a unit with a rate source at this
-  date**, says "No rate was recorded for XAU-ozt on this date." and
+  date**, says "No rate was recorded for Gold, troy ounce on this date." and
   carries its own **Look it up**. Opening fetches nothing. Pressing it
   issues the request and **saves what comes back at once**, with no
   further press and no confirmation, into this line and every other
@@ -355,12 +355,13 @@ one:
 Clearing says its own consequence, and where the entry is the unit's
 only one, says that too:
 
-> Clearing the XAU-ozt price for 31 July leaves that date with no price
-> for it. 2 holdings measured in XAU-ozt move on that date.
+> Clearing the Gold, troy ounce price for 31 July leaves that date with
+> no price for it. 2 holdings measured in Gold, troy ounce move on that
+> date.
 
-> This is the only price recorded for XAU-ozt. Clearing it leaves every
-> holding measured in it with no price at all, and they leave the
-> total until one exists.
+> This is the only price recorded for Gold, troy ounce. Clearing it
+> leaves every holding measured in it with no price at all, and they
+> leave the total until one exists.
 
 **The count is of holdings whose value on that date changes**: measured
 in that unit, not archived before the date, holding a figure at or
@@ -502,7 +503,8 @@ Standard app shell, content max-width 900px.
     its holding is archived Update offers no control for it.
   - **Holdings silent that day are not here.** Nothing counts or names
     them. Filling one in is an edit, after Update.
-- **The prices**, one line each: the unit, the price, and where it came
+- **The prices**, one line each: the unit's name (`design-system.md`,
+  Units), the price, and where it came
   from. **This screen owns the provenance vocabulary**, used wherever a
   price's origin is shown, the sweep's rate block included. Each is a
   chip (`design-system.md`, Components) beside the figure:
@@ -544,8 +546,9 @@ filled critical inside the Dialog, no ladder and no typed word:
 > **Delete the recording for 31 July?**
 >
 > Every figure recorded that day goes, and so does every price captured
-> with it. 9 holdings measured in USD and XAU-ozt move on that date,
-> including ones you recorded nothing for. This cannot be undone.
+> with it. 9 holdings measured in USD and Gold, troy ounce move on
+> that date, including ones you recorded nothing for. This cannot be
+> undone.
 
 Where the date holds the zero of a holding archived on it, that zero
 stays and the confirmation adds:
@@ -724,20 +727,20 @@ The same Dialog, prefilled with the stored value, date and note.
   Dialog stays open on it, the message above Save critical with its
   icon, naming every unit that did not save:
 
-  > Moved to 10 April 2026. The prices for USD and XAU-ozt on that date
-  > did not save.
+  > Moved to 10 April 2026. The prices for USD and Gold, troy ounce on
+  > that date did not save.
 
   One unit reads "The price for USD on that date did not save." Units
   are computed. One button, **Open the recording**, goes to that date's
   Recording detail, where empty lines are filled after Update. Save is
   inert until something changes.
 - **Duplicate date, entering**: on save, a confirm rather than a
-  rejection: "You already recorded 12 450.00 USD for 31 July. Replace
+  rejection: "You already recorded USD 12,450.00 for 31 July. Replace
   it?", naming the stored value in the holding's own unit (Same
   holding, same date: upsert). Confirming updates in place. Declining
   leaves the original untouched and returns to the form.
 - **Duplicate date, moving**: different copy, because a second record
-  dies: "30 July already holds a snapshot of 12 100.00 USD. Moving this
+  dies: "30 July already holds a snapshot of USD 12,100.00. Moving this
   entry there will delete it." Destructive styling on the confirm
   (Moving the date onto an occupied date).
 - **The date became taken while you were working**: refused whole,
@@ -1603,3 +1606,9 @@ Editing an existing entry).
     this", without being opened. Test:
     `tests/browser/parts/snapshot-entry.mjs`,
     `tests/browser/parts/snapshot-entry-review-fold.mjs`.
+96. (blind) Recording detail and Update values name a unit as
+    `design-system.md`, Units, sets: a price line for `XAU-ozt` reads
+    "Gold, troy ounce", one for `XAU-g` reads "Gold, gram", a currency
+    reads by its code, and no line or message shows a symbol such as
+    `XAU-ozt`. Test: `tests/browser/parts/recording-detail.mjs`,
+    `tests/browser/parts/update-values.mjs`.

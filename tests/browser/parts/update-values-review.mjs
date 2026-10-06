@@ -73,7 +73,7 @@ await run(async () => {
   );
   check(
     'review: a redraw on screen continues the sitting, so the line keeps the outage wording',
-    outageWording('USD', await lineState('USD')) && outageWording('XAU-ozt', await lineState('XAU-ozt')),
+    outageWording('USD', await lineState('USD')) && outageWording('Gold, troy ounce', await lineState('XAU-ozt')),
     JSON.stringify([await lineState('USD'), await lineState('XAU-ozt')]),
   );
   check('review: nothing is written for the units the source did not answer for', on(await stored('rate'), DX).length === 0);
@@ -147,7 +147,7 @@ await run(async () => {
   );
   check(
     'review: a line the answer left out stays empty with its own Look it up',
-    reopenedWording('GBP', await lineState('GBP')) && reopenedWording('XAU-g', await lineState('XAU-g')),
+    reopenedWording('GBP', await lineState('GBP')) && reopenedWording('Gold, gram', await lineState('XAU-g')),
     JSON.stringify([await lineState('GBP'), await lineState('XAU-g')]),
   );
   await home();
@@ -181,14 +181,14 @@ await run(async () => {
   );
   check(
     'review: the banner says the price was filled in another window',
-    (await text()).includes('The XAU-ozt rate was filled in another window, and the line shows what is stored now.'),
+    (await text()).includes('The Gold, troy ounce rate was filled in another window, and the line shows what is stored now.'),
     (await text()).slice(0, 600),
   );
   await home();
   const leftNotice = await text();
   check(
     'review: leaving with the typed line names that unit, and not the one stored elsewhere',
-    leftNotice.includes('the USD rate') && !leftNotice.includes('the XAU-ozt rate'),
+    leftNotice.includes('the USD rate') && !leftNotice.includes('the Gold, troy ounce rate'),
     leftNotice.slice(0, 400),
   );
 
@@ -210,7 +210,7 @@ await run(async () => {
     'review: a create that fails keeps the answer on its line and is named outside the lines',
     figure((await lineState('USD')).value) === Number(proposalsFor(DU).USD.rate) &&
       figure((await lineState('XAU-ozt')).value) === Number(proposalsFor(DU)['XAU-ozt'].rate) &&
-      outsideLines.includes('USD') && outsideLines.includes('XAU-ozt') && on(await stored('rate'), DU).length === 0,
+      outsideLines.includes('USD') && outsideLines.includes('Gold, troy ounce') && on(await stored('rate'), DU).length === 0,
     JSON.stringify({ usd: await lineState('USD'), gold: await lineState('XAU-ozt'), outsideLines: outsideLines.slice(0, 400) }),
   );
   traffic.length = 0;

@@ -192,7 +192,7 @@ await run(async () => {
   check(
     'review 86: at a narrow and a wide window the prices line shows each full name, price and provenance, nothing overlapping or wider than its box',
     Object.values(geometry).every((g) => g.problems.length === 0 && g.chipsFit &&
-      ['United States Dollar', 'Gold'].every((name) => g.seen.some((l) => l.unit === name && l.chip.startsWith('Market rate')))),
+      ['USD', 'Gold, troy ounce'].every((name) => g.seen.some((l) => l.unit === name && l.chip.startsWith('Market rate')))),
     JSON.stringify(geometry),
   );
 
