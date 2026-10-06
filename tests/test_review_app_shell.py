@@ -6,7 +6,7 @@ Tech stack, WSGI server). A start empties the rate cache and keeps the
 schema version and everything else (Database, criterion 80). A request
 gunicorn cannot read gets Solvent's Not Found card and headers, and no
 log line keeps its address, its peer or gunicorn's reason (Error pages,
-Requests Flask never sees, criteria 27, 77, 81 and 82; spec/
+Requests Flask never sees, criteria 27, 77, 85 and 86; spec/
 architecture.md, Storage & data handling).
 
 Written from the spec alone. gunicorn runs with the Dockerfile's own
@@ -199,7 +199,7 @@ PEER = "127.0.0.2"
 TOKEN = "Q7reviewInviteToken"
 
 # Each request gunicorn cannot read, named by what is wrong with it. The
-# first six are criterion 81's. The rest are shapes gunicorn refuses on
+# first six are criterion 85's. The rest are shapes gunicorn refuses on
 # its own, which "an address of any length or shape that reaches Solvent
 # is answered by Solvent" covers.
 UNREADABLE = {
@@ -250,7 +250,7 @@ def comparable(response: http.client.HTTPResponse) -> dict:
 
 
 def test_an_unreadable_request_gets_the_not_found_card_and_every_header(tmp_path):
-    """Criterion 81 and the Edge case: each request gunicorn cannot read
+    """Criterion 85 and the Edge case: each request gunicorn cannot read
     is a Bad Request carrying exactly what an invented path's Not Found
     carries, and nothing of it reaches the output."""
     with gunicorn(tmp_path) as (port, process):
@@ -357,7 +357,7 @@ def server_error_body(app):
 def test_a_failure_before_the_app_answers_is_the_failure_card_and_logs_only_its_class(
     app, server_error_body, tmp_path, monkeypatch, capfd
 ):
-    """Criterion 82: a worker set up as the image sets it up, through
+    """Criterion 86: a worker set up as the image sets it up, through
     solvent.server's post_worker_init, answers a failure outside the
     parser with a Server Error carrying the failure body and every
     header, and the log names the class and nothing of the request."""
