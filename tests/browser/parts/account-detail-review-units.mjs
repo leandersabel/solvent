@@ -19,8 +19,9 @@ const HOLDINGS = [
   { name: 'Dollar account', unit: 'USD', values: [[BACKDATE, '12450.00'], [TODAY, '12450.00']], carries: new RegExp(`^USD\\s?${DIGITS}$`) },
   { name: 'Flat', unit: 'm2', values: [[BACKDATE, '95']], carries: new RegExp(`^${DIGITS}\\s?m2$`) },
 ];
-// A header naming any unit, or a unit in brackets.
-const NAMES_A_UNIT = /ozt|\bg\b|gram|troy|gold|xau|usd|chf|m2|\(/i;
+// A header naming any unit but the main currency, CHF, or a unit in
+// brackets.
+const NAMES_A_UNIT = /ozt|\bg\b|gram|troy|gold|xau|usd|m2|\(/i;
 
 const table = () => page.call(() => {
   const heads = [...document.querySelectorAll('main th, main [role=columnheader]')].map((h) => h.textContent.trim());
@@ -60,7 +61,7 @@ await run(async () => {
     const seen = await table();
     const what = `${h.name} (${h.unit})`;
     check(`review 63: the list of values of ${what} has a Value column`, seen.valueAt >= 0, JSON.stringify(seen.heads));
-    check(`review 63: no header of the list of values of ${what} names a unit`,
+    check(`review 63: no header of the list of values of ${what} names a unit but the main currency`,
       seen.heads.length > 0 && seen.heads.every((t) => !NAMES_A_UNIT.test(t)), JSON.stringify(seen.heads));
     check(`review 63: each value of ${what} carries its unit as Units sets`,
       seen.cells.length === h.values.length && seen.cells.every((c) => c !== null && h.carries.test(c)), JSON.stringify(seen.cells));
