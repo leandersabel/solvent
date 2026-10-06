@@ -40,8 +40,10 @@ for (const account of manifest.accounts.filter((a) => a.kind === 'vault_owner'))
 
     const read = () => page.eval(`(() => {
       const plain = (text) => text.replace(/^[A-Z]{3}\\s/, '').replace(/\\u2212/g, '-');
+      // A side shown as "—" has no figure, as the manifest's null says.
+      const side = (text) => (text === '\\u2014' ? null : plain(text));
       const parts = Object.fromEntries([...document.querySelectorAll('.hero-part')].map((part) => [
-        part.querySelector('.eyebrow').textContent, plain(part.querySelector('.hero-part-value').textContent),
+        part.querySelector('.eyebrow').textContent, side(part.querySelector('.hero-part-value').textContent),
       ]));
       const total = document.querySelector('.hero-amount');
       return JSON.stringify({

@@ -221,14 +221,13 @@ ZERO = {"exact": "0", "display": "0"}
                      {"Flat": [(D1, 90)]}, id="unpriced-and-unrecorded"),
     ],
 )
-def test_with_no_holding_valued_the_total_is_null_and_the_sides_zero(holdings, snapshots):
+def test_with_no_holding_valued_the_total_and_the_sides_are_null(holdings, snapshots):
     from decimal import Decimal
 
     snapshots = {k: [(d, Decimal(v)) for d, v in s] for k, s in snapshots.items()}
     result = prices.expected("CHF", holdings, snapshots, {}, 2)
     for mode in ("latest", "asRecorded"):
-        assert result[mode]["total"] is None, mode
-        assert result[mode]["assets"] == ZERO and result[mode]["debts"] == ZERO, mode
+        assert [result[mode][key] for key in ("total", "assets", "debts")] == [None] * 3, mode
 
 
 def test_a_valued_vault_keeps_a_total_even_when_it_sums_to_zero():
@@ -362,18 +361,20 @@ def shown(generated, patched):
 
 @needs_browser
 def test_every_dashboard_shows_the_manifest_figures_and_a_null_total_as_a_dash(generated, shown):
+    dashes = {key: "\u2014" for key in ("total", "assets", "debts")}
+    no_hero = dict.fromkeys(dashes)  # an empty vault shows its first-holding prompt instead
     for username, figures in generated.manifest["expected"].items():
         if username not in shown:
             continue  # a backup file
         for mode in ("latest", "asRecorded"):
             seen = shown[username].get(mode)
             if figures[mode]["total"] is None:
-                assert seen is None or seen["total"] in (None, "\u2014"), (username, mode, seen)
+                assert seen in (None, dashes, no_hero), (username, mode, seen)
                 continue
             wanted = {key: figures[mode][key]["display"] for key in ("total", "assets", "debts")}
             assert seen == wanted, (username, mode)
     archived = covering_names(generated.manifest, "all-archived")
-    assert all(shown[u]["latest"]["total"] == "\u2014" for u in archived)
+    assert archived and all(shown[u]["latest"] == dashes for u in archived)
 
 
 def covering_names(manifest: dict, name: str) -> "list[str]":

@@ -681,11 +681,10 @@ def test_prepare_refuses_a_cleared_date_whose_prices_lie_on_the_line():
         prices.build_vault(account, date.today())
 
 
-def test_with_nothing_valued_the_total_is_none_and_the_sides_are_zero():
+def test_with_nothing_valued_the_total_and_the_sides_are_none():
     holdings = {"Savings": {"unit": "CHF", "archived": True}}
     result = prices.figures("CHF", holdings, {"Savings": [("2026-01-31", Decimal(5))]}, {}, 2, "latest")
-    assert result["total"] is None
-    assert result["assets"] == result["debts"] == {"exact": "0", "display": "0"}
+    assert result["total"] is result["assets"] is result["debts"] is None
     assert result["excluded"] == {"Savings": "archived"}
 
 
