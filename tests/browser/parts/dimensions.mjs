@@ -24,6 +24,8 @@ await run(async () => {
       key: 'dimensions' in v.profile,
       options: [...document.querySelectorAll('.chart-controls select option')].map((o) => o.textContent),
       chart: Boolean(document.querySelector('svg.trend')),
+      link: document.querySelector('.chart-controls a.create-dimension')?.getAttribute('href') ?? null,
+      linkText: document.querySelector('.chart-controls a.create-dimension')?.textContent ?? null,
     });
   })()`));
   check(
@@ -31,14 +33,18 @@ await run(async () => {
     !ungrouped.key && ungrouped.chart && ungrouped.options.join(',') === 'Total',
     JSON.stringify(ungrouped),
   );
-  await page.eval(`document.querySelector('.topbar nav a[href="#/settings"]').click()`);
-  await page.waitUntil("document.body.innerText.includes('Main currency')", { label: 'settings for dimensions' });
+  check(
+    'with no dimension, Group by carries a link to create one',
+    ungrouped.link === '/settings/dimensions' && ungrouped.linkText === 'Create a dimension',
+    JSON.stringify(ungrouped),
+  );
 
-  await page.eval(`document.querySelector('.link-row[href="/settings/dimensions"]').click()`);
+  await page.eval("document.querySelector('.chart-controls a.create-dimension').click()");
   await page.waitUntil("document.body.innerText.includes('Dimensions are how')", {
     timeout: 20000,
     label: 'the dimensions empty state',
   });
+  check('the link opens the dimensions screen', (await page.eval('location.hash')) === '#/settings/dimensions');
   check(
     'opening dimensions does not ask for the password again',
     !(await page.eval("Boolean(document.querySelector('#unlock-password'))")),
@@ -289,6 +295,10 @@ await run(async () => {
     'the order of dimensions is the order of the Group by select',
     groupings.join(',') === 'Total,Emergency fund,Liquid assets',
     groupings.join(','),
+  );
+  check(
+    'with a dimension active, Group by carries no link to create one',
+    !(await page.eval("Boolean(document.querySelector('.create-dimension'))")),
   );
   await page.eval("location.hash = '#/settings/dimensions'");
   await page.waitUntil("document.querySelector('.dimension-card')", { label: 'the dimensions screen once more' });

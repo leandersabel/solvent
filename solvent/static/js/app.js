@@ -382,6 +382,7 @@ function actionsFor(vault) {
     openHolding: (id) => go(`#/holding/${id}`),
     openRecording: (date) => go(`#/recording/${date}`),
     openSweep,
+    openDimensions: () => go('#/settings/dimensions'),
     addHolding: () => addHoldingDialog(vault),
   };
 }
