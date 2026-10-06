@@ -70,10 +70,12 @@ Past steps 1 and 2, a problem issue with no rating that counts
 with `gh label create` if the repository lacks it.
 
 1. **Not started.** The issue is closed, or has no `accepted` and was
-   not opened by `github-actions[bot]` (`app/github-actions` in `gh`'s
-   output): stop without a word.
-2. **Edited after acceptance.** Someone other than the client edited
-   the title or body after `accepted` was added: remove `accepted`,
+   opened by neither `claude[bot]` nor `github-actions[bot]`
+   (`app/claude` or `app/github-actions` in `gh`'s output): stop
+   without a word.
+2. **Edited after acceptance.** The issue started when `accepted` was
+   added, and someone other than the client edited the title or body
+   since: remove `accepted`,
    `queued` and `implementing`, add `needs-answer`, and comment to
    `@leandersabel` that the text changed after it was accepted and that
    adding `accepted` again resumes it. Stop.
@@ -150,7 +152,7 @@ Read the issue and the feature pages in `spec/features/` it touches
 once, with `spec/requirements.md` and, where it matters,
 `spec/architecture.md`. An issue holding several requests keeps the
 first. Each of the rest that no open issue already holds, file as
-`claude[bot]`: labeled `bug` or `change` and `accepted`, titled in the
+`claude[bot]`: labeled `bug` or `change`, titled in the
 issue's language, with a body quoting the client's words verbatim from
 text you may read (Trust), linking where they wrote them, and ending
 with `<!-- from: #<issue> -->`.
@@ -330,7 +332,7 @@ causes, or this issue covers, stays in that work.
    nothing, or your rating label and a comment why when yours is higher.
 2. Otherwise open an issue as `claude[bot]`: `bug` with its rating,
    creating the label when missing, or `maintenance` when nothing the
-   client sees changes, with `accepted` and `queued`, so it waits in
+   client sees changes, with `queued`, so it waits in
    line as filed. Title and body follow Writing, in this issue's
    language: what is wrong first, then its reproduction, the steps or a
    failing test, the technical reading in a closing `<details>` block,
@@ -347,7 +349,7 @@ lists the rest.
   its head commit, with every check green.
 - Push to `master`, force-push anything but a `claude/` branch, or
   close, reopen or edit an issue.
-- Add `accepted`, except to an issue you open, as you open it.
+- Add `accepted`.
 - Write another issue's branch.
 
 ## Writing

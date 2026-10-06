@@ -8,7 +8,7 @@ run-name: "${{ github.event.inputs.issue && format('Agent: {0}{1}', github.event
 # issue, if any, from who acted and on what, before any agent runs.
 on:
   issues:
-    types: [labeled, closed]
+    types: [opened, labeled, closed]
   issue_comment:
     types: [created]
   pull_request_review:
@@ -66,7 +66,7 @@ jobs:
           from_branch() { sed -nE "s#^claude/(spec|issue)-([0-9]+)\$#\2#p" <<<"$1"; }
           dispatch() { gh workflow run agent.yml --ref master -f issue="$1"; }
           # Whose rating counts (CLAUDE.md, The loop, Severity), and who
-          # closes accepted work: the client, or the loop merging its fix.
+          # closes started work: the client, or the loop merging its fix.
           counts() { [[ "$1" == "$OWNER" || "$1" == "claude[bot]" || "$1" == "github-actions[bot]" ]]; }
           # Each code scanning alert on master gets an issue of its own,
           # which waits in line as filed (CLAUDE.md, The loop, Findings).
@@ -114,10 +114,10 @@ jobs:
             issues)
               label=$(jqe .label.name)
               if [ "$(jqe .action)" = closed ]; then
-                if ! counts "$sender" && jq -e '.issue.labels | any(.name == "accepted")' "$GITHUB_EVENT_PATH" >/dev/null; then
-                  # Only the client closes accepted work. Its author can
+                if ! counts "$sender" && jq -e '.issue | any(.labels[]; .name == "accepted") or (.user.login | IN("claude[bot]", "github-actions[bot]"))' "$GITHUB_EVENT_PATH" >/dev/null; then
+                  # Only the client closes started work. Its author can
                   # close an issue without triage access.
-                  gh issue reopen "$(jqe .issue.number)" --comment "Only @$OWNER or a merged pull request closes accepted work, so this issue is open again."
+                  gh issue reopen "$(jqe .issue.number)" --comment "Only @$OWNER or a merged pull request closes started work, so this issue is open again."
                 else
                   # A closed issue gives up its place in line and the slot.
                   gh issue edit "$(jqe .issue.number)" --remove-label queued || true
@@ -129,9 +129,10 @@ jobs:
                 # A rating that does not count is removed, so the line
                 # ranks only ratings that do.
                 gh issue edit "$(jqe .issue.number)" --remove-label "$label"
-              elif [ "$label" = accepted ] && [ "$(jqe .issue.state)" = open ]; then
+              elif { [ "$label" = accepted ] || [ "$(jqe .action)" = opened ]; } && [ "$(jqe .issue.state)" = open ]; then
                 # A finding is filed in line and has no run of its own
-                # (CLAUDE.md, The loop, Findings).
+                # (CLAUDE.md, The loop, Findings). An issue opened by
+                # anyone but the loop is not started, as checked below.
                 jq -e '.issue.labels | any(.name == "queued")' "$GITHUB_EVENT_PATH" >/dev/null || issue=$(jqe .issue.number)
               fi ;;
             issue_comment)
@@ -197,11 +198,11 @@ jobs:
           esac
           # Not started (advance skill, step 1): no agent runs on an
           # issue that is closed, or that lacks `accepted` unless the
-          # workflow opened it. A read that fails lets the run start,
+          # loop or the workflow opened it. A read that fails lets the run start,
           # and the skill checks again.
           if [ -n "$issue" ]; then
             started=$(gh api "repos/$GH_REPO/issues/$issue" 2>/dev/null \
-              --jq '.state == "open" and (any(.labels[]; .name == "accepted") or .user.login == "github-actions[bot]")') || started=true
+              --jq '.state == "open" and (any(.labels[]; .name == "accepted") or (.user.login | IN("claude[bot]", "github-actions[bot]")))') || started=true
             [ "$started" = true ] || issue=
           fi
           echo "issue=$issue" >> "$GITHUB_OUTPUT"
@@ -340,7 +341,7 @@ jobs:
             # Waiting on the client or the queue, or not started.
             jq -e '[.labels[].name] as $l
               | any($l[]; . == "needs-answer" or . == "stuck" or . == "queued")
-                or ((any($l[]; . == "accepted") | not) and .user.login != "github-actions[bot]")' \
+                or ((any($l[]; . == "accepted") | not) and (.user.login | IN("claude[bot]", "github-actions[bot]") | not))' \
               <<<"$issue" >/dev/null && exit 0
             # A pull request waits on its checks or the client's review.
             for kind in spec issue; do
@@ -564,7 +565,7 @@ jobs:
           # Implementation), among those a run would start on and nothing
           # waits on the client for.
           next=$(open_with queued | jq -c --argjson blocked "$blocked" '(.labels | map(.name)) as $l | .number as $n
-            | select(($l | index("accepted")) or .user.login == "github-actions[bot]")
+            | select(($l | index("accepted")) or (.user.login | IN("claude[bot]", "github-actions[bot]")))
             | select($l | index("stuck") or index("needs-answer") | not)
             | ($blocked | map(select(.number == $n))[0]) as $b
             | select($b == null or ($b.open | length) == 0)

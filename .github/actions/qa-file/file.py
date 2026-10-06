@@ -57,10 +57,10 @@ for path in sorted(glob.glob("qa-unfiled/*.json")):
             gh("issue", "edit", str(repeats), "--add-label", label)
         gh("issue", "comment", str(repeats), "--body-file", "-", body=str(record["comment"]))
     elif str(record["title"]).startswith("QA could not check "):
-        create(record, str(record["body"]), ["maintenance", "qa", "accepted", "queued"])
+        create(record, str(record["body"]), ["maintenance", "qa", "queued"])
     elif type(steps) is list and steps and all(type(step) is str and step.strip() for step in steps):
         listed = "\n".join(f"{n}. {step}" for n, step in enumerate(steps, 1))
-        create(record, f"{record['body']}\n\nSteps to reproduce:\n\n{listed}", ["bug", "qa", "accepted", "queued", *rated])
+        create(record, f"{record['body']}\n\nSteps to reproduce:\n\n{listed}", ["bug", "qa", "queued", *rated])
     else:
         print(f"Not filed, no steps to reproduce it: {record.get('title')}")
     os.remove(path)
