@@ -270,7 +270,7 @@ Line states:
   "estimated 14 months ago", and writes nothing unless changed
   (`record-rate.md`, The refresh). The copy names why and never borrows
   the outage wording. A symbol with no provider yet: "No market price
-  for silver yet. This one is yours to set." A free-text unit: "Nobody
+  for Silver, troy ounce yet. This one is yours to set." A free-text unit: "Nobody
   publishes a price for m2. This one is yours to set." A sourced unit in
   a vault whose main currency no source quotes into (`record-rate.md`,
   Reading): "No price source quotes in ARS, your main currency. This
