@@ -553,6 +553,24 @@ export const CLOCK = `(() => {
 })();`;
 export const MINUTE = 60000;
 
+// The device's calendar day held at `iso`, from noon in the page's zone,
+// for the open document. The clock still runs, so timers and intervals
+// behave as before, and every `new Date()` and `Date.now()` reads it.
+export const holdToday = (iso) =>
+  page.call((day) => {
+    const Real = window.__realDate || (window.__realDate = Date);
+    const [year, month, date] = day.split('-').map(Number);
+    const shift = new Real(year, month - 1, date, 12).getTime() - Real.now();
+    window.Date = class extends Real {
+      constructor(...args) {
+        super(...(args.length ? args : [Real.now() + shift]));
+      }
+      static now() {
+        return Real.now() + shift;
+      }
+    };
+  }, iso);
+
 // How many of `needles` satisfy `found`. Only this count leaves a probe,
 // so a failing check never prints what it searched for.
 export const occurring = (needles, found) => {

@@ -495,12 +495,12 @@ export class Vault {
     return [...dates].sort();
   }
 
-  /** The chart's last day: the newest date carrying a snapshot, a price
-   *  entry or an archive, so an archive made on a day with no recording
-   *  still falls inside the chart (net-worth-view.md, Ranges and modes). */
+  /** The chart's last day: today, or a later archive date, since
+   *  every holding is carried forward after its last figure
+   *  (net-worth-view.md, Ranges and modes). */
   chartLastDate() {
     const archives = [...this.holdings.values()].map((h) => h.payload.archivedAt).filter(Boolean);
-    return [...this.recordingDates(), ...archives].sort().at(-1);
+    return [today(), ...archives].sort().at(-1);
   }
 
   /** The days a range of `span` days shows, counted back from the

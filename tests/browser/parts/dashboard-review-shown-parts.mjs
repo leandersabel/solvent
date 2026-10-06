@@ -8,7 +8,7 @@
 // the earlier part in screen order.
 // Templates: dashboard.html. Modules: view-dashboard.js, decimal.js,
 // model.js, format.js.
-import { check, holdings, page, plant, reloadModel, run, setProfile, vaultOwner } from '../harness.mjs';
+import { check, holdToday, holdings, page, plant, reloadModel, run, setProfile, vaultOwner } from '../harness.mjs';
 
 // Exact figures are integers at scale 12, as the value model holds them.
 const SCALE = 12;
@@ -138,8 +138,13 @@ const groupBy = async (id) => {
   await page.frames();
 };
 
+// The device's today, two days past the last recording, where the chart
+// and every range end.
+const TODAY = '2026-01-14';
+
 await run(async () => {
   await vaultOwner();
+  await holdToday(TODAY);
   const ids = await holdings(HOLDINGS.map(([name, unit, dims]) => [name, unit, dims]));
   await setProfile({
     dimensions: [{ id: 'liq', label: 'Liquidity', values: [{ id: 'cash', label: 'Cash' }, { id: 'inv', label: 'Invested' }, { id: 'fixed', label: 'Fixed' }] }],
@@ -191,9 +196,9 @@ await run(async () => {
       gotRows.every((g) => g !== null) && sum(gotRows) === halfEvenDiv(sum(Object.values(exactRows)), unitOf(places)),
       JSON.stringify(now.table));
 
-    // The legend, at the right hand edge, which on latest rates is the
-    // total the hero shows.
-    const lastDay = dayOf('2026-01-11');
+    // The legend, at the right hand edge, today, which on latest rates
+    // is the total the hero shows.
+    const lastDay = dayOf(TODAY);
     const edge = bandsAt(SECOND, lastDay);
     const gotLegend = now.legend.map(([, value]) => shown(value, 0));
     check(`net-worth-view: the legend reads as the spec's rounding gives at the right hand edge ${where}`,
@@ -294,7 +299,7 @@ await run(async () => {
     chart.blur();
     return read;
   });
-  check('net-worth-view: the hero reading the last day rounds its net once, half-even, as the hero at rest does',
-    followed.date === 'Jan 12, 2026' && shown(resting, 0) === 5n && shown(followed.hero, 0) === 5n && shown(followed.net, 2) === 450n,
+  check('net-worth-view: the hero reading the last day, today, rounds its net once, half-even, as the hero at rest does',
+    followed.date === 'Jan 14, 2026' && shown(resting, 0) === 5n && shown(followed.hero, 0) === 5n && shown(followed.net, 2) === 450n,
     JSON.stringify({ resting, followed }));
 }, { signsIn: false });

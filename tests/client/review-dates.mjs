@@ -288,11 +288,15 @@ if (group === 'records') {
       assert.equal(decimal.format(vault.totals().net), '109', 'the total');
       assert.deepEqual(vault.quantityDates(), ['2026-09-01']);
       assert.deepEqual(vault.recordingDates(), ['2026-09-01']);
-      assert.equal(vault.chartLastDate(), '2026-09-01', "the chart's last day");
+      // The chart ends today, never at a misdated record after it.
+      assert.equal(vault.chartLastDate(), '2026-09-30', "the chart's last day");
       const first = dayNumber('2026-09-01');
-      assert.deepEqual(vault.chartRange(null), { fromDay: first, lastDay: first });
-      const { bands } = vault.series(null, first, first);
-      assert.equal(decimal.format(bands.reduce((sum, band) => sum + band.points[0], 0n)), '109');
+      const last = dayNumber('2026-09-30');
+      assert.deepEqual(vault.chartRange(null), { fromDay: first, lastDay: last });
+      const { bands } = vault.series(null, first, last);
+      for (const at of [0, -1]) {
+        assert.equal(decimal.format(bands.reduce((sum, band) => sum + band.points.at(at), 0n)), '109');
+      }
     });
   });
 
