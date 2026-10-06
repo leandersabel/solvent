@@ -1088,4 +1088,6 @@ from an administrator removing an account (`admin-invites.md`).
     administrator, every field is empty, the gauge shows no filled
     segment and no rating, and Change password is disabled. Test:
     `tests/browser/parts/settings.mjs`,
-    `tests/browser/parts/admin-review-cleared.mjs`.
+    `tests/browser/parts/settings-review-gauge.mjs`,
+    `tests/browser/parts/admin-review-cleared.mjs`,
+    `tests/browser/parts/admin-review-gauge.mjs`.
