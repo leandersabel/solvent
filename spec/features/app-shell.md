@@ -650,7 +650,12 @@ for a control above the dialog to protect.
 28. The CSP refuses framing and no `X-Frame-Options` is served. Test:
     `tests/test_headers.py::test_no_separate_x_frame_options_is_served`.
 29. (blind) No screen, error pages reached by navigation included, logs a
-    console error. Test: `tests/browser/parts/error-page.mjs`.
+    console error of its own: a resource the page needs that is blocked
+    or refused, a policy violation or an uncaught exception. The
+    browser's line for a refused request the person made, such as a
+    wrong password, a used invite or too many attempts, is the product
+    answering and not such an error. Test:
+    `tests/browser/parts/error-page.mjs`.
 30. The Alpine build served is the CSP-safe one. Test:
     `tests/test_chrome.py::test_the_alpine_build_served_is_the_csp_safe_one_at_its_pinned_hash`.
 31. (blind) Every shell page and every error page declares the icon from

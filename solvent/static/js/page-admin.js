@@ -7,7 +7,7 @@
 import * as api from './api.js';
 import { dialog, el, inlineRename, mount, shortDate } from './dom.js';
 import { changePassword, signOut } from './session.js';
-import { passwordWithToggle } from './unlock.js';
+import { knownUsernameField, passwordWithToggle } from './unlock.js';
 import { strengthGauge } from './strength.js';
 
 const container = document.getElementById('app');
@@ -544,14 +544,15 @@ function passwordCard() {
   const confirm = el('input', { type: 'password', autocomplete: 'new-password' });
   const error = el('p', { class: 'field-error', hidden: true });
   const done = el('p', { class: 'banner', hidden: true, role: 'status' });
-  const button = el('button', { class: 'btn-primary', text: 'Change password', disabled: true });
+  const button = el('button', { type: 'submit', class: 'btn-primary', text: 'Change password', disabled: true });
   let strong = false;
   const gauge = strengthGauge(next, (ok) => {
     strong = ok;
     button.disabled = !ok;
   });
 
-  button.addEventListener('click', async () => {
+  const submit = async (event) => {
+    event.preventDefault();
     error.hidden = true;
     done.hidden = true;
     if (next.value !== confirm.value) {
@@ -585,9 +586,11 @@ function passwordCard() {
       button.disabled = !strong;
       button.textContent = 'Change password';
     }
-  });
+  };
 
-  return el('section', { class: 'card' }, [
+  // A form with the username, so a password manager offers to update
+  // the saved login. Enter submits it.
+  return el('form', { class: 'card', novalidate: true, onsubmit: submit }, [
     el('h2', { class: 'section-heading', text: 'Your password' }),
     el('p', {
       class: 'hint',
@@ -600,6 +603,7 @@ function passwordCard() {
     gauge.element,
     el('div', { class: 'field' }, [el('label', { text: 'Confirm new password' }), passwordWithToggle(confirm)]),
     done,
+    knownUsernameField(username),
     button,
   ]);
 }

@@ -297,7 +297,7 @@ await run(async () => {
     `${kept} kept, the second field was ${shownType}`,
   );
   await unlockInPlace('the vault after unlocking over the password card');
-  const filled = await onCard(passwordCard, (card) => [...card.querySelectorAll('input')].filter(f => f.value !== '').length);
+  const filled = await onCard(passwordCard, (card) => [...card.querySelectorAll('.password-field input')].filter(f => f.value !== '').length);
   check('no password field is refilled after unlocking', filled === 0, `${filled} filled`);
   check('no password field is refilled after unlocking', filled === 0, `${filled} filled`);
 });

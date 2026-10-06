@@ -14,7 +14,7 @@ import {
   signOut,
 } from './session.js';
 import { IDLE_LOCK_PERIODS } from './model.js';
-import { passwordWithToggle, show } from './unlock.js';
+import { knownUsernameField, passwordWithToggle, show } from './unlock.js';
 import { strengthGauge } from './strength.js';
 
 /** `open` goes to one of the screens reached from here, by the last
@@ -198,7 +198,7 @@ function changePasswordCard(kdf, username, sessions) {
   const confirm = el('input', { type: 'password', autocomplete: 'new-password' });
   const error = el('p', { class: 'field-error', role: 'alert', hidden: true });
   const done = el('p', { class: 'banner', hidden: true, role: 'status' });
-  const button = el('button', { class: 'btn-primary', text: 'Change password', disabled: true });
+  const button = el('button', { type: 'submit', class: 'btn-primary', text: 'Change password', disabled: true });
   let strong = false;
   const gauge = strengthGauge(next, (ok) => {
     strong = ok;
@@ -217,7 +217,8 @@ function changePasswordCard(kdf, username, sessions) {
     button.disabled = on || !strong;
   };
 
-  button.addEventListener('click', async () => {
+  const submit = async (event) => {
+    event.preventDefault();
     error.hidden = true;
     done.hidden = true;
     if (next.value !== confirm.value) {
@@ -248,16 +249,18 @@ function changePasswordCard(kdf, username, sessions) {
       button.textContent = 'Change password';
       quiet(false);
     }
-  });
+  };
 
-  return el('section', { class: 'card' }, [
+  // A form with the username, so a password manager offers to update
+  // the saved login. Enter submits it.
+  return el('form', { class: 'card', novalidate: true, onsubmit: submit }, [
     el('h2', { class: 'section-heading', text: 'Change password' }),
     el('p', {
       class: 'callout',
       text: 'Your data is not re-encrypted. Only the lock around your key is rebuilt, which is why this is fast even on a large vault.',
     }),
     // An error sits above the first field (design-system.md, States).
-    el('div', { class: 'form-narrow' }, [error, ...fields, done, button]),
+    el('div', { class: 'form-narrow' }, [error, ...fields, done, knownUsernameField(username), button]),
     el('p', { class: 'warning-line' }, [
       icon('alert', 18),
       el('span', {
@@ -401,7 +404,7 @@ function dangerZone(username, open) {
  *  vault back (spec/design-system.md, Dialog). */
 function deleteAccountDialog(username, open) {
   const password = el('input', { type: 'password', autocomplete: 'current-password' });
-  const typed = el('input', { type: 'text', autocomplete: 'off', spellcheck: 'false' });
+  const typed = el('input', { type: 'text', spellcheck: 'false' });
   const error = el('p', { class: 'field-error', role: 'alert', hidden: true });
   const remove = el('button', { class: 'btn-destructive', text: 'Delete my vault', disabled: true });
 
@@ -435,9 +438,14 @@ function deleteAccountDialog(username, open) {
       el('p', {
         text: 'Deleting takes the account, everything in the vault, and every session you have open. It happens all at once and it cannot be undone. Nothing is kept in reserve, and there is no vault left for anybody to recover.',
       }),
-      error,
-      field('Your password', passwordWithToggle(password)),
-      field('Type your username to confirm', typed),
+      // A form with the username, so a password manager can fill the
+      // password. Enter does nothing: only Delete my vault deletes.
+      el('form', { novalidate: true, onsubmit: (event) => event.preventDefault() }, [
+        error,
+        field('Your password', passwordWithToggle(password)),
+        field('Type your username to confirm', typed),
+        knownUsernameField(username),
+      ]),
     ],
     actions: [
       el('button', { class: 'btn-secondary', text: 'Cancel', onclick: () => close() }),
