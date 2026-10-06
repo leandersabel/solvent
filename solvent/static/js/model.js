@@ -52,6 +52,8 @@ export class Vault {
     // is the AAD-binding tripwire firing, and it is surfaced rather
     // than swallowed (net-worth-view.md).
     this.unreadable = [];
+    // Of those, the profile records: settings still, readable or not.
+    this.unreadableProfiles = 0;
   }
 
   async load() {
@@ -69,6 +71,7 @@ export class Vault {
     this.snapshots.clear();
     this.rates.clear();
     this.unreadable = [];
+    this.unreadableProfiles = 0;
 
     for (const type of RECORD_TYPES) {
       for (const record of byType[type]) {
@@ -93,17 +96,19 @@ export class Vault {
     // A schema_version above what this client knows is unreadable
     // rather than guessed at: guessing at a future shape is how data
     // gets silently corrupted.
-    if (record.schemaVersion > SCHEMA_VERSION) {
-      this.unreadable.push(record.recordId);
-      return null;
-    }
+    if (record.schemaVersion > SCHEMA_VERSION) return this._unreadable(record);
     try {
       const payload = migrate(record.recordType, record.schemaVersion, await crypto.decryptRecord(this.dek, record));
       return { ...record, payload };
     } catch {
-      this.unreadable.push(record.recordId);
-      return null;
+      return this._unreadable(record);
     }
+  }
+
+  _unreadable(record) {
+    this.unreadable.push(record.recordId);
+    if (record.recordType === 'profile') this.unreadableProfiles += 1;
+    return null;
   }
 
   _index(entry) {

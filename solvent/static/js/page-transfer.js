@@ -124,9 +124,10 @@ function importCard(vault, reload) {
     rate: countOf(vault.rates),
   };
   // The profile is the vault's settings, not something the person put
-  // in it, so it is not counted and a vault holding nothing else holds
-  // nothing to erase.
-  const total = mine.account + mine.snapshot + mine.rate + vault.unreadable.length;
+  // in it, so it is not counted, readable or not, and a vault holding
+  // nothing else holds nothing to erase.
+  const unreadable = vault.unreadable.length - vault.unreadableProfiles;
+  const total = mine.account + mine.snapshot + mine.rate + unreadable;
   const holdsData = total > 0;
 
   let parsed = null;
@@ -285,11 +286,16 @@ function importCard(vault, reload) {
               el('p', { text: counted(mine.account, 'holding', 'holdings') }),
               el('p', { text: counted(mine.snapshot, 'recorded figure', 'recorded figures') }),
               el('p', { text: counted(mine.rate, 'captured price', 'captured prices') }),
+              // A restore deletes these too, so the total is the sum of
+              // the lines above it.
+              unreadable
+                ? el('p', { text: `${counted(unreadable, 'record', 'records')} that could not be read` })
+                : null,
               el('p', { class: 'strong', text: `Your vault currently holds ${counted(total, 'record', 'records')}. All of them will be deleted.` }),
             ]
           : [el('p', { text: 'Your vault is empty. Nothing will be deleted.' })]),
       ]),
-      theirs && theirs !== vault.mainCurrency
+      theirs && vault.mainCurrency && theirs !== vault.mainCurrency
         ? el('p', { class: 'review-line', text: `This vault is kept in ${theirs}. Yours is currently in ${vault.mainCurrency}.` })
         : null,
       parsed.formatVersion < transfer.FORMAT_VERSION

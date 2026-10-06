@@ -101,11 +101,17 @@ Replace-only, and nothing on the screen may imply a merge exists.
    captured prices, and the date it was exported, in the date style of
    the vault that is open. Alongside it, what will be destroyed, in the
    same kinds and with the total of every record but the profile,
-   unreadable ones included: "Your vault currently holds X records. All
-   of them will be deleted." Both sides read in the same terms,
-   because the step exists to answer what is being traded for what.
+   readable or not, other unreadable records included: "Your vault
+   currently holds X records. All of them will be deleted." Both sides
+   read in the same terms, because the step exists to answer what is
+   being traded for what.
    - Prices get their own line, because this is where a person sees both
      timelines are in the file before destroying the ones they have.
+   - Records other than the profile that the vault holds but cannot
+     read get a line after the prices, "N records that could not be
+     read" ("1 record that could not be read"), shown only above zero,
+     because a restore deletes them too. The total is the sum of the
+     lines above it.
    - **A vault holding only its profile is empty here**, because the
      profile is settings, not anything the person put in. The destroyed
      side reads "Your vault is empty. Nothing will be deleted." The step
@@ -511,12 +517,15 @@ There is no `formatVersion` below 1.
     `tests/browser/parts/export-import.mjs`.
 21. Into a vault holding only its profile, the review says nothing will be
     deleted and asks for no `ERASE`. Test:
-    `tests/browser/parts/export-import.mjs`.
+    `tests/browser/parts/export-import.mjs`,
+    `tests/browser/parts/export-import-review-unreadable.mjs`.
 22. Into a non-empty vault, an import without the typed `ERASE` is refused
-    and changes nothing. Test: `tests/browser/parts/export-import.mjs`.
+    and changes nothing. Test: `tests/browser/parts/export-import.mjs`,
+    `tests/browser/parts/export-import-review-unreadable.mjs`.
 23. The review sets the file against what will be deleted, in the same
     kinds, prices on their own line. Test:
-    `tests/browser/parts/export-import.mjs`.
+    `tests/browser/parts/export-import.mjs`,
+    `tests/browser/parts/export-import-review-unreadable.mjs`.
 24. The review names a main currency that differs from the vault's. Test:
     `tests/browser/parts/export-import.mjs`.
 25. The review says so when the file carries an older `formatVersion`.
@@ -639,3 +648,8 @@ There is no `formatVersion` below 1.
     no typed `ERASE` and nothing re-encrypted kept. Test:
     `tests/browser/parts/export-import.mjs`,
     `tests/browser/parts/export-import-review-damaged.mjs`.
+58. The review's total of what will be deleted is the sum of the lines
+    above it: the vault's settings are not counted, readable or not, and
+    other records the vault cannot read get a line of their own. Test:
+    `tests/browser/parts/export-import.mjs`,
+    `tests/browser/parts/export-import-review-unreadable.mjs`.
