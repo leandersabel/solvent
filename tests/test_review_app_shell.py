@@ -12,12 +12,14 @@ from __future__ import annotations
 
 import http.client
 import os
+import shutil
 import socket
 import subprocess
 import sys
 import time
 from contextlib import ExitStack, contextmanager
 
+import pytest
 from gunicorn.config import Config
 
 import solvent.rates as rates
@@ -176,3 +178,12 @@ def test_a_start_empties_the_rate_cache_and_keeps_everything_else(app):
         started_again(app)
         assert rows(app, "SELECT * FROM rate_cache") == []
         assert [rows(app, sql) for sql in kept] == before
+
+
+@pytest.mark.skipif(shutil.which("node") is None, reason="node is not installed")
+def test_only_the_route_table_names_a_screen_inside_the_vault():
+    """Criterion 83, against routes.js in Node: the table's addresses
+    open, nothing else does, and a sweep only at a recorded day."""
+    script = REPO_ROOT / "tests" / "client" / "review-dates.mjs"
+    result = subprocess.run(["node", str(script), "addresses"], capture_output=True, text=True, timeout=60)
+    assert result.returncode == 0, result.stdout + result.stderr

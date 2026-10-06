@@ -76,3 +76,17 @@ def test_scale_12_holds_every_digit_a_proposal_carries():
         ["142857142900", "1428571429000000000000"],
         ["3142.751234", "31427512340000"],
     ]
+
+
+DATES = REPO_ROOT / "tests" / "client" / "review-dates.mjs"
+
+
+@pytest.mark.skipif(shutil.which("node") is None, reason="node is not installed")
+def test_only_a_recorded_day_is_written_or_counted():
+    """Criteria 98, 99 and 100, and rate-lookup.md's `date` bullet: a
+    figure or price at a date that does not exist or is still to come is
+    refused before anything is encrypted or sent, a stored one counts
+    toward nothing and its recording still opens, and today is the
+    device's calendar day in any zone."""
+    result = subprocess.run(["node", str(DATES), "records"], capture_output=True, text=True, timeout=180)
+    assert result.returncode == 0, result.stdout + result.stderr
