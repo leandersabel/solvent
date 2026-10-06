@@ -2973,6 +2973,26 @@ await check('record-rate: the confirmation names each unit, how many holdings mo
   assert.ok(copy[2].startsWith('This is the only price recorded for Gold, troy ounce.'), copy[2]);
 });
 
+await check('record-rate: the confirmation leaves out a changed price that moves no holding on that date', () => {
+  const vault = model({
+    holdings: [
+      { name: 'A', unit: 'USD' },
+      { name: 'Silver', unit: 'XAG-ozt' },
+    ],
+    figures: [['A', '2026-06-30', '100']],
+    prices: [
+      ['USD', '2026-07-31', '0.9'],
+      ['XAG-ozt', '2026-07-31', '30'],
+      ['XAG-ozt', '2026-06-30', '29'],
+    ],
+  });
+  vault.symbols = new Map(SYMBOLS.map((row) => [row.symbol, row]));
+  assert.deepEqual(views.rateChangeCopy(vault, '2026-07-31', [{ unit: 'XAG-ozt' }]), []);
+  const copy = views.rateChangeCopy(vault, '2026-07-31', [{ unit: 'USD' }, { unit: 'XAG-ozt' }]);
+  assert.equal(copy.length, 1, copy.join(' | '));
+  assert.ok(copy[0].includes('moves 1 holding measured in USD'), copy[0]);
+});
+
 await check('design-system: a unit is named in full, carried in short after a figure, and grams never read as troy ounces', () => {
   const vault = new Vault(null);
   vault.profile = { mainCurrency: 'CHF', locale: 'en-US' };
