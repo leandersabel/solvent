@@ -831,7 +831,9 @@ host's network are reachable.
 35. Retiring a symbol leaves its row in `GET /api/rates/symbols`
     unchanged but for `retired: true`, and both forms of `/api/rates`
     still price it. Unretiring restores the row exactly. Test:
-    `tests/test_rates.py::test_retiring_flags_a_symbol_and_leaves_its_row_and_pricing_alone`.
+    `tests/test_rates.py::test_retiring_flags_a_symbol_and_leaves_its_row_and_pricing_alone`,
+    `tests/test_review_rate_lookup.py::test_retiring_changes_only_the_flag_and_unretiring_restores_the_row_exactly`,
+    `tests/test_review_rate_lookup.py::test_a_retired_symbol_is_priced_by_both_forms_as_before`.
 36. `PATCH` setting `lookup: true` on a symbol with no provider adapter
     is a Bad Request, and so is `POST` creating one that way. Test:
     `tests/test_rates.py::test_lookup_cannot_promise_a_proposal_the_proxy_cannot_serve`.
@@ -1066,4 +1068,5 @@ host's network are reachable.
 80. A holding measured in a retired unit reads the unit by its label on
     the dashboard and on Update values, and still gets a market rate
     where its unit has a price source. Test:
-    `tests/browser/parts/update-values-retired.mjs`.
+    `tests/browser/parts/update-values-retired.mjs`,
+    `tests/browser/parts/update-values-review-retired.mjs`.

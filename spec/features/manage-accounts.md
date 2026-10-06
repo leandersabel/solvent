@@ -904,5 +904,7 @@ Unarchiving and archiving it again writes the zero at the new D.
     such as "12.5 ozt". Test: `tests/browser/parts/account-detail.mjs`.
 64. A retired unit is not offered for a new holding, and typed as free
     text in any case it is refused. A holding already measured in it
-    shows it as its current choice by its label. Test:
-    `tests/browser/parts/account-form-retired.mjs`.
+    shows it as its current choice by its label, and so does one whose
+    unit is fixed by a recorded value. Test:
+    `tests/browser/parts/account-form-retired.mjs`,
+    `tests/browser/parts/account-form-review-retired.mjs`.

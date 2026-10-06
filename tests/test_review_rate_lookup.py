@@ -28,7 +28,10 @@ Every proposal is the pinned composition rounded once, half to even, to
 the client gets, criteria 57, 78 and 79). A success resets its
 provider's count unless that provider counted a failure after the
 proxy request began (Rate limiting and failure, criteria 24, 25, 27
-and 29).
+and 29). A retired symbol keeps its row but for the flag, and both forms
+of the lookup price it, a retired main currency included, while
+registration no longer offers it (The symbol table, Maintaining the
+table, criterion 35).
 
 Written from the spec alone. Each provider is reached on a loopback HTTP
 server through the app's own opener, so the app's real socket timeout
@@ -2651,3 +2654,81 @@ def test_a_success_resets_its_own_count_from_before_the_request_whatever_the_oth
 
     assert "USD" in priced and not GOLD & set(priced)
     assert failures() == {"frankfurter": 0, "nbp": 1}
+
+
+# ---- Retiring a symbol (The symbol table, Maintaining the table,
+# criterion 35; record-rate.md, Reading) -----------------------------------
+
+
+def symbol_rows(owner) -> dict[str, dict]:
+    return {row["symbol"]: row for row in owner.get("/api/rates/symbols", headers=CSRF).get_json()}
+
+
+def set_retired(admin, symbol: str, retired: bool):
+    response = admin.patch(f"/api/admin/symbols/{symbol}", json={"retired": retired}, headers=CSRF)
+    assert response.status_code == 200, response.get_data(as_text=True)
+
+
+@pytest.mark.parametrize("symbol", ["XAU-ozt", "XAG-ozt", "USD", "CHF"])
+def test_retiring_changes_only_the_flag_and_unretiring_restores_the_row_exactly(owner, admin, symbol):
+    """Criterion 35: the row stays in the table, alike but for `retired`,
+    and unretiring gives back the row it was."""
+    before = symbol_rows(owner)[symbol]
+    assert before["retired"] is False
+
+    set_retired(admin, symbol, True)
+    assert symbol_rows(owner)[symbol] == {**before, "retired": True}
+
+    set_retired(admin, symbol, False)
+    assert symbol_rows(owner)[symbol] == before
+
+
+def test_a_retired_symbol_is_priced_by_both_forms_as_before(owner, admin, sources):
+    """Criterion 35 and Maintaining the table: both forms of
+    `/api/rates` still price a retired currency and a retired metal with
+    a source, at the figures they had before."""
+    priced = {symbol: table(owner)[symbol]["rate"] for symbol in ("USD", "XAU-ozt", "XAU-g")}
+    for symbol in priced:
+        set_retired(admin, symbol, True)
+
+    whole = table(owner, on=day(1))
+    for symbol, rate in priced.items():
+        assert whole[symbol]["rate"] == rate
+        single = owner.get(f"/api/rates?date={PAST}&quote=CHF&symbol={symbol}", headers=CSRF)
+        assert single.status_code == 200, single.get_data(as_text=True)
+        assert single.get_json()["rate"] == rate
+
+
+def test_a_retired_main_currency_still_quotes_and_keeps_its_since(owner, admin, sources):
+    """record-rate.md, Reading: a main currency is a currency row with a
+    `since`, retired or not, so a vault totalling in it keeps its rate
+    sources, and the proxy still quotes into it."""
+    set_retired(admin, "CHF", True)
+
+    row = symbol_rows(owner)["CHF"]
+    assert row["kind"] == "currency" and row["since"] == "1999-01-04" and row["retired"] is True
+    whole = table(owner)
+    assert {"USD", "XAU-ozt", "XAU-g"} <= set(whole)
+    single = owner.get(f"/api/rates?date={PAST}&quote=CHF&symbol=USD", headers=CSRF)
+    assert single.status_code == 200, single.get_data(as_text=True)
+
+
+def test_a_retired_currency_is_not_offered_at_registration(app, client, admin):
+    """The symbol table, `retired`: the main-currency list at
+    registration leaves a retired row out."""
+    set_retired(admin, "USD", True)
+    page = client.get(f"/register?invite={mint_invite(app)}").get_data(as_text=True)
+
+    offered = offered_currencies(page)
+    assert "CHF" in offered and "USD" not in offered
+
+
+def test_retiring_without_the_csrf_header_changes_nothing(owner, admin):
+    """architecture.md, Application hardening: a mutating endpoint
+    refuses a request without the CSRF header."""
+    before = symbol_rows(owner)["XAU-ozt"]
+
+    response = admin.patch("/api/admin/symbols/XAU-ozt", json={"retired": True})
+
+    assert response.status_code == 403
+    assert symbol_rows(owner)["XAU-ozt"] == before

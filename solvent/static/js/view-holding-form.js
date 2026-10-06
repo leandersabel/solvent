@@ -282,8 +282,14 @@ function unitPicker(vault, current, locked) {
     }
   });
 
-  if (locked) draw();
-  else load();
+  if (locked) {
+    draw();
+    // The label once the table is here. Without it the symbol stands.
+    symbols().then((rows) => {
+      table = rows;
+      draw();
+    }, () => {});
+  } else load();
 
   return {
     element: el('div', { class: 'field unit-field' }, [
