@@ -44,10 +44,10 @@ await run(async () => {
     await page.send('Page.navigateToHistoryEntry', { entryId: entries[currentIndex + delta].id });
   };
   // The position a screen settles at once it has drawn and grown.
-  const settled = async (want, read) => {
-    await page.holds(`(${read})() === ${JSON.stringify(want)}`, { timeout: 5000 });
+  const settled = async (want, read, ...args) => {
+    await page.holds(`(${read})(...args.slice(1)) === args[0]`, { args: [want, ...args], timeout: 5000 });
     await page.frames(4);
-    return page.call(read);
+    return page.call(read, ...args);
   };
 
   // ---- The bar's link ---------------------------------------------------
@@ -96,10 +96,10 @@ await run(async () => {
   // ---- A holding's row far down -----------------------------------------
 
   const lastRow = (name) => [...document.querySelectorAll('.holdings-table .row-name')].find((b) => b.textContent === name);
-  await page.call(`(name) => (${lastRow})(name).scrollIntoView({ block: 'center' })`, LAST);
+  await page.call((name) => [...document.querySelectorAll('.holdings-table .row-name')].find((b) => b.textContent === name).scrollIntoView({ block: 'center' }), LAST);
   await page.frames();
-  const rowTop = `() => Math.round((${lastRow})(${JSON.stringify(LAST)}).getBoundingClientRect().top)`;
-  const rowBefore = { ...(await where()), row: await page.call(rowTop) };
+  const rowTop = (name) => Math.round([...document.querySelectorAll('.holdings-table .row-name')].find((b) => b.textContent === name).getBoundingClientRect().top);
+  const rowBefore = { ...(await where()), row: await page.call(rowTop, LAST) };
   const row = await centerOf(lastRow, LAST);
   await page.mouseClick(row.x, row.y);
   await page.waitUntil("location.hash.startsWith('#/holding/') && document.querySelector('.detail-header')", { label: 'the holding' });
@@ -116,7 +116,7 @@ await run(async () => {
   await scrollTo(holdingAt);
   await navigate(-1);
   await dashboard();
-  const rowAfter = await settled(rowBefore.row, rowTop);
+  const rowAfter = await settled(rowBefore.row, rowTop, LAST);
   check(
     "app-shell: Back from the holding returns the dashboard with the holding's row at the same height on screen",
     rowAfter === rowBefore.row,
