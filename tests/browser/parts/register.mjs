@@ -54,12 +54,37 @@ await run(async () => {
   await setValue('input[type=text]', 'leander');
   await setValue('input[type=password]', VAULT_PASSWORD, 0);
   await setValue('input[type=password]', VAULT_PASSWORD, 1);
-  await setValue('select', 'CHF');
   await page.eval(`(() => {
     const box = document.querySelector('input[type=checkbox]');
     box.checked = true;
     box.dispatchEvent(new Event('change', { bubbles: true }));
   })()`);
+  await page.waitUntil("document.querySelectorAll('.gauge-segment.filled').length >= 4", { label: 'the gauge scoring' });
+  check(
+    'the main currency starts unchosen and the button stays unusable without one',
+    (await page.eval("document.querySelectorAll('#register-currency-list [aria-selected=true]').length")) === 0 &&
+      (await text()).includes('No currency chosen yet.') &&
+      (await page.eval("document.querySelector('button[type=submit]').disabled")),
+  );
+  await setValue('#register-currency', 'fRANc');
+  const narrowed = JSON.parse(await page.eval(`JSON.stringify({
+    symbols: [...document.querySelectorAll('#register-currency-list [role=option]')].map((o) => o.dataset.symbol),
+    texts: [...document.querySelectorAll('#register-currency-list [role=option]')].map((o) => o.textContent),
+    chosen: document.querySelectorAll('#register-currency-list [aria-selected=true]').length,
+  })`));
+  check(
+    'typing narrows the currencies to those whose code or name holds the text, and chooses none',
+    narrowed.symbols.includes('CHF') && narrowed.texts.every((t) => t.toLowerCase().includes('franc')) && narrowed.chosen === 0 &&
+      (await page.eval("document.querySelector('button[type=submit]').disabled")),
+    JSON.stringify(narrowed),
+  );
+  await setValue('#register-currency', 'chf');
+  check(
+    'a search by code finds the currency',
+    (await page.eval("JSON.stringify([...document.querySelectorAll('#register-currency-list [role=option]')].map((o) => o.dataset.symbol))")) === '["CHF"]',
+  );
+  await page.eval(`document.querySelector('#register-currency-list [data-symbol="CHF"]').click()`);
+  check('the chosen currency is named under the list', (await text()).includes('Chosen: Swiss Franc (CHF)'));
   await page.waitUntil("!document.querySelector('button[type=submit]').disabled", { label: 'the registration button' });
   await markDocument(page, 'registration');
   await submit();
@@ -138,7 +163,7 @@ await run(async () => {
         set('input[type=text]', username);
         set('input[type=password]', password, 0);
         set('input[type=password]', password, 1);
-        set('select', 'CHF');
+        document.querySelector('#register-currency-list [data-symbol="CHF"]').click();
         const box = document.querySelector('input[type=checkbox]');
         box.checked = true;
         box.dispatchEvent(new Event('change', { bubbles: true }));

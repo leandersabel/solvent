@@ -436,7 +436,7 @@ export async function startRecorder() {
     await set('input[type=text]', 'recorder');
     await set('input[type=password]', RECORDER_PASSWORD, 0);
     await set('input[type=password]', RECORDER_PASSWORD, 1);
-    await set('select', 'CHF');
+    await ev(`document.querySelector('#register-currency-list [data-symbol="CHF"]').click()`);
     await ev(`(() => {
       const box = document.querySelector('input[type=checkbox]');
       box.checked = true;

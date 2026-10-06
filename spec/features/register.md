@@ -163,13 +163,27 @@ because it is the most consequential sentence in the product.
 
 #### Main currency
 
-On the vault form only. A searchable select, with a 13px ink-secondary
-line directly beneath it: **"This cannot be changed later."** People
-choose this in five seconds and live with it for years, so the warning
-belongs at the point of choice and not in settings afterwards
-(`account-settings.md`, Settings). Every option works for every
-conversion the vault will ever make (Rules), so there is no
-"unsupported currency" state.
+On the vault form only. A searchable combobox (`design-system.md`,
+Components, Combobox, searchable): a search field with the placeholder
+"Search by code or name" over the list of currencies, each shown as its
+name and code, "Swiss Franc (CHF)". Typing narrows the list to the
+currencies whose code or name contains the text, ignoring case, and a
+search that matches none shows "No currency matches." Typed text never
+chooses: a currency is chosen only by picking it from the list, by
+click, or by Enter or Space on an option reached with the arrow keys.
+
+Nothing is chosen when the form opens, because whatever came first
+would otherwise be fixed for good on a vault whose owner skipped the
+field. Until a currency is chosen, the line under the list reads "No
+currency chosen yet." and **Create vault** stays unusable. Once one is,
+it reads "Chosen: Swiss Franc (CHF)" and the option shows selected.
+
+A 13px ink-secondary line sits directly beneath: **"This cannot be
+changed later."** People choose this in five seconds and live with it
+for years, so the warning belongs at the point of choice and not in
+settings afterwards (`account-settings.md`, Settings). Every option
+works for every conversion the vault will ever make (Rules), so there
+is no "unsupported currency" state.
 
 #### Setting up
 
@@ -695,3 +709,9 @@ fixture prevents.
 48. A `POST /api/register` whose profile schema version is past
     2^53 - 1 is a Bad Request that writes nothing. Test:
     `tests/test_register_refusals.py::test_a_profile_schema_version_past_two_to_the_fifty_three_is_a_bad_request`.
+49. The vault form opens with no main currency chosen, and with every
+    other field filled **Create vault** stays unusable until a currency
+    is picked from the list. Test: `tests/browser/parts/register.mjs`.
+50. Typing in the main currency's search narrows the list to the
+    currencies whose code or name contains the text, ignoring case, and
+    chooses none. Test: `tests/browser/parts/register.mjs`.
