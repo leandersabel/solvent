@@ -313,7 +313,7 @@ await run(async () => {
 
   await openSection('Invites');
   await tap(await spotInRow(LONG_NOTE, 'Call back'), 'Call back on the waiting administrator invite');
-  await page.waitUntil(`document.querySelector(${JSON.stringify(DIALOG)})`, { label: 'the call back dialog' });
+  await page.waitUntil((sel) => document.querySelector(sel), { args: [DIALOG], label: 'the call back dialog' });
   const confirmCallBack = await confirmIn();
   await tap(await spot(confirmCallBack, DIALOG), `${confirmCallBack} in the call back dialog`);
   await page.waitUntil(
@@ -326,7 +326,7 @@ await run(async () => {
   await openSection('Accounts');
   await tap(await spotInRow(LONG_NAME, 'Remove'), `Remove on ${LONG_NAME}`);
   const DIALOG_INPUT = DIALOG.split(', ').map((s) => `${s} input:not([type=hidden])`).join(', ');
-  await page.waitUntil(`document.querySelector(${JSON.stringify(DIALOG_INPUT)})`, { label: 'the remove dialog' });
+  await page.waitUntil((sel) => document.querySelector(sel), { args: [DIALOG_INPUT], label: 'the remove dialog' });
   await page.call((sel, name) => {
     const input = document.querySelector(sel);
     input.value = name;
@@ -352,7 +352,7 @@ await run(async () => {
 
   await openSection('Units');
   await tap(await spotInRow('XAU-ozt', 'Retire'), 'Retire on XAU-ozt');
-  await page.waitUntil(`document.querySelector(${JSON.stringify(DIALOG)})`, { label: 'the retire dialog' });
+  await page.waitUntil((sel) => document.querySelector(sel), { args: [DIALOG], label: 'the retire dialog' });
   const confirmRetire = await confirmIn();
   await tap(await spot(confirmRetire, DIALOG), `${confirmRetire} in the retire dialog`);
   await page.waitUntil(
