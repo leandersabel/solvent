@@ -165,8 +165,17 @@ await run(async () => {
 
   // What the bytes may not show: an id, a counter, a timestamp, a record.
   const ids = [...new Set(before.flatMap((r) => [r.recordId, r.accountId]).filter(Boolean))];
-  const decoded = ['salt', 'wrappedDek', 'dekNonce', 'nonce', 'ciphertext'].map((k) => Buffer.from(file[k] || '', 'base64'));
-  const anywhere = (needle) => text.includes(needle) || decoded.some((b) => b.includes(Buffer.from(needle, 'utf8')));
+  // The base64 fields are read decoded only, since their text is random
+  // letters. Every other byte of the file is read as text.
+  const BASE64 = ['salt', 'wrappedDek', 'dekNonce', 'nonce', 'ciphertext'];
+  check('the salt, wrapper and envelope are canonical base64, so decoding reads all they hold',
+    BASE64.every((k) => typeof file[k] === 'string' && Buffer.from(file[k], 'base64').toString('base64') === file[k]));
+  const decoded = BASE64.map((k) => Buffer.from(file[k] || '', 'base64'));
+  const open = BASE64.reduce((rest, k) => rest.replaceAll(JSON.stringify(file[k] || ''), ''), text);
+  // A needle under four bytes occurs in random bytes by chance, so inside
+  // them it is sought as the JSON string a sealed record would hold.
+  const anywhere = (needle) => open.includes(needle) ||
+    decoded.some((b) => b.includes(needle.length < 4 ? JSON.stringify(needle) : needle));
   check('no record id or holding id appears in the file, in the open or decoded', ids.length > 4 && !ids.some(anywhere),
     `${ids.filter(anywhere).length} of ${ids.length}`);
   const fields = ['"recordId"', '"accountId"', '"recordType"', '"version"', '"schemaVersion"', '"exportedAt"', '"records"'];
