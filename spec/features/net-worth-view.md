@@ -387,7 +387,7 @@ The regions keep their order and stack, 20px apart.
   "not yet valued", so the table renders above the group with those rows
   alone. Total `—`, not 0. No chart. New recording works, because
   recording is how this state is left.
-- **A one-day history** (every snapshot, price and archive on one date):
+- **A one-day history** (every snapshot, price and archive dated today):
   one point at the plot's middle under every range, never a failure or a
   flat line back to the beginning of time (Axes).
 - **All holdings archived**: total `—`, history still renders. Show
@@ -659,14 +659,18 @@ otherwise looks like a lost value or a bad entry.
 #### Ranges and modes
 
 - Ranges 1M, 6M, 1Y, All. Default 1Y, or All if history is shorter.
-- **The chart's last day is the newest date carrying a snapshot, a price
-  entry or an `archivedAt`**, and every range counts back from it. An
-  archive whose D carries no snapshot still falls inside the chart.
+- **The chart's last day is today**, the device's calendar day, or a
+  later `archivedAt`, and every range counts back from it. Each holding
+  is carried forward after its last figure, so a range ending at the last
+  recording would describe a span that ended weeks ago. After the last
+  recording the line runs level to today, and an archive whose D
+  carries no snapshot still falls inside the chart.
 - **A range starts no earlier than the oldest date carrying a
   snapshot.** No band has a value before it, so counting further back
   would draw an empty stretch ending in a jump, and push a one-day
   history's only point to the edge. A range longer than the history shows
-  all of it, and a one-day history is that day under every range.
+  all of it, and a one-day history, recorded only today, is that day
+  under every range.
 - **Pricing mode is not a chart control.** Every point is drawn at the
   prices of its own date, so switching moves no pixel. On latest rates
   the right hand edge **is** the total: each active holding's last
@@ -987,7 +991,7 @@ rule of the chart (Archived holdings, Ranges and modes).
 39. (blind) 2000 to 2001 reads `+0.0%` beside the rising arrow, −1000 to
     −500 reads `+50.0%`, and 0 to 500 shows the amount with no
     percentage. Test: no test.
-40. (blind) With a single recording, at 1280px and 390px, under 1M, 6M, 1Y
+40. (blind) With a single recording, made today, at 1280px and 390px, under 1M, 6M, 1Y
     and All, the point's center is at the plot's horizontal middle within
     half a pixel and its mark's bounding box lies wholly inside the
     drawing. The pointer at either edge and the middle reads that day.
@@ -1022,11 +1026,11 @@ rule of the chart (Archived holdings, Ranges and modes).
     31 January 2026, reads 50 on 16 January, and no vertical edge is
     drawn at 31 January. Test:
     `tests/test_client.py::test_the_client_side_rules_hold`.
-48. (blind) A holding archived on the newest recorded date leaves the
+48. (blind) A holding archived on the chart's last day leaves the
     chart's last point, the table's last row and the end of the change
     each equal to the total on latest rates, exactly. Test:
     `tests/test_client.py::test_the_client_side_rules_hold`.
-49. (blind) A holding archived after the newest recording extends the
+49. (blind) A holding archived after the newest recording draws the
     chart to the archive date through its zero, and the point there
     equals the total on latest rates. Test:
     `tests/test_client.py::test_the_client_side_rules_hold`.
@@ -1146,3 +1150,7 @@ rule of the chart (Archived holdings, Ranges and modes).
     the legend's changes over a selected span to the change as shown,
     and the readout's rows to its net as shown. Test:
     `tests/browser/parts/dashboard-review-shown-parts.mjs`.
+76. With the last recording on 2026-09-15 and today 2026-10-03, the
+    chart ends on 2026-10-03, the last figure runs level to it, 1M
+    starts on 2026-09-03 and All on the first recording. Test:
+    `tests/test_client.py::test_the_client_side_rules_hold`.

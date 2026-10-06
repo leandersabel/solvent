@@ -12,9 +12,22 @@ await run(async () => {
   await page.send('Emulation.setDeviceMetricsOverride', { width: 1280, height: 900, deviceScaleFactor: 1, mobile: false });
 
   // Builds a vault from `spec` the way the value model's own tests do and
-  // shows its dashboard alone on the page.
+  // shows its dashboard alone on the page. A `today` holds the device's
+  // clock at its noon, so the chart ends there.
   await page.call(() => {
-    globalThis.show = async ({ main = 'CHF', profile = {}, dimensions = [], holdings = [], figures = [], prices = [] }) => {
+    const RealDate = Date;
+    globalThis.show = async ({ today, main = 'CHF', profile = {}, dimensions = [], holdings = [], figures = [], prices = [] }) => {
+      const instant = `${today}T12:00:00`;
+      globalThis.Date = today
+        ? class extends RealDate {
+          constructor(...args) {
+            super(...(args.length ? args : [instant]));
+          }
+          static now() {
+            return new RealDate(instant).getTime();
+          }
+        }
+        : RealDate;
       const { Vault } = await import('/static/js/model.js');
       const { dashboardView } = await import('/static/js/view-dashboard.js');
       const vault = new Vault(null);
@@ -67,6 +80,7 @@ await run(async () => {
   // USD holding, and a main-currency holding archived on 20 May with no
   // figure that day.
   await show({
+    today: '2026-06-30',
     holdings: [
       { name: 'Cash', unit: 'CHF' },
       { name: 'Dollars', unit: 'USD' },
@@ -109,6 +123,7 @@ await run(async () => {
     page.eval(`(() => { const s = document.querySelector('.chart-card select'); s.value = 'd'; s.dispatchEvent(new Event('change', { bubbles: true })); })()`);
   await show({
     ...bands,
+    today: '2026-03-01',
     figures: [['First', '2026-03-01', '4503599627370496.25'], ['Second', '2026-03-01', '4503599627370496.25']],
   });
   await group();
@@ -124,6 +139,7 @@ await run(async () => {
 
   await show({
     ...bands,
+    today: '2026-06-30',
     figures: [
       ['First', '2026-01-15', '100.5'], ['First', '2026-06-30', '200'],
       ['Second', '2026-03-01', '300'],
@@ -150,7 +166,7 @@ await run(async () => {
   const start = Date.parse('2014-01-01T00:00:00Z');
   const length = 4000;
   const daily = Array.from({ length }, (_, at) => ['Cash', new Date(start + at * 86400000).toISOString().slice(0, 10), String(1000 + at)]);
-  await show({ holdings: [{ name: 'Cash', unit: 'CHF' }], figures: daily });
+  await show({ today: '2024-12-13', holdings: [{ name: 'Cash', unit: 'CHF' }], figures: daily });
   await chartDrawn();
   await click('All');
   const long = await table();

@@ -18,6 +18,26 @@ async function check(name, body) {
   }
 }
 
+// The device's clock held at noon UTC on `date` while `body` runs, so a
+// rule that counts from today reads the same day on every run.
+async function onDay(date, body) {
+  const RealDate = Date;
+  const instant = `${date}T12:00:00Z`;
+  globalThis.Date = class extends RealDate {
+    constructor(...args) {
+      super(...(args.length ? args : [instant]));
+    }
+    static now() {
+      return new RealDate(instant).getTime();
+    }
+  };
+  try {
+    return await body();
+  } finally {
+    globalThis.Date = RealDate;
+  }
+}
+
 // When set, every step the sign-in takes is appended here: each call
 // into WebCrypto, each derivation handed to the worker, and each
 // request, by its shape and never its bytes.
@@ -1542,19 +1562,21 @@ await check('net-worth-view: archived on the newest recorded date, the chart edg
     ],
     prices: [['XAU-ozt', '2026-09-15', '2000']],
   });
-  assert.equal(vault.chartLastDate(), '2026-10-01');
-  const { days, bands } = vault.series(null, day('2026-09-15'), day(vault.chartLastDate()));
-  const edge = bands.reduce((sum, band) => sum + band.points.at(-1), 0n);
-  assert.equal(edge, vault.totals('latest').net);
-  assert.equal(decimal.format(edge), '1000');
-  // The change over the range reads the same last point.
-  assert.equal(decimal.format(edge - bands[0].points[0]), '-4000');
-  // The zero is the side just before the date, so the line runs down
-  // into it: 1000 just before it and at it, with no drop at the date.
-  assert.equal(await justBefore(bands, days.length - 1), 1000);
+  await onDay('2026-10-01', async () => {
+    assert.equal(vault.chartLastDate(), '2026-10-01');
+    const { days, bands } = vault.series(null, day('2026-09-15'), day(vault.chartLastDate()));
+    const edge = bands.reduce((sum, band) => sum + band.points.at(-1), 0n);
+    assert.equal(edge, vault.totals('latest').net);
+    assert.equal(decimal.format(edge), '1000');
+    // The change over the range reads the same last point.
+    assert.equal(decimal.format(edge - bands[0].points[0]), '-4000');
+    // The zero is the side just before the date, so the line runs down
+    // into it: 1000 just before it and at it, with no drop at the date.
+    assert.equal(await justBefore(bands, days.length - 1), 1000);
+  });
 });
 
-await check('net-worth-view: archived after the newest recording, the chart extends to the archive date through its zero and its edge is the total', () => {
+await check('net-worth-view: archived after the newest recording, the chart extends to the archive date through its zero and its edge is the total', () => onDay('2026-10-05', () => {
   const vault = model({
     holdings: [
       { name: 'Kept', unit: 'CHF' },
@@ -1572,7 +1594,7 @@ await check('net-worth-view: archived after the newest recording, the chart exte
   assert.deepEqual(days, [day('2026-09-15'), day('2026-10-05')]);
   assert.equal(bands.reduce((sum, band) => sum + band.points.at(-1), 0n), vault.totals('latest').net);
   assert.equal(decimal.format(vault.totals('latest').net), '1000');
-});
+}));
 
 await check('net-worth-view: without a zero at D, a price entry at the archive date moves the side just before it and leaves the value at it unchanged', async () => {
   const at = (rate) => {
@@ -1812,7 +1834,7 @@ await check('net-worth-view: one holding at 2500 has ticks 0 to 2500 by 500, rea
   assert.equal(tickLabel(3e9, english), '3B');
 });
 
-await check('net-worth-view: a range starts no earlier than the oldest snapshot, whatever price entry is older', () => {
+await check('net-worth-view: a range starts no earlier than the oldest snapshot, whatever price entry is older', () => onDay('2026-04-10', () => {
   const vault = model({
     holdings: [{ name: 'Cash', unit: 'CHF' }],
     figures: [['Cash', '2026-03-01', '100'], ['Cash', '2026-04-10', '200']],
@@ -1831,7 +1853,21 @@ await check('net-worth-view: a range starts no earlier than the oldest snapshot,
   for (const span of [30, 183, 365, null]) {
     assert.deepEqual(single.chartRange(span), { fromDay: last, lastDay: last }, String(span));
   }
-});
+}));
+
+await check('net-worth-view: the chart ends today, and every range counts back from today, weeks after the last recording', () => onDay('2026-10-03', () => {
+  const vault = model({
+    holdings: [{ name: 'Cash', unit: 'CHF' }],
+    figures: [['Cash', '2026-01-10', '100'], ['Cash', '2026-09-15', '200']],
+  });
+  assert.equal(vault.chartLastDate(), '2026-10-03');
+  assert.deepEqual(vault.chartRange(30), { fromDay: day('2026-09-03'), lastDay: day('2026-10-03') });
+  assert.deepEqual(vault.chartRange(null), { fromDay: day('2026-01-10'), lastDay: day('2026-10-03') });
+  // Carried forward: the line runs level from the last figure to today.
+  const { days, bands } = vault.series(null, day('2026-09-03'), day('2026-10-03'));
+  assert.equal(days.at(-1), day('2026-10-03'));
+  assert.equal(decimal.format(bands[0].points.at(-1)), '200');
+}));
 
 await check('net-worth-view: stepping a day is calendar arithmetic and skips or repeats none across a clock change in any zone', () => {
   const zone = process.env.TZ;
@@ -3097,7 +3133,7 @@ await check('a misdated figure or price counts toward nothing and is listed', as
   assert.deepEqual(vault.usableEntries('USD').map((e) => e.payload.date), ['2026-01-01']);
   assert.deepEqual(vault.quantityDates(), ['2026-01-01']);
   assert.deepEqual(vault.recordingDates(), ['2026-01-01']);
-  assert.equal(vault.chartLastDate(), '2026-01-01');
+  await onDay('2026-01-01', () => assert.equal(vault.chartLastDate(), '2026-01-01'));
   assert.deepEqual(
     vault.misdated().map(({ date, label }) => `${label} ${date}`).sort(),
     ['Cash 2099-01-01', 'Cash garbage', 'USD 2099-01-01'],
