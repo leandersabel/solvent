@@ -153,7 +153,8 @@ confirmation.
 - It runs in a Worker, and the tab stays responsive.
 - **Nothing is uploaded until every record has decrypted.**
 - During the review the page holds the new DEK and the re-encrypted
-  records, never the file's DEK or any plaintext payload.
+  records, and of the file's plaintext only its main currency, which
+  the review names. It never holds the file's DEK.
 
 #### At phone width
 
@@ -487,7 +488,8 @@ There is no `formatVersion` below 1.
     before any review, counting the record without naming it, and
     uploads nothing and leaves the vault intact. Test:
     `tests/test_client.py::test_the_client_side_rules_hold`,
-    `tests/browser/parts/export-import.mjs`.
+    `tests/browser/parts/export-import.mjs`,
+    `tests/browser/parts/export-import-review-damaged.mjs`.
 16. A wrong password for the file aborts before any request is sent, with
     the file still chosen. Test:
     `tests/test_client.py::test_the_client_side_rules_hold`,
@@ -630,7 +632,9 @@ There is no `formatVersion` below 1.
     `tests/browser/parts/export-import-review-sealed.mjs`.
 56. A record at a newer `schemaVersion` is refused as a newer file, not
     a damaged one, before any request. Test:
-    `tests/test_client.py::test_the_client_side_rules_hold`.
+    `tests/test_client.py::test_the_client_side_rules_hold`,
+    `tests/browser/parts/export-import-review-damaged.mjs`.
 57. A lock during the import starts it again at step 1, with no review,
     no typed `ERASE` and nothing re-encrypted kept. Test:
-    `tests/browser/parts/export-import.mjs`.
+    `tests/browser/parts/export-import.mjs`,
+    `tests/browser/parts/export-import-review-damaged.mjs`.

@@ -170,6 +170,7 @@ function importCard(vault, reload) {
     error.hidden = true;
     if (from <= 1) {
       parsed = null;
+      password.value = '';
       stepPassword.hidden = true;
     }
     if (from <= 2) {
@@ -252,8 +253,9 @@ function importCard(vault, reload) {
     }
     if (!current()) return;
     reset(2);
-    // What the review and the upload need, and no key to the file.
-    opened = { profile: file.profile, records: file.records, exportedAt: file.exportedAt, rekeyed };
+    // What the review and the upload need: no key to the file, and of
+    // its plaintext only the main currency the review names.
+    opened = { currency: file.profile?.mainCurrency ?? null, records: file.records, exportedAt: file.exportedAt, rekeyed };
     showReview();
   };
   openButton.addEventListener('click', open);
@@ -266,7 +268,7 @@ function importCard(vault, reload) {
 
   const showReview = () => {
     const counts = transfer.countKinds(opened.records);
-    const theirs = opened.profile ? opened.profile.mainCurrency : null;
+    const theirs = opened.currency;
     mount(review, [
       el('div', { class: 'review-side' }, [
         el('h3', { class: 'group-heading', text: 'In the file' }),
@@ -337,7 +339,7 @@ function importCard(vault, reload) {
       return;
     }
 
-    const theirs = opened.profile ? opened.profile.mainCurrency : null;
+    const theirs = opened.currency;
     const before = vault.mainCurrency;
     let next;
     try {
