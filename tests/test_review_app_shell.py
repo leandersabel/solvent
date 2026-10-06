@@ -3,7 +3,11 @@ request threads than lookups can hold, so requests held open as long
 as every lookup slot can be leave the instance answering
 (spec/features/app-shell.md, criteria 78 and 79; spec/architecture.md,
 Tech stack, WSGI server). A start empties the rate cache and keeps the
-schema version and everything else (Database, criterion 80).
+schema version and everything else (Database, criterion 80). A request
+gunicorn cannot read gets Solvent's Not Found card and headers, and no
+log line keeps its address, its peer or gunicorn's reason (Error pages,
+Requests Flask never sees, criteria 27, 77, 81 and 82; spec/
+architecture.md, Storage & data handling).
 
 Written from the spec alone. gunicorn runs with the Dockerfile's own
 arguments, on loopback.
@@ -11,6 +15,7 @@ arguments, on loopback.
 from __future__ import annotations
 
 import http.client
+import logging
 import os
 import shutil
 import socket
@@ -23,7 +28,8 @@ import pytest
 from gunicorn.config import Config
 
 import solvent.rates as rates
-from tests.helpers import connect, register, rows
+from solvent.guard import navigation
+from tests.helpers import CSRF, connect, register, rows
 from tests.test_deployment import REPO_ROOT, image_command
 
 
@@ -187,3 +193,242 @@ def test_only_the_route_table_names_a_screen_inside_the_vault():
     script = REPO_ROOT / "tests" / "client" / "review-dates.mjs"
     result = subprocess.run(["node", str(script), "addresses"], capture_output=True, text=True, timeout=60)
     assert result.returncode == 0, result.stdout + result.stderr
+
+
+PEER = "127.0.0.2"
+TOKEN = "Q7reviewInviteToken"
+
+# Each request gunicorn cannot read, named by what is wrong with it. The
+# first six are criterion 81's. The rest are shapes gunicorn refuses on
+# its own, which "an address of any length or shape that reaches Solvent
+# is answered by Solvent" covers.
+UNREADABLE = {
+    "request line over the limit": b"GET /?a=" + TOKEN.encode() * 500 + b" HTTP/1.1\r\nHost: x\r\n\r\n",
+    "invite address over the limit": (
+        b"GET /register?invite=" + (TOKEN.encode() * 300)[:5000] + b" HTTP/1.1\r\nHost: x\r\n\r\n"
+    ),
+    "header over the limit": b"GET / HTTP/1.1\r\nHost: x\r\nX-Long: " + b"v" * 9000 + b"\r\n\r\n",
+    "too many headers": b"GET / HTTP/1.1\r\nHost: x\r\n" + b"".join(
+        b"X-H%d: v\r\n" % n for n in range(150)
+    ) + b"\r\n",
+    "invalid request line": b"NOT A REQUEST\r\n\r\n",
+    "invalid header name": f"GET /register?invite={TOKEN} HTTP/1.1\r\nHost: x\r\nBad Header: v\r\n\r\n".encode(),
+    "invalid HTTP version": f"GET /register?invite={TOKEN} HTTP/9.9\r\nHost: x\r\n\r\n".encode(),
+    "invalid method": f"g@t /register?invite={TOKEN} HTTP/1.1\r\nHost: x\r\n\r\n".encode(),
+    "invalid content length": b"POST / HTTP/1.1\r\nHost: x\r\nContent-Length: ten\r\n\r\n",
+    "obsolete line folding": b"GET / HTTP/1.1\r\nHost: x\r\nX-A: one\r\n two\r\n\r\n",
+    "unsupported transfer coding": b"POST / HTTP/1.1\r\nHost: x\r\nTransfer-Encoding: rot13\r\n\r\n",
+    "unmet expectation": b"GET / HTTP/1.1\r\nHost: x\r\nExpect: the-unexpected\r\n\r\n",
+}
+
+# Words of gunicorn's own reasons, any of which in the server's output
+# shows its handler, or its message, still ran.
+GUNICORN_REASONS = ("Invalid", "too large", "limit request", "Request Line", "Error handling", "Traceback")
+
+
+def exchange(port: int, raw: bytes) -> http.client.HTTPResponse:
+    """Send raw bytes from PEER and read the answer whole."""
+    with socket.socket() as client:
+        client.bind((PEER, 0))
+        client.settimeout(10)
+        client.connect(("127.0.0.1", port))
+        client.sendall(raw)
+        response = http.client.HTTPResponse(client)
+        response.begin()
+        response.body = response.read()
+        return response
+
+
+def comparable(response: http.client.HTTPResponse) -> dict:
+    """The headers every response carries: all but the date, the
+    connection's and gunicorn's own."""
+    return {
+        name: value
+        for name, value in response.getheaders()
+        if name.lower() not in ("date", "connection", "server")
+    }
+
+
+def test_an_unreadable_request_gets_the_not_found_card_and_every_header(tmp_path):
+    """Criterion 81 and the Edge case: each request gunicorn cannot read
+    is a Bad Request carrying exactly what an invented path's Not Found
+    carries, and nothing of it reaches the output."""
+    with gunicorn(tmp_path) as (port, process):
+        not_found = exchange(port, b"GET /no/such/page HTTP/1.1\r\nHost: x\r\nConnection: close\r\n\r\n")
+        answers = {shape: exchange(port, raw) for shape, raw in UNREADABLE.items()}
+    assert not_found.status == 404
+    assert not_found.getheader("Content-Security-Policy")
+    assert not_found.getheader("Strict-Transport-Security")
+
+    for shape, answer in answers.items():
+        assert (shape, answer.status) == (shape, 400)
+        assert answer.getheader("Connection") == "close", shape
+        assert answer.getheader("Set-Cookie") is None, shape
+        assert comparable(answer) == comparable(not_found), shape
+        assert answer.body == not_found.body, shape
+
+    for word in (TOKEN, PEER, *GUNICORN_REASONS):
+        assert word not in process.output
+
+
+def without_config(argv: "list[str]") -> "list[str]":
+    at = argv.index("--config")
+    return argv[:at] + argv[at + 2 :]
+
+
+@pytest.mark.parametrize("level", ["error", "warning"])
+def test_no_log_line_carries_the_peer_at_either_level(tmp_path, level):
+    """Criterion 77: unreadable requests and a wrong Auth Key from PEER
+    leave no trace of PEER, at the image's level and at warning."""
+    argv = image_command()[1:]
+    argv[argv.index("--log-level") + 1] = level
+    output = provoke(tmp_path, argv)
+
+    assert PEER not in output
+    assert TOKEN not in output
+
+
+def test_the_control_without_solvents_handler_does_log_the_peer(tmp_path):
+    """Criterion 77's control: gunicorn's own handler, at warning, prints
+    the peer, so the clean runs above saw the requests arrive."""
+    argv = without_config(image_command()[1:])
+    argv[argv.index("--log-level") + 1] = "warning"
+
+    assert f"ip={PEER}" in provoke(tmp_path, argv)
+
+
+def test_the_image_hands_gunicorn_solvents_server_config():
+    """How it works, Requests Flask never sees: the image runs gunicorn
+    with --config python:solvent.server."""
+    assert parsed(image_command()[1:]).config == "python:solvent.server"
+
+
+def provoke(tmp_path, argv: "list[str]") -> str:
+    """Run gunicorn with argv on loopback, send it every unreadable
+    request and a wrong Auth Key from PEER, and return all it printed."""
+    port = free_port()
+    argv[argv.index("--bind") + 1] = f"127.0.0.1:{port}"
+    process = subprocess.Popen(
+        [sys.executable, "-m", "gunicorn", *argv],
+        cwd=REPO_ROOT,
+        env=dict(os.environ, SECRET_KEY="review-app-shell-key", DATABASE_PATH=str(tmp_path / "solvent.db")),
+        stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True,
+    )
+    body = b'{"username": "nobody", "authKey": "AAAA"}'
+    try:
+        for _ in range(300):
+            try:
+                assert sign_in_page(port, timeout=5) == 200
+                break
+            except OSError:
+                time.sleep(0.1)
+        for raw in UNREADABLE.values():
+            try:
+                exchange(port, raw)
+            except (OSError, http.client.HTTPException):
+                pass
+        exchange(
+            port,
+            b"POST /api/auth/login HTTP/1.1\r\nHost: x\r\nConnection: close\r\n"
+            b"Content-Type: application/json\r\nX-Solvent-Request: 1\r\n"
+            + b"Content-Length: %d\r\n\r\n" % len(body) + body,
+        )
+    finally:
+        process.terminate()
+        out, err = process.communicate(timeout=60)
+    return out + err
+
+
+@pytest.fixture
+def server_error_body(app):
+    """The body of a Server Error the app itself answers."""
+
+    @app.route("/dashboard/__review_failure")
+    @navigation
+    def failure():
+        raise RuntimeError("review failure")
+
+    owner, _ = register(app, "owner")
+    response = owner.get("/dashboard/__review_failure")
+    assert response.status_code == 500
+    return response.data
+
+
+def test_a_failure_before_the_app_answers_is_the_failure_card_and_logs_only_its_class(
+    app, server_error_body, tmp_path, monkeypatch, capfd
+):
+    """Criterion 82: a worker set up as the image sets it up, through
+    solvent.server's post_worker_init, answers a failure outside the
+    parser with a Server Error carrying the failure body and every
+    header, and the log names the class and nothing of the request."""
+    import solvent.server
+    from gunicorn.config import Config
+    from gunicorn.glogging import Logger
+    from gunicorn.http.parser import RequestParser
+    from gunicorn.workers.gthread import ThreadWorker
+
+    monkeypatch.setenv("DATABASE_PATH", app.config["DATABASE_PATH"])
+    config = parsed(image_command()[1:])
+    config.set("worker_tmp_dir", str(tmp_path))
+    log = Logger(config)
+    worker = ThreadWorker(0, os.getpid(), [], None, 30, config, log)
+    worker.wsgi = app
+    solvent.server.post_worker_init(worker)
+    seen = []
+    catcher = logging.Handler()
+    catcher.emit = lambda record: seen.append(logging.Formatter().format(record))
+    for name in ("", "gunicorn.error", app.logger.name):
+        logging.getLogger(name).addHandler(catcher)
+
+    raw = f"GET /register?invite={TOKEN} HTTP/1.1\r\nHost: x\r\n\r\n".encode()
+    request = next(RequestParser(config, [raw], ("203.0.113.9", 4711)))
+    server_side, client_side = socket.socketpair()
+    try:
+        with client_side, server_side:
+            try:
+                raise LookupError(f"failure naming {TOKEN}")
+            except LookupError as failure:
+                worker.handle_error(request, server_side, ("203.0.113.9", 4711), failure)
+            server_side.shutdown(socket.SHUT_WR)
+            answer = http.client.HTTPResponse(client_side)
+            answer.begin()
+            body = answer.read()
+    finally:
+        for name in ("", "gunicorn.error", app.logger.name):
+            logging.getLogger(name).removeHandler(catcher)
+
+    flask_answer = app.test_client().get("/api/no-such-route", headers=CSRF)
+    assert answer.status == 500
+    assert body == server_error_body
+    assert answer.getheader("Connection") == "close"
+    assert answer.getheader("Set-Cookie") is None
+    for header in ("Content-Security-Policy", "Strict-Transport-Security"):
+        assert answer.getheader(header) == flask_answer.headers[header]
+    printed = "\n".join(seen) + "".join(capfd.readouterr())
+    assert "LookupError" in printed
+    for leak in (TOKEN, "203.0.113.9", "failure naming", "Traceback"):
+        assert leak not in printed
+
+
+def test_every_response_shape_carries_one_csp_and_one_hsts(app):
+    """Criterion 27: a shell page, a JSON endpoint, a Not Found and a
+    Server Error carry the same CSP and the same HSTS, compared with
+    each other rather than with the module's constant."""
+
+    @app.route("/dashboard/__review_boom")
+    @navigation
+    def boom():
+        raise RuntimeError("review boom")
+
+    owner, _ = register(app, "owner")
+    shapes = [
+        owner.get("/dashboard"),
+        owner.get("/api/records?type=account", headers=CSRF),
+        owner.get("/no/such/page"),
+        owner.get("/dashboard/__review_boom"),
+    ]
+    assert [r.status_code for r in shapes] == [200, 200, 404, 500]
+    assert len({r.headers["Content-Security-Policy"] for r in shapes}) == 1
+    assert len({r.headers["Strict-Transport-Security"] for r in shapes}) == 1
+    assert "frame-ancestors 'none'" in shapes[0].headers["Content-Security-Policy"]
+    assert "max-age=" in shapes[0].headers["Strict-Transport-Security"]
