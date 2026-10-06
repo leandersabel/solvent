@@ -936,8 +936,9 @@ export function holdingsIn(vault, unit, date) {
 }
 
 /** The confirmation for a save of rate lines: one per save, naming each
- *  unit and how many holdings move (record-snapshot.md, Update
- *  values, Changing or clearing a rate says what it moves). */
+ *  unit and how many holdings move, and nothing for a changed price that
+ *  moves none on that date (record-snapshot.md, Update values, Changing
+ *  or clearing a rate says what it moves). */
 export function rateChangeCopy(vault, date, changes) {
   const on = vault.format.longDate(date);
   const lines = [];
@@ -946,7 +947,7 @@ export function rateChangeCopy(vault, date, changes) {
     const count = holdingsIn(vault, unit, date);
     const holdings = `${counted(count, 'holding', 'holdings')} measured in ${name}`;
     if (!clearing) {
-      lines.push(`Changing the ${name} rate for ${on} moves ${holdings} on that date. Your net worth on that day changes with them.`);
+      if (count) lines.push(`Changing the ${name} rate for ${on} moves ${holdings} on that date. Your net worth on that day changes with them.`);
       continue;
     }
     lines.push(`Clearing the ${name} price for ${on} leaves that date with no price for it. ${holdings} ${count === 1 ? 'moves' : 'move'} on that date.`);
@@ -1007,17 +1008,19 @@ function saveRates(vault, sit, block, { say, refused, syncSave, emptied, keepTyp
     say([partialCopy(vault, result), conflictCopy].filter(Boolean).join(' '), { critical: result.failed.length > 0 });
   };
 
-  // Filling a missing price changes none, so only an update or a clear
-  // asks first.
-  const moving = planned.filter(({ change }) => change.existing || change.remove);
-  if (!moving.length) return save();
+  // Filling a missing price changes none, so only an update that moves a
+  // holding, or a clear, asks first.
+  const copy = rateChangeCopy(
+    vault,
+    sit.date,
+    planned
+      .filter(({ change }) => change.existing || change.remove)
+      .map(({ line, change }) => ({ unit: line.unit, clearing: Boolean(change.remove) })),
+  );
+  if (!copy.length) return save();
   const close = dialog({
     heading: 'Changing a price moves the holdings measured in it',
-    body: rateChangeCopy(
-      vault,
-      sit.date,
-      moving.map(({ line, change }) => ({ unit: line.unit, clearing: Boolean(change.remove) })),
-    ).map((text) => el('p', { text })),
+    body: copy.map((text) => el('p', { text })),
     actions: [
       el('button', { class: 'btn-secondary', text: 'Cancel', onclick: () => close() }),
       el('button', {

@@ -232,8 +232,9 @@ Each record is its own request under its own version check.
   save to retry. An answer arriving after the screen was left or the
   vault locked writes nothing.
 - **The rate-lines save** writes every changed line. One confirmation
-  names what each update or clear moves, and a save that only creates
-  entries asks nothing. It needs no holding touched and
+  names what each clear and each update that moves a holding moves, and
+  a save with neither asks nothing (`record-snapshot.md`, Update values,
+  Changing or clearing a rate says what it moves). It needs no holding touched and
   runs only at a date holding a record. Its order is fixed:
   0. If any line creates an entry, the pre-create reload. A slot taken,
      or the date found empty, refuses the whole save before any write.
@@ -360,9 +361,8 @@ silently.
 - **Editing one entry changes every holding in that symbol on that
   date**, which is what one price per symbol per day means. The
   confirmation says so with the count of holdings (`record-snapshot.md`,
-  Update values, says which count), which the client knows from the
-  records it holds. Several changed rates confirm once, naming each
-  symbol and its count.
+  Update values, says which count and when it asks), which the client
+  knows from the records it holds.
 - **Deleting an entry** is clearing its line (`record-snapshot.md`,
   Clearing a figure), and deleting the recording removes every entry at
   its date. The symbol then prices from its neighbors, so deleting the

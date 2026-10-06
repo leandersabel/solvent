@@ -331,16 +331,32 @@ await run(async () => {
   await typeLine('USD', '0.7777');
   await set('#snapshot-value', '5400');
   await formSave();
-  const announced = await ev("[...document.querySelectorAll('.dialog')].pop().textContent");
-  await ev("[...[...document.querySelectorAll('.dialog')].pop().querySelectorAll('button')].find(b => b.textContent === 'Save').click()");
-  await quiet();
+  const proposalDialogs = await ev("document.querySelectorAll('.dialog').length");
   const formEdited = on(await stored('rate'), DR).find((r) => r.payload.symbol === 'USD');
   check(
-    'record-snapshot: a price changed on the form says what it moves, and is written as edited behind the figure',
-    announced.includes(`Changing the USD rate for ${await format('longDate', DR)} moves 2 holdings measured in USD`) &&
-      formEdited && formEdited.payload.rate === '0.7777' && formEdited.payload.rateSource === 'edited',
-    announced,
+    'record-snapshot: a proposal changed on the form fills in a missing price, asks nothing, and is written as edited behind the figure',
+    proposalDialogs === 0 && formEdited && formEdited.payload.rate === '0.7777' && formEdited.payload.rateSource === 'edited',
+    JSON.stringify({ proposalDialogs, formEdited: formEdited && formEdited.payload }),
   );
+
+  // An estimate carried from an earlier day is no stored price either.
+  const DM = ago(51);
+  await openForm('Savings');
+  await set('#snapshot-date', await format('date', DM));
+  await ev('document.activeElement.blur()');
+  await quiet();
+  const flatBefore = await lineState('m2');
+  await typeLine('m2', '10250');
+  await set('#snapshot-value', '5450');
+  await formSave();
+  const firstPriceDialogs = await ev("document.querySelectorAll('.dialog').length");
+  const flatStored = on(await stored('rate'), DM).find((r) => r.payload.symbol === 'm2');
+  check(
+    'record-snapshot: a price typed on the form over a carried estimate asks nothing',
+    flatBefore && flatBefore.value !== '' && firstPriceDialogs === 0 && flatStored && flatStored.payload.rate === '10250',
+    JSON.stringify({ flatBefore, firstPriceDialogs, flatStored: flatStored && flatStored.payload }),
+  );
+  await closeDialogs();
 
   const DS = ago(55);
   faults.push((r) => (r.method === 'PUT' && bodyOf(r).recordType === 'rate' ? 500 : null));

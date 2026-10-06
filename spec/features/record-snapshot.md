@@ -357,7 +357,9 @@ screen names the unit whose price was left (States).
 One confirmation per save that changes or clears a stored price, before
 anything goes through, naming each such unit and how many holdings move.
 Filling in a missing price asks nothing and is never called changing
-one:
+one, whether the line was empty or showed a proposal or an estimate. A
+change that moves no holding on that date is left out, and a save left
+with nothing to say asks nothing:
 
 > Changing the USD rate for 31 July moves 3 holdings measured in USD
 > on that date. Your net worth on that day changes with them.
@@ -671,8 +673,8 @@ line, ink-secondary, opening into the same rate lines the sweep carries:
 
 - **A date holding no recording**: "Prices for 31 July will be recorded
   with this", opening to the proposals. A 2019 figure takes 2019's
-  prices. Changing a line here is the same act as on the sweep, with
-  the same announcement of what it moves.
+  prices. A line changed here fills in a missing price, as on the
+  sweep at a new date, so saving asks nothing.
 - **A date that holds a recording**: "31 July already holds prices.
   This figure joins them." It opens to that recording's stored prices,
   read only, with a link to its Recording detail, where they are
@@ -1371,8 +1373,9 @@ Editing an existing entry).
     shown, typed) reads the same a year later, whether it was changed on
     the evening or years afterwards. Test:
     `tests/browser/parts/update-values.mjs`.
-30. Changing a price on a reopened recording is announced before it goes
-    through, naming how many holdings move, and moves every holding in
+30. Changing a price on a reopened recording that moves a holding on
+    that date is announced before it goes through, naming how many
+    holdings move, and moves every holding in
     that unit on that date, visibly the rows on screen. Test:
     `tests/browser/parts/update-values.mjs`.
 31. No screen lists prices on their own or lets one be changed away from
@@ -1679,3 +1682,11 @@ Editing an existing entry).
      with focus on its button, and a second closes the Dialog. Test:
      `tests/browser/parts/snapshot-entry.mjs`,
      `tests/browser/parts/snapshot-entry-review-calendar.mjs`.
+102. (blind) A price filled in on Snapshot entry, over an empty line, a
+     proposal or an estimate, saves with no confirmation, and a changed
+     stored price that moves no holding on its date is left out of the
+     confirmation, which does not open when nothing is left. Test:
+     `tests/browser/parts/snapshot-entry.mjs`,
+     `tests/browser/parts/snapshot-entry-review-first-price.mjs`,
+     `tests/browser/parts/update-values-review-first-price.mjs`,
+     `tests/test_client.py::test_the_client_side_rules_hold`.

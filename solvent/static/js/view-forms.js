@@ -5,7 +5,7 @@ import * as writes from './writes.js';
 import { dialog, el, mount, resumable, today } from './dom.js';
 import { dateField } from './datepicker.js';
 import { dayNumber, isoFromDay } from './model.js';
-import { closedCopy, describeConverted as showConverted, rateBlock, rateChangeCopy } from './view-sweep.js';
+import { closedCopy, describeConverted as showConverted, rateBlock } from './view-sweep.js';
 
 /** One holding, one date: the small form for an odd date or a
  *  backfill. There is no rate field on it, because a price belongs to
@@ -203,30 +203,6 @@ export function snapshotDialog(vault, holding, existing, onSaved, onOpenRecordin
     onSaved();
   };
 
-  // A line changed here is the same act as one changed on the sweep,
-  // and says what it moves before anything goes through.
-  const confirmPrices = (changedLines, proceed) => {
-    const on = date.value;
-    const confirm = dialog({
-      heading: 'Changing a price moves the holdings measured in it',
-      body: rateChangeCopy(vault, on, changedLines.map((line) => ({ unit: line.unit, clearing: false }))).map(
-        (text) => el('p', { text }),
-      ),
-      actions: [
-        el('button', { class: 'btn-secondary', text: 'Cancel', onclick: () => confirm() }),
-        el('button', {
-          class: 'btn-primary',
-          text: 'Save',
-          onclick: () => {
-            confirm();
-            proceed();
-          },
-        }),
-      ],
-    });
-    return null;
-  };
-
   // Saves the edit and reports what a move must still say. The prices
   // are the lines' own, after the quantity: a proposal still in flight
   // is waited for here, and Save never waited on it.
@@ -307,7 +283,6 @@ export function snapshotDialog(vault, holding, existing, onSaved, onOpenRecordin
       if (block && block.lines.some((line) => line.invalid())) {
         return fail('A price on the prices line does not read as a number. Nothing was saved.');
       }
-      const changedLines = block ? block.lines.filter((line) => line.changed()) : [];
       if (existing) {
         // An edit is an ordinary versioned write of this record, its
         // date included. Moving it onto a date the holding already
@@ -315,8 +290,7 @@ export function snapshotDialog(vault, holding, existing, onSaved, onOpenRecordin
         // after, so a failure leaves two entries on one date rather
         // than none: a visible fault beats silent loss.
         const edit = () => attempt(() => editEntry(on, payload, atDate));
-        const priced = () => (changedLines.length ? confirmPrices(changedLines, edit) : edit());
-        return atDate ? confirmMove(atDate, holding, vault, priced) : priced();
+        return atDate ? confirmMove(atDate, holding, vault, edit) : edit();
       }
       if (atDate) {
         // The date here is chosen blind, so the stored figure is put
@@ -328,8 +302,7 @@ export function snapshotDialog(vault, holding, existing, onSaved, onOpenRecordin
           }),
         );
       }
-      const createEntry = () => attempt(() => create(on, stored));
-      return changedLines.length ? confirmPrices(changedLines, createEntry) : createEntry();
+      return attempt(() => create(on, stored));
     },
   });
   const cancel = el('button', { class: 'btn-secondary', text: 'Cancel', onclick: () => close() });
