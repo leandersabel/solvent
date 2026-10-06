@@ -354,7 +354,7 @@ await run(async () => {
     ]) {
       await chooseFile(fixture(name, JSON.stringify(file)));
       await openWith(VAULT_PASSWORD);
-      await page.waitUntil(`document.querySelector('#import-card .field-error').textContent.includes('${says}')`, { timeout: 60000, label: name });
+      await page.waitUntil((words) => document.querySelector('#import-card .field-error').textContent.includes(words), { args: [says], timeout: 60000, label: name });
       check(
         `a sealed file that ${says} is refused once its password opens it, uploading nothing`,
         (await uploads()) === 0 && (await page.eval("document.querySelector('.review').hidden")) && vaultRows() === rowsBefore,
