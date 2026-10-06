@@ -1840,6 +1840,57 @@ await check('net-worth-view: the breakdown sums to the total exactly, in both mo
   }
 });
 
+await check('net-worth-view: the shown bars and the shown assets and liabilities add up to the shown total', async () => {
+  const { breakdownTotals, heroParts } = await load('view-dashboard.js');
+  const values = ['a', 'b', 'c', 'e'].map((id) => ({ id, label: id.toUpperCase() }));
+  const dimension = { id: 'd', label: 'D', values };
+  const vault = model({
+    dimensions: [dimension],
+    holdings: values.map((v) => ({ name: v.id, unit: 'CHF', dims: { d: v.id } })),
+    figures: [
+      ['a', '2026-01-01', '1234.50'],
+      ['b', '2026-01-01', '4133.26'],
+      ['c', '2026-01-01', '41373.46'],
+      ['e', '2026-01-01', '340000'],
+    ],
+  });
+  const whole = (n) => decimal.parse(String(n));
+  const bars = breakdownTotals(vault, dimension, 'latest');
+  assert.deepEqual(bars.map((b) => b.shown), [1235, 4133, 41373, 340000, 0].map(whole));
+  assert.equal(decimal.toDisplay(vault.totals('latest').net, 0, ''), '386741');
+
+  const debt = model({
+    holdings: [{ name: 'cash', unit: 'CHF' }, { name: 'loan', unit: 'CHF' }],
+    figures: [['cash', '2026-01-01', '100.6'], ['loan', '2026-01-01', '-50.6']],
+  });
+  assert.deepEqual(heroParts(debt.totals('latest')), [whole(101), whole(-51)]);
+});
+
+await check('decimal: apportion rounds the total once and shares its units out by largest remainder, ties to the earlier part', () => {
+  const p = (list) => list.map((text) => decimal.parse(text));
+  assert.deepEqual(decimal.apportion(p(['0.4', '0.4', '0.4']), 0), p(['1', '0', '0']));
+  assert.deepEqual(decimal.apportion(p(['-0.4', '-0.4', '-0.4']), 0), p(['0', '0', '-1']));
+  assert.deepEqual(decimal.apportion(p(['0.25', '0.25']), 1), p(['0.3', '0.2']));
+  assert.deepEqual(decimal.apportion(p(['2.5', '0.5']), 0), p(['3', '0']));
+  assert.deepEqual(decimal.apportion(p(['10.004', '-3.001']), 2), p(['10', '-3']));
+  assert.deepEqual(decimal.apportion([], 0), []);
+  for (let seed = 1; seed < 200; seed += 1) {
+    const parts = Array.from({ length: 1 + (seed % 7) }, (_, i) =>
+      BigInt(((seed * 7919 + i * 104729) % 2000003) - 1000001) * 10n ** 9n);
+    for (const places of [0, 2]) {
+      const shown = decimal.apportion(parts, places);
+      const unit = 10n ** BigInt(decimal.SCALE - places);
+      const sum = (list) => list.reduce((a, b) => a + b, 0n);
+      assert.equal(decimal.toDisplay(sum(shown), places), decimal.toDisplay(sum(parts), places));
+      shown.forEach((value, i) => {
+        assert.equal(value % unit, 0n);
+        const gap = value - parts[i];
+        assert.ok(gap > -unit && gap < unit);
+      });
+    }
+  }
+});
+
 await check('net-worth-view: an archived holding is a row whatever its figures, and both groups list active holdings only', async () => {
   const { holdingGroups } = await load('view-dashboard.js');
   const vault = model({

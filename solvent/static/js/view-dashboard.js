@@ -150,8 +150,8 @@ function hero(vault, state, render, actions, history, dimension) {
       el('p', { class: 'hero-at-line' }, [el('span', { class: 'hero-at', hidden: true })]),
     ]),
     el('div', { class: 'hero-parts' }, [
-      heroPart('Assets', vault.mainWhole(totals.assets)),
-      heroPart('Liabilities', vault.mainWhole(totals.liabilities)),
+      ...heroParts(totals).map((shown, i) =>
+        heroPart(i ? 'Liabilities' : 'Assets', vault.mainWhole(shown))),
     ]),
     el('div', { class: 'hero-action' }, [
       el('button', {
@@ -723,9 +723,17 @@ function group(title, holdings, vault, actions, explanation) {
   ]);
 }
 
+/** Gross assets and liabilities as shown, adding up to the net as the
+ *  hero shows it. */
+export function heroParts(totals) {
+  return decimal.apportion([totals.assets, totals.liabilities], 0);
+}
+
 /** Each band's signed total right now, in the dimension's configured
- *  order with "Unassigned" last. Summed from the same per-holding
- *  figures as the hero, so the bars add up to the total exactly. */
+ *  order with "Unassigned" last, and `shown`, its whole-unit figure.
+ *  Summed from the same per-holding figures as the hero, so the bars
+ *  add up to the total exactly, and shared out so their shown figures
+ *  add up to the shown total. */
 export function breakdownTotals(vault, dimension, mode) {
   const bands = new Map();
   for (const value of dimension.values.filter((v) => !v.archivedAt)) {
@@ -748,7 +756,9 @@ export function breakdownTotals(vault, dimension, mode) {
   const other = rest.length
     ? [{ label: 'Other', total: rest.reduce((sum, band) => sum + band.total, decimal.ZERO) }]
     : [];
-  return [...all, unassigned, ...other];
+  const result = [...all, unassigned, ...other];
+  const shown = decimal.apportion(result.map((band) => band.total), 0);
+  return result.map((band, i) => ({ ...band, shown: shown[i] }));
 }
 
 /** Where the chart shows how composition moved, this shows what it is
@@ -786,7 +796,7 @@ function breakdown(vault, dimension, state) {
           el('span', { class: 'bar-label' }, [
             el('span', { class: 'bar-name', text: band.label }),
             ' ',
-            el('span', { class: 'bar-amount', text: vault.mainWhole(band.total) }),
+            el('span', { class: 'bar-amount', text: vault.mainWhole(band.shown) }),
           ]),
         ]);
       }),

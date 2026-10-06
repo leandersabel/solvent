@@ -97,7 +97,8 @@ own row beneath, at the left. Summary figures (the total, the change,
 gross assets and liabilities, the legend and the breakdown) are written
 by the formatter's `whole`. The holdings table and the data table carry
 the money places, because that is where a figure is checked against a
-statement.
+statement. Gross assets and gross liabilities as shown add up to the
+total as shown (Breakdown by dimension says how).
 
 - **The change** over the selected range or selection: an arrow icon, the
   signed amount and the percentage (one decimal place), in status good or
@@ -276,8 +277,14 @@ width less the room the labels take at the outboard ends. A band can be net nega
 (a mortgage under "Fixed"), so negative bands run leftward. When every
 band is positive the baseline sits at the left edge, and the layout never
 changes shape with the data. The bars sum to exactly the net-worth total,
-as a signed sum. Under "Total" the section is absent, because one bar
-equal to the hero says nothing.
+as a signed sum, and their amounts as shown add up to the total as
+shown, because rounding each alone misses it: three bands of 0.40 make
+a total of 1 and would each show 0. The total rounds once, half-even.
+Each bar rounds toward minus infinity, and the units still missing go
+to the bars with the largest remainders, ties to the earlier bar, so a
+bar's amount never moves a whole unit from its exact value. Under
+"Total" the section is absent, because one bar equal to the hero says
+nothing.
 
 #### Holdings table
 
@@ -1090,7 +1097,10 @@ rule of the chart (Archived holdings, Ranges and modes).
     `tests/test_client.py::test_the_client_side_rules_hold`,
     `tests/browser/parts/dashboard.mjs`.
 66. The breakdown sums to exactly the net worth total, with no
-    disclaimer. Test:
+    disclaimer, and bars of 1,234.50, 4,133.26, 41,373.46 and 340,000
+    read 1'235, 4'133, 41'373 and 340'000 under a total of 386'741.
+    Gross assets and liabilities as shown add up to the total as shown.
+    Test:
     `tests/test_client.py::test_the_client_side_rules_hold`.
 67. (blind) With one record corrupted, the view renders the rest and
     warns "1 record could not be read.". With the corrupted record a
