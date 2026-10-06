@@ -167,6 +167,10 @@ created. Columns: **Kind**, **Note**, **Created**, **Stops working**,
 - **Status** is a chip: **Waiting**, **Used**, **Expired** or **Called
   back**. A Used chip is followed on the same line by the username it
   produced and the date, and the username links to that row in Accounts.
+  Once that account is removed, by an administrator or by its owner, the
+  username gives way to "account removed", with no link, because the
+  name is free to register again and the row would credit whoever takes
+  it.
   A row that is not Waiting sets its text in ink-secondary, so live links
   stand out without a second chip color.
 - The action cell offers **Call back** on a Waiting row only, with a
@@ -176,7 +180,9 @@ created. Columns: **Kind**, **Note**, **Created**, **Stops working**,
   > has time left. Anybody holding it will be turned away.
 
   On a Used row it reads, in ink-secondary: "Already used. Remove the
-  account instead." On an Expired or Called back row it is empty.
+  account instead.", or "Already used. The account it created has since
+  been removed." once that account is gone. On an Expired or Called back
+  row it is empty.
 
 #### Accounts
 
@@ -451,6 +457,11 @@ An invite row: `id`, `token_hash`, `kind`, `created_by`, `created_at`,
   account (register.md). A failed registration does not consume it. Of
   two registrations racing on one invite, exactly one wins, and the
   other gets the generic invalid-invite error.
+- **`used_by`** is the username the invite registered, and is set to
+  null in the transaction that deletes that principal, by either
+  deletion path, through a trigger (app-shell.md, Database). A start-up
+  pass clears any `used_by` naming no principal. `status` and `used_at`
+  stay.
 - **`label`** is the note, deliberately server-side plaintext, because
   invites are provisioning metadata, not vault data. Encrypting it would
   make the invite list readable only by the administrator who wrote it.
@@ -480,7 +491,7 @@ Refusals).
   to explain one on.
 - `GET /api/admin/invites` returns a list of `{ id, label, kind,
   createdAt, expiresAt, status, usedAt, usedBy }`. **Never the token or
-  its hash.**
+  its hash.** `usedBy` is null on a used invite whose account is gone.
 - `POST /api/admin/invites/<id>/revoke` sets `status: revoked`, and a
   revoked link already sent is refused at once. Idempotent on a revoked
   invite. An administrator may revoke their own invites with no special
@@ -814,3 +825,10 @@ administrator), and the lost sole password (Bootstrap). The rest:
     `tests/test_admin.py::test_items_count_what_the_owner_added_and_no_profile`.
 49. The password card's error line sits above the Current password
     field. Test: `tests/browser/parts/admin.mjs`.
+50. Removing an account, by an administrator or by its owner, clears the
+    username from the invite that created it and leaves it used, and a
+    start-up clears a stale one. Test:
+    `tests/test_admin.py::test_removing_an_account_clears_its_name_from_the_invite`.
+51. A used invite whose account is gone reads "account removed" and
+    "Already used. The account it created has since been removed." Test:
+    `tests/browser/parts/admin.mjs`.

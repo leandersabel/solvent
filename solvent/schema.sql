@@ -166,6 +166,14 @@ BEGIN
     SELECT RAISE(ABORT, 'an administrator has no vault');
 END;
 
+-- A removed account's name is free to register again, so the invite
+-- that created it stops naming it (admin-invites.md, Invite lifecycle).
+CREATE TRIGGER IF NOT EXISTS invites_forget_removed_principal
+AFTER DELETE ON principals
+BEGIN
+    UPDATE invites SET used_by = NULL WHERE used_by = OLD.username;
+END;
+
 -- The version this file creates. `init_db` refuses to serve a database
 -- stamped with any other, because every statement above is
 -- `IF NOT EXISTS` and so leaves an older table exactly as it found it.

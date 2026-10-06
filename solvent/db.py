@@ -96,6 +96,10 @@ def init_db(app: flask.Flask) -> None:
                 "UPDATE principals SET last_login_at = created_at "
                 "WHERE last_login_at IS NULL"
             )
+            conn.execute(
+                "UPDATE invites SET used_by = NULL "
+                "WHERE used_by NOT IN (SELECT username FROM principals)"
+            )
         except BaseException:
             conn.execute("ROLLBACK")
             raise
