@@ -726,4 +726,4 @@ On failure it prints `docker logs` of `solvent` and `standin`.
 44. With no holding valued the expected total is `null` and `assets` and
     `debts` are zero. Test: `tests/test_nightly_tools.py::test_with_nothing_valued_the_total_is_none_and_the_sides_are_zero`.
 45. A registration form that never shows, as for a refused invite,
-    fails the generator with the text the page shows. Test: `tests/test_nightly_browser.py::test_a_registration_form_that_never_shows_fails_naming_what_the_page_shows`.
+    fails the generator with the text the page shows. Test: `tests/test_nightly_browser.py::test_a_registration_form_that_never_shows_fails_naming_what_the_page_shows`, `tests/test_review_nightly_harness.py::test_a_refused_invite_fails_the_generator_naming_the_address_and_what_the_page_shows`.
