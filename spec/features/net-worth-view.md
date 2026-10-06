@@ -1144,4 +1144,5 @@ rule of the chart (Archived holdings, Ranges and modes).
     `tests/test_client.py::test_the_client_side_rules_hold`.
 75. (blind) The legend adds up to the chart's right hand edge as shown,
     the legend's changes over a selected span to the change as shown,
-    and the readout's rows to its net as shown. Test: no test.
+    and the readout's rows to its net as shown. Test:
+    `tests/browser/parts/dashboard-review-shown-parts.mjs`.
