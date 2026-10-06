@@ -377,7 +377,7 @@ function chartSection(vault, state, render, dimension, actions, { days, bands })
           }
           const shown = vault.valuesAt(dimension, day).filter((band) => !state.hidden.has(band.id));
           const figures = decimal.apportion(shown.map((band) => band.value), vault.format.places);
-          const net = figures.reduce((sum, value) => sum + value, 0n);
+          const net = shown.reduce((sum, band) => sum + band.value, 0n);
           const date = vault.format.longDate(isoFromDay(day));
           readout.replaceChildren(
             el('p', { class: 'readout-date', text: date }),
