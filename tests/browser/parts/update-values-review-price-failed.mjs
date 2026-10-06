@@ -56,7 +56,7 @@ await run(async () => {
   );
   check(
     'review rate 8: the screen says the prices were not updated, naming each unit typed',
-    /not (been )?(updated|saved)|did not save/i.test(banner) && banner.includes('m2') && banner.includes('XAG-ozt'),
+    /not (been )?(updated|saved)|did not save/i.test(banner) && banner.includes('m2') && banner.includes('Silver, troy ounce'),
     banner.slice(0, 600),
   );
   check(

@@ -146,7 +146,7 @@ await run(async () => {
   await typeLine('XAU-ozt', '2111');
   traffic.length = 0;
   await cancel();
-  const priceOnly = await on91(`You left the entry for ${await format('longDate', DA)} ${LEFT}: the XAU-ozt rate.`)();
+  const priceOnly = await on91(`You left the entry for ${await format('longDate', DA)} ${LEFT}: the Gold, troy ounce rate.`)();
   check('review 91: a price typed with no figure writes nothing and names only its unit', noWrites() && priceOnly.ok, JSON.stringify(priceOnly));
 
   // ---- 91: nothing changed, or changed back, names nothing -------------
