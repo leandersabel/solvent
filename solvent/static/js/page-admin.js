@@ -159,6 +159,17 @@ function showLink(card, invite, reload) {
   ]);
 }
 
+// An admin table, which at a narrow width becomes a list of entries,
+// each cell beside its column's heading (tokens.css, .stack-table).
+// The action cell has no heading.
+function stackTable(heads, rows, { head = true } = {}) {
+  for (const row of rows) [...row.children].forEach((cell, i) => heads[i] && (cell.dataset.label = heads[i]));
+  return el('table', { class: 'data-table stack-table' }, [
+    head ? el('thead', {}, [el('tr', {}, heads.map((text) => el('th', { text })))]) : null,
+    el('tbody', {}, rows),
+  ]);
+}
+
 const STATUS_WORDS = {
   pending: 'Waiting',
   used: 'Used',
@@ -180,48 +191,44 @@ async function loadInvites(list) {
   }
   mount(
     list,
-    el('table', { class: 'data-table' }, [
-      el('thead', {}, [
-        el('tr', {}, ['Kind', 'Note', 'Created', 'Stops working', 'Status', ''].map((head) => el('th', { text: head }))),
-      ]),
-      el(
-        'tbody',
-        {},
-        rows.map((row) =>
-          el('tr', { class: row.status === 'pending' ? null : 'dimmed' }, [
-            el('td', {}, [
-              el('span', {
-                class: 'chip',
-                text: row.kind === 'administrator' ? 'Administrator' : 'User',
-              }),
-            ]),
-            el('td', { text: row.label || 'None' }),
-            el('td', { text: shortDate(row.createdAt.slice(0, 10)) }),
-            el('td', { text: shortDate(row.expiresAt.slice(0, 10)) }),
-            el('td', {}, [
+    stackTable(
+      ['Kind', 'Note', 'Created', 'Stops working', 'Status', ''],
+      rows.map((row) =>
+        el('tr', { class: row.status === 'pending' ? null : 'dimmed' }, [
+          el('td', {}, [
+            el('span', {
+              class: 'chip',
+              text: row.kind === 'administrator' ? 'Administrator' : 'User',
+            }),
+          ]),
+          el('td', { class: 'typed', text: row.label || 'None' }),
+          el('td', { text: shortDate(row.createdAt.slice(0, 10)) }),
+          el('td', { text: shortDate(row.expiresAt.slice(0, 10)) }),
+          el('td', {}, [
+            el('span', {}, [
               el('span', { class: 'chip', text: STATUS_WORDS[row.status] }),
-              row.status === 'used' ? el('span', { text: ` ${row.usedBy ?? 'account removed'}` }) : null,
-            ]),
-            el('td', {}, [
-              row.status === 'pending'
-                ? el('button', {
-                    class: 'btn-inline',
-                    text: 'Call back',
-                    onclick: () => callBack(row, list),
-                  })
-                : row.status === 'used'
-                  ? el('span', {
-                      class: 'hint',
-                      text: row.usedBy
-                        ? 'Already used. Remove the account instead.'
-                        : 'Already used. The account it created has since been removed.',
-                    })
-                  : null,
+              row.status === 'used' ? el('span', { class: row.usedBy ? 'typed' : null, text: ` ${row.usedBy ?? 'account removed'}` }) : null,
             ]),
           ]),
-        ),
+          el('td', {}, [
+            row.status === 'pending'
+              ? el('button', {
+                  class: 'btn-inline',
+                  text: 'Call back',
+                  onclick: () => callBack(row, list),
+                })
+              : row.status === 'used'
+                ? el('span', {
+                    class: 'hint',
+                    text: row.usedBy
+                      ? 'Already used. Remove the account instead.'
+                      : 'Already used. The account it created has since been removed.',
+                  })
+                : null,
+          ]),
+        ]),
       ),
-    ]),
+    ),
   );
 }
 
@@ -263,47 +270,41 @@ async function accounts(body) {
     body,
     el('section', { class: 'card' }, [
       el('h2', { class: 'section-heading', text: 'Accounts' }),
-      el('table', { class: 'data-table' }, [
-        el('thead', {}, [
-          el('tr', {}, ['Username', 'Kind', 'Created', 'Last signed in', 'Items', ''].map((head) => el('th', { text: head }))),
-        ]),
-        el(
-          'tbody',
-          {},
-          rows.map((row) =>
-            el('tr', {}, [
-              el('td', { text: row.username }),
-              el('td', {}, [
-                el('span', {
-                  class: 'chip',
-                  text: row.kind === 'administrator' ? 'Administrator' : 'User',
-                }),
-              ]),
-              el('td', { text: shortDate(row.createdAt.slice(0, 10)) }),
-              el('td', { text: shortDate(row.lastLoginAt.slice(0, 10)) }),
-              // Zero and "there is nothing to count" are different
-              // statements, and a zero invites the reader to think a
-              // vault is sitting there empty. Only No vault is muted,
-              // because the Kind column says the same.
-              'itemCount' in row
-                ? el('td', { text: String(row.itemCount) })
-                : el('td', { class: 'muted', text: 'No vault' }),
-              el('td', {}, [
-                row.kind === 'administrator' && administrators === 1
-                  ? el('span', {
-                      class: 'hint',
-                      text: 'The only administrator. Invite another one before removing this account.',
-                    })
-                  : el('button', {
-                      class: 'btn-destructive',
-                      text: 'Remove',
-                      onclick: () => removeAccount(row, body),
-                    }),
-              ]),
+      stackTable(
+        ['Username', 'Kind', 'Created', 'Last signed in', 'Items', ''],
+        rows.map((row) =>
+          el('tr', {}, [
+            el('td', { class: 'typed', text: row.username }),
+            el('td', {}, [
+              el('span', {
+                class: 'chip',
+                text: row.kind === 'administrator' ? 'Administrator' : 'User',
+              }),
             ]),
-          ),
+            el('td', { text: shortDate(row.createdAt.slice(0, 10)) }),
+            el('td', { text: shortDate(row.lastLoginAt.slice(0, 10)) }),
+            // Zero and "there is nothing to count" are different
+            // statements, and a zero invites the reader to think a
+            // vault is sitting there empty. Only No vault is muted,
+            // because the Kind column says the same.
+            'itemCount' in row
+              ? el('td', { text: String(row.itemCount) })
+              : el('td', { class: 'muted', text: 'No vault' }),
+            el('td', {}, [
+              row.kind === 'administrator' && administrators === 1
+                ? el('span', {
+                    class: 'hint',
+                    text: 'The only administrator. Invite another one before removing this account.',
+                  })
+                : el('button', {
+                    class: 'btn-destructive',
+                    text: 'Remove',
+                    onclick: () => removeAccount(row, body),
+                  }),
+            ]),
+          ]),
         ),
-      ]),
+      ),
     ]),
   );
 }
@@ -368,6 +369,8 @@ function removeAccount(row, body) {
   cancel.focus();
 }
 
+const UNIT_HEADS = ['Code', 'Name', 'Kind', 'Rate lookup', ''];
+
 async function unitTable(body) {
   mount(body, el('p', { class: 'hint', text: 'Loading…' }));
   let rows;
@@ -383,18 +386,11 @@ async function unitTable(body) {
   mount(body, [
     el('section', { class: 'card' }, [
       el('h2', { class: 'section-heading', text: 'Units' }),
-      el('table', { class: 'data-table' }, [
-        el('thead', {}, [
-          el('tr', {}, ['Code', 'Name', 'Kind', 'Rate lookup', ''].map((head) => el('th', { text: head }))),
-        ]),
-        el('tbody', {}, live.map((row) => unitRow(row, body))),
-      ]),
+      stackTable(UNIT_HEADS, live.map((row) => unitRow(row, body))),
       retired.length
         ? el('details', {}, [
             el('summary', { text: 'Retired' }),
-            el('table', { class: 'data-table' }, [
-              el('tbody', {}, retired.map((row) => unitRow(row, body))),
-            ]),
+            stackTable(UNIT_HEADS, retired.map((row) => unitRow(row, body)), { head: false }),
           ])
         : null,
       addUnit(body),

@@ -875,6 +875,13 @@ th.numeric {
 
 .data-table tr.dimmed td { color: var(--ink-secondary); }
 
+/* An admin table's chips are fixed wording of a word or two, so they
+   never wrap, and a column is never narrower than its chip. What
+   somebody typed, a username or a note, can be one long word, so it
+   breaks anywhere rather than widen the table. */
+.stack-table .chip { white-space: nowrap; }
+.stack-table .typed { overflow-wrap: anywhere; }
+
 .data-table tr.flagged td:first-child {
   border-left: 3px solid var(--status-critical);
   padding-left: 12px;
@@ -1957,6 +1964,39 @@ select {
   .values-table .btn-icon { min-height: 44px; }
 
   .values-table .btn-icon { min-width: 44px; justify-content: center; }
+
+  /* An admin table as a list of entries: each cell on a line of its
+     own beside its column's heading, and the row's action beneath. */
+  .stack-table thead { display: none; }
+
+  .stack-table,
+  .stack-table tbody,
+  .stack-table tr { display: block; }
+
+  .stack-table tr { padding: 12px 0; border-bottom: 1px solid var(--hairline); }
+  .stack-table tbody tr:last-child { border-bottom: 0; }
+
+  .stack-table td {
+    display: grid;
+    grid-template-columns: 112px minmax(0, 1fr);
+    column-gap: 12px;
+    align-items: baseline;
+    padding: 4px 0;
+    border: 0;
+    text-align: left;
+  }
+
+  .stack-table td::before {
+    content: attr(data-label);
+    font-size: 13px;
+    color: var(--ink-secondary);
+  }
+
+  .stack-table td > * { grid-column: 2; justify-self: start; }
+  .stack-table td:not([data-label]) { display: block; padding-top: 8px; }
+  .stack-table td:not([data-label])::before { content: none; }
+  .stack-table td:empty { display: none; }
+  .stack-table .btn-inline { min-height: 44px; }
 
   /* A recording's figures and prices as a list: the holding or unit on
      the first line, its two figures beneath it, each wrapping whole to
