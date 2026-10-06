@@ -82,6 +82,10 @@ The values behind each of these are design-system.md's.
   holding's detail sit in between. A content region fills only once the
   browser has decrypted it, so a screen shows its skeleton first and a
   refresh costs a fresh decryption.
+- **A screen you open starts at its top**, with the whole bar in view,
+  whether you opened it from the bar, a button or a link. Going back or
+  forward with the browser returns you to where you were on that
+  screen.
 
 ### On a phone
 
@@ -486,6 +490,22 @@ the client gets, The bar. It differs by kind, by omission:
   to fetch one, embed the server's current default KDF envelope in
   their own page.
 
+#### Where a screen opens
+
+The vault page draws each screen in place under one address, so the
+browser would otherwise keep the last screen's scroll position, clamped
+to the new screen's height, and hide part of the bar. `app.js` sets
+`history.scrollRestoration` to `manual` and gives each history entry a
+random key in its state the first time it is drawn. On every change of
+address it records the screen being left's `scrollY` under that
+entry's key, in memory, and scrolls the screen it draws to the
+position recorded for its own key, or to the top for an entry it has
+never drawn. It sets the position again while the screen grows before
+its second frame, because the trend chart draws at its first layout. A
+redraw at the same address keeps the position. A `replaceState` that
+rewrites the address in place passes `history.state` through, so the
+entry keeps its key. Nothing of this outlives the page.
+
 #### The bar above a dialog
 
 **While any dialog is open, a vault owner's Lock stays visible and
@@ -830,3 +850,11 @@ for a control above the dialog to protect.
     `tests/test_review_app_shell.py::test_the_control_holding_every_thread_does_stop_the_sign_in_page`.
 80. A start empties the rate cache and keeps the schema version. Test:
     `tests/test_rates.py::test_starting_the_app_empties_the_rate_cache`.
+81. At a 390px phone viewport, a real click on Settings in the bar with
+    the dashboard scrolled down, and on a holding's row far down the
+    dashboard, each opens its screen with `scrollY` 0 and the bar's top
+    at 0. Test: `tests/browser/parts/dashboard-scroll.mjs`.
+82. Back from each returns the dashboard to where it was: the same
+    `scrollY` from Settings, and the holding's row at the same height on
+    screen from the holding. Test:
+    `tests/browser/parts/dashboard-scroll.mjs`.

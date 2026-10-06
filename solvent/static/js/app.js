@@ -110,16 +110,42 @@ document.addEventListener('leftunsaved', ({ detail }) => {
   else leftOnForm = detail;
 });
 
+// Where each history entry was left scrolled, by the key the entry
+// carries in its state. A screen opened anew starts at its top, and
+// Back or Forward returns to where its entry was left
+// (app-shell.md, Where a screen opens). The browser's own restoring
+// would measure against the screen being left.
+history.scrollRestoration = 'manual';
+const scrolled = new Map();
+let shownEntry = null;
+
 function render() {
   const left = unsavedOnSweep();
   const fromForm = leftOnForm;
   leftOnForm = null;
+  const arriving = isUnlocked() && drawnHash !== window.location.hash;
+  if (arriving && shownEntry) scrolled.set(shownEntry, window.scrollY);
   draw();
+  if (arriving) {
+    if (!history.state?.entry) history.replaceState({ entry: crypto.randomUUID() }, '');
+    shownEntry = history.state.entry;
+    scrollBack(scrolled.get(shownEntry) ?? 0);
+  }
   leftUnsaved(left);
   if (fromForm) leftUnsaved(fromForm);
   markCurrentNav();
   vaultShown = isUnlocked();
   if (vaultShown) trackEdits(container);
+}
+
+/** Scrolls to `y`, and again whenever the screen grows before its
+ *  second frame: the trend chart draws itself at its first layout, so
+ *  the page reaches its full height only then (static/js/chart.js). */
+function scrollBack(y) {
+  window.scrollTo(0, y);
+  const growing = new ResizeObserver(() => window.scrollTo(0, y));
+  growing.observe(container);
+  requestAnimationFrame(() => requestAnimationFrame(() => growing.disconnect()));
 }
 
 /** Leaving a sweep or the single-holding form with typed figures says
