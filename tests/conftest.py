@@ -1,10 +1,25 @@
 from __future__ import annotations
 
+import fcntl
 from datetime import datetime, timedelta, timezone
 
 import pytest
 
 from tests.helpers import EpochClient, register
+
+
+@pytest.fixture(scope="module", autouse=True)
+def network_lock(request, tmp_path_factory):
+    """A module with a test that starts Docker containers runs while no
+    other module does, across workers. Each container adds and removes a
+    network interface, and Chrome fails every request in flight when one
+    comes or goes. The lock spans the module because its module-scoped
+    fixtures start Chrome too."""
+    docker = any(item.module is request.module and "python_image" in item.fixturenames for item in request.session.items)
+    lock = tmp_path_factory.getbasetemp().parent / "network.lock"
+    with lock.open("a") as held:
+        fcntl.flock(held, fcntl.LOCK_EX if docker else fcntl.LOCK_SH)
+        yield
 
 
 @pytest.fixture
