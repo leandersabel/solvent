@@ -219,7 +219,9 @@ never look like a hang.
 - The page embeds the server's current default KDF envelope
   (architecture.md, Key management).
 - Unlocking again returns to the previous view with unsaved input
-  intact. Everything else on it is re-read and re-decrypted.
+  intact. Everything else on it is re-read and re-decrypted. A restore
+  from a file keeps nothing and starts again (`export-import.md`,
+  Import).
 - **A dialog opened to fill in or choose something comes back** after
   unlocking, destructive or not, over the restored view with what was
   typed in it. A password field comes back empty, because a password

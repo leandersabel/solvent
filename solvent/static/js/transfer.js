@@ -36,10 +36,13 @@ export class FileRefused extends Error {
 
 export class WrongPassword extends Error {}
 
-export class RecordUnreadable extends Error {
-  constructor(recordId) {
-    super(`record ${recordId} does not decrypt`);
-    this.recordId = recordId;
+/** Records of the file that do not decrypt. A record that fails
+ *  authentication has no field worth trusting, so only the count is
+ *  told. */
+export class RecordsUnreadable extends Error {
+  constructor(count) {
+    super(`${count} records do not decrypt`);
+    this.count = count;
   }
 }
 
@@ -110,6 +113,9 @@ function checkContents(body) {
         ? accounts.has(record.accountId)
         : record.accountId === null);
     if (!fine) throw new FileRefused('format');
+    // A record shaped by a later version is not guessed at, as on an
+    // ordinary read.
+    if (record.schemaVersion > SCHEMA_VERSION) throw new FileRefused('newer');
     seen.add(record.recordId);
   }
   // The profile holds the main currency every price is denominated in,
@@ -126,14 +132,7 @@ export function countKinds(records) {
 }
 
 async function decryptOne(dek, record) {
-  // A schema version above what this client knows is unreadable rather
-  // than guessed at, as it is on an ordinary read.
-  if (record.schemaVersion > SCHEMA_VERSION) throw new RecordUnreadable(record.recordId);
-  try {
-    return migrate(record.recordType, record.schemaVersion, await crypto.decryptRecord(dek, record));
-  } catch {
-    throw new RecordUnreadable(record.recordId);
-  }
+  return migrate(record.recordType, record.schemaVersion, await crypto.decryptRecord(dek, record));
 }
 
 /** The vault as a file: the server's read of it, with when it was made
@@ -146,9 +145,9 @@ export async function sealFile(dek, { exportedAt, records, salt, kdf, wrappedDek
 }
 
 /** Derive the file's own Master Key from the password it was exported
- *  under, unwrap its DEK, open the envelope, and decrypt the profile
- *  alone: all the review needs, and a wrong password is caught before
- *  any other record is touched and before any request is sent.
+ *  under, unwrap its DEK, open the envelope, and decrypt the profile,
+ *  so a wrong password is caught before any other record is touched
+ *  and before any request is sent.
  *  Resolves to the file's DEK, profile, records and export time. */
 export async function openFile(body, password) {
   const keys = await crypto.deriveKeys(password, body.salt, body.kdf);
@@ -168,20 +167,28 @@ export async function openFile(body, password) {
     checkContents(contents);
   }
   const record = contents.records.find((r) => r.recordType === 'profile');
-  const profile = record ? await decryptOne(fileDek, record) : null;
+  // A profile that does not decrypt is counted with the rest by
+  // `decryptAll`, which runs before the review.
+  const profile = record ? await decryptOne(fileDek, record).catch(() => null) : null;
   return { fileDek, profile, records: contents.records, exportedAt: contents.exportedAt };
 }
 
 /** Every record decrypted under the file's DEK and its own AAD, and
  *  migrated to the current shape by the same chain an ordinary read
- *  uses. The first failure aborts the whole import, naming the record:
- *  a partial restore is worse than none. */
+ *  uses. Any failure aborts the whole import, counting every record
+ *  that failed: a partial restore is worse than none. */
 export async function decryptAll(fileDek, records, onProgress = () => {}) {
   const plain = [];
+  let unreadable = 0;
   for (const [index, record] of records.entries()) {
-    plain.push({ record, payload: await decryptOne(fileDek, record) });
+    try {
+      plain.push({ record, payload: await decryptOne(fileDek, record) });
+    } catch {
+      unreadable += 1;
+    }
     onProgress(index + 1, records.length);
   }
+  if (unreadable) throw new RecordsUnreadable(unreadable);
   return plain;
 }
 

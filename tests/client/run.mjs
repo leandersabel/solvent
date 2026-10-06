@@ -1156,16 +1156,19 @@ await check('a wrong password for the file stops at the unwrap and sends nothing
   assert.deepEqual(requests, []);
 });
 
-await check('one byte altered in one record aborts the import and names that record', async () => {
+await check('altered records abort the import, counting every one and naming none', async () => {
   const file = copyOf(FIXTURE);
-  const target = file.records.find((r) => r.recordType === 'snapshot');
-  const bytes = cryptoModule.b64decode(target.ciphertext);
-  bytes[3] ^= 0x01;
-  target.ciphertext = cryptoModule.b64encode(bytes);
+  const targets = file.records.filter((r) => r.recordType !== 'account').slice(0, 2);
+  for (const target of targets) {
+    const bytes = cryptoModule.b64decode(target.ciphertext);
+    bytes[3] ^= 0x01;
+    target.ciphertext = cryptoModule.b64encode(bytes);
+  }
   const { fileDek } = await transfer.openFile(transfer.checkFile(file), FIXTURE_PASSWORD);
   await assert.rejects(transfer.rekey(fileDek, file.records), (error) => {
-    assert.ok(error instanceof transfer.RecordUnreadable);
-    assert.equal(error.recordId, target.recordId);
+    assert.ok(error instanceof transfer.RecordsUnreadable);
+    assert.equal(error.count, targets.length);
+    for (const target of targets) assert.ok(!error.message.includes(target.recordId));
     return true;
   });
   assert.deepEqual(requests, []);
@@ -1185,6 +1188,8 @@ await check('the file is checked before it is decrypted, as the server checks th
   assert.equal(refused(() => {}), 'accepted');
   assert.equal(refused((f) => { f.formatVersion = transfer.FORMAT_VERSION + 1; }), 'newer');
   assert.equal(refused((f) => { f.formatVersion = 0; }), 'format');
+  // A record shaped by a later version is newer, not damaged.
+  assert.equal(refused((f) => { f.records[1].schemaVersion += 1000; }), 'newer');
   assert.equal(refused((f) => { f.format = 'something-else'; }), 'format');
   assert.equal(refused((f) => { f.records[1].recordType = 'invoice'; }), 'format');
   assert.equal(refused((f) => { f.records[1].recordId = 'not-a-uuid'; }), 'format');

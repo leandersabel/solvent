@@ -92,10 +92,11 @@ Replace-only, and nothing on the screen may imply a merge exists.
 2. **Password for that file.** Labeled "The password this file was
    exported under", never "your password", because they can differ and
    this is the feature's most confusing point. It opens the file's
-   envelope, checks the records in it as the server would, and decrypts
-   **the profile alone**, all the review needs, so a wrong password or
-   a bad file is caught before any other record is touched or any
-   request sent.
+   envelope, checks the records in it as the server would, then
+   decrypts and re-encrypts **every record** (The decryption wait), so
+   a wrong password or a file that cannot be restored is caught here,
+   before the review and before any request is sent. Only the wrap and
+   the upload wait for the confirmation.
 3. **Review.** What is in the file, by kind: holdings, recorded figures,
    captured prices, and the date it was exported, in the date style of
    the vault that is open. Alongside it, what will be destroyed, in the
@@ -120,6 +121,11 @@ Replace-only, and nothing on the screen may imply a merge exists.
    primary button "Replace my vault". Into an empty vault the word is
    dropped. Every other vault requires it, and no setting turns it off.
 
+A lock, signing out or leaving the screen at any step starts the flow
+again at step 1, keeping nothing: the file, its password, the typed
+`ERASE` and the re-encrypted records all go, and a re-key in progress
+stops. Choosing another file or opening it again discards the same.
+
 Below the flow, what does and does not change:
 
 > Your password stays the same and your login is unaffected. Only the
@@ -138,12 +144,16 @@ pages show is `login.md`, Unlock, Replaced elsewhere, and
 #### The decryption wait
 
 The re-key (The re-key step) is the longest operation in the product.
+It runs at step 2, before the review, and the upload after the
+confirmation.
 
 - Named phases. "Decrypting 340 of 1 208…" and "Re-encrypting …" each
   carry determinate progress, because one bar that stalls halfway looks
   broken. "Uploading" is one request, so it waits without a percentage.
 - It runs in a Worker, and the tab stays responsive.
 - **Nothing is uploaded until every record has decrypted.**
+- During the review the page holds the new DEK and the re-encrypted
+  records, never the file's DEK or any plaintext payload.
 
 #### At phone width
 
@@ -168,12 +178,18 @@ The re-key (The re-key step) is the longest operation in the product.
 - **Error, wrong password for the file**: "That password does not open
   this file." Nothing is uploaded and the vault is untouched. The flow
   returns to step 2 with the file still selected.
-- **Error, one record fails to decrypt**: the whole import aborts,
-  naming which record: "No records were imported. Your vault is
-  unchanged." A partial restore is worse than none.
+- **Error, a record fails to decrypt**: refused at step 2, with no
+  review and no `ERASE` asked for: "This file is damaged and cannot be
+  restored. 1 record in it could not be read. Your vault is unchanged."
+  The count covers every record that failed. It names none, because a
+  record that fails authentication has no field worth trusting. A
+  partial restore is worse than none.
 - **Error, malformed JSON, wrong `format`, or a newer `formatVersion`**:
   refused at step 1 with a clear message. A newer file in an older app
   is not something to guess at.
+- **Error, a record at a newer `schemaVersion`**: refused as a newer
+  file, not a damaged one, as soon as its records can be read: at step
+  1 for a format 1 file, at step 2 for a sealed one.
 - **Error, a damaged file**: an envelope that does not open under a
   password that opens the wrapper, or records the server would refuse,
   is refused at step 2: "That is not a Solvent vault file, or it has
@@ -467,8 +483,9 @@ There is no `formatVersion` below 1.
     field by field, since a rewritten envelope under the same password
     also signs in. Test:
     `tests/test_transfer.py::test_import_replaces_the_wrapper_and_leaves_the_credential_untouched`.
-15. One byte altered in one record's ciphertext aborts the import, names
-    the record, uploads nothing and leaves the vault intact. Test:
+15. One byte altered in one record's ciphertext is refused at step 2,
+    before any review, counting the record without naming it, and
+    uploads nothing and leaves the vault intact. Test:
     `tests/test_client.py::test_the_client_side_rules_hold`,
     `tests/browser/parts/export-import.mjs`.
 16. A wrong password for the file aborts before any request is sent, with
@@ -611,3 +628,9 @@ There is no `formatVersion` below 1.
     `tests/test_client.py::test_the_client_side_rules_hold`,
     `tests/browser/parts/export-import.mjs`,
     `tests/browser/parts/export-import-review-sealed.mjs`.
+56. A record at a newer `schemaVersion` is refused as a newer file, not
+    a damaged one, before any request. Test:
+    `tests/test_client.py::test_the_client_side_rules_hold`.
+57. A lock during the import starts it again at step 1, with no review,
+    no typed `ERASE` and nothing re-encrypted kept. Test:
+    `tests/browser/parts/export-import.mjs`.
