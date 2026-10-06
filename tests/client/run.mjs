@@ -2993,6 +2993,126 @@ await check('a count of exactly one takes the singular, every other count the pl
   assert.equal(counted(2, 'recorded value', 'recorded values'), '2 recorded values');
 });
 
+// ---- Recorded days and addresses ---------------------------------------
+//
+// A figure or a price describes a day that has passed, so a date that
+// does not exist or is still to come reaches no record and no figure,
+// whether it came through a form or an address typed by hand
+// (record-snapshot.md, A recording is a date, app-shell.md, Addresses
+// inside the vault).
+
+await check('a recorded day is a calendar day that exists, on or before today', async () => {
+  const { isRecordedDay } = await load('model.js');
+  for (const date of ['2026-10-06', '2026-10-05', '2024-02-29', '1999-01-04']) {
+    assert.equal(isRecordedDay(date, '2026-10-06'), true, date);
+  }
+  for (const date of ['2026-10-07', '2099-01-01', '2026-02-30', '2026-13-01', '2026-1-05', 'garbage', '', null, undefined]) {
+    assert.equal(isRecordedDay(date, '2026-10-06'), false, String(date));
+  }
+});
+
+await check('today is the calendar day on the device, in every time zone', async () => {
+  const dom = await load('dom.js');
+  const RealDate = Date;
+  const zone = process.env.TZ;
+  const at = (tz, iso) => {
+    process.env.TZ = tz;
+    globalThis.Date = class extends RealDate {
+      constructor(...args) {
+        super(...(args.length ? args : [iso]));
+      }
+    };
+  };
+  try {
+    at('Pacific/Kiritimati', '2026-09-30T12:00:00Z');
+    assert.equal(dom.today(), '2026-10-01');
+    at('Pacific/Pago_Pago', '2026-09-30T05:00:00Z');
+    assert.equal(dom.today(), '2026-09-29');
+    at('UTC', '2026-09-30T23:59:59Z');
+    assert.equal(dom.today(), '2026-09-30');
+  } finally {
+    globalThis.Date = RealDate;
+    if (zone === undefined) delete process.env.TZ;
+    else process.env.TZ = zone;
+  }
+});
+
+await check('only an address in the route table names a screen', async () => {
+  const { route } = await load('routes.js');
+  const recorded = (date) => date === 'garbage' || date === '2099-01-01';
+  const at = (hash) => route(hash, '2026-10-06', recorded);
+  assert.deepEqual(at(''), { view: 'dashboard' });
+  assert.deepEqual(at('#/'), { view: 'dashboard' });
+  assert.deepEqual(at('#/unassigned/d1'), { view: 'unassigned', argument: 'd1' });
+  assert.deepEqual(at('#/settings'), { view: 'settings', argument: undefined });
+  assert.deepEqual(at('#/settings/dimensions'), { view: 'settings', argument: 'dimensions' });
+  assert.deepEqual(at('#/settings/export-import'), { view: 'settings', argument: 'export-import' });
+  assert.deepEqual(at('#/holding/h1'), { view: 'holding', argument: 'h1', mode: undefined });
+  assert.deepEqual(at('#/holding/h1/edit'), { view: 'holding', argument: 'h1', mode: 'edit' });
+  assert.deepEqual(at('#/sweep/2026-10-06'), { view: 'sweep', argument: '2026-10-06' });
+  assert.deepEqual(at('#/recording/2026-10-01'), { view: 'recording', argument: '2026-10-01' });
+  // A misdated recording still opens, to move or delete what it holds.
+  assert.deepEqual(at('#/recording/garbage'), { view: 'recording', argument: 'garbage' });
+  assert.deepEqual(at('#/recording/2099-01-01'), { view: 'recording', argument: '2099-01-01' });
+  for (const hash of [
+    '#/nonsense', '#/holdings', '#/admin', '#/unassigned', '#/unassigned/d1/x', '#/settings/', '#/settings/nonsense',
+    '#/holding', '#/holding/h1/nonsense', '#/sweep', '#/sweep/garbage', '#/sweep/2099-01-01', '#/sweep/2026-10-07',
+    '#/sweep/2026-02-30', '#/sweep/2026-10-06/x', '#/recording/2098-01-01', '#/recording/nonsense', '#/recording',
+    '#nonsense', '#//', '#/settings/dimensions/x',
+  ]) {
+    assert.equal(at(hash), null, hash);
+  }
+});
+
+await check('a figure or a price at a date that is no recorded day is refused before anything is sent', async () => {
+  const sent = [];
+  globalThis.fetch = async (url) => {
+    sent.push(url);
+    return { ok: true, status: 200, json: async () => ({}) };
+  };
+  const writes = await load('writes.js');
+  const vault = new Vault(await cryptoModule.generateDek());
+  const tomorrow = isoFromDay(dayNumber((await load('dom.js')).today()) + 1);
+  for (const date of ['garbage', '2026-02-30', '2099-01-01', tomorrow]) {
+    await assert.rejects(writes.saveSnapshot(vault, 'h1', null, { date, value: '1', note: null }), Error, date);
+    await assert.rejects(
+      writes.saveRate(vault, null, { symbol: 'USD', date, rate: '1', rateTarget: 'CHF', rateSource: 'manual', rateAsOf: null, proposedRate: null }),
+      Error,
+      date,
+    );
+  }
+  assert.deepEqual(sent, []);
+  assert.equal(vault.snapshots.size + vault.rates.size, 0);
+});
+
+await check('a misdated figure or price counts toward nothing and is listed', async () => {
+  const vault = model({
+    holdings: [{ name: 'Cash', unit: 'USD' }],
+    figures: [['Cash', '2026-01-01', '100'], ['Cash', 'garbage', '5'], ['Cash', '2099-01-01', '7']],
+    prices: [['USD', '2026-01-01', '0.9'], ['USD', '2099-01-01', '2']],
+  });
+  const id = vault.ids.Cash;
+  assert.deepEqual(vault.usableSnapshots(id).map((s) => s.payload.date), ['2026-01-01']);
+  assert.equal(vault.latestSnapshot(id).payload.value, '100');
+  assert.deepEqual(vault.usableEntries('USD').map((e) => e.payload.date), ['2026-01-01']);
+  assert.deepEqual(vault.quantityDates(), ['2026-01-01']);
+  assert.deepEqual(vault.recordingDates(), ['2026-01-01']);
+  assert.equal(vault.chartLastDate(), '2026-01-01');
+  assert.deepEqual(
+    vault.misdated().map(({ date, label }) => `${label} ${date}`).sort(),
+    ['Cash 2099-01-01', 'Cash garbage', 'USD 2099-01-01'],
+  );
+  // Kept where it is, so its recording can still be opened.
+  assert.equal(vault.holdsRecording('garbage'), true);
+});
+
+await check('a stored date that is no calendar day reads as stored', async () => {
+  const { formatter } = await load('format.js');
+  assert.equal(formatter({ locale: 'en-US' }).longDate('garbage'), 'garbage');
+  assert.equal(formatter({ locale: 'en-US' }).longDate('2026-02-30'), '2026-02-30');
+  assert.equal(formatter({ locale: 'en-US', dateStyle: 'dmy' }).longDate('garbage'), 'garbage');
+});
+
 // ---- The username rule -------------------------------------------------
 
 // The same file the server's normalization is run over

@@ -503,8 +503,12 @@ export function shortDate(isoDate) {
   });
 }
 
+/** Today as `YYYY-MM-DD`: the calendar day on the person's own
+ *  device, which can be a day off the server's UTC one. */
 export function today() {
-  return new Date().toISOString().slice(0, 10);
+  const now = new Date();
+  const two = (n) => String(n).padStart(2, '0');
+  return `${now.getFullYear()}-${two(now.getMonth() + 1)}-${two(now.getDate())}`;
 }
 
 /** The sign-in and registration addresses serve this page in the

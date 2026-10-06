@@ -210,9 +210,15 @@ export function formatter(profile) {
   };
 }
 
+/** A stored date that is no calendar day reads as stored, never as
+ *  "Invalid Date" (record-snapshot.md, A recording is a date). */
 function spelled(iso, locale, parts) {
   if (!iso) return '';
-  return new Date(iso + 'T00:00:00Z').toLocaleDateString(locale, { ...parts, timeZone: 'UTC' });
+  const date = new Date(iso + 'T00:00:00Z');
+  // The engine rolls 2026-02-30 over to 2 March, so a date is shown
+  // spelled only when it reads back as written.
+  const real = !Number.isNaN(date.getTime()) && date.toISOString().slice(0, 10) === iso;
+  return real ? date.toLocaleDateString(locale, { ...parts, timeZone: 'UTC' }) : iso;
 }
 
 // Marks a reader types for the one they see: a plain apostrophe for
@@ -246,6 +252,7 @@ function readDecimal(typed, group, point) {
 
 function writeDate(iso, order, sep) {
   if (!iso) return '';
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(iso)) return iso;
   const [year, month, day] = iso.split('-');
   const by = { year, month, day };
   return order.map((part) => by[part]).join(sep);

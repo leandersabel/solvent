@@ -82,7 +82,13 @@ figures you were not looking at.
 - **No price attached to a value**, to disagree with the unit's own.
 - **No price refresh on a timer.** Nothing updates while you are away,
   and a screen you are only reading never contacts a source.
-- **No future dates.** An entry describes what was.
+- **No future dates.** An entry describes what was, and today is the
+  calendar day on your own device. An address typed by hand cannot
+  get around it.
+- **No entry under a date that is not a day that has passed counts.**
+  Should one exist, it stays where it is, flagged on the dashboard and
+  on its holding, out of every figure, until you move or delete it.
+  Solvent never changes or deletes it by itself.
 - **No button that records every holding at once** (Update values,
   Confirm is one click, always).
 - **No value carried into your history.** A holding without an entry
@@ -523,7 +529,9 @@ Standard app shell, content max-width 900px.
   where it came from a year later exactly as on the evening it was
   written.
 - **Update**, primary, opens the sweep for this date holding what was
-  recorded. Everything possible on the evening is possible again.
+  recorded. Everything possible on the evening is possible again. A
+  misdated recording has no Update, because the sweep opens only at a
+  recorded day. Its entries are moved from their holding.
 - **Delete**, destructive (Delete).
 
 **Nothing on this screen contacts a price source**, however old the
@@ -924,6 +932,33 @@ Consequences:
 - Export carries recordings by carrying their members
   (`export-import.md`), with no format change.
 
+**A recorded day** is a date written `YYYY-MM-DD` that is a calendar
+day, so `isoFromDay(dayNumber(date))` gives it back, and that is on or
+before the device's local today (`model.js`, `isRecordedDay`). Every
+snapshot and price entry carries one:
+
+- `writes.putRecord` refuses a snapshot or rate payload whose `date` is
+  not a recorded day, before it encrypts or sends anything, whichever
+  screen called it. A delete is never checked, so a misdated record can
+  always go.
+- A record already stored at a date that is not a recorded day is
+  misdated. `usableSnapshots` and `usableEntries` leave it out, so it
+  counts toward no total, age, chart range or price, and neither
+  `quantityDates` nor `recordingDates` holds its date. It stays in the
+  model, so its recording opens at its date (`app-shell.md`, Addresses
+  inside the vault), without Update, and its holding's Values table
+  lists it.
+- The dashboard's fault banner names each misdated record by holding or
+  unit and its date as stored, each line opening its recording. The
+  holding's Values row is flagged with "This is not a day that has
+  passed. Move or delete this entry. It counts toward nothing."
+- A stored date that is not a calendar day is shown as stored, never as
+  "Invalid Date".
+- The device's today can be the day after the server's UTC today, which
+  the price lookup refuses as future. The lookup for such a date asks
+  for the server's today, whose latest close is the same
+  (`rate-lookup.md`, SSRF and egress hardening).
+
 ### Reopening and editing a recording
 
 Saving a reopened recording covers, in any combination:
@@ -1197,7 +1232,11 @@ Editing an existing entry).
   no required price field, no warning to dismiss. The line says nothing
   was written for that unit, and the holding is listed as not priced
   rather than counted wrong (`record-rate.md`, The refresh).
-- **Future date**: refused on the date field.
+- **Future date**: refused on the date field, and refused by the write
+  path whatever reached it (A recording is a date).
+- **An address naming a sweep at a date that does not exist or is
+  still to come**: no screen, the in-app missing card
+  (`app-shell.md`, Addresses inside the vault).
 - **Date before the holding's `createdAt`**: allowed. Backfilling is
   normal.
 - **Editing a past snapshot**: allowed, versioned. The AAD's `version`
@@ -1620,3 +1659,14 @@ Editing an existing entry).
     word "snapshot". Test:
     `tests/test_record_snapshot.py::test_no_copy_says_snapshot`,
     `tests/browser/parts/snapshot-entry-review-word.mjs`.
+98. (blind) A snapshot or price entry whose date does not exist or is
+    after the device's today is refused before anything is encrypted
+    or sent. Test:
+    `tests/test_client.py::test_the_client_side_rules_hold`.
+99. (blind) A misdated snapshot or price entry counts toward no figure,
+    age or chart range, is listed for moving or deleting, and its
+    recording still opens without Update. Test:
+    `tests/test_client.py::test_the_client_side_rules_hold`,
+    `tests/browser/parts/recording-detail-misdated.mjs`.
+100. Today is the calendar day on the device, in any time zone. Test:
+     `tests/test_client.py::test_the_client_side_rules_hold`.

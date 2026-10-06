@@ -2,7 +2,7 @@
 // Error page), and the app shell's rule that every page declares its icon.
 // Templates: error.html, shell/. Modules: app.js, shell.js.
 import {
-  ADMIN_PASSWORD, BASE, VAULT_PASSWORD, administrator, check, openBrowser, problems, run, signInOn, vaultOwner,
+  ADMIN_PASSWORD, BASE, OWN, VAULT_PASSWORD, administrator, check, openBrowser, problems, run, signInOn, sql, vaultOwner,
 } from '../harness.mjs';
 
 await run(async () => {
@@ -77,6 +77,33 @@ await run(async () => {
       await administrator.session.waitUntil("location.pathname === '/admin'", { timeout: 90000, label: 'the admin area for the Not Found check' });
       await signInOn(owner.session, VAULT_PASSWORD, 'leander');
       await owner.session.waitUntil("location.pathname === '/dashboard' && document.querySelector('.topbar nav a')", { timeout: 90000, label: 'the dashboard for the Not Found check' });
+
+      // app-shell.md, Addresses inside the vault: an address the vault
+      // page has no screen for shows the missing variant in place, with
+      // the vault still unlocked, and a sweep at a day that has not
+      // passed, or does not exist, is no screen.
+      const records = () => sql(`SELECT COUNT(*) AS n FROM records ${OWN}`)[0].n;
+      const before = records();
+      for (const hash of ['#/nonsense', '#/holdings', '#/admin', '#/sweep/garbage', '#/sweep/2099-01-01', '#/sweep/2026-02-30']) {
+        await owner.session.call((to) => { location.hash = to; }, hash);
+        await owner.session.waitUntil(
+          () => document.querySelector('#app h1')?.textContent === 'There is no page at this address.',
+          { timeout: 30000, label: `the in-app Not Found card at ${hash}` },
+        );
+        const shown = await owner.session.eval(`({
+          button: document.querySelector('#app button.btn-primary')?.textContent,
+          lock: Boolean(document.querySelector('.topbar .btn-lock')?.checkVisibility()),
+          figures: document.querySelectorAll('#app input').length,
+        })`);
+        check(`${hash} shows the missing card with Go to Solvent, no field, and Lock`, shown.button === 'Go to Solvent' && shown.figures === 0 && shown.lock, JSON.stringify(shown));
+      }
+      check('no unknown address wrote a record', records() === before, `${before} then ${records()}`);
+      await owner.session.mouseClick(...(await owner.session.eval(`(() => {
+        const box = document.querySelector('#app button.btn-primary').getBoundingClientRect();
+        return [box.x + box.width / 2, box.y + box.height / 2];
+      })()`)));
+      await owner.session.waitUntil("location.hash === '#/' && document.querySelector('#app h1')?.textContent !== 'There is no page at this address.'", { timeout: 30000, label: 'the dashboard from the in-app Go to Solvent' });
+      check('the in-app Go to Solvent opens the dashboard with the vault unlocked', true);
 
       const answers = {};
       for (const [name, who, path] of [

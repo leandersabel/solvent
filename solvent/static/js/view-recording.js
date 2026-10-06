@@ -6,7 +6,8 @@
 // being opened is the one thing this screen must not be.
 import * as decimal from './decimal.js';
 import * as writes from './writes.js';
-import { counted, dialog, el, priceDateLine } from './dom.js';
+import { counted, dialog, el, priceDateLine, today } from './dom.js';
+import { isRecordedDay } from './model.js';
 import { holdingsIn, provenanceChip } from './view-sweep.js';
 
 export function recordingView(vault, date, { onUpdate, onOpenHolding, onDeleted, onChanged, onPickDate }) {
@@ -57,7 +58,10 @@ export function recordingView(vault, date, { onUpdate, onOpenHolding, onDeleted,
         ),
       ]),
       el('div', { class: 'form-actions' }, [
-        el('button', { class: 'btn-primary', text: 'Update', onclick: () => onUpdate(date) }),
+        // The sweep opens only at a recorded day (record-snapshot.md, Recording detail).
+        isRecordedDay(date, today())
+          ? el('button', { class: 'btn-primary', text: 'Update', onclick: () => onUpdate(date) })
+          : null,
         // Nothing to remove where the date holds only archives' zeros.
         !prices.length && figures.every((f) => vault.isArchiveZero(f.holding, f.snapshot))
           ? null

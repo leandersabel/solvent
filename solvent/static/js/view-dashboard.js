@@ -114,18 +114,18 @@ function duplicateBanner(vault, actions) {
       faults.push({ date, label: vault.unitName(symbol) });
     }
   }
-  if (!faults.length) return null;
-  return el(
-    'div',
-    { class: 'banner banner-critical', role: 'alert' },
-    faults.map((fault) =>
-      el('button', {
-        class: 'link-button',
-        text: `Two entries on ${vault.format.longDate(fault.date)} for ${fault.label}. Open the recording.`,
-        onclick: () => actions.openRecording(fault.date),
-      }),
+  const misdated = vault.misdated();
+  if (!faults.length && !misdated.length) return null;
+  const line = (fault, text) =>
+    el('button', { class: 'link-button', text, onclick: () => actions.openRecording(fault.date) });
+  return el('div', { class: 'banner banner-critical', role: 'alert' }, [
+    ...faults.map((fault) =>
+      line(fault, `Two entries on ${vault.format.longDate(fault.date)} for ${fault.label}. Open the recording.`),
     ),
-  );
+    ...misdated.map((fault) =>
+      line(fault, `The entry for ${fault.label} is dated ${vault.format.longDate(fault.date)}, which is not a day that has passed. It counts toward nothing. Open the recording.`),
+    ),
+  ]);
 }
 
 function hero(vault, state, render, actions, history, dimension) {

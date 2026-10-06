@@ -37,6 +37,7 @@ import { resetSweepState, sweepView, unsavedOnSweep } from './view-sweep.js';
 import { settingsView } from './view-settings.js';
 import { dimensionsView, resetDimensionsState } from './view-dimensions.js';
 import { transferView } from './page-transfer.js';
+import { route } from './routes.js';
 
 const container = document.getElementById('app');
 // Who is signed in. The server writes it into a page it served with a
@@ -293,9 +294,15 @@ function draw() {
   const vault = currentVault();
   const arrived = drawnHash !== window.location.hash;
   drawnHash = window.location.hash;
-  const [, view, argument, mode] = (window.location.hash || '#/').split('/');
+  const shown = route(window.location.hash, today(), (date) => vault.holdsRecording(date));
   // The notice is the dashboard's, and goes once the person leaves it.
-  if (['settings', 'holding', 'recording', 'sweep'].includes(view)) sinceOpen = null;
+  if (shown?.view !== 'dashboard' && shown?.view !== 'unassigned') sinceOpen = null;
+  if (!shown) {
+    width('narrow');
+    mount(container, noPage());
+    return;
+  }
+  const { view, argument, mode } = shown;
 
   if (view === 'settings' && argument === 'dimensions') {
     width('narrow');
@@ -356,6 +363,16 @@ function draw() {
     unassignedOf: view === 'unassigned' ? argument : null,
     replaced: sinceOpen,
   }));
+}
+
+/** An address inside the vault that names no screen: the error
+ *  page's missing variant, drawn in place so the vault stays unlocked
+ *  (app-shell.md, Addresses inside the vault). */
+function noPage() {
+  return el('div', { class: 'card signin-card' }, [
+    el('h1', { class: 'card-heading', text: 'There is no page at this address.' }),
+    el('button', { type: 'button', class: 'btn-primary btn-block', text: 'Go to Solvent', onclick: () => go('#/') }),
+  ]);
 }
 
 function actionsFor(vault) {
