@@ -1,7 +1,8 @@
 // The trend chart from the keyboard and by click, written from
 // spec/features/net-worth-view.md (Trend chart card, Keyboard; Reading a
-// date; acceptance criteria 26, 27 and 71). Focus reads the last day,
-// Home and End the ends, Right every day once across a daylight-saving
+// date; Ranges and modes; acceptance criteria 26, 27, 71 and 72). The
+// device's today is three days past the last recording, where the chart
+// ends. Focus reads that last day, Home and End the ends, Right every day once across a daylight-saving
 // change, Shift and an arrow the marked dates, with Just the line on
 // too, and Enter or a click opens a recording only on a marked date or
 // its tick. Each is asked again with a mouse resting in the chart's axis
@@ -9,18 +10,20 @@
 // it.
 // Templates: dashboard.html. Modules: view-dashboard.js, chart.js,
 // model.js, format.js.
-import { check, holdings, page, plant, reloadModel, run, vaultOwner } from '../harness.mjs';
+import { check, holdToday, holdings, page, plant, reloadModel, run, vaultOwner } from '../harness.mjs';
 
 // Europe/Zurich moves its clocks on 2026-03-29, inside the range.
 const ZONE = 'Europe/Zurich';
 const MARKED = ['2026-03-20', '2026-03-29', '2026-04-05'];
 const UNMARKED = '2026-03-25';
+const TODAY = '2026-04-08';
 const DAYS = [];
-for (let at = Date.UTC(2026, 2, 20); at <= Date.UTC(2026, 3, 5); at += 86400000) DAYS.push(new Date(at).toISOString().slice(0, 10));
+for (let at = Date.UTC(2026, 2, 20); at <= Date.UTC(2026, 3, 8); at += 86400000) DAYS.push(new Date(at).toISOString().slice(0, 10));
 
 await run(async () => {
   await page.send('Emulation.setTimezoneOverride', { timezoneId: ZONE });
   await vaultOwner();
+  await holdToday(TODAY);
   const ids = await holdings([['Cash', 'CHF'], ['Savings', 'CHF']]);
   await plant([
     ...MARKED.map((date, n) => ({ type: 'snapshot', accountId: ids.Cash, payload: { date, value: String(1000 + 500 * n), note: null } })),

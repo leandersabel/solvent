@@ -995,7 +995,8 @@ rule of the chart (Archived holdings, Ranges and modes).
     and All, the point's center is at the plot's horizontal middle within
     half a pixel and its mark's bounding box lies wholly inside the
     drawing. The pointer at either edge and the middle reads that day.
-    Test: `tests/browser/parts/dashboard.mjs`.
+    Test: `tests/browser/parts/dashboard.mjs`,
+    `tests/browser/parts/dashboard-review-chart-end.mjs`.
 41. Every recorded point is drawn whole on a computer and a phone,
     including one at the chart's first or last date. Test:
     `tests/browser/parts/dashboard.mjs`.
@@ -1153,4 +1154,6 @@ rule of the chart (Archived holdings, Ranges and modes).
 76. With the last recording on 2026-09-15 and today 2026-10-03, the
     chart ends on 2026-10-03, the last figure runs level to it, 1M
     starts on 2026-09-03 and All on the first recording. Test:
-    `tests/test_client.py::test_the_client_side_rules_hold`.
+    `tests/test_client.py::test_the_client_side_rules_hold`,
+    `tests/test_review_net_worth_view.py::test_the_chart_ends_today_and_every_range_counts_back_from_it`,
+    `tests/browser/parts/dashboard-review-chart-end.mjs`.
