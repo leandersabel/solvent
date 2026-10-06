@@ -25,7 +25,10 @@ for good only once fetched at or after 00:00 UTC on D+2, and any other
 for an hour, whatever its `asOf` (Caching, criteria 13, 14, 76 and 77).
 Every proposal is the pinned composition rounded once, half to even, to
 10 significant digits but never past the twelfth place (Providers, What
-the client gets, criteria 57, 78 and 79).
+the client gets, criteria 57, 78 and 79). A success resets its
+provider's count unless that provider counted a failure after the
+proxy request began (Rate limiting and failure, criteria 24, 25, 27
+and 29).
 
 Written from the spec alone. Each provider is reached on a loopback HTTP
 server through the app's own opener, so the app's real socket timeout
@@ -2525,3 +2528,126 @@ def test_a_settled_entry_is_kept_until_the_app_next_starts(app, sources):
     assert (first["cached"], again["cached"], asked) == (False, True, 1)
     assert (after["rate"], after["cached"]) == ("0.9194556822", False)
     assert len(sources.opened) == 2
+
+
+# A success resets its provider's count unless that provider counted a
+# failure after the proxy request began (Rate limiting and failure,
+# criteria 24, 25, 27, 29 and 68). Each order is forced by holding an
+# answer back, so no assertion turns on thread scheduling.
+
+HELD = 1.0
+
+
+def held(body_of, status=200):
+    """A plan holding the whole answer back for `HELD` seconds."""
+    return lambda url: ([b"", answer(body_of(url), status)], HELD)
+
+
+def by_day(plans: dict, otherwise):
+    """A Frankfurter plan choosing by the day asked for."""
+    return lambda url: plans.get(url.split("/v1/")[1][:10], otherwise)(url)
+
+
+FX_SHAPE = at_once(fx_table(base="EUR"))
+FX_DOWN = at_once(lambda url: b"down", status=503)
+
+
+@pytest.mark.parametrize(
+    "late", ["table", "leg"], ids=["table read after the leg failed", "leg failing after the table"]
+)
+def test_a_quote_legs_failure_counts_one_whichever_answer_is_read_last(owner, sources, logged, late):
+    """Criteria 24 and 68: the requested day's table succeeds and the
+    gold quote leg, for NBP's day before, answers in a changed shape.
+    Frankfurter's count is one, in either order."""
+    sources.plans["nbp"] = at_once(gold_price(251.37, lag_days=1))
+    table_plan = held(fx_table()) if late == "table" else at_once(fx_table())
+    leg_plan = FX_SHAPE if late == "table" else held(fx_table(base="EUR"))
+    sources.plans["frankfurter"] = by_day({PAST: table_plan}, leg_plan)
+
+    priced = table(owner)
+
+    assert {"USD", "PLN"} <= set(priced)
+    assert not GOLD & set(priced)
+    assert_lines(logged, [("frankfurter", {"shape"})])
+    assert failures() == {"frankfurter": 1, "nbp": 0}
+
+
+def test_a_late_table_never_saves_a_failing_quote_leg_from_opening_the_breaker(app, owner, sources):
+    """Criteria 25 and 29: each request's table succeeds after its quote
+    leg failed, so the leg failures are consecutive. The breaker opens on
+    exactly the configured one, and the next request within the cool-off
+    sends nothing to Frankfurter while NBP is still asked."""
+    app.config["RATE_BREAKER_FAILURES"] = 3
+    sources.plans["nbp"] = at_once(gold_price(251.37, lag_days=1))
+    asked = [day(n) for n in range(0, 8, 2)]
+    sources.plans["frankfurter"] = by_day({on: held(fx_table()) for on in asked}, FX_SHAPE)
+
+    counts = []
+    for on in asked[:3]:
+        table(owner, on=on)
+        counts.append(failures()["frankfurter"])
+    sent = len(sources.opened)
+    last = table(owner, on=asked[3])
+
+    assert counts == [1, 2, 3]
+    assert [p for p, _ in sources.opened[sent:]] == ["nbp"]
+    assert last == {}
+
+
+def test_a_quote_legs_success_never_wipes_the_tables_failure(owner, sources):
+    """Criterion 24, the other way round: the requested day's table
+    fails at once and the quote leg answers late. The leg's success
+    prices gold at its day, and Frankfurter's count stays one."""
+    sources.plans["nbp"] = at_once(gold_price(251.37, lag_days=1))
+    sources.plans["frankfurter"] = by_day({PAST: FX_DOWN}, held(fx_table()))
+
+    priced = table(owner)
+
+    assert set(priced) == GOLD
+    assert {entry["asOf"] for entry in priced.values()} == {day(1)}
+    assert failures() == {"frankfurter": 1, "nbp": 0}
+
+
+def test_another_requests_failure_during_this_one_keeps_the_count(app, owner, sources):
+    """Rate limiting and failure: a success resets nothing when its
+    provider counted a failure after the proxy request began, whichever
+    request counted it. A starts and its table answers late. B, from
+    another session, fails Frankfurter meanwhile."""
+    _, key = register(app, "other")
+    other, _ = sign_in(app, "other", key)
+    sources.plans["frankfurter"] = by_day({PAST: held(fx_table())}, FX_DOWN)
+    answers = {}
+
+    def ask(name, client, on):
+        answers[name] = client.get(f"/api/rates?date={on}&quote=CHF&symbol=USD", headers=CSRF)
+
+    first = threading.Thread(target=ask, args=("a", owner, PAST))
+    first.start()
+    deadline = time.monotonic() + HELD / 2
+    while not sources.opened and time.monotonic() < deadline:
+        time.sleep(0.01)
+    assert sources.opened, "A's table never went out"
+    ask("b", other, day(1))
+    first.join()
+
+    assert answers["a"].status_code == 200
+    assert answers["b"].status_code == 204
+    assert failures() == {"frankfurter": 1, "nbp": 0}
+
+
+def test_a_success_resets_its_own_count_from_before_the_request_whatever_the_other_did(app, owner, sources):
+    """Criteria 25 and 27: failures counted before the request began are
+    reset by its success, and an NBP failure within it neither keeps
+    Frankfurter's count nor is reset by Frankfurter's success."""
+    app.config["RATE_BREAKER_FAILURES"] = 5
+    sources.plans["frankfurter"] = FX_DOWN
+    for n in range(1, 4):
+        owner.get(f"/api/rates?date={day(n)}&quote=CHF&symbol=USD", headers=CSRF)
+    assert failures() == {"frankfurter": 3, "nbp": 0}
+    sources.plans["frankfurter"] = held(fx_table())
+    sources.plans["nbp"] = at_once(lambda url: b"down", status=503)
+
+    priced = table(owner)
+
+    assert "USD" in priced and not GOLD & set(priced)
+    assert failures() == {"frankfurter": 0, "nbp": 1}
