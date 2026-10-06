@@ -146,6 +146,8 @@ Both forms use it, unchanged, against the bar in Rules.
   you can remember is stronger than `P@ssw0rd!`."
 - The button stays disabled until both conditions pass, and whichever
   one is unmet is named inline. Never a bare "password too weak".
+- It reads what the field holds now. A form that clears the field
+  empties the gauge with it, and the button is disabled again.
 - Autocomplete `new-password`.
 
 #### The acknowledgement

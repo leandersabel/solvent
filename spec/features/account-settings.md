@@ -1084,3 +1084,8 @@ from an administrator removing an account (`admin-invites.md`).
     your current one." above the first field, keeps every field and
     sends nothing. Test: `tests/browser/parts/settings.mjs`,
     `tests/browser/parts/settings-review-reuse.mjs`.
+83. After a successful password change, for a vault owner and for an
+    administrator, every field is empty, the gauge shows no filled
+    segment and no rating, and Change password is disabled. Test:
+    `tests/browser/parts/settings.mjs`,
+    `tests/browser/parts/admin-review-cleared.mjs`.

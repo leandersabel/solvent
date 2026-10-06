@@ -464,6 +464,20 @@ await run(async () => {
     'the change confirms what else happened',
     (await text()).includes('Every other session was signed out, and this one is still open.'),
   );
+  const cleared = await page.call((words) => {
+    const card = [...document.querySelectorAll('.card')].find((c) => c.textContent.includes(words));
+    return {
+      fields: [...card.querySelectorAll('input[type=password]')].map((n) => n.value),
+      filled: card.querySelectorAll('.gauge-segment.filled').length,
+      rating: card.querySelector('.gauge-label').textContent,
+      disabled: card.querySelector('.btn-primary').disabled,
+    };
+  }, PASSWORD_CARD);
+  check(
+    'after a change the fields are empty, the gauge reads nothing and Change password is disabled',
+    cleared.fields.every((v) => v === '') && cleared.filled === 0 && cleared.rating === '' && cleared.disabled,
+    JSON.stringify(cleared),
+  );
   check(
     'a successful change sends no salt request',
     apiSince(beforeChangeRequests, '/api/auth/salt').length === 0,

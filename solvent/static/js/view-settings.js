@@ -233,6 +233,7 @@ function changePasswordCard(kdf, username, sessions) {
     try {
       await changePassword(username, current.value, next.value, kdf);
       current.value = next.value = confirm.value = '';
+      gauge.evaluate();
       show(done, 'Your password is changed. Every other session was signed out, and this one is still open.');
       sessions();
     } catch (failure) {

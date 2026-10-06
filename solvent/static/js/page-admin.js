@@ -545,7 +545,9 @@ function passwordCard() {
   const error = el('p', { class: 'field-error', hidden: true });
   const done = el('p', { class: 'banner', hidden: true, role: 'status' });
   const button = el('button', { class: 'btn-primary', text: 'Change password', disabled: true });
+  let strong = false;
   const gauge = strengthGauge(next, (ok) => {
+    strong = ok;
     button.disabled = !ok;
   });
 
@@ -567,6 +569,7 @@ function passwordCard() {
     try {
       await changePassword(username, current.value, next.value, kdf);
       current.value = next.value = confirm.value = '';
+      gauge.evaluate();
       done.textContent =
         'Your password is changed. Every other session of yours was signed out, and this one is still open.';
       done.hidden = false;
@@ -579,7 +582,7 @@ function passwordCard() {
           : 'Nothing was changed. Your current password still works.';
       error.hidden = false;
     } finally {
-      button.disabled = false;
+      button.disabled = !strong;
       button.textContent = 'Change password';
     }
   });
