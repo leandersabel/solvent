@@ -1712,15 +1712,12 @@ select {
   line-height: 1;
 }
 
+/* In the form's flow, so it never spills past a dialog's edge. */
 .date-popover {
-  position: absolute;
-  top: calc(100% + 6px);
-  left: 0;
-  z-index: 20;
+  flex-basis: 100%;
   background: var(--surface);
   border: 1px solid var(--hairline);
   border-radius: var(--radius-card);
-  box-shadow: 0 8px 24px rgba(6, 39, 47, 0.14);
   padding: 12px;
 }
 

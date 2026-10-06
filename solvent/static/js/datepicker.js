@@ -48,7 +48,7 @@ export function dateField(
   // refusal until the value fits, so the form never shifts.
   const line = el('p', { id: id ? `${id}-line` : null, class: 'date-line hint', 'aria-live': 'polite', text: hint });
   const popover = el('div', { class: 'date-popover', hidden: true });
-  const wrap = el('div', { class: 'date-field' }, [text, open, popover, formatHint, line]);
+  const wrap = el('div', { class: 'date-field' }, [text, open, formatHint, line, popover]);
 
   const show = (reason) => {
     line.textContent = reason ?? hint;
@@ -94,14 +94,15 @@ export function dateField(
     popover.hidden = true;
     popover.replaceChildren();
     open.setAttribute('aria-expanded', 'false');
-    document.removeEventListener('keydown', onKey);
   };
-  const onKey = (event) => {
-    if (event.key === 'Escape') {
-      closeCalendar();
-      open.focus();
-    }
-  };
+  // On the field rather than the document, so the Escape that closes the
+  // calendar never reaches a dialog holding the field.
+  wrap.addEventListener('keydown', (event) => {
+    if (event.key !== 'Escape' || popover.hidden) return;
+    event.stopPropagation();
+    closeCalendar();
+    open.focus();
+  });
 
   open.addEventListener('click', () => {
     if (!popover.hidden) {
@@ -110,8 +111,7 @@ export function dateField(
     }
     popover.hidden = false;
     open.setAttribute('aria-expanded', 'true');
-    document.addEventListener('keydown', onKey);
-    dateGrid(popover, format, current || today(), {
+    const grid = dateGrid(popover, format, current || today(), {
       max,
       keep,
       selected: current,
@@ -121,8 +121,14 @@ export function dateField(
         closeCalendar();
         text.focus();
       },
-      onClose: closeCalendar,
+      onClose: () => {
+        closeCalendar();
+        open.focus();
+      },
     });
+    // Focus inside the field is what lets Escape find the calendar.
+    popover.scrollIntoView({ block: 'nearest' });
+    grid.focus();
   });
 
   return {

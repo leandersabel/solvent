@@ -102,7 +102,7 @@ await run(async () => {
     D9, D10, D11, proxy, traffic, faults, writesSent, rateAsks, typeReads,
     bodyOf, ev, quiet, set, press, stored, on, bytes,
     plantHere, archiveElsewhere, reread, go, format, line, lineState, typeLine, figure,
-    home, id, layout, snap, price, viewport,
+    home, id, layout, snap, price, viewport, realClick, realKey,
   } = r;
 
   // ---- record-snapshot: the single-holding form ---------------------------
@@ -125,6 +125,49 @@ await run(async () => {
       await rec.frames();
     }
   };
+
+  // The calendar lies inside the dialog, Close included, with no shadow,
+  // and Escape closes it alone. Real input, because element.click() and a
+  // synthetic Escape skip what is painted over and who is listening.
+  const calendars = [];
+  for (const [width, height] of [[1280, 900], [390, 900], [1280, 480]]) {
+    await rec.send('Emulation.setDeviceMetricsOverride', { width, height, deviceScaleFactor: 1, mobile: false });
+    await openForm('Current account');
+    await realClick('.dialog .date-open');
+    const look = JSON.parse(await ev(`JSON.stringify((() => {
+      // A calendar taller than a short window scrolls inside the dialog,
+      // so its sides are measured as they stand and Close once in view.
+      const dialog = document.querySelector('.dialog');
+      const popover = dialog.querySelector('.date-popover');
+      const close = [...popover.querySelectorAll('button')].find(b => b.textContent === 'Close');
+      const sides = popover.getBoundingClientRect();
+      const frame = dialog.getBoundingClientRect();
+      close.scrollIntoView({ block: 'nearest' });
+      const shut = close.getBoundingClientRect();
+      const now = dialog.getBoundingClientRect();
+      return {
+        calendar: sides.left >= frame.left && sides.right <= frame.right,
+        close: shut.top >= now.top && shut.bottom <= now.bottom && shut.left >= now.left && shut.right <= now.right,
+        shadow: getComputedStyle(popover).boxShadow, focusInGrid: popover.contains(document.activeElement),
+      };
+    })())`));
+    await realKey('Escape', 'Escape', 27);
+    const first = JSON.parse(await ev(`JSON.stringify({
+      dialog: Boolean(document.querySelector('.dialog')),
+      calendar: !document.querySelector('.dialog .date-popover')?.hidden,
+      onButton: document.activeElement === document.querySelector('.dialog .date-open'),
+    })`));
+    await realKey('Escape', 'Escape', 27);
+    const second = await ev("Boolean(document.querySelector('.dialog'))");
+    calendars.push({ width, height, ...look, first, second });
+  }
+  await viewport(1280);
+  check(
+    'record-snapshot: the calendar lies inside the dialog with its Close, has no shadow, and Escape closes it alone, focus on its button, then the dialog',
+    calendars.every((c) => c.calendar && c.close && c.shadow === 'none' && c.focusInGrid &&
+      c.first.dialog && !c.first.calendar && c.first.onButton && !c.second),
+    JSON.stringify(calendars),
+  );
 
   proxy.mode = 'down';
   await openForm('Current account');

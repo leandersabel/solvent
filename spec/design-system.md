@@ -553,6 +553,12 @@ outside it use, are `app-shell.md`'s (The chrome).
   focus to the button, and a date outside the allowed range is disabled
   in the grid and refused when typed. A field that does not parse
   reports no value, so nothing saves an old date under a new one.
+  - **The calendar opens in the form's flow**, below the field's
+    message line, never laid over the form, so it stays inside a
+    dialog's edges, and it carries a hairline and no shadow. A dialog
+    too short for it scrolls. Opening it moves focus into the grid, and
+    Escape there closes the calendar alone, never the dialog holding
+    it.
   - **The upper limit and its reason come from the screen using the
     field.** A screen that names neither has today as the limit and
     the future as the reason.
