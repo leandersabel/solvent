@@ -1670,3 +1670,8 @@ Editing an existing entry).
     `tests/browser/parts/recording-detail-misdated.mjs`.
 100. Today is the calendar day on the device, in any time zone. Test:
      `tests/test_client.py::test_the_client_side_rules_hold`.
+101. In Snapshot entry, at desktop width, at phone width and in a short
+     window, the opened calendar and its Close lie inside the Dialog,
+     the calendar casts no shadow, one Escape closes only the calendar
+     with focus on its button, and a second closes the Dialog. Test:
+     `tests/browser/parts/snapshot-entry.mjs`.
