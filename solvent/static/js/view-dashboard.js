@@ -146,14 +146,15 @@ function hero(vault, state, render, actions, history, dimension) {
     el('div', { class: 'hero-main' }, [
       el('p', { class: 'eyebrow', text: 'Net worth' }),
       figure,
-      history ? heroChange(vault, history, state.range, state.selection, dimension) : null,
+      history && totals.valued ? heroChange(vault, history, state.range, state.selection, dimension) : null,
       // The line keeps its height while empty, so the date the chart
       // reads never moves the chart under the pointer.
       el('p', { class: 'hero-at-line' }, [el('span', { class: 'hero-at', hidden: true })]),
     ]),
     el('div', { class: 'hero-parts' }, [
-      heroPart('Assets', vault.mainWhole(assets)),
-      heroPart('Liabilities', vault.mainWhole(liabilities)),
+      // Nothing valued sums to no figure, never to 0, which is a real one.
+      heroPart('Assets', totals.valued ? vault.mainWhole(assets) : '—'),
+      heroPart('Liabilities', totals.valued ? vault.mainWhole(liabilities) : '—'),
     ]),
     el('div', { class: 'hero-action' }, [
       el('button', {
@@ -402,7 +403,8 @@ function chartSection(vault, state, render, dimension, actions, { days, bands })
           // The hero follows the cursor: the value first, its date
           // beneath it.
           if (heroAmount) heroAmount.textContent = vault.format.whole(net);
-          if (heroAt) {
+          // A dashed total has no figure for the date to belong to.
+          if (heroAt && heroAmount) {
             heroAt.textContent = `on ${date}`;
             heroAt.hidden = false;
           }

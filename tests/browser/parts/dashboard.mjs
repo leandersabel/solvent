@@ -336,6 +336,8 @@ await run(async () => {
       return JSON.stringify({
         text: card.textContent,
         total: document.querySelector('.hero-figure').textContent,
+        parts: [...document.querySelectorAll('.hero-part-value')].map(p => p.textContent),
+        change: Boolean(document.querySelector('.hero-change')),
         chart: Boolean(document.querySelector('svg.trend')),
         rows: [...card.querySelectorAll('.holdings-table tbody tr')].map(r => {
           const cells = [...r.querySelectorAll('.cell-native, .cell-converted, .cell-asof')];
@@ -507,8 +509,8 @@ await run(async () => {
       await toggleArchived();
       const archivedNames = ['Archive cellar', 'Archive empty'];
       check(
-        `net-worth-view: with holdings and no snapshots, the total is a dash with no chart, and active holdings sit under Not yet valued (${where})`,
-        without.total === '—' && !without.chart && without.notValued.includes('Active cellar') &&
+        `net-worth-view: with holdings and no snapshots, the total, assets and liabilities are dashes with no change and no chart, and active holdings sit under Not yet valued (${where})`,
+        without.total === '—' && without.parts.join('|') === '—|—' && !without.change && !without.chart && without.notValued.includes('Active cellar') &&
           archivedNames.every((name) => !without.notValued.includes(name)) && without.notPriced.length === 0,
         JSON.stringify(without),
       );

@@ -219,6 +219,8 @@ await run(async () => {
     page.eval(`(() => {
       const c = document.querySelector('.holdings-card');
       return JSON.stringify({
+        hero: [...document.querySelectorAll('.hero-figure, .hero-part-value')].map((p) => p.textContent),
+        change: Boolean(document.querySelector('.hero-change')),
         tables: c.querySelectorAll('table').length,
         headings: c.querySelectorAll('th').length,
         line: [...c.querySelectorAll('p.hint')].map((p) => p.textContent),
@@ -226,6 +228,29 @@ await run(async () => {
       });
     })()`).then(JSON.parse);
   const hiddenArchive = await card();
+  await chartDrawn();
+  const hoveredArchive = await page.call(() => {
+    const svg = document.querySelector('svg.trend');
+    const box = svg.getBoundingClientRect();
+    svg.dispatchEvent(new PointerEvent('pointermove', { clientX: box.left + box.width / 2, clientY: box.top + 40, bubbles: true }));
+    const shown = {
+      readout: !document.querySelector('.chart-readout').hidden,
+      total: document.querySelector('.hero-figure').textContent,
+      at: !document.querySelector('.hero-at').hidden,
+    };
+    svg.dispatchEvent(new PointerEvent('pointerleave', { bubbles: true }));
+    return shown;
+  });
+  check(
+    'net-worth-view: with every holding archived the total, assets and liabilities are dashes with no change',
+    hiddenArchive.hero.join('|') === '—|—|—' && !hiddenArchive.change,
+    JSON.stringify(hiddenArchive),
+  );
+  check(
+    'net-worth-view: with every holding archived, hovering the chart reads the day in the tooltip and leaves the hero a dash with no date',
+    hoveredArchive.readout && hoveredArchive.total === '—' && !hoveredArchive.at,
+    JSON.stringify(hoveredArchive),
+  );
   check(
     'net-worth-view: with every holding archived and Show archived off there is no table, no heading, and the line "Every holding is archived."',
     hiddenArchive.tables === 0 && hiddenArchive.headings === 0 && hiddenArchive.rows.length === 0 &&
