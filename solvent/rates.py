@@ -258,6 +258,8 @@ class _Breaker:
     def __init__(self) -> None:
         self.lock = threading.Lock()
         self.failures = 0
+        # Every failure ever counted, which a cool-off never resets.
+        self.counted = 0
         self.opened_at: "datetime | None" = None
 
     def is_open(self, cooloff: timedelta) -> bool:
@@ -273,11 +275,16 @@ class _Breaker:
     def record_failure(self, threshold: int) -> None:
         with self.lock:
             self.failures += 1
+            self.counted += 1
             if self.failures >= threshold:
                 self.opened_at = datetime.now(timezone.utc)
 
-    def record_success(self) -> None:
+    def record_success(self, counted: "int | None" = None) -> None:
+        """Reset the count, unless a failure was counted after `counted`:
+        a reply read late must not wipe a failure that came after it."""
         with self.lock:
+            if counted is not None and counted != self.counted:
+                return
             self.failures = 0
             self.opened_at = None
 
@@ -295,17 +302,20 @@ class _Egress(NamedTuple):
     cooloff: timedelta
     failures: int
     log: logging.Logger
+    counted: "dict[str, int]"
 
 
 def _egress() -> _Egress:
     """One deadline for the whole proxy request, shared by every
-    provider it asks."""
+    provider it asks, and each breaker's failures counted as it began,
+    so a success of the request resets no failure counted since."""
     config = current_app.config
     return _Egress(
         time.monotonic() + EGRESS_TIMEOUT_SECONDS,
         timedelta(minutes=config["RATE_BREAKER_COOLOFF_MINUTES"]),
         config["RATE_BREAKER_FAILURES"],
         current_app.logger,
+        {provider: breaker.counted for provider, breaker in breakers.items()},
     )
 
 
@@ -394,7 +404,7 @@ def _fetch_json(provider: str, url: str, egress: _Egress, read):
         status = _failure(error)
     else:
         if result is not None:
-            breaker.record_success()
+            breaker.record_success(egress.counted[provider])
             return result
         status = "shape"
     egress.log.warning("rates.provider source=%s status=%s", provider, status)

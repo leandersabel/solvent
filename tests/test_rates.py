@@ -1406,6 +1406,39 @@ def test_a_failing_fx_leg_of_gold_counts_against_frankfurter_not_nbp(app, owner,
     assert rates.breakers["frankfurter"].opened_at is not None
 
 
+def test_a_table_answering_after_the_quote_leg_failed_does_not_reset_its_count(
+    owner, providers, monkeypatch
+):
+    """The table and the quote leg are in flight to Frankfurter at once.
+    The table's success is read only once the leg's failure is counted,
+    and must not wipe it."""
+    providers.lag_days = 1
+    leg_counted = threading.Event()
+    record_failure = rates._Breaker.record_failure
+
+    def counted(self, threshold):
+        record_failure(self, threshold)
+        leg_counted.set()
+
+    monkeypatch.setattr(rates._Breaker, "record_failure", counted)
+    healthy = rates._opener.open
+
+    def open_(request, timeout=None):
+        if "frankfurter" in request.full_url:
+            if f"/v1/{PAST}" not in request.full_url:
+                raise ConnectionRefusedError("refused")
+            assert leg_counted.wait(timeout)
+        return healthy(request, timeout)
+
+    monkeypatch.setattr(rates._opener, "open", open_)
+
+    priced = owner.get(f"/api/rates?date={PAST}&quote=CHF", headers=CSRF).get_json()["rates"]
+
+    assert {"USD", "PLN"} <= set(priced)
+    assert not {"XAU-g", "XAU-ozt"} & set(priced)
+    assert rates.breakers["frankfurter"].failures == 1
+
+
 @pytest.fixture
 def server_clock(monkeypatch):
     """The clock the breakers read, stopped until a test moves it."""
