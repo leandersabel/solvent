@@ -432,7 +432,8 @@ There is no `formatVersion` below 1.
    `tests/browser/parts/export-import.mjs`.
 3. The export read carries profile, account, snapshot and rate records
    in one `records` array. Test:
-   `tests/test_transfer.py::test_the_export_carries_both_timelines_and_one_wrapper`.
+   `tests/test_transfer.py::test_the_export_carries_both_timelines_and_one_wrapper`,
+   `tests/test_review_export_import.py::test_the_export_read_carries_every_kind_in_one_records_array_beside_what_opens_it`.
 4. (blind) A scan of the file's actual bytes finds no plaintext holding
    name, note, dimension label, value, rate, symbol, date or currency.
    Test: `tests/browser/parts/export-import.mjs`.
@@ -599,11 +600,14 @@ There is no `formatVersion` below 1.
     and the envelope's nonce: no record id, holding id, edit counter,
     record or timestamp. Test:
     `tests/test_client.py::test_the_client_side_rules_hold`,
-    `tests/browser/parts/export-import.mjs`.
+    `tests/browser/parts/export-import.mjs`,
+    `tests/browser/parts/export-import-review-sealed.mjs`.
 54. A sealed file opens with its password to the records it sealed, and
     restores. Test: `tests/test_client.py::test_the_client_side_rules_hold`,
-    `tests/browser/parts/export-import.mjs`.
+    `tests/browser/parts/export-import.mjs`,
+    `tests/browser/parts/export-import-review-sealed.mjs`.
 55. One byte altered in a sealed file's envelope refuses it as damaged
     once its password opens the wrapper, uploading nothing. Test:
     `tests/test_client.py::test_the_client_side_rules_hold`,
-    `tests/browser/parts/export-import.mjs`.
+    `tests/browser/parts/export-import.mjs`,
+    `tests/browser/parts/export-import-review-sealed.mjs`.
