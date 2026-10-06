@@ -364,7 +364,8 @@ Found to a vault owner (`app-shell.md`, The two surfaces).
   and `PATCH` reject it like any unknown field.
 - `POST /api/admin/symbols` `{ symbol, label, kind, lookup }`: adds a
   row. `symbol` must match the canonical form (SSRF and egress
-  hardening) and not exist yet.
+  hardening), a metal's in its weighed form (Seeded symbols), and not
+  exist yet.
 - `PATCH /api/admin/symbols/<symbol>` `{ label?, lookup?, retired? }`:
   changes only those three.
 
@@ -417,7 +418,11 @@ costs a few rows, and because the picker offers the table before free
 text, it is also the path of least resistance.
 
 The naming rule is generative: **`<ISO 4217 metal code>-<unit>`**, unit
-`ozt` or `g`.
+`ozt` or `g`. The server holds every metal to it, fully matching
+`^(?=.{1,16}$)[A-Z0-9][A-Z0-9._]*-(ozt|g)$`, because a metal without a
+weight has no rate that could be right. A stored metal row that fails
+it is retired at every start, and `PATCH` with `retired: false` on it is a Bad Request. Its
+holdings keep their unit and their prices as any retired unit's do.
 
 | symbol | label | kind | lookup |
 |---|---|---|---|
@@ -467,8 +472,9 @@ host's network are reachable.
 - Provider hosts and URL templates are **server-side constants**. No
   part of the outbound URL's scheme, host or port comes from client
   input.
-- `symbol` must match `^(?=.{1,16}$)[A-Z0-9][A-Z0-9._]*(-[a-z]+)?$`
-  **and** be in the symbol table. Regex alone is not sufficient. The
+- `symbol` must fully match `^(?=.{1,16}$)[A-Z0-9][A-Z0-9._]*(-[a-z]+)?$`
+  **and** be in the symbol table. Regex alone is not sufficient. A full
+  match, because `$` alone admits a trailing newline. The
   pattern is the canonical form of Seeded symbols, an upper-case code
   and an optional lower-case unit: it admits `XAU-ozt` and refuses `usd`
   and `xau-ozt`, so the table cannot hold two spellings of one symbol.
@@ -1070,3 +1076,11 @@ host's network are reachable.
     where its unit has a price source. Test:
     `tests/browser/parts/update-values-retired.mjs`,
     `tests/browser/parts/update-values-review-retired.mjs`.
+81. `POST` adding a metal whose code does not end in `-ozt` or `-g`, or
+    any code with a trailing newline, is a Bad Request and adds
+    nothing. A currency needs no weight. Test:
+    `tests/test_rates.py::test_a_metal_names_its_weight`.
+82. A stored metal row with no weight is retired at start, and `PATCH`
+    with `retired: false` on it is a Bad Request while a rename still
+    saves. Test:
+    `tests/test_rates.py::test_a_weightless_metal_is_retired_on_start_and_stays_retired`.

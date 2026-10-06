@@ -370,6 +370,8 @@ function removeAccount(row, body) {
 }
 
 const UNIT_HEADS = ['Code', 'Name', 'Kind', 'Rate lookup', ''];
+const WEIGHED = /-(ozt|g)$/;
+const METAL_SHAPE = 'Metals are named <code>-ozt or <code>-g, such as XAU-ozt.';
 
 async function unitTable(body) {
   mount(body, el('p', { class: 'hint', text: 'Loading…' }));
@@ -427,6 +429,7 @@ function unitRow(row, body) {
     }
   });
 
+  const weightless = row.retired && row.kind === 'metal' && !WEIGHED.test(row.symbol);
   return el('tr', { class: row.retired ? 'dimmed' : null }, [
     el('td', { class: 'numeric' }, [
       el('span', { text: row.symbol }),
@@ -447,8 +450,12 @@ function unitRow(row, body) {
       el('button', {
         class: 'btn-inline',
         text: row.retired ? 'Restore' : 'Retire',
+        disabled: weightless,
         onclick: () => retireUnit(row, body),
       }),
+      weightless
+        ? el('span', { class: 'hint', text: `It names no weight, so it cannot be restored. ${METAL_SHAPE}` })
+        : null,
     ]),
   ]);
 }
@@ -503,7 +510,7 @@ function addUnit(body) {
       }),
       el('p', {
         class: 'hint',
-        text: 'Metals are named <code>-ozt or <code>-g, such as XAU-ozt.',
+        text: METAL_SHAPE,
       }),
     ]),
     el('div', { class: 'field' }, [el('label', { text: 'Name' }), name]),
@@ -523,10 +530,11 @@ function addUnit(body) {
           });
           unitTable(body);
         } catch (failure) {
-          error.textContent =
-            failure.status === 409
-              ? 'That code already exists.'
-              : 'That is not a valid code. Use letters, digits, dots, dashes and underscores, starting with a letter or digit.';
+          if (failure.status === 409) error.textContent = 'That code already exists.';
+          else if (kind.value === 'metal') error.textContent = `That is not a valid metal code. ${METAL_SHAPE}`;
+          else
+            error.textContent =
+              'That is not a valid code. Use letters, digits, dots, dashes and underscores, starting with a letter or digit.';
           error.hidden = false;
         }
       },

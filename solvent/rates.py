@@ -39,8 +39,11 @@ from .validation import Payload, parse
 bp = Blueprint("rates", __name__)
 
 # The canonical form (rate-lookup.md, Seeded symbols): an upper-case code
-# and an optional lower-case unit, so `usd` cannot sit beside `USD`.
-SYMBOL_PATTERN = re.compile(r"^(?=.{1,16}$)[A-Z0-9][A-Z0-9._]*(-[a-z]+)?$")
+# and an optional lower-case unit, so `usd` cannot sit beside `USD`. A
+# metal's unit is its weight, because a rate is per the holding's weight.
+# Both are full matches: `$` alone admits a trailing newline.
+SYMBOL_PATTERN = re.compile(r"(?=.{1,16}$)[A-Z0-9][A-Z0-9._]*(-[a-z]+)?")
+METAL_PATTERN = re.compile(r"(?=.{1,16}$)[A-Z0-9][A-Z0-9._]*-(ozt|g)")
 
 # Frankfurter's own currency list, which is what the spec seeds the
 # currency half of the table from: not the full ISO 4217 set, because a
@@ -758,7 +761,7 @@ def get_rates():
             return "", 204
         return jsonify({"date": on.isoformat(), "quote": quote, "rates": resolved})
 
-    if not SYMBOL_PATTERN.match(symbol):
+    if not SYMBOL_PATTERN.fullmatch(symbol):
         abort(400)
     row = get_db().execute(
         "SELECT * FROM symbols WHERE symbol = ?", (symbol,)
@@ -837,7 +840,8 @@ class SymbolPatch(Payload):
 @bp.post("/api/admin/symbols")
 def admin_create_symbol():
     body = parse(SymbolCreate, request.get_json(silent=True))
-    if not SYMBOL_PATTERN.match(body.symbol):
+    pattern = METAL_PATTERN if body.kind == "metal" else SYMBOL_PATTERN
+    if not pattern.fullmatch(body.symbol):
         abort(400)
     if body.lookup and adapter_for(body.symbol, body.kind) is None:
         # The flag cannot promise a proposal the proxy cannot serve.
@@ -869,6 +873,9 @@ def admin_patch_symbol(symbol: str):
         ).fetchone()
         if row is None:
             abort(404)
+        if body.retired is False and row["kind"] == "metal" and not METAL_PATTERN.fullmatch(symbol):
+            # A metal that names no weight stays out of the picker.
+            abort(400)
         if body.lookup and adapter_for(symbol, row["kind"]) is None:
             abort(400)
         for column, value in (

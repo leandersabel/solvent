@@ -157,6 +157,12 @@ def _seed_symbols(conn: sqlite3.Connection) -> None:
         "VALUES (?, ?, ?, ?)",
         [(s["symbol"], s["label"], s["kind"], int(s["lookup"])) for s in SEEDED_SYMBOLS],
     )
+    # A metal that names no weight leaves the picker (rate-lookup.md,
+    # Seeded symbols), and holdings already in it keep working.
+    conn.execute(
+        "UPDATE symbols SET retired = 1 WHERE kind = 'metal' "
+        "AND symbol NOT GLOB '*-ozt' AND symbol NOT GLOB '*-g'"
+    )
 
 
 def get_db() -> sqlite3.Connection:
