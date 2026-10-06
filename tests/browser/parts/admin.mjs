@@ -3,7 +3,7 @@
 // Templates: admin.html. Modules: page-admin.js, dom.js, shell.js.
 import {
   ADMIN_PASSWORD, BASE, CLOCK, MINUTE, SECOND_PASSWORD, administrator, check, click, confirmLook, labels, looksDisabled,
-  intoVault, looksEnabledRed, mintInvite, openBrowser, register, setValue, signInOn, text, page, run, VAULT_PASSWORD,
+  expectedFailures, intercept, intoVault, looksEnabledRed, mintInvite, openBrowser, register, setValue, signInOn, text, page, run, VAULT_PASSWORD,
   watched,
 } from '../harness.mjs';
 
@@ -130,6 +130,45 @@ await run(async () => {
         && row('XAG-ozt').querySelector('select').disabled;
     })()`),
   );
+  await page.call(
+    (fields) => {
+      const form = [...document.querySelectorAll('details')].find((d) => d.querySelector('summary').textContent === 'Add a unit');
+      form.open = true;
+      const [code, name] = form.querySelectorAll('input');
+      [[code, fields.code], [name, fields.name], [form.querySelector('select'), 'metal']].forEach(([field, value]) => {
+        field.value = value;
+        field.dispatchEvent(new Event('input', { bubbles: true }));
+      });
+    },
+    { code: 'XYZ', name: 'Test' },
+  );
+  expectedFailures.add('/api/admin/symbols');
+  await click('Add the unit');
+  await page.waitUntil("document.body.innerText.includes('That is not a valid metal code')", { label: 'the metal refusal' });
+  expectedFailures.delete('/api/admin/symbols');
+  check(
+    'a metal code that names no weight is refused, naming the shape, and nothing is added',
+    (await text()).includes('That is not a valid metal code. Metals are named <code>-ozt or <code>-g, such as XAU-ozt.')
+      && !(await page.eval("[...document.querySelectorAll('td.numeric')].some((c) => c.textContent.trim() === 'XYZ')")),
+  );
+
+  const unit = (symbol, kind) => ({ symbol, label: symbol, kind, lookup: false, retired: true, hasAdapter: false });
+  const releaseUnits = await intercept(page, '*/api/admin/symbols', (request) =>
+    request.method === 'GET' ? { status: 200, body: JSON.stringify([unit('XYZ', 'metal'), unit('XAG-g', 'metal'), unit('XYZ', 'currency')]) } : null,
+  );
+  await click('Invites');
+  await click('Units');
+  // The retired section is collapsed, so its text is read from the DOM.
+  await page.waitUntil("document.querySelector('#app').textContent.includes('XAG-g')", { label: 'the retired units' });
+  check(
+    'a retired metal that names no weight cannot be restored, and says why',
+    await page.eval(`(() => {
+      const restore = [...document.querySelectorAll('td:last-child button')];
+      return restore.map((b) => b.disabled).join() === 'true,false,false'
+        && document.querySelector('#app').textContent.includes('It names no weight, so it cannot be restored. Metals are named <code>-ozt or <code>-g, such as XAU-ozt.');
+    })()`),
+  );
+  await releaseUnits();
 
   await click('Your password');
   await page.waitUntil("document.body.innerText.includes('same bar as anybody')", { label: 'the password card' });

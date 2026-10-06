@@ -743,6 +743,39 @@ def test_a_symbol_has_one_spelling(admin):
     ).status_code in (200, 201)
 
 
+def test_a_metal_names_its_weight(admin):
+    def add(symbol, kind):
+        return admin.post(
+            "/api/admin/symbols",
+            json={"symbol": symbol, "label": "X", "kind": kind, "lookup": False},
+            headers=CSRF,
+        ).status_code
+
+    for symbol in ("XYZ", "XYZ-kg", "XYZ-ozt\n", "XYZ-gozt"):
+        assert add(symbol, "metal") == 400, symbol
+    assert add("USD\n", "currency") == 400
+    assert add("XYZ", "currency") in (200, 201)
+    assert add("XYZ-g", "metal") in (200, 201)
+    table = {r["symbol"] for r in admin.get("/api/admin/symbols", headers=CSRF).get_json()}
+    assert "XYZ-g" in table and "XYZ-kg" not in table
+
+
+def test_a_weightless_metal_is_retired_on_start_and_stays_retired(app, admin):
+    conn = connect(app)
+    conn.execute("INSERT INTO symbols (symbol, label, kind, lookup) VALUES ('XYZ', 'Test', 'metal', 0)")
+    conn.commit()
+    conn.close()
+    create_app({"DATABASE_PATH": app.config["DATABASE_PATH"], "TESTING": True})
+    assert rows(app, "SELECT retired FROM symbols WHERE symbol = 'XYZ'") == [{"retired": 1}]
+    assert rows(app, "SELECT count(*) AS n FROM symbols WHERE retired = 1") == [{"n": 1}]
+    assert admin.patch(
+        "/api/admin/symbols/XYZ", json={"retired": False}, headers=CSRF
+    ).status_code == 400
+    assert admin.patch(
+        "/api/admin/symbols/XYZ", json={"label": "Renamed"}, headers=CSRF
+    ).status_code == 200
+
+
 def test_lookup_cannot_promise_a_proposal_the_proxy_cannot_serve(admin):
     assert admin.patch(
         "/api/admin/symbols/XAG-ozt", json={"lookup": True}, headers=CSRF

@@ -31,7 +31,10 @@ proxy request began (Rate limiting and failure, criteria 24, 25, 27
 and 29). A retired symbol keeps its row but for the flag, and both forms
 of the lookup price it, a retired main currency included, while
 registration no longer offers it (The symbol table, Maintaining the
-table, criterion 35).
+table, criterion 35). A metal names its weight: adding one that does
+not is refused, a stored one is retired at every start and cannot be
+restored, and a code with a trailing newline is refused everywhere
+(Seeded symbols, SSRF and egress hardening, criteria 81 and 82).
 
 Written from the spec alone. Each provider is reached on a loopback HTTP
 server through the app's own opener, so the app's real socket timeout
@@ -2732,3 +2735,194 @@ def test_retiring_without_the_csrf_header_changes_nothing(owner, admin):
 
     assert response.status_code == 403
     assert symbol_rows(owner)["XAU-ozt"] == before
+
+
+# ---- A metal names its weight (Maintaining the table, Seeded symbols,
+# SSRF and egress hardening, criteria 81 and 82) ------------------------
+
+
+def admin_table(admin) -> list[dict]:
+    response = admin.get("/api/admin/symbols", headers=CSRF)
+    assert response.status_code == 200, response.get_data(as_text=True)
+    return response.get_json()
+
+
+def add(admin, symbol: str, kind: str, headers=CSRF):
+    return admin.post(
+        "/api/admin/symbols",
+        json={"symbol": symbol, "label": "Added", "kind": kind, "lookup": False},
+        headers=headers,
+    )
+
+
+def store(app, symbol: str, kind: str, retired: int = 0):
+    """A row as an older version, or an operator's shell, left it."""
+    with connect(app) as conn:
+        conn.execute(
+            "INSERT INTO symbols (symbol, label, kind, lookup, retired) VALUES (?, ?, ?, 0, ?)",
+            (symbol, f"Stored {symbol}", kind, retired),
+        )
+
+
+def restart(app):
+    from solvent import create_app
+
+    return create_app({"DATABASE_PATH": app.config["DATABASE_PATH"], "TESTING": True})
+
+
+def retired_of(app, symbol: str) -> int:
+    return rows(app, "SELECT retired FROM symbols WHERE symbol = ?", (symbol,))[0]["retired"]
+
+
+WEIGHTLESS = [
+    "XRH", "XRH-kg", "XRH-oz", "XRH-OZT", "XRH-G", "xrh-ozt", "XRHozt", "XRH_ozt",
+    "XRH-g-ozt", "XRH-ozt2", "-ozt", "ABCDEFGHIJKLM-ozt",
+    "XRH-ozt\n", "XRH-g\n", "XRH-ozt\r\n", "XRH-ozt ", " XRH-ozt",
+]
+
+
+@pytest.mark.parametrize("symbol", WEIGHTLESS)
+def test_adding_a_metal_that_names_no_weight_is_refused_and_adds_nothing(app, admin, symbol):
+    """Criterion 81 and Seeded symbols: a metal fully matches
+    `^(?=.{1,16}$)[A-Z0-9][A-Z0-9._]*-(ozt|g)$`, or `POST` is a Bad
+    Request that adds no row."""
+    before = admin_table(admin)
+    stored = rows(app, "SELECT COUNT(*) AS n FROM symbols")[0]["n"]
+
+    response = add(admin, symbol, "metal")
+
+    assert response.status_code == 400, response.get_data(as_text=True)
+    assert admin_table(admin) == before
+    assert rows(app, "SELECT COUNT(*) AS n FROM symbols")[0]["n"] == stored
+
+
+@pytest.mark.parametrize("symbol", ["XRH-ozt", "XRH-g", "ABCDEFGHIJKL-ozt", "X.1_A-g", "9-g"])
+def test_a_metal_in_its_weighed_form_is_added(owner, admin, symbol):
+    """Maintaining the table: a metal in its weighed form that does not
+    exist yet is added, and both symbol routes list it."""
+    response = add(admin, symbol, "metal")
+
+    assert response.status_code < 300, response.get_data(as_text=True)
+    added = {row["symbol"]: row for row in admin_table(admin)}[symbol]
+    assert (added["kind"], added["retired"], added["lookup"]) == ("metal", False, False)
+    assert symbol_rows(owner)[symbol]["retired"] is False
+
+
+@pytest.mark.parametrize("symbol", ["XYZ", "XYZ1", "A.B_C"])
+def test_a_currency_needs_no_weight(admin, symbol):
+    """Criterion 81: a currency needs no weight."""
+    response = add(admin, symbol, "currency")
+
+    assert response.status_code < 300, response.get_data(as_text=True)
+    assert symbol in {row["symbol"] for row in admin_table(admin)}
+
+
+@pytest.mark.parametrize("symbol", ["XYZ\n", "XYZ\r\n", "XYZ ", "xyz", "ABCDEFGHIJKLMNOPQ"])
+def test_a_currency_off_the_canonical_form_is_refused_and_adds_nothing(admin, symbol):
+    """Criterion 81 and SSRF and egress hardening: any code with a
+    trailing newline, or otherwise off the full canonical form, is a Bad
+    Request that adds nothing."""
+    before = admin_table(admin)
+
+    response = add(admin, symbol, "currency")
+
+    assert response.status_code == 400, response.get_data(as_text=True)
+    assert admin_table(admin) == before
+
+
+def test_adding_a_unit_without_the_csrf_header_adds_nothing(admin):
+    """architecture.md, Application hardening: a mutating endpoint
+    refuses a request without the CSRF header."""
+    before = admin_table(admin)
+
+    response = add(admin, "XRH-g", "metal", headers={})
+
+    assert response.status_code == 403
+    assert admin_table(admin) == before
+
+
+@pytest.mark.parametrize("symbol", ["XAU-ozt%0A", "XAU-ozt%0D%0A", "XAU-ozt%20", "USD%0A"])
+def test_a_symbol_with_a_trailing_newline_reaches_no_provider(owner, monkeypatch, symbol):
+    """SSRF and egress hardening: `symbol` must fully match, because `$`
+    alone admits a trailing newline."""
+    sent = []
+    monkeypatch.setattr(rates._opener, "open", lambda request, timeout=None: sent.append(request))
+
+    response = owner.get(f"/api/rates?date={PAST}&quote=CHF&symbol={symbol}", headers=CSRF)
+
+    assert response.status_code == 400
+    assert sent == []
+
+
+def test_a_stored_weightless_metal_is_retired_at_every_start(app, admin):
+    """Criterion 82 and Seeded symbols: a stored metal row that fails
+    the weighed form is retired at every start. A weighed metal and a
+    currency without a weight are left as they were."""
+    weightless = ["XYZ", "XRH-kg", "xrh-ozt", "Gold-g"]
+    for symbol in weightless:
+        store(app, symbol, "metal")
+    store(app, "XRH-g", "metal")
+    store(app, "XYZC", "currency")
+    seeded_before = {row["symbol"]: row["retired"] for row in admin_table(admin)}
+
+    restart(app)
+
+    assert [retired_of(app, s) for s in weightless] == [1, 1, 1, 1]
+    assert retired_of(app, "XRH-g") == 0 and retired_of(app, "XYZC") == 0
+    after = {row["symbol"]: row["retired"] for row in admin_table(admin)}
+    assert {s: r for s, r in after.items() if s not in weightless} == {
+        s: r for s, r in seeded_before.items() if s not in weightless
+    }
+
+    with connect(app) as conn:
+        conn.execute("UPDATE symbols SET retired = 0 WHERE symbol = 'XYZ'")
+    restart(app)
+    assert retired_of(app, "XYZ") == 1
+
+
+def test_a_weightless_metal_cannot_be_restored_but_can_be_renamed(app, admin):
+    """Criterion 82: `PATCH` with `retired: false` on a weightless metal
+    is a Bad Request and changes nothing, while a rename still saves."""
+    store(app, "XYZ", "metal", retired=1)
+
+    refused = admin.patch("/api/admin/symbols/XYZ", json={"retired": False}, headers=CSRF)
+    assert refused.status_code == 400, refused.get_data(as_text=True)
+    assert retired_of(app, "XYZ") == 1
+
+    both = admin.patch("/api/admin/symbols/XYZ", json={"retired": False, "label": "Both"}, headers=CSRF)
+    assert both.status_code == 400, both.get_data(as_text=True)
+    assert rows(app, "SELECT label, retired FROM symbols WHERE symbol = 'XYZ'") == [{"label": "Stored XYZ", "retired": 1}]
+
+    renamed = admin.patch("/api/admin/symbols/XYZ", json={"label": "Renamed"}, headers=CSRF)
+    assert renamed.status_code == 200, renamed.get_data(as_text=True)
+    assert rows(app, "SELECT label, retired FROM symbols WHERE symbol = 'XYZ'") == [{"label": "Renamed", "retired": 1}]
+
+
+@pytest.mark.parametrize("symbol", ["XAG-g", "USD"])
+def test_a_retired_weighed_metal_and_a_retired_currency_are_restored(owner, admin, symbol):
+    """admin-invites.md, criterion 55, on the server: a retired `XAG-g`
+    and a retired currency can be restored."""
+    before = symbol_rows(owner)[symbol]
+    set_retired(admin, symbol, True)
+
+    set_retired(admin, symbol, False)
+
+    assert symbol_rows(owner)[symbol] == before
+
+
+def test_a_retired_weightless_metal_keeps_its_unit_and_prices(app, owner, monkeypatch):
+    """Seeded symbols: its holdings keep their unit and their prices as
+    any retired unit's do. It stays in the table under its own label,
+    retired, and the proxy still accepts it, answering No Content with
+    no outbound request since nothing prices it."""
+    store(app, "XYZ", "metal")
+    restart(app)
+    sent = []
+    monkeypatch.setattr(rates._opener, "open", lambda request, timeout=None: sent.append(request))
+
+    row = symbol_rows(owner)["XYZ"]
+    response = owner.get(f"/api/rates?date={PAST}&quote=CHF&symbol=XYZ", headers=CSRF)
+
+    assert (row["label"], row["kind"], row["retired"], row["lookup"]) == ("Stored XYZ", "metal", True, False)
+    assert response.status_code == 204, response.get_data(as_text=True)
+    assert sent == []

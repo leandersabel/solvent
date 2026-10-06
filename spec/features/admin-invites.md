@@ -283,6 +283,10 @@ action.
   retired row sets its text in ink-secondary and carries a **Retired**
   chip beside its code. Retired rows sit in a collapsed **Retired**
   section beneath the table when there are any.
+- A retired metal whose code names no weight (`rate-lookup.md`, Seeded
+  symbols) has Restore disabled, with the reason in ink-secondary
+  beside it: "It names no weight, so it cannot be restored. Metals are
+  named `<code>-ozt` or `<code>-g`, such as `XAU-ozt`."
 
 **Add a unit**, beneath the table, opens a form:
 
@@ -387,8 +391,12 @@ Units:
   row, the control back at Entered by hand: "The source for this unit is
   no longer configured on the server. Reload to see the current list."
   It reads as something that changed, not a mistake.
-- **Error, that code already exists**, or **that is not a valid code**
-  (naming the shape): inline in the add form, every field kept.
+- **Error, that code already exists** ("That code already exists."), or
+  **that is not a valid code**, naming the shape: inline in the add
+  form, every field kept. For a currency: "That is not a valid code.
+  Use letters, digits, dots, dashes and underscores, starting with a
+  letter or digit." For a metal: "That is not a valid metal code.
+  Metals are named `<code>-ozt` or `<code>-g`, such as `XAU-ozt`."
 - **Error, retire or restore failed**: inline on the row, unchanged.
 
 Your password:
@@ -859,3 +867,12 @@ administrator), and the lost sole password (Bootstrap). The rest:
     no word of a chip, heading or control is split across lines. Test:
     `tests/browser/parts/admin-phone.mjs`,
     `tests/browser/parts/admin-review-phone.mjs`.
+54. Adding a metal whose code names no weight, such as `XYZ`, shows
+    "That is not a valid metal code. Metals are named `<code>-ozt` or
+    `<code>-g`, such as `XAU-ozt`." in the add form, and the unit list
+    stays without it. Test: `tests/browser/parts/admin.mjs`,
+    `tests/browser/parts/admin-review-units.mjs`.
+55. A retired metal whose code names no weight has Restore disabled with
+    its reason beside it, while a retired `XAG-g` and a retired currency
+    can be restored. Test: `tests/browser/parts/admin.mjs`,
+    `tests/browser/parts/admin-review-units.mjs`.

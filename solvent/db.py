@@ -150,12 +150,22 @@ def _fill_epochs(conn: sqlite3.Connection) -> None:
 
 
 def _seed_symbols(conn: sqlite3.Connection) -> None:
-    from .rates import SEEDED_SYMBOLS
+    from .rates import METAL_PATTERN, SEEDED_SYMBOLS
 
     conn.executemany(
         "INSERT OR IGNORE INTO symbols (symbol, label, kind, lookup) "
         "VALUES (?, ?, ?, ?)",
         [(s["symbol"], s["label"], s["kind"], int(s["lookup"])) for s in SEEDED_SYMBOLS],
+    )
+    # A metal that names no weight leaves the picker (rate-lookup.md,
+    # Seeded symbols), and holdings already in it keep working.
+    conn.executemany(
+        "UPDATE symbols SET retired = 1 WHERE symbol = ?",
+        [
+            (symbol,)
+            for (symbol,) in conn.execute("SELECT symbol FROM symbols WHERE kind = 'metal'")
+            if not METAL_PATTERN.fullmatch(symbol)
+        ],
     )
 
 
