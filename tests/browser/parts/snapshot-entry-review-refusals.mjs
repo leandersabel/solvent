@@ -42,12 +42,11 @@ await run(async () => {
   };
   // The field's state: its message line is what aria-describedby names,
   // and a reason shown elsewhere in the Dialog counts against it.
-  const field = (reason) => ev(`(() => {
+  const field = (reason) => rec.call((reason) => {
     const input = document.querySelector('#snapshot-date');
     const dialog = [...document.querySelectorAll('.dialog')].pop();
-    const lines = (input.getAttribute('aria-describedby') || '').split(/\\s+/).filter(Boolean)
+    const lines = (input.getAttribute('aria-describedby') || '').split(/\s+/).filter(Boolean)
       .map((i) => document.getElementById(i)).filter(Boolean);
-    const reason = ${JSON.stringify(reason)};
     const all = [...dialog.querySelectorAll('*')].filter((n) => n.children.length === 0 && n.textContent.includes(reason));
     return {
       invalid: input.getAttribute('aria-invalid'),
@@ -57,7 +56,7 @@ await run(async () => {
       focused: document.activeElement === input,
       placeholder: input.getAttribute('placeholder'),
     };
-  })()`);
+  }, reason);
   const refused = (f) => f.invalid === 'true' && f.onLine && f.elsewhere.length === 0;
 
   const FUTURE = 'That date is in the future.';

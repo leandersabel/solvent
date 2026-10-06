@@ -26,6 +26,19 @@ await run(async () => {
     await realClick('.form-actions button', 'Record a value');
     await rec.waitUntil("document.querySelector('#snapshot-value')", { label: `the form for ${name}` });
     await quiet();
+    // The calendar: the widest ancestor of its grid that does not hold
+    // the date input itself.
+    await rec.call(() => {
+      window.__calendar = () => {
+        const dialog = [...document.querySelectorAll('.dialog')].pop();
+        const input = document.querySelector('#snapshot-date');
+        const day = dialog && dialog.querySelector('[role=grid], .date-day');
+        if (!day) return null;
+        let root = day;
+        while (root.parentElement && !root.parentElement.contains(input)) root = root.parentElement;
+        return root.offsetParent === null && getComputedStyle(root).position !== 'fixed' ? null : root;
+      };
+    });
   };
 
   // The button beside the date input: the first button in the nearest
@@ -39,24 +52,13 @@ await run(async () => {
     }
     return false;
   })()`);
-  // The calendar: the widest ancestor of its grid that does not hold the
-  // date input itself.
-  const CALENDAR = `(() => {
-    const dialog = [...document.querySelectorAll('.dialog')].pop();
-    const input = document.querySelector('#snapshot-date');
-    const day = dialog && dialog.querySelector('[role=grid], .date-day');
-    if (!day) return null;
-    let root = day;
-    while (root.parentElement && !root.parentElement.contains(input)) root = root.parentElement;
-    return root.offsetParent === null && getComputedStyle(root).position !== 'fixed' ? null : root;
-  })()`;
-  const calendarOpen = () => ev(`Boolean(${CALENDAR})`);
+  const calendarOpen = () => ev('Boolean(window.__calendar())');
 
   // Where the calendar and its Close lie, each edge scrolled into view
   // and hit-tested, so a part clipped by the dialog or drawn under
   // something else fails.
   const geometry = () => ev(`(() => {
-    const cal = ${CALENDAR};
+    const cal = window.__calendar();
     const dialog = [...document.querySelectorAll('.dialog')].pop();
     if (!cal) return { open: false };
     const close = [...cal.querySelectorAll('button')].find((b) => b.textContent.trim() === 'Close');
@@ -116,7 +118,7 @@ await run(async () => {
   })()`);
   const focusInGrid = () => ev(`(() => {
     const a = document.activeElement;
-    const cal = ${CALENDAR};
+    const cal = window.__calendar();
     return Boolean(cal && a && cal.contains(a) && (a.closest('[role=grid]') || a.classList.contains('date-day')));
   })()`);
   const focusOnToggle = () => ev('document.activeElement === window.__toggle');
@@ -220,7 +222,7 @@ await run(async () => {
   await rec.frames();
   await quiet();
   const otherControl = await ev(`(() => {
-    const cal = ${CALENDAR};
+    const cal = window.__calendar();
     if (!cal) return false;
     const b = [...cal.querySelectorAll('button')].find((n) => !n.closest('[role=grid]') && !n.classList.contains('date-day') && n.textContent.trim() !== 'Close' && !n.disabled);
     if (!b) return false;
@@ -238,7 +240,7 @@ await run(async () => {
   await rec.frames();
   await quiet();
   const at = await ev(`(() => {
-    const cal = ${CALENDAR};
+    const cal = window.__calendar();
     const close = cal && [...cal.querySelectorAll('button')].find((b) => b.textContent.trim() === 'Close');
     if (!close) return null;
     close.scrollIntoView({ block: 'nearest' });
@@ -263,13 +265,13 @@ await run(async () => {
   await rec.frames();
   await quiet();
   const tomorrow = ago(-1);
-  const future = await ev(`(() => {
-    const cal = ${CALENDAR};
-    const cell = cal && cal.querySelector('[data-date="${tomorrow}"]');
-    const next = cal && [...cal.querySelectorAll('[data-date]')].filter((n) => n.dataset.date > '${r.T}');
+  const future = await rec.call((day, today) => {
+    const cal = window.__calendar();
+    const cell = cal && [...cal.querySelectorAll('[data-date]')].find((n) => n.dataset.date === day);
+    const next = cal && [...cal.querySelectorAll('[data-date]')].filter((n) => n.dataset.date > today);
     return { cell: Boolean(cell), disabled: cell ? (cell.disabled || cell.getAttribute('aria-disabled') === 'true') : null,
       later: next ? next.filter((n) => !(n.disabled || n.getAttribute('aria-disabled') === 'true')).map((n) => n.dataset.date) : null };
-  })()`);
+  }, tomorrow, r.T);
   check(
     'review design-system: every day after today in the calendar is disabled',
     future.later !== null && future.later.length === 0 && (!future.cell || future.disabled),
