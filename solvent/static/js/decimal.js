@@ -85,6 +85,28 @@ export function toDisplay(value, places, group = '\u2009', point = '.') {
   return (negative ? '\u2212' : '') + grouped(whole, group) + (fraction ? point + fraction : '');
 }
 
+// Parts of a total, each at `places`, that add up to the total as
+// toDisplay rounds it, where rounding each part alone can miss it by a
+// unit per part. Each part rounds toward minus infinity, and the units
+// still missing go to the largest remainders, ties to the earlier part,
+// so no part moves a whole unit from its exact value.
+export function apportion(values, places) {
+  const unit = 10n ** BigInt(SCALE - places);
+  const floors = values.map((value) => value - (((value % unit) + unit) % unit));
+  const total = values.reduce((sum, value) => sum + value, ZERO);
+  let missing = (rescale(total, unit) * unit - floors.reduce((sum, value) => sum + value, ZERO)) / unit;
+  const shown = [...floors];
+  const order = values.map((_, i) => i).sort((a, b) => {
+    const gap = (values[b] - floors[b]) - (values[a] - floors[a]);
+    return gap > 0n ? 1 : gap < 0n ? -1 : a - b;
+  });
+  for (const i of order) {
+    if (missing-- <= 0n) break;
+    shown[i] += unit;
+  }
+  return shown;
+}
+
 // A chart's value tick: its magnitude over the largest of a thousand, a
 // million and a billion that does not exceed it, at most one decimal
 // and no trailing zero, then that unit's suffix

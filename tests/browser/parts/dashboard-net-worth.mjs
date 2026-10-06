@@ -653,13 +653,13 @@ await run(async () => {
       })`)),
       want: {
         since: `from ${await format('longDate', isoOf(first + lo))} to ${await format('longDate', isoOf(first + hi))}`,
-        ...(await model(({ v }, earlyDay, lateDay) => {
+        ...(await model(({ v, decimal }, earlyDay, lateDay) => {
           const dimension = v.activeDimensions().find(d => d.id === 'liq');
           const early = v.valuesAt(dimension, earlyDay);
           const late = v.valuesAt(dimension, lateDay);
           const total = (bands) => bands.reduce((sum, band) => sum + band.value, 0n);
           const sign = (n) => (n > 0n ? '+' : '') + v.format.whole(n);
-          return { delta: v.mainCurrency + ' ' + sign(total(late) - total(early)), deltas: late.map((band, i) => sign(band.value - early[i].value)) };
+          return { delta: v.mainCurrency + ' ' + sign(total(late) - total(early)), deltas: decimal.apportion(late.map((band, i) => band.value - early[i].value), 0).map(sign) };
         }, first + lo, first + hi)),
       },
     });

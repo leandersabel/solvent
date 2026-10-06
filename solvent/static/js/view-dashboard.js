@@ -130,13 +130,15 @@ function duplicateBanner(vault, actions) {
 
 function hero(vault, state, render, actions, history, dimension) {
   const totals = vault.totals(state.mode);
+  const [assets, liabilities] = heroParts(totals);
+  const net = vault.format.whole(totals.net);
   const rateDate = vault.newestRateDate();
 
   const figure = totals.valued
     ? el('p', { class: 'hero-figure' }, [
         el('span', { class: 'hero-code', text: vault.mainCurrency }),
         ' ',
-        el('span', { class: 'hero-amount', text: vault.format.whole(totals.net), dataset: { total: vault.format.whole(totals.net) } }),
+        el('span', { class: 'hero-amount', text: net, dataset: { total: net } }),
       ])
     : el('p', { class: 'hero-figure', text: '—' });
 
@@ -150,8 +152,8 @@ function hero(vault, state, render, actions, history, dimension) {
       el('p', { class: 'hero-at-line' }, [el('span', { class: 'hero-at', hidden: true })]),
     ]),
     el('div', { class: 'hero-parts' }, [
-      heroPart('Assets', vault.mainWhole(totals.assets)),
-      heroPart('Liabilities', vault.mainWhole(totals.liabilities)),
+      heroPart('Assets', vault.mainWhole(assets)),
+      heroPart('Liabilities', vault.mainWhole(liabilities)),
     ]),
     el('div', { class: 'hero-action' }, [
       el('button', {
@@ -374,14 +376,15 @@ function chartSection(vault, state, render, dimension, actions, { days, bands })
             return;
           }
           const shown = vault.valuesAt(dimension, day).filter((band) => !state.hidden.has(band.id));
+          const figures = decimal.apportion(shown.map((band) => band.value), vault.format.places);
           const net = shown.reduce((sum, band) => sum + band.value, 0n);
           const date = vault.format.longDate(isoFromDay(day));
           readout.replaceChildren(
             el('p', { class: 'readout-date', text: date }),
-            ...shown.map((band) =>
+            ...shown.map((band, i) =>
               el('p', { class: 'readout-row' }, [
                 el('span', { text: band.label }),
-                el('span', { class: 'numeric', text: vault.format.money(band.value) }),
+                el('span', { class: 'numeric', text: vault.format.money(figures[i]) }),
               ]),
             ),
             el('p', { class: 'readout-row readout-net' }, [
@@ -470,9 +473,13 @@ function legend(vault, bands, state, render, dimension) {
   const marksShown = !state.justTheLine;
   if (bands.length < 2 && !marksShown) return null;
   const last = bands.length ? bands[0].points.length - 1 : 0;
+  const values = decimal.apportion(bands.map((band) => band.points[last]), 0);
   // Each band's value at the two days of a selected span.
   const [early, late] = state.selection
     ? state.selection.map((day) => new Map(vault.valuesAt(dimension, day).map((band) => [band.id, band.value])))
+    : [];
+  const deltas = state.selection
+    ? decimal.apportion(bands.map((band) => late.get(band.id) - early.get(band.id)), 0)
     : [];
   const highlight = (entry, id) => {
     const chart = entry.closest('.chart-card').querySelector('svg.trend');
@@ -506,10 +513,10 @@ function legend(vault, bands, state, render, dimension) {
             }, [
               el('span', { class: 'swatch', style: { background: fillFor(band, index) } }),
               el('span', { class: 'legend-name', text: band.label }),
-              el('span', { class: 'legend-value', text: vault.format.whole(band.points[last]) }),
+              el('span', { class: 'legend-value', text: vault.format.whole(values[index]) }),
               // Each band's own change across a selected span.
               state.selection
-                ? el('span', { class: 'legend-delta', text: signed(vault, late.get(band.id) - early.get(band.id)) })
+                ? el('span', { class: 'legend-delta', text: signed(vault, deltas[index]) })
                 : null,
             ]);
             return entry;
@@ -555,6 +562,7 @@ function holdingsTable(vault, state, render, actions, grouping) {
   const dimensions = vault.activeDimensions();
   const { rows, unpriced, unvalued } = holdingGroups(vault, state, grouping);
   const newestRate = vault.newestRateDate();
+  const shown = vault.shownFigures(state.mode);
   const filtering = state.unassignedOnly && grouping;
   const listed = rows.length + unpriced.length + unvalued.length > 0;
 
@@ -654,7 +662,7 @@ function holdingsTable(vault, state, render, actions, grouping) {
             // hold no price or no figure at all.
             el('td', { class: 'numeric cell-converted' }, value.state === 'valued'
               ? [
-                  vault.format.money(value.converted),
+                  vault.format.money(shown.get(holding) ?? value.converted),
                   priceDateLine(vault, value.priceDate, state.mode === 'latest' ? newestRate : value.asOf),
                 ]
               : value.state === 'unpriced' ? ['not priced'] : []),
@@ -723,9 +731,17 @@ function group(title, holdings, vault, actions, explanation) {
   ]);
 }
 
+/** Gross assets and liabilities as shown, adding up to the net as the
+ *  hero shows it. */
+export function heroParts(totals) {
+  return decimal.apportion([totals.assets, totals.liabilities], 0);
+}
+
 /** Each band's signed total right now, in the dimension's configured
- *  order with "Unassigned" last. Summed from the same per-holding
- *  figures as the hero, so the bars add up to the total exactly. */
+ *  order with "Unassigned" last, and `shown`, its whole-unit figure.
+ *  Summed from the same per-holding figures as the hero, so the bars
+ *  add up to the total exactly, and shared out so their shown figures
+ *  add up to the total as shown. */
 export function breakdownTotals(vault, dimension, mode) {
   const bands = new Map();
   for (const value of dimension.values.filter((v) => !v.archivedAt)) {
@@ -748,7 +764,9 @@ export function breakdownTotals(vault, dimension, mode) {
   const other = rest.length
     ? [{ label: 'Other', total: rest.reduce((sum, band) => sum + band.total, decimal.ZERO) }]
     : [];
-  return [...all, unassigned, ...other];
+  const result = [...all, unassigned, ...other];
+  const shown = decimal.apportion(result.map((band) => band.total), 0);
+  return result.map((band, i) => ({ ...band, shown: shown[i] }));
 }
 
 /** Where the chart shows how composition moved, this shows what it is
@@ -786,7 +804,7 @@ function breakdown(vault, dimension, state) {
           el('span', { class: 'bar-label' }, [
             el('span', { class: 'bar-name', text: band.label }),
             ' ',
-            el('span', { class: 'bar-amount', text: vault.mainWhole(band.total) }),
+            el('span', { class: 'bar-amount', text: vault.mainWhole(band.shown) }),
           ]),
         ]);
       }),
