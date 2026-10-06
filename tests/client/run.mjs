@@ -2274,9 +2274,9 @@ await check('record-rate: the main currency\'s since bounds every unit quoted in
   assert.equal(vault.publishedFrom('USD'), '2000-01-13');
   assert.equal(vault.quotable('USD', '2000-01-13'), true);
   assert.equal(vault.quotable('USD', '2000-01-12'), false);
-  // A main currency retired since registration bounds nothing.
-  vault.symbols.delete('BRL');
-  assert.equal(vault.quotable('USD', '1999-01-04'), true);
+  // A main currency retired since registration bounds as before.
+  vault.symbols.set('BRL', { ...vault.symbols.get('BRL'), retired: true });
+  assert.equal(vault.quotable('USD', '2000-01-12'), false);
 });
 
 await check('record-rate: in a vault whose main currency no source quotes into, every unit is its owner\'s to price and nothing is asked', async () => {
