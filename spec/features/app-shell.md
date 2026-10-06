@@ -293,6 +293,9 @@ the schema, before any request is served, and keeps the schema version:
 - **The rate cache is emptied** (`rate-lookup.md`, Caching), because an
   entry may hold a proposal an earlier build rounded otherwise, and a
   settled one would never be fetched again.
+- **An invite's `used_by` naming no principal is set to null**
+  (`admin-invites.md`, Invite lifecycle), because a file an earlier
+  build wrote may keep the username of an account removed since.
 
 **Expired `attempts` rows are also deleted once every 60 seconds in
 each serving process**, by one daemon thread the app factory starts.
@@ -311,6 +314,10 @@ Credentials and vault key wrappers). They are triggers because a SQLite
 `CHECK` cannot reach another table. Nothing in the application is
 expected to hit them. They exist so that a future feature that would
 has to be written deliberately.
+
+An `AFTER DELETE` trigger on `principals` sets `invites.used_by` to null
+where it names the deleted username, so both deletion paths clear it in
+their own transaction (admin-invites.md, Invite lifecycle).
 
 ### The two surfaces
 

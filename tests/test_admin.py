@@ -7,6 +7,7 @@ import subprocess
 import sys
 from pathlib import Path
 
+from solvent import create_app
 from solvent.guard import ADMINISTRATION, surface_of
 from tests.helpers import CSRF, b64, connect, mint_invite, put_record, register, rows
 from tests.test_guard import fingerprint
@@ -228,6 +229,48 @@ def test_an_administrator_removes_another_while_a_third_remains(app, admin):
     assert app.test_client().post(
         "/api/auth/login", json={"username": "second", "authKey": "x"}, headers=CSRF
     ).status_code == 401
+
+
+def test_removing_an_account_clears_its_name_from_the_invite(app, admin):
+    """Both deletion paths, and a start-up over a row an earlier build
+    left naming a removed account. The invite stays used."""
+
+    def invite_for(username):
+        created = admin.post("/api/admin/invites", json={"kind": "vault_owner"}, headers=CSRF)
+        invite = created.get_json()
+        client, auth_key = register(app, username, invite_token=invite["token"])
+        return invite["id"], client, auth_key
+
+    def listed(invite_id):
+        invites = admin.get("/api/admin/invites", headers=CSRF).get_json()
+        return next(row for row in invites if row["id"] == invite_id)
+
+    removed_by_admin, _, _ = invite_for("sarah")
+    removed_by_owner, owner, owner_key = invite_for("alice")
+    kept, _, _ = invite_for("bob")
+
+    assert admin.delete(
+        "/api/admin/accounts/sarah", json={"confirmUsername": "sarah"}, headers=CSRF
+    ).status_code == 200
+    assert owner.delete(
+        "/api/auth/account", json={"authKey": owner_key, "confirmUsername": "alice"}, headers=CSRF
+    ).status_code == 200
+
+    for invite_id in (removed_by_admin, removed_by_owner):
+        row = listed(invite_id)
+        assert (row["status"], row["usedBy"]) == ("used", None)
+        assert row["usedAt"]
+    assert listed(kept)["usedBy"] == "bob"
+
+    conn = connect(app)
+    try:
+        conn.execute("UPDATE invites SET used_by = 'gone' WHERE id = ?", (removed_by_admin,))
+        conn.commit()
+    finally:
+        conn.close()
+    create_app({"DATABASE_PATH": app.config["DATABASE_PATH"], "TESTING": True})
+    assert listed(removed_by_admin)["usedBy"] is None
+    assert listed(kept)["usedBy"] == "bob"
 
 
 def test_a_mismatched_confirm_username_deletes_nothing(app, admin):

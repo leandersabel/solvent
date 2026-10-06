@@ -9,7 +9,7 @@ import uuid
 
 import pytest
 
-from tests.helpers import CSRF, b64, mint_invite, put_record, register, rows
+from tests.helpers import CSRF, b64, connect, mint_invite, put_record, register, rows
 
 ADMIN_KEYS = {"username", "kind", "createdAt", "lastLoginAt"}
 OWNER_KEYS = ADMIN_KEYS | {"itemCount"}
@@ -156,3 +156,167 @@ def test_review_no_route_changes_an_existing_accounts_kind(app, as_kind):
                 caller.open(concrete(rule, values), method=method, json=body, headers=CSRF)
     after = {row["username"]: row["kind"] for row in rows(app, "SELECT username, kind FROM principals")}
     assert {name: after.get(name, kind) for name, kind in before.items()} == before
+
+
+# ---- Issue #113: a used invite stops naming a removed account ----
+# Written from admin-invites.md (Admin, Invites; Invite lifecycle,
+# `used_by`; Endpoints; criteria 9 and 50), app-shell.md (Database) and
+# account-settings.md (Delete my account), blind to the change.
+
+
+def issue(admin, label) -> tuple[str, str]:
+    """An invite handed out in the app: its id and its token."""
+    response = admin.post(
+        "/api/admin/invites", json={"expiresInDays": 7, "label": label, "kind": "vault_owner"}, headers=CSRF
+    )
+    assert response.status_code == 201, response.get_data(as_text=True)
+    created = response.get_json()
+    return created["id"], created["token"]
+
+
+def listed_invites(admin) -> dict:
+    response = admin.get("/api/admin/invites", headers=CSRF)
+    assert response.status_code == 200, response.get_data(as_text=True)
+    return {row["id"]: row for row in response.get_json()}
+
+
+def invite_row(app, invite_id) -> dict:
+    return rows(app, "SELECT status, used_at, used_by FROM invites WHERE id = ?", (invite_id,))[0]
+
+
+def remove_by_admin(admin, username):
+    return admin.delete(f"/api/admin/accounts/{username}", json={"confirmUsername": username}, headers=CSRF)
+
+
+def remove_by_owner(owner, username, auth_key):
+    return owner.delete(
+        "/api/auth/account", json={"authKey": auth_key, "confirmUsername": username}, headers=CSRF
+    )
+
+
+def registered(app, admin, username, **kwargs):
+    invite_id, token = issue(admin, f"for {username}")
+    client, auth_key = register(app, username, invite_token=token, **kwargs)
+    return invite_id, client, auth_key
+
+
+@pytest.mark.parametrize("path", ["administrator", "owner"])
+def test_review_either_deletion_path_clears_the_name_and_keeps_the_invite_used(app, admin, path):
+    invite_id, sarah, auth_key = registered(app, admin, "sarah")
+    kept_id, _, _ = registered(app, admin, "kept")
+    before = invite_row(app, invite_id)
+    assert before["status"] == "used" and before["used_by"] == "sarah" and before["used_at"]
+
+    if path == "administrator":
+        response = remove_by_admin(admin, "sarah")
+    else:
+        response = remove_by_owner(sarah, "sarah", auth_key)
+    assert response.status_code in (200, 204), response.get_data(as_text=True)
+
+    assert invite_row(app, invite_id) == {**before, "used_by": None}
+    assert invite_row(app, kept_id)["used_by"] == "kept"
+    listed = listed_invites(admin)
+    assert listed[invite_id]["status"] == "used" and listed[invite_id]["usedBy"] is None
+    assert listed[invite_id]["usedAt"]
+    assert listed[kept_id]["usedBy"] == "kept"
+
+
+def test_review_an_administrator_account_removed_clears_its_invite_too(app, admin):
+    response = admin.post(
+        "/api/admin/invites", json={"expiresInDays": 7, "label": "ops", "kind": "administrator"}, headers=CSRF
+    ).get_json()
+    invite_id, token = response["id"], response["token"]
+    register(app, "peer", kind="administrator", invite_token=token)
+    assert remove_by_admin(admin, "peer").status_code in (200, 204)
+    row = invite_row(app, invite_id)
+    assert row["status"] == "used" and row["used_by"] is None and row["used_at"]
+
+
+def test_review_a_freed_name_registered_again_is_not_credited_with_the_old_link(app, admin):
+    old_id, _, _ = registered(app, admin, "sarah")
+    assert remove_by_admin(admin, "sarah").status_code in (200, 204)
+    new_id, _, _ = registered(app, admin, "sarah")
+    listed = listed_invites(admin)
+    assert listed[old_id]["usedBy"] is None
+    assert listed[new_id]["usedBy"] == "sarah"
+
+
+def test_review_a_mixed_case_registration_is_still_cleared(app, admin):
+    """The username is normalized before it is stored, so what the
+    invite names must be what the deletion matches."""
+    invite_id, _, _ = registered(app, admin, "  Sarah.Mixed ")
+    assert invite_row(app, invite_id)["used_by"] == "sarah.mixed"
+    assert remove_by_admin(admin, "sarah.mixed").status_code in (200, 204)
+    assert invite_row(app, invite_id)["used_by"] is None
+
+
+def test_review_a_refused_deletion_leaves_the_name(app, admin):
+    invite_id, sarah, auth_key = registered(app, admin, "sarah")
+    assert admin.delete(
+        "/api/admin/accounts/sarah", json={"confirmUsername": "someone"}, headers=CSRF
+    ).status_code == 400
+    assert remove_by_owner(sarah, "sarah", b64()).status_code == 400
+    assert remove_by_owner(sarah, "other", auth_key).status_code == 400
+    assert remove_by_admin(admin, "root").status_code == 409
+    assert invite_row(app, invite_id)["used_by"] == "sarah"
+    assert listed_invites(admin)[invite_id]["usedBy"] == "sarah"
+
+
+def test_review_revoking_a_used_invite_whose_account_is_gone_is_still_a_conflict(app, admin):
+    invite_id, _, _ = registered(app, admin, "sarah")
+    assert remove_by_admin(admin, "sarah").status_code in (200, 204)
+    before = invite_row(app, invite_id)
+    assert admin.post(f"/api/admin/invites/{invite_id}/revoke", headers=CSRF).status_code == 409
+    assert invite_row(app, invite_id) == before
+
+
+def test_review_a_start_up_clears_a_stale_name_and_only_that(app, admin):
+    from solvent import create_app
+
+    kept_id, _, _ = registered(app, admin, "kept")
+    stale_id = uuid.uuid4().hex
+    conn = connect(app)
+    try:
+        # A file an earlier build wrote: the account went, the name stayed.
+        for (name,) in conn.execute("SELECT name FROM sqlite_master WHERE type = 'trigger' AND tbl_name = 'principals'"):
+            conn.execute(f'DROP TRIGGER "{name}"')
+        conn.execute(
+            "INSERT INTO invites (id, token_hash, kind, created_by, created_at, expires_at, status, "
+            "used_at, used_by, label) VALUES (?, ?, 'vault_owner', 'root', '2024-01-01T00:00:00+00:00', "
+            "'2024-01-08T00:00:00+00:00', 'used', '2024-01-02T00:00:00+00:00', 'ghost', '')",
+            (stale_id, uuid.uuid4().hex),
+        )
+        conn.commit()
+        version = conn.execute("PRAGMA user_version").fetchone()[0]
+    finally:
+        conn.close()
+
+    restarted = create_app({"DATABASE_PATH": app.config["DATABASE_PATH"], "TESTING": True})
+    assert invite_row(restarted, stale_id) == {
+        "status": "used", "used_at": "2024-01-02T00:00:00+00:00", "used_by": None,
+    }
+    assert invite_row(restarted, kept_id)["used_by"] == "kept"
+    conn = connect(restarted)
+    try:
+        assert conn.execute("PRAGMA user_version").fetchone()[0] == version
+    finally:
+        conn.close()
+    assert listed_invites(admin)[stale_id]["usedBy"] is None
+
+
+def test_review_the_trigger_is_in_the_schema_after_a_start_up(app, admin):
+    """A start-up restores what a fresh schema has, so a file an
+    earlier build wrote gets the trigger too."""
+    from solvent import create_app
+
+    conn = connect(app)
+    try:
+        for (name,) in conn.execute("SELECT name FROM sqlite_master WHERE type = 'trigger' AND tbl_name = 'principals'"):
+            conn.execute(f'DROP TRIGGER "{name}"')
+        conn.commit()
+    finally:
+        conn.close()
+    restarted = create_app({"DATABASE_PATH": app.config["DATABASE_PATH"], "TESTING": True})
+    invite_id, _, _ = registered(restarted, admin, "sarah")
+    assert remove_by_admin(admin, "sarah").status_code in (200, 204)
+    assert invite_row(restarted, invite_id)["used_by"] is None

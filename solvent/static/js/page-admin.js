@@ -200,7 +200,7 @@ async function loadInvites(list) {
             el('td', { text: shortDate(row.expiresAt.slice(0, 10)) }),
             el('td', {}, [
               el('span', { class: 'chip', text: STATUS_WORDS[row.status] }),
-              row.usedBy ? el('span', { text: ` ${row.usedBy}` }) : null,
+              row.status === 'used' ? el('span', { text: ` ${row.usedBy ?? 'account removed'}` }) : null,
             ]),
             el('td', {}, [
               row.status === 'pending'
@@ -210,7 +210,12 @@ async function loadInvites(list) {
                     onclick: () => callBack(row, list),
                   })
                 : row.status === 'used'
-                  ? el('span', { class: 'hint', text: 'Already used. Remove the account instead.' })
+                  ? el('span', {
+                      class: 'hint',
+                      text: row.usedBy
+                        ? 'Already used. Remove the account instead.'
+                        : 'Already used. The account it created has since been removed.',
+                    })
                   : null,
             ]),
           ]),

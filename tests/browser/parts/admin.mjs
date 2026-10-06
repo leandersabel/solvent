@@ -87,6 +87,33 @@ await run(async () => {
   await click('Cancel');
   await page.waitUntil("!document.querySelector('.dialog')", { label: 'the dialog to close' });
 
+  // The invite that created a removed account stops naming it.
+  const { session: removed, close: closeRemoved } = await openBrowser();
+  await register(removed, mintInvite('vault-owner'), 'sam', VAULT_PASSWORD);
+  await intoVault(removed, 'the account to remove');
+  closeRemoved();
+  await click('Invites');
+  await click('Accounts');
+  await page.waitUntil("[...document.querySelectorAll('td')].some((td) => td.textContent === 'sam')", { label: 'sam in the list' });
+  await page.eval(`[...document.querySelectorAll('tr')].find((r) => r.cells[0]?.textContent === 'sam').querySelector('button').click()`);
+  await page.waitUntil("document.querySelector('.dialog input')", { label: 'the removal dialog' });
+  await setValue('.dialog input', 'sam');
+  await click('Remove account');
+  await page.waitUntil("!document.querySelector('.dialog') && ![...document.querySelectorAll('td')].some((td) => td.textContent === 'sam')", {
+    label: 'sam removed',
+  });
+  await click('Invites');
+  await page.waitUntil("document.querySelector('#app table.data-table')", { label: 'the outstanding invites' });
+  check(
+    'a used invite whose account is gone reads account removed, never the name',
+    await page.eval(`(() => {
+      const status = [...document.querySelectorAll('tbody tr')].map((r) => [r.cells[4].textContent, r.cells[5].textContent]);
+      return status.some(([cell, action]) => cell === 'Used account removed'
+        && action === 'Already used. The account it created has since been removed.')
+        && !status.some(([cell]) => cell.includes('sam'));
+    })()`),
+  );
+
   await click('Units');
   await page.waitUntil("document.body.innerText.includes('XAU-ozt')", { label: 'the unit table' });
   check('a unit with no source says so', (await text()).includes('No source for this unit yet'));
