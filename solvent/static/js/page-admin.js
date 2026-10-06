@@ -26,7 +26,8 @@ let section = 'invites';
 const BOUNDARY =
   'You can invite and remove people on this instance, and maintain the list of units a holding can be measured in. You cannot read anyone’s holdings, balances, notes, or history, you cannot reset anybody’s password, and you cannot recover a locked-out vault. Solvent holds no key that could, including for the vault behind your own user account.';
 
-function render() {
+// focus names the account whose row Accounts focuses once it loads.
+function render(focus) {
   const body = el('div', {});
   mount(container, [
     el('p', { class: 'callout', text: BOUNDARY }),
@@ -49,7 +50,7 @@ function render() {
   ]);
 
   if (section === 'invites') invites(body);
-  if (section === 'accounts') accounts(body);
+  if (section === 'accounts') accounts(body, focus);
   if (section === 'units') unitTable(body);
   if (section === 'password') mount(body, passwordCard());
 }
@@ -207,7 +208,7 @@ async function loadInvites(list) {
           el('td', {}, [
             el('span', {}, [
               el('span', { class: 'chip', text: STATUS_WORDS[row.status] }),
-              row.status === 'used' ? el('span', { class: row.usedBy ? 'typed' : null, text: ` ${row.usedBy ?? 'account removed'}` }) : null,
+              row.status === 'used' ? usedBy(row) : null,
             ]),
           ]),
           el('td', {}, [
@@ -230,6 +231,23 @@ async function loadInvites(list) {
       ),
     ),
   );
+}
+
+function usedBy(row) {
+  const on = ` on ${shortDate(row.usedAt.slice(0, 10))}`;
+  if (!row.usedBy) return el('span', { text: ` account removed${on}` });
+  return el('span', {}, [
+    ' ',
+    el('button', {
+      class: 'link-button typed',
+      text: row.usedBy,
+      onclick: () => {
+        section = 'accounts';
+        render(row.usedBy);
+      },
+    }),
+    on,
+  ]);
 }
 
 function callBack(row, list) {
@@ -255,7 +273,7 @@ function callBack(row, list) {
   });
 }
 
-async function accounts(body) {
+async function accounts(body, focus) {
   mount(body, el('p', { class: 'hint', text: 'Loading…' }));
   let rows;
   try {
@@ -274,7 +292,7 @@ async function accounts(body) {
         ['Username', 'Kind', 'Created', 'Last signed in', 'Items', ''],
         rows.map((row) =>
           el('tr', {}, [
-            el('td', { class: 'typed', text: row.username }),
+            el('td', { class: 'typed', text: row.username, tabindex: row.username === focus ? '-1' : null }),
             el('td', {}, [
               el('span', {
                 class: 'chip',
@@ -307,6 +325,11 @@ async function accounts(body) {
       ),
     ]),
   );
+  const focused = body.querySelector('td[tabindex]');
+  if (focused) {
+    focused.scrollIntoView({ block: 'center' });
+    focused.focus();
+  }
 }
 
 function removeAccount(row, body) {

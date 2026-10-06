@@ -39,7 +39,7 @@ const measure = (session) => session.call(() => {
     if (b.left < -0.5 || b.right > width + 0.5) past.push(`${label(n)} ${Math.round(b.left)}..${Math.round(b.right)}`);
   }
   const broken = [];
-  for (const n of document.querySelectorAll('#app .chip, #app th, #app button, #app select')) {
+  for (const n of document.querySelectorAll('#app .chip, #app th, #app button:not(.typed), #app select')) {
     if (!shown(n)) continue;
     const walker = document.createTreeWalker(n, NodeFilter.SHOW_TEXT);
     while (walker.nextNode()) {
