@@ -659,7 +659,7 @@ export function archiveHoldingDialog(vault, holding, onDone, then = 'reload', sa
     replaced
       ? el('p', {
           class: 'archive-replaces',
-          text: `This replaces the ${vault.format.quantity(replaced.payload.value)} ${holding.payload.unit} recorded for ${on}.`,
+          text: `This replaces the ${vault.amount(replaced.payload.value, holding.payload.unit)} recorded for ${on}.`,
         })
       : null,
   ]);
@@ -731,13 +731,13 @@ export function archiveHoldingDialog(vault, holding, onDone, then = 'reload', sa
       if (status === 'flagFailed' || status === 'flagConflict') {
         // Both halves, and the archive offered again: the retry finds
         // the zero and writes only what is still missing.
-        reopen(flagFailedCopy(status, on, unpriced));
+        reopen(flagFailedCopy(status, on, unpriced.map((unit) => vault.unitName(unit))));
         return;
       }
       if (unpriced.length) {
         // The zero is recorded and the archive went through. Nothing
         // is rolled back, and the units left without a price are named.
-        done(`Archived. The prices for ${named(unpriced)} on ${on} did not save. Add them in the recording for that date.`);
+        done(`Archived. The prices for ${named(unpriced.map((unit) => vault.unitName(unit)))} on ${on} did not save. Add them in the recording for that date.`);
         return;
       }
       close();

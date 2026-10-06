@@ -109,8 +109,8 @@ await run(async () => {
   check('a dollar holding on the dashboard reads without cents', dollars === 'USD 8’300', dollars);
   check('an ounce holding on the dashboard shows its stored digits', gold === '12.125 ozt', gold);
   for (const [name, hero, listed] of [
-    ['UBS dollar account', 'USD 8’300', '8’300'],
-    ['Gold bars', '12.125 ozt', '12.125'],
+    ['UBS dollar account', 'USD 8’300', 'USD 8’300'],
+    ['Gold bars', '12.125 ozt', '12.125 ozt'],
   ]) {
     await page.call((holding) => [...document.querySelectorAll('.data-table tbody .row-name')].find((b) => b.textContent === holding).click(), name);
     await page.waitUntil("location.hash.startsWith('#/holding/') && document.querySelector('.card .data-table tbody tr td.numeric')", { label: `${name} page` });

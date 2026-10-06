@@ -176,7 +176,7 @@ moment it is stopped:
   width it is on screen together with the confirm button. Where the
   date already holds a zero in any form, there is no such line.
 
-  > This replaces the 12 450.00 USD recorded for 3 October 2026.
+  > This replaces the USD 12,450.00 recorded for 3 October 2026.
 
 The same confirmation opens from Account detail's **Archive** action,
 the only way a holding with no values reaches it.
@@ -277,7 +277,7 @@ reached by clicking a holding's row on the dashboard.
 
 #### The holding's own list of values
 
-A table, newest first: Date, Value (native unit), In main currency, row
+A table, newest first: Date, Value, In main currency, row
 actions. Both value columns are figure columns (design-system.md,
 Typography).
 
@@ -316,7 +316,7 @@ action is a 44px target, and nothing on the screen pans sideways.
 
 A single confirm:
 
-> Delete the snapshot of 12 450.00 USD for 31 July? Your net worth for
+> Delete the snapshot of USD 12,450.00 for 31 July? Your net worth for
 > the period around this date will change.
 
 For the holding's only snapshot, the copy says instead that the holding
@@ -552,8 +552,8 @@ Failures, each a state of the archive dialog:
   path). Nothing is rolled back. The message names the units, computed
   rather than written into the copy, and the recording is a link:
 
-  > Archived. The prices for USD and XAU-ozt on 3 October 2026 did not
-  > save. Add them in the recording for that date.
+  > Archived. The prices for USD and Gold, troy ounce on 3 October 2026
+  > did not save. Add them in the recording for that date.
 
 - **The flag did not save**: the zero and the prices written stay at D,
   and the holding stays active at zero. The archive is offered again,
@@ -896,3 +896,6 @@ Unarchiving and archiving it again writes the zero at the new D.
     weight (`design-system.md`, Typography). Test:
     `tests/browser/parts/account-detail.mjs`,
     `tests/browser/parts/account-detail-review-heading.mjs`.
+63. (blind) No header of the holding's own list of values names a unit,
+    and each value carries its unit as `design-system.md`, Units, sets,
+    such as "12.5 ozt". Test: `tests/browser/parts/account-detail.mjs`.

@@ -133,8 +133,8 @@ export function sweepView(vault, date, actions = {}) {
       syncSave();
       for (const row of rows) row.describe();
       const notes = [
-        ...result.taken.map((unit) => `The ${unit} rate was filled in another window, and the line shows what is stored now.`),
-        ...result.failed.map((unit) => `The ${unit} rate did not save. Save the rate lines to try again.`),
+        ...result.taken.map((unit) => `The ${vault.unitName(unit)} rate was filled in another window, and the line shows what is stored now.`),
+        ...result.failed.map((unit) => `The ${vault.unitName(unit)} rate did not save. Save the rate lines to try again.`),
       ];
       if (notes.length) say(notes.join(' '), { critical: result.failed.length > 0 });
     }
@@ -170,7 +170,7 @@ export function sweepView(vault, date, actions = {}) {
     }
     syncSave();
     if (failed.length) {
-      say(`Recorded. Prices were not updated for ${failed.join(', ')}.`, { critical: true });
+      say(`Recorded. Prices were not updated for ${failed.map((unit) => vault.unitName(unit)).join(', ')}.`, { critical: true });
     }
   };
 
@@ -210,7 +210,7 @@ export function sweepView(vault, date, actions = {}) {
     element,
     unsaved: () => [
       ...rows.filter((row) => row.changed()).map((row) => row.name),
-      ...block.lines.filter((line) => line.changed()).map((line) => `the ${line.unit} rate`),
+      ...block.lines.filter((line) => line.changed()).map((line) => `the ${vault.unitName(line.unit)} rate`),
     ],
   };
   return element;
@@ -694,12 +694,12 @@ function rateLine(vault, unit, date, { sit, readOnly: blockReadOnly, fillMissing
     const row = vault.symbols.get(unit);
     if (unquoted()) return `${unquotedCopy} This one is yours to set.`;
     return row
-      ? `No market price for ${described.name.toLowerCase()} yet. This one is yours to set.`
-      : `Nobody publishes a price for ${unit}. This one is yours to set.`;
+      ? `No market price for ${described.name} yet. This one is yours to set.`
+      : `Nobody publishes a price for ${described.name}. This one is yours to set.`;
   };
 
   const earlyCopy = (yours = true) =>
-    `Published prices for ${unit} begin on ${format.fullDate(publishedFrom)}.${yours ? ' This one is yours to set.' : ''}`;
+    `Published prices for ${described.name} begin on ${format.fullDate(publishedFrom)}.${yours ? ' This one is yours to set.' : ''}`;
 
   /** Chip and wording for what the field holds now. Never touches the
    *  field itself, so typing is never overwritten. */
@@ -744,14 +744,14 @@ function rateLine(vault, unit, date, { sit, readOnly: blockReadOnly, fillMissing
     }
     provenance.textContent = line.changed() ? 'Typed by you' : '';
     if (readOnly) {
-      explanation.textContent = `No price for ${unit} at this date.`;
+      explanation.textContent = `No price for ${described.name} at this date.`;
       return;
     }
     if (early) {
       explanation.textContent = line.carried
         ? `Set on ${format.fullDate(line.carried.payload.date)}. ${earlyCopy()}`
         : line.asked
-          ? `What was 1 ${unit} worth in ${vault.mainCurrency} on ${format.fullDate(date)}? ${earlyCopy(false)} The figure records either way, and until a price exists the holding is listed as not priced.`
+          ? `What was ${described.one} worth in ${vault.mainCurrency} on ${format.fullDate(date)}? ${earlyCopy(false)} The figure records either way, and until a price exists the holding is listed as not priced.`
           : earlyCopy();
       return;
     }
@@ -760,15 +760,15 @@ function rateLine(vault, unit, date, { sit, readOnly: blockReadOnly, fillMissing
         ? `Estimated ${ageInWords(line.carried.payload.date)}. ${ownCopy()}`
         : line.asked
           ? askCopy()
-          : `No price for ${unit} yet. ${ownCopy()}`;
+          : `No price for ${described.name} yet. ${ownCopy()}`;
       return;
     }
     if (line.asked && !line.carried) {
       explanation.textContent = askCopy();
     } else if (reopened()) {
-      explanation.textContent = `No rate was recorded for ${unit} on this date.`;
+      explanation.textContent = `No rate was recorded for ${described.name} on this date.`;
     } else {
-      explanation.textContent = `No market rate came back for ${unit}. Nothing will be recorded for it for this date.`;
+      explanation.textContent = `No market rate came back for ${described.name}. Nothing will be recorded for it for this date.`;
     }
     // A line that went in empty carries its own lookup, since the
     // outage that emptied it is the reason for coming back.
@@ -776,7 +776,7 @@ function rateLine(vault, unit, date, { sit, readOnly: blockReadOnly, fillMissing
   };
 
   const askCopy = () => {
-    const why = unquoted() ? unquotedCopy : `Nothing prices ${unit} yet.`;
+    const why = unquoted() ? unquotedCopy : `Nothing prices ${described.name} yet.`;
     return `What is ${described.one} worth in ${vault.mainCurrency}? ${why} The figure records either way, and until a price exists the holding is listed as not priced.`;
   };
 
@@ -885,7 +885,7 @@ function rateLine(vault, unit, date, { sit, readOnly: blockReadOnly, fillMissing
     lookup.disabled = true;
     const answered = await lookUp(line);
     lookup.disabled = false;
-    if (!answered) explanation.textContent = `No market rate came back for ${unit}.`;
+    if (!answered) explanation.textContent = `No market rate came back for ${described.name}.`;
   });
 
   line.reset();
@@ -942,15 +942,16 @@ export function rateChangeCopy(vault, date, changes) {
   const on = vault.format.longDate(date);
   const lines = [];
   for (const { unit, clearing } of changes) {
+    const name = vault.unitName(unit);
     const count = holdingsIn(vault, unit, date);
-    const holdings = `${count} ${count === 1 ? 'holding' : 'holdings'} measured in ${unit}`;
+    const holdings = `${count} ${count === 1 ? 'holding' : 'holdings'} measured in ${name}`;
     if (!clearing) {
-      lines.push(`Changing the ${unit} rate for ${on} moves ${holdings} on that date. Your net worth on that day changes with them.`);
+      lines.push(`Changing the ${name} rate for ${on} moves ${holdings} on that date. Your net worth on that day changes with them.`);
       continue;
     }
-    lines.push(`Clearing the ${unit} price for ${on} leaves that date with no price for it. ${holdings} ${count === 1 ? 'moves' : 'move'} on that date.`);
+    lines.push(`Clearing the ${name} price for ${on} leaves that date with no price for it. ${holdings} ${count === 1 ? 'moves' : 'move'} on that date.`);
     if (vault.entriesFor(unit).length === 1) {
-      lines.push(`This is the only price recorded for ${unit}. Clearing it leaves every holding measured in it with no price at all, and they leave the total until one exists.`);
+      lines.push(`This is the only price recorded for ${name}. Clearing it leaves every holding measured in it with no price at all, and they leave the total until one exists.`);
     }
   }
   return lines;
@@ -958,8 +959,8 @@ export function rateChangeCopy(vault, date, changes) {
 
 /** Both halves of a save that landed in part, by holding name and by
  *  unit: a count alone leaves the vault in a state nobody can see. */
-export function partialCopy(result) {
-  const named = (list) => list.map((change) => change.name).join(', ');
+export function partialCopy(vault, result) {
+  const named = (list) => list.map((change) => vault.unitName(change.name)).join(', ');
   if (!result.failed.length) return 'Saved.';
   const landed = result.saved.length ? `Saved: ${named(result.saved)}. ` : '';
   return `${landed}Not saved: ${named(result.failed)}. Nothing was rolled back, and saving again retries only what did not land.`;
@@ -1002,8 +1003,8 @@ function saveRates(vault, sit, block, { say, refused, syncSave, emptied, keepTyp
       if (!failed.has(line.unit) || conflicts.includes(line.unit)) line.reset();
     }
     syncSave();
-    const conflictCopy = conflicts.map((unit) => `The ${unit} rate was changed in another window, and the line shows what is stored now.`).join(' ');
-    say([partialCopy(result), conflictCopy].filter(Boolean).join(' '), { critical: result.failed.length > 0 });
+    const conflictCopy = conflicts.map((unit) => `The ${vault.unitName(unit)} rate was changed in another window, and the line shows what is stored now.`).join(' ');
+    say([partialCopy(vault, result), conflictCopy].filter(Boolean).join(' '), { critical: result.failed.length > 0 });
   };
 
   // Filling a missing price changes none, so only an update or a clear

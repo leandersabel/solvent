@@ -52,7 +52,7 @@ export function recordingView(vault, date, { onUpdate, onOpenHolding, onDeleted,
         ...empty.map((unit) =>
           el('p', {
             class: 'hint missing-price',
-            text: `No price for ${unit} at this date. The line is empty, and it is filled in after Update.`,
+            text: `No price for ${vault.unitName(unit)} at this date. The line is empty, and it is filled in after Update.`,
           }),
         ),
       ]),
@@ -102,9 +102,8 @@ function priceRow(vault, entry, onChanged) {
   const rivals = vault
     .entriesFor(entry.payload.symbol)
     .filter((e) => e.payload.date === entry.payload.date && e.recordId !== entry.recordId);
-  const unit = vault.unitOf(entry.payload.symbol);
   return el('tr', { class: rivals.length ? 'flagged' : null, 'data-unit': entry.payload.symbol }, [
-    el('td', { text: entry.payload.symbol, title: unit.name }),
+    el('td', { text: vault.unitName(entry.payload.symbol) }),
     el('td', {
       class: 'numeric',
       text: `${vault.format.editable(decimal.parse(entry.payload.rate), 6)} ${vault.mainCurrency}`,
@@ -138,7 +137,7 @@ function named(vault, entries) {
     .map((entry) =>
       entry.recordType === 'snapshot'
         ? (vault.holdings.get(entry.accountId) || { payload: { name: 'a holding' } }).payload.name
-        : `the ${entry.payload.symbol} price`,
+        : `the ${vault.unitName(entry.payload.symbol)} price`,
     )
     .join(', ');
 }
@@ -164,7 +163,7 @@ function confirmDelete(vault, date, onDeleted, redraw) {
   if (units.length) {
     body.push(
       el('p', {
-        text: `${affected} ${affected === 1 ? 'holding' : 'holdings'} measured in ${units.join(' and ')} move on that date, including ones you recorded nothing for.`,
+        text: `${affected} ${affected === 1 ? 'holding' : 'holdings'} measured in ${units.map((unit) => vault.unitName(unit)).join(' and ')} move on that date, including ones you recorded nothing for.`,
       }),
     );
   }

@@ -69,7 +69,7 @@ await run(async () => {
   const requests = rateCalls();
   check('a four-row sweep asks the proxy once', requests === 1, `issued ${requests}`);
   const rateNames = await labels('.rate-unit');
-  check('a rate line is headed by the unit\'s name', rateNames.join(',') === 'United States Dollar,Gold', rateNames.join(','));
+  check('a rate line is headed by the unit\'s name', rateNames.join('|') === 'USD|Gold, troy ounce', rateNames.join('|'));
 
   await page.eval(`document.querySelector('.topbar nav a[href="#/"]').click()`);
   await page.waitUntil("document.querySelector('.hero-figure')", { label: 'the dashboard' });
@@ -146,7 +146,7 @@ await run(async () => {
   const silver = await lineState('XAG-ozt');
   check(
     'record-rate: a symbol with no provider shows its last figure, its age, and whose it is to set',
-    figure(silver.value) === 25 && silver.says.startsWith('Estimated ') && silver.says.includes('No market price for silver yet. This one is yours to set.'),
+    figure(silver.value) === 25 && silver.says.startsWith('Estimated ') && silver.says.includes('No market price for Silver, troy ounce yet. This one is yours to set.'),
     JSON.stringify(silver),
   );
   const silverConverted = await ev("[...document.querySelectorAll('.sweep-row')].find(r => r.querySelector('.holding-name').textContent === 'Silver coins').querySelector('.sweep-input .hint').textContent");
@@ -368,7 +368,7 @@ await run(async () => {
   const goldGap = await lineState('XAU-ozt');
   check(
     'record-rate: a line that went in empty says so and carries its own Look it up',
-    goldGap.value === '' && goldGap.says === 'No rate was recorded for XAU-ozt on this date.' && goldGap.lookup,
+    goldGap.value === '' && goldGap.says === 'No rate was recorded for Gold, troy ounce on this date.' && goldGap.lookup,
     JSON.stringify(goldGap),
   );
   const held = await lineState('USD');
@@ -501,7 +501,7 @@ await run(async () => {
   await press('Save the prices', '.dialog');
   check(
     'record-rate: a save that lands in part names both halves by unit and keeps what did not land typed',
-    halves.startsWith('Saved: USD. Not saved: XAU-ozt.') && figure(keptTyped.value) === 2799,
+    halves.startsWith('Saved: USD. Not saved: Gold, troy ounce.') && figure(keptTyped.value) === 2799,
     halves,
   );
   check(
@@ -715,7 +715,7 @@ await run(async () => {
   const kept = on(await stored('snapshot'), D6).find((s) => s.accountId === id['Current account']);
   check(
     'record-rate: with every price write failing, the figure is stored exactly and the screen says the prices were not updated',
-    kept && kept.payload.value === '20.25' && reported.includes('Prices were not updated for USD, XAU-ozt') &&
+    kept && kept.payload.value === '20.25' && reported.includes('Prices were not updated for USD, Gold, troy ounce') &&
       (await rowState('Current account')).state === 'Recorded for this date.' && on(await stored('rate'), D6).length === 0,
     reported,
   );
@@ -914,7 +914,7 @@ await run(async () => {
   const earlyUsd = await lineState('USD');
   check(
     'record-rate: gold before its published prices begin says so and is the owner\'s to price, never an outage',
-    early.value === '' && early.says === `Published prices for XAU-ozt begin on ${begins}. This one is yours to set.` && !early.lookup &&
+    early.value === '' && early.says === `Published prices for Gold, troy ounce begin on ${begins}. This one is yours to set.` && !early.lookup &&
       earlyUsd.value !== '',
     JSON.stringify({ early, earlyUsd }),
   );
@@ -928,7 +928,7 @@ await run(async () => {
   const earlyAsked = await lineState('XAU-ozt');
   check(
     'record-rate: recording gold before its published prices asks for a price in the line\'s own words and writes none',
-    earlyAsked.says === `What was 1 XAU-ozt worth in CHF on ${await format('fullDate', EARLY)}? Published prices for XAU-ozt begin on ${begins}. The figure records either way, and until a price exists the holding is listed as not priced.` &&
+    earlyAsked.says === `What was 1 troy ounce worth in CHF on ${await format('fullDate', EARLY)}? Published prices for Gold, troy ounce begin on ${begins}. The figure records either way, and until a price exists the holding is listed as not priced.` &&
       on(await stored('snapshot'), EARLY).length === 1 && !on(await stored('rate'), EARLY).some((r) => r.payload.symbol === 'XAU-ozt'),
     JSON.stringify(earlyAsked),
   );
@@ -937,7 +937,7 @@ await run(async () => {
   const earlyReopened = await lineState('XAU-ozt');
   check(
     'record-rate: a reopened recording offers no Look it up on gold before its published prices and asks the proxy nothing',
-    !earlyReopened.lookup && earlyReopened.says.startsWith('Published prices for XAU-ozt begin on') && rateAsks().length === 0,
+    !earlyReopened.lookup && earlyReopened.says.startsWith('Published prices for Gold, troy ounce begin on') && rateAsks().length === 0,
     JSON.stringify(earlyReopened),
   );
   await home();

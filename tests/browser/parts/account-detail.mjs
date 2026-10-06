@@ -27,6 +27,23 @@ await run(async () => {
     (await labels('.form-actions button')).join(',') === 'Record a value,Edit,Archive,Delete',
   );
   check('there is no rate column on a holding', !(await text()).includes('Source'));
+  // design-system.md, Units: no header names a unit, and each value
+  // carries its own.
+  const values = await page.call(async () => {
+    const vault = (await import('/static/js/session.js')).currentVault();
+    const holding = vault.holdings.get(location.hash.split('/')[2]);
+    const table = document.querySelector('.values-table');
+    return {
+      headers: [...table.querySelectorAll('th')].map((th) => th.textContent),
+      shown: table.querySelector('tbody td.numeric').textContent,
+      expected: vault.amount(vault.snapshotsFor(holding.recordId)[0].payload.value, holding.payload.unit),
+    };
+  });
+  check(
+    "no header on the holding's values names a unit, and each value carries it",
+    values.headers[1] === 'Value' && values.shown === values.expected,
+    JSON.stringify(values),
+  );
   // design-system.md, Typography: the screen heading is 32px/600, 26px
   // at phone width.
   const nameFont = await page.eval(
@@ -121,10 +138,10 @@ await run(async () => {
       return choice.checked && button.hidden && !document.querySelector('.dialog input[value=delete]').checked;
     })()`),
   );
-  const named = await page.call(async (value) => {
+  const named = await page.call(async (value, id) => {
     const v = (await import('/static/js/session.js')).currentVault();
-    return v.format.quantity(value);
-  }, beforeArchive.here[0]?.value);
+    return v.amount(value, v.holdings.get(id).payload.unit);
+  }, beforeArchive.here[0]?.value, archivingId);
   check(
     'an occupied archive date names the figure the zero replaces, above the confirm',
     beforeArchive.here.length === 1 && (await text()).includes(`This replaces the ${named} `),

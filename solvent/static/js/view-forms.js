@@ -193,7 +193,7 @@ export function snapshotDialog(vault, holding, existing, onSaved, onOpenRecordin
     // lines show, on their own requests.
     if (sit.proposals) block.showProposals(await sit.proposals);
     const { failed } = await writes.refreshPrices(vault, on, {}, (unit) => block.partFor(unit));
-    if (failed.length) return finishWith(`Saved. The prices were not updated for ${failed.join(', ')}.`);
+    if (failed.length) return finishWith(`Saved. The prices were not updated for ${failed.map((unit) => vault.unitName(unit)).join(', ')}.`);
     return done();
   };
 
@@ -246,7 +246,8 @@ export function snapshotDialog(vault, holding, existing, onSaved, onOpenRecordin
     const { failed, undeleted } = result;
     const left = `The entry already on ${vault.format.longDate(on)} could not be deleted, so the date holds both until you keep one.`;
     if (!failed.length) return undeleted ? finishWith(`Moved. ${left}`) : done();
-    const units = failed.length > 1 ? `${failed.slice(0, -1).join(', ')} and ${failed.at(-1)}` : failed[0];
+    const names = failed.map((unit) => vault.unitName(unit));
+    const units = names.length > 1 ? `${names.slice(0, -1).join(', ')} and ${names.at(-1)}` : names[0];
     const lost = `${failed.length > 1 ? 'The prices' : 'The price'} for ${units} on that date did not save.`;
     // The entry has moved: what the dialog shows follows it, Save stays
     // inert until something changes, and the date's own screen is where
@@ -343,7 +344,7 @@ export function snapshotDialog(vault, holding, existing, onSaved, onOpenRecordin
         ? []
         : [
             ...(value.value !== opened.value || note.value !== opened.note || moving() ? [holding.payload.name] : []),
-            ...(block ? block.lines.filter((line) => line.changed()).map((line) => `the ${line.unit} rate`) : []),
+            ...(block ? block.lines.filter((line) => line.changed()).map((line) => `the ${vault.unitName(line.unit)} rate`) : []),
           ],
     }),
     resume: resumable(reopenSnapshot, holding.recordId, existing ? existing.recordId : null),
@@ -353,7 +354,7 @@ export function snapshotDialog(vault, holding, existing, onSaved, onOpenRecordin
         date.element,
       ]),
       el('div', { class: 'field' }, [
-        el('label', { for: 'snapshot-value', text: `Value in ${holding.payload.unit}` }),
+        el('label', { for: 'snapshot-value', text: `Value in ${vault.unitName(holding.payload.unit)}` }),
         value,
         converted,
       ]),

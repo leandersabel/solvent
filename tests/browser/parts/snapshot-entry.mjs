@@ -310,7 +310,7 @@ await run(async () => {
   const pricesFailed = await formError();
   check(
     'record-snapshot: the form keeps the figure when its prices do not save, and names the units',
-    pricesFailed === 'Saved. The prices were not updated for USD, XAU-ozt.' &&
+    pricesFailed === 'Saved. The prices were not updated for USD, Gold, troy ounce.' &&
       on(await stored('snapshot'), DS).some((s) => s.accountId === id.Savings) &&
       (await ev("[...document.querySelectorAll('.dialog button')].some(b => b.textContent === 'Done')")),
     pricesFailed,
@@ -375,8 +375,8 @@ await run(async () => {
   check(
     'record-snapshot: the opened prices line shows each unit in full, without overlap or clipping, at a desktop width',
     formLayout.shown.problems.length === 0 && formLayout.longest.problems.length === 0 && formLayout.proposed.problems.length === 0 &&
-      formLayout.proposed.seen.some((l) => l.unit === 'Gold' && l.chip.startsWith('Market rate as of ')) &&
-      ['United States Dollar', 'Gold'].every((name) => formLayout.shown.seen.some((l) => l.unit === name && l.chip.startsWith('Edited from '))),
+      formLayout.proposed.seen.some((l) => l.unit === 'Gold, troy ounce' && l.chip.startsWith('Market rate as of ')) &&
+      ['USD', 'Gold, troy ounce'].every((name) => formLayout.shown.seen.some((l) => l.unit === name && l.chip.startsWith('Edited from '))),
     JSON.stringify(formLayout),
   );
   check(
@@ -470,7 +470,7 @@ await run(async () => {
   })`);
   check(
     'record-snapshot: a move whose prices do not save has moved, names every unit, leaves Save inert and offers the recording',
-    lostPrices.startsWith(`Moved to ${await format('fullDate', DX)}. The prices for USD and XAU-ozt on that date did not save.`) &&
+    lostPrices.startsWith(`Moved to ${await format('fullDate', DX)}. The prices for USD and Gold, troy ounce on that date did not save.`) &&
       lostState.save && lostState.open === 'Open the recording' &&
       on(await stored('snapshot'), DX).some((s) => s.recordId === firstEntry.recordId) && on(await stored('rate'), DX).length === 0 &&
       writesSent().filter((r) => r.method === 'DELETE').length === 0,
