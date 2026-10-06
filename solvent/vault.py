@@ -32,10 +32,6 @@ from .validation import Payload, decode_b64, is_uuid4, parse
 
 bp = Blueprint("vault", __name__)
 
-EXPORT_FORMAT = "solvent-vault"
-EXPORT_FORMAT_VERSION = 1
-
-
 @bp.delete("/api/accounts/<account_id>")
 def purge_account(account_id: str):
     """Delete an `account` record and every snapshot carrying its id,
@@ -70,7 +66,8 @@ def purge_account(account_id: str):
 
 @bp.get("/api/export")
 def export_vault():
-    """The whole vault plus what opens it, as one attachment.
+    """The whole vault plus what opens it, as one attachment, which the
+    client seals into the export file before saving it.
 
     The filename carries no user identifier, for the same reason the
     contents carry none: a file found on a lost machine must not say
@@ -95,8 +92,6 @@ def export_vault():
     params = json.loads(credential["params"])
 
     payload = {
-        "format": EXPORT_FORMAT,
-        "formatVersion": EXPORT_FORMAT_VERSION,
         "exportedAt": utcnow(),
         "salt": params["salt"],
         "kdf": params["kdf"],

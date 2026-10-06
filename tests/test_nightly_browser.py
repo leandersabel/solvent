@@ -123,7 +123,7 @@ def test_the_generator_writes_every_output_and_the_manifest_covers_every_name(ge
     assert (current["file"], older["file"]) == (
         "tools/nightly/fixtures/out/backup-history.owner.json", "tools/nightly/fixtures/backup-format-1.json"
     )
-    assert json.loads((generated.out / "backup-history.owner.json").read_text())["formatVersion"] == 1
+    assert json.loads((generated.out / "backup-history.owner.json").read_text())["formatVersion"] == 2
     assert set(manifest["expected"]) >= {a["username"] for a in manifest["accounts"] if a["kind"] == "vault_owner"} | {
         current["file"], older["file"]
     }

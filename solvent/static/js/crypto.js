@@ -168,11 +168,13 @@ export function aad({ accountId, recordType, recordId, schemaVersion, version })
   return out;
 }
 
-export async function encryptRecord(dek, slot, payload) {
+/** `payload` as JSON under `key`, bound to `additionalData`, with a
+ *  fresh nonce. */
+export async function seal(key, additionalData, payload) {
   const nonce = randomBytes(12);
   const ciphertext = await crypto.subtle.encrypt(
-    { name: 'AES-GCM', iv: nonce, additionalData: aad(slot) },
-    dek,
+    { name: 'AES-GCM', iv: nonce, additionalData },
+    key,
     encoder.encode(JSON.stringify(payload)),
   );
   return {
@@ -181,11 +183,19 @@ export async function encryptRecord(dek, slot, payload) {
   };
 }
 
-export async function decryptRecord(dek, record) {
+export async function open(key, additionalData, { nonce, ciphertext }) {
   const plain = await crypto.subtle.decrypt(
-    { name: 'AES-GCM', iv: b64decode(record.nonce), additionalData: aad(record) },
-    dek,
-    b64decode(record.ciphertext),
+    { name: 'AES-GCM', iv: b64decode(nonce), additionalData },
+    key,
+    b64decode(ciphertext),
   );
   return JSON.parse(decoder.decode(plain));
+}
+
+export function encryptRecord(dek, slot, payload) {
+  return seal(dek, aad(slot), payload);
+}
+
+export function decryptRecord(dek, record) {
+  return open(dek, aad(record), record);
 }

@@ -178,6 +178,26 @@ await run(async () => {
     const exportedPath = join(downloads, filename);
     const exportedText = readFileSync(exportedPath, 'utf8');
     const exported = JSON.parse(exportedText);
+    // What the file seals, opened with its password.
+    const contents = await inPage(async ({ t }, file, password) => {
+      const { exportedAt, records } = await t.openFile(file, password);
+      return { exportedAt, records };
+    }, exported, VAULT_PASSWORD);
+    // The same contents as a format 1 file, which keeps its records in
+    // the open, for the refusals checked before a password is asked for.
+    const formatOne = (change = () => {}) => {
+      const { nonce, ciphertext, ...header } = exported;
+      const file = { ...header, formatVersion: 1, ...JSON.parse(JSON.stringify(contents)) };
+      change(file);
+      return JSON.stringify(file);
+    };
+    check(
+      'the exported file shows no record id, holding id, edit counter or timestamp',
+      !('records' in exported) && !('exportedAt' in exported) &&
+        contents.records.every((r) => !exportedText.includes(r.recordId)) &&
+        !exportedText.includes(contents.exportedAt.slice(0, 10)),
+      Object.keys(exported).join(','),
+    );
     await page.waitUntil("!document.querySelector('#export-card [role=status]').hidden", { label: 'what the file holds' });
     check(
       'afterwards the screen says what the file holds, both timelines named',
@@ -300,15 +320,12 @@ await run(async () => {
     await chooseFile(fixture('not-json.json', 'this is not a vault'));
     check('a file that is not JSON is refused at the first step', (await importError()).includes('not a Solvent vault file') &&
       (await page.eval("Boolean(document.querySelector('#import-password').closest('[hidden]'))")));
-    await chooseFile(fixture('newer.json', JSON.stringify({ ...exported, formatVersion: 2 })));
+    await chooseFile(fixture('newer.json', JSON.stringify({ ...exported, formatVersion: exported.formatVersion + 1 })));
     check('a file from a newer version is refused at the first step', (await importError()).includes('newer version'));
-    const badType = JSON.parse(exportedText);
-    badType.records[0].recordType = 'invoice';
-    await chooseFile(fixture('bad-type.json', JSON.stringify(badType)));
+    await chooseFile(fixture('bad-type.json', formatOne((f) => { f.records[0].recordType = 'invoice'; })));
     check('a file the server would refuse is refused before it is opened', (await importError()).includes('not a Solvent vault file'));
-    const noProfile = JSON.parse(exportedText);
-    noProfile.records = noProfile.records.filter((r) => r.recordType !== 'profile');
-    await chooseFile(fixture('no-profile.json', JSON.stringify(noProfile)));
+    const withoutProfile = (f) => { f.records = f.records.filter((r) => r.recordType !== 'profile'); };
+    await chooseFile(fixture('no-profile.json', formatOne(withoutProfile)));
     check(
       'a file with no profile record is refused at the first step, before any password is asked for',
       (await importError()) === 'This file carries no vault settings, so it would restore a vault with no main currency. It cannot be restored.' &&
@@ -317,9 +334,33 @@ await run(async () => {
       await importError(),
     );
     const large = fixture('large.json', '');
-    truncateSync(large, 49 * 1024 * 1024);
+    truncateSync(large, 65 * 1024 * 1024);
     await chooseFile(large);
     check('an oversized file is refused by its size', (await importError()).includes('too large'));
+
+    // A sealed file shows its records only once its password opens it,
+    // so these are refused there, still before any request.
+    const sealedWithoutProfile = await inPage(async ({ t }, file, password) => {
+      const opened = await t.openFile(file, password);
+      const records = opened.records.filter((r) => r.recordType !== 'profile');
+      return t.sealFile(opened.fileDek, { ...file, exportedAt: opened.exportedAt, records });
+    }, exported, VAULT_PASSWORD);
+    const envelope = Buffer.from(exported.ciphertext, 'base64');
+    envelope[5] ^= 0x01;
+    const damaged = { ...exported, ciphertext: envelope.toString('base64') };
+    for (const [name, file, says] of [
+      ['sealed-no-profile.json', sealedWithoutProfile, 'carries no vault settings'],
+      ['damaged.json', damaged, 'has been damaged'],
+    ]) {
+      await chooseFile(fixture(name, JSON.stringify(file)));
+      await openWith(VAULT_PASSWORD);
+      await page.waitUntil(`document.querySelector('#import-card .field-error').textContent.includes('${says}')`, { timeout: 60000, label: name });
+      check(
+        `a sealed file that ${says} is refused once its password opens it, uploading nothing`,
+        (await uploads()) === 0 && (await page.eval("document.querySelector('.review').hidden")) && vaultRows() === rowsBefore,
+        await importError(),
+      );
+    }
 
     await chooseFile(exportedPath);
     const callsBefore = await apiCalls('/api/');
@@ -335,7 +376,7 @@ await run(async () => {
     await openWith(VAULT_PASSWORD);
     await page.waitUntil("!document.querySelector('.review').hidden", { timeout: 60000, label: 'the review' });
     const kinds = { account: 0, snapshot: 0, rate: 0 };
-    for (const record of exported.records) if (record.recordType in kinds) kinds[record.recordType] += 1;
+    for (const record of contents.records) if (record.recordType in kinds) kinds[record.recordType] += 1;
     const review = await page.eval("document.querySelector('.review').innerText");
     const total = sql(`SELECT record_id FROM records ${OWN}`).length;
     check(
@@ -357,7 +398,7 @@ await run(async () => {
       (await importError()).includes('Type ERASE') && (await uploads()) === 0 && vaultRows() === rowsBefore,
     );
 
-    const altered = JSON.parse(exportedText);
+    const altered = JSON.parse(formatOne());
     const target = altered.records.find((record) => record.recordType === 'snapshot');
     const bytes = Buffer.from(target.ciphertext, 'base64');
     bytes[5] ^= 0x01;
@@ -466,8 +507,8 @@ await run(async () => {
       JSON.stringify(reread),
     );
     const stillOpens = await inPage(async ({ t }, file, password) => {
-      const { fileDek } = await t.openFile(file, password);
-      return (await t.decryptAll(fileDek, file.records)).length === file.records.length;
+      const { fileDek, records } = await t.openFile(file, password);
+      return (await t.decryptAll(fileDek, records)).length === records.length;
     }, exported, VAULT_PASSWORD);
     check('the exported file still opens with its own password after the vault was re-keyed', stillOpens);
 
@@ -551,7 +592,7 @@ await run(async () => {
         payload: { name: 'Transfer probe', unit: 'EUR', dims: {}, note: null, archivedAt: null, createdAt: '2026-01-01T00:00:00Z' },
       }]);
       await plantSecond([{ type: 'snapshot', accountId: transferred, payload: { date: BACKDATE, value: '321', note: null } }]);
-      const secondText = await second.eval(`(async () => (await fetch('/api/export', { headers: ${HANDS} })).text())()`);
+      const secondText = await second.eval("(async () => JSON.stringify((await (await import('/static/js/session.js')).exportFile()).file))()");
       // Written by the source after the export, for the injection check.
       const [later] = await plantSecond([{
         type: 'account',
@@ -720,7 +761,7 @@ await run(async () => {
     await chooseFile(exportedPath);
     await openWith(VAULT_PASSWORD);
     await page.waitUntil("!document.querySelector('.review').hidden", { timeout: 60000, label: 'the review in year-first dates' });
-    const exportedOn = exported.exportedAt.slice(0, 10);
+    const exportedOn = contents.exportedAt.slice(0, 10);
     const exportedLine = await page.eval("[...document.querySelectorAll('.review .hint')].map(n => n.textContent).find(t => t.startsWith('Exported')) || ''");
     check(
       "the import review's Exported date is in the style of the vault that is open, not the file's",
@@ -783,7 +824,7 @@ await run(async () => {
       await replaceVault();
       await page.waitUntil("document.body.innerText.includes('Your vault was replaced from the file')", { timeout: 90000, label: 'the restore the other tabs meet' });
       const restoredIds = sql(`SELECT record_id FROM records ${OWN} ORDER BY record_id`).map((r) => r.record_id);
-      check('the restore leaves exactly the file\'s records', JSON.stringify(restoredIds) === JSON.stringify(exported.records.map((r) => r.recordId).sort()));
+      check('the restore leaves exactly the file\'s records', JSON.stringify(restoredIds) === JSON.stringify(contents.records.map((r) => r.recordId).sort()));
 
       // The tab that was not used closes the vault before it sends a request.
       await watcher.session.waitUntil("document.body.innerText.includes('Your vault was replaced from a file in another tab')", { label: 'the other tab to close its vault' });
@@ -824,7 +865,7 @@ await run(async () => {
       })()`).then(JSON.parse);
       check(
         'every restored record reads in that tab and it shows no notice of its own',
-        reopened.unreadable === 0 && reopened.holdings === exported.records.filter((r) => r.recordType === 'account').length && !reopened.notice,
+        reopened.unreadable === 0 && reopened.holdings === contents.records.filter((r) => r.recordType === 'account').length && !reopened.notice,
         JSON.stringify(reopened),
       );
 

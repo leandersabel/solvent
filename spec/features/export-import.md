@@ -86,14 +86,16 @@ Settings) reaches the same export, warning included.
 A flow in one card, each step revealed as the previous completes.
 Replace-only, and nothing on the screen may imply a merge exists.
 
-1. **Choose file.** Drag-drop or picker. Validated client-side for size,
-   `format` and `formatVersion` before parse, and refused when it
-   carries no profile record. Nothing is decrypted first.
+1. **Choose file.** Drag-drop or picker. Validated client-side for size
+   before parse, then for `format`, `formatVersion` and the rest of what
+   the file shows without its password. Nothing is decrypted first.
 2. **Password for that file.** Labeled "The password this file was
    exported under", never "your password", because they can differ and
-   this is the feature's most confusing point. It decrypts **the profile
-   alone**, all the review needs, so a wrong password is caught before
-   any other record is touched or any request sent.
+   this is the feature's most confusing point. It opens the file's
+   envelope, checks the records in it as the server would, and decrypts
+   **the profile alone**, all the review needs, so a wrong password or
+   a bad file is caught before any other record is touched or any
+   request sent.
 3. **Review.** What is in the file, by kind: holdings, recorded figures,
    captured prices, and the date it was exported, in the date style of
    the vault that is open. Alongside it, what will be destroyed, in the
@@ -152,8 +154,8 @@ The re-key (The re-key step) is the longest operation in the product.
 
 #### States
 
-- **Loading**: export assembles server-side and the button shows a
-  progress state. Import as in The decryption wait.
+- **Loading**: the export is read from the server and sealed in the
+  browser, and the button shows a progress state. Import as in The decryption wait.
 - **Empty**: an empty vault exports a file carrying its profile record
   alone. The button stays enabled and the screen says so: "Your vault is
   empty, so the file holds its settings and no holdings, figures or
@@ -172,12 +174,16 @@ The re-key (The re-key step) is the longest operation in the product.
 - **Error, malformed JSON, wrong `format`, or a newer `formatVersion`**:
   refused at step 1 with a clear message. A newer file in an older app
   is not something to guess at.
+- **Error, a damaged file**: an envelope that does not open under a
+  password that opens the wrapper, or records the server would refuse,
+  is refused at step 2: "That is not a Solvent vault file, or it has
+  been damaged." Nothing is uploaded.
 - **Error, oversized file**: refused client-side by its size, before
   parse, and server-side before any write.
-- **Error, a file with no profile record**: refused at step 1, before
-  any password is asked for: "This file carries no vault settings, so
-  it would restore a vault with no main currency. It cannot be
-  restored."
+- **Error, a file with no profile record**: refused as soon as its
+  records can be read, before any request: at step 2, and at step 1 for
+  a format 1 file. "This file carries no vault settings, so it would
+  restore a vault with no main currency. It cannot be restored."
 - **Error, import failed server-side**: the screen says plainly that the
   original vault is intact and readable.
 - **Error, the password changed elsewhere**: the page locks and the
@@ -203,8 +209,11 @@ Beyond what the feature does not do (What the client gets):
 
 ### What it does
 
-Without the password the file reveals nothing but record counts and
-types (architecture.md, Key management, No password recovery).
+Without the password the file reveals nothing but its size
+(architecture.md, Key management, No password recovery). Record ids,
+holding ids, edit counters and when it was made would say which figures
+belong to one holding, how often each was edited and when the backup
+was taken, so they are all sealed.
 
 **It carries both timelines.** Quantities and prices are both ordinary
 vault records (`record-rate.md`), so both ride in the same `records`
@@ -221,19 +230,14 @@ method is what makes a vault exportable at all.
 
 ### Export
 
-`GET /api/export` returns a JSON file with `Content-Disposition:
-attachment`, named `solvent-vault-<YYYY-MM-DD>.json`. Two vaults
-exported on one day collide in a downloads folder, and the browser's
-own numbering is the answer to that.
-
-It **requires the `X-Solvent-Request` header** despite being a GET
-(architecture.md, Application hardening, CSRF), so it is not reachable
-by navigation. Following the URL directly is a Forbidden.
+`GET /api/export` reads the vault and what opens it, with
+`Content-Disposition: attachment` naming the file
+`solvent-vault-<YYYY-MM-DD>.json`. Two vaults exported on one day
+collide in a downloads folder, and the browser's own numbering is the
+answer to that.
 
 ```json
 {
-  "format": "solvent-vault",
-  "formatVersion": 1,
   "exportedAt": "2026-08-01T09:14:00Z",
   "salt": "…",
   "kdf": { "alg": "argon2id", "v": 19, "m": 65536, "t": 3, "p": 1 },
@@ -245,6 +249,41 @@ by navigation. Following the URL directly is a Forbidden.
   ]
 }
 ```
+
+It **requires the `X-Solvent-Request` header** despite being a GET
+(architecture.md, Application hardening, CSRF), so it is not reachable
+by navigation. Following the URL directly is a Forbidden.
+
+The browser unwraps the read's `wrappedDek` with the page's Master Key
+and seals `{ exportedAt, records }` as JSON in one AES-256-GCM envelope
+under that DEK, with a fresh 96-bit nonce and the AAD `solvent-vault`
+0x1F `2`, the format version in decimal. That file is what it saves:
+
+```json
+{
+  "format": "solvent-vault",
+  "formatVersion": 2,
+  "salt": "…",
+  "kdf": { "alg": "argon2id", "v": 19, "m": 65536, "t": 3, "p": 1 },
+  "wrappedDek": "…", "dekNonce": "…",
+  "nonce": "…", "ciphertext": "…"
+}
+```
+
+A wrapper that does not open with the page's Master Key writes no file.
+The envelope's AAD has two fields where a record's has five, so neither
+can pass for the other, and it binds the envelope to its format
+version. Records inside keep their own encryption and AAD, so a restore
+decrypts them as before.
+
+A `formatVersion: 1` file is the read itself, with `format` and
+`formatVersion` beside it: its records, ids and timestamp are in the
+open. It still restores, checked record by record at step 1.
+
+The client refuses a file over **64 MiB** by its size. The server's cap
+is on the ciphertext it stores, and the file carries that ciphertext
+base64 encoded twice, once per record and once in the envelope, so the
+file cap sits above it.
 
 Neither the file nor its name carries a **user identifier**, because a
 file found on a lost machine or a shared drive must not say whose vault
@@ -336,8 +375,8 @@ written.
   enforces `version: 1` on every imported record rather than trusting
   the client's step 4. A record at any other version is a Bad Request
   for the whole payload.
-- Client-side validation mirrors this, so a bad file fails fast without
-  a large upload.
+- Client-side validation mirrors this, on a sealed file once its
+  envelope opens, so a bad file fails fast without a large upload.
 - The import is one transaction. A failure at any point leaves the vault
   exactly as it was, never half-erased, and a tab closed mid-import
   leaves no partial state to recover from.
@@ -391,8 +430,8 @@ There is no `formatVersion` below 1.
    total in both pricing modes (`net-worth-view.md`), which fails if
    either timeline is dropped. Test:
    `tests/browser/parts/export-import.mjs`.
-3. An export carries profile, account, snapshot and rate records in one
-   `records` array. Test:
+3. The export read carries profile, account, snapshot and rate records
+   in one `records` array. Test:
    `tests/test_transfer.py::test_the_export_carries_both_timelines_and_one_wrapper`.
 4. (blind) A scan of the file's actual bytes finds no plaintext holding
    name, note, dimension label, value, rate, symbol, date or currency.
@@ -440,8 +479,9 @@ There is no `formatVersion` below 1.
     `tests/test_transfer.py::test_a_principal_id_in_the_payload_is_refused_whole_and_neither_vault_changes`.
 18. Imported records land under the session user. Test:
     `tests/test_transfer.py::test_imported_records_land_under_the_session_user`.
-19. A file with no profile record is refused before decryption, before a
-    password is asked for and before any request. Test:
+19. A file with no profile record is refused before any request: a
+    format 1 file before a password is asked for, a sealed file once its
+    password opens it. Test:
     `tests/test_client.py::test_the_client_side_rules_hold`,
     `tests/browser/parts/export-import.mjs`.
 20. A file that is not JSON, has the wrong `format` or a newer
@@ -553,4 +593,17 @@ There is no `formatVersion` below 1.
     `tests/test_credential_changed.py::test_the_page_that_changed_the_password_still_restores`.
 52. A restore refused for a credential changed elsewhere locks the page
     and says why, and unlocking returns to this screen. Test:
+    `tests/browser/parts/export-import.mjs`.
+53. (blind) An exported file shows nothing outside its envelope but
+    `format`, `formatVersion`, the salt, the KDF envelope, the wrapper
+    and the envelope's nonce: no record id, holding id, edit counter,
+    record or timestamp. Test:
+    `tests/test_client.py::test_the_client_side_rules_hold`,
+    `tests/browser/parts/export-import.mjs`.
+54. A sealed file opens with its password to the records it sealed, and
+    restores. Test: `tests/test_client.py::test_the_client_side_rules_hold`,
+    `tests/browser/parts/export-import.mjs`.
+55. One byte altered in a sealed file's envelope refuses it as damaged
+    once its password opens the wrapper, uploading nothing. Test:
+    `tests/test_client.py::test_the_client_side_rules_hold`,
     `tests/browser/parts/export-import.mjs`.

@@ -34,7 +34,7 @@ server table looks free. It is not:
 - **Export carries it either way.** The file must carry both timelines
   or a restore reprices the whole history (architecture.md, Components).
   A server table would enter the export as plaintext, turning a file
-  that reveals only record counts and types into a list of every symbol
+  that reveals nothing but its size into a list of every symbol
   held and every date recorded. As a vault record it rides along with no
   format change.
 - **Server-side deletability buys nothing.** The providers rejected on

@@ -1183,7 +1183,7 @@ await check('the file is checked before it is decrypted, as the server checks th
     return 'accepted';
   };
   assert.equal(refused(() => {}), 'accepted');
-  assert.equal(refused((f) => { f.formatVersion = 2; }), 'newer');
+  assert.equal(refused((f) => { f.formatVersion = transfer.FORMAT_VERSION + 1; }), 'newer');
   assert.equal(refused((f) => { f.formatVersion = 0; }), 'format');
   assert.equal(refused((f) => { f.format = 'something-else'; }), 'format');
   assert.equal(refused((f) => { f.records[1].recordType = 'invoice'; }), 'format');
@@ -1196,6 +1196,64 @@ await check('the file is checked before it is decrypted, as the server checks th
   assert.equal(refused((f) => { delete f.wrappedDek; }), 'format');
   // A vault restored without its profile would have no main currency.
   assert.equal(refused((f) => { f.records = f.records.filter((r) => r.recordType !== 'profile'); }), 'noProfile');
+});
+
+// The fixture's contents sealed as the export seals them, under the DEK
+// its wrapper opens to.
+const sealed = async (change = () => {}) => {
+  const { fileDek } = await transfer.openFile(copyOf(FIXTURE), FIXTURE_PASSWORD);
+  const contents = copyOf(FIXTURE);
+  change(contents);
+  return transfer.sealFile(fileDek, contents);
+};
+
+await check('a sealed file shows no record id, holding id, edit counter or timestamp', async () => {
+  const file = await sealed();
+  assert.equal(file.formatVersion, transfer.FORMAT_VERSION);
+  assert.deepEqual(
+    Object.keys(file).sort(),
+    ['ciphertext', 'dekNonce', 'format', 'formatVersion', 'kdf', 'nonce', 'salt', 'wrappedDek'],
+  );
+  const text = JSON.stringify(file);
+  for (const record of FIXTURE.records) {
+    assert.ok(!text.includes(record.recordId), record.recordId);
+    if (record.accountId) assert.ok(!text.includes(record.accountId), record.accountId);
+  }
+  assert.ok(!text.includes(FIXTURE.exportedAt.slice(0, 10)));
+  // Its header alone passes the first step.
+  transfer.checkFile(copyOf(file));
+});
+
+await check('a sealed file opens with its password to the records it sealed', async () => {
+  const opened = await transfer.openFile(transfer.checkFile(await sealed()), FIXTURE_PASSWORD);
+  assert.deepEqual(opened.records, FIXTURE.records);
+  assert.equal(opened.exportedAt, FIXTURE.exportedAt);
+  assert.deepEqual(opened.profile, FIXTURE_PAYLOADS.profile);
+  const { records } = await transfer.rekey(opened.fileDek, opened.records);
+  assert.equal(records.length, FIXTURE.records.length);
+});
+
+await check('a sealed file is refused as damaged after the password, sending nothing', async () => {
+  const refusedAfterPassword = async (file) => {
+    try {
+      await transfer.openFile(transfer.checkFile(file), FIXTURE_PASSWORD);
+    } catch (error) {
+      return error instanceof transfer.FileRefused ? error.reason : error.message;
+    }
+    return 'accepted';
+  };
+  const altered = await sealed();
+  const bytes = cryptoModule.b64decode(altered.ciphertext);
+  bytes[3] ^= 0x01;
+  altered.ciphertext = cryptoModule.b64encode(bytes);
+  assert.equal(await refusedAfterPassword(altered), 'format');
+  assert.equal(await refusedAfterPassword(await sealed((f) => { f.records[1].recordType = 'invoice'; })), 'format');
+  assert.equal(
+    await refusedAfterPassword(await sealed((f) => { f.records = f.records.filter((r) => r.recordType !== 'profile'); })),
+    'noProfile',
+  );
+  assert.throws(() => transfer.checkFile({ ...FIXTURE, formatVersion: 2 }), transfer.FileRefused);
+  assert.deepEqual(requests, []);
 });
 
 await check('net-worth-view: a date with prices and no figures still bends the bands', () => {

@@ -519,6 +519,10 @@ or kinds.
     never needs its own `principal_id` and no endpoint returns one, and
     a vault transfer re-keys rather than re-binds (record-api.md,
     export-import.md).
+  - **An export file's envelope is the one other blob under the DEK.**
+    Its AAD is `solvent-vault` 0x1F the format version, two fields where
+    a record's has five, so neither passes for the other
+    (export-import.md, Export).
 - **Session key handling**: the Master Key and the unwrapped DEK live
   only in page memory, never in localStorage or sessionStorage. A page
   refresh re-derives them from the password.

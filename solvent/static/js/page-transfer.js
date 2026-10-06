@@ -5,7 +5,7 @@
 // account on the instance. Neither card treats that as a hazard.
 import * as api from './api.js';
 import { el, icon, mount } from './dom.js';
-import { heldSalt, lockForChangedCredential, replaceDek, wrapForMaster } from './session.js';
+import { exportFile, heldSalt, lockForChangedCredential, replaceDek, wrapForMaster } from './session.js';
 import * as transfer from './transfer.js';
 import { passwordWithToggle } from './unlock.js';
 
@@ -56,16 +56,17 @@ function exportCard() {
       let ceiling = false;
       try {
         // Not a link: the endpoint requires a header a navigation
-        // cannot send, so it is fetched and saved through a blob.
-        const { blob, filename } = await api.downloadExport();
+        // cannot send, so it is fetched, sealed and saved through a
+        // blob.
+        const { file, filename, records } = await exportFile();
+        const blob = new Blob([JSON.stringify(file)], { type: 'application/json' });
         const url = URL.createObjectURL(blob);
         const anchor = el('a', { href: url, download: filename });
         document.body.append(anchor);
         anchor.click();
         anchor.remove();
         URL.revokeObjectURL(url);
-        // What the file holds, read from the file itself.
-        const counts = transfer.countKinds(JSON.parse(await blob.text()).records);
+        const counts = transfer.countKinds(records);
         const size = `about ${Math.max(1, Math.round(blob.size / 1024))} KB`;
         status.textContent =
           counts.account + counts.snapshot + counts.rate
@@ -186,14 +187,7 @@ function importCard(vault, reload) {
       parsed = transfer.checkFile(JSON.parse(await chosen.text()));
     } catch (failure) {
       parsed = null;
-      const reason = failure instanceof transfer.FileRefused ? failure.reason : 'format';
-      fail(
-        reason === 'newer'
-          ? 'This file was written by a newer version of Solvent. Update Solvent before restoring it.'
-          : reason === 'noProfile'
-            ? 'This file carries no vault settings, so it would restore a vault with no main currency. It cannot be restored.'
-            : 'That is not a Solvent vault file, or it has been damaged.',
-      );
+      fail(refusal(failure));
       return;
     }
     stepPassword.hidden = false;
@@ -216,7 +210,9 @@ function importCard(vault, reload) {
       fail(
         failure instanceof transfer.WrongPassword
           ? 'That password does not open this file.'
-          : `No records were imported. Your vault is unchanged. Record ${failure.recordId} in the file could not be decrypted.`,
+          : failure instanceof transfer.FileRefused
+            ? refusal(failure)
+            : `No records were imported. Your vault is unchanged. Record ${failure.recordId} in the file could not be decrypted.`,
       );
       return;
     } finally {
@@ -233,7 +229,7 @@ function importCard(vault, reload) {
   });
 
   const showReview = () => {
-    const counts = transfer.countKinds(parsed.records);
+    const counts = transfer.countKinds(opened.records);
     const theirs = opened.profile ? opened.profile.mainCurrency : null;
     mount(review, [
       el('div', { class: 'review-side' }, [
@@ -241,7 +237,7 @@ function importCard(vault, reload) {
         el('p', { text: `${counts.account} holdings` }),
         el('p', { text: `${counts.snapshot} recorded figures` }),
         el('p', { text: `${counts.rate} captured prices` }),
-        el('p', { class: 'hint', text: `Exported ${vault.format.longDate(parsed.exportedAt.slice(0, 10))}` }),
+        el('p', { class: 'hint', text: `Exported ${vault.format.longDate(opened.exportedAt.slice(0, 10))}` }),
       ]),
       el('div', { class: 'review-side' }, [
         el('h3', { class: 'group-heading', text: 'What will be deleted' }),
@@ -287,7 +283,7 @@ function importCard(vault, reload) {
     let rekeyed;
     try {
       // Nothing is uploaded until every record has decrypted.
-      rekeyed = await inWorker(opened.fileDek, parsed.records, (step, done, of) =>
+      rekeyed = await inWorker(opened.fileDek, opened.records, (step, done, of) =>
         progress(`${step === 'decrypt' ? 'Decrypting' : 'Re-encrypting'} ${done} of ${of}…`, done, of),
       );
     } catch (failure) {
@@ -324,7 +320,7 @@ function importCard(vault, reload) {
     const before = vault.mainCurrency;
     const next = await replaceDek(rekeyed.dek, answered.vaultEpoch, wrapper);
     restored = {
-      counts: transfer.countKinds(parsed.records),
+      counts: transfer.countKinds(opened.records),
       currency: next.mainCurrency,
       currencyChanged: Boolean(theirs) && theirs !== before,
     };
@@ -370,6 +366,16 @@ function inWorker(fileDek, records, onProgress) {
     };
     worker.postMessage({ fileDek, records });
   });
+}
+
+/** What the screen says of a file `checkFile` or `openFile` refused. */
+function refusal(failure) {
+  const reason = failure instanceof transfer.FileRefused ? failure.reason : 'format';
+  if (reason === 'newer') return 'This file was written by a newer version of Solvent. Update Solvent before restoring it.';
+  if (reason === 'noProfile') {
+    return 'This file carries no vault settings, so it would restore a vault with no main currency. It cannot be restored.';
+  }
+  return 'That is not a Solvent vault file, or it has been damaged.';
 }
 
 function countOf(map) {
