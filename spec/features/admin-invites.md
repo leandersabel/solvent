@@ -320,7 +320,8 @@ says so in one line.
 One card, the only control here not about the instance (How it works,
 An administrator's own credential). Current password, new password,
 confirm, with the bar and strength gauge registration uses (register.md,
-Register).
+Register), in a form with the username (design-system.md, Components,
+Password field). Enter submits it once the button is enabled.
 
 - One line above the fields: "This protects the power to remove every
   account on this instance, so it is held to the same bar as anybody
@@ -832,3 +833,8 @@ administrator), and the lost sole password (Bootstrap). The rest:
 51. A used invite whose account is gone reads "account removed" and
     "Already used. The account it created has since been removed." Test:
     `tests/browser/parts/admin.mjs`.
+52. The password card's fields sit in a form holding the
+    administrator's username in a hidden text field with autocomplete
+    `username`, ahead of the password fields. Test:
+    `tests/browser/parts/admin.mjs`,
+    `tests/browser/parts/admin-review-forms.mjs`.

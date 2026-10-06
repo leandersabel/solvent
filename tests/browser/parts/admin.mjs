@@ -130,6 +130,13 @@ await run(async () => {
   await page.waitUntil("document.body.innerText.includes('same bar as anybody')", { label: 'the password card' });
   check('an administrator can change their own password', (await labels('.card button')).includes('Change password'));
   check(
+    "the password card's fields sit in a form with the administrator's username",
+    (await page.eval(`(() => {
+      const name = document.querySelector('input[autocomplete=new-password]').closest('form')?.querySelector('input[autocomplete=username]');
+      return name?.hidden && name.type === 'text' && name.value;
+    })()`)) === 'ops.leander',
+  );
+  check(
     "the password card's error sits above the current password field",
     await page.eval(`(() => {
       const card = document.querySelector('input[autocomplete=current-password]').closest('.card');

@@ -139,7 +139,7 @@ function importCard(vault, reload) {
   ]);
 
   // 2. The password for that file.
-  const password = el('input', { type: 'password', id: 'import-password', autocomplete: 'off' });
+  const password = el('input', { type: 'password', id: 'import-password' });
   const openButton = el('button', { class: 'btn-secondary', text: 'Open the file', type: 'button' });
   const stepPassword = el('div', { class: 'field', hidden: true }, [
     el('label', { for: 'import-password', text: 'The password this file was exported under' }),

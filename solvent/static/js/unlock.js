@@ -47,12 +47,11 @@ export function unlockCard({ knownUsername = null, replaced = null, credentialCh
     onclick: () => form.requestSubmit(),
   });
 
-  // Unlocking again, a hidden text field carries the known username so a
-  // password manager can pair it with the password. `type=hidden` would
-  // not be read as a username. Sign-in never reads it.
+  // Unlocking again, the known username rides along for a password
+  // manager. Sign-in never reads it.
   const identity = knownUsername
     ? el('p', { class: 'known-username' }, [
-        el('input', { type: 'text', autocomplete: 'username', value: knownUsername, hidden: true }),
+        knownUsernameField(knownUsername),
         el('span', { text: knownUsername }),
         el('a', { href: '/api/auth/logout', class: 'link-quiet', text: 'Not you? Sign out', onclick: signOutLink }),
       ])
@@ -159,6 +158,14 @@ function messageFor(failure) {
 export function show(node, text) {
   node.textContent = text;
   node.hidden = false;
+}
+
+/** A hidden text field holding the signed-in username, so a password
+ *  manager pairs it with the password fields after it in the same form
+ *  and can store or update the right login. `type=hidden` would not be read as
+ *  a username. Nothing submits it. */
+export function knownUsernameField(username) {
+  return el('input', { type: 'text', autocomplete: 'username', value: username, hidden: true });
 }
 
 export function passwordWithToggle(input) {

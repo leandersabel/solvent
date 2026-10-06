@@ -69,12 +69,12 @@ await run(async () => {
   const same = await page.call((words, copy) => {
     const card = [...document.querySelectorAll('.card')].find((c) => c.textContent.includes(words));
     const error = [...card.querySelectorAll('*')].find((n) => n.textContent.trim() === copy && ![...n.children].some((c) => c.textContent.trim() === copy));
-    const first = card.querySelector('input');
+    const first = card.querySelector('input[type=password]');
     return {
       found: Boolean(error),
       before: Boolean(error && error.compareDocumentPosition(first) & Node.DOCUMENT_POSITION_FOLLOWING),
       above: Boolean(error && error.getBoundingClientRect().bottom <= first.getBoundingClientRect().top + 0.5),
-      kept: [...card.querySelectorAll('input')].map((i) => i.value),
+      kept: [...card.querySelectorAll('input[type=password]')].map((i) => i.value),
       posted: window.__posted,
       working: window.__working,
     };
@@ -96,7 +96,7 @@ await run(async () => {
   await page.idle();
   const weak = await page.call((words) => {
     const card = [...document.querySelectorAll('.card')].find((c) => c.textContent.includes(words));
-    return { posted: window.__posted, working: window.__working, kept: [...card.querySelectorAll('input')].map((i) => i.value) };
+    return { posted: window.__posted, working: window.__working, kept: [...card.querySelectorAll('input[type=password]')].map((i) => i.value) };
   }, CARD);
   check('nothing is derived for a new password that fails the policy', weak.posted === 0 && !weak.working, JSON.stringify(weak));
   check('nothing is sent for a new password that fails the policy', changeRequests() === beforeWeak, `${changeRequests() - beforeWeak} sent`);

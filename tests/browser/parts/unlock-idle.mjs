@@ -276,7 +276,7 @@ await run(async () => {
   // Made up inside the page, so no script source the test sent carries
   // them and the heap search below finds only what the page kept.
   const typedValues = JSON.parse(await onCard(passwordCard, (card) => {
-    const fields = card.querySelectorAll('input');
+    const fields = card.querySelectorAll('.password-field input');
     const type = (field) => {
       field.value = 'pw-' + crypto.randomUUID();
       field.dispatchEvent(new Event('input', { bubbles: true }));
@@ -287,7 +287,7 @@ await run(async () => {
     typed.push(type(fields[1]));
     return JSON.stringify(typed);
   }));
-  const shownType = await onCard(passwordCard, (card) => card.querySelectorAll('input')[1].type);
+  const shownType = await onCard(passwordCard, (card) => card.querySelectorAll('.password-field input')[1].type);
   await idleLock();
   // Only counts leave these checks, so a failure never prints a password.
   const kept = await reachable(typedValues);
@@ -297,7 +297,7 @@ await run(async () => {
     `${kept} kept, the second field was ${shownType}`,
   );
   await unlockInPlace('the vault after unlocking over the password card');
-  const filled = await onCard(passwordCard, (card) => [...card.querySelectorAll('input')].filter(f => f.value !== '').length);
+  const filled = await onCard(passwordCard, (card) => [...card.querySelectorAll('.password-field input')].filter(f => f.value !== '').length);
   check('no password field is refilled after unlocking', filled === 0, `${filled} filled`);
   check('no password field is refilled after unlocking', filled === 0, `${filled} filled`);
 });

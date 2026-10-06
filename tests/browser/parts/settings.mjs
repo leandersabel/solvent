@@ -283,7 +283,7 @@ await run(async () => {
   const deleteState = (password, typed) =>
     page.call((secret, username) => {
       const dialog = document.querySelector('.dialog');
-      const [pw, name] = dialog.querySelectorAll('input');
+      const [pw, name] = dialog.querySelectorAll('.field input');
       pw.value = secret;
       pw.dispatchEvent(new Event('input', { bubbles: true }));
       name.value = username;
@@ -294,6 +294,13 @@ await run(async () => {
     await deleteState('', 'leander'),
     await deleteState('something', 'Leander'),
   ];
+  check(
+    "the delete dialog's password sits in a form with the signed-in username",
+    (await page.call(() => {
+      const name = document.querySelector('.dialog input[type=password]').closest('form')?.querySelector('input[autocomplete=username]');
+      return name?.hidden && name.value;
+    })) === 'leander',
+  );
   const disabledLook = await confirmLook('Delete my vault');
   gates.push(await deleteState('something', 'leander'));
   const enabledLook = await confirmLook('Delete my vault');
@@ -364,6 +371,16 @@ await run(async () => {
   const elsewhere = await otherSession('leander', VAULT_PASSWORD);
   check('the other session is open before the change', (await statusWith(elsewhere)) === 200);
 
+  // design-system.md, Password field: a form a password manager pairs
+  // with the signed-in username.
+  check(
+    'the Change password fields sit in a form with the signed-in username',
+    (await page.eval(`(() => {
+      const name = document.querySelector('.card input[autocomplete=new-password]').closest('form')?.querySelector('input[autocomplete=username]');
+      return name?.hidden && name.type === 'text' && name.value;
+    })()`)) === 'leander',
+  );
+
   const PASSWORD_CARD = 'Change password';
   const fillPasswords = async (current, next) => {
     await page.call((words, currentValue, nextValue) => {
@@ -399,8 +416,8 @@ await run(async () => {
     const card = [...document.querySelectorAll('.card')].find((c) => c.textContent.includes(words));
     const error = card.querySelector('.field-error:not([hidden])');
     return {
-      above: Boolean(error.compareDocumentPosition(card.querySelector('input')) & Node.DOCUMENT_POSITION_FOLLOWING),
-      kept: [...card.querySelectorAll('input')].map((i) => i.value),
+      above: Boolean(error.compareDocumentPosition(card.querySelector('.password-field input')) & Node.DOCUMENT_POSITION_FOLLOWING),
+      kept: [...card.querySelectorAll('.password-field input')].map((i) => i.value),
     };
   }, PASSWORD_CARD);
   check(
@@ -419,10 +436,10 @@ await run(async () => {
   const wrongCurrent = await page.call((words) => {
     const card = [...document.querySelectorAll('.card')].find((c) => c.textContent.includes(words));
     const error = card.querySelector('.field-error:not([hidden])');
-    const first = card.querySelector('input');
+    const first = card.querySelector('.password-field input');
     return {
       above: Boolean(error.compareDocumentPosition(first) & Node.DOCUMENT_POSITION_FOLLOWING),
-      kept: [...card.querySelectorAll('input')].map((i) => i.value),
+      kept: [...card.querySelectorAll('.password-field input')].map((i) => i.value),
     };
   }, PASSWORD_CARD);
   check(
@@ -448,7 +465,7 @@ await run(async () => {
     button.click();
     return {
       label: button.textContent,
-      quiet: [...card.querySelectorAll('input, .password-field button')].every((n) => n.disabled),
+      quiet: [...card.querySelectorAll('.password-field input, .password-field button')].every((n) => n.disabled),
     };
   }, PASSWORD_CARD);
   check(
@@ -665,7 +682,7 @@ await run(async () => {
           zone.querySelector('.btn-destructive').click();
         }
         const dialog = document.querySelector('.dialog');
-        const [pw, name] = dialog.querySelectorAll('input');
+        const [pw, name] = dialog.querySelectorAll('.field input');
         pw.value = secret;
         pw.dispatchEvent(new Event('input', { bubbles: true }));
         name.value = 'leaving';

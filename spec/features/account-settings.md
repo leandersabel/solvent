@@ -124,7 +124,9 @@ link. Neither belongs inside a settings card, so neither is a section.
 
 Current password, new password, confirm, with the same bar and strength
 gauge as registration (`register.md`, Register). Autocomplete
-`current-password` and `new-password`. Top to bottom in the card:
+`current-password` and `new-password`, in a form with the username
+(design-system.md, Components, Password field). Enter submits it once
+the button is enabled. Top to bottom in the card:
 
 - A tinted callout: "Your data is not re-encrypted. Only the lock
   around your key is rebuilt, which is why this is fast even on a large
@@ -166,7 +168,8 @@ screen, its label in critical. Opened, it holds one destructive button,
 the disclosure itself.
 
 The dialog, headed **Delete your account**, asks for the password and
-the username and says:
+the username, in a form with the username (design-system.md,
+Components, Password field) that Enter never submits, and says:
 
 > Deleting takes the account, everything in the vault, and every
 > session you have open. It happens all at once and it cannot be
@@ -1091,3 +1094,8 @@ from an administrator removing an account (`admin-invites.md`).
     `tests/browser/parts/settings-review-gauge.mjs`,
     `tests/browser/parts/admin-review-cleared.mjs`,
     `tests/browser/parts/admin-review-gauge.mjs`.
+84. The Change password fields and the delete dialog's password field
+    each sit in a form holding the signed-in username in a hidden text
+    field with autocomplete `username`, ahead of the password fields.
+    Test: `tests/browser/parts/settings.mjs`,
+    `tests/browser/parts/settings-review-forms.mjs`.
