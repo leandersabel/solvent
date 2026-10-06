@@ -529,7 +529,9 @@ Standard app shell, content max-width 900px.
   where it came from a year later exactly as on the evening it was
   written.
 - **Update**, primary, opens the sweep for this date holding what was
-  recorded. Everything possible on the evening is possible again.
+  recorded. Everything possible on the evening is possible again. A
+  misdated recording has no Update, because the sweep opens only at a
+  recorded day. Its entries are moved from their holding.
 - **Delete**, destructive (Delete).
 
 **Nothing on this screen contacts a price source**, however old the
@@ -944,7 +946,8 @@ snapshot and price entry carries one:
   counts toward no total, age, chart range or price, and neither
   `quantityDates` nor `recordingDates` holds its date. It stays in the
   model, so its recording opens at its date (`app-shell.md`, Addresses
-  inside the vault) and its holding's Values table lists it.
+  inside the vault), without Update, and its holding's Values table
+  lists it.
 - The dashboard's fault banner names each misdated record by holding or
   unit and its date as stored, each line opening its recording. The
   holding's Values row is flagged with "This is not a day that has
@@ -1662,7 +1665,8 @@ Editing an existing entry).
     `tests/test_client.py::test_the_client_side_rules_hold`.
 99. (blind) A misdated snapshot or price entry counts toward no figure,
     age or chart range, is listed for moving or deleting, and its
-    recording still opens. Test:
-    `tests/test_client.py::test_the_client_side_rules_hold`.
+    recording still opens without Update. Test:
+    `tests/test_client.py::test_the_client_side_rules_hold`,
+    `tests/browser/parts/recording-detail-misdated.mjs`.
 100. Today is the calendar day on the device, in any time zone. Test:
      `tests/test_client.py::test_the_client_side_rules_hold`.
