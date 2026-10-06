@@ -30,8 +30,14 @@ page.on((message) => {
 });
 const unpaired = () => logged.filter((e) => UNPAIRED.some((note) => e.text.includes(note)));
 
-const card = `[...document.querySelectorAll('.card')].find((c) => c.textContent.includes(${JSON.stringify(CARD)}))`;
-const confirmField = `[...${card}.querySelectorAll('input[autocomplete=new-password]')].at(-1)`;
+// Each runs in the page with the card's words as data.
+const shown = (words) => [...document.querySelectorAll('.card')].some((c) => c.textContent.includes(words));
+const enabled = (words) =>
+  ![...document.querySelectorAll('.card')].find((c) => c.textContent.includes(words)).querySelector('.btn-primary').disabled;
+const focusConfirm = (words) =>
+  [...[...document.querySelectorAll('.card')].find((c) => c.textContent.includes(words)).querySelectorAll('input[autocomplete=new-password]')]
+    .at(-1)
+    .focus();
 const fill = (current, next) =>
   page.call((words, currentValue, nextValue) => {
     const found = [...document.querySelectorAll('.card')].find((c) => c.textContent.includes(words));
@@ -42,29 +48,38 @@ const fill = (current, next) =>
     set(found.querySelector('input[autocomplete=current-password]'), currentValue);
     for (const node of found.querySelectorAll('input[autocomplete=new-password]')) set(node, nextValue);
   }, CARD, current, next);
-const enterIn = async (selector) => {
-  await page.eval(`${selector}.focus()`);
+const enterIn = async (focus, ...args) => {
+  await page.call(focus, ...args);
   await page.key('Enter');
 };
 const authRequests = () => watched[0].requests.filter((r) => r.url.includes('/api/auth/')).length;
 
 const changeByEnter = async (current, next) => {
   await fill(current, next);
-  await page.waitUntil(`!${card}.querySelector('.btn-primary').disabled`, { label: 'the strength gauge' });
-  await page.eval(`window.__working = false; new MutationObserver(() => { if (${card}.textContent.includes('Changing your password')) window.__working = true; }).observe(${card}, { subtree: true, childList: true, characterData: true })`);
-  await enterIn(confirmField);
+  await page.waitUntil(enabled, { args: [CARD], label: 'the strength gauge' });
+  await page.call((words) => {
+    const cardOf = () => [...document.querySelectorAll('.card')].find((c) => c.textContent.includes(words));
+    window.__working = false;
+    new MutationObserver(() => {
+      if (cardOf().textContent.includes('Changing your password')) window.__working = true;
+    }).observe(cardOf(), { subtree: true, childList: true, characterData: true });
+  }, CARD);
+  await enterIn(focusConfirm, CARD);
   return page
-    .waitUntil(`window.__working && ${card}.textContent.includes(${JSON.stringify(CHANGED)}) && !${card}.textContent.includes('Changing your password')`, {
-      timeout: 90000,
-      label: 'the password changed by Enter',
-    })
+    .waitUntil(
+      (words, done) => {
+        const found = [...document.querySelectorAll('.card')].find((c) => c.textContent.includes(words));
+        return window.__working && found.textContent.includes(done) && !found.textContent.includes('Changing your password');
+      },
+      { args: [CARD, CHANGED], timeout: 90000, label: 'the password changed by Enter' },
+    )
     .then(() => true, () => false);
 };
 
 await run(async () => {
   await administrator();
   await click('Your password');
-  await page.waitUntil(`${card}`, { label: 'the password card' });
+  await page.waitUntil(shown, { args: [CARD], label: 'the password card' });
   await page.idle();
 
   const form = await page.call((words) => {
@@ -91,15 +106,18 @@ await run(async () => {
   const beforeWeak = authRequests();
   await fill(ADMIN_PASSWORD, WEAK);
   await page.idle();
-  const disabled = await page.eval(`${card}.querySelector('.btn-primary').disabled`);
-  await enterIn(confirmField);
+  const disabled = !(await page.call(enabled, CARD));
+  await enterIn(focusConfirm, CARD);
   await page.idle();
   check('with the button disabled, Enter sends nothing', disabled && authRequests() === beforeWeak, `${authRequests() - beforeWeak} sent`);
   check('Enter never navigates the page', (await page.eval('location.href')) === location, await page.eval('location.href'));
 
   // Another name in the hidden field: the change still goes through, and
   // no request carries it.
-  await page.eval(`${card}.querySelector('input[type=password]').form.querySelector('input[autocomplete=username]').value = ${JSON.stringify(MARKER)}`);
+  await page.call((words, marker) => {
+    const found = [...document.querySelectorAll('.card')].find((c) => c.textContent.includes(words));
+    found.querySelector('input[type=password]').form.querySelector('input[autocomplete=username]').value = marker;
+  }, CARD, MARKER);
   const sentBefore = watched[0].requests.length;
   check('Enter submits the change once the button is enabled', await changeByEnter(ADMIN_PASSWORD, NEW_PASSWORD));
   check(
@@ -114,9 +132,15 @@ await run(async () => {
   expectedFailures.add('/api/auth/');
   const fromWrong = logged.length;
   await fill(NEW_PASSWORD, 'quartz meridian lantern obelisk');
-  await page.waitUntil(`!${card}.querySelector('.btn-primary').disabled`, { label: 'the strength gauge' });
-  await page.eval(`${card}.querySelector('.btn-primary').click()`);
-  await page.waitUntil(`${card}.textContent.includes(${JSON.stringify(WRONG)})`, { timeout: 90000, label: 'the wrong password' });
+  await page.waitUntil(enabled, { args: [CARD], label: 'the strength gauge' });
+  await page.call(
+    (words) => [...document.querySelectorAll('.card')].find((c) => c.textContent.includes(words)).querySelector('.btn-primary').click(),
+    CARD,
+  );
+  await page.waitUntil(
+    (words, refused) => [...document.querySelectorAll('.card')].find((c) => c.textContent.includes(words)).textContent.includes(refused),
+    { args: [CARD, WRONG], timeout: 90000, label: 'the wrong password' },
+  );
   await page.idle();
   expectedFailures.delete('/api/auth/');
   const errors = logged.slice(fromWrong).filter((e) => e.level === 'error');

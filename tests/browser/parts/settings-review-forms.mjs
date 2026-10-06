@@ -60,7 +60,14 @@ const formOf = (scopeSelector, words) =>
     };
   }, scopeSelector, words);
 
-const card = `[...document.querySelectorAll('.card')].find((c) => c.textContent.includes(${JSON.stringify(CARD)}))`;
+// Each runs in the page with the card's words as data.
+const shown = (words) => [...document.querySelectorAll('.card')].some((c) => c.textContent.includes(words));
+const enabled = (words) =>
+  ![...document.querySelectorAll('.card')].find((c) => c.textContent.includes(words)).querySelector('.btn-primary').disabled;
+const focusConfirm = (words) =>
+  [...[...document.querySelectorAll('.card')].find((c) => c.textContent.includes(words)).querySelectorAll('input[autocomplete=new-password]')]
+    .at(-1)
+    .focus();
 const fill = (current, next) =>
   page.call((words, currentValue, nextValue) => {
     const found = [...document.querySelectorAll('.card')].find((c) => c.textContent.includes(words));
@@ -71,31 +78,39 @@ const fill = (current, next) =>
     set(found.querySelector('input[autocomplete=current-password]'), currentValue);
     for (const node of found.querySelectorAll('input[autocomplete=new-password]')) set(node, nextValue);
   }, CARD, current, next);
-const enterIn = async (selector) => {
-  await page.eval(`${selector}.focus()`);
+const enterIn = async (focus, ...args) => {
+  await page.call(focus, ...args);
   await page.key('Enter');
 };
-const confirmField = `[...${card}.querySelectorAll('input[autocomplete=new-password]')].at(-1)`;
 const authRequests = () => watched[0].requests.filter((r) => r.url.includes('/api/auth/')).length;
 
 // Changes the password by pressing Enter in the confirm field.
 const changeByEnter = async (current, next) => {
   await fill(current, next);
-  await page.waitUntil(`!${card}.querySelector('.btn-primary').disabled`, { label: 'the strength gauge' });
-  await page.eval(`window.__working = false; new MutationObserver(() => { if (${card}.textContent.includes('Changing your password')) window.__working = true; }).observe(${card}, { subtree: true, childList: true, characterData: true })`);
-  await enterIn(confirmField);
+  await page.waitUntil(enabled, { args: [CARD], label: 'the strength gauge' });
+  await page.call((words) => {
+    const cardOf = () => [...document.querySelectorAll('.card')].find((c) => c.textContent.includes(words));
+    window.__working = false;
+    new MutationObserver(() => {
+      if (cardOf().textContent.includes('Changing your password')) window.__working = true;
+    }).observe(cardOf(), { subtree: true, childList: true, characterData: true });
+  }, CARD);
+  await enterIn(focusConfirm, CARD);
   return page
-    .waitUntil(`window.__working && ${card}.textContent.includes(${JSON.stringify(CHANGED)}) && !${card}.textContent.includes('Changing your password')`, {
-      timeout: 90000,
-      label: 'the password changed by Enter',
-    })
+    .waitUntil(
+      (words, done) => {
+        const found = [...document.querySelectorAll('.card')].find((c) => c.textContent.includes(words));
+        return window.__working && found.textContent.includes(done) && !found.textContent.includes('Changing your password');
+      },
+      { args: [CARD, CHANGED], timeout: 90000, label: 'the password changed by Enter' },
+    )
     .then(() => true, () => false);
 };
 
 await run(async () => {
   await vaultOwner();
   await page.eval("location.hash = '#/settings'");
-  await page.waitUntil(`${card}`, { label: 'the password card' });
+  await page.waitUntil(shown, { args: [CARD], label: 'the password card' });
   await page.idle();
 
   // ---- Change password ----------------------------------------------------
@@ -116,8 +131,8 @@ await run(async () => {
   const beforeWeak = authRequests();
   await fill(VAULT_PASSWORD, WEAK);
   await page.idle();
-  const disabled = await page.eval(`${card}.querySelector('.btn-primary').disabled`);
-  await enterIn(confirmField);
+  const disabled = !(await page.call(enabled, CARD));
+  await enterIn(focusConfirm, CARD);
   await page.idle();
   check('with the button disabled, Enter sends nothing', disabled && authRequests() === beforeWeak, `${authRequests() - beforeWeak} sent`);
   check('Enter never navigates the page', (await page.eval('location.href')) === location, await page.eval('location.href'));
@@ -125,7 +140,10 @@ await run(async () => {
   // Nothing sends or reads the hidden username: another name in it, and
   // the change still goes through as this account, with the name on no
   // request.
-  await page.eval(`${card}.querySelector('input[type=password]').form.querySelector('input[autocomplete=username]').value = ${JSON.stringify(MARKER)}`);
+  await page.call((words, marker) => {
+    const found = [...document.querySelectorAll('.card')].find((c) => c.textContent.includes(words));
+    found.querySelector('input[type=password]').form.querySelector('input[autocomplete=username]').value = marker;
+  }, CARD, MARKER);
   const sentBefore = watched[0].requests.length;
   check('Enter submits the change once the button is enabled', await changeByEnter(VAULT_PASSWORD, NEW_PASSWORD));
   check(
@@ -142,9 +160,15 @@ await run(async () => {
   expectedFailures.add('/api/auth/');
   const fromWrong = logged.length;
   await fill(NEW_PASSWORD, 'quartz meridian lantern obelisk');
-  await page.waitUntil(`!${card}.querySelector('.btn-primary').disabled`, { label: 'the strength gauge' });
-  await page.eval(`${card}.querySelector('.btn-primary').click()`);
-  await page.waitUntil(`${card}.textContent.includes(${JSON.stringify(WRONG)})`, { timeout: 90000, label: 'the wrong password' });
+  await page.waitUntil(enabled, { args: [CARD], label: 'the strength gauge' });
+  await page.call(
+    (words) => [...document.querySelectorAll('.card')].find((c) => c.textContent.includes(words)).querySelector('.btn-primary').click(),
+    CARD,
+  );
+  await page.waitUntil(
+    (words, refused) => [...document.querySelectorAll('.card')].find((c) => c.textContent.includes(words)).textContent.includes(refused),
+    { args: [CARD, WRONG], timeout: 90000, label: 'the wrong password' },
+  );
   await page.idle();
   expectedFailures.delete('/api/auth/');
   const errors = logged.slice(fromWrong).filter((e) => e.level === 'error');
@@ -179,7 +203,6 @@ await run(async () => {
   );
 
   // Enter never submits it, even with everything filled.
-  const box = "[...document.querySelectorAll('.dialog')].find((d) => d.textContent.includes('Delete your account'))";
   await page.call((secret) => {
     const d = [...document.querySelectorAll('.dialog')].find((n) => n.textContent.includes('Delete your account'));
     const set = (node, value) => {
@@ -190,17 +213,29 @@ await run(async () => {
     set([...d.querySelectorAll('input[type=text]')].find((n) => n.checkVisibility()), 'leander');
   }, VAULT_PASSWORD);
   await page.idle();
-  const armed = await page.eval(`![...${box}.querySelectorAll('button')].find((b) => b.textContent.trim() === 'Delete my vault').disabled`);
+  const armed = await page.call(() => {
+    const d = [...document.querySelectorAll('.dialog')].find((d) => d.textContent.includes('Delete your account'));
+    return ![...d.querySelectorAll('button')].find((b) => b.textContent.trim() === 'Delete my vault').disabled;
+  });
   const writesBefore = watched[0].requests.filter((r) => r.method !== 'GET').length;
-  await enterIn(`${box}.querySelector('input[type=password]')`);
+  await enterIn(() => {
+    const d = [...document.querySelectorAll('.dialog')].find((d) => d.textContent.includes('Delete your account'));
+    d.querySelector('input[type=password]').focus();
+  });
   await page.idle();
-  await enterIn(`[...${box}.querySelectorAll('input[type=text]')].find((n) => n.checkVisibility())`);
+  await enterIn(() => {
+    const d = [...document.querySelectorAll('.dialog')].find((d) => d.textContent.includes('Delete your account'));
+    [...d.querySelectorAll('input[type=text]')].find((n) => n.checkVisibility()).focus();
+  });
   await page.idle();
   const writesAfter = watched[0].requests.filter((r) => r.method !== 'GET').length;
   check('Delete my vault is enabled once the dialog is filled', armed);
   check('Enter in the delete dialog sends nothing', writesAfter === writesBefore, `${writesAfter - writesBefore} sent`);
   check('the account is still there after Enter in the delete dialog', sql("SELECT count(*) AS n FROM principals WHERE username = 'leander'")[0].n === 1);
-  check('the delete dialog stays open after Enter', await page.eval(`Boolean(${box})`));
+  check(
+    'the delete dialog stays open after Enter',
+    await page.call(() => [...document.querySelectorAll('.dialog')].some((d) => d.textContent.includes('Delete your account'))),
+  );
   check('Enter in the delete dialog left the page where it was', (await page.eval('location.href')) === location, await page.eval('location.href'));
   await page.key('Escape');
   await page.idle();
