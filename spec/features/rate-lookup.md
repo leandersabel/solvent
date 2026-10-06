@@ -291,12 +291,14 @@ test eliminates LBMA.
 ### The symbol table
 
 `GET /api/rates/symbols` returns `[{ symbol, label, kind, lookup,
-since }]`, the configured table without retired rows. Session-
-authenticated, read-only, cacheable, no outbound request.
+since, retired }]`, the whole configured table, retired rows included.
+Session-authenticated, read-only, cacheable, no outbound request.
 
 It exists because **the unit picker is built from it**
 (`manage-accounts.md`, Account form): the unit a holding is measured in
-is also its rate symbol. An unknown symbol is a Bad Request at
+is also its rate symbol. Every screen also names and prices a unit from
+it (`design-system.md`, Units, and `record-rate.md`, Reading), so a
+retired row stays in it. An unknown symbol is a Bad Request at
 `/api/rates`, which no user reaches by choosing: the client never names
 a symbol, and a free-text unit draws no proposal rather than an error.
 
@@ -307,6 +309,9 @@ a symbol, and a free-text unit draws no proposal rather than an error.
   means valid and canonical with no provider yet: the rate is entered by
   hand and `/api/rates` answers No Content, not Bad Request. A designed
   state, not a degraded one.
+- `retired`: whether an administrator retired it. Only the unit
+  picker and the main-currency list at registration leave a retired row
+  out.
 - `since`: the symbol's floor, `YYYY-MM-DD`, or `null` with no provider
   adapter. It does not follow `lookup`, because the floor is the
   provider's fact, and a main currency whose `lookup` is off still
@@ -374,10 +379,12 @@ owner one at a time, and fixable only by hand-editing an export.
   `kind: currency` row, and a vault's main currency is fixed at
   registration (`register.md`). Flipping a currency to a metal would
   break every lookup a vault has made.
-- **`retired: true` replaces deleting.** A retired symbol leaves
-  `GET /api/rates/symbols`, so no new holding can be measured in it, and
-  stays valid everywhere else: `/api/rates` still prices it, existing
-  holdings keep working, and unretiring restores it exactly. Same shape
+- **`retired: true` replaces deleting.** A retired symbol leaves the
+  unit picker, so no new holding can be measured in it, and stays valid
+  everywhere else: `GET /api/rates/symbols` still lists it with
+  `retired: true`, both forms of `/api/rates` still price it, existing
+  holdings keep their unit's name and price source, and unretiring
+  restores it exactly. Same shape
   as archiving a dimension (`account-settings.md`, Deleting is
   archiving): reversibility costs one flag, and deletion cannot be
   undone.
@@ -821,10 +828,12 @@ host's network are reachable.
 34. (blind) No route deletes a symbol, asserted by enumerating the
     registered routes, not by probing a guessed path. Test:
     `tests/test_rates.py::test_symbol_and_kind_are_immutable_and_there_is_no_delete`.
-35. Retiring a symbol removes it from `GET /api/rates/symbols` and leaves
-    `/api/rates` pricing it, so a holding measured in it still resolves a
-    rate. Unretiring restores it to the picker. Test:
-    `tests/test_rates.py::test_retiring_removes_a_symbol_from_the_picker_and_leaves_pricing_alone`.
+35. Retiring a symbol leaves its row in `GET /api/rates/symbols`
+    unchanged but for `retired: true`, and both forms of `/api/rates`
+    still price it. Unretiring restores the row exactly. Test:
+    `tests/test_rates.py::test_retiring_flags_a_symbol_and_leaves_its_row_and_pricing_alone`,
+    `tests/test_review_rate_lookup.py::test_retiring_changes_only_the_flag_and_unretiring_restores_the_row_exactly`,
+    `tests/test_review_rate_lookup.py::test_a_retired_symbol_is_priced_by_both_forms_as_before`.
 36. `PATCH` setting `lookup: true` on a symbol with no provider adapter
     is a Bad Request, and so is `POST` creating one that way. Test:
     `tests/test_rates.py::test_lookup_cannot_promise_a_proposal_the_proxy_cannot_serve`.
@@ -1056,3 +1065,8 @@ host's network are reachable.
 79. No proposal has more than twelve decimal places or ten significant
     digits, asserted from a rate of 7e-12 to one of 10^7. Test:
     `tests/test_rates.py::test_no_proposal_has_more_than_twelve_places_or_ten_significant_digits`.
+80. A holding measured in a retired unit reads the unit by its label on
+    the dashboard and on Update values, and still gets a market rate
+    where its unit has a price source. Test:
+    `tests/browser/parts/update-values-retired.mjs`,
+    `tests/browser/parts/update-values-review-retired.mjs`.

@@ -108,11 +108,14 @@ so it stacks at phone width.
     case kept, because `m²` is not `M²`. Where it matches a listed
     symbol ignoring case, the form offers that symbol instead, because a
     holding in `usd` and one in `USD` look identical everywhere and only
-    one is ever priced.
-  - **A unit the table does not offer** still shows as the current
-    choice on a holding measured in it, with its stored text. A retired
-    symbol keeps pricing (`rate-lookup.md`, Maintaining the table), so
-    nothing needs deciding. It is absent for anyone choosing afresh.
+    one is ever priced. Where it matches a retired symbol ignoring
+    case, it is refused with "XAG-ozt is no longer offered for new
+    holdings.", naming the symbol.
+  - **A unit the picker does not offer** still shows as the current
+    choice on a holding measured in it: a retired symbol by its label,
+    free text as stored. A retired symbol keeps its name and pricing
+    (`rate-lookup.md`, Maintaining the table), so nothing needs
+    deciding. It is absent for anyone choosing afresh.
   - **A missing unit** has the free-text option as its answer, with:
     "Not listed? This list is set up for the whole instance by an
     administrator, not per vault." Adding a unit is an administrator
@@ -899,3 +902,9 @@ Unarchiving and archiving it again writes the zero at the new D.
 63. (blind) No header of the holding's own list of values names a unit
     but the main currency, and each value carries its unit as `design-system.md`, Units, sets,
     such as "12.5 ozt". Test: `tests/browser/parts/account-detail.mjs`.
+64. A retired unit is not offered for a new holding, and typed as free
+    text in any case it is refused. A holding already measured in it
+    shows it as its current choice by its label, and so does one whose
+    unit is fixed by a recorded value. Test:
+    `tests/browser/parts/account-form-retired.mjs`,
+    `tests/browser/parts/account-form-review-retired.mjs`.

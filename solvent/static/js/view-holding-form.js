@@ -21,8 +21,10 @@ async function symbols() {
 /** The unit picker's groups, ordinary answers first: the vault's main
  *  currency, then the other currencies, then the metals, because nearly
  *  every holding is a bank account or a depot in a currency. Currencies
- *  and metals sit in one list, grouped by kind. */
-function groupsOf(table, mainCurrency) {
+ *  and metals sit in one list, grouped by kind. A retired row is in
+ *  none, so no new holding is measured in it. */
+function groupsOf(rows, mainCurrency) {
+  const table = rows.filter((s) => !s.retired);
   const main = table.filter((s) => s.symbol === mainCurrency);
   const currencies = table.filter((s) => s.kind === 'currency' && s.symbol !== mainCurrency);
   const metals = table.filter((s) => s.kind === 'metal');
@@ -116,7 +118,8 @@ function unitPicker(vault, current, locked) {
     // Case is kept, because m² is not M². What is not kept is a unit
     // that is a listed symbol spelled another way: usd and USD would
     // look identical on every later screen and only one is ever priced.
-    if (!match) {
+    // A retired symbol is offered to nobody, and check() refuses it.
+    if (!match || match.retired) {
       listed.hidden = true;
       return null;
     }
@@ -153,14 +156,14 @@ function unitPicker(vault, current, locked) {
       !needle || row.symbol.toLowerCase().includes(needle) || row.label.toLowerCase().includes(needle);
     const children = [];
     // A unit the table does not offer, a retired symbol or free text,
-    // stays the current choice with its stored text. Nobody choosing
-    // afresh is offered it.
-    if (current && !rowFor(current) && (!needle || current.toLowerCase().includes(needle))) {
+    // stays the current choice. Nobody choosing afresh is offered it.
+    const kept = describe(current);
+    if (current && !(rowFor(current) && !rowFor(current).retired) && (!needle || kept.toLowerCase().includes(needle))) {
       children.push(
         el('li', { role: 'group', 'aria-label': 'Now', class: 'unit-group' }, [
           el('span', { class: 'unit-group-label', 'aria-hidden': 'true', text: 'Now' }),
           el('ul', { role: 'presentation' }, [
-            option(current, () => {
+            option(kept, () => {
               other = false;
               setValue(current);
             }, !other && value === current, { dataset: { symbol: current } }),
@@ -247,8 +250,13 @@ function unitPicker(vault, current, locked) {
     if (locked) return { unit: current };
     const unit = other ? freeText.value.trim() : value;
     if (!unit) return { problem: 'Choose a unit, or type one under Something else.' };
-    if (other && table && matchIgnoringCase(unit) && unit !== current) {
-      return { problem: `${matchIgnoringCase(unit).symbol} is on the list. Use it from there.` };
+    const match = other && table && unit !== current && matchIgnoringCase(unit);
+    if (match) {
+      return {
+        problem: match.retired
+          ? `${match.symbol} is no longer offered for new holdings.`
+          : `${match.symbol} is on the list. Use it from there.`,
+      };
     }
     return { unit };
   }
@@ -274,8 +282,14 @@ function unitPicker(vault, current, locked) {
     }
   });
 
-  if (locked) draw();
-  else load();
+  if (locked) {
+    draw();
+    // The label once the table is here. Without it the symbol stands.
+    symbols().then((rows) => {
+      table = rows;
+      draw();
+    }, () => {});
+  } else load();
 
   return {
     element: el('div', { class: 'field unit-field' }, [

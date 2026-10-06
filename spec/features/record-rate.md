@@ -307,13 +307,6 @@ other way than these:
   this from its table with no request. This one test decides the price
   at a date, whether a recording asks the proxy (The refresh), and
   whether a line offers Look it up.
-  - A main currency retired since registration is absent from the
-    client's table and bounds nothing there. The server still applies
-    its floor, so before 1999-01-04, or 2000-01-13 for the currencies
-    starting then, that vault's lines read as a source that did not
-    answer. Accepted, because retiring a currency vaults total in is an
-    administrator's act, told what it means (`rate-lookup.md`,
-    Maintaining the table).
 - **The price at a date** values a figure shown at its own date: a
   recording's figures (`record-snapshot.md`, Recording detail), a
   holding's list of values (`manage-accounts.md`, Account detail), and

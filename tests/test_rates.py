@@ -754,20 +754,26 @@ def test_lookup_cannot_promise_a_proposal_the_proxy_cannot_serve(admin):
     ).status_code == 400
 
 
-def test_retiring_removes_a_symbol_from_the_picker_and_leaves_pricing_alone(app, admin, provider):
+def test_retiring_flags_a_symbol_and_leaves_its_row_and_pricing_alone(app, admin, provider):
     owner, _ = register(app, "owner")
     provider.answers["frankfurter"] = fx(PAST, {"USD": 0.8})
 
+    def usd():
+        table = owner.get("/api/rates/symbols", headers=CSRF).get_json()
+        return next(row for row in table if row["symbol"] == "USD")
+
+    before = usd()
+    assert before["retired"] is False
     admin.patch("/api/admin/symbols/USD", json={"retired": True}, headers=CSRF)
-    offered = [row["symbol"] for row in owner.get("/api/rates/symbols", headers=CSRF).get_json()]
-    assert "USD" not in offered
+    assert usd() == {**before, "retired": True}
     assert owner.get(
         f"/api/rates?date={PAST}&quote=CHF&symbol=USD", headers=CSRF
     ).status_code == 200
+    whole = owner.get(f"/api/rates?date={PAST}&quote=CHF", headers=CSRF).get_json()
+    assert "USD" in whole["rates"]
 
     admin.patch("/api/admin/symbols/USD", json={"retired": False}, headers=CSRF)
-    restored = [row["symbol"] for row in owner.get("/api/rates/symbols", headers=CSRF).get_json()]
-    assert "USD" in restored
+    assert usd() == before
 
 
 def test_a_label_changes_freely(admin):

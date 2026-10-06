@@ -746,7 +746,7 @@ def get_rates():
             return "", 204
         rows = [
             row
-            for row in table_rows()
+            for row in table_rows(include_retired=True)
             if looks_up(row)
             and row["symbol"] != quote
             and on >= (_floor_for(row, quote_row) or on)
@@ -783,8 +783,9 @@ def get_rates():
 
 @bp.get("/api/rates/symbols")
 def list_symbols():
-    """What the account form's unit picker is built from. Retired rows
-    are omitted, so no new holding can be measured in one."""
+    """What every screen reads a unit from, retired rows included,
+    because a holding measured in one keeps its name and its prices.
+    The account form's unit picker leaves retired rows out."""
     return jsonify(
         [
             {
@@ -793,8 +794,9 @@ def list_symbols():
                 "kind": row["kind"],
                 "lookup": looks_up(row),
                 "since": since.isoformat() if (since := _since(row)) else None,
+                "retired": bool(row["retired"]),
             }
-            for row in table_rows()
+            for row in table_rows(include_retired=True)
         ]
     )
 
