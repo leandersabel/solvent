@@ -405,8 +405,8 @@ export class Vault {
    *  holding (net-worth-view.md, Dashboard). */
   newestRateDate() {
     let newest = null;
-    for (const entries of this.rates.values()) {
-      for (const entry of entries) {
+    for (const symbol of this.rates.keys()) {
+      for (const entry of this.usableEntries(symbol)) {
         if (!newest || entry.payload.date > newest) newest = entry.payload.date;
       }
     }

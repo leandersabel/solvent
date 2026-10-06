@@ -3109,6 +3109,7 @@ await check('a misdated figure or price counts toward nothing and is listed', as
 await check('a stored date that is no calendar day reads as stored', async () => {
   const { formatter } = await load('format.js');
   assert.equal(formatter({ locale: 'en-US' }).longDate('garbage'), 'garbage');
+  assert.equal(formatter({ locale: 'en-US' }).longDate('2026-02-30'), '2026-02-30');
   assert.equal(formatter({ locale: 'en-US', dateStyle: 'dmy' }).longDate('garbage'), 'garbage');
 });
 

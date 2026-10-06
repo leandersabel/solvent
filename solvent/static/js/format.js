@@ -215,7 +215,10 @@ export function formatter(profile) {
 function spelled(iso, locale, parts) {
   if (!iso) return '';
   const date = new Date(iso + 'T00:00:00Z');
-  return Number.isNaN(date.getTime()) ? iso : date.toLocaleDateString(locale, { ...parts, timeZone: 'UTC' });
+  // The engine rolls 2026-02-30 over to 2 March, so a date is shown
+  // spelled only when it reads back as written.
+  const real = !Number.isNaN(date.getTime()) && date.toISOString().slice(0, 10) === iso;
+  return real ? date.toLocaleDateString(locale, { ...parts, timeZone: 'UTC' }) : iso;
 }
 
 // Marks a reader types for the one they see: a plain apostrophe for
