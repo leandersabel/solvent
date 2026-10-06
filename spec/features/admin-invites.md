@@ -335,6 +335,20 @@ Password field). Enter submits it once the button is enabled.
   "That is not your current password." It is caught when the server
   answers, and the screen claims nothing earlier.
 
+#### At phone width
+
+Up to 900px wide, narrower than the full tables need, each table
+becomes a list of entries, one per row, divided by
+hairlines. An entry puts each cell on a line of its own, beside its
+column's heading in ink-secondary, and the row's action beneath them,
+so every detail and every control stays on screen without panning
+sideways.
+
+At every width a chip in these tables stays on one line, because its
+wording is fixed and a word or two long, and a column is never
+narrower than its chip. A username or a note can be one long word, so
+it breaks anywhere rather than widen the table.
+
 #### States
 
 Every table loads as skeleton rows. The create card and the password card
@@ -838,3 +852,10 @@ administrator), and the lost sole password (Bootstrap). The rest:
     `username`, ahead of the password fields. Test:
     `tests/browser/parts/admin.mjs`,
     `tests/browser/parts/admin-review-forms.mjs`.
+53. On Invites, Accounts and Units, at 320, 390, 768, 901 and 1280px,
+    with a waiting administrator invite carrying a long note, used
+    invites and a 32-character username, nothing scrolls sideways but
+    the section links, no control is drawn past the screen's edge, and
+    no word of a chip, heading or control is split across lines. Test:
+    `tests/browser/parts/admin-phone.mjs`,
+    `tests/browser/parts/admin-review-phone.mjs`.
