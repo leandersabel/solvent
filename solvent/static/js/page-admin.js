@@ -370,7 +370,8 @@ function removeAccount(row, body) {
 }
 
 const UNIT_HEADS = ['Code', 'Name', 'Kind', 'Rate lookup', ''];
-const WEIGHED = /-(ozt|g)$/;
+// rates.METAL_PATTERN
+const WEIGHED = /^(?=.{1,16}$)[A-Z0-9][A-Z0-9._]*-(ozt|g)$/;
 const METAL_SHAPE = 'Metals are named <code>-ozt or <code>-g, such as XAU-ozt.';
 
 async function unitTable(body) {

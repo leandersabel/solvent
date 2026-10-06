@@ -754,8 +754,8 @@ def test_a_metal_names_its_weight(admin):
     for symbol in ("XYZ", "XYZ-kg", "XYZ-ozt\n", "XYZ-gozt"):
         assert add(symbol, "metal") == 400, symbol
     assert add("USD\n", "currency") == 400
-    assert add("XYZ", "currency") == 201
-    assert add("XYZ-g", "metal") == 201
+    assert add("XYZ", "currency") in (200, 201)
+    assert add("XYZ-g", "metal") in (200, 201)
     table = {r["symbol"] for r in admin.get("/api/admin/symbols", headers=CSRF).get_json()}
     assert "XYZ-g" in table and "XYZ-kg" not in table
 

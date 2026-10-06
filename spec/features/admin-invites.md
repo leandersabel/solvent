@@ -870,7 +870,9 @@ administrator), and the lost sole password (Bootstrap). The rest:
 54. Adding a metal whose code names no weight, such as `XYZ`, shows
     "That is not a valid metal code. Metals are named `<code>-ozt` or
     `<code>-g`, such as `XAU-ozt`." in the add form, and the unit list
-    stays without it. Test: `tests/browser/parts/admin.mjs`.
+    stays without it. Test: `tests/browser/parts/admin.mjs`,
+    `tests/browser/parts/admin-review-units.mjs`.
 55. A retired metal whose code names no weight has Restore disabled with
     its reason beside it, while a retired `XAG-g` and a retired currency
-    can be restored. Test: `tests/browser/parts/admin.mjs`.
+    can be restored. Test: `tests/browser/parts/admin.mjs`,
+    `tests/browser/parts/admin-review-units.mjs`.

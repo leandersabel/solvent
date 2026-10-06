@@ -1079,8 +1079,15 @@ host's network are reachable.
 81. `POST` adding a metal whose code does not end in `-ozt` or `-g`, or
     any code with a trailing newline, is a Bad Request and adds
     nothing. A currency needs no weight. Test:
-    `tests/test_rates.py::test_a_metal_names_its_weight`.
+    `tests/test_rates.py::test_a_metal_names_its_weight`,
+    `tests/test_review_rate_lookup.py::test_adding_a_metal_that_names_no_weight_is_refused_and_adds_nothing`,
+    `tests/test_review_rate_lookup.py::test_a_metal_in_its_weighed_form_is_added`,
+    `tests/test_review_rate_lookup.py::test_a_currency_needs_no_weight`,
+    `tests/test_review_rate_lookup.py::test_a_symbol_with_a_trailing_newline_reaches_no_provider`.
 82. A stored metal row with no weight is retired at start, and `PATCH`
     with `retired: false` on it is a Bad Request while a rename still
     saves. Test:
-    `tests/test_rates.py::test_a_weightless_metal_is_retired_on_start_and_stays_retired`.
+    `tests/test_rates.py::test_a_weightless_metal_is_retired_on_start_and_stays_retired`,
+    `tests/test_review_rate_lookup.py::test_a_stored_weightless_metal_is_retired_at_every_start`,
+    `tests/test_review_rate_lookup.py::test_a_weightless_metal_cannot_be_restored_but_can_be_renamed`,
+    `tests/test_review_rate_lookup.py::test_a_retired_weightless_metal_keeps_its_unit_and_prices`.
