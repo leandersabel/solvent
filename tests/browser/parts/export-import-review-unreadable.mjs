@@ -104,22 +104,22 @@ const damage = (recordId) =>
   sql(`UPDATE records SET ciphertext = (CASE substr(ciphertext, 1, 1) WHEN 'A' THEN 'B' ELSE 'A' END) || substr(ciphertext, 2)
        WHERE record_id = ?`, recordId);
 
-// A holding that authenticates but is written at a schema version past
-// the one this client knows, which record-api.md, Schema migration,
-// makes unreadable.
-const plantFuture = () =>
-  page.call(async () => {
+// A record of `type` that authenticates but is written at a schema
+// version past the one this client knows, which record-api.md, Schema
+// migration, makes unreadable.
+const plantFuture = (type, payload) =>
+  page.call(async (recordType, body) => {
     const api = await import('/static/js/api.js');
     const c = await import('/static/js/crypto.js');
     const s = await import('/static/js/session.js');
     const { SCHEMA_VERSION } = await import('/static/js/model.js');
-    const slot = { recordId: c.uuid4(), recordType: 'account', accountId: null, schemaVersion: SCHEMA_VERSION + 1, version: 1 };
-    const blob = await c.encryptRecord(s.currentVault().dek, slot, { name: 'From a later version', unit: 'CHF' });
+    const slot = { recordId: c.uuid4(), recordType, accountId: null, schemaVersion: SCHEMA_VERSION + 1, version: 1 };
+    const blob = await c.encryptRecord(s.currentVault().dek, slot, body);
     await api.put('/api/records/' + slot.recordId, {
-      recordType: slot.recordType, accountId: null, schemaVersion: slot.schemaVersion, version: 1, ...blob,
+      recordType, accountId: null, schemaVersion: slot.schemaVersion, version: 1, ...blob,
     });
     return slot.recordId;
-  });
+  }, type, payload);
 
 const rows = () => JSON.stringify(sql(`SELECT records.* FROM records ${OWN} ORDER BY record_id`));
 
@@ -149,7 +149,7 @@ await run(async () => {
   // -- A holding damaged, its figure still readable, one from a later version
 
   damage(ids['Dollar account']);
-  await plantFuture();
+  await plantFuture('account', { name: 'From a later version', unit: 'CHF' });
   const damaged = await review(file);
   totals('three records the vault cannot read', damaged.deleted, 3);
 
@@ -196,6 +196,17 @@ await run(async () => {
     !unreadProfile.asksErase, JSON.stringify(unreadProfile));
   const said = await page.call(() => document.querySelector('.review').parentElement.innerText);
   check('export-import step 3: no line of the review prints "undefined" or "null"', !/\b(undefined|null)\b/.test(said), said);
+
+  // -- The profile alone, written by a later version --------------------------
+
+  const damagedProfile = sql(`SELECT record_id FROM records ${OWN} AND record_type = 'profile'`)[0].record_id;
+  await plantFuture('profile', { mainCurrency: 'CHF' });
+  sql('DELETE FROM records WHERE record_id = ?', damagedProfile);
+  const laterProfile = await review(file);
+  check('export-import 58: a profile from a later version is still settings, and the vault is empty',
+    laterProfile.deleted.includes(EMPTY) && !laterProfile.deleted.some((l) => /^\d+ /.test(l)), JSON.stringify(laterProfile));
+  check('export-import 21: a vault whose only record is a profile from a later version asks for no ERASE',
+    !laterProfile.asksErase, JSON.stringify(laterProfile));
 
   rmSync(DIR, { recursive: true, force: true });
 });
