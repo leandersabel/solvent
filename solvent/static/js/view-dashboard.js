@@ -322,7 +322,19 @@ function chartSection(vault, state, render, dimension, actions, { days, bands })
               }, coverageText(coverage))
             // Nothing is left to filter to, so it is only a count.
             : el('span', { class: 'coverage' }, coverageText(coverage))
-          : null,
+          : vault.activeDimensions().length
+            ? null
+            // The real address, which a new tab follows, while a click
+            // stays on this page and so in the unlocked vault.
+            : el('a', {
+                class: 'create-dimension',
+                href: '/settings/dimensions',
+                text: 'Create a dimension',
+                onclick: (event) => {
+                  event.preventDefault();
+                  actions.openDimensions();
+                },
+              }),
         el('div', { class: 'switch', role: 'group', 'aria-label': 'Scale' }, [
           switchButton('Absolute', !state.percentage, () => {
             state.percentage = false;

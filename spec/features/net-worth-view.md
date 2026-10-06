@@ -157,7 +157,9 @@ wrapping beneath the heading when the row runs out:
 - **Range**: 1M / 6M / 1Y / All, segmented (Ranges and modes).
 - **Group by**: "Total" plus every configured dimension in the profile's
   order, archived ones excluded (`account-settings.md`, Dimensions).
-  "Total" (one band) until a dimension exists. It also drives the
+  "Total" (one band) until a dimension exists. While no dimension is
+  active, a "Create a dimension" link beside it opens the Dimensions
+  screen, where one is created or restored. It also drives the
   breakdown. Beside it the **coverage**, "7 of 10 holdings assigned", N
   the active holdings (`account-settings.md`, Dimensions, owns what
   coverage is for). While some are unassigned it is a link filtering the
@@ -419,8 +421,8 @@ The regions keep their order and stack, 20px apart.
 
   > Every holding has a Liquidity value. Show all holdings
 
-- **No dimensions configured**: Group by offers only "Total", with a link
-  to create one (`account-settings.md`, Dimensions). One band, no
+- **No dimensions configured**, or every one archived: Group by offers
+  only "Total", with the "Create a dimension" link beside it. One band, no
   breakdown, every other control works. This is a new vault's default and
   must not nag.
 - **A dimension no holding carries**: one "Unassigned" band, coverage "0
@@ -1175,3 +1177,8 @@ rule of the chart (Archived holdings, Ranges and modes).
     its tooltip and leaves the hero a dash with no date. Test:
     `tests/browser/parts/dashboard-fixtures.mjs`,
     `tests/browser/parts/dashboard-review-unvalued.mjs`.
+78. With no active dimension, a "Create a dimension" link sits beside
+    Group by and opens the Dimensions screen without asking for the
+    password, and once a dimension is active the link is gone. Test:
+    `tests/browser/parts/dimensions.mjs`,
+    `tests/browser/parts/dashboard-review-create-dimension.mjs`.
