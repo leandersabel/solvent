@@ -1585,14 +1585,17 @@ Editing an existing entry).
     an `aria-describedby` naming that line, Save issues no `PUT`, and the
     Dialog's general line stays empty (finding the text anywhere on the
     Dialog is the easy fake). Test:
-    `tests/browser/parts/snapshot-entry.mjs`.
+    `tests/browser/parts/snapshot-entry.mjs`,
+    `tests/browser/parts/snapshot-entry-review-refusals.mjs`.
 82. (blind) Unparseable text in the date field, on Save, shows the
     unparseable reason and never the empty-date one, and issues no
     `PUT`. An emptied field shows the empty-date reason. Test:
-    `tests/browser/parts/snapshot-entry.mjs`.
+    `tests/browser/parts/snapshot-entry.mjs`,
+    `tests/browser/parts/snapshot-entry-review-refusals.mjs`.
 83. (blind) Correcting a refused date to one that fits clears the
     refusal and `aria-invalid` before Save, asserted without pressing
-    Save. Test: `tests/browser/parts/snapshot-entry.mjs`.
+    Save. Test: `tests/browser/parts/snapshot-entry.mjs`,
+    `tests/browser/parts/snapshot-entry-review-refusals.mjs`.
 84. Recording against an archived holding is blocked at every entry
     point and every date. Test: `tests/browser/parts/account-detail.mjs`.
 85. (blind) On a reopened recording, the archive's zero row shows the
@@ -1674,4 +1677,5 @@ Editing an existing entry).
      window, the opened calendar and its Close lie inside the Dialog,
      the calendar casts no shadow, one Escape closes only the calendar
      with focus on its button, and a second closes the Dialog. Test:
-     `tests/browser/parts/snapshot-entry.mjs`.
+     `tests/browser/parts/snapshot-entry.mjs`,
+     `tests/browser/parts/snapshot-entry-review-calendar.mjs`.
