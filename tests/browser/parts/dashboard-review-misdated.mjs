@@ -2,7 +2,8 @@
 // record-snapshot.md, A recording is a date, criterion 99), written from
 // the spec alone: a figure stored at a date that is not a day that has
 // passed counts toward nothing the dashboard shows, is listed with its
-// holding, each line opens its recording, and its holding flags it.
+// holding, each line opens its recording, which offers no Update, and
+// its holding flags it.
 // Modules: view-dashboard.js, view-holding.js, model.js, routes.js.
 import {
   BACKDATE, check, holdings, idNamed, openHolding, page, plant, recording, reloadModel, run, vaultOwner,
@@ -75,6 +76,8 @@ await run(async () => {
     await page.idle();
     const shown = await page.eval('document.body.innerText');
     check(`the recording at ${date} opens`, !shown.includes(MISSING) && shown.includes('Cash'), shown.slice(0, 400));
+    const controls = await page.eval("[...document.querySelectorAll('#app button, #app a')].map((n) => n.textContent.trim())");
+    check(`the recording at ${date} offers no Update`, !controls.includes('Update'), controls.join('|'));
   }
 
   await openHolding(cash);
