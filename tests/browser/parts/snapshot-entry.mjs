@@ -523,7 +523,7 @@ await run(async () => {
   let snapshotsNow = await stored('snapshot');
   check(
     'record-snapshot: moving onto an occupied date names the deletion, and leaves one record there',
-    moveCopy.includes(`${await format('longDate', D10)} already holds a snapshot of`) && moveCopy.includes('Moving this entry there will delete it.') &&
+    moveCopy.includes(`${await format('longDate', D10)} already holds a value of`) && moveCopy.includes('Moving this entry there will delete it.') &&
       savingsAt(D10).length === 1 && savingsAt(D9).length === 0,
     moveCopy,
   );
@@ -560,7 +560,7 @@ await run(async () => {
   await closeDialogs();
   check(
     'record-snapshot: an edit from a tab holding a stale version is refused and overwrites nothing',
-    stale.startsWith('This snapshot was changed in another tab.') &&
+    stale.startsWith('This value was changed in another tab.') &&
       bytes(on(await stored('snapshot'), D1).filter((s) => s.accountId === id.Savings)) === savingsPlanted,
     stale,
   );

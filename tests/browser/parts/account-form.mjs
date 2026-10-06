@@ -317,7 +317,7 @@ await run(async () => {
 
     await openHolding(probeId);
     check('an unvalued holding says so rather than 0', (await text()).includes('Not yet valued'));
-    check('with no values, one sentence and the primary action', (await text()).includes('No snapshots yet. Record what this holding is worth.'));
+    check('with no values, one sentence and the primary action', (await text()).includes('Nothing recorded yet. Record what this holding is worth.'));
     await click('Record a value');
     await page.waitUntil("document.querySelector('#snapshot-value')", { label: 'the value form' });
     const pastDay = await page.call(async (day) => {

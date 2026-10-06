@@ -295,7 +295,7 @@ export function snapshotDialog(vault, holding, existing, onSaved, onOpenRecordin
         } catch (failure) {
           if (failure.status === 409) {
             await writes.reloadType(vault, 'snapshot').catch(() => {});
-            fail('This snapshot was changed in another tab. Nothing was overwritten. Close this and redo the edit.');
+            fail('This value was changed in another tab. Nothing was overwritten. Close this and redo the edit.');
           } else {
             fail('That did not save.');
           }
@@ -404,7 +404,7 @@ function confirmMove(stored, holding, vault, onConfirm) {
     heading: 'Move this entry onto an occupied date?',
     body: [
       el('p', {
-        text: `${vault.format.longDate(stored.payload.date)} already holds a snapshot of ${vault.amount(stored.payload.value, holding.payload.unit)}. Moving this entry there will delete it.`,
+        text: `${vault.format.longDate(stored.payload.date)} already holds a value of ${vault.amount(stored.payload.value, holding.payload.unit)}. Moving this entry there will delete it.`,
       }),
     ],
     actions: [

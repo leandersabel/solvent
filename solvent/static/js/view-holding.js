@@ -160,7 +160,7 @@ export function holdingView(vault, accountId, { editing = false, onOpenRecording
           ])
         : el('p', {
             class: 'empty-line',
-            text: 'No snapshots yet. Record what this holding is worth.',
+            text: 'Nothing recorded yet. Record what this holding is worth.',
           }),
     ]),
   ]);
@@ -270,10 +270,10 @@ function historyRow(vault, holding, snapshot, flagged, { onOpenRecording, onChan
 function confirmDeleteSnapshot(vault, holding, snapshot, error, onChanged) {
   const only = vault.snapshotsFor(holding.recordId).length === 1;
   const close = dialog({
-    heading: 'Delete this snapshot?',
+    heading: 'Delete this value?',
     body: [
       el('p', {
-        text: `Delete the snapshot of ${vault.amount(snapshot.payload.value, holding.payload.unit)} for ${vault.format.longDate(snapshot.payload.date)}?`,
+        text: `Delete the value of ${vault.amount(snapshot.payload.value, holding.payload.unit)} for ${vault.format.longDate(snapshot.payload.date)}?`,
       }),
       el('p', {
         text: only

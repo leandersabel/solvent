@@ -75,8 +75,8 @@ await run(async () => {
   for (const [name, shape] of Object.entries(asFigure)) {
     await openHolding(ids[name]);
     const deleting = await dialogOf(deleteFirstRow);
-    check(`review: deleting a snapshot of ${name} names the figure with its unit as Units sets`,
-      new RegExp(`Delete the snapshot of ${shape} for `).test(deleting) && !SYMBOL.test(deleting), deleting);
+    check(`review: deleting a value of ${name} names the figure with its unit as Units sets`,
+      new RegExp(`Delete the value of ${shape} for `).test(deleting) && !SYMBOL.test(deleting), deleting);
     const archiving = await dialogOf(() => click('Archive'));
     check(`review: archiving ${name} names the figure it replaces with its unit as Units sets`,
       new RegExp(`This replaces the ${shape} recorded for `).test(archiving) && !SYMBOL.test(archiving), archiving);
