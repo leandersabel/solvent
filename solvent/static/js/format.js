@@ -210,9 +210,12 @@ export function formatter(profile) {
   };
 }
 
+/** A stored date that is no calendar day reads as stored, never as
+ *  "Invalid Date" (record-snapshot.md, A recording is a date). */
 function spelled(iso, locale, parts) {
   if (!iso) return '';
-  return new Date(iso + 'T00:00:00Z').toLocaleDateString(locale, { ...parts, timeZone: 'UTC' });
+  const date = new Date(iso + 'T00:00:00Z');
+  return Number.isNaN(date.getTime()) ? iso : date.toLocaleDateString(locale, { ...parts, timeZone: 'UTC' });
 }
 
 // Marks a reader types for the one they see: a plain apostrophe for
@@ -246,6 +249,7 @@ function readDecimal(typed, group, point) {
 
 function writeDate(iso, order, sep) {
   if (!iso) return '';
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(iso)) return iso;
   const [year, month, day] = iso.split('-');
   const by = { year, month, day };
   return order.map((part) => by[part]).join(sep);

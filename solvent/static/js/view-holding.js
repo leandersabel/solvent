@@ -5,7 +5,8 @@
 // looked up from it, at any age. Every figure comes from the model.
 import * as decimal from './decimal.js';
 import * as writes from './writes.js';
-import { ageInWords, dialog, el, icon, priceDateLine, trackEdits } from './dom.js';
+import { ageInWords, dialog, el, icon, priceDateLine, today, trackEdits } from './dom.js';
+import { isRecordedDay } from './model.js';
 import { snapshotDialog } from './view-forms.js';
 import { archiveHoldingDialog, deleteHoldingDialog, holdingForm } from './view-holding-form.js';
 
@@ -190,6 +191,7 @@ function historyRow(vault, holding, snapshot, flagged, { onOpenRecording, onChan
   const quantity = decimal.parse(snapshot.payload.value);
   const price = vault.priceAtDate(holding.payload.unit, snapshot.payload.date);
   const duplicate = flagged.has(snapshot.payload.date);
+  const misdated = !isRecordedDay(snapshot.payload.date, today());
   const failed = el('p', { class: 'field-error', hidden: true, role: 'alert' });
   const noteRow = snapshot.payload.note
     ? el('tr', { class: 'note-row', hidden: true }, [
@@ -211,7 +213,7 @@ function historyRow(vault, holding, snapshot, flagged, { onOpenRecording, onChan
       }, [icon('note', 14)])
     : null;
 
-  const row = el('tr', { class: duplicate ? 'flagged' : null }, [
+  const row = el('tr', { class: duplicate || misdated ? 'flagged' : null }, [
     el('td', {}, [
       el('button', {
         class: 'link-button',
@@ -223,6 +225,12 @@ function historyRow(vault, holding, snapshot, flagged, { onOpenRecording, onChan
         ? el('span', {
             class: 'flag-note',
             text: 'Two entries share this date. Keep one.',
+          })
+        : null,
+      misdated
+        ? el('span', {
+            class: 'flag-note',
+            text: 'This is not a day that has passed. Move or delete this entry. It counts toward nothing.',
           })
         : null,
     ]),

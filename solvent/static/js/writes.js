@@ -9,9 +9,16 @@
 import * as api from './api.js';
 import * as crypto from './crypto.js';
 import * as decimal from './decimal.js';
-import { SCHEMA_VERSION, migrate } from './model.js';
+import { today } from './dom.js';
+import { SCHEMA_VERSION, isRecordedDay, migrate } from './model.js';
 
 export async function putRecord(vault, slot, payload) {
+  // A figure or a price at a date that is no recorded day is refused
+  // before anything is encrypted or sent (record-snapshot.md, A
+  // recording is a date).
+  if ((slot.recordType === 'snapshot' || slot.recordType === 'rate') && !isRecordedDay(payload.date, today())) {
+    throw new Error(`${payload.date} is not a day that has passed.`);
+  }
   const blob = await crypto.encryptRecord(vault.dek, slot, payload);
   await api.put(`/api/records/${slot.recordId}`, {
     recordType: slot.recordType,
@@ -117,8 +124,12 @@ export function saveRate(vault, existing, payload) {
  *  repeating list of what this person holds, on the schedule they do
  *  their books (rate-lookup.md, The client never names a symbol). */
 export async function fetchProposals(vault, date) {
+  // The device's today can be the day after the server's, which the
+  // proxy refuses as future. Its price for the server's today is the
+  // same latest close.
+  const serverToday = new Date().toISOString().slice(0, 10);
   try {
-    const answer = await api.getRates({ date, quote: vault.mainCurrency });
+    const answer = await api.getRates({ date: date > serverToday ? serverToday : date, quote: vault.mainCurrency });
     return answer ? answer.rates : {};
   } catch {
     return {};

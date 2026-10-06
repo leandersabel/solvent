@@ -474,6 +474,9 @@ host's network are reachable.
   with an adapter, whatever its `lookup`, on or after its applicable
   floor (The symbol table). A single global floor would reject valid FX
   dates or wave through gold dates with no data.
+  The future is the server's, by UTC. A client whose own today is
+  already the next UTC day asks for the server's today instead, whose
+  latest close is the same (`writes.fetchProposals`).
 - HTTP redirects are **disabled**, not followed to a validated target.
 - Egress has a hard deadline, `EGRESS_TIMEOUT_SECONDS` = 5, for
   connect and the whole read together across one proxy request (shared

@@ -111,6 +111,11 @@ route to something a narrow screen could not offer.
 - **No custom typeface**, because a downloaded one has to be hosted and
   pinned and flashes unstyled text on the password screen, the slowest
   screen in the product (design-system.md, Typography).
+- **No address leads somewhere it should not.** An address typed or
+  changed by hand inside the app either opens a screen the app has or
+  says "There is no page at this address." It never opens the
+  dashboard in its place, and never a screen that could save a value
+  under a day that has not passed.
 - **No financial data in the shell, and it could not show any.** Its
   only words are the app's name and the navigation labels, and the
   server that renders it holds no readable copy of the vault. Figures,
@@ -167,6 +172,16 @@ is one such address, and a vault screen opened by an administrator is
 another. Telling them apart would confirm which addresses exist, which
 this instance does not hand out (`admin-invites.md`, The admin
 boundary).
+
+#### Inside the vault
+
+An address inside the unlocked vault page that names no screen
+(How it works, Addresses inside the vault) shows the same card in the
+content region, drawn in place by the page: the missing variant's
+heading, and **Go to Solvent** as Button, primary, which opens the
+dashboard. The bar stays, with Lock, because the vault is still
+unlocked and nothing was reloaded. The card is the page's own and
+reveals nothing the server would refuse to say.
 
 #### What it deliberately does not show
 
@@ -542,6 +557,30 @@ for a control above the dialog to protect.
   `login.md`, Unlock. A dialog that comes back puts the bar back in
   this state.
 
+### Addresses inside the vault
+
+Every screen past the unlock gate is a hash route of the one vault
+page. The hash is input the person, a link or a bookmark can set to
+anything, so `routes.js` reads it against a closed table before any
+screen draws, a pure function of the hash, the device's today and
+whether a stored record carries a given date:
+
+| Hash | Screen |
+|---|---|
+| empty, `#/` | Dashboard |
+| `#/unassigned/<dimension>` | Dashboard, filtered |
+| `#/settings`, `#/settings/dimensions`, `#/settings/export-import` | Settings and its pages |
+| `#/holding/<id>`, `#/holding/<id>/edit` | The holding |
+| `#/sweep/<date>` | Update values, when `<date>` is a recorded day |
+| `#/recording/<date>` | Recording detail, when `<date>` is a recorded day or a stored record carries it |
+
+A recorded day is `record-snapshot.md`'s (A recording is a date). A
+recording at a stored date that is no recorded day still opens, so its
+records can be moved or deleted. Anything else, an extra segment
+included, names no screen and draws the in-app missing card (Error
+page, Inside the vault). Unknown segments never fall through to the
+dashboard.
+
 ### Rules
 
 - **The vault surface is one shell page.** `/dashboard` carries every
@@ -867,3 +906,11 @@ for a control above the dialog to protect.
     `scrollY` from Settings, and the holding's row at the same height on
     screen from the holding. Test:
     `tests/browser/parts/dashboard-scroll.mjs`.
+83. (blind) Only the addresses in the route table name a screen, and a
+    sweep only at a recorded day. Test:
+    `tests/test_client.py::test_the_client_side_rules_hold`.
+84. An address inside the vault that names no screen, a sweep at a date
+    that does not exist or is still to come among them, shows "There is
+    no page at this address." with Go to Solvent and Lock, writes
+    nothing, and Go to Solvent opens the dashboard still unlocked. Test:
+    `tests/browser/parts/error-page.mjs`.

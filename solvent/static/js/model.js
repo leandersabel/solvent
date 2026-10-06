@@ -9,6 +9,7 @@ import * as api from './api.js';
 import * as crypto from './crypto.js';
 import * as decimal from './decimal.js';
 import { formatter as makeFormatter } from './format.js';
+import { today } from './dom.js';
 
 export const RECORD_TYPES = ['profile', 'account', 'snapshot', 'rate'];
 export const SCHEMA_VERSION = 1;
@@ -20,6 +21,16 @@ export function dayNumber(isoDate) {
 
 export function isoFromDay(day) {
   return new Date(day * 86400000).toISOString().slice(0, 10);
+}
+
+/** Whether a figure or a price may carry `date`: a calendar day that
+ *  exists, written `YYYY-MM-DD`, and not after `on`, the device's
+ *  today (record-snapshot.md, A recording is a date). A figure says
+ *  what something was worth on a day that has passed. */
+export function isRecordedDay(date, on) {
+  if (typeof date !== 'string' || !/^\d{4}-\d{2}-\d{2}$/.test(date) || date > on) return false;
+  const day = dayNumber(date);
+  return Number.isFinite(day) && isoFromDay(day) === date;
 }
 
 function byDate(a, b) {
@@ -292,17 +303,34 @@ export class Vault {
 
   /** Entries that are safe to read: a (symbol, date) carrying two
    *  differing figures drops out of the series until it is answered,
-   *  rather than the chart picking a number nobody chose. */
+   *  rather than the chart picking a number nobody chose, and so does
+   *  an entry at a date that is no recorded day. */
   usableEntries(symbol) {
-    const flagged = this.duplicateRateDates(symbol);
-    if (!flagged.size) return this.entriesFor(symbol);
-    return this.entriesFor(symbol).filter((e) => !flagged.has(e.payload.date));
+    return usable(this.entriesFor(symbol), this.duplicateRateDates(symbol));
   }
 
   usableSnapshots(accountId) {
-    const flagged = this.duplicateSnapshotDates(accountId);
-    if (!flagged.size) return this.snapshotsFor(accountId);
-    return this.snapshotsFor(accountId).filter((s) => !flagged.has(s.payload.date));
+    return usable(this.snapshotsFor(accountId), this.duplicateSnapshotDates(accountId));
+  }
+
+  /** Every figure and price whose date is no recorded day, as
+   *  `{ date, label }`: kept where it is, counted in nothing, and
+   *  listed so it can be moved or deleted. */
+  misdated() {
+    const on = today();
+    const found = [];
+    for (const [accountId, list] of this.snapshots) {
+      const holding = this.holdings.get(accountId);
+      for (const s of list) {
+        if (!isRecordedDay(s.payload.date, on)) found.push({ date: s.payload.date, label: holding ? holding.payload.name : accountId });
+      }
+    }
+    for (const [symbol, list] of this.rates) {
+      for (const e of list) {
+        if (!isRecordedDay(e.payload.date, on)) found.push({ date: e.payload.date, label: this.unitName(symbol) });
+      }
+    }
+    return found;
   }
 
   duplicateSnapshotDates(accountId) {
@@ -438,9 +466,12 @@ export class Vault {
   /** Every date carrying at least one snapshot: the chart's entry
    *  marks. A tick means a quantity, never a price. */
   quantityDates() {
+    const on = today();
     const dates = new Set();
     for (const list of this.snapshots.values()) {
-      for (const snapshot of list) dates.add(snapshot.payload.date);
+      for (const snapshot of list) {
+        if (isRecordedDay(snapshot.payload.date, on)) dates.add(snapshot.payload.date);
+      }
     }
     return [...dates].sort();
   }
@@ -449,9 +480,12 @@ export class Vault {
    *  picker marks, including a recording whose figures were all
    *  cleared but whose prices are still captured. */
   recordingDates() {
+    const on = today();
     const dates = new Set(this.quantityDates());
     for (const list of this.rates.values()) {
-      for (const entry of list) dates.add(entry.payload.date);
+      for (const entry of list) {
+        if (isRecordedDay(entry.payload.date, on)) dates.add(entry.payload.date);
+      }
     }
     return [...dates].sort();
   }
@@ -660,6 +694,11 @@ export class Vault {
 function push(map, key, value) {
   if (!map.has(key)) map.set(key, []);
   map.get(key).push(value);
+}
+
+function usable(entries, duplicated) {
+  const on = today();
+  return entries.filter((e) => !duplicated.has(e.payload.date) && isRecordedDay(e.payload.date, on));
 }
 
 function duplicateDates(entries) {
