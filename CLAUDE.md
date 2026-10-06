@@ -183,14 +183,16 @@ The client is `leandersabel`. No agent edits an issue body.
 - Issues are filed through the Bug and Change request forms, which set
   `bug` or `change`, in any language. Everything the loop writes on an
   issue is in the issue's language.
-- An issue starts the loop when `accepted` is added, or at once when
-  `github-actions[bot]` opened it. Adding a label takes triage access,
-  and no form sets `accepted`. An agent adds it only to an issue it
-  opens: a finding or a request split off another issue.
+- An issue `claude[bot]` or `github-actions[bot]` opened starts the
+  loop at once: a finding, a request split off another issue, or a
+  failure the workflow reports. Any other issue starts when `accepted`
+  is added, so the client's own issues wait as a backlog until they
+  add it. Adding a label takes triage access, no form sets `accepted`,
+  and no agent adds it.
 - The loop reads an issue's body, the comments by `leandersabel` and
   its own comments, and for a request split off another issue, the
   client's comments there. Nothing else is read, whatever it says. It
-  reads the body as it stood when `accepted` was added, and asks the
+  reads the body as it stood when the issue started, and asks the
   client when it has been edited since.
 
 ### Clarify
@@ -214,12 +216,12 @@ Questions follow Who asks the client. A `bug` where a requirement is
 what is wrong becomes a `change`, and the reverse, with a comment
 saying so. A decision the client never made is asked, never settled on
 their behalf. No agent closes an issue. A merged pull request or the
-client does, and the workflow reopens, with a comment, an accepted
+client does, and the workflow reopens, with a comment, a started
 issue anyone else closes.
 
 An issue holding several requests keeps the first. The loop files each
 of the rest as an issue of its own, in the client's words with a link
-to where they asked, labeled `bug` or `change` and `accepted`.
+to where they asked, labeled `bug` or `change`.
 
 ### Requirements
 
@@ -362,8 +364,8 @@ found.
 - A problem the work in hand causes, or its issue covers, is part of
   that work. Any other is filed by `claude[bot]`, or by QA's
   filing run as `github-actions[bot]`, as a rated `bug`, or as
-  `maintenance` when nothing the client sees changes, with `accepted`,
-  `queued`, where it was found, and its reproduction: the steps, or a
+  `maintenance` when nothing the client sees changes, with `queued`,
+  where it was found, and its reproduction: the steps, or a
   failing test. Without one it is not filed. An agent never files a
   `change`, because a requirement is only ever the client's request.
 - A finding waits in line as filed, with no clarify run, because
@@ -526,7 +528,7 @@ found.
 
 | State | On GitHub |
 |---|---|
-| Not started | without `accepted`, unless `github-actions[bot]` opened it |
+| Not started | without `accepted`, unless `claude[bot]` or `github-actions[bot]` opened it |
 | New | started, no comment from `claude[bot]` yet |
 | Waiting on the client | `needs-answer` or `stuck` |
 | Requirements in review | an open requirements pull request links it |
