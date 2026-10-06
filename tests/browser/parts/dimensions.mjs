@@ -39,12 +39,14 @@ await run(async () => {
     JSON.stringify(ungrouped),
   );
 
-  await page.eval("document.querySelector('.chart-controls a.create-dimension').click()");
+  await page.eval(`document.querySelector('.topbar nav a[href="#/settings"]').click()`);
+  await page.waitUntil("document.body.innerText.includes('Main currency')", { label: 'settings for dimensions' });
+
+  await page.eval(`document.querySelector('.link-row[href="/settings/dimensions"]').click()`);
   await page.waitUntil("document.body.innerText.includes('Dimensions are how')", {
     timeout: 20000,
     label: 'the dimensions empty state',
   });
-  check('the link opens the dimensions screen', (await page.eval('location.hash')) === '#/settings/dimensions');
   check(
     'opening dimensions does not ask for the password again',
     !(await page.eval("Boolean(document.querySelector('#unlock-password'))")),

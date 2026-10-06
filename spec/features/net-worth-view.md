@@ -1180,4 +1180,5 @@ rule of the chart (Archived holdings, Ranges and modes).
 78. With no active dimension, a "Create a dimension" link sits beside
     Group by and opens the Dimensions screen without asking for the
     password, and once a dimension is active the link is gone. Test:
-    `tests/browser/parts/dimensions.mjs`.
+    `tests/browser/parts/dimensions.mjs`,
+    `tests/browser/parts/dashboard-review-create-dimension.mjs`.
