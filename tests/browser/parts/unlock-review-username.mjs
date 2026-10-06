@@ -108,7 +108,7 @@ await run(async () => {
       set('input[type=text]', username);
       set('input[type=password]', password, 0);
       set('input[type=password]', password, 1);
-      set('select', 'CHF');
+      document.querySelector('#register-currency-list [data-symbol="CHF"]').click();
       const box = document.querySelector('input[type=checkbox]');
       box.checked = true;
       box.dispatchEvent(new Event('change', { bubbles: true }));

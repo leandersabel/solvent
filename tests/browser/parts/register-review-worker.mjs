@@ -80,8 +80,7 @@ const fill = (username, password) =>
     set(document.querySelector('input[type=text]'), name);
     set(document.querySelectorAll('input[type=password]')[0], secret);
     set(document.querySelectorAll('input[type=password]')[1], secret);
-    const select = document.querySelector('select');
-    if (select) set(select, 'EUR');
+    document.querySelector('#register-currency-list [data-symbol="EUR"]')?.click();
     const box = document.querySelector('input[type=checkbox]');
     if (box) {
       box.checked = true;
@@ -100,7 +99,7 @@ const formState = () =>
     text: document.body.innerText,
     username: document.querySelector('input[type=text]')?.value ?? null,
     passwords: [...document.querySelectorAll('input[type=password]')].map((n) => n.value),
-    currency: document.querySelector('select')?.value ?? null,
+    currency: document.querySelector('#register-currency-list [aria-selected=true]')?.dataset.symbol ?? null,
     box: document.querySelector('input[type=checkbox]')?.checked ?? null,
     button: document.querySelector('button[type=submit]') ? {
       text: document.querySelector('button[type=submit]').textContent.replace(/\\s+/g, ' ').trim(),

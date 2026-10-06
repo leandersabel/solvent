@@ -546,9 +546,9 @@ await run(async () => {
         ['input[type=text]', 'second.owner'],
         ['input[type=password]', SECOND_PASSWORD, 0],
         ['input[type=password]', SECOND_PASSWORD, 1],
-        ['select', 'EUR'],
         ['input[type=checkbox]', true],
       ]);
+      await second.eval(`document.querySelector('#register-currency-list [data-symbol="EUR"]').click()`);
       await second.waitUntil("!document.querySelector('button[type=submit]').disabled", { label: 'the registration button' });
       await second.eval("document.querySelector('button[type=submit]').click()");
       await second.waitUntil("location.pathname === '/dashboard'", { timeout: 90000, label: 'the second vault' });

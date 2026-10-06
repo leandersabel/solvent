@@ -6,7 +6,7 @@
 import * as api from './api.js';
 import * as decimal from './decimal.js';
 import * as writes from './writes.js';
-import { dialog, el, resumable, today } from './dom.js';
+import { dialog, el, listOption, resumable, today } from './dom.js';
 import { newId } from './view-dimensions.js';
 
 let symbolTable = null;
@@ -137,28 +137,7 @@ function unitPicker(vault, current, locked) {
     return match;
   };
 
-  const option = (text, onPick, selected, extra = {}) =>
-    el('li', {
-      role: 'option',
-      tabindex: '-1',
-      class: selected ? 'unit-option is-selected' : 'unit-option',
-      'aria-selected': selected ? 'true' : 'false',
-      text,
-      onclick: onPick,
-      onkeydown: (event) => {
-        if (event.key === 'Enter' || event.key === ' ') {
-          event.preventDefault();
-          onPick();
-        } else if (event.key === 'ArrowDown' || event.key === 'ArrowUp') {
-          event.preventDefault();
-          const options = [...list.querySelectorAll('[role=option]')];
-          const at = options.indexOf(event.currentTarget) + (event.key === 'ArrowDown' ? 1 : -1);
-          if (at < 0) search.focus();
-          else if (options[at]) options[at].focus();
-        }
-      },
-      ...extra,
-    });
+  const option = (...args) => listOption(list, search, ...args);
 
   function draw() {
     if (locked) {

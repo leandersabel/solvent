@@ -13,7 +13,7 @@
 // (page-register.js).
 import * as api from './api.js';
 import * as crypto from './crypto.js';
-import { el } from './dom.js';
+import { el, listOption } from './dom.js';
 import { SCHEMA_VERSION } from './model.js';
 import { WAIT_NOTE, passwordWithToggle } from './unlock.js';
 import { MIN_LENGTH, strengthGauge } from './strength.js';
@@ -87,9 +87,45 @@ export function registerForm({ kind, token: inviteToken, currencies, kdf, onCrea
       confirm.removeAttribute('aria-invalid');
     });
   }
-  const currency = el('select', {}, currencies.map((row) =>
-    el('option', { value: row.symbol, text: `${row.label} (${row.symbol})` }),
-  ));
+  // The main currency starts unchosen, so nobody is fixed to whatever
+  // came first. Typing only narrows the list (register.md, Main currency).
+  let mainCurrency = null;
+  const currencySearch = el('input', {
+    type: 'text',
+    id: 'register-currency',
+    role: 'combobox',
+    'aria-controls': 'register-currency-list',
+    'aria-autocomplete': 'list',
+    'aria-expanded': 'true',
+    placeholder: 'Search by code or name',
+  });
+  const currencyList = el('ul', { id: 'register-currency-list', role: 'listbox', class: 'unit-list', 'aria-label': 'Currencies' });
+  const chosenCurrency = el('p', { class: 'hint', 'aria-live': 'polite' });
+  const currencyText = (row) => `${row.label} (${row.symbol})`;
+  function drawCurrencies() {
+    const needle = currencySearch.value.trim().toLowerCase();
+    const rows = currencies.filter((row) =>
+      !needle || row.symbol.toLowerCase().includes(needle) || row.label.toLowerCase().includes(needle));
+    currencyList.replaceChildren(...rows.map((row) =>
+      listOption(currencyList, currencySearch, currencyText(row), () => {
+        mainCurrency = row.symbol;
+        drawCurrencies();
+        currencyList.querySelector('.is-selected').focus();
+        refresh();
+      }, row.symbol === mainCurrency, { dataset: { symbol: row.symbol } }),
+    ));
+    if (!rows.length) currencyList.append(el('li', { class: 'unit-group-label', text: 'No currency matches.' }));
+    const chosen = currencies.find((row) => row.symbol === mainCurrency);
+    chosenCurrency.textContent = chosen ? `Chosen: ${currencyText(chosen)}` : 'No currency chosen yet.';
+  }
+  currencySearch.addEventListener('input', drawCurrencies);
+  currencySearch.addEventListener('keydown', (event) => {
+    if (event.key === 'ArrowDown') {
+      event.preventDefault();
+      currencyList.querySelector('[role=option]')?.focus();
+    }
+  });
+  drawCurrencies();
   const acknowledge = el('input', { type: 'checkbox' });
   const mismatch = el('p', { id: 'register-confirm-line', class: 'field-error', 'aria-live': 'polite', hidden: true });
   const error = el('p', { class: 'field-error', hidden: true });
@@ -116,7 +152,7 @@ export function registerForm({ kind, token: inviteToken, currencies, kdf, onCrea
   });
   function refresh() {
     submit.disabled =
-      !strongEnough || normalizeUsername(username.value) === null || (isVault && !acknowledge.checked);
+      !strongEnough || normalizeUsername(username.value) === null || (isVault && (!acknowledge.checked || !mainCurrency));
   }
   acknowledge.addEventListener('change', refresh);
 
@@ -142,8 +178,10 @@ export function registerForm({ kind, token: inviteToken, currencies, kdf, onCrea
     ]),
     isVault
       ? el('div', { class: 'field' }, [
-          el('label', { text: 'Main currency' }),
-          currency,
+          el('label', { for: 'register-currency', text: 'Main currency' }),
+          currencySearch,
+          currencyList,
+          chosenCurrency,
           el('p', { class: 'hint', text: 'This cannot be changed later.' }),
         ])
       : null,
@@ -213,7 +251,7 @@ export function registerForm({ kind, token: inviteToken, currencies, kdf, onCrea
           version: 1,
         };
         const blob = await crypto.encryptRecord(dek, slot, {
-          mainCurrency: currency.value,
+          mainCurrency,
           createdAt: new Date().toISOString(),
         });
         body.profileRecordId = recordId;

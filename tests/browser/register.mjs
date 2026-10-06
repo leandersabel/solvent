@@ -104,6 +104,7 @@ const fillRest = async (vault) => {
   await type('input[type=password]', PASSWORD, 1);
   if (vault) {
     await page.call((selector) => {
+      document.querySelector('#register-currency-list [role=option]').click();
       const box = document.querySelector(selector);
       box.checked = true;
       box.dispatchEvent(new Event('change', { bubbles: true }));

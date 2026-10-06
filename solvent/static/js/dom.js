@@ -45,6 +45,33 @@ export function el(tag, props = {}, children = []) {
   return node;
 }
 
+// An option of a searchable combobox's listbox (spec/design-system.md,
+// Combobox, searchable). Enter or Space picks it, and the arrows move
+// between the options of `list`, up from the first back to `search`.
+export function listOption(list, search, text, onPick, selected, extra = {}) {
+  return el('li', {
+    role: 'option',
+    tabindex: '-1',
+    class: selected ? 'unit-option is-selected' : 'unit-option',
+    'aria-selected': selected ? 'true' : 'false',
+    text,
+    onclick: onPick,
+    onkeydown: (event) => {
+      if (event.key === 'Enter' || event.key === ' ') {
+        event.preventDefault();
+        onPick();
+      } else if (event.key === 'ArrowDown' || event.key === 'ArrowUp') {
+        event.preventDefault();
+        const options = [...list.querySelectorAll('[role=option]')];
+        const at = options.indexOf(event.currentTarget) + (event.key === 'ArrowDown' ? 1 : -1);
+        if (at < 0) search.focus();
+        else if (options[at]) options[at].focus();
+      }
+    },
+    ...extra,
+  });
+}
+
 // An inline rename (spec/design-system.md, Components): the label
 // with an Edit action that reveals an ordinary input in place. Only
 // Save or Enter writes, so clicking away never does. A blank name is
