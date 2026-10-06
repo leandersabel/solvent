@@ -7,7 +7,9 @@
 // scrolls to that row and focuses its username with the focus ring,
 // whether clicked or pressed from the keyboard. A removed account reads
 // "account removed" with no control, one removed while Invites was open
-// focuses nothing, and the cell fits every width criterion 53 names.
+// focuses nothing, and the cell fits every width criterion 53 names,
+// the username beside the chip where it fits and otherwise on the next
+// line.
 import { REGISTRANT_PASSWORD, administrator, check, openBrowser, page, register, run, sql } from '../harness.mjs';
 
 const KEPT = 'sarah.used';
@@ -142,8 +144,9 @@ const accountsLoaded = () =>
 
 // The Status cell holding the button `name` at the current width: the
 // page's sideways overflow, the button, the Used chip and every piece
-// of the cell's text against the screen's edges, and whether the
-// username starts on the chip's line.
+// of the cell's text against the screen's edges, whether the username
+// starts on the chip's line or below it, and whether it would fit,
+// unbroken and after a space, in the room beside the chip.
 const fit = (name) =>
   page.call((n) => {
     const b = [...document.querySelectorAll('#app button')].find((x) => x.textContent.trim() === n);
@@ -174,7 +177,18 @@ const fit = (name) =>
     const overlap = (a, c) => a && c && a.top < c.bottom && c.top < a.bottom;
     const chipBox = chip ? chip.getBoundingClientRect() : null;
     const nameFirst = [...nameRange.getClientRects()].filter((r) => r.width > 0).sort((x, y) => x.top - y.top)[0];
+    const whole = b.cloneNode(true);
+    Object.assign(whole.style, { position: 'absolute', visibility: 'hidden', whiteSpace: 'nowrap' });
+    b.parentElement.append(whole);
+    const bs = getComputedStyle(b);
+    const unbroken = whole.getBoundingClientRect().width + parseFloat(bs.marginLeft) + parseFloat(bs.marginRight);
+    whole.remove();
+    const pen = document.createElement('canvas').getContext('2d');
+    pen.font = getComputedStyle(b.parentElement).font;
+    const room = chipBox ? cell.getBoundingClientRect().right - parseFloat(getComputedStyle(cell).paddingRight) - chipBox.right : 0;
     return {
+      fits: room >= pen.measureText(' ').width + unbroken,
+      nameBelowChip: Boolean(chipBox && nameFirst && nameFirst.top >= chipBox.bottom - 0.5),
       pans: document.documentElement.scrollWidth > innerWidth + 0.5,
       past,
       chip: Boolean(chip),
@@ -186,7 +200,8 @@ const fit = (name) =>
         chip: chipBox && Math.round(chipBox.width),
         name: Math.round(br.width),
         display: getComputedStyle(b).display,
-        besideChip: chipBox && Math.round(cell.getBoundingClientRect().right - parseFloat(getComputedStyle(cell).paddingRight) - chipBox.right),
+        room: Math.round(room),
+        unbroken: Math.round(unbroken),
       },
     };
   }, name);
@@ -306,9 +321,14 @@ await run(async () => {
       check(`nothing scrolls sideways with ${name} at ${width}px`, !f.pans, JSON.stringify(f));
       check(`no piece of ${name}'s Status cell is past the screen's edge at ${width}px`, f.past.length === 0, f.past.join('; '));
       check(`the Used chip of ${name} stays on one line at ${width}px`, f.chipLines === 1, JSON.stringify(f));
+      check(
+        f.fits
+          ? `${name} fits beside the Used chip at ${width}px and follows it on its line`
+          : `${name} does not fit beside the Used chip at ${width}px and starts the next line`,
+        f.fits ? f.nameBesideChip : f.nameBelowChip,
+        JSON.stringify([f.firstTops, f.widths]),
+      );
     }
-    const f = await fit(KEPT);
-    if (f) check(`the username follows the Used chip on its line at ${width}px`, f.nameBesideChip, JSON.stringify([f.firstTops, f.widths]));
   }
   await page.send('Emulation.clearDeviceMetricsOverride');
 }, { signsIn: false });
