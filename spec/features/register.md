@@ -711,7 +711,7 @@ fixture prevents.
     `tests/test_register_refusals.py::test_a_profile_schema_version_past_two_to_the_fifty_three_is_a_bad_request`.
 49. The vault form opens with no main currency chosen, and with every
     other field filled **Create vault** stays unusable until a currency
-    is picked from the list. Test: `tests/browser/parts/register.mjs`.
+    is picked from the list. Test: `tests/browser/parts/register.mjs`, `tests/browser/parts/register-review-currency.mjs`.
 50. Typing in the main currency's search narrows the list to the
     currencies whose code or name contains the text, ignoring case, and
-    chooses none. Test: `tests/browser/parts/register.mjs`.
+    chooses none. Test: `tests/browser/parts/register.mjs`, `tests/browser/parts/register-review-currency.mjs`.
