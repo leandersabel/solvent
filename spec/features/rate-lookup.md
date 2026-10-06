@@ -842,12 +842,16 @@ host's network are reachable.
     `tests/test_review_rate_lookup.py::test_a_retired_symbol_is_priced_by_both_forms_as_before`.
 36. `PATCH` setting `lookup: true` on a symbol with no provider adapter
     is a Bad Request, and so is `POST` creating one that way. Test:
-    `tests/test_rates.py::test_lookup_cannot_promise_a_proposal_the_proxy_cannot_serve`.
+    `tests/test_rates.py::test_lookup_cannot_promise_a_proposal_the_proxy_cannot_serve`,
+    `tests/test_review_rate_lookup.py::test_adding_a_unit_no_source_serves_at_automatic_is_refused_and_adds_nothing`,
+    `tests/test_review_rate_lookup.py::test_a_unit_no_source_serves_cannot_be_turned_to_automatic`,
+    `tests/test_review_rate_lookup.py::test_a_seeded_unit_with_no_source_cannot_be_turned_to_automatic_and_one_with_a_source_can`.
 37. (blind) `GET /api/admin/symbols` reports `hasAdapter: true` on
     exactly the symbols the adapter registry covers, asserted against the
     registry itself rather than a fixture, and every symbol with
     `lookup: true` also has `hasAdapter: true`. Test:
-    `tests/test_rates.py::test_has_adapter_is_derived_from_the_registry`.
+    `tests/test_rates.py::test_has_adapter_is_derived_from_the_registry`,
+    `tests/test_review_rate_lookup.py::test_has_adapter_is_the_registry_on_every_row_seeded_or_added`.
 38. `POST` or `PATCH` carrying `hasAdapter` is a Bad Request and changes
     nothing. Test: `tests/test_rates.py::test_has_adapter_is_read_only`.
 39. (blind) No response from any `/api/admin/symbols` route contains a

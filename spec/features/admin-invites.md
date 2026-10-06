@@ -883,4 +883,5 @@ administrator), and the lost sole password (Bootstrap). The rest:
     source for this unit yet. Rate lookup can be turned on once one is
     configured on the server." beneath it, and a currency it adds that
     no source serves, such as `XTS`, lists disabled at Entered by hand
-    with the same reason. Test: `tests/browser/parts/admin.mjs`.
+    with the same reason. Test: `tests/browser/parts/admin.mjs`,
+    `tests/browser/parts/admin-review-unit-lookup.mjs`.
