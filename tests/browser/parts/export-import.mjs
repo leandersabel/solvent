@@ -378,7 +378,7 @@ await run(async () => {
     const kinds = { account: 0, snapshot: 0, rate: 0 };
     for (const record of contents.records) if (record.recordType in kinds) kinds[record.recordType] += 1;
     const review = await page.eval("document.querySelector('.review').innerText");
-    const total = sql(`SELECT record_id FROM records ${OWN}`).length;
+    const total = sql(`SELECT record_id FROM records ${OWN} AND record_type != 'profile'`).length;
     check(
       'the review sets what is in the file against what will be deleted, prices on their own line',
       review.includes(`${kinds.account} holdings`) && review.includes(`${kinds.rate} captured prices`) &&

@@ -163,7 +163,7 @@ function confirmDelete(vault, date, onDeleted, redraw) {
   if (units.length) {
     body.push(
       el('p', {
-        text: `${counted(affected, 'holding', 'holdings')} measured in ${units.map((unit) => vault.unitName(unit)).join(' and ')} move on that date, including ones you recorded nothing for.`,
+        text: `${counted(affected, 'holding', 'holdings')} measured in ${units.map((unit) => vault.unitName(unit)).join(' and ')} ${affected === 1 ? 'moves' : 'move'} on that date, including ones you recorded nothing for.`,
       }),
     );
   }

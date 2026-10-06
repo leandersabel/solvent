@@ -123,10 +123,11 @@ function importCard(vault, reload) {
     snapshot: countOf(vault.snapshots),
     rate: countOf(vault.rates),
   };
-  const total = mine.account + mine.snapshot + mine.rate + vault.unreadable.length + (vault.profileRecord ? 1 : 0);
   // The profile is the vault's settings, not something the person put
-  // in it, so a vault holding nothing else holds nothing to erase.
-  const holdsData = total > (vault.profileRecord ? 1 : 0);
+  // in it, so it is not counted and a vault holding nothing else holds
+  // nothing to erase.
+  const total = mine.account + mine.snapshot + mine.rate + vault.unreadable.length;
+  const holdsData = total > 0;
 
   let parsed = null;
   let opened = null;

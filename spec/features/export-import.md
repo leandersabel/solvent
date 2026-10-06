@@ -100,8 +100,9 @@ Replace-only, and nothing on the screen may imply a merge exists.
 3. **Review.** What is in the file, by kind: holdings, recorded figures,
    captured prices, and the date it was exported, in the date style of
    the vault that is open. Alongside it, what will be destroyed, in the
-   same kinds and with the total: "Your vault currently holds X records.
-   All of them will be deleted." Both sides read in the same terms,
+   same kinds and with the total of every record but the profile,
+   unreadable ones included: "Your vault currently holds X records. All
+   of them will be deleted." Both sides read in the same terms,
    because the step exists to answer what is being traded for what.
    - Prices get their own line, because this is where a person sees both
      timelines are in the file before destroying the ones they have.
