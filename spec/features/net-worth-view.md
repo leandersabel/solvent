@@ -1069,7 +1069,8 @@ rule of the chart (Archived holdings, Ranges and modes).
 55. An active holding with no snapshots is listed as "not yet valued" and
     not counted as 0. With holdings and no values the total, gross assets
     and gross liabilities read `—`, with no change and no chart. Test:
-    `tests/browser/parts/dashboard.mjs`.
+    `tests/browser/parts/dashboard.mjs`,
+    `tests/browser/parts/dashboard-review-unvalued.mjs`.
 56. At 1280px, in a vault whose only holdings are active with no
     snapshots, no holdings table and no column heading render. Recording
     one renders the table with that holding as its only row. Test: no
@@ -1172,4 +1173,5 @@ rule of the chart (Archived holdings, Ranges and modes).
 77. With every holding archived, the total, gross assets and gross
     liabilities read `—` with no change, and hovering the chart fills
     its tooltip and leaves the hero a dash with no date. Test:
-    `tests/browser/parts/dashboard-fixtures.mjs`.
+    `tests/browser/parts/dashboard-fixtures.mjs`,
+    `tests/browser/parts/dashboard-review-unvalued.mjs`.
