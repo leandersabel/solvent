@@ -373,6 +373,14 @@ const UNIT_HEADS = ['Code', 'Name', 'Kind', 'Rate lookup', ''];
 // rates.METAL_PATTERN
 const WEIGHED = /^(?=.{1,16}$)[A-Z0-9][A-Z0-9._]*-(ozt|g)$/;
 const METAL_SHAPE = 'Metals are named <code>-ozt or <code>-g, such as XAU-ozt.';
+const NO_SOURCE = 'No source for this unit yet. Rate lookup can be turned on once one is configured on the server.';
+
+function lookupControl() {
+  return el('select', {}, [
+    el('option', { value: 'true', text: 'Automatic' }),
+    el('option', { value: 'false', text: 'Entered by hand' }),
+  ]);
+}
 
 async function unitTable(body) {
   mount(body, el('p', { class: 'hint', text: 'Loading…' }));
@@ -412,10 +420,7 @@ function unitRow(row, body) {
     () => 'That rename did not save.',
   );
 
-  const lookup = el('select', {}, [
-    el('option', { value: 'true', text: 'Automatic' }),
-    el('option', { value: 'false', text: 'Entered by hand' }),
-  ]);
+  const lookup = lookupControl();
   lookup.value = String(row.lookup);
   lookup.disabled = !row.hasAdapter;
   lookup.addEventListener('change', async () => {
@@ -440,12 +445,7 @@ function unitRow(row, body) {
     el('td', { text: row.kind === 'currency' ? 'Currency' : 'Metal' }),
     el('td', {}, [
       lookup,
-      row.hasAdapter
-        ? null
-        : el('span', {
-            class: 'hint',
-            text: 'No source for this unit yet. Rate lookup can be turned on once one is configured on the server.',
-          }),
+      row.hasAdapter ? null : el('span', { class: 'hint', text: NO_SOURCE }),
     ]),
     el('td', {}, [
       el('button', {
@@ -498,6 +498,10 @@ function addUnit(body) {
     el('option', { value: 'currency', text: 'Currency' }),
     el('option', { value: 'metal', text: 'Metal' }),
   ]);
+  // Every unit a source serves is seeded, so one added here has none.
+  const lookup = lookupControl();
+  lookup.value = 'false';
+  lookup.disabled = true;
   const error = el('p', { class: 'field-error', hidden: true });
 
   return el('details', {}, [
@@ -516,6 +520,11 @@ function addUnit(body) {
     ]),
     el('div', { class: 'field' }, [el('label', { text: 'Name' }), name]),
     el('div', { class: 'field' }, [el('label', { text: 'Kind' }), kind]),
+    el('div', { class: 'field' }, [
+      el('label', { text: 'Rate lookup' }),
+      lookup,
+      el('p', { class: 'hint', text: NO_SOURCE }),
+    ]),
     error,
     el('button', {
       class: 'btn-primary',

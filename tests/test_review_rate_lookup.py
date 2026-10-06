@@ -34,7 +34,10 @@ registration no longer offers it (The symbol table, Maintaining the
 table, criterion 35). A metal names its weight: adding one that does
 not is refused, a stored one is retired at every start and cannot be
 restored, and a code with a trailing newline is refused everywhere
-(Seeded symbols, SSRF and egress hardening, criteria 81 and 82).
+(Seeded symbols, SSRF and egress hardening, criteria 81 and 82). No
+unit a source does not serve can be added or turned to Automatic, and
+`hasAdapter` is the registry's answer on every row (Maintaining the
+table, criteria 36 and 37).
 
 Written from the spec alone. Each provider is reached on a loopback HTTP
 server through the app's own opener, so the app's real socket timeout
@@ -2926,3 +2929,86 @@ def test_a_retired_weightless_metal_keeps_its_unit_and_prices(app, owner, monkey
     assert (row["label"], row["kind"], row["retired"], row["lookup"]) == ("Stored XYZ", "metal", True, False)
     assert response.status_code == 204, response.get_data(as_text=True)
     assert sent == []
+
+
+def admin_rows(admin) -> dict[str, dict]:
+    return {row["symbol"]: row for row in admin_table(admin)}
+
+
+UNSERVED_UNITS = [("XTS", "currency"), ("XRH-g", "metal")]
+
+
+@pytest.mark.parametrize(("symbol", "kind"), UNSERVED_UNITS)
+def test_adding_a_unit_no_source_serves_at_automatic_is_refused_and_adds_nothing(app, admin, symbol, kind):
+    """Criterion 36, on `POST`: a unit no adapter serves cannot be added
+    with `lookup: true`, and the refusal writes no row."""
+    response = admin.post(
+        "/api/admin/symbols",
+        json={"symbol": symbol, "label": "Test unit", "kind": kind, "lookup": True},
+        headers=CSRF,
+    )
+
+    assert response.status_code == 400, response.get_data(as_text=True)
+    assert rows(app, "SELECT symbol FROM symbols WHERE symbol = ?", (symbol,)) == []
+
+
+@pytest.mark.parametrize(("symbol", "kind"), UNSERVED_UNITS)
+def test_a_unit_no_source_serves_cannot_be_turned_to_automatic(app, admin, symbol, kind):
+    """Criterion 36, on `PATCH`: a unit added at Entered by hand stays
+    there, alone or beside a rename, and turning it off still works."""
+    added = admin.post(
+        "/api/admin/symbols",
+        json={"symbol": symbol, "label": "Test unit", "kind": kind, "lookup": False},
+        headers=CSRF,
+    )
+    assert added.status_code in (200, 201), added.get_data(as_text=True)
+
+    alone = admin.patch(f"/api/admin/symbols/{symbol}", json={"lookup": True}, headers=CSRF)
+    renamed = admin.patch(f"/api/admin/symbols/{symbol}", json={"lookup": True, "label": "Renamed"}, headers=CSRF)
+    off = admin.patch(f"/api/admin/symbols/{symbol}", json={"lookup": False}, headers=CSRF)
+
+    assert alone.status_code == 400, alone.get_data(as_text=True)
+    assert renamed.status_code == 400, renamed.get_data(as_text=True)
+    assert off.status_code == 200, off.get_data(as_text=True)
+    assert rows(app, "SELECT label, lookup FROM symbols WHERE symbol = ?", (symbol,)) == [
+        {"label": "Test unit", "lookup": 0}
+    ]
+    row = admin_rows(admin)[symbol]
+    assert (row["lookup"], row["hasAdapter"]) == (False, False)
+
+
+def test_a_seeded_unit_with_no_source_cannot_be_turned_to_automatic_and_one_with_a_source_can(app, admin):
+    """Criterion 36 on a seeded row, and its converse: `XAG-g` has no
+    adapter, `XAU-g` has one, and either can be turned off."""
+    refused = admin.patch("/api/admin/symbols/XAG-g", json={"lookup": True}, headers=CSRF)
+    off = admin.patch("/api/admin/symbols/XAU-g", json={"lookup": False}, headers=CSRF)
+    on = admin.patch("/api/admin/symbols/XAU-g", json={"lookup": True}, headers=CSRF)
+
+    assert refused.status_code == 400, refused.get_data(as_text=True)
+    assert off.status_code == 200, off.get_data(as_text=True)
+    assert on.status_code == 200, on.get_data(as_text=True)
+    table = admin_rows(admin)
+    assert table["XAG-g"]["lookup"] is False
+    assert table["XAU-g"]["lookup"] is True
+
+
+def test_has_adapter_is_the_registry_on_every_row_seeded_or_added(app, admin):
+    """Criterion 37: `hasAdapter` is what the adapter registry says for
+    each row, units an administrator added included, and no row reads
+    `lookup: true` without it."""
+    for symbol, kind in UNSERVED_UNITS:
+        added = admin.post(
+            "/api/admin/symbols",
+            json={"symbol": symbol, "label": "Test unit", "kind": kind, "lookup": False},
+            headers=CSRF,
+        )
+        assert added.status_code in (200, 201), added.get_data(as_text=True)
+
+    table = admin_rows(admin)
+
+    assert {symbol: row["hasAdapter"] for symbol, row in table.items()} == {
+        symbol: rates.adapter_for(symbol, row["kind"]) is not None for symbol, row in table.items()
+    }
+    assert [symbol for symbol, row in table.items() if row["lookup"] and not row["hasAdapter"]] == []
+    assert table["XAU-g"]["hasAdapter"] is True
+    assert all(table[symbol]["hasAdapter"] is False for symbol, _ in UNSERVED_UNITS)

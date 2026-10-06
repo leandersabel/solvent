@@ -300,7 +300,10 @@ action.
   `<code>-ozt` or `<code>-g`, such as `XAU-ozt`."
 - **Name.**
 - **Kind**, currency or metal, fixed once the unit exists.
-- **Rate lookup**, Entered by hand selected.
+- **Rate lookup**, disabled at Entered by hand, with the no-source
+  reason beneath it. Every unit a source serves is already in the
+  table (`rate-lookup.md`, Seeded symbols), so a unit added here has
+  none.
 
 **Retiring, not deleting.** Retire is the only way a unit leaves the
 picker:
@@ -876,3 +879,9 @@ administrator), and the lost sole password (Bootstrap). The rest:
     its reason beside it, while a retired `XAG-g` and a retired currency
     can be restored. Test: `tests/browser/parts/admin.mjs`,
     `tests/browser/parts/admin-review-units.mjs`.
+56. Add a unit shows Rate lookup disabled at Entered by hand with "No
+    source for this unit yet. Rate lookup can be turned on once one is
+    configured on the server." beneath it, and a currency it adds that
+    no source serves, such as `XTS`, lists disabled at Entered by hand
+    with the same reason. Test: `tests/browser/parts/admin.mjs`,
+    `tests/browser/parts/admin-review-unit-lookup.mjs`.
