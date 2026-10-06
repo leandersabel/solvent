@@ -87,7 +87,7 @@ async function register(session, path, account) {
     set('input[type=text]', name);
     set('input[type=password]', secret, 0);
     set('input[type=password]', secret, 1);
-    if (document.querySelector('select')) set('select', money);
+    document.querySelector(`#register-currency-list [data-symbol="${money}"]`)?.click();
     const box = document.querySelector('input[type=checkbox]');
     if (box) {
       box.checked = true;

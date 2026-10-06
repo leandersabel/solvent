@@ -101,7 +101,7 @@ const typeInto = async (selector, index, value) => {
 
 await run(async () => {
   await page.goto(`${BASE}/register?invite=${mintInvite('vault-owner')}`);
-  const form = await page.holds(`document.querySelector('input[type=password]') && document.querySelector(${JSON.stringify(SEARCH)})`,
+  const form = await page.holds('document.querySelector(\'input[type=password]\') && document.querySelector(\'input[placeholder="Search by code or name"]\')',
     { label: 'the vault form with its currency search' });
   check('the vault form has a currency search field with its placeholder', form);
   if (!form) return;
