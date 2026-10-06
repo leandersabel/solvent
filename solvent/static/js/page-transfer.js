@@ -130,6 +130,10 @@ function importCard(vault, reload) {
 
   let parsed = null;
   let opened = null;
+  // The attempt to open the file in flight, and its re-key, both ended
+  // whenever the step they serve is reset.
+  let attempt = null;
+  let worker = null;
 
   // 1. Choose file.
   const file = el('input', { type: 'file', accept: 'application/json,.json', id: 'import-file' });
@@ -148,6 +152,9 @@ function importCard(vault, reload) {
     el('div', { class: 'form-actions' }, [openButton]),
   ]);
 
+  const phase = el('p', { class: 'progress-label', hidden: true, role: 'status' });
+  const bar = el('progress', { class: 'progress', hidden: true, max: '1', value: '0' });
+
   // 3. Review, and 4. Confirm.
   const review = el('div', { class: 'review', hidden: true });
   const erase = el('input', { type: 'text', id: 'import-erase', placeholder: 'ERASE' });
@@ -159,19 +166,24 @@ function importCard(vault, reload) {
     replace,
   ]);
 
-  const phase = el('p', { class: 'progress-label', hidden: true, role: 'status' });
-  const bar = el('progress', { class: 'progress', hidden: true, max: '1', value: '0' });
-
   const reset = (from) => {
     error.hidden = true;
     if (from <= 1) {
       parsed = null;
+      password.value = '';
       stepPassword.hidden = true;
     }
     if (from <= 2) {
+      attempt = null;
+      worker?.terminate();
+      worker = null;
+      openButton.disabled = false;
       opened = null;
+      erase.value = '';
       review.hidden = true;
       stepConfirm.hidden = true;
+      phase.hidden = true;
+      bar.hidden = true;
     }
   };
 
@@ -200,24 +212,50 @@ function importCard(vault, reload) {
     take(event.dataTransfer.files[0]);
   });
 
+  // The whole file is decrypted and re-keyed before the review, so a
+  // file that cannot be restored never reaches the step where a person
+  // decides. Only the wrap and the upload wait for the confirmation.
   const open = async () => {
     reset(2);
     if (!parsed) return;
     openButton.disabled = true;
+    const mine = {};
+    attempt = mine;
+    // Superseded by another file or another attempt, or the card gone
+    // with a lock or the screen left, which starts the restore again
+    // from the first step.
+    const current = () => attempt === mine && review.isConnected;
+    let file;
+    let rekeyed;
     try {
-      opened = await transfer.openFile(parsed, password.value);
+      file = await transfer.openFile(parsed, password.value);
+      if (!current()) return;
+      worker = new Worker('/static/js/transfer-worker.js', { type: 'module' });
+      rekeyed = await inWorker(worker, file.fileDek, file.records, (step, done, of) => {
+        if (!review.isConnected) return reset(2);
+        progress(`${step === 'decrypt' ? 'Decrypting' : 'Re-encrypting'} ${done} of ${of}…`, done, of);
+      });
     } catch (failure) {
+      if (!current()) return;
+      reset(2);
       fail(
         failure instanceof transfer.WrongPassword
           ? 'That password does not open this file.'
           : failure instanceof transfer.FileRefused
             ? refusal(failure)
-            : `No records were imported. Your vault is unchanged. Record ${failure.recordId} in the file could not be decrypted.`,
+            : failure.unreadable
+              ? `This file is damaged and cannot be restored. ${failure.unreadable === 1 ? '1 record' : `${failure.unreadable} records`} in it could not be read. Your vault is unchanged.`
+              : 'This file could not be opened. Your vault is unchanged.',
       );
       return;
     } finally {
-      openButton.disabled = false;
+      if (attempt === mine) openButton.disabled = false;
     }
+    if (!current()) return;
+    reset(2);
+    // What the review and the upload need: no key to the file, and of
+    // its plaintext only the main currency the review names.
+    opened = { currency: file.profile?.mainCurrency ?? null, records: file.records, exportedAt: file.exportedAt, rekeyed };
     showReview();
   };
   openButton.addEventListener('click', open);
@@ -230,7 +268,7 @@ function importCard(vault, reload) {
 
   const showReview = () => {
     const counts = transfer.countKinds(opened.records);
-    const theirs = opened.profile ? opened.profile.mainCurrency : null;
+    const theirs = opened.currency;
     mount(review, [
       el('div', { class: 'review-side' }, [
         el('h3', { class: 'group-heading', text: 'In the file' }),
@@ -280,22 +318,7 @@ function importCard(vault, reload) {
       return;
     }
     replace.disabled = true;
-    let rekeyed;
-    try {
-      // Nothing is uploaded until every record has decrypted.
-      rekeyed = await inWorker(opened.fileDek, opened.records, (step, done, of) =>
-        progress(`${step === 'decrypt' ? 'Decrypting' : 'Re-encrypting'} ${done} of ${of}…`, done, of),
-      );
-    } catch (failure) {
-      phase.hidden = true;
-      bar.hidden = true;
-      fail(
-        `No records were imported. Your vault is unchanged.${failure.recordId ? ` Record ${failure.recordId} in the file could not be decrypted.` : ''}`,
-      );
-      replace.disabled = false;
-      return;
-    }
-
+    const { rekeyed } = opened;
     let answered;
     let wrapper;
     try {
@@ -316,9 +339,15 @@ function importCard(vault, reload) {
       return;
     }
 
-    const theirs = opened.profile ? opened.profile.mainCurrency : null;
+    const theirs = opened.currency;
     const before = vault.mainCurrency;
-    const next = await replaceDek(rekeyed.dek, answered.vaultEpoch, wrapper);
+    let next;
+    try {
+      next = await replaceDek(rekeyed.dek, answered.vaultEpoch, wrapper);
+    } catch {
+      // A lock during the upload already took the keys and the screen.
+      return;
+    }
     restored = {
       counts: transfer.countKinds(opened.records),
       currency: next.mainCurrency,
@@ -327,7 +356,9 @@ function importCard(vault, reload) {
     reload();
   });
 
-  return el('section', { class: 'card', id: 'import-card' }, [
+  // A lock starts the restore again from the first step, so not even
+  // the typed ERASE outlives it (export-import.md, Import).
+  return el('section', { class: 'card', id: 'import-card', 'data-keeps-nothing': '' }, [
     el('h2', { class: 'section-heading', text: 'Import' }),
     stepFile,
     stepPassword,
@@ -345,9 +376,8 @@ function importCard(vault, reload) {
 
 /** The decrypt and re-encrypt, in a Worker so the tab stays responsive.
  *  Resolves to the new DEK and the re-encrypted records, or rejects
- *  naming the record that would not decrypt. */
-function inWorker(fileDek, records, onProgress) {
-  const worker = new Worker('/static/js/transfer-worker.js', { type: 'module' });
+ *  counting the records that would not decrypt. */
+function inWorker(worker, fileDek, records, onProgress) {
   return new Promise((resolve, reject) => {
     worker.onmessage = ({ data }) => {
       if (data.phase === 'done') {
@@ -355,7 +385,7 @@ function inWorker(fileDek, records, onProgress) {
         resolve({ dek: data.dek, records: data.records });
       } else if (data.phase === 'failed') {
         worker.terminate();
-        reject(Object.assign(new Error('unreadable'), { recordId: data.recordId }));
+        reject(Object.assign(new Error('unreadable'), { unreadable: data.unreadable }));
       } else {
         onProgress(data.phase, data.done, data.total);
       }

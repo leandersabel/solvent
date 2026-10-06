@@ -405,15 +405,27 @@ await run(async () => {
     target.ciphertext = bytes.toString('base64');
     await chooseFile(fixture('altered.json', JSON.stringify(altered)));
     await openWith(VAULT_PASSWORD);
-    await page.waitUntil("!document.querySelector('.review').hidden", { timeout: 60000, label: 'the review of the altered file' });
-    await setValue('#import-erase', 'ERASE');
-    await replaceVault();
-    await page.waitUntil("document.querySelector('#import-card .field-error').textContent.includes('No records were imported')", { timeout: 60000, label: 'the refused record' });
+    await page.waitUntil("document.querySelector('#import-card .field-error').textContent.includes('damaged')", { timeout: 60000, label: 'the refused record' });
     check(
-      'one byte altered in one record aborts the import, names the record, uploads nothing and leaves the vault',
-      (await importError()).includes(target.recordId) && (await importError()).includes('Your vault is unchanged') &&
+      'one byte altered in one record is refused before the review, counted and not named, uploading nothing',
+      (await importError()) === 'This file is damaged and cannot be restored. 1 record in it could not be read. Your vault is unchanged.' &&
+        (await page.eval("document.querySelector('.review').hidden && document.querySelector('.confirm-step').hidden")) &&
         (await uploads()) === 0 && vaultRows() === rowsBefore,
       await importError(),
+    );
+
+    await chooseFile(exportedPath);
+    await openWith(VAULT_PASSWORD);
+    await page.waitUntil("!document.querySelector('.review').hidden", { timeout: 60000, label: 'the review before the lock' });
+    await setValue('#import-erase', 'ERASE');
+    await page.eval("document.querySelector('.btn-lock').click()");
+    await page.waitUntil("document.querySelector('#unlock-password')", { timeout: 20000, label: 'the lock during the import' });
+    await enterPassword(VAULT_PASSWORD);
+    await page.waitUntil("document.querySelector('#import-file')", { timeout: 90000, label: 'the import screen after the lock' });
+    check(
+      'a lock during the import starts it again at the first step, with no review and no typed ERASE',
+      await page.eval("document.querySelector('.review').hidden && Boolean(document.querySelector('#import-password').closest('[hidden]')) && document.querySelector('#import-erase').value === '' && document.querySelector('#import-file').files.length === 0"),
+      await page.eval("document.querySelector('#import-card').innerText"),
     );
 
     await chooseFile(exportedPath);

@@ -346,7 +346,8 @@ export function resumable(reopen, ...ids) {
 // Rules). That means what the person typed or chose, and only where it
 // differs from what the form was built with: a field prefilled from the
 // vault and left alone is vault content read back, and goes with the
-// rest. A password never survives, shown or not.
+// rest. A password never survives, shown or not, and nothing under
+// `data-keeps-nothing` does.
 
 const edited = new WeakSet();
 const baselines = new WeakMap();
@@ -385,7 +386,7 @@ export function editedFields(root) {
   const kept = [];
   fieldsOf(root).forEach((field, index) => {
     if (!edited.has(field)) return;
-    if (field.type === 'password' || field.type === 'file' || field.closest('.password-field')) return;
+    if (field.type === 'password' || field.type === 'file' || field.closest('.password-field, [data-keeps-nothing]')) return;
     const value = valueOf(field);
     if (value === baselines.get(field)) return;
     kept.push({ index, kind: kindOf(field), value });

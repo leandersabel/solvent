@@ -4,7 +4,7 @@
 //
 // Every plaintext payload lives and dies here. The page receives the
 // new DEK and ciphertext only, and ends the worker once it has them.
-import { RecordUnreadable, rekey } from './transfer.js';
+import { RecordsUnreadable, rekey } from './transfer.js';
 
 self.onmessage = async (event) => {
   const { fileDek, records } = event.data;
@@ -16,7 +16,7 @@ self.onmessage = async (event) => {
   } catch (error) {
     self.postMessage({
       phase: 'failed',
-      recordId: error instanceof RecordUnreadable ? error.recordId : null,
+      unreadable: error instanceof RecordsUnreadable ? error.count : null,
     });
   }
 };

@@ -357,9 +357,14 @@ export async function exportFile() {
 export async function replaceDek(dek, vaultEpoch, wrapped) {
   api.announce(api.vaultEpoch());
   api.setVaultEpoch(vaultEpoch);
+  // A lock during the upload took the keys, and stays the last word, so
+  // a locked page never holds the restored vault readable.
+  if (held === null) throw new LockedWhileOpeningError();
+  const began = generation;
   held = { ...held, ...wrapped };
   const next = new Vault(dek);
   await next.load();
+  stillOpen(began);
   vault = next;
   return vault;
 }
