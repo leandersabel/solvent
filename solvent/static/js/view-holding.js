@@ -26,11 +26,11 @@ export function holdingView(vault, accountId, { editing = false, onOpenRecording
   // a hashchange, because nothing needs to redraw.
   const address = `#/holding/${accountId}`;
   const closeEditor = () => {
-    window.history.replaceState(null, '', address);
+    window.history.replaceState(window.history.state, '', address);
     onChanged();
   };
   const openEditor = () => {
-    window.history.replaceState(null, '', `${address}/edit`);
+    window.history.replaceState(window.history.state, '', `${address}/edit`);
     const notice = conflictNotice;
     conflictNotice = null;
     panel.replaceChildren(

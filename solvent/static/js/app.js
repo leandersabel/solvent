@@ -110,16 +110,55 @@ document.addEventListener('leftunsaved', ({ detail }) => {
   else leftOnForm = detail;
 });
 
+// Where each history entry was left scrolled, by the key the entry
+// carries in its state. A screen opened anew starts at its top, and
+// Back or Forward returns to where its entry was left
+// (app-shell.md, Where a screen opens). The browser's own restoring
+// would measure against the screen being left.
+history.scrollRestoration = 'manual';
+const scrolled = new Map();
+let shownEntry = null;
+let settling = null;
+
 function render() {
   const left = unsavedOnSweep();
   const fromForm = leftOnForm;
   leftOnForm = null;
+  const arriving = isUnlocked() && drawnHash !== window.location.hash;
+  if (arriving && shownEntry) scrolled.set(shownEntry, window.scrollY);
   draw();
+  if (arriving) {
+    if (!history.state?.entry) history.replaceState({ entry: crypto.randomUUID() }, '');
+    shownEntry = history.state.entry;
+    scrollBack(scrolled.get(shownEntry) ?? 0);
+  }
   leftUnsaved(left);
   if (fromForm) leftUnsaved(fromForm);
   markCurrentNav();
   vaultShown = isUnlocked();
   if (vaultShown) trackEdits(container);
+}
+
+/** Scrolls to `y`. A screen that fills in after it is drawn, as the
+ *  trend chart does at its first layout and Settings when its session
+ *  list arrives, is too short for it at first, so the position is set
+ *  again as the screen grows, until it is reached, the person scrolls
+ *  or presses a key, or another screen opens. */
+function scrollBack(y) {
+  settling?.abort();
+  window.scrollTo(0, y);
+  if (window.scrollY >= y) return;
+  const done = new AbortController();
+  settling = done;
+  const growing = new ResizeObserver(() => {
+    window.scrollTo(0, y);
+    if (window.scrollY >= y) done.abort();
+  });
+  growing.observe(container);
+  done.signal.addEventListener('abort', () => growing.disconnect());
+  for (const name of ['wheel', 'touchstart', 'keydown', 'pointerdown']) {
+    window.addEventListener(name, () => done.abort(), { signal: done.signal, passive: true });
+  }
 }
 
 /** Leaving a sweep or the single-holding form with typed figures says

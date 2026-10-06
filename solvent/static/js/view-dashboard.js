@@ -591,7 +591,7 @@ function holdingsTable(vault, state, render, actions, grouping) {
             onclick: () => {
               state.unassignedOnly = false;
               if (window.location.hash.startsWith('#/unassigned')) {
-                window.history.replaceState(null, '', '#/');
+                window.history.replaceState(window.history.state, '', '#/');
               }
               render();
             },
