@@ -115,6 +115,10 @@ recordings, because the dates are already on screen:
   act, and a page in front of it would add a step to what the product
   exists to make cheap.
 
+**No screen says "snapshot".** It is the record type's name. On
+screen, what one holding held on a date is a value or a figure, and
+every record on one date is a recording.
+
 **A converted figure** on every screen here is the figure on the unit's
 rate line for its date where that line holds one, else the price at
 its date (`record-rate.md`, Reading). Where that price is from an
@@ -740,7 +744,7 @@ The same Dialog, prefilled with the stored value, date and note.
   holding, same date: upsert). Confirming updates in place. Declining
   leaves the original untouched and returns to the form.
 - **Duplicate date, moving**: different copy, because a second record
-  dies: "30 July already holds a snapshot of USD 12,100.00. Moving this
+  dies: "30 July already holds a value of USD 12,100.00. Moving this
   entry there will delete it." Destructive styling on the confirm
   (Moving the date onto an occupied date).
 - **The date became taken while you were working**: refused whole,
@@ -1612,3 +1616,6 @@ Editing an existing entry).
     reads by its code, and no line or message shows a symbol such as
     `XAU-ozt`. Test: `tests/browser/parts/recording-detail.mjs`,
     `tests/browser/parts/update-values.mjs`.
+97. (blind) No text the app shows, and no accessible name, contains the
+    word "snapshot". Test:
+    `tests/test_record_snapshot.py::test_no_copy_says_snapshot`.

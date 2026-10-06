@@ -316,7 +316,7 @@ action is a 44px target, and nothing on the screen pans sideways.
 
 A single confirm:
 
-> Delete the snapshot of USD 12,450.00 for 31 July? Your net worth for
+> Delete the value of USD 12,450.00 for 31 July? Your net worth for
 > the period around this date will change.
 
 For the holding's only snapshot, the copy says instead that the holding
@@ -331,8 +331,8 @@ detail's act.
 #### States
 
 - **Loading**: none.
-- **Empty, no snapshots**: "No snapshots yet. Record what this holding
-  is worth." and the primary action, in place of the table.
+- **Empty, no snapshots**: "Nothing recorded yet. Record what this
+  holding is worth." and the primary action, in place of the table.
 - **One snapshot**: a table with one row.
 - **Error, duplicate date**: two entries share one date (a date move
   whose `DELETE` failed, or two crossed sittings). Both rows render
@@ -342,7 +342,7 @@ detail's act.
   answering it in either place answers it.
 - **A figure unpriced at its date**: its native value and "not priced".
   Other rows are unaffected.
-- **Error, Conflict on a snapshot write**: "This snapshot was changed in
+- **Error, Conflict on a snapshot write**: "This value was changed in
   another tab." The row reloads.
 - **Error, delete failed**: inline on the row, "Nothing was deleted.",
   and the row stays.
