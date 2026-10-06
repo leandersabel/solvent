@@ -771,7 +771,12 @@ host's network are reachable.
     Frankfurter's count at one. Test:
     `tests/test_rates.py::test_outbound_requests_run_on_threads_with_no_flask_context`,
     `tests/test_rates.py::test_a_breaker_count_changed_from_many_threads_loses_no_update`,
-    `tests/test_rates.py::test_a_table_answering_after_the_quote_leg_failed_does_not_reset_its_count`.
+    `tests/test_rates.py::test_a_table_answering_after_the_quote_leg_failed_does_not_reset_its_count`,
+    `tests/test_review_rate_lookup.py::test_a_quote_legs_failure_counts_one_whichever_answer_is_read_last`,
+    `tests/test_review_rate_lookup.py::test_a_late_table_never_saves_a_failing_quote_leg_from_opening_the_breaker`,
+    `tests/test_review_rate_lookup.py::test_a_quote_legs_success_never_wipes_the_tables_failure`,
+    `tests/test_review_rate_lookup.py::test_another_requests_failure_during_this_one_keeps_the_count`,
+    `tests/test_review_rate_lookup.py::test_a_success_resets_its_own_count_from_before_the_request_whatever_the_other_did`.
 25. (blind) After the configured number of consecutive failures of one
     provider, a request needing only that provider returns No Content
     without an outbound attempt, and that provider is asked again once
