@@ -700,7 +700,8 @@ dashboard.
 27. (blind) A shell page, a JSON endpoint, a Not Found and a Server Error
     each carry the same CSP and carry HSTS. Test:
     `tests/test_headers.py::test_every_response_shape_carries_the_policy_byte_identically`,
-    `tests/test_headers.py::test_every_response_shape_carries_hsts`.
+    `tests/test_headers.py::test_every_response_shape_carries_hsts`,
+    `tests/test_review_app_shell.py::test_every_response_shape_carries_one_csp_and_one_hsts`.
 28. The CSP refuses framing and no `X-Frame-Options` is served. Test:
     `tests/test_headers.py::test_no_separate_x_frame_options_is_served`.
 29. (blind) No screen, error pages reached by navigation included, logs a
@@ -899,7 +900,9 @@ dashboard.
     at `--log-level error` and at `warning`. The same run without
     `--config` at `warning` logs `ip=127.0.0.2`, which proves the test
     sees the line Solvent's handler drops. Test:
-    `tests/test_deployment.py::test_no_server_log_line_carries_the_peer_address`.
+    `tests/test_deployment.py::test_no_server_log_line_carries_the_peer_address`,
+    `tests/test_review_app_shell.py::test_no_log_line_carries_the_peer_at_either_level`,
+    `tests/test_review_app_shell.py::test_the_control_without_solvents_handler_does_log_the_peer`.
 78. The Dockerfile's gunicorn command runs one `gthread` process with
     more request threads than `LOOKUP_CONCURRENCY`. Test:
     `tests/test_deployment.py::test_one_gthread_process_serves_more_requests_than_lookups_can_hold`,
@@ -913,17 +916,6 @@ dashboard.
     `tests/test_review_app_shell.py::test_the_control_holding_every_thread_does_stop_the_sign_in_page`.
 80. A start empties the rate cache and keeps the schema version. Test:
     `tests/test_rates.py::test_starting_the_app_empties_the_rate_cache`.
-81. (blind) gunicorn, run with the Dockerfile's arguments, answers an
-    over-long request line, an over-long invite address, an over-long
-    header, too many headers, an invalid request line and an invalid
-    header name each with Bad Request, `Connection: close`, no
-    `Set-Cookie`, and the CSP, HSTS and body of an invented path's Not
-    Found, and its output holds neither gunicorn's reason nor the
-    address. Test:
-    `tests/test_deployment.py::test_a_request_gunicorn_cannot_read_gets_the_missing_card_with_every_protection`.
-82. A failure before the app answers is a Server Error with the
-    `failure` body, and the log names only the exception's class. Test:
-    `tests/test_chrome.py::test_a_failure_before_flask_answers_with_the_failure_body_and_logs_only_its_class`.
 81. At a 390px phone viewport, a real click on Settings in the bar with
     the dashboard scrolled down, and on a holding's row far down the
     dashboard, each opens its screen with `scrollY` 0 and the bar's top
@@ -940,3 +932,16 @@ dashboard.
     no page at this address." with Go to Solvent and Lock, writes
     nothing, and Go to Solvent opens the dashboard still unlocked. Test:
     `tests/browser/parts/error-page.mjs`.
+85. (blind) gunicorn, run with the Dockerfile's arguments, answers an
+    over-long request line, an over-long invite address, an over-long
+    header, too many headers, an invalid request line and an invalid
+    header name each with Bad Request, `Connection: close`, no
+    `Set-Cookie`, and the CSP, HSTS and body of an invented path's Not
+    Found, and its output holds neither gunicorn's reason nor the
+    address. Test:
+    `tests/test_deployment.py::test_a_request_gunicorn_cannot_read_gets_the_missing_card_with_every_protection`,
+    `tests/test_review_app_shell.py::test_an_unreadable_request_gets_the_not_found_card_and_every_header`.
+86. A failure before the app answers is a Server Error with the
+    `failure` body, and the log names only the exception's class. Test:
+    `tests/test_chrome.py::test_a_failure_before_flask_answers_with_the_failure_body_and_logs_only_its_class`,
+    `tests/test_review_app_shell.py::test_a_failure_before_the_app_answers_is_the_failure_card_and_logs_only_its_class`.
