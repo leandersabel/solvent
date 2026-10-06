@@ -1618,4 +1618,5 @@ Editing an existing entry).
     `tests/browser/parts/update-values.mjs`.
 97. (blind) No text the app shows, and no accessible name, contains the
     word "snapshot". Test:
-    `tests/test_record_snapshot.py::test_no_copy_says_snapshot`.
+    `tests/test_record_snapshot.py::test_no_copy_says_snapshot`,
+    `tests/browser/parts/snapshot-entry-review-word.mjs`.
