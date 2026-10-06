@@ -106,6 +106,10 @@ Replace-only, and nothing on the screen may imply a merge exists.
    because the step exists to answer what is being traded for what.
    - Prices get their own line, because this is where a person sees both
      timelines are in the file before destroying the ones they have.
+   - Records the vault holds but cannot read get a line after the
+     prices, "N records that could not be read" ("1 record that could
+     not be read"), shown only above zero, because a restore deletes
+     them too. The total is the sum of the lines above it.
    - **A vault holding only its profile is empty here**, because the
      profile is settings, not anything the person put in. The destroyed
      side reads "Your vault is empty. Nothing will be deleted." The step
@@ -639,3 +643,7 @@ There is no `formatVersion` below 1.
     no typed `ERASE` and nothing re-encrypted kept. Test:
     `tests/browser/parts/export-import.mjs`,
     `tests/browser/parts/export-import-review-damaged.mjs`.
+58. The review's total of what will be deleted is the sum of the lines
+    above it: the vault's settings are not counted, and records the vault
+    cannot read get a line of their own. Test:
+    `tests/browser/parts/export-import.mjs`.

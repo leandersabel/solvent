@@ -285,6 +285,11 @@ function importCard(vault, reload) {
               el('p', { text: counted(mine.account, 'holding', 'holdings') }),
               el('p', { text: counted(mine.snapshot, 'recorded figure', 'recorded figures') }),
               el('p', { text: counted(mine.rate, 'captured price', 'captured prices') }),
+              // A restore deletes these too, so the total is the sum of
+              // the lines above it.
+              vault.unreadable.length
+                ? el('p', { text: `${counted(vault.unreadable.length, 'record', 'records')} that could not be read` })
+                : null,
               el('p', { class: 'strong', text: `Your vault currently holds ${counted(total, 'record', 'records')}. All of them will be deleted.` }),
             ]
           : [el('p', { text: 'Your vault is empty. Nothing will be deleted.' })]),

@@ -414,6 +414,31 @@ await run(async () => {
       await importError(),
     );
 
+    // A captured price copied under a new id no longer matches its AAD,
+    // so the vault holds a record it cannot read, which a restore
+    // deletes too.
+    const unreadable = 'unreadable-price';
+    sql(
+      'INSERT INTO records (principal_id, record_id, record_type, account_id, schema_version, version, nonce, ciphertext, updated_at) ' +
+        'SELECT records.principal_id, ?, records.record_type, records.account_id, records.schema_version, records.version, records.nonce, records.ciphertext, records.updated_at ' +
+        `FROM records ${OWN} AND records.record_type = 'rate' LIMIT 1`,
+      unreadable,
+    );
+    await unlockAt('/settings/export-import', "document.querySelector('#import-file')");
+    await chooseFile(exportedPath);
+    await openWith(VAULT_PASSWORD);
+    await page.waitUntil("!document.querySelector('.review').hidden", { timeout: 60000, label: 'the review of a vault with an unreadable record' });
+    const deleted = await page.eval("[...document.querySelectorAll('.review-side')[1].querySelectorAll('p')].map((p) => p.textContent)");
+    const lines = deleted.slice(0, -1).map((line) => Number(line.split(' ')[0]));
+    check(
+      'the review counts the records the vault cannot read on a line of their own, and its total is the sum of its lines',
+      deleted.at(-2) === '1 record that could not be read' &&
+        deleted.at(-1) === `Your vault currently holds ${lines.reduce((a, b) => a + b)} records. All of them will be deleted.`,
+      JSON.stringify(deleted),
+    );
+    sql('DELETE FROM records WHERE record_id = ?', unreadable);
+    await unlockAt('/settings/export-import', "document.querySelector('#import-file')");
+
     await chooseFile(exportedPath);
     await openWith(VAULT_PASSWORD);
     await page.waitUntil("!document.querySelector('.review').hidden", { timeout: 60000, label: 'the review before the lock' });
