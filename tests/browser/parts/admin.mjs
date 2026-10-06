@@ -152,6 +152,39 @@ await run(async () => {
       && !(await page.eval("[...document.querySelectorAll('td.numeric')].some((c) => c.textContent.trim() === 'XYZ')")),
   );
 
+  check(
+    'the add form offers rate lookup held at entered by hand, with the reason',
+    await page.eval(`(() => {
+      const form = [...document.querySelectorAll('details')].find((d) => d.querySelector('summary').textContent === 'Add a unit');
+      const field = [...form.querySelectorAll('.field')].find((f) => f.querySelector('label').textContent === 'Rate lookup');
+      const lookup = field?.querySelector('select');
+      return lookup?.value === 'false' && lookup.disabled && field.textContent.includes('No source for this unit yet');
+    })()`),
+  );
+  await page.call(
+    (fields) => {
+      const form = [...document.querySelectorAll('details')].find((d) => d.querySelector('summary').textContent === 'Add a unit');
+      const [code, name] = form.querySelectorAll('input');
+      [[code, fields.code], [name, fields.name], [form.querySelector('select'), 'currency']].forEach(([field, value]) => {
+        field.value = value;
+        field.dispatchEvent(new Event('input', { bubbles: true }));
+      });
+    },
+    { code: 'XTS', name: 'Test currency' },
+  );
+  await click('Add the unit');
+  await page.waitUntil("[...document.querySelectorAll('td.numeric')].some((c) => c.textContent.trim() === 'XTS')", {
+    label: 'the added currency',
+  });
+  check(
+    'an added currency no source serves is held at entered by hand, with the reason',
+    await page.eval(`(() => {
+      const row = [...document.querySelectorAll('tr')].find((r) => r.cells[0]?.textContent.trim() === 'XTS');
+      const lookup = row.querySelector('select');
+      return lookup.value === 'false' && lookup.disabled && row.textContent.includes('No source for this unit yet');
+    })()`),
+  );
+
   const unit = (symbol, kind) => ({ symbol, label: symbol, kind, lookup: false, retired: true, hasAdapter: false });
   const releaseUnits = await intercept(page, '*/api/admin/symbols', (request) =>
     request.method === 'GET' ? { status: 200, body: JSON.stringify([unit('XYZ', 'metal'), unit('XAG-g', 'metal'), unit('XYZ', 'currency')]) } : null,
