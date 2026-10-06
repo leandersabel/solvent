@@ -6,7 +6,7 @@
 import * as api from './api.js';
 import * as decimal from './decimal.js';
 import * as writes from './writes.js';
-import { dialog, el, listOption, resumable, today } from './dom.js';
+import { counted, dialog, el, listOption, resumable, today } from './dom.js';
 import { newId } from './view-dimensions.js';
 
 let symbolTable = null;
@@ -594,7 +594,7 @@ function unitList(units) {
  *  figure is an archive's zero changes none. */
 function purgeCopy(snapshots) {
   if (!snapshots.length) return 'There are no recorded values to delete. Your past net worth figures stay as they are.';
-  const values = snapshots.length === 1 ? '1 recorded value' : `${snapshots.length} recorded values`;
+  const values = counted(snapshots.length, 'recorded value', 'recorded values');
   const changes = snapshots.some((s) => decimal.parse(s.payload.value) !== decimal.ZERO);
   return `This also deletes ${values}. Your past net worth figures ${changes ? 'will change' : 'stay as they are'}.`;
 }

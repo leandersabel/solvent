@@ -5,7 +5,7 @@
 // balance or a holding's name, because none is reachable from this
 // session.
 import * as api from './api.js';
-import { dialog, el, inlineRename, mount, shortDate } from './dom.js';
+import { counted, dialog, el, inlineRename, mount, shortDate } from './dom.js';
 import { changePassword, signOut } from './session.js';
 import { knownUsernameField, passwordWithToggle } from './unlock.js';
 import { strengthGauge } from './strength.js';
@@ -79,7 +79,7 @@ function createInvite(reload) {
   }
   const label = el('input', { type: 'text', placeholder: 'Sarah’s laptop' });
   const days = el('select', {}, [1, 3, 7, 14, 30].map((n) =>
-    el('option', { value: String(n), text: `${n} days`, selected: n === 7 }),
+    el('option', { value: String(n), text: counted(n, 'day', 'days'), selected: n === 7 }),
   ));
   const error = el('p', { class: 'field-error', hidden: true });
   const card = el('section', { class: 'card' });

@@ -460,6 +460,12 @@ export function reopenDialogs(kept, context) {
   }
 }
 
+/** A count and its noun, singular for exactly one
+ *  (spec/design-system.md, Figures). */
+export function counted(n, one, many) {
+  return `${n} ${n === 1 ? one : many}`;
+}
+
 /** "3 weeks ago", "about a year ago" (spec/features/record-snapshot.md,
  *  Update values, Age).
  *  Relative, because the question is how long this has been sitting

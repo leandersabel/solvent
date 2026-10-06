@@ -287,6 +287,11 @@ Every figure is grouped and pointed as Settings sets it
   because a tick only has to place a line and the readout is where a
   value is read.
 
+- **A count agrees with its noun, and a verb with its count.** One
+  reads "1 day", "1 recorded figure" and "1 holding moves", every other
+  count the plural, 0 included. In "N of M holdings assigned" the noun
+  agrees with M. A unit symbol never changes, so "about 1 KB".
+
 ### Units
 
 A unit reads the same way on every screen that names it, from the

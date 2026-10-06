@@ -4,7 +4,7 @@
 // administrator never reaches this address at all.
 import * as api from './api.js';
 import * as writes from './writes.js';
-import { dialog, el, icon, mount, resumable, today } from './dom.js';
+import { counted, dialog, el, icon, mount, resumable, today } from './dom.js';
 import * as format from './format.js';
 import {
   WrongPasswordError,
@@ -185,7 +185,7 @@ function organizingCard(vault, open) {
     ]);
   return el('section', { class: 'card link-list' }, [
     row('dimensions', 'Dimensions', 'How your holdings split up in the chart.',
-      count ? `${count} ${count === 1 ? 'dimension' : 'dimensions'}` : 'None yet'),
+      count ? counted(count, 'dimension', 'dimensions') : 'None yet'),
     row('export-import', 'Export and import', 'Download your vault, or restore one from a file.'),
   ]);
 }

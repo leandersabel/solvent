@@ -140,9 +140,9 @@ link**.
   > it. It is the one thing anybody types in Solvent that the server can
   > read, so keep it to a nickname.
 
-- **This link stops working after.** A select, 1 to 30 days, 7 selected.
-  Short enough that a forgotten link expires, long enough to survive a
-  weekend.
+- **This link stops working after.** A select, "1 day" to "30 days", 7
+  selected. Short enough that a forgotten link expires, long enough to
+  survive a weekend.
 
 **The link, once.** On success the card is replaced in place by the link
 in a read-only field with a **Copy** button, and beneath it:
