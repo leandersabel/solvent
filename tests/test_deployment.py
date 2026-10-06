@@ -135,10 +135,12 @@ def test_requests_held_open_as_long_as_lookups_can_be_leave_the_instance_answeri
 PEER = "127.0.0.2"
 
 
-def serve_and_provoke(tmp_path, *, log_level: "str | None" = None) -> str:
-    """Run gunicorn with the image's arguments on loopback, send it
-    requests it cannot parse and a wrong Auth Key from PEER, and return
-    everything it printed."""
+def serve_and_provoke(tmp_path, *, log_level: "str | None" = None, stock: bool = False):
+    """Run gunicorn with the image's arguments on loopback, send it from
+    PEER an invented path, the requests it cannot read and a wrong Auth
+    Key, and return everything it printed and each raw answer by name.
+    `stock` drops Solvent's server config, leaving gunicorn's own error
+    handler."""
     with socket.socket() as probe:
         probe.bind(("127.0.0.1", 0))
         port = probe.getsockname()[1]
@@ -146,6 +148,8 @@ def serve_and_provoke(tmp_path, *, log_level: "str | None" = None) -> str:
     argv[argv.index("--bind") + 1] = f"127.0.0.1:{port}"
     if log_level:
         argv[argv.index("--log-level") + 1] = log_level
+    if stock:
+        del argv[argv.index("--config"):argv.index("--config") + 2]
     env = dict(
         os.environ,
         SECRET_KEY="deployment-test-key",
@@ -156,18 +160,21 @@ def serve_and_provoke(tmp_path, *, log_level: "str | None" = None) -> str:
         cwd=REPO_ROOT, env=env, stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True,
     )
 
-    def send(raw: bytes) -> None:
+    def send(raw: bytes) -> bytes:
+        received = b""
         with socket.socket() as client:
             client.bind((PEER, 0))
             client.settimeout(10)
             client.connect(("127.0.0.1", port))
             client.sendall(raw)
             try:
-                while client.recv(4096):
-                    pass
+                while chunk := client.recv(4096):
+                    received += chunk
             except OSError:
                 pass
+        return received
 
+    answers = {}
     try:
         for _ in range(200):
             try:
@@ -175,10 +182,10 @@ def serve_and_provoke(tmp_path, *, log_level: "str | None" = None) -> str:
                 break
             except OSError:
                 time.sleep(0.1)
+        answers["invented"] = send(b"GET /no-such-page HTTP/1.1\r\nHost: x\r\nConnection: close\r\n\r\n")
+        for name, raw in UNREADABLE.items():
+            answers[name] = send(raw)
         body = json.dumps({"username": "nobody", "authKey": "AAAA"}).encode()
-        send(b"NOT A REQUEST\r\n\r\n")
-        send(b"GET / HTTP/1.1\r\nBad Header: x\r\n\r\n")
-        send(b"GET /" + b"a" * 9000 + b" HTTP/1.1\r\n\r\n")
         send(
             b"POST /api/auth/login HTTP/1.1\r\nHost: x\r\nConnection: close\r\n"
             b"Content-Type: application/json\r\nX-Solvent-Request: 1\r\n"
@@ -187,15 +194,48 @@ def serve_and_provoke(tmp_path, *, log_level: "str | None" = None) -> str:
     finally:
         server.terminate()
         out, err = server.communicate(timeout=60)
-    return out + err
+    return out + err, answers
+
+
+UNREADABLE = {
+    "an invalid request line": b"NOT A REQUEST\r\n\r\n",
+    "an invalid header name": b"GET / HTTP/1.1\r\nBad Header: x\r\n\r\n",
+    "an over-long request line": b"GET /?a=" + b"a" * 9000 + b" HTTP/1.1\r\nHost: x\r\n\r\n",
+    "an over-long invite": b"GET /register?invite=" + b"a" * 5000 + b" HTTP/1.1\r\nHost: x\r\n\r\n",
+    "an over-long header": b"GET / HTTP/1.1\r\nHost: x\r\nX-Long: " + b"a" * 9000 + b"\r\n\r\n",
+    "too many headers": b"GET / HTTP/1.1\r\n" + b"".join(b"X-%d: 1\r\n" % i for i in range(101)) + b"\r\n",
+}
+
+
+def parse(answer: bytes) -> "tuple[str, dict[str, str], bytes]":
+    head, _, body = answer.partition(b"\r\n\r\n")
+    status, *lines = head.decode("latin-1").split("\r\n")
+    return status, dict(line.split(": ", 1) for line in lines), body
 
 
 def test_no_server_log_line_carries_the_peer_address(tmp_path):
-    """The control keeps the test honest: at warning gunicorn prints the
-    peer on a request it cannot parse, so a clean run at the image's
-    level shows the flag and not a request that never arrived."""
-    assert f"ip={PEER}" in serve_and_provoke(tmp_path, log_level="warning")
-    assert PEER not in serve_and_provoke(tmp_path)
+    """The control keeps the test honest: gunicorn's own handler prints
+    the peer on a request it cannot parse at warning, so a clean run of
+    the image shows Solvent's handler and level and not a request that
+    never arrived."""
+    assert f"ip={PEER}" in serve_and_provoke(tmp_path, log_level="warning", stock=True)[0]
+    assert PEER not in serve_and_provoke(tmp_path)[0]
+    assert PEER not in serve_and_provoke(tmp_path, log_level="warning")[0]
+
+
+def test_a_request_gunicorn_cannot_read_gets_the_missing_card_with_every_protection(tmp_path):
+    output, answers = serve_and_provoke(tmp_path)
+    _, invented_headers, missing = parse(answers["invented"])
+    assert b"There is no page at this address." in missing
+    for name in UNREADABLE:
+        status, headers, body = parse(answers[name])
+        assert status == "HTTP/1.1 400 Bad Request", name
+        assert headers["Content-Security-Policy"] == invented_headers["Content-Security-Policy"], name
+        assert headers["Strict-Transport-Security"] == invented_headers["Strict-Transport-Security"], name
+        assert headers["Connection"] == "close", name
+        assert "Set-Cookie" not in headers, name
+        assert body == missing, name
+    assert "Request Line" not in output and "aaaa" not in output
 
 
 def test_no_invite_token_reaches_the_containers_standard_output_or_error(tmp_path):
