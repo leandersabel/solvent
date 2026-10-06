@@ -113,6 +113,11 @@ await run(async () => {
         && !status.some(([cell]) => cell.includes('sam'));
     })()`),
   );
+  check(
+    'the expiry list reads a count of one in the singular',
+    (await page.eval("[...document.querySelectorAll('#app select option')].map((o) => o.textContent).join(',')")) ===
+      '1 day,3 days,7 days,14 days,30 days',
+  );
 
   await click('Units');
   await page.waitUntil("document.body.innerText.includes('XAU-ozt')", { label: 'the unit table' });

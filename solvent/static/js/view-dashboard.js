@@ -5,7 +5,7 @@
 // band visibility and selection all read a model already in memory.
 import * as decimal from './decimal.js';
 import { chartTable, fillFor, trendChart } from './chart.js';
-import { dialog, el, icon, mount, priceDateLine, REPLACED_SINCE_OPEN, replacedCallout, resumable, today } from './dom.js';
+import { counted, dialog, el, icon, mount, priceDateLine, REPLACED_SINCE_OPEN, replacedCallout, resumable, today } from './dom.js';
 import { dateGrid } from './datepicker.js';
 import { isoFromDay } from './model.js';
 import * as writes from './writes.js';
@@ -92,7 +92,7 @@ function decryptionBanner(vault) {
   const count = vault.unreadable.length;
   return el('div', { class: 'banner banner-critical', role: 'alert' }, [
     el('span', {
-      text: `${count} ${count === 1 ? 'record' : 'records'} could not be read.`,
+      text: `${counted(count, 'record', 'records')} could not be read.`,
     }),
     el('details', { class: 'unreadable-list' }, [
       el('summary', { text: 'Which records' }),
@@ -311,7 +311,7 @@ function chartSection(vault, state, render, dimension, actions, { days, bands })
           ? coverage.assigned < coverage.total
             ? el('button', {
                 class: 'link-button coverage',
-                'aria-label': `${coverage.assigned} of ${coverage.total} holdings assigned. Show the unassigned ones.`,
+                'aria-label': `${coverage.assigned} of ${counted(coverage.total, 'holding', 'holdings')} assigned. Show the unassigned ones.`,
                 onclick: () => {
                   state.unassignedOnly = true;
                   render();
@@ -434,7 +434,7 @@ function chartSection(vault, state, render, dimension, actions, { days, bands })
 function coverageText(coverage) {
   return [
     `${coverage.assigned} of ${coverage.total} `,
-    el('span', { class: 'wide-only', text: 'holdings ' }),
+    el('span', { class: 'wide-only', text: coverage.total === 1 ? 'holding ' : 'holdings ' }),
     'assigned',
   ];
 }

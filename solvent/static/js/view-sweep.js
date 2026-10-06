@@ -7,7 +7,7 @@
 // own age in plain language instead.
 import * as decimal from './decimal.js';
 import * as writes from './writes.js';
-import { ageInWords, dialog, el, icon, mount, priceDateLine } from './dom.js';
+import { ageInWords, counted, dialog, el, icon, mount, priceDateLine } from './dom.js';
 import { dayNumber } from './model.js';
 
 // One sitting per date, kept across redraws of the sweep on screen and
@@ -944,7 +944,7 @@ export function rateChangeCopy(vault, date, changes) {
   for (const { unit, clearing } of changes) {
     const name = vault.unitName(unit);
     const count = holdingsIn(vault, unit, date);
-    const holdings = `${count} ${count === 1 ? 'holding' : 'holdings'} measured in ${name}`;
+    const holdings = `${counted(count, 'holding', 'holdings')} measured in ${name}`;
     if (!clearing) {
       lines.push(`Changing the ${name} rate for ${on} moves ${holdings} on that date. Your net worth on that day changes with them.`);
       continue;

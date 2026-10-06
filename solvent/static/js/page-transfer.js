@@ -4,7 +4,7 @@
 // to a new machine, to a fresh install, or into another person's
 // account on the instance. Neither card treats that as a hazard.
 import * as api from './api.js';
-import { el, icon, mount } from './dom.js';
+import { counted, el, icon, mount } from './dom.js';
 import { exportFile, heldSalt, lockForChangedCredential, replaceDek, wrapForMaster } from './session.js';
 import * as transfer from './transfer.js';
 import { passwordWithToggle } from './unlock.js';
@@ -37,7 +37,7 @@ function confirmation({ counts, currency, currencyChanged }) {
  *  timelines are named, because a file carrying only one of them would
  *  restore a vault that reprices its whole history. */
 function kinds(counts) {
-  return `${counts.account} holdings, ${counts.snapshot} recorded figures and ${counts.rate} captured prices`;
+  return `${counted(counts.account, 'holding', 'holdings')}, ${counted(counts.snapshot, 'recorded figure', 'recorded figures')} and ${counted(counts.rate, 'captured price', 'captured prices')}`;
 }
 
 function exportCard() {
@@ -244,7 +244,7 @@ function importCard(vault, reload) {
           : failure instanceof transfer.FileRefused
             ? refusal(failure)
             : failure.unreadable
-              ? `This file is damaged and cannot be restored. ${failure.unreadable === 1 ? '1 record' : `${failure.unreadable} records`} in it could not be read. Your vault is unchanged.`
+              ? `This file is damaged and cannot be restored. ${counted(failure.unreadable, 'record', 'records')} in it could not be read. Your vault is unchanged.`
               : 'This file could not be opened. Your vault is unchanged.',
       );
       return;
@@ -272,19 +272,19 @@ function importCard(vault, reload) {
     mount(review, [
       el('div', { class: 'review-side' }, [
         el('h3', { class: 'group-heading', text: 'In the file' }),
-        el('p', { text: `${counts.account} holdings` }),
-        el('p', { text: `${counts.snapshot} recorded figures` }),
-        el('p', { text: `${counts.rate} captured prices` }),
+        el('p', { text: counted(counts.account, 'holding', 'holdings') }),
+        el('p', { text: counted(counts.snapshot, 'recorded figure', 'recorded figures') }),
+        el('p', { text: counted(counts.rate, 'captured price', 'captured prices') }),
         el('p', { class: 'hint', text: `Exported ${vault.format.longDate(opened.exportedAt.slice(0, 10))}` }),
       ]),
       el('div', { class: 'review-side' }, [
         el('h3', { class: 'group-heading', text: 'What will be deleted' }),
         ...(holdsData
           ? [
-              el('p', { text: `${mine.account} holdings` }),
-              el('p', { text: `${mine.snapshot} recorded figures` }),
-              el('p', { text: `${mine.rate} captured prices` }),
-              el('p', { class: 'strong', text: `Your vault currently holds ${total} records. All of them will be deleted.` }),
+              el('p', { text: counted(mine.account, 'holding', 'holdings') }),
+              el('p', { text: counted(mine.snapshot, 'recorded figure', 'recorded figures') }),
+              el('p', { text: counted(mine.rate, 'captured price', 'captured prices') }),
+              el('p', { class: 'strong', text: `Your vault currently holds ${counted(total, 'record', 'records')}. All of them will be deleted.` }),
             ]
           : [el('p', { text: 'Your vault is empty. Nothing will be deleted.' })]),
       ]),

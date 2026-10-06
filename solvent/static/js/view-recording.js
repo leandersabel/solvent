@@ -6,7 +6,7 @@
 // being opened is the one thing this screen must not be.
 import * as decimal from './decimal.js';
 import * as writes from './writes.js';
-import { dialog, el, priceDateLine } from './dom.js';
+import { counted, dialog, el, priceDateLine } from './dom.js';
 import { holdingsIn, provenanceChip } from './view-sweep.js';
 
 export function recordingView(vault, date, { onUpdate, onOpenHolding, onDeleted, onChanged, onPickDate }) {
@@ -163,7 +163,7 @@ function confirmDelete(vault, date, onDeleted, redraw) {
   if (units.length) {
     body.push(
       el('p', {
-        text: `${affected} ${affected === 1 ? 'holding' : 'holdings'} measured in ${units.map((unit) => vault.unitName(unit)).join(' and ')} move on that date, including ones you recorded nothing for.`,
+        text: `${counted(affected, 'holding', 'holdings')} measured in ${units.map((unit) => vault.unitName(unit)).join(' and ')} move on that date, including ones you recorded nothing for.`,
       }),
     );
   }

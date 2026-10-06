@@ -2986,6 +2986,13 @@ await check('a figure dated today is "today" at any hour, not "yesterday"', asyn
   }
 });
 
+await check('a count of exactly one takes the singular, every other count the plural', async () => {
+  const { counted } = await load('dom.js');
+  assert.equal(counted(0, 'day', 'days'), '0 days');
+  assert.equal(counted(1, 'day', 'days'), '1 day');
+  assert.equal(counted(2, 'recorded value', 'recorded values'), '2 recorded values');
+});
+
 // ---- The username rule -------------------------------------------------
 
 // The same file the server's normalization is run over

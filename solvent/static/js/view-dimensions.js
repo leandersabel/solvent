@@ -5,7 +5,7 @@
 // Nothing on this screen reads or writes an account record, so no
 // operation can fail partway across several of them.
 import * as writes from './writes.js';
-import { dialog, el, inlineRename, resumable } from './dom.js';
+import { counted, dialog, el, inlineRename, resumable } from './dom.js';
 
 const CONFLICT = 'Your settings were changed in another tab.';
 const SAVE_FAILED = 'That did not save. Nothing changed.';
@@ -181,10 +181,10 @@ function dimensionCard(vault, dimension, { index, count, busy, failed }) {
       coverage.assigned < coverage.total
         ? el('button', {
             class: 'link-button',
-            text: `${coverage.assigned} of ${coverage.total} holdings assigned`,
+            text: `${coverage.assigned} of ${counted(coverage.total, 'holding', 'holdings')} assigned`,
             onclick: () => openUnassigned(dimension.id),
           })
-        : `${coverage.assigned} of ${coverage.total} holdings assigned`,
+        : `${coverage.assigned} of ${counted(coverage.total, 'holding', 'holdings')} assigned`,
     ]),
     el(
       'ul',
