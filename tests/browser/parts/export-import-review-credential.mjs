@@ -81,12 +81,13 @@ await run(async () => {
   await vaultOwner();
   await holdings([['Cantonal account', 'CHF']]);
 
-  // The file this page restores, exported through the page's own module.
+  // The file this page restores, sealed by the page's own session as
+  // the Export vault button seals it.
   const dir = mkdtempSync(join(tmpdir(), 'solvent-review-credential-'));
   const file = join(dir, 'vault.json');
   writeFileSync(file, await page.call(async () => {
-    const api = await import('/static/js/api.js');
-    return (await api.downloadExport()).blob.text();
+    const s = await import('/static/js/session.js');
+    return JSON.stringify((await s.exportFile()).file);
   }));
 
   await page.goto(`${BASE}/settings/export-import`);
