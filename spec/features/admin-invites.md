@@ -337,8 +337,8 @@ Password field). Enter submits it once the button is enabled.
 
 #### At phone width
 
-Below a viewport of 900px, which is narrower than the full tables
-need, each table becomes a list of entries, one per row, divided by
+Up to 900px wide, narrower than the full tables need, each table
+becomes a list of entries, one per row, divided by
 hairlines. An entry puts each cell on a line of its own, beside its
 column's heading in ink-secondary, and the row's action beneath them,
 so every detail and every control stays on screen without panning
@@ -857,4 +857,5 @@ administrator), and the lost sole password (Bootstrap). The rest:
     invites and a 32-character username, nothing scrolls sideways but
     the section links, no control is drawn past the screen's edge, and
     no word of a chip, heading or control is split across lines. Test:
-    `tests/browser/parts/admin-phone.mjs`.
+    `tests/browser/parts/admin-phone.mjs`,
+    `tests/browser/parts/admin-review-phone.mjs`.
