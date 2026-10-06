@@ -896,6 +896,6 @@ Unarchiving and archiving it again writes the zero at the new D.
     weight (`design-system.md`, Typography). Test:
     `tests/browser/parts/account-detail.mjs`,
     `tests/browser/parts/account-detail-review-heading.mjs`.
-63. (blind) No header of the holding's own list of values names a unit,
-    and each value carries its unit as `design-system.md`, Units, sets,
+63. (blind) No header of the holding's own list of values names a unit
+    but the main currency, and each value carries its unit as `design-system.md`, Units, sets,
     such as "12.5 ozt". Test: `tests/browser/parts/account-detail.mjs`.

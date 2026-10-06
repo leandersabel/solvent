@@ -808,7 +808,7 @@ function rateLine(vault, unit, date, { sit, readOnly: blockReadOnly, fillMissing
     pair.replaceChildren(
       ...line.rivals.map((entry) =>
         el('p', { class: 'flag-note' }, [
-          `${format.editable(parsed(entry.payload.rate), 6)} ${vault.mainCurrency}, ${provenanceChip(entry.payload, format)} `,
+          `${vault.mainCurrency} ${format.editable(parsed(entry.payload.rate), 6)}, ${provenanceChip(entry.payload, format)} `,
           readOnly
             ? null
             : el('button', {

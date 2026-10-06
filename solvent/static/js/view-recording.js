@@ -106,7 +106,7 @@ function priceRow(vault, entry, onChanged) {
     el('td', { text: vault.unitName(entry.payload.symbol) }),
     el('td', {
       class: 'numeric',
-      text: `${vault.format.editable(decimal.parse(entry.payload.rate), 6)} ${vault.mainCurrency}`,
+      text: `${vault.mainCurrency} ${vault.format.editable(decimal.parse(entry.payload.rate), 6)}`,
     }),
     el('td', {}, [el('span', { class: 'chip', text: provenanceChip(entry.payload, vault.format) })]),
     keepCell(vault, rivals, 'Two prices for this unit share this date. Keep one.', onChanged),

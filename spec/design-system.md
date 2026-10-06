@@ -298,13 +298,14 @@ symbol table (`rate-lookup.md`, Seeded symbols).
   A unit the table does not list is free text and reads exactly as
   typed.
 - **A figure carries a unit in short**: a currency's code ahead of it,
-  "USD 12,450.00", and any other unit after it, by the part of the
+  "USD 12,450.00", a price included, "CHF 2,500.000000", and any
+  other unit after it, by the part of the
   symbol after the hyphen or the free text as typed, "12.5 ozt".
 - **No screen outside the unit picker and the administrator's symbol
   table shows a symbol such as `XAU-ozt` in place of a unit's name.**
-- **No table header names a unit**, because a header is set in capitals
-  and "OZT" is no unit's name. The unit sits in each cell, with its
-  figure.
+- **A table header names no unit but a currency**, by its code, "In
+  CHF", because a header is set in capitals and "OZT" is no unit's
+  name. Any other unit sits in each cell, with its figure.
 
 ## Spacing and shape
 

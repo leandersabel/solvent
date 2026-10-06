@@ -735,12 +735,12 @@ The same Dialog, prefilled with the stored value, date and note.
   Recording detail, where empty lines are filled after Update. Save is
   inert until something changes.
 - **Duplicate date, entering**: on save, a confirm rather than a
-  rejection: "You already recorded 12 450.00 USD for 31 July. Replace
+  rejection: "You already recorded USD 12,450.00 for 31 July. Replace
   it?", naming the stored value in the holding's own unit (Same
   holding, same date: upsert). Confirming updates in place. Declining
   leaves the original untouched and returns to the form.
 - **Duplicate date, moving**: different copy, because a second record
-  dies: "30 July already holds a snapshot of 12 100.00 USD. Moving this
+  dies: "30 July already holds a snapshot of USD 12,100.00. Moving this
   entry there will delete it." Destructive styling on the confirm
   (Moving the date onto an occupied date).
 - **The date became taken while you were working**: refused whole,
