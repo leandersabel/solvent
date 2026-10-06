@@ -4,8 +4,12 @@ name: Nightly
 # lists, becomes a dated pre-release when it passes (CLAUDE.md, The
 # loop, Nightly and stable).
 on:
+  # 1 a.m. in Switzerland in winter and 2 a.m. in summer, so a start
+  # GitHub delays by hours still finishes by morning. Off the hour,
+  # when GitHub delays least, and after midnight UTC, so the UTC date a
+  # version is named after is the date in Switzerland.
   schedule:
-    - cron: "0 1 * * *"
+    - cron: "7 0 * * *"
   workflow_dispatch:
     inputs:
       full:
