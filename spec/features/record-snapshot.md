@@ -1373,8 +1373,9 @@ Editing an existing entry).
     shown, typed) reads the same a year later, whether it was changed on
     the evening or years afterwards. Test:
     `tests/browser/parts/update-values.mjs`.
-30. Changing a price on a reopened recording is announced before it goes
-    through, naming how many holdings move, and moves every holding in
+30. Changing a price on a reopened recording that moves a holding on
+    that date is announced before it goes through, naming how many
+    holdings move, and moves every holding in
     that unit on that date, visibly the rows on screen. Test:
     `tests/browser/parts/update-values.mjs`.
 31. No screen lists prices on their own or lets one be changed away from
@@ -1686,4 +1687,6 @@ Editing an existing entry).
      stored price that moves no holding on its date is left out of the
      confirmation, which does not open when nothing is left. Test:
      `tests/browser/parts/snapshot-entry.mjs`,
+     `tests/browser/parts/snapshot-entry-review-first-price.mjs`,
+     `tests/browser/parts/update-values-review-first-price.mjs`,
      `tests/test_client.py::test_the_client_side_rules_hold`.
