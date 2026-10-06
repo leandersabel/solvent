@@ -118,6 +118,7 @@ document.addEventListener('leftunsaved', ({ detail }) => {
 history.scrollRestoration = 'manual';
 const scrolled = new Map();
 let shownEntry = null;
+let settling = null;
 
 function render() {
   const left = unsavedOnSweep();
@@ -138,14 +139,26 @@ function render() {
   if (vaultShown) trackEdits(container);
 }
 
-/** Scrolls to `y`, and again whenever the screen grows before its
- *  second frame: the trend chart draws itself at its first layout, so
- *  the page reaches its full height only then (static/js/chart.js). */
+/** Scrolls to `y`. A screen that fills in after it is drawn, as the
+ *  trend chart does at its first layout and Settings when its session
+ *  list arrives, is too short for it at first, so the position is set
+ *  again as the screen grows, until it is reached, the person scrolls
+ *  or presses a key, or another screen opens. */
 function scrollBack(y) {
+  settling?.abort();
   window.scrollTo(0, y);
-  const growing = new ResizeObserver(() => window.scrollTo(0, y));
+  if (window.scrollY >= y) return;
+  const done = new AbortController();
+  settling = done;
+  const growing = new ResizeObserver(() => {
+    window.scrollTo(0, y);
+    if (window.scrollY >= y) done.abort();
+  });
   growing.observe(container);
-  requestAnimationFrame(() => requestAnimationFrame(() => growing.disconnect()));
+  done.signal.addEventListener('abort', () => growing.disconnect());
+  for (const name of ['wheel', 'touchstart', 'keydown', 'pointerdown']) {
+    window.addEventListener(name, () => done.abort(), { signal: done.signal, passive: true });
+  }
 }
 
 /** Leaving a sweep or the single-holding form with typed figures says

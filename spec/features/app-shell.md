@@ -500,8 +500,12 @@ random key in its state the first time it is drawn. On every change of
 address it records the screen being left's `scrollY` under that
 entry's key, in memory, and scrolls the screen it draws to the
 position recorded for its own key, or to the top for an entry it has
-never drawn. It sets the position again while the screen grows before
-its second frame, because the trend chart draws at its first layout. A
+never drawn. A screen that fills in after it is drawn, as the trend
+chart does at its first layout and Settings when its session list
+arrives, is too short for that position at first, so it sets the
+position again each time the screen grows, until the position is
+reached, the person scrolls, touches or presses a key, or another
+screen opens. A
 redraw at the same address keeps the position. A `replaceState` that
 rewrites the address in place passes `history.state` through, so the
 entry keeps its key. Nothing of this outlives the page.
