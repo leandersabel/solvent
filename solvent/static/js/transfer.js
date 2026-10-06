@@ -7,12 +7,17 @@ import * as crypto from './crypto.js';
 import { RECORD_TYPES, SCHEMA_VERSION, migrate } from './model.js';
 
 const FORMAT = 'solvent-vault';
-export const FORMAT_VERSION = 1;
+export const FORMAT_VERSION = 2;
+// Binds the envelope to its format version, and can never equal a
+// record's AAD, which always has five fields (record-api.md, The AAD
+// encoding).
+const envelopeAad = (version) => new TextEncoder().encode(`${FORMAT}\x1f${version}`);
 
 // Refused by size before the file is read at all. The server's own cap
 // is on the ciphertext it stores, and a file carries that ciphertext
-// base64 encoded inside JSON, so this sits above it rather than on it.
-export const MAX_FILE_BYTES = 48 * 1024 * 1024;
+// base64 encoded inside JSON, sealed and base64 encoded again, so this
+// sits above it rather than on it.
+export const MAX_FILE_BYTES = 64 * 1024 * 1024;
 const MAX_RECORDS = 50_000;
 
 const UUID4 = /^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/;
@@ -47,9 +52,8 @@ function isBase64(value, bytes = null) {
 
 const positive = (value) => Number.isInteger(value) && value >= 1;
 
-/** The same rules the server applies to the upload, applied to the file
- *  before anything is decrypted, so a bad file fails fast without a
- *  large upload (export-import.md, Rules). Throws FileRefused. */
+/** The file's header, checked before any password is asked for, and for
+ *  a format 1 file its records too. Throws FileRefused. */
 export function checkFile(body) {
   if (!body || typeof body !== 'object' || body.format !== FORMAT) {
     throw new FileRefused('format');
@@ -65,7 +69,21 @@ export function checkFile(body) {
     isBase64(body.wrappedDek) &&
     isBase64(body.dekNonce, 12) &&
     body.kdf &&
-    typeof body.kdf === 'object' &&
+    typeof body.kdf === 'object';
+  if (!shaped) throw new FileRefused('format');
+  if (body.formatVersion === 1) return checkContents(body);
+  if (!isBase64(body.nonce, 12) || !isBase64(body.ciphertext)) throw new FileRefused('format');
+  return body;
+}
+
+/** The same rules the server applies to the upload, applied to the
+ *  records before any is decrypted, so a bad file fails fast without a
+ *  large upload (export-import.md, Rules). Throws FileRefused. */
+function checkContents(body) {
+  const shaped =
+    body &&
+    typeof body === 'object' &&
+    typeof body.exportedAt === 'string' &&
     Array.isArray(body.records) &&
     body.records.length <= MAX_RECORDS;
   if (!shaped) throw new FileRefused('format');
@@ -118,10 +136,20 @@ async function decryptOne(dek, record) {
   }
 }
 
+/** The vault as a file: the server's read of it, with when it was made
+ *  and every record sealed under the DEK its wrapper opens to, so
+ *  without the password the file shows only its size
+ *  (export-import.md, Export). */
+export async function sealFile(dek, { exportedAt, records, salt, kdf, wrappedDek, dekNonce }) {
+  const envelope = await crypto.seal(dek, envelopeAad(FORMAT_VERSION), { exportedAt, records });
+  return { format: FORMAT, formatVersion: FORMAT_VERSION, salt, kdf, wrappedDek, dekNonce, ...envelope };
+}
+
 /** Derive the file's own Master Key from the password it was exported
- *  under, unwrap its DEK, and decrypt the profile alone: all the review
- *  needs, and a wrong password is caught before any other record is
- *  touched and before any request is sent. */
+ *  under, unwrap its DEK, open the envelope, and decrypt the profile
+ *  alone: all the review needs, and a wrong password is caught before
+ *  any other record is touched and before any request is sent.
+ *  Resolves to the file's DEK, profile, records and export time. */
 export async function openFile(body, password) {
   const keys = await crypto.deriveKeys(password, body.salt, body.kdf);
   let fileDek;
@@ -130,9 +158,18 @@ export async function openFile(body, password) {
   } catch {
     throw new WrongPassword('that password does not open this file');
   }
-  const record = body.records.find((r) => r.recordType === 'profile');
+  let contents = body;
+  if (body.formatVersion > 1) {
+    try {
+      contents = await crypto.open(fileDek, envelopeAad(body.formatVersion), body);
+    } catch {
+      throw new FileRefused('format');
+    }
+    checkContents(contents);
+  }
+  const record = contents.records.find((r) => r.recordType === 'profile');
   const profile = record ? await decryptOne(fileDek, record) : null;
-  return { fileDek, profile };
+  return { fileDek, profile, records: contents.records, exportedAt: contents.exportedAt };
 }
 
 /** Every record decrypted under the file's DEK and its own AAD, and

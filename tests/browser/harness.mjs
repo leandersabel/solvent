@@ -475,11 +475,11 @@ export const importOwnExport = () =>
     const c = await import('/static/js/crypto.js');
     const s = await import('/static/js/session.js');
     const t = await import('/static/js/transfer.js');
-    const file = t.checkFile(JSON.parse(await (await api.downloadExport()).blob.text()));
+    const file = t.checkFile((await s.exportFile()).file);
 
-    const { fileDek } = await t.openFile(file, password);
+    const { fileDek, records } = await t.openFile(file, password);
     // Re-key: a freshly generated DEK, never the file's.
-    const { dek: newDek, records: rekeyed } = await t.rekey(fileDek, file.records);
+    const { dek: newDek, records: rekeyed } = await t.rekey(fileDek, records);
     const wrapper = await s.wrapForMaster(newDek);
     const answered = await api.post('/api/import', { ...wrapper, currentSalt: s.heldSalt(), records: rekeyed });
 
@@ -492,7 +492,7 @@ export const importOwnExport = () =>
       names: [...reopened.holdings.values()].map(h => h.payload.name).sort(),
       unreadable: reopened.unreadable.length,
       rekeyed: fileRaw !== newRaw,
-      kinds: [...new Set(file.records.map(r => r.recordType))].sort(),
+      kinds: [...new Set(records.map(r => r.recordType))].sort(),
     });
   }, VAULT_PASSWORD);
 

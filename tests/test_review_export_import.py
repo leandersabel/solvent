@@ -16,7 +16,7 @@ from flask.testing import FlaskClient
 
 import solvent.vault as vault_module
 from solvent.config import DEFAULT_KDF_ENVELOPE
-from tests.helpers import CSRF, b64, connect, register_body
+from tests.helpers import CSRF, b64, connect, put_record, register, register_body, rows
 
 CHANGED = {"refused": "credential-changed"}
 REPLACED = {"refused": "vault-replaced"}
@@ -269,3 +269,30 @@ def test_an_import_naming_the_current_salt_goes_through_after_an_upgrade_elsewhe
 
     here.sign_in("owner", upgraded_key)
     assert here.restore().status_code == 200
+
+
+# ---- Criterion 3 ----------------------------------------------------------
+
+
+def test_the_export_read_carries_every_kind_in_one_records_array_beside_what_opens_it(app):
+    """The read the browser seals: the vault's records of every kind in
+    one `records` array, beside the timestamp, the password credential's
+    salt and KDF envelope, and its wrapper (export-import.md, Export)."""
+    client, _ = register(app, "owner")
+    account, answered = put_record(client, record_type="account")
+    assert answered.status_code == 200, answered.get_data(as_text=True)
+    for kind, owner in (("snapshot", account), ("rate", None)):
+        _, answered = put_record(client, record_type=kind, accountId=owner)
+        assert answered.status_code == 200, answered.get_data(as_text=True)
+
+    response = client.get("/api/export", headers=CSRF)
+    assert response.status_code == 200, response.get_data(as_text=True)
+    read = response.get_json()
+    assert set(read) == {"exportedAt", "salt", "kdf", "wrappedDek", "dekNonce", "records"}
+    assert sorted(r["recordType"] for r in read["records"]) == ["account", "profile", "rate", "snapshot"]
+    assert all(
+        set(r) == {"recordId", "recordType", "accountId", "schemaVersion", "version", "nonce", "ciphertext"}
+        for r in read["records"]
+    )
+    params = json.loads(rows(app, "SELECT params FROM credentials")[0]["params"])
+    assert (read["salt"], read["kdf"]) == (params["salt"], params["kdf"])

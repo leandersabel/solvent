@@ -122,8 +122,6 @@ def test_the_export_carries_both_timelines_and_one_wrapper(owner):
     put_record(owner, record_type="rate")
 
     body = owner.get("/api/export", headers=CSRF).get_json()
-    assert body["format"] == "solvent-vault"
-    assert body["formatVersion"] == 1
     kinds = {record["recordType"] for record in body["records"]}
     assert kinds == {"profile", "account", "snapshot", "rate"}
     assert isinstance(body["wrappedDek"], str)
@@ -131,7 +129,7 @@ def test_the_export_carries_both_timelines_and_one_wrapper(owner):
 
 
 EXPORT_KEYS = {
-    "format", "formatVersion", "exportedAt", "salt", "kdf", "wrappedDek", "dekNonce", "records",
+    "exportedAt", "salt", "kdf", "wrappedDek", "dekNonce", "records",
 }
 RECORD_KEYS = {
     "recordId", "recordType", "accountId", "schemaVersion", "version", "nonce", "ciphertext",

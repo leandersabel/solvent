@@ -194,8 +194,8 @@ const makeOlder = (session, username, password, memory) =>
 
 const exportBody = (session) =>
   session.call(async () => {
-    const api = await import('/static/js/api.js');
-    return (await api.downloadExport()).blob.text();
+    const s = await import('/static/js/session.js');
+    return JSON.stringify((await s.exportFile()).file);
   });
 
 async function run() {

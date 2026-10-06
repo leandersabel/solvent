@@ -8,6 +8,7 @@
 import * as api from './api.js';
 import * as crypto from './crypto.js';
 import { Vault } from './model.js';
+import { sealFile } from './transfer.js';
 import { deleteRecord } from './writes.js';
 
 const DEFAULT_IDLE_MINUTES = 15;
@@ -335,6 +336,17 @@ export function heldSalt() {
 
 export function wrapForMaster(dek) {
   return crypto.wrapDek(dek, masterKey);
+}
+
+/** The vault as an export file, sealed under the DEK the server's
+ *  wrapper opens to, so an export whose wrapper does not open with the
+ *  page's Master Key throws and writes no file (export-import.md,
+ *  Export). Resolves to the file, its name and the records it seals. */
+export async function exportFile() {
+  const { blob, filename } = await api.downloadExport();
+  const read = JSON.parse(await blob.text());
+  const dek = await crypto.unwrapDek(read.wrappedDek, read.dekNonce, masterKey);
+  return { file: await sealFile(dek, read), filename, records: read.records };
 }
 
 /** After an import: the in-memory DEK becomes the new one, the page's

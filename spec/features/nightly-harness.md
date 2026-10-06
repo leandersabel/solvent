@@ -439,7 +439,7 @@ Outputs in `<dir>`:
     "about": "Open the dashboard before anything else: the browser holds this session." },
   "backups": [
     { "file": "tools/nightly/fixtures/out/backup-….json", "password": "…",
-      "formatVersion": 1, "covers": ["current-backup"] }
+      "formatVersion": 2, "covers": ["current-backup"] }
   ],
   "expected": { "<username or backup file>": {
     "latest": { "total": {"exact": "…", "display": "…"}, "assets": {…},
