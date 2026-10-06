@@ -364,8 +364,8 @@ record-rate.md, Reading, computed independently of the app in
   at scale 12, as `static/js/decimal.js` multiplies.
 - The total is the sum of those figures at scale 12. `assets` sums the
   figures above zero and `debts` those below.
-- With no holding valued the total is `null`, because the dashboard
-  shows `—`, while `assets` and `debts` are zero.
+- With no holding valued the total, `assets` and `debts` are `null`,
+  because the dashboard shows `—` for each.
 - Each is given `exact`, at scale 12 without trailing zeros, and
   `display`, rounded half-even to the places the vault's profile shows,
   with no grouping and `-` for a negative.
@@ -723,7 +723,7 @@ On failure it prints `docker logs` of `solvent` and `standin`.
 43. (blind) `prepare` refuses a cleared or deleted date outside the
     recorded dates, with no recording, or whose prices all lie on their
     neighbors' line. Test: `tests/test_nightly_tools.py::test_prepare_refuses_a_cleared_or_deleted_date_that_bends_nothing`, `tests/test_nightly_tools.py::test_prepare_refuses_a_cleared_date_whose_prices_lie_on_the_line`.
-44. With no holding valued the expected total is `null` and `assets` and
-    `debts` are zero. Test: `tests/test_nightly_tools.py::test_with_nothing_valued_the_total_is_none_and_the_sides_are_zero`.
+44. With no holding valued the expected total, `assets` and `debts` are
+    `null`. Test: `tests/test_nightly_tools.py::test_with_nothing_valued_the_total_and_the_sides_are_none`.
 45. A registration form that never shows, as for a refused invite,
     fails the generator with the text the page shows. Test: `tests/test_nightly_browser.py::test_a_registration_form_that_never_shows_fails_naming_what_the_page_shows`, `tests/test_review_nightly_harness.py::test_a_refused_invite_fails_the_generator_naming_the_address_and_what_the_page_shows`.

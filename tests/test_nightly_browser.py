@@ -177,7 +177,7 @@ def test_each_dashboard_shows_the_manifests_totals_under_both_modes_and_the_dama
             assert dashboards[username]["latest"]["total"] is None
             continue
         for mode in ("latest", "asRecorded"):
-            # A total of None is a vault with nothing valued, whose hero reads "—".
+            # None is a vault with nothing valued, whose hero and sides read "—".
             wanted = {key: expected[mode][key] and expected[mode][key]["display"] for key in ("total", "assets", "debts")}
             assert dashboards[username][mode] == wanted, (username, mode)
         assert dashboards[username]["unreadable"] == (1 if username == "mixed.owner" else 0), username

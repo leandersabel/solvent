@@ -241,10 +241,10 @@ def figures(main_currency: str, holdings: "dict[str, dict]", snapshots: "dict[st
         else:
             assets += value
     return {
-        # No holding valued: the dashboard shows "—", not a zero.
+        # No holding valued: the dashboard shows "—" for all three, not a zero.
         "total": _figure(total, 0) if shown else None,
-        "assets": _figure(assets, 0),
-        "debts": _figure(debts, 0),
+        "assets": _figure(assets, 0) if shown else None,
+        "debts": _figure(debts, 0) if shown else None,
         "holdings": shown,
         "excluded": excluded,
     }

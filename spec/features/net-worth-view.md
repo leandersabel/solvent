@@ -19,7 +19,9 @@ cannot tell two colors apart loses nothing.
 
 - **The total**, with the change over the span the chart shows, and
   beside it gross assets and gross liabilities, because hiding a mortgage
-  inside one figure hides the most important thing about it.
+  inside one figure hides the most important thing about it. Until a
+  holding you keep has a value, all three read as a dash, never as 0,
+  because 0 is a real figure that means something else.
 - **Two dates.** Each holding counts at its last recorded quantity,
   valued at the most recent rate for its unit (your March dollars at this
   month's rate), and states the date of its own last figure. The screen
@@ -98,6 +100,12 @@ gross assets and liabilities, the legend and the breakdown) are written
 by the formatter's `whole`. The holdings table and the data table carry
 the money places, because that is where a figure is checked against a
 statement.
+
+While no active holding is valued, the total, gross assets and gross
+liabilities each read `—`, with no change beneath them, and the hero
+follows neither hover nor keyboard, because a sum of nothing is no
+figure and 0 is a real one. A side with no holdings beside valued ones
+reads 0, because that sum is real.
 
 Every set of figures shown as the parts of a figure adds up to that
 figure as shown: gross assets and liabilities to the total, the bars to
@@ -385,12 +393,15 @@ The regions keep their order and stack, 20px apart.
   yet valued" directly beneath the head row, no table, no column headings.
   With Show archived on, each archived holding is an archived row reading
   "not yet valued", so the table renders above the group with those rows
-  alone. Total `—`, not 0. No chart. New recording works, because
+  alone. Total, gross assets and gross liabilities `—`, not 0 (Hero
+  figure). No chart. New recording works, because
   recording is how this state is left.
 - **A one-day history** (every snapshot, price and archive dated today):
   one point at the plot's middle under every range, never a failure or a
   flat line back to the beginning of time (Axes).
-- **All holdings archived**: total `—`, history still renders. Show
+- **All holdings archived**: total, gross assets and gross liabilities
+  `—` with no change (Hero figure), history still renders. Reading a day
+  on the chart fills its tooltip and leaves the hero as it is. Show
   archived off: the card holds one ink-secondary line beneath its head
   row and no table:
 
@@ -1056,8 +1067,10 @@ rule of the chart (Archived holdings, Ranges and modes).
     value are in a visible, counted "Unassigned" band. Test:
     `tests/test_client.py::test_the_client_side_rules_hold`.
 55. An active holding with no snapshots is listed as "not yet valued" and
-    not counted as 0. With holdings and no values the total reads `—` and
-    there is no chart. Test: `tests/browser/parts/dashboard.mjs`.
+    not counted as 0. With holdings and no values the total, gross assets
+    and gross liabilities read `—`, with no change and no chart. Test:
+    `tests/browser/parts/dashboard.mjs`,
+    `tests/browser/parts/dashboard-review-unvalued.mjs`.
 56. At 1280px, in a vault whose only holdings are active with no
     snapshots, no holdings table and no column heading render. Recording
     one renders the table with that holding as its only row. Test: no
@@ -1157,3 +1170,8 @@ rule of the chart (Archived holdings, Ranges and modes).
     `tests/test_client.py::test_the_client_side_rules_hold`,
     `tests/test_review_net_worth_view.py::test_the_chart_ends_today_and_every_range_counts_back_from_it`,
     `tests/browser/parts/dashboard-review-chart-end.mjs`.
+77. With every holding archived, the total, gross assets and gross
+    liabilities read `—` with no change, and hovering the chart fills
+    its tooltip and leaves the hero a dash with no date. Test:
+    `tests/browser/parts/dashboard-fixtures.mjs`,
+    `tests/browser/parts/dashboard-review-unvalued.mjs`.
