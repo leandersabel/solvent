@@ -1096,5 +1096,6 @@ from an administrator removing an account (`admin-invites.md`).
     `tests/browser/parts/admin-review-gauge.mjs`.
 84. The Change password fields and the delete dialog's password field
     each sit in a form holding the signed-in username in a hidden text
-    field with autocomplete `username`. Test:
-    `tests/browser/parts/settings.mjs`.
+    field with autocomplete `username`, ahead of the password fields.
+    Test: `tests/browser/parts/settings.mjs`,
+    `tests/browser/parts/settings-review-forms.mjs`.

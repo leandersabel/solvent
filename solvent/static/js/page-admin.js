@@ -598,12 +598,12 @@ function passwordCard() {
     }),
     // An error sits above the first field (design-system.md, States).
     error,
+    knownUsernameField(username),
     el('div', { class: 'field' }, [el('label', { text: 'Current password' }), passwordWithToggle(current)]),
     el('div', { class: 'field' }, [el('label', { text: 'New password' }), passwordWithToggle(next)]),
     gauge.element,
     el('div', { class: 'field' }, [el('label', { text: 'Confirm new password' }), passwordWithToggle(confirm)]),
     done,
-    knownUsernameField(username),
     button,
   ]);
 }

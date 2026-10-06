@@ -322,7 +322,7 @@ export function dialog({ heading, body, actions, resume = null, unsaved = null }
   openDialogs.add(entry);
   syncPage();
   trackEdits(panel);
-  const focusTarget = panel.querySelector('input, button');
+  const focusTarget = panel.querySelector('input:not([hidden]), button');
   if (focusTarget) focusTarget.focus();
   return close;
 }

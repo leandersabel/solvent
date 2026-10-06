@@ -260,7 +260,7 @@ function changePasswordCard(kdf, username, sessions) {
       text: 'Your data is not re-encrypted. Only the lock around your key is rebuilt, which is why this is fast even on a large vault.',
     }),
     // An error sits above the first field (design-system.md, States).
-    el('div', { class: 'form-narrow' }, [error, ...fields, done, knownUsernameField(username), button]),
+    el('div', { class: 'form-narrow' }, [error, knownUsernameField(username), ...fields, done, button]),
     el('p', { class: 'warning-line' }, [
       icon('alert', 18),
       el('span', {
@@ -442,9 +442,9 @@ function deleteAccountDialog(username, open) {
       // password. Enter does nothing: only Delete my vault deletes.
       el('form', { novalidate: true, onsubmit: (event) => event.preventDefault() }, [
         error,
+        knownUsernameField(username),
         field('Your password', passwordWithToggle(password)),
         field('Type your username to confirm', typed),
-        knownUsernameField(username),
       ]),
     ],
     actions: [

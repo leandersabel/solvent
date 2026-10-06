@@ -161,8 +161,8 @@ export function show(node, text) {
 }
 
 /** A hidden text field holding the signed-in username, so a password
- *  manager pairs it with the password fields of the same form and can
- *  store or update the right login. `type=hidden` would not be read as
+ *  manager pairs it with the password fields after it in the same form
+ *  and can store or update the right login. `type=hidden` would not be read as
  *  a username. Nothing submits it. */
 export function knownUsernameField(username) {
   return el('input', { type: 'text', autocomplete: 'username', value: username, hidden: true });

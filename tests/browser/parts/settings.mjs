@@ -283,7 +283,7 @@ await run(async () => {
   const deleteState = (password, typed) =>
     page.call((secret, username) => {
       const dialog = document.querySelector('.dialog');
-      const [pw, name] = dialog.querySelectorAll('input');
+      const [pw, name] = dialog.querySelectorAll('.field input');
       pw.value = secret;
       pw.dispatchEvent(new Event('input', { bubbles: true }));
       name.value = username;
@@ -416,7 +416,7 @@ await run(async () => {
     const card = [...document.querySelectorAll('.card')].find((c) => c.textContent.includes(words));
     const error = card.querySelector('.field-error:not([hidden])');
     return {
-      above: Boolean(error.compareDocumentPosition(card.querySelector('input')) & Node.DOCUMENT_POSITION_FOLLOWING),
+      above: Boolean(error.compareDocumentPosition(card.querySelector('.password-field input')) & Node.DOCUMENT_POSITION_FOLLOWING),
       kept: [...card.querySelectorAll('.password-field input')].map((i) => i.value),
     };
   }, PASSWORD_CARD);
@@ -436,7 +436,7 @@ await run(async () => {
   const wrongCurrent = await page.call((words) => {
     const card = [...document.querySelectorAll('.card')].find((c) => c.textContent.includes(words));
     const error = card.querySelector('.field-error:not([hidden])');
-    const first = card.querySelector('input');
+    const first = card.querySelector('.password-field input');
     return {
       above: Boolean(error.compareDocumentPosition(first) & Node.DOCUMENT_POSITION_FOLLOWING),
       kept: [...card.querySelectorAll('.password-field input')].map((i) => i.value),
@@ -682,7 +682,7 @@ await run(async () => {
           zone.querySelector('.btn-destructive').click();
         }
         const dialog = document.querySelector('.dialog');
-        const [pw, name] = dialog.querySelectorAll('input');
+        const [pw, name] = dialog.querySelectorAll('.field input');
         pw.value = secret;
         pw.dispatchEvent(new Event('input', { bubbles: true }));
         name.value = 'leaving';

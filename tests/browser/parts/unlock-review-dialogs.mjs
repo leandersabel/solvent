@@ -165,7 +165,7 @@ await run(async () => {
   await page.eval("document.querySelector('.danger-zone').open = true");
   await press(button, false, 'Delete my account');
   await page.waitUntil("document.querySelector('.dialog input[type=password]')", { label: 'the deletion dialog' });
-  const nameField = '.dialog input:not([type=password]):not([type=hidden]):not([type=checkbox]):not([type=radio])';
+  const nameField = '.dialog input:not([type=password]):not([type=hidden]):not([type=checkbox]):not([type=radio]):not([hidden])';
   await type(nameField, TYPED_NAME);
   await type('.dialog input[type=password]', VAULT_PASSWORD);
   check('Lock is pressable above the deletion dialog', await lock());

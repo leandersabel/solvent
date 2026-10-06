@@ -397,8 +397,8 @@ outside it use, are `app-shell.md`'s (The chrome).
   screen, so a password manager can generate, store and update the
   password (`login.md`, What the client gets). It sits in a `<form>`,
   and where the screen knows whose password it is, the form also holds
-  a hidden text field with autocomplete `username` and the signed-in
-  username, so the manager knows which login to fill or update. Nothing
+  a hidden text field ahead of it with autocomplete `username` and the
+  signed-in username, so the manager knows which login to fill or update. Nothing
   sends that field.
 - **Chip**: petrol-50 fill, petrol-200 border, petrol-700 text, 4px
   radius, 12px. Used for a dimension assignment (`Liquidity: Cash`), for

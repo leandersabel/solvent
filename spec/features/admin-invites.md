@@ -835,4 +835,6 @@ administrator), and the lost sole password (Bootstrap). The rest:
     `tests/browser/parts/admin.mjs`.
 52. The password card's fields sit in a form holding the
     administrator's username in a hidden text field with autocomplete
-    `username`. Test: `tests/browser/parts/admin.mjs`.
+    `username`, ahead of the password fields. Test:
+    `tests/browser/parts/admin.mjs`,
+    `tests/browser/parts/admin-review-forms.mjs`.
