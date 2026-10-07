@@ -635,6 +635,17 @@ def test_the_factory_starts_one_daemon_pruner_and_a_failed_pass_only_logs(
     assert not path.exists()
 
 
+def test_the_pruner_of_an_app_a_test_builds_runs_no_pass(tmp_path, monkeypatch):
+    """A pass from a test's thread would outlive the test and log into
+    whichever test runs when its database is gone."""
+    passes = []
+    monkeypatch.setattr(ratelimit, "PRUNE_INTERVAL_SECONDS", 0)
+    monkeypatch.setattr(ratelimit, "prune_pass", passes.append)
+    make_app(tmp_path, monkeypatch)
+    threading.Event().wait(0.2)
+    assert passes == []
+
+
 def test_a_pass_deletes_what_has_expired(app, clock):
     _insert(app, "address:a", db.utcnow())
     clock.advance(24 * 3600)

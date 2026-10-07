@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import fcntl
+import threading
 from datetime import datetime, timedelta, timezone
 
 import pytest
@@ -92,6 +93,20 @@ def clock(monkeypatch):
 
     monkeypatch.setattr("solvent.db.datetime", Stopped)
     return stopped
+
+
+@pytest.fixture(autouse=True)
+def idle_pruner(monkeypatch):
+    """Every app a test builds starts its pruning thread, which would
+    outlive the test and log a failed pass into a later test once its
+    database is removed. Here the thread waits out its test and ends
+    without a pass, and a test that prunes calls `prune_pass`."""
+    import solvent.ratelimit as ratelimit
+
+    ended = threading.Event()
+    monkeypatch.setattr(ratelimit, "_prune_forever", lambda app: ended.wait())
+    yield
+    ended.set()
 
 
 @pytest.fixture(autouse=True)
