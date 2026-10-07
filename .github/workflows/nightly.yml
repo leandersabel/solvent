@@ -144,7 +144,7 @@ jobs:
           { echo '```'; cat sources.txt; echo '```'; } >> "$GITHUB_STEP_SUMMARY"
           exit "$status"
       - if: steps.decide.outputs.go == 'true'
-        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
         with:
           name: image
           path: image.tar
@@ -346,7 +346,7 @@ jobs:
             --mcp-config '{"mcpServers":{"playwright":{"command":"npx","args":["-y","@playwright/mcp@0.0.83","--headless","--browser","chrome","--isolated","--caps=network","--storage-state","${{ github.workspace }}/tools/nightly/fixtures/out/storage-state.json"]},"playwright2":{"command":"npx","args":["-y","@playwright/mcp@0.0.83","--headless","--browser","chrome","--isolated"]},"harness":{"command":"env","args":["-i","PATH=/usr/bin:/bin","python3","${{ github.workspace }}/tools/nightly/mcp.py","--container","solvent","--state","${{ runner.temp }}/standin","--url","http://localhost:8000"]}}}'
 
       - if: always()
-        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
         with:
           name: qa-${{ matrix.shard.id }}
           path: |
@@ -446,7 +446,7 @@ jobs:
           RECORD: ${{ needs.plan.outputs.record }}
         continue-on-error: true
         run: printf '%s\n' "$RECORD" > qa-walked.json
-      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+      - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
         continue-on-error: true
         with:
           name: qa-walked
