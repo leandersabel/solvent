@@ -3,7 +3,7 @@
 // Templates: admin.html. Modules: page-admin.js, dom.js, shell.js.
 import {
   ADMIN_PASSWORD, BASE, CLOCK, MINUTE, SECOND_PASSWORD, administrator, check, click, confirmLook, labels, looksDisabled,
-  expectedFailures, intercept, intoVault, looksEnabledRed, mintInvite, openBrowser, register, setValue, signInOn, text, page, run, VAULT_PASSWORD,
+  expectedFailures, fieldNames, intercept, intoVault, looksEnabledRed, mintInvite, openBrowser, register, setValue, signInOn, text, page, run, VAULT_PASSWORD,
   watched,
 } from '../harness.mjs';
 
@@ -31,6 +31,16 @@ await run(async () => {
         && card.firstElementChild.matches('h2.section-heading');
     })()`),
   );
+  // Each check below reads the names a screen reader gets from the accessibility tree.
+  const names = async (scope, expected) => {
+    const fields = await fieldNames(scope);
+    check(
+      `a screen reader names ${expected.join(', ')} by the label shown beside each`,
+      fields.labels.join('|') === expected.join('|') && fields.names.join('|') === fields.labels.join('|'),
+      JSON.stringify(fields),
+    );
+  };
+  await names('#app', ['A note to yourself', 'This link stops working after']);
   await setValue('input[type=text]', 'Sprint test');
   await click('Create invite link');
   await page.waitUntil("document.body.innerText.includes('Copy this now')", { label: 'the one-time link' });
@@ -97,6 +107,7 @@ await run(async () => {
   await page.waitUntil("document.body.innerText.includes('ops.second')", { label: 'the second administrator in the list' });
   await page.eval(`[...document.querySelectorAll('tr')].find((r) => r.textContent.includes('ops.second')).querySelector('button').click()`);
   await page.waitUntil("document.querySelector('.dialog input')", { label: 'the removal dialog' });
+  await names('.dialog', ['Type the username to confirm']);
   const removeDisabled = await confirmLook('Remove account');
   await setValue('.dialog input', 'ops.second');
   const removeEnabled = await confirmLook('Remove account');
@@ -151,6 +162,13 @@ await run(async () => {
         && row('XAG-ozt').querySelector('select').disabled;
     })()`),
   );
+  check(
+    "a screen reader names each unit row's Rate lookup by its column's heading and the unit's code",
+    await page.eval(`[...document.querySelectorAll('#app table tbody tr')].filter((r) => r.querySelector('select')).every((r) =>
+      r.querySelector('select').getAttribute('aria-label') === 'Rate lookup, ' + r.firstElementChild.textContent.trim())`),
+  );
+  await page.eval("[...document.querySelectorAll('summary')].find((s) => s.textContent === 'Add a unit').parentElement.open = true");
+  await names('#app details[open]', ['Code', 'Name', 'Kind', 'Rate lookup']);
   await page.call(
     (fields) => {
       const form = [...document.querySelectorAll('details')].find((d) => d.querySelector('summary').textContent === 'Add a unit');
@@ -227,6 +245,7 @@ await run(async () => {
   await click('Your password');
   await page.waitUntil("document.body.innerText.includes('same bar as anybody')", { label: 'the password card' });
   check('an administrator can change their own password', (await labels('.card button')).includes('Change password'));
+  await names('#app', ['Current password', 'New password', 'Confirm new password']);
   check(
     "the password card's fields sit in a form with the administrator's username",
     (await page.eval(`(() => {
