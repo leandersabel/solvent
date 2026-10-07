@@ -83,8 +83,8 @@ This shard's app is its own, and no other shard reaches it.
      hold the live sessions the manifest's `live-sessions` coverage
      names.
 
-   A check whose data the manifest lacks is a criterion `qa` could not
-   check. Without a manifest, `qa` builds its data by hand and lists what that
+   A check whose data the manifest lacks and `qa` cannot enter by hand
+   is a criterion `qa` could not check. Without a manifest, `qa` builds its data by hand and lists what that
    leaves it unable to check.
 3. **Record each finding** in `qa-unfiled/<n>.json`, numbered from 1
    and continuing across runs, as `{"title": ..., "body": ...,

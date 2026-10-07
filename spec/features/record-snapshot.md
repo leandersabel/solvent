@@ -1281,11 +1281,11 @@ Editing an existing entry).
 
 ## Acceptance criteria
 
-1. A recorded value shows in the total and the chart at once, from
-   local state, with no reload. Test:
+1. (walk) A recorded value shows in the total and the chart at once,
+   from local state, with no reload. Test:
    `tests/browser/parts/snapshot-entry.mjs`.
-2. The converted figure is visible while the value is typed, before
-   anything is saved. Test: no test.
+2. (walk) The converted figure is visible while the value is typed,
+   before anything is saved. Test: no test.
 3. Recording stores one `snapshot` record whose plaintext columns carry
    `account_id` and no date or value, and whose payload carries no
    price field. Test: `tests/test_client.py::test_the_client_side_rules_hold`.
@@ -1296,239 +1296,254 @@ Editing an existing entry).
    twelfth decimal, asserted on a value exactly on the midpoint in both
    directions (any other case also passes round-half-up). Test:
    `tests/test_client.py::test_the_client_side_rules_hold`.
-6. A value with more than twelve decimal places is refused at input,
-   not truncated. Test:
+6. (walk) A value with more than twelve decimal places is refused at
+   input, not truncated. Test:
    `tests/test_client.py::test_the_client_side_rules_hold`,
    `tests/browser/parts/snapshot-entry.mjs`.
-7. Typed `12.50`, `007`, `.5`, `12.` and `-0.00` store `"12.50"`, `"7"`,
-   `"0.5"`, `"12"` and `"0.00"`, and every stored `value` matches the
-   canonical form with no signed zero. Test:
+7. (walk) Typed `12.50`, `007`, `.5`, `12.` and `-0.00` store `"12.50"`,
+   `"7"`, `"0.5"`, `"12"` and `"0.00"`, and every stored `value` matches
+   the canonical form with no signed zero. Test:
    `tests/test_client.py::test_the_client_side_rules_hold`.
 8. (blind) A snapshot stored as `"12.5"` reads `12.5`, and displaying
    it, opening its recording and confirming it at a new date leave its
    own record byte-identical, compared byte for byte. Test:
    `tests/browser/parts/update-values.mjs`.
-9. Saving the single-holding form at a date that holds a snapshot asks
-   to replace it, naming the stored figure in the holding's unit, and
-   confirming leaves one record for that (holding, date) at `version` +
-   1 under a different nonce. Test:
+9. (walk) Saving the single-holding form at a date that holds a snapshot
+   asks to replace it, naming the stored figure in the holding's unit,
+   and confirming leaves one record for that (holding, date) at
+   `version` + 1 under a different nonce. Test:
    `tests/browser/parts/snapshot-entry.mjs`.
-10. Declining the replace prompt leaves the original record untouched.
-    Test: `tests/browser/parts/snapshot-entry.mjs`.
-11. (blind) Editing inside a reopened recording never shows the replace
-    prompt, while the single-holding form at an occupied date still
-    does. Assert both directions. Test:
+10. (walk) Declining the replace prompt leaves the original record
+    untouched. Test: `tests/browser/parts/snapshot-entry.mjs`.
+11. (blind) (walk) Editing inside a reopened recording never shows the
+    replace prompt, while the single-holding form at an occupied date
+    still does. Assert both directions. Test:
     `tests/browser/parts/update-values.mjs`,
     `tests/browser/parts/snapshot-entry.mjs`.
-12. Zero and negative values are accepted, round-trip and count in the
-    total. Zero is a closed-out position, distinct from never valued. A
-    holding with no snapshots is excluded from the total. Test:
+12. (walk) Zero and negative values are accepted, round-trip and count
+    in the total. Zero is a closed-out position, distinct from never
+    valued. A holding with no snapshots is excluded from the total.
+    Test:
     `tests/test_client.py::test_the_client_side_rules_hold`.
-13. No request issued while recording, on the sweep or the form,
+13. (walk) No request issued while recording, on the sweep or the form,
     contains the entered value, in any field or encoding. Test:
     `tests/browser/parts/update-values.mjs`,
     `tests/browser/parts/snapshot-entry.mjs`.
-14. With the rate proxy down, the value still saves, every row still
-    records, nothing is written for that unit, and the line says so
-    quietly rather than blocking. Test:
+14. (walk) With the rate proxy down, the value still saves, every row
+    still records, nothing is written for that unit, and the line says
+    so quietly rather than blocking. Test:
     `tests/browser/parts/update-values.mjs`,
     `tests/browser/parts/snapshot-entry.mjs`.
-15. (blind) A quantity in a unit with no price at all, none typed, saves
-    with the save control live throughout, writes one `snapshot`, and
-    the holding is listed as not priced. Asserted for a free-text unit,
-    a symbol whose lookup returned nothing, and gold before its `since`
-    (the case that looks like a listed symbol with a source). Test:
+15. (blind) (walk) A quantity in a unit with no price at all, none
+    typed, saves with the save control live throughout, writes one
+    `snapshot`, and the holding is listed as not priced. Asserted for a
+    free-text unit, a symbol whose lookup returned nothing, and gold
+    before its `since` (the case that looks like a listed symbol with a
+    source). Test:
     `tests/browser/parts/update-values.mjs`.
-16. A holding in a unit you made up triggers no lookup, gets no entry
-    from a recording, and its line says why the price is yours to set.
-    Once a price is typed there, the line no longer says there is no
-    price, how old the last one is, or asks for one. Test:
+16. (walk) A holding in a unit you made up triggers no lookup, gets no
+    entry from a recording, and its line says why the price is yours to
+    set. Once a price is typed there, the line no longer says there is
+    no price, how old the last one is, or asks for one. Test:
     `tests/browser/parts/update-values.mjs`,
     `tests/browser/parts/update-values-review-typed.mjs`,
     `tests/browser/parts/update-values-review-typed-saved.mjs`.
-17. On a date before a published unit's prices begin, its line says when
-    they begin and that the price is yours to set, starts from the last
-    price before that date, asks for one when there is none, triggers no
-    lookup, and never reads like a source that did not answer. Once a
-    price is typed there, it says only when published prices begin and
-    that the price is yours to set, saved or not and on reopening. Test:
+17. (walk) On a date before a published unit's prices begin, its line
+    says when they begin and that the price is yours to set, starts from
+    the last price before that date, asks for one when there is none,
+    triggers no lookup, and never reads like a source that did not
+    answer. Once a price is typed there, it says only when published
+    prices begin and that the price is yours to set, saved or not and on
+    reopening. Test:
     `tests/browser/parts/update-values.mjs`,
     `tests/browser/parts/update-values-review-typed.mjs`,
     `tests/browser/parts/update-values-review-typed-saved.mjs`.
-18. A holding measured in the main currency shows no price anywhere, and
-    the main currency has no rate line. Test:
+18. (walk) A holding measured in the main currency shows no price
+    anywhere, and the main currency has no rate line. Test:
     `tests/browser/parts/update-values.mjs`.
-19. A rate published later changes no recorded figure and no chart point
-    before today. Nothing the app does on its own rewrites a stored
-    price. Test: no test.
-20. (blind) A row not acted on produces no entry: leave most rows of a
-    sweep alone, save the rest, and those holdings' record sets hold no
-    snapshot at that date, asserted against the record sets and not the
-    sweep's report. A prefilled figure nobody confirmed appears nowhere.
+19. (walk) A rate published later changes no recorded figure and no
+    chart point before today. Nothing the app does on its own rewrites a
+    stored price. Test: no test.
+20. (blind) (walk) A row not acted on produces no entry: leave most rows
+    of a sweep alone, save the rest, and those holdings' record sets
+    hold no snapshot at that date, asserted against the record sets and
+    not the sweep's report. A prefilled figure nobody confirmed appears
+    nowhere. Test: `tests/browser/parts/update-values.mjs`.
+21. (walk) Two sweeps covering different halves of the holdings leave
+    entries only for the halves covered, and neither is treated as
+    unfinished. Test: no test.
+22. (walk) Nothing on the sweep counts, scores, flags or later mentions
+    how many holdings were left alone. Test: no test.
+23. (walk) Recording one franc holding writes a price entry dated that
+    day for every published unit in the vault, touched or not, and none
+    for the main currency.
     Test: `tests/browser/parts/update-values.mjs`.
-21. Two sweeps covering different halves of the holdings leave entries
-    only for the halves covered, and neither is treated as unfinished.
-    Test: no test.
-22. Nothing on the sweep counts, scores, flags or later mentions how many
-    holdings were left alone. Test: no test.
-23. Recording one franc holding writes a price entry dated that day for
-    every published unit in the vault, touched or not, and none for the
-    main currency. Test: `tests/browser/parts/update-values.mjs`.
-24. On one sweep, an untouched rate line is written and an untouched
-    holding row is not. Test: `tests/browser/parts/update-values.mjs`.
-25. (blind) Opening the sweep, acting on nothing and leaving writes
-    nothing, prices included, whether the date was empty or held a
-    recording. With a price typed at a date holding no record and no row
-    recorded, leaving leaves no record of any kind at that date,
+24. (walk) On one sweep, an untouched rate line is written and an
+    untouched holding row is not.
+    Test: `tests/browser/parts/update-values.mjs`.
+25. (blind) (walk) Opening the sweep, acting on nothing and leaving
+    writes nothing, prices included, whether the date was empty or held
+    a recording. With a price typed at a date holding no record and no
+    row recorded, leaving leaves no record of any kind at that date,
     asserted against the record sets. Test:
     `tests/browser/parts/update-values.mjs`.
-26. Backfilling a figure dated in March writes March's prices, not
-    today's. Test: `tests/test_client.py::test_the_client_side_rules_hold`,
+26. (walk) Backfilling a figure dated in March writes March's prices,
+    not today's. Test: `tests/test_client.py::test_the_client_side_rules_hold`,
     `tests/browser/parts/snapshot-entry.mjs`.
-27. A unit only you can price keeps its figure and date however many
-    times something else is recorded. Test:
+27. (walk) A unit only you can price keeps its figure and date however
+    many times something else is recorded. Test:
     `tests/browser/parts/update-values.mjs`.
-28. A date before the holding was created is accepted. Test:
+28. (walk) A date before the holding was created is accepted. Test:
     `tests/browser/parts/snapshot-entry.mjs`.
-29. A price's provenance (proposed, changed with the proposal still
-    shown, typed) reads the same a year later, whether it was changed on
-    the evening or years afterwards. Test:
+29. (walk) A price's provenance (proposed, changed with the proposal
+    still shown, typed) reads the same a year later, whether it was
+    changed on the evening or years afterwards. Test:
     `tests/browser/parts/update-values.mjs`.
-30. Changing a price on a reopened recording that moves a holding on
-    that date is announced before it goes through, naming how many
-    holdings move, and moves every holding in
-    that unit on that date, visibly the rows on screen. Test:
+30. (walk) Changing a price on a reopened recording that moves a holding
+    on that date is announced before it goes through, naming how many
+    holdings move, and moves every holding in that unit on that date,
+    visibly the rows on screen. Test:
     `tests/browser/parts/update-values.mjs`.
-31. No screen lists prices on their own or lets one be changed away from
-    the recording that wrote it. Test: no test.
-32. Opening a date that holds a recording shows every figure recorded
-    for it, including other sittings that day, and starts no second
-    recording. Test: `tests/browser/parts/recording-detail.mjs`.
-33. Correcting a figure from months ago moves the chart only between
-    that entry's neighbors. Test:
+31. (walk) No screen lists prices on their own or lets one be changed
+    away from the recording that wrote it. Test: no test.
+32. (walk) Opening a date that holds a recording shows every figure
+    recorded for it, including other sittings that day, and starts no
+    second recording. Test: `tests/browser/parts/recording-detail.mjs`.
+33. (walk) Correcting a figure from months ago moves the chart only
+    between that entry's neighbors. Test:
     `tests/test_client.py::test_the_client_side_rules_hold`.
-34. (blind) Opening a recording of any age, its own screen or its sweep,
-    issues no `PUT`, no `DELETE` and no request to `/api/rates`, and
-    every record at that date is byte-identical afterwards. With an
+34. (blind) (walk) Opening a recording of any age, its own screen or its
+    sweep, issues no `PUT`, no `DELETE` and no request to `/api/rates`,
+    and every record at that date is byte-identical afterwards. With an
     empty rate line present, the request fires only when Look it up is
     pressed (a stub that answers passes whether it fired on open or on
     press). Test: `tests/browser/parts/update-values.mjs`,
     `tests/browser/parts/recording-detail.mjs`.
-35. A line left empty because no price came back says so on the
-    reopened recording and offers Look it up, whichever way the recording
-    is reached. A line holding a price never offers it, nor one dated
-    before its unit's published prices.
+35. (walk) A line left empty because no price came back says so on the
+    reopened recording and offers Look it up, whichever way the
+    recording is reached. A line holding a price never offers it, nor
+    one dated before its unit's published prices.
     Test: `tests/browser/parts/update-values.mjs`,
     `tests/browser/parts/update-values-review.mjs`.
-36. Pressing Look it up fills the line when the source answers, labeled
-    with the day it is for, and saves it. Test:
+36. (walk) Pressing Look it up fills the line when the source answers,
+    labeled with the day it is for, and saves it. Test:
     `tests/browser/parts/update-values-review.mjs`.
-37. (blind) A price filled in on a reopened recording saves on its own,
-    with no holding row touched: pressing Look it up writes the answer
-    for every empty published line it covers, as `proposed`, with no
-    further press and no confirmation, and leaving at once names no unit
-    as unsaved. Test: `tests/browser/parts/update-values.mjs`.
-38. Adding a figure for a holding silent at a reopened date creates one
-    `snapshot` at `version: 1` and changes no other snapshot there. Test:
+37. (blind) (walk) A price filled in on a reopened recording saves on
+    its own, with no holding row touched: pressing Look it up writes the
+    answer for every empty published line it covers, as `proposed`, with
+    no further press and no confirmation, and leaving at once names no
+    unit as unsaved. Test: `tests/browser/parts/update-values.mjs`.
+38. (walk) Adding a figure for a holding silent at a reopened date
+    creates one `snapshot` at `version: 1` and changes no other snapshot
+    there. Test:
     `tests/browser/parts/update-values.mjs`.
-39. Adding a figure to a date that carries prices uses them, looks none
-    up again, and fills only an empty line for a published unit when the
-    source answers. Test: `tests/browser/parts/update-values.mjs`,
+39. (walk) Adding a figure to a date that carries prices uses them,
+    looks none up again, and fills only an empty line for a published
+    unit when the source answers.
+    Test: `tests/browser/parts/update-values.mjs`,
     `tests/browser/parts/snapshot-entry.mjs`.
-40. (blind) Clearing a figure backed by a record at that date deletes
-    exactly that record. Clearing a field prefilled from another date
-    deletes nothing and writes nothing (a test that clears a field
+40. (blind) (walk) Clearing a figure backed by a record at that date
+    deletes exactly that record. Clearing a field prefilled from another
+    date deletes nothing and writes nothing (a test that clears a field
     backed by a real record passes whatever rule is used). Test:
     `tests/browser/parts/update-values.mjs`.
-41. (blind) Clearing every quantity at a date leaves its price entries
-    byte-identical, the recording reopens with its rate lines, and the
-    prices still price the dates around it. A test that only finds the
-    date in a list proves nothing. Test:
+41. (blind) (walk) Clearing every quantity at a date leaves its price
+    entries byte-identical, the recording reopens with its rate lines,
+    and the prices still price the dates around it. A test that only
+    finds the date in a list proves nothing. Test:
     `tests/browser/parts/update-values.mjs`.
-42. A recording with no figures reads as an ordinary empty recording on
-    its own screen, saying it holds no figures, listing its prices and
-    offering Update and Delete, never as an error. Test: no test.
-43. Clearing a figure asks no more than changing one: no typed
+42. (walk) A recording with no figures reads as an ordinary empty
+    recording on its own screen, saying it holds no figures, listing its
+    prices and offering Update and Delete, never as an error.
+    Test: no test.
+43. (walk) Clearing a figure asks no more than changing one: no typed
     confirmation, no second warning. Test: no test.
-44. A recording is deleted only by its own button on Recording detail,
-    never from the sweep and never by emptying it. Test:
+44. (walk) A recording is deleted only by its own button on Recording
+    detail, never from the sweep and never by emptying it. Test:
     `tests/browser/parts/recording-detail.mjs`.
-45. The delete confirmation says the prices go too, that every holding
-    in those units moves on that date, and that it cannot be undone.
-    Test: `tests/browser/parts/recording-detail.mjs`.
-46. Deleting a recording removes every snapshot and price entry at that
-    date, the chart runs across it, and the date is offered as a fresh
-    recording. Test: `tests/browser/parts/recording-detail.mjs`.
-47. (blind) Deleting a recording that holds an archive's zero leaves that
-    zero byte-identical and the date still opening, while every other
-    record at the date goes. Test:
+45. (walk) The delete confirmation says the prices go too, that every
+    holding in those units moves on that date, and that it cannot be
+    undone. Test: `tests/browser/parts/recording-detail.mjs`.
+46. (walk) Deleting a recording removes every snapshot and price entry
+    at that date, the chart runs across it, and the date is offered as a
+    fresh recording. Test: `tests/browser/parts/recording-detail.mjs`.
+47. (blind) (walk) Deleting a recording that holds an archive's zero
+    leaves that zero byte-identical and the date still opening, while
+    every other record at the date goes. Test:
     `tests/browser/parts/account-detail.mjs`.
 48. A delete whose third `DELETE` fails leaves the remaining records
     readable, rolls nothing back, and reports what is left. Test:
     `tests/browser/parts/recording-detail.mjs`.
-49. A `DELETE` answering Not Found during a save is reported as saved.
+49. (walk) A `DELETE` answering Not Found during a save is reported as
+    saved.
     Test: `tests/test_client.py::test_the_client_side_rules_hold`.
-50. New recording opens a date picker set to today that marks every date
-    holding a recording, emptied ones included. Test:
+50. (walk) New recording opens a date picker set to today that marks
+    every date holding a recording, emptied ones included. Test:
     `tests/browser/parts/dashboard-net-worth.mjs`,
     `tests/browser/parts/update-values.mjs`.
-51. Picking a marked date opens that recording's own screen with no
-    warning, no request and no create. Picking an unmarked date goes
+51. (walk) Picking a marked date opens that recording's own screen with
+    no warning, no request and no create. Picking an unmarked date goes
     straight to the sweep. Test:
     `tests/browser/parts/recording-detail.mjs`,
     `tests/browser/parts/update-values.mjs`.
-52. Recording detail shows its date, every figure with its holding, and
-    every price with its unit and provenance. Test:
+52. (walk) Recording detail shows its date, every figure with its
+    holding, and every price with its unit and provenance. Test:
     `tests/browser/parts/recording-detail.mjs`.
-53. A holding named on Recording detail opens that holding. Test: no
+53. (walk) A holding named on Recording detail opens that holding.
+    Test: no
     test.
-54. Update on Recording detail opens the sweep at that date holding what
-    was recorded. Test: `tests/browser/parts/update-values.mjs`.
-55. Every route to an existing recording lands on its own screen, except
-    Update values in the top bar, which opens the sweep at today. Test:
+54. (walk) Update on Recording detail opens the sweep at that date
+    holding what was recorded.
+    Test: `tests/browser/parts/update-values.mjs`.
+55. (walk) Every route to an existing recording lands on its own screen,
+    except Update values in the top bar, which opens the sweep at today.
+    Test:
     `tests/browser/parts/update-values.mjs`.
-56. No figure converts at another day's price as though it were that
-    day's. On a recording and in a holding's list, a published unit with
-    no price on a covered date reads "not priced", and an owner-priced
-    unit, or one dated before its published prices, shows the date of
-    an earlier price it is valued at. Test:
+56. (walk) No figure converts at another day's price as though it were
+    that day's. On a recording and in a holding's list, a published unit
+    with no price on a covered date reads "not priced", and an
+    owner-priced unit, or one dated before its published prices, shows
+    the date of an earlier price it is valued at. Test:
     `tests/browser/parts/recording-detail.mjs`.
-57. (blind) A second session whose model predates another session's
-    recording is refused when it creates at that date: the reload runs,
-    nothing is written, not even into free slots, the message names the
-    date as taken rather than blaming the person, and one click opens
-    that recording. Asserted for a fresh recording and for one holding
-    added inside a reopened one, and against the record sets, since the
-    message alone is the easy fake. Test:
+57. (blind) (walk) A second session whose model predates another
+    session's recording is refused when it creates at that date: the
+    reload runs, nothing is written, not even into free slots, the
+    message names the date as taken rather than blaming the person, and
+    one click opens that recording. Asserted for a fresh recording and
+    for one holding added inside a reopened one, and against the record
+    sets, since the message alone is the easy fake. Test:
     `tests/browser/parts/update-values.mjs`,
     `tests/test_client.py::test_the_client_side_rules_hold`.
-58. (blind) A sweep recording many rows at a new date issues exactly one
-    extra type reload, before the first row is written, and none after,
-    asserted as a request count and position. Test:
+58. (blind) (walk) A sweep recording many rows at a new date issues
+    exactly one extra type reload, before the first row is written, and
+    none after, asserted as a request count and position. Test:
     `tests/browser/parts/update-values.mjs`.
-59. (blind) A sitting that only changes and clears existing records
-    issues no type reload, and its writes are updates at stored
+59. (blind) (walk) A sitting that only changes and clears existing
+    records issues no type reload, and its writes are updates at stored
     `version` + 1. Test: `tests/browser/parts/update-values.mjs`.
-60. (blind) On a sweep at a new date, after the first row is recorded, a
-    rate-lines save that creates a price issues its own type reload and
-    writes that price. Skipping the reload because the sitting claimed
-    the date passes every test on a date nobody else touched. Test:
+60. (blind) (walk) On a sweep at a new date, after the first row is
+    recorded, a rate-lines save that creates a price issues its own type
+    reload and writes that price. Skipping the reload because the
+    sitting claimed the date passes every test on a date nobody else
+    touched. Test:
     `tests/test_client.py::test_the_client_side_rules_hold`.
-61. (blind) A Conflict on a snapshot inside a recording save reloads that
-    row to the stored record, retries nothing, and leaves it
-    byte-identical. Test: `tests/browser/parts/update-values.mjs`.
-62. Editing a snapshot with a stale `version`, from a second tab, returns
-    Conflict, overwrites nothing, and says so. Test:
+61. (blind) (walk) A Conflict on a snapshot inside a recording save
+    reloads that row to the stored record, retries nothing, and leaves
+    it byte-identical. Test: `tests/browser/parts/update-values.mjs`.
+62. (walk) Editing a snapshot with a stale `version`, from a second tab,
+    returns Conflict, overwrites nothing, and says so. Test:
     `tests/browser/parts/snapshot-entry.mjs`,
     `tests/test_records.py::test_only_stored_version_plus_one_is_accepted`.
-63. A recording offers no way to change its own date, and moving one
-    snapshot's date from the holding's page works. Test:
+63. (walk) A recording offers no way to change its own date, and moving
+    one snapshot's date from the holding's page works. Test:
     `tests/browser/parts/update-values.mjs`,
     `tests/browser/parts/snapshot-entry.mjs`.
-64. (blind) Changing only an entry's value or note issues no request to
-    `/api/rates`, writes no price and runs no pre-create reload. Test:
+64. (blind) (walk) Changing only an entry's value or note issues no
+    request to `/api/rates`, writes no price and runs no pre-create
+    reload. Test:
     `tests/browser/parts/snapshot-entry.mjs`.
-65. Deleting a snapshot deletes no price entry, asserted by count. Test:
+65. (walk) Deleting a snapshot deletes no price entry, asserted by
+    count. Test:
     `tests/browser/parts/snapshot-entry.mjs`.
 66. (blind) Confirming writes the holding's last recorded `value` string
     character for character at the new date, for a holding in the main
@@ -1538,19 +1553,20 @@ Editing an existing entry).
     `"1000.40"` writes `"1000.40"`, read from the written record, not
     the screen. Test: `tests/browser/parts/update-values.mjs`,
     `tests/test_client.py::test_the_client_side_rules_hold`.
-67. (blind) A sweep row prefilled from `"12.5"` offers Confirm, offers
-    Record once edited, offers Confirm again when the prefill is typed
-    back, and with `12.50` typed writes `"12.50"` (a numeric comparison
-    fails these cases). Test: `tests/browser/parts/update-values.mjs`.
-68. Confirm stays available and one click with the rate proxy answering
-    No Content. Test: `tests/browser/parts/update-values.mjs`.
-69. Confirm is not offered for a holding never valued, and the
+67. (blind) (walk) A sweep row prefilled from `"12.5"` offers Confirm,
+    offers Record once edited, offers Confirm again when the prefill is
+    typed back, and with `12.50` typed writes `"12.50"` (a numeric
+    comparison fails these cases).
+    Test: `tests/browser/parts/update-values.mjs`.
+68. (walk) Confirm stays available and one click with the rate proxy
+    answering No Content. Test: `tests/browser/parts/update-values.mjs`.
+69. (walk) Confirm is not offered for a holding never valued, and the
     equivalent request is refused client-side. Test:
     `tests/browser/parts/update-values.mjs`,
     `tests/test_client.py::test_the_client_side_rules_hold`.
-70. Moving a snapshot onto an occupied date prompts with copy naming the
-    deletion, different from the replace prompt, and on confirm leaves
-    exactly one record for that date. Test:
+70. (walk) Moving a snapshot onto an occupied date prompts with copy
+    naming the deletion, different from the replace prompt, and on
+    confirm leaves exactly one record for that date. Test:
     `tests/browser/parts/snapshot-entry.mjs`.
 71. (blind) A move issues the snapshot `PUT`, then every rate `PUT`,
     then the displaced record's `DELETE`, asserted on the wire with each
@@ -1563,127 +1579,129 @@ Editing an existing entry).
     the holding's page shows both flagged and asks which to keep, and
     the chart leaves that date out until answered. Test:
     `tests/browser/parts/snapshot-entry.mjs`.
-73. With two snapshots for one (holding, date), the holding's history,
-    the recording and the sweep show both flagged with Keep this one,
-    the app picks neither, and the date is left out of the
+73. (walk) With two snapshots for one (holding, date), the holding's
+    history, the recording and the sweep show both flagged with Keep
+    this one, the app picks neither, and the date is left out of the
     interpolated series until resolved. Test:
     `tests/browser/parts/dashboard.mjs`,
     `tests/browser/parts/update-values.mjs`.
-74. (blind) Moving a `USD` snapshot from 2010-03-31 to 2026-04-10, a date
-    holding no records, issues exactly one request to `/api/rates`, for
-    2026-04-10, writes an entry there for every symbol the refresh
-    covers, converts the figure at that entry on the recording and in
-    the holding's list, and leaves every entry at 2010-03-31
-    byte-identical. A move that only rewrites the date fails this. Test:
+74. (blind) (walk) Moving a `USD` snapshot from 2010-03-31 to
+    2026-04-10, a date holding no records, issues exactly one request to
+    `/api/rates`, for 2026-04-10, writes an entry there for every symbol
+    the refresh covers, converts the figure at that entry on the
+    recording and in the holding's list, and leaves every entry at
+    2010-03-31 byte-identical. A move that only rewrites the date fails
+    this. Test:
     `tests/browser/parts/snapshot-entry.mjs`,
     `tests/browser/parts/recording-detail.mjs`.
-75. (blind) With the proxy answering No Content for that move, the
-    snapshot moves, no `USD` entry is written, and the figure reads not
-    priced at 2026-04-10 on the recording and in the holding's list,
+75. (blind) (walk) With the proxy answering No Content for that move,
+    the snapshot moves, no `USD` entry is written, and the figure reads
+    not priced at 2026-04-10 on the recording and in the holding's list,
     never at the 2010-03-31 price. Test:
     `tests/browser/parts/recording-detail.mjs`.
-76. (blind) Moving an `XAU-g` snapshot to 2012-06-29, a date holding no
-    records, in a vault whose only other unit is the main currency,
-    issues no request to `/api/rates` and writes no price. With an
-    `XAU-g` entry at 2011-06-30 the figure converts at it and carries
-    2011-06-30 on the recording and in the holding's list. With none at
-    or before 2012-06-29 it reads not priced. Test: no test.
-77. Moving a snapshot onto a date whose prices are complete issues no
-    request to `/api/rates` and leaves every price there byte-identical.
-    Onto a date missing one symbol, it writes that symbol's entry and no
-    other. Test: `tests/browser/parts/snapshot-entry.mjs`,
+76. (blind) (walk) Moving an `XAU-g` snapshot to 2012-06-29, a date
+    holding no records, in a vault whose only other unit is the main
+    currency, issues no request to `/api/rates` and writes no price.
+    With an `XAU-g` entry at 2011-06-30 the figure converts at it and
+    carries 2011-06-30 on the recording and in the holding's list. With
+    none at or before 2012-06-29 it reads not priced. Test: no test.
+77. (walk) Moving a snapshot onto a date whose prices are complete
+    issues no request to `/api/rates` and leaves every price there
+    byte-identical. Onto a date missing one symbol, it writes that
+    symbol's entry and no other.
+    Test: `tests/browser/parts/snapshot-entry.mjs`,
     `tests/test_client.py::test_the_client_side_rules_hold`.
-78. Moving an archived holding's entry to an earlier date with no entry
-    for its unit writes that unit's entry there. Test:
+78. (walk) Moving an archived holding's entry to an earlier date with no
+    entry for its unit writes that unit's entry there. Test:
     `tests/test_client.py::test_the_client_side_rules_hold`.
-79. (blind) A move whose reload finds the holding's slot at the new date
-    taken by a record its confirmation did not name writes nothing and
-    names the date. Test:
+79. (blind) (walk) A move whose reload finds the holding's slot at the
+    new date taken by a record its confirmation did not name writes
+    nothing and names the date. Test:
     `tests/test_client.py::test_the_client_side_rules_hold`,
     `tests/browser/parts/snapshot-entry-review-move.mjs`.
 80. A move whose prices did not save leaves the entry moved, names every
     unit in the Dialog, leaves Save inert until something changes, and
     offers the recording. Test: `tests/browser/parts/snapshot-entry.mjs`.
-81. (blind) A typed future date is refused on the date field's own line
-    with the future reason, the input carries `aria-invalid="true"` and
-    an `aria-describedby` naming that line, Save issues no `PUT`, and the
-    Dialog's general line stays empty (finding the text anywhere on the
-    Dialog is the easy fake). Test:
+81. (blind) (walk) A typed future date is refused on the date field's
+    own line with the future reason, the input carries
+    `aria-invalid="true"` and an `aria-describedby` naming that line,
+    Save issues no `PUT`, and the Dialog's general line stays empty
+    (finding the text anywhere on the Dialog is the easy fake). Test:
     `tests/browser/parts/snapshot-entry.mjs`,
     `tests/browser/parts/snapshot-entry-review-refusals.mjs`.
-82. (blind) Unparseable text in the date field, on Save, shows the
-    unparseable reason and never the empty-date one, and issues no
+82. (blind) (walk) Unparseable text in the date field, on Save, shows
+    the unparseable reason and never the empty-date one, and issues no
     `PUT`. An emptied field shows the empty-date reason. Test:
     `tests/browser/parts/snapshot-entry.mjs`,
     `tests/browser/parts/snapshot-entry-review-refusals.mjs`.
-83. (blind) Correcting a refused date to one that fits clears the
+83. (blind) (walk) Correcting a refused date to one that fits clears the
     refusal and `aria-invalid` before Save, asserted without pressing
     Save. Test: `tests/browser/parts/snapshot-entry.mjs`,
     `tests/browser/parts/snapshot-entry-review-refusals.mjs`.
-84. Recording against an archived holding is blocked at every entry
-    point and every date. Test: `tests/browser/parts/account-detail.mjs`.
-85. (blind) On a reopened recording, the archive's zero row shows the
-    zero as text with no control. The server cannot see this, so only a
-    test against the controls asserts it. Test:
+84. (walk) Recording against an archived holding is blocked at every
+    entry point and every date. Test: `tests/browser/parts/account-detail.mjs`.
+85. (blind) (walk) On a reopened recording, the archive's zero row shows
+    the zero as text with no control. The server cannot see this, so
+    only a test against the controls asserts it. Test:
     `tests/browser/parts/account-detail.mjs`.
-86. (blind) On the single-holding form, the opened prices line shows
-    every unit's full name, price and whole provenance at a narrow and a
-    wide window, no chip wider than its container and no two boxes
+86. (blind) (walk) On the single-holding form, the opened prices line
+    shows every unit's full name, price and whole provenance at a narrow
+    and a wide window, no chip wider than its container and no two boxes
     intersecting, asserted on rendered geometry, not on text in the DOM.
     Test: `tests/browser/parts/snapshot-entry.mjs`.
-87. (blind) A single-holding form open since before another window
-    archived its holding writes nothing at an earlier date, and says the
-    holding was archived in another window. Test:
+87. (blind) (walk) A single-holding form open since before another
+    window archived its holding writes nothing at an earlier date, and
+    says the holding was archived in another window. Test:
     `tests/browser/parts/snapshot-entry.mjs`.
-88. A date move onto or past an archive another window made since the
-    form opened writes nothing and says nothing was moved. Test:
+88. (walk) A date move onto or past an archive another window made since
+    the form opened writes nothing and says nothing was moved. Test:
     `tests/browser/parts/snapshot-entry.mjs`.
-89. (blind) A sweep row of a holding archived in another window after
-    the sweep claimed its date writes nothing, says so, and leaves the
-    screen. Test: `tests/browser/parts/update-values.mjs`.
+89. (blind) (walk) A sweep row of a holding archived in another window
+    after the sweep claimed its date writes nothing, says so, and leaves
+    the screen. Test: `tests/browser/parts/update-values.mjs`.
 90. In a vault whose main currency no source quotes into, a currency's
     rate line says no price source quotes in that main currency, offers
     no Look it up, and the sweep asks the proxy nothing. Test:
     `tests/browser/parts/update-values.mjs`,
     `tests/browser/parts/update-values-review-unquoted.mjs`.
-91. Closing the single-holding form with a typed price or figure
+91. (walk) Closing the single-holding form with a typed price or figure
     unsaved writes nothing, and the screen it closes onto names the
     holding and the unit left. A lock and unlock in between shows no
     notice. Test: `tests/browser/parts/snapshot-entry.mjs`,
     `tests/browser/parts/snapshot-entry-review-leave.mjs`,
     `tests/browser/parts/unlock-lock.mjs`.
-92. A move to a date that held no record when the Dialog showed it,
-    where another window records a different holding's figure there
+92. (walk) A move to a date that held no record when the Dialog showed
+    it, where another window records a different holding's figure there
     before Save, writes nothing, names the date and offers its
     recording, although no slot the move would take is taken. Test:
     `tests/browser/parts/snapshot-entry.mjs`,
     `tests/browser/parts/snapshot-entry-review-move.mjs`,
     `tests/test_client.py::test_the_client_side_rules_hold`.
-93. The single-holding form's heading reads "Record a value for" and the
-    holding's name for a new figure, and "Edit this value" for a stored
-    one. Test: `tests/browser/parts/snapshot-entry.mjs`,
+93. (walk) The single-holding form's heading reads "Record a value for"
+    and the holding's name for a new figure, and "Edit this value" for a
+    stored one. Test: `tests/browser/parts/snapshot-entry.mjs`,
     `tests/browser/parts/snapshot-entry-review-heading.mjs`.
-94. At 320px, 375px, 601px and 901px wide, Recording detail holding two
-    seven-digit figures for one holding on its date pans no screen or
-    box sideways. Every control, Keep this one included, lies on screen
-    and takes a tap at its center, and each control in its lists is at
-    least 44px tall at phone width. A holding name with no break in it
-    wraps rather than pans. Test:
+94. (walk) At 320px, 375px, 601px and 901px wide, Recording detail
+    holding two seven-digit figures for one holding on its date pans no
+    screen or box sideways. Every control, Keep this one included, lies
+    on screen and takes a tap at its center, and each control in its
+    lists is at least 44px tall at phone width. A holding name with no
+    break in it wraps rather than pans. Test:
     `tests/browser/parts/recording-detail.mjs`,
     `tests/browser/parts/recording-detail-review-phone.mjs`.
-95. On the single-holding form, the folded prices line shows what the
-    save writes, such as "Prices for 31 July will be recorded with
+95. (walk) On the single-holding form, the folded prices line shows what
+    the save writes, such as "Prices for 31 July will be recorded with
     this", without being opened. Test:
     `tests/browser/parts/snapshot-entry.mjs`,
     `tests/browser/parts/snapshot-entry-review-fold.mjs`.
-96. (blind) Recording detail and Update values name a unit as
+96. (blind) (walk) Recording detail and Update values name a unit as
     `design-system.md`, Units, sets: a price line for `XAU-ozt` reads
     "Gold, troy ounce", one for `XAU-g` reads "Gold, gram", a currency
     reads by its code, and no line or message shows a symbol such as
     `XAU-ozt`. Test: `tests/browser/parts/recording-detail.mjs`,
     `tests/browser/parts/update-values.mjs`.
-97. (blind) No text the app shows, and no accessible name, contains the
-    word "snapshot". Test:
+97. (blind) (walk) No text the app shows, and no accessible name,
+    contains the word "snapshot". Test:
     `tests/test_record_snapshot.py::test_no_copy_says_snapshot`,
     `tests/browser/parts/snapshot-entry-review-word.mjs`.
 98. (blind) A snapshot or price entry whose date does not exist or is
@@ -1697,30 +1715,32 @@ Editing an existing entry).
     `tests/browser/parts/recording-detail-misdated.mjs`.
 100. Today is the calendar day on the device, in any time zone. Test:
      `tests/test_client.py::test_the_client_side_rules_hold`.
-101. In Snapshot entry, at desktop width, at phone width and in a short
-     window, the opened calendar and its Close lie inside the Dialog,
-     the calendar casts no shadow, one Escape closes only the calendar
-     with focus on its button, and a second closes the Dialog. Test:
+101. (walk) In Snapshot entry, at desktop width, at phone width and in a
+     short window, the opened calendar and its Close lie inside the
+     Dialog, the calendar casts no shadow, one Escape closes only the
+     calendar with focus on its button, and a second closes the Dialog.
+     Test:
      `tests/browser/parts/snapshot-entry.mjs`,
      `tests/browser/parts/snapshot-entry-review-calendar.mjs`.
-102. (blind) A price filled in on Snapshot entry, over an empty line, a
-     proposal or an estimate, saves with no confirmation, and a changed
-     stored price that moves no holding on its date is left out of the
-     confirmation, which does not open when nothing is left. Test:
+102. (blind) (walk) A price filled in on Snapshot entry, over an empty
+     line, a proposal or an estimate, saves with no confirmation, and a
+     changed stored price that moves no holding on its date is left out
+     of the confirmation, which does not open when nothing is left.
+     Test:
      `tests/browser/parts/snapshot-entry.mjs`,
      `tests/browser/parts/snapshot-entry-review-first-price.mjs`,
      `tests/browser/parts/update-values-review-first-price.mjs`,
      `tests/test_client.py::test_the_client_side_rules_hold`.
-103. (blind) Recording detail names a unit with no price at its date
-     as empty, to be filled after Update, only where a source prices
-     that unit at that date. A unit with no rate source there, such as
-     m2 or silver, is never named so. Test:
+103. (blind) (walk) Recording detail names a unit with no price at its
+     date as empty, to be filled after Update, only where a source
+     prices that unit at that date. A unit with no rate source there,
+     such as m2 or silver, is never named so. Test:
      `tests/browser/parts/recording-detail.mjs`,
      `tests/browser/parts/recording-detail-review-unpriced.mjs`.
-104. The delete confirmation names the units it moves as "A, B and C",
-     never chained with "and". Test:
+104. (walk) The delete confirmation names the units it moves as "A, B
+     and C", never chained with "and". Test:
      `tests/browser/parts/recording-detail-units.mjs`.
-105. On Update values, a screen reader names each value field by its
-     holding's name and "value", such as "Mortgage value". Test:
+105. (walk) On Update values, a screen reader names each value field by
+     its holding's name and "value", such as "Mortgage value". Test:
      `tests/browser/parts/update-values.mjs`,
      `tests/browser/parts/update-values-review-field-names.mjs`.

@@ -680,33 +680,35 @@ host's network are reachable.
 
 ## Acceptance criteria
 
-1. With the price service off, every figure can still be entered and
-   saved by hand, and the screen says in a sentence why the field is the
-   person's to fill. Test: `tests/browser/parts/update-values.mjs`.
-2. A unit whose source did not answer gets no rate entry that day, and
-   the day can be filled in later by opening its recording. Test:
+1. (walk) With the price service off, every figure can still be entered
+   and saved by hand, and the screen says in a sentence why the field is
+   the person's to fill. Test: `tests/browser/parts/update-values.mjs`.
+2. (walk) A unit whose source did not answer gets no rate entry that
+   day, and the day can be filled in later by opening its recording.
+   Test:
    `tests/test_client.py::test_the_client_side_rules_hold`.
-3. Every rate request the app makes omits `symbol`, so the pattern of
-   lookups is the same whichever holding was updated. Test:
+3. (walk) Every rate request the app makes omits `symbol`, so the
+   pattern of lookups is the same whichever holding was updated. Test:
    `tests/browser/parts/account-detail.mjs`,
    `tests/test_client.py::test_the_client_side_rules_hold`.
-4. (blind) Recording across fifteen holdings in six symbols issues
-   exactly one request to this endpoint, asserted as a count, since every
-   data assertion passes under a per-symbol fan-out. Test:
+4. (blind) (walk) Recording across fifteen holdings in six symbols
+   issues exactly one request to this endpoint, asserted as a count,
+   since every data assertion passes under a per-symbol fan-out. Test:
    `tests/test_client.py::test_the_client_side_rules_hold`.
 5. (blind) The accepted parameter set is exactly `{symbol, date,
    quote}`, with `symbol` the only optional one, and any other parameter
    is a Bad Request. Asserted by enumerating the set, because a handler
    that ignores extra parameters passes every functional test. Test:
    `tests/test_rates.py::test_the_accepted_parameter_set_is_exactly_symbol_date_and_quote`.
-6. A proposal for a date with nothing published shows the earlier day
-   it is for, never the recording date. Test:
+6. (walk) A proposal for a date with nothing published shows the earlier
+   day it is for, never the recording date. Test:
    `tests/browser/parts/update-values.mjs`,
    `tests/browser/parts/update-values-review-prior-close.mjs`.
-7. With NBP publishing nothing for a requested Saturday, the proposal
-   carries the preceding published day as `asOf`, and with nothing in
-   the whole 14-day window the answer is No Content. A currency takes
-   Frankfurter's prior close however far back it lies. Test:
+7. (walk) With NBP publishing nothing for a requested Saturday, the
+   proposal carries the preceding published day as `asOf`, and with
+   nothing in the whole 14-day window the answer is No Content. A
+   currency takes Frankfurter's prior close however far back it lies.
+   Test:
    `tests/test_rates.py::test_the_nbp_range_query_takes_the_last_published_day_on_or_before`,
    `tests/test_rates.py::test_nothing_published_in_the_window_is_no_content`,
    `tests/test_review_rate_lookup.py::test_a_saturday_takes_fridays_close_for_every_class`,
@@ -714,30 +716,31 @@ host's network are reachable.
    `tests/test_review_rate_lookup.py::test_gold_asks_nbp_for_the_14_days_up_to_the_date`,
    `tests/test_review_rate_lookup.py::test_gold_asks_nbp_for_the_window_solvent_rates_exposes`,
    `tests/test_review_rate_lookup.py::test_an_empty_gold_range_quoted_in_pln_is_no_content`.
-8. `XAU-g` and `XAU-ozt` for the same date and quote differ by exactly
-   31.1034768, to the precision returned. Test:
+8. (walk) `XAU-g` and `XAU-ozt` for the same date and quote differ by
+   exactly 31.1034768, to the precision returned. Test:
    `tests/test_rates.py::test_gold_in_grams_and_troy_ounces_differ_by_exactly_the_conversion`.
-9. A unit with no price source reads as one ("No market price for
-   Silver, troy ounce yet", "Nobody publishes a price for m2"), and reads as normal,
-   not broken. Test: `tests/browser/parts/update-values.mjs`.
-10. A date before a source's prices begin reads as that, and an outage
-    reads as an outage, each worded differently from the other and from
-    a unit with no source. Test: no test.
-11. A request for a supported symbol and past date returns a rate, and a
-    repeat returns `"cached": true` with no second outbound request, so
-    asking twice costs once whoever asks. Test:
+9. (walk) A unit with no price source reads as one ("No market price for
+   Silver, troy ounce yet", "Nobody publishes a price for m2"), and
+   reads as normal, not broken. Test:
+   `tests/browser/parts/update-values.mjs`.
+10. (walk) A date before a source's prices begin reads as that, and an
+    outage reads as an outage, each worded differently from the other
+    and from a unit with no source. Test: no test.
+11. (walk) A request for a supported symbol and past date returns a
+    rate, and a repeat returns `"cached": true` with no second outbound
+    request, so asking twice costs once whoever asks. Test:
     `tests/test_rates.py::test_a_supported_symbol_resolves_and_then_serves_from_cache`.
-12. A request omitting `symbol` returns every symbol the proxy can price
-    for that date and quote, with `lookup: false` symbols absent from the
-    map, never null, and costs at most one outbound request more than the
-    gold path alone. Test:
+12. (walk) A request omitting `symbol` returns every symbol the proxy
+    can price for that date and quote, with `lookup: false` symbols
+    absent from the map, never null, and costs at most one outbound
+    request more than the gold path alone. Test:
     `tests/test_rates.py::test_a_whole_table_request_omits_symbols_the_proxy_cannot_price`.
 13. (blind) A whole-table request followed by a single-symbol request for
     a symbol in it makes no second outbound request. Test:
     `tests/test_rates.py::test_the_whole_table_and_a_single_symbol_share_one_cache`,
     `tests/test_review_rate_lookup.py::test_the_whole_table_and_a_single_symbol_share_one_unsettled_entry`.
-14. An entry fetched under an hour ago is served from cache whatever its
-    date. Test:
+14. (walk) An entry fetched under an hour ago is served from cache
+    whatever its date. Test:
     `tests/test_rates.py::test_a_price_fetched_under_an_hour_ago_is_served_from_cache_whatever_its_date`,
     `tests/test_review_rate_lookup.py::test_a_price_looked_up_under_an_hour_ago_is_served_from_cache_whatever_its_date`,
     `tests/test_review_rate_lookup.py::test_a_price_looked_up_before_d_plus_2_is_looked_up_again_after_an_hour`.
@@ -799,33 +802,33 @@ host's network are reachable.
     asserted per provider with a stubbed clock. Test:
     `tests/test_rates.py::test_each_provider_is_asked_again_after_its_own_cooloff`,
     `tests/test_rates.py::test_the_circuit_breaker_opens_and_closes`.
-26. (blind) With Frankfurter failing and NBP answering, PLN-quoted
-    whole-table requests, each for a different date, still send their NBP
-    request and return the gold symbols, Frankfurter's breaker opens
-    after the configured Frankfurter failures, and no Frankfurter request
-    goes out within the cool-off. Test:
+26. (blind) (walk) With Frankfurter failing and NBP answering,
+    PLN-quoted whole-table requests, each for a different date, still
+    send their NBP request and return the gold symbols, Frankfurter's
+    breaker opens after the configured Frankfurter failures, and no
+    Frankfurter request goes out within the cool-off. Test:
     `tests/test_rates.py::test_frankfurter_failing_opens_its_breaker_while_nbp_keeps_answering`.
-27. (blind) NBP successes interleaved with Frankfurter failures do not
-    reset Frankfurter's count: its breaker opens on exactly the configured
-    Frankfurter failure. Test:
+27. (blind) (walk) NBP successes interleaved with Frankfurter failures
+    do not reset Frankfurter's count: its breaker opens on exactly the
+    configured Frankfurter failure. Test:
     `tests/test_rates.py::test_frankfurter_failing_opens_its_breaker_while_nbp_keeps_answering`.
-28. (blind) With NBP failing past the configured count, whole-table
-    requests, each for a different date, still send their Frankfurter
-    request and return the currency rates, with only the gold symbols
-    absent. Test:
+28. (blind) (walk) With NBP failing past the configured count,
+    whole-table requests, each for a different date, still send their
+    Frankfurter request and return the currency rates, with only the
+    gold symbols absent. Test:
     `tests/test_rates.py::test_nbp_failing_past_the_count_stops_only_the_gold_symbols`.
-29. (blind) A failing FX leg of a gold request counts against
+29. (blind) (walk) A failing FX leg of a gold request counts against
     Frankfurter's breaker and not NBP's, asserted by how many requests
     each provider then receives. Test:
     `tests/test_rates.py::test_a_failing_fx_leg_of_gold_counts_against_frankfurter_not_nbp`.
-30. An unauthenticated request returns Unauthorized and makes no
+30. (walk) An unauthenticated request returns Unauthorized and makes no
     outbound request. Test:
     `tests/test_rates.py::test_an_unauthenticated_request_makes_no_outbound_request`.
-31. Every `/api/admin/symbols` route returns Not Found to a vault owner
-    session. Test:
+31. (walk) Every `/api/admin/symbols` route returns Not Found to a vault
+    owner session. Test:
     `tests/test_admin.py::test_a_vault_owner_gets_not_found_from_every_admin_route`.
-32. `GET /api/rates/symbols` returns Not Found to an administrator
-    session. Test:
+32. (walk) `GET /api/rates/symbols` returns Not Found to an
+    administrator session. Test:
     `tests/test_rates.py::test_the_symbol_table_answers_an_administrator_not_found`.
 33. `PATCH /api/admin/symbols/<symbol>` carrying a new `symbol` or a new
     `kind` is a Bad Request and changes nothing. Test:
@@ -833,7 +836,7 @@ host's network are reachable.
 34. (blind) No route deletes a symbol, asserted by enumerating the
     registered routes, not by probing a guessed path. Test:
     `tests/test_rates.py::test_symbol_and_kind_are_immutable_and_there_is_no_delete`.
-35. Retiring a symbol leaves its row in `GET /api/rates/symbols`
+35. (walk) Retiring a symbol leaves its row in `GET /api/rates/symbols`
     unchanged but for `retired: true`, and both forms of `/api/rates`
     still price it. Unretiring restores the row exactly. Test:
     `tests/test_rates.py::test_retiring_flags_a_symbol_and_leaves_its_row_and_pricing_alone`,
@@ -857,7 +860,7 @@ host's network are reachable.
     count, list or other indication of which holdings use a symbol,
     asserted against the full response shape. Test:
     `tests/test_rates.py::test_no_admin_symbol_response_counts_which_holdings_use_one`.
-40. A currency an administrator adds that no source serves is not
+40. (walk) A currency an administrator adds that no source serves is not
     offered in the next registration's main-currency picker. Test:
     `tests/test_rates.py::test_a_currency_no_source_serves_is_not_offered_at_registration`,
     `tests/test_review_rate_lookup.py::test_a_currency_no_source_serves_is_not_offered_at_registration`,
@@ -866,11 +869,11 @@ host's network are reachable.
     provider API key, checked against real output even though no
     provider has a key. Test:
     `tests/test_review_rate_lookup.py::test_no_output_of_a_lookup_carries_a_provider_key`.
-42. (blind) Exceeding the per-user rate limit returns Too Many Requests
-    and writes no `attempts` row, so the limit lifts an hour after the
-    oldest lookup it let through however often the client retried,
-    asserted by retrying while over it and comparing the table row for
-    row. Test:
+42. (blind) (walk) Exceeding the per-user rate limit returns Too Many
+    Requests and writes no `attempts` row, so the limit lifts an hour
+    after the oldest lookup it let through however often the client
+    retried, asserted by retrying while over it and comparing the table
+    row for row. Test:
     `tests/test_rates.py::test_exceeding_the_per_user_limit_is_too_many_requests`,
     `tests/test_rates.py::test_a_refused_lookup_writes_no_row_and_the_limit_lifts_an_hour_after_the_oldest`.
 43. A future date is a Bad Request. Test:
@@ -881,11 +884,11 @@ host's network are reachable.
     getting no Bad Request, `lookup: false` symbols included and
     answering No Content. Test:
     `tests/test_rates.py::test_every_symbol_the_table_offers_is_accepted_by_the_rate_endpoint`.
-45. `GET /api/rates/symbols` requires a session and makes no outbound
-    request. Test:
+45. (walk) `GET /api/rates/symbols` requires a session and makes no
+    outbound request. Test:
     `tests/test_rates.py::test_the_symbol_table_requires_a_session_and_makes_no_outbound_request`.
-46. The table holds all eight seeded metal symbols, with `lookup: true`
-    on exactly `XAU-ozt` and `XAU-g`. Test:
+46. (walk) The table holds all eight seeded metal symbols, with
+    `lookup: true` on exactly `XAU-ozt` and `XAU-g`. Test:
     `tests/test_rates.py::test_the_seeded_table_holds_all_eight_metals_with_lookup_on_gold_alone`.
 47. (blind) A gold request with a non-PLN quote, both sources
     publishing on NBP's last day, makes exactly two outbound requests,
@@ -893,9 +896,9 @@ host's network are reachable.
     date, asserted against a stub returning a different rate for each. Test:
     `tests/test_rates.py::test_gold_converts_through_fx_at_the_as_of_date_not_the_requested_one`,
     `tests/test_review_rate_lookup.py::test_gold_quoted_elsewhere_takes_both_halves_from_nbps_last_day`.
-48. With the FX leg failing, the response is No Content and no rate
-    carrying a PLN figure under another currency's label is returned.
-    Test:
+48. (walk) With the FX leg failing, the response is No Content and no
+    rate carrying a PLN figure under another currency's label is
+    returned. Test:
     `tests/test_rates.py::test_a_failed_fx_leg_never_returns_a_pln_figure_under_another_label`.
 49. (blind) Each class has its floor on both sides: a currency on
     1998-12-31 is a Bad Request that reaches no provider and on
@@ -904,10 +907,10 @@ host's network are reachable.
     Test:
     `tests/test_rates.py::test_each_class_has_its_own_floor_on_both_sides`,
     `tests/test_rates.py::test_a_gold_date_before_the_floor_is_a_bad_request`.
-50. `GET /api/rates/symbols` carries `since` on every row: `1999-01-04`
-    for `USD`, `2000-01-13` for `BRL`, `2013-01-02` for `XAU-g` and
-    `XAU-ozt`, `null` for `XAG-ozt`. A currency whose `lookup` an
-    administrator turned off keeps its date. Test:
+50. (walk) `GET /api/rates/symbols` carries `since` on every row:
+    `1999-01-04` for `USD`, `2000-01-13` for `BRL`, `2013-01-02` for
+    `XAU-g` and `XAU-ozt`, `null` for `XAG-ozt`. A currency whose
+    `lookup` an administrator turned off keeps its date. Test:
     `tests/test_rates.py::test_the_symbol_table_carries_each_symbols_since`.
 51. (blind) For every row but `EUR` with a `since`, a single-symbol
     request quoted in `EUR` dated the day before is a Bad Request with no
@@ -920,14 +923,14 @@ host's network are reachable.
     `lookup` off answers Bad Request before its floor, because the floor
     follows the adapter and not the flag. Test:
     `tests/test_rates.py::test_a_symbol_with_no_adapter_answers_no_content_at_any_date`.
-53. (blind) A whole-table request dated 2012-12-31 quoted in `CHF` sends
-    Frankfurter's request and no NBP request, and returns the currencies
-    with both gold symbols absent. Test:
+53. (blind) (walk) A whole-table request dated 2012-12-31 quoted in
+    `CHF` sends Frankfurter's request and no NBP request, and returns
+    the currencies with both gold symbols absent. Test:
     `tests/test_rates.py::test_the_whole_table_before_gold_asks_no_gold_source`.
-54. (blind) A whole-table request dated 1999-06-30 quoted in `CHF`
-    returns `USD` with `BRL`, `CNY`, `ILS` and `INR` absent. Quoted in
-    `BRL`, it sends no outbound request, answers No Content, and leaves
-    Frankfurter's failure count where it was. Test:
+54. (blind) (walk) A whole-table request dated 1999-06-30 quoted in
+    `CHF` returns `USD` with `BRL`, `CNY`, `ILS` and `INR` absent.
+    Quoted in `BRL`, it sends no outbound request, answers No Content,
+    and leaves Frankfurter's failure count where it was. Test:
     `tests/test_rates.py::test_the_whole_table_leaves_out_currencies_not_yet_published`,
     `tests/test_rates.py::test_a_quote_before_its_own_start_asks_nothing_and_spares_the_breaker`.
 55. `symbol=CHF&quote=CHF` returns `rate: "1"` with no outbound request.
@@ -991,11 +994,12 @@ host's network are reachable.
     replaced. Test:
     `tests/test_rates.py::test_a_cached_rate_with_an_unusable_date_is_fetched_again`,
     `tests/test_review_rate_lookup.py::test_a_cached_gold_rate_dated_before_its_window_is_fetched_again`.
-66. (blind) A failed fetch logs exactly `rates.provider source=<source>
-    status=<status>`, with the status for an answer that was not 200,
-    `shape` for a changed shape, and `timeout`, `tls`, `network`, `body`
-    or `other` for each other failure, and no date, quote, provider
-    host, error text or anything of the answer's body. Test:
+66. (blind) (walk) A failed fetch logs exactly
+    `rates.provider source=<source> status=<status>`, with the status
+    for an answer that was not 200, `shape` for a changed shape, and
+    `timeout`, `tls`, `network`, `body` or `other` for each other
+    failure, and no date, quote, provider host, error text or anything
+    of the answer's body. Test:
     `tests/test_rates.py::test_a_failed_fetch_logs_its_source_and_status_and_nothing_of_the_request`,
     `tests/test_review_rate_lookup.py::test_a_failed_answer_logs_its_source_and_status_alone`,
     `tests/test_review_rate_lookup.py::test_a_changed_shape_logs_shape_and_counts_against_its_breaker_alone`.
@@ -1041,8 +1045,9 @@ host's network are reachable.
     `tests/test_rates.py::test_gold_with_no_day_both_sources_published_is_no_content`,
     `tests/test_review_rate_lookup.py::test_gold_with_no_day_both_published_in_the_window_is_no_proposal`,
     `tests/test_review_rate_lookup.py::test_a_frankfurter_day_before_nbps_window_is_no_proposal`.
-73. A currency row with no adapter reads `lookup: false` and `since:
-    null` on both symbol routes, even when stored with `lookup` on. Test:
+73. (walk) A currency row with no adapter reads `lookup: false` and
+    `since: null` on both symbol routes, even when stored with `lookup`
+    on. Test:
     `tests/test_rates.py::test_a_currency_no_source_serves_reads_lookup_false_with_no_since`,
     `tests/test_review_rate_lookup.py::test_a_currency_no_source_serves_reads_lookup_false_with_no_since_on_both_routes`.
 74. (blind) Quoted in a currency with no adapter, the whole table and
@@ -1074,13 +1079,13 @@ host's network are reachable.
 79. No proposal has more than twelve decimal places or ten significant
     digits, asserted from a rate of 7e-12 to one of 10^7. Test:
     `tests/test_rates.py::test_no_proposal_has_more_than_twelve_places_or_ten_significant_digits`.
-80. A holding measured in a retired unit reads the unit by its label on
-    the dashboard and on Update values, and still gets a market rate
-    where its unit has a price source. Test:
+80. (walk) A holding measured in a retired unit reads the unit by its
+    label on the dashboard and on Update values, and still gets a market
+    rate where its unit has a price source. Test:
     `tests/browser/parts/update-values-retired.mjs`,
     `tests/browser/parts/update-values-review-retired.mjs`.
-81. `POST` adding a metal whose code does not end in `-ozt` or `-g`, or
-    any code with a trailing newline, is a Bad Request and adds
+81. (walk) `POST` adding a metal whose code does not end in `-ozt` or
+    `-g`, or any code with a trailing newline, is a Bad Request and adds
     nothing. A currency needs no weight. Test:
     `tests/test_rates.py::test_a_metal_names_its_weight`,
     `tests/test_review_rate_lookup.py::test_adding_a_metal_that_names_no_weight_is_refused_and_adds_nothing`,

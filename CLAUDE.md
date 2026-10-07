@@ -69,11 +69,13 @@ when, is in the issues and the history.
     checkable statement followed by the test that asserts it, or "no
     test". An item a passing test could fake is marked "(blind)", so a
     reviewer writes their own test for it rather than trusting the one
-    beside it.
+    beside it. An item a person can check in the running app, with what
+    nightly QA has (`.claude/agents/qa.md`), is marked "(walk)". The
+    others are the test suite's alone.
 
   A feature the client cannot see has no What the client gets: the
   record store, the record of prices and the nightly harness. Nightly QA
-  walks every page that has one. The nightly harness is pipeline
+  walks the "(walk)" criteria of every page that has one. The nightly harness is pipeline
   tooling, never in the image (The loop, Nightly and stable). A feature
   with no screen of its own can still be one the client sees: the app
   shell's chrome is where "looks like a private bank" is cashed out.
@@ -416,7 +418,7 @@ found.
   against its provenance and reused.
 - **Nightly.** Every night that code on `master` changed since the last
   nightly, `.github/workflows/nightly.yml` builds, walks, files and
-  publishes. `qa` walks the acceptance list of each feature whose page
+  publishes. `qa` walks the "(walk)" criteria of each feature whose page
   changed since the last nightly's commit, each one a changed file of
   the image or the harness names by its page's path, and the one walked
   longest ago. What each walk covered is read from the last nightly's

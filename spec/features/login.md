@@ -554,28 +554,28 @@ password change and an upgrade keep the DEK, so they leave it alone.
 
 ## Acceptance criteria
 
-1. A valid vault owner username and password sign in, and the client
-   holds a working DEK proven by decrypting the profile record, so the
-   real figures appear. Test:
+1. (walk) A valid vault owner username and password sign in, and the
+   client holds a working DEK proven by decrypting the profile record,
+   so the real figures appear. Test:
    `tests/test_auth.py::test_a_vault_owner_login_returns_the_one_wrapper_and_the_kind`,
    `tests/browser/parts/unlock.mjs`.
-2. A valid administrator username and password sign in, the response
-   carries `kind: administrator` and no `wrappedDek`, `dekNonce` or
-   `vaultEpoch`, and the session lands in the admin area with nothing
-   decrypted and no dashboard. Test:
+2. (walk) A valid administrator username and password sign in, the
+   response carries `kind: administrator` and no `wrappedDek`,
+   `dekNonce` or `vaultEpoch`, and the session lands in the admin area
+   with nothing decrypted and no dashboard. Test:
    `tests/test_auth.py::test_an_administrator_login_carries_no_wrapper`,
    `tests/browser/parts/unlock.mjs`.
-3. A vault owner's username and password never reach the admin area,
-   however submitted. Test:
+3. (walk) A vault owner's username and password never reach the admin
+   area, however submitted. Test:
    `tests/test_admin.py::test_a_vault_owner_gets_not_found_from_every_admin_route`.
 4. A vault owner's login response carries `vaultEpoch` equal to the
    account's `vault_epochs` row, and after an import the next sign-in's
    equals the epoch the import returned. Test:
    `tests/test_vault_epoch.py::test_a_vault_owner_login_carries_the_epoch_and_an_administrators_none`,
    `tests/test_vault_epoch.py::test_the_next_sign_in_after_an_import_carries_the_new_epoch`.
-5. The login body carries the Auth Key and nothing derived from the
-   Master Key, and the password appears in no request on any attempt.
-   Test: no test.
+5. (walk) The login body carries the Auth Key and nothing derived from
+   the Master Key, and the password appears in no request on any
+   attempt. Test: no test.
 6. The session cookie carries no key material and is `HttpOnly`,
    `Secure`, `SameSite=Lax`. Test:
    `tests/test_auth.py::test_a_login_cookie_carries_its_flags_and_no_key_material`.
@@ -585,10 +585,10 @@ password change and an upgrade keep the DEK, so they leave it alone.
    and timing, so an added field fails it. Test:
    `tests/test_auth.py::test_the_salt_response_is_identically_shaped_for_both_kinds_and_a_stranger`,
    `tests/test_timing.py::test_the_salt_takes_the_same_time_for_either_kind_and_a_stranger`.
-8. The decoy salt for a username is stable across calls. Test:
+8. (walk) The decoy salt for a username is stable across calls. Test:
    `tests/test_auth.py::test_the_decoy_salt_for_a_username_is_stable_across_calls`.
-9. No `/api/auth/salt` response names, implies or permits deriving the
-   kind, asserted against the full response shape. Test:
+9. (walk) No `/api/auth/salt` response names, implies or permits
+   deriving the kind, asserted against the full response shape. Test:
    `tests/test_auth.py::test_no_field_of_the_salt_response_names_or_implies_a_kind`.
 10. `/api/auth/login` with a wrong Auth Key against an administrator, a
     vault owner and an unknown username gives byte-identical responses
@@ -611,17 +611,19 @@ password change and an upgrade keep the DEK, so they leave it alone.
     over the HKDF Auth Key, not the raw Argon2id output, shown by
     deriving both and checking which verifies. Test:
     `tests/test_browser.py::test_the_workflows_hold_in_a_browser`.
-15. A wrong password and an unknown username produce the same message on
-    the card, for either kind. Test: `tests/browser/parts/unlock.mjs`.
+15. (walk) A wrong password and an unknown username produce the same
+    message on the card, for either kind. Test:
+    `tests/browser/parts/unlock.mjs`.
 16. A correct Auth Key whose DEK unwrap fails is a failed sign-in with
     the same message and no keys held. Test:
     `tests/browser/parts/unlock.mjs`.
-17. A salt lookup or sign-in that gets no answer or a server error, for
-    a vault owner, an administrator and an unknown username, and a vault
-    read that gets a server error after a correct password, each show
-    "That did not go through. Everything you typed is still here, so you
-    can try again." with both fields still filled, and the vault read
-    leaves no keys held. Test: `tests/browser/parts/unlock.mjs`,
+17. (walk) A salt lookup or sign-in that gets no answer or a server
+    error, for a vault owner, an administrator and an unknown username,
+    and a vault read that gets a server error after a correct password,
+    each show "That did not go through. Everything you typed is still
+    here, so you can try again." with both fields still filled, and the
+    vault read leaves no keys held. Test:
+    `tests/browser/parts/unlock.mjs`,
     `tests/browser/parts/unlock-review-unreachable.mjs`.
 18. A vault owner below the default envelope is upgraded at sign-in:
     salt, envelope, Auth Key hash and wrapped DEK change, and the DEK is
@@ -643,8 +645,8 @@ password change and an upgrade keep the DEK, so they leave it alone.
 22. Raising the server's default memory parameter and signing in leaves
     the vault at the new value with every record decryptable. Test:
     `tests/test_auth.py::test_raising_the_server_default_upgrades_an_account_at_the_old_one`.
-23. If `/api/auth/upgrade-kdf` answers Server Error, the caller stays
-    signed in and signs in afterwards on the old parameters. Test:
+23. (walk) If `/api/auth/upgrade-kdf` answers Server Error, the caller
+    stays signed in and signs in afterwards on the old parameters. Test:
     `tests/browser/parts/unlock.mjs`,
     `tests/test_client.py::test_the_client_side_rules_hold`.
 24. `POST /api/auth/upgrade-kdf` from a vault owner carrying the epoch
@@ -674,8 +676,8 @@ password change and an upgrade keep the DEK, so they leave it alone.
 30. (blind) Signing in, then unlocking 11 hours later, leaves a session
     that answers Unauthorized 12 hours after the first sign-in. Test:
     `tests/test_session.py::test_unlocking_does_not_move_issued_at_so_the_expiry_counts_from_sign_in`.
-31. Everybody is signed out 12 hours after signing in, however busy.
-    Test:
+31. (walk) Everybody is signed out 12 hours after signing in, however
+    busy. Test:
     `tests/test_session.py::test_a_session_past_the_absolute_lifetime_is_refused`,
     `tests/test_session.py::test_the_absolute_expiry_binds_an_administrator_the_same_way`.
 32. (blind) A sign-in sets `last_login_at` to the request time, and so
@@ -730,8 +732,8 @@ password change and an upgrade keep the DEK, so they leave it alone.
     give Too Many Requests at 60:01 and 74:00 and a sign-in at 74:01.
     Test:
     `tests/test_attempts.py::test_a_username_lock_runs_its_full_length_on_the_schedule_that_ages_failures_out`.
-42. A lock covers every username from that connection, a name nobody
-    has tried yet included, until it ends. Test:
+42. (walk) A lock covers every username from that connection, a name
+    nobody has tried yet included, until it ends. Test:
     `tests/test_attempts.py::test_an_address_lock_refuses_every_username_and_spares_other_addresses`.
 43. (blind) No plaintext address is stored. After failures from
     `203.0.113.7` and `2001:db8:1:2::5`, no table value, no byte of the
@@ -756,71 +758,72 @@ password change and an upgrade keep the DEK, so they leave it alone.
     `tests/test_attempts.py::test_without_trusted_proxies_a_forwarded_header_changes_nothing_and_is_logged_once`,
     `tests/test_attempts.py::test_with_one_trusted_proxy_the_last_forwarded_entry_is_the_client`,
     `tests/test_review_login.py::test_forwarded_headers_arriving_together_log_the_ignored_notice_once`.
-48. (blind) Tripping a lock logs exactly one `auth.lockout` line and the
-    requests it refuses none. The address line has no address and no
-    address key. A username with a newline and a quote logs as one line
-    holding its JSON string. Test:
+48. (blind) (walk) Tripping a lock logs exactly one `auth.lockout` line
+    and the requests it refuses none. The address line has no address
+    and no address key. A username with a newline and a quote logs as
+    one line holding its JSON string. Test:
     `tests/test_attempts.py::test_a_lock_logs_one_line_when_it_trips_and_the_requests_it_refuses_none`,
     `tests/test_attempts.py::test_an_address_lock_logs_one_line_with_no_address`.
-49. The card shows "Too many attempts. Try again in a few minutes." past
-    the limit. Test: `tests/browser/parts/unlock.mjs`.
+49. (walk) The card shows "Too many attempts. Try again in a few
+    minutes." past the limit. Test: `tests/browser/parts/unlock.mjs`.
 50. A vault opens on a phone and a tablet in a little under two seconds,
     showing the working state and staying responsive to touch
     throughout. Test: no test.
-51. The card shows "Deriving your key" and goes quiet while the key is
-    derived. Test: `tests/browser/parts/unlock.mjs`.
+51. (walk) The card shows "Deriving your key" and goes quiet while the
+    key is derived. Test: `tests/browser/parts/unlock.mjs`.
 52. A browser that cannot run the encryption gets a hard stop with no
     fallback. Not enough memory offers Try again, which derives again.
     Test: `tests/browser/parts/unlock.mjs`.
-53. (blind) After the idle period, reading vault data prompts for
+53. (blind) (walk) After the idle period, reading vault data prompts for
     re-unlock, the keys are gone, and no decrypted holding name, value
     or snapshot is reachable, asserted against the in-memory model, not
     only the key handles. Unsaved form input is the one thing left.
     Test: `tests/browser/parts/unlock-idle.mjs`.
-54. (blind) Re-unlocking after a lock refetches and re-decrypts the
-    vault rather than restoring a model kept across the lock. Test:
+54. (blind) (walk) Re-unlocking after a lock refetches and re-decrypts
+    the vault rather than restoring a model kept across the lock. Test:
     `tests/browser/parts/unlock-idle.mjs`.
-55. What was typed in an open form is there after unlocking, and the
-    person returns to the view the lock found. Test:
+55. (walk) What was typed in an open form is there after unlocking, and
+    the person returns to the view the lock found. Test:
     `tests/browser/parts/unlock-idle.mjs`.
-56. A dialog to fill in or choose something comes back after unlocking
-    with what was typed or chosen in it, destructive or not, a
+56. (walk) A dialog to fill in or choose something comes back after
+    unlocking with what was typed or chosen in it, destructive or not, a
     yes-or-no confirmation does not, and no password field is refilled.
     The Archive or delete dialog comes back with Delete permanently
     chosen and the typed name, its confirm enabled only by the whole
     name. Test: `tests/browser/parts/unlock-lock.mjs`,
     `tests/browser/parts/unlock-idle.mjs`,
     `tests/browser/parts/unlock-review-dialogs.mjs`.
-57. Lock locks at once with no confirmation, keeps the server session,
-    and unlocking needs only the password. Test:
+57. (walk) Lock locks at once with no confirmation, keeps the server
+    session, and unlocking needs only the password. Test:
     `tests/browser/parts/unlock.mjs`.
-58. A refresh asks for the password again. Test:
+58. (walk) A refresh asks for the password again. Test:
     `tests/browser/parts/unlock.mjs`.
-59. (blind) No key material is written to `localStorage` or
+59. (blind) (walk) No key material is written to `localStorage` or
     `sessionStorage` at any step, upgrade, lock, unlock and restore
     included. Test: `tests/browser/parts/unlock.mjs`.
-60. (blind) No vault epoch is written to `localStorage` or
+60. (blind) (walk) No vault epoch is written to `localStorage` or
     `sessionStorage` at any step. An epoch kept in storage to survive a
     lock passes every functional test. Test: no test.
-61. A signed-in vault owner at the sign-in address goes to the dashboard
-    and is asked only for the password. A signed-in administrator goes to
-    the admin area. Test:
+61. (walk) A signed-in vault owner at the sign-in address goes to the
+    dashboard and is asked only for the password. A signed-in
+    administrator goes to the admin area. Test:
     `tests/test_auth.py::test_an_already_authenticated_caller_at_login_is_sent_to_the_root`,
     `tests/browser/parts/unlock.mjs`.
-62. A session that ran out mid-action shows the card with the username
-    known, and signing in returns to the form with what was typed. Test:
+62. (walk) A session that ran out mid-action shows the card with the
+    username known, and signing in returns to the form with what was
+    typed. Test:
     `tests/browser/parts/unlock.mjs`.
-63. (blind) Two pages, one browser. Pages A and B are unlocked on one
-    vault and B has a holding form open with a name typed. A restores a
-    file. Before B sends any request, B holds no key, no decrypted name
-    or figure and no typed name, every dialog is closed, and its card is
-    in Replaced elsewhere for dropped input. A stays open on the
-    restored vault. Unlocking B opens the dashboard with the restored
-    figures, no notice and no unreadable record. Test:
+63. (blind) (walk) Two pages, one browser. Pages A and B are unlocked on
+    one vault and B has a holding form open with a name typed. A
+    restores a file. Before B sends any request, B holds no key, no
+    decrypted name or figure and no typed name, every dialog is closed,
+    and its card is in Replaced elsewhere for dropped input. A stays
+    open on the restored vault. Unlocking B opens the dashboard with the
+    restored figures, no notice and no unreadable record. Test:
     `tests/browser/parts/export-import.mjs`.
-64. (blind) The same with B showing only the dashboard and nothing kept
-    puts B's card in the wording for nothing dropped. A kept dialog with
-    nothing typed counts as dropped. Test:
+64. (blind) (walk) The same with B showing only the dashboard and
+    nothing kept puts B's card in the wording for nothing dropped. A
+    kept dialog with nothing typed counts as dropped. Test:
     `tests/browser/parts/export-import.mjs`,
     `tests/browser/parts/unlock-replaced.mjs`.
 65. (blind) With B's channel stubbed so no message arrives, B's save
@@ -830,29 +833,30 @@ password change and an upgrade keep the DEK, so they leave it alone.
     form's version reload. Test:
     `tests/browser/parts/export-import.mjs`,
     `tests/test_client.py::test_the_client_side_rules_hold`.
-66. (blind) A page in a second browser context, with its own session,
-    stays drawn and sends nothing while hidden during a restore. Made
-    visible, it sends one `GET /api/records?type=profile` and nothing
-    else and shows Replaced elsewhere. Its session row still exists.
-    Test: `tests/browser/parts/export-import.mjs`.
-67. (blind) A page idle-locked in a second context through a restore
-    shows, on unlocking, the Replaced since last open notice: for
-    dropped input with a form's input held, the same with a kept dialog
-    and nothing typed, and for nothing dropped with nothing kept. In
-    each case it posted `{"replaced":"<the epoch it held>"}`. Test:
+66. (blind) (walk) A page in a second browser context, with its own
+    session, stays drawn and sends nothing while hidden during a
+    restore. Made visible, it sends one `GET /api/records?type=profile`
+    and nothing else and shows Replaced elsewhere. Its session row still
+    exists. Test: `tests/browser/parts/export-import.mjs`.
+67. (blind) (walk) A page idle-locked in a second context through a
+    restore shows, on unlocking, the Replaced since last open notice:
+    for dropped input with a form's input held, the same with a kept
+    dialog and nothing typed, and for nothing dropped with nothing kept.
+    In each case it posted `{"replaced":"<the epoch it held>"}`. Test:
     `tests/browser/parts/export-import.mjs`.
-68. (blind) A page in a second context holding typed input when the
-    first logs out everywhere, signs in and restores: its next request
-    answers Unauthorized and the card shows the session-ran-out state
-    with the input held. Signing in drops the input, opens the dashboard
-    and shows Replaced since last open for dropped input. With no restore
-    in between, signing in returns to the view with the input and no
-    notice. Test: `tests/browser/parts/export-import.mjs`,
+68. (blind) (walk) A page in a second context holding typed input when
+    the first logs out everywhere, signs in and restores: its next
+    request answers Unauthorized and the card shows the session-ran-out
+    state with the input held. Signing in drops the input, opens the
+    dashboard and shows Replaced since last open for dropped input. With
+    no restore in between, signing in returns to the view with the input
+    and no notice. Test: `tests/browser/parts/export-import.mjs`,
     `tests/browser/parts/unlock.mjs`.
-69. (blind) Signing out and in again after a restore shows no Replaced
-    since last open notice. Test: `tests/browser/parts/export-import.mjs`.
-70. (blind) Reloading and signing in again after a restore shows no
-    Replaced since last open notice. Test: no test.
+69. (blind) (walk) Signing out and in again after a restore shows no
+    Replaced since last open notice. Test:
+    `tests/browser/parts/export-import.mjs`.
+70. (blind) (walk) Reloading and signing in again after a restore shows
+    no Replaced since last open notice. Test: no test.
 71. (blind) A page ignores a channel message naming an epoch it does not
     hold, a message of any other shape, and every message while it holds
     no epoch. Every message a page posts has `replaced` as its only key,
@@ -862,7 +866,7 @@ password change and an upgrade keep the DEK, so they leave it alone.
 72. (blind) A page that learned by Conflict or at sign-in posts the
     epoch it held, and a page that learned by message posts nothing.
     Test: `tests/test_client.py::test_the_client_side_rules_hold`.
-73. Unlocking again, the card holds one hidden text field with
+73. (walk) Unlocking again, the card holds one hidden text field with
     `autocomplete="username"` and the known username, before the
     password field, and no username field a person can type in. With
     another name written into it, unlocking still signs in as the known
@@ -895,8 +899,8 @@ password change and an upgrade keep the DEK, so they leave it alone.
 83. The stale-KDF upgrade carries the salt the sign-in derived from.
     Test: `tests/test_client.py::test_the_client_side_rules_hold`,
     `tests/browser/parts/unlock.mjs`.
-84. (blind) A restore refused for a credential changed elsewhere locks
-    the page, draws the Unlock card with the Password changed elsewhere
-    callout, writes no vault row, and unlocking with the current
-    password returns to the export and import screen without the
+84. (blind) (walk) A restore refused for a credential changed elsewhere
+    locks the page, draws the Unlock card with the Password changed
+    elsewhere callout, writes no vault row, and unlocking with the
+    current password returns to the export and import screen without the
     callout. Test: `tests/browser/parts/export-import.mjs`.

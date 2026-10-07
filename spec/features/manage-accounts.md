@@ -673,25 +673,25 @@ Unarchiving and archiving it again writes the zero at the new D.
 2. The name, unit, note and dimension assignments appear nowhere in
    plaintext in the database. Test:
    `tests/browser/parts/account-form.mjs`.
-3. A holding reads back with the same name, note and filing after a
-   fresh unlock. Test: `tests/browser/parts/account-form.mjs`.
-4. Two holdings can share a name and both work. Test:
+3. (walk) A holding reads back with the same name, note and filing after
+   a fresh unlock. Test: `tests/browser/parts/account-form.mjs`.
+4. (walk) Two holdings can share a name and both work. Test:
    `tests/browser/parts/account-form.mjs`.
-5. A free-text unit is stored as typed, case kept, and the holding
-   works normally. Test: `tests/browser/parts/account-form.mjs`.
-6. No rate-lookup request names any symbol, free text or listed.
+5. (walk) A free-text unit is stored as typed, case kept, and the
+   holding works normally. Test: `tests/browser/parts/account-form.mjs`.
+6. (walk) No rate-lookup request names any symbol, free text or listed.
    Recording across holdings in several symbols issues one whole-table
    request for the recording date (`rate-lookup.md`, The client never
    names a symbol). Test: `tests/browser/parts/account-detail.mjs`.
-7. A holding in the main currency is never asked a conversion rate.
-   Test: `tests/browser/parts/update-values.mjs`.
+7. (walk) A holding in the main currency is never asked a conversion
+   rate. Test: `tests/browser/parts/update-values.mjs`.
 8. Editing name, note or a dimension assignment increments `version`
    and writes a different nonce. Test:
    `tests/browser/parts/account-form.mjs`.
-9. (blind) A `PUT` with a stale `version` is Conflict with no `refused`
-   member and leaves the stored record unchanged. The form says so,
-   reloads and the redone edit saves. Only this Conflict runs the
-   reload-and-redo, never `vault-replaced`. Test:
+9. (blind) (walk) A `PUT` with a stale `version` is Conflict with no
+   `refused` member and leaves the stored record unchanged. The form
+   says so, reloads and the redone edit saves. Only this Conflict runs
+   the reload-and-redo, never `vault-replaced`. Test:
    `tests/test_records.py::test_only_stored_version_plus_one_is_accepted`,
    `tests/browser/parts/account-form.mjs`.
 10. Re-saving a holding with another value for a dimension leaves
@@ -700,41 +700,42 @@ Unarchiving and archiving it again writes the zero at the new D.
 11. (blind) No `account` record has a rate-symbol field, asserted
     against the record shape rather than values. Test:
     `tests/browser/parts/account-form.mjs`.
-12. (blind) Changing the unit of a holding with a snapshot is refused by
-    the UI, which says why. The test asserts the UI, never an API
-    rejection, because the server cannot see the unit. Test:
+12. (blind) (walk) Changing the unit of a holding with a snapshot is
+    refused by the UI, which says why. The test asserts the UI, never an
+    API rejection, because the server cannot see the unit. Test:
     `tests/browser/parts/account-form.mjs`.
 13. The dimension list is derived client-side from the decrypted
     profile, and no request returns dimensions, labels or values. Test:
     `tests/browser/parts/account-detail.mjs`.
-14. (blind) Renaming a dimension or value label writes exactly one
-    record, the profile, and leaves every `account` record
+14. (blind) (walk) Renaming a dimension or value label writes exactly
+    one record, the profile, and leaves every `account` record
     byte-identical, compared row by row. Test:
     `tests/browser/parts/account-form.mjs`.
-15. A holding not filed under a dimension shows as "Unassigned", as a
-    normal state. Test:
+15. (walk) A holding not filed under a dimension shows as "Unassigned",
+    as a normal state. Test:
     `tests/test_client.py::test_the_client_side_rules_hold`.
-16. (blind) A holding whose `dims` names an archived dimension or value
-    renders as "Unassigned", and restoring it restores the assignment,
-    with no `account` record written either way. Test:
+16. (blind) (walk) A holding whose `dims` names an archived dimension or
+    value renders as "Unassigned", and restoring it restores the
+    assignment, with no `account` record written either way. Test:
     `tests/browser/parts/account-form.mjs`.
-17. (blind) A name, note or dimension label containing
+17. (blind) (walk) A name, note or dimension label containing
     `<img src=x onerror=alert(1)>` renders as literal text everywhere
     it appears: the list, the chart legend and every tooltip, not only
     the form. Test: `tests/browser/parts/account-form.mjs`.
-18. Delete on a holding with snapshots offers archive, preselected, and
-    permanent delete. Test: `tests/browser/parts/account-form.mjs`.
-19. A holding with no snapshots is deleted outright with no dialog.
-    Test: `tests/browser/parts/account-form.mjs`.
-20. Delete on an archived holding offers permanent delete alone. Test:
-    `tests/browser/parts/account-detail.mjs`.
-21. (blind) The disabled permanent-delete confirm has the shared
+18. (walk) Delete on a holding with snapshots offers archive,
+    preselected, and permanent delete. Test:
+    `tests/browser/parts/account-form.mjs`.
+19. (walk) A holding with no snapshots is deleted outright with no
+    dialog. Test: `tests/browser/parts/account-form.mjs`.
+20. (walk) Delete on an archived holding offers permanent delete alone.
+    Test: `tests/browser/parts/account-detail.mjs`.
+21. (blind) (walk) The disabled permanent-delete confirm has the shared
     disabled look on computed style (petrol-200 fill and border,
     ink-secondary label, opacity 1, no red) and turns red once the name
     matches. A test of the disabled attribute alone passes a dimmed or
     red button. Test: `tests/browser/parts/account-form.mjs`.
-22. (blind) The archive dialog offers no value field and no way to
-    archive without the zero. Absence is the assertion. Test:
+22. (blind) (walk) The archive dialog offers no value field and no way
+    to archive without the zero. Absence is the assertion. Test:
     `tests/browser/parts/account-detail.mjs`.
 23. (blind) Archiving onto a D holding no records writes, in this
     order: one `snapshot` with that `account_id`, `date` D, `value`
@@ -744,42 +745,42 @@ Unarchiving and archiving it again writes the zero at the new D.
     `account` record with `archivedAt` D at `version` + 1. Asserted on
     the wire, with each write stubbed to fail in turn. Test:
     `tests/test_client.py::test_the_client_side_rules_hold`.
-24. (blind) The archived holding's own unit gets an entry at D even when
-    it is the last holding measured in it. Test:
+24. (blind) (walk) The archived holding's own unit gets an entry at D
+    even when it is the last holding measured in it. Test:
     `tests/test_client.py::test_the_client_side_rules_hold`.
-25. Archiving deletes no snapshot, and every earlier snapshot of the
-    holding is byte-identical afterwards. Test:
+25. (walk) Archiving deletes no snapshot, and every earlier snapshot of
+    the holding is byte-identical afterwards. Test:
     `tests/test_client.py::test_the_client_side_rules_hold`,
     `tests/browser/parts/account-detail.mjs`.
-26. Archiving removes the holding from today's total and its active
-    list. Test: `tests/browser/parts/account-detail.mjs`.
-27. (blind) Archiving onto a D whose prices are complete issues no
-    request to `/api/rates`, writes no `rate` record and leaves every
+26. (walk) Archiving removes the holding from today's total and its
+    active list. Test: `tests/browser/parts/account-detail.mjs`.
+27. (blind) (walk) Archiving onto a D whose prices are complete issues
+    no request to `/api/rates`, writes no `rate` record and leaves every
     rate entry at D byte-identical, counted both ways against a D
     holding no prices. Test:
     `tests/test_client.py::test_the_client_side_rules_hold`.
-28. (blind) The archive runs one reload of `type=snapshot` and
+28. (blind) (walk) The archive runs one reload of `type=snapshot` and
     `type=rate` before its first create, and none when it creates
     nothing, asserted as request count and position. Test:
     `tests/test_client.py::test_the_client_side_rules_hold`.
-29. (blind) Archiving onto a D where the holding has a non-zero
+29. (blind) (walk) Archiving onto a D where the holding has a non-zero
     snapshot names that figure as replaced before the confirm and shows
     no replace prompt. Test: `tests/browser/parts/account-detail.mjs`.
-30. Afterwards exactly one snapshot exists for that holding and D: same
-    `record_id`, `version` + 1, a different nonce, `value` `"0"`, the
-    `note` unchanged. Test:
+30. (walk) Afterwards exactly one snapshot exists for that holding and
+    D: same `record_id`, `version` + 1, a different nonce, `value`
+    `"0"`, the `note` unchanged. Test:
     `tests/test_client.py::test_the_client_side_rules_hold`,
     `tests/browser/parts/account-detail.mjs`.
-31. (blind) Archiving onto a D where the holding's snapshot is `"0.00"`
-    states no replacement, writes no snapshot and leaves that record
-    byte-identical. Test:
+31. (blind) (walk) Archiving onto a D where the holding's snapshot is
+    `"0.00"` states no replacement, writes no snapshot and leaves that
+    record byte-identical. Test:
     `tests/test_client.py::test_the_client_side_rules_hold`.
-32. A Conflict on the replacement is not retried, and the dialog states
-    the figure now stored. Test:
+32. (walk) A Conflict on the replacement is not retried, and the dialog
+    states the figure now stored. Test:
     `tests/test_client.py::test_the_client_side_rules_hold`,
     `tests/browser/parts/account-detail.mjs`.
-33. (blind) With a second session having recorded this holding at D
-    after the first read its model, the first session's archive is
+33. (blind) (walk) With a second session having recorded this holding at
+    D after the first read its model, the first session's archive is
     refused after the reload and writes nothing. A second session that
     recorded only other holdings at D does not refuse it. Test:
     `tests/test_client.py::test_the_client_side_rules_hold`.
@@ -802,55 +803,56 @@ Unarchiving and archiving it again writes the zero at the new D.
     `tests/browser/parts/account-detail.mjs`.
 37. With the rate proxy answering 503, the archive still goes through.
     Test: `tests/test_client.py::test_the_client_side_rules_hold`.
-38. A Conflict on the archive flag reloads the `account` record, and
-    archiving again finishes against it. Test:
+38. (walk) A Conflict on the archive flag reloads the `account` record,
+    and archiving again finishes against it. Test:
     `tests/test_client.py::test_the_client_side_rules_hold`.
-39. A holding with no snapshots archives to a zero at D at `version: 1`,
-    then the `account` record. Unarchived, it reads zero, not "Not yet
-    valued". Test: `tests/browser/parts/account-detail.mjs`,
+39. (walk) A holding with no snapshots archives to a zero at D at
+    `version: 1`, then the `account` record. Unarchived, it reads zero,
+    not "Not yet valued". Test:
+    `tests/browser/parts/account-detail.mjs`,
     `tests/test_client.py::test_the_client_side_rules_hold`.
-40. (blind) After archiving a holding with no snapshots and unarchiving
-    it, changing its unit is refused at the UI. Test:
+40. (blind) (walk) After archiving a holding with no snapshots and
+    unarchiving it, changing its unit is refused at the UI. Test:
     `tests/browser/parts/account-detail.mjs`.
-41. (blind) While archived, the holding offers no way to record a figure
-    at any date. Its zero at D offers no edit, clear or delete on
+41. (blind) (walk) While archived, the holding offers no way to record a
+    figure at any date. Its zero at D offers no edit, clear or delete on
     Account detail, on the update row for D, or in the snapshot form,
     asserted on the controls rather than an API. Test:
     `tests/browser/parts/account-detail.mjs`.
-42. While archived, an earlier entry's value can still be edited. Test:
-    `tests/browser/parts/account-detail.mjs`.
-43. (blind) While archived, typing D into an earlier entry's date
+42. (walk) While archived, an earlier entry's value can still be edited.
+    Test: `tests/browser/parts/account-detail.mjs`.
+43. (blind) (walk) While archived, typing D into an earlier entry's date
     refuses it on the date field's own line with the archive as the
     reason, never the future-date wording, with `aria-invalid` set, and
     Save issues no `PUT`. The same holds for a date strictly between a
     past D and today and for a date after today. Test:
     `tests/browser/parts/account-detail.mjs`.
-44. Correcting that date to one before D clears the refusal before Save,
-    and Save writes the move. Test:
+44. (walk) Correcting that date to one before D clears the refusal
+    before Save, and Save writes the move. Test:
     `tests/browser/parts/account-detail.mjs`.
-45. (blind) Deleting the recording at D deletes every other record
-    bearing D and leaves the archive's zero byte-identical. The
+45. (blind) (walk) Deleting the recording at D deletes every other
+    record bearing D and leaves the archive's zero byte-identical. The
     recording still opens, holding the zero, and the confirmation says
     the zero stays. Test: `tests/browser/parts/account-detail.mjs`.
 46. Purging an archived holding deletes its zero with every other
     snapshot. Test: `tests/browser/parts/account-detail.mjs`.
-47. (blind) Unarchiving writes only the `account` record, with
+47. (blind) (walk) Unarchiving writes only the `account` record, with
     `archivedAt` `null`, and leaves every snapshot, the zero included,
     byte-identical. Test: `tests/browser/parts/account-detail.mjs`.
-48. Unarchived, the holding rejoins the active list and the total at
-    zero, a figure can be recorded for it, and the zero can be edited.
-    Test: `tests/browser/parts/account-detail.mjs`.
+48. (walk) Unarchived, the holding rejoins the active list and the total
+    at zero, a figure can be recorded for it, and the zero can be
+    edited. Test: `tests/browser/parts/account-detail.mjs`.
 49. (blind) A holding archived on D with no snapshot at D, or a non-zero
     one, gains no snapshot on unlock, on any read or on any write
     elsewhere, compared over every snapshot record before and after.
     Test: `tests/test_client.py::test_the_client_side_rules_hold`.
 50. Unarchiving such a holding and archiving it again writes the zero at
     the new D. Test: no test.
-51. Archiving the last holding in a unit stops that unit being refreshed
-    when recording. Its rates so far stay, and unarchiving resumes them.
-    Test: no test.
-52. An earlier figure can be corrected by opening its recording from the
-    date link in the holding's own list. Test: no test.
+51. (walk) Archiving the last holding in a unit stops that unit being
+    refreshed when recording. Its rates so far stay, and unarchiving
+    resumes them. Test: no test.
+52. (walk) An earlier figure can be corrected by opening its recording
+    from the date link in the holding's own list. Test: no test.
 53. (blind) A purge removes the `account` record and every snapshot with
     that `account_id` in one transaction. With a fault injected
     mid-delete, neither is partially deleted. Test:
@@ -861,50 +863,51 @@ Unarchiving and archiving it again writes the zero at the new D.
     `tests/test_transfer.py::test_purge_removes_the_holding_and_every_snapshot_carrying_its_id`.
 55. A purge without `mode=purge` is a Bad Request. Test:
     `tests/test_transfer.py::test_purge_requires_the_mode_parameter`.
-56. A purge naming another vault's `account_id` answers Not Found, never
-    Forbidden, and deletes nothing, so the app gives no hint the
-    holding exists. Test:
+56. (walk) A purge naming another vault's `account_id` answers Not
+    Found, never Forbidden, and deletes nothing, so the app gives no
+    hint the holding exists. Test:
     `tests/test_transfer.py::test_purge_cannot_reach_another_users_records`.
-57. (blind) A purge naming a restored holding, sent with the epoch from
-    before the import, answers Conflict `{"refused":"vault-replaced"}`
-    and leaves the holding and every snapshot in place, row for row.
-    Import keeps record ids, so a purge that checks only the id deletes
-    it. Test:
+57. (blind) (walk) A purge naming a restored holding, sent with the
+    epoch from before the import, answers Conflict
+    `{"refused":"vault-replaced"}` and leaves the holding and every
+    snapshot in place, row for row. Import keeps record ids, so a purge
+    that checks only the id deletes it. Test:
     `tests/test_vault_epoch.py::test_a_page_holding_the_replaced_key_never_reaches_the_vault`,
     `tests/test_vault_epoch.py::test_an_import_between_the_gate_and_the_transaction_makes_the_write_answer_replaced`.
-58. At 320px, 375px, 601px and 901px wide, a holding with a note, a
-    seven-digit figure and two entries sharing a date pans no screen or
-    box sideways. Every control lies on screen and takes a tap at its
+58. (walk) At 320px, 375px, 601px and 901px wide, a holding with a note,
+    a seven-digit figure and two entries sharing a date pans no screen
+    or box sideways. Every control lies on screen and takes a tap at its
     center, each control in the list of values is at least 44px tall at
     phone width, and no date wraps. A note holding an email address
     pans nothing either, nor does a name without a space. Test:
     `tests/browser/parts/account-detail.mjs`,
     `tests/browser/parts/account-detail-review-phone.mjs`.
-59. The permanent-delete dialog of a holding with no snapshots says
-    there are no recorded values to delete and that past net worth
+59. (walk) The permanent-delete dialog of a holding with no snapshots
+    says there are no recorded values to delete and that past net worth
     figures stay as they are, and of one whose only snapshot is an
     archive's zero, that it deletes 1 recorded value and past figures
     stay as they are. Test: `tests/browser/parts/account-detail.mjs`,
     `tests/browser/parts/account-detail-review-delete.mjs`.
-60. A name or unit refused on Save stops being refused, with
+60. (walk) A name or unit refused on Save stops being refused, with
     `aria-invalid` gone, the moment the field holds one that fits,
     before Save is pressed again. Test:
     `tests/browser/parts/account-form.mjs`,
     `tests/browser/parts/account-form-review-refusals.mjs`.
-61. In a vault whose main currency no source quotes into, every unit
-    option but the main currency is marked "rate entered by hand". Test:
-    `tests/browser/parts/account-form.mjs`,
+61. (walk) In a vault whose main currency no source quotes into, every
+    unit option but the main currency is marked "rate entered by hand".
+    Test: `tests/browser/parts/account-form.mjs`,
     `tests/browser/parts/account-form-review-unquoted.mjs`.
-62. The holding's name is drawn at the screen heading's size and
+62. (walk) The holding's name is drawn at the screen heading's size and
     weight (`design-system.md`, Typography). Test:
     `tests/browser/parts/account-detail.mjs`,
     `tests/browser/parts/account-detail-review-heading.mjs`.
-63. (blind) No header of the holding's own list of values names a unit
-    but the main currency, and each value carries its unit as `design-system.md`, Units, sets,
-    such as "12.5 ozt". Test: `tests/browser/parts/account-detail.mjs`.
-64. A retired unit is not offered for a new holding, and typed as free
-    text in any case it is refused. A holding already measured in it
-    shows it as its current choice by its label, and so does one whose
-    unit is fixed by a recorded value. Test:
+63. (blind) (walk) No header of the holding's own list of values names a
+    unit but the main currency, and each value carries its unit as
+    `design-system.md`, Units, sets, such as "12.5 ozt". Test:
+    `tests/browser/parts/account-detail.mjs`.
+64. (walk) A retired unit is not offered for a new holding, and typed as
+    free text in any case it is refused. A holding already measured in
+    it shows it as its current choice by its label, and so does one
+    whose unit is fixed by a recorded value. Test:
     `tests/browser/parts/account-form-retired.mjs`,
     `tests/browser/parts/account-form-review-retired.mjs`.

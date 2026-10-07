@@ -448,12 +448,12 @@ There is no `formatVersion` below 1.
 
 ## Acceptance criteria
 
-1. (blind) Export, wipe, import restores the same ids, types, `account_id`
-   links and decrypted payloads, figures and prices alike. Test:
-   `tests/browser/parts/export-import.mjs`.
-2. (blind) A reimported vault draws a byte-identical chart and the same
-   total in both pricing modes (`net-worth-view.md`), which fails if
-   either timeline is dropped. Test:
+1. (blind) (walk) Export, wipe, import restores the same ids, types,
+   `account_id` links and decrypted payloads, figures and prices alike.
+   Test: `tests/browser/parts/export-import.mjs`.
+2. (blind) (walk) A reimported vault draws a byte-identical chart and
+   the same total in both pricing modes (`net-worth-view.md`), which
+   fails if either timeline is dropped. Test:
    `tests/browser/parts/export-import.mjs`.
 3. The export read carries profile, account, snapshot and rate records
    in one `records` array. Test:
@@ -470,11 +470,12 @@ There is no `formatVersion` below 1.
 7. An exported file carries exactly one wrapper and no field that names,
    counts or describes a credential. Test:
    `tests/test_transfer.py::test_the_export_carries_exactly_one_wrapper_and_nothing_describing_a_credential`.
-8. An empty vault exports a valid file holding its profile alone. Test:
+8. (walk) An empty vault exports a valid file holding its profile alone.
+   Test:
    `tests/test_transfer.py::test_an_empty_vault_exports_a_file_with_only_its_profile`.
-9. After an import the unchanged password signs in and every restored
-   record reads. Test: `tests/browser/parts/export-import.mjs`.
-10. A file exported by a different user imports, and every record
+9. (walk) After an import the unchanged password signs in and every
+   restored record reads. Test: `tests/browser/parts/export-import.mjs`.
+10. (walk) A file exported by a different user imports, and every record
     decrypts. Test: `tests/browser/parts/export-import.mjs`.
 11. (blind) After an import the stored wrapper unwraps to a key that is
     not the file's `DEK_file`, asserted directly, since a verbatim restore
@@ -483,8 +484,8 @@ There is no `formatVersion` below 1.
 12. (blind) A record the source vault writes after the export, inserted
     straight into the destination's rows, fails to decrypt. Test:
     `tests/browser/parts/export-import.mjs`.
-13. The exported file still opens with its own password after its vault is
-    re-keyed by an import. Test:
+13. (walk) The exported file still opens with its own password after its
+    vault is re-keyed by an import. Test:
     `tests/test_client.py::test_the_client_side_rules_hold`,
     `tests/browser/parts/export-import.mjs`.
 14. (blind) An import replaces `wrapped_dek` and `dek_nonce` and leaves
@@ -492,14 +493,14 @@ There is no `formatVersion` below 1.
     field by field, since a rewritten envelope under the same password
     also signs in. Test:
     `tests/test_transfer.py::test_import_replaces_the_wrapper_and_leaves_the_credential_untouched`.
-15. One byte altered in one record's ciphertext is refused at step 2,
-    before any review, counting the record without naming it, and
-    uploads nothing and leaves the vault intact. Test:
+15. (walk) One byte altered in one record's ciphertext is refused at
+    step 2, before any review, counting the record without naming it,
+    and uploads nothing and leaves the vault intact. Test:
     `tests/test_client.py::test_the_client_side_rules_hold`,
     `tests/browser/parts/export-import.mjs`,
     `tests/browser/parts/export-import-review-damaged.mjs`.
-16. A wrong password for the file aborts before any request is sent, with
-    the file still chosen. Test:
+16. (walk) A wrong password for the file aborts before any request is
+    sent, with the file still chosen. Test:
     `tests/test_client.py::test_the_client_side_rules_hold`,
     `tests/browser/parts/export-import.mjs`.
 17. A `principalId` field at the top level or on a record refuses the
@@ -516,21 +517,22 @@ There is no `formatVersion` below 1.
     `formatVersion`, or is oversized, is refused at the first step. Test:
     `tests/test_client.py::test_the_client_side_rules_hold`,
     `tests/browser/parts/export-import.mjs`.
-21. Into a vault holding only its profile, the review says nothing will be
-    deleted and asks for no `ERASE`. Test:
+21. (walk) Into a vault holding only its profile, the review says
+    nothing will be deleted and asks for no `ERASE`. Test:
     `tests/browser/parts/export-import.mjs`,
     `tests/browser/parts/export-import-review-unreadable.mjs`.
-22. Into a non-empty vault, an import without the typed `ERASE` is refused
-    and changes nothing. Test: `tests/browser/parts/export-import.mjs`,
-    `tests/browser/parts/export-import-review-unreadable.mjs`.
-23. The review sets the file against what will be deleted, in the same
-    kinds, prices on their own line. Test:
+22. (walk) Into a non-empty vault, an import without the typed `ERASE`
+    is refused and changes nothing. Test:
     `tests/browser/parts/export-import.mjs`,
     `tests/browser/parts/export-import-review-unreadable.mjs`.
-24. The review names a main currency that differs from the vault's. Test:
-    `tests/browser/parts/export-import.mjs`.
-25. The review says so when the file carries an older `formatVersion`.
-    Test: no test.
+23. (walk) The review sets the file against what will be deleted, in the
+    same kinds, prices on their own line. Test:
+    `tests/browser/parts/export-import.mjs`,
+    `tests/browser/parts/export-import-review-unreadable.mjs`.
+24. (walk) The review names a main currency that differs from the
+    vault's. Test: `tests/browser/parts/export-import.mjs`.
+25. (walk) The review says so when the file carries an older
+    `formatVersion`. Test: no test.
 26. A DB failure mid-import leaves the original vault intact and readable,
     and the screen says so. Test:
     `tests/test_transfer.py::test_a_fault_mid_import_leaves_the_original_vault_intact`,
@@ -550,26 +552,26 @@ There is no `formatVersion` below 1.
 31. Every record reads `version: 1` after an import. Test:
     `tests/test_transfer.py::test_import_replaces_the_vault_entirely`,
     `tests/browser/parts/export-import.mjs`.
-32. (blind) Pages A and B of one browser share a cookie and A restores. B
-    never saves a holding, its create, update, delete and purge each
-    answer Conflict `{"refused":"vault-replaced"}`, and A unlocked shows
-    every restored record and none unreadable. Test:
+32. (blind) (walk) Pages A and B of one browser share a cookie and A
+    restores. B never saves a holding, its create, update, delete and
+    purge each answer Conflict `{"refused":"vault-replaced"}`, and A
+    unlocked shows every restored record and none unreadable. Test:
     `tests/test_vault_epoch.py::test_a_page_holding_the_replaced_key_never_reaches_the_vault`,
     `tests/browser/parts/export-import.mjs`.
-33. (blind) A second session of the importing user still exists after an
-    import, never Unauthorized. Its create, update, delete and purge with
-    the old epoch each answer Conflict `{"refused":"vault-replaced"}` and
-    leave the imported set. Test:
+33. (blind) (walk) A second session of the importing user still exists
+    after an import, never Unauthorized. Its create, update, delete and
+    purge with the old epoch each answer Conflict
+    `{"refused":"vault-replaced"}` and leave the imported set. Test:
     `tests/test_vault_epoch.py::test_a_second_session_with_the_old_epoch_writes_nothing`,
     `tests/test_transfer.py::test_import_revokes_no_session`.
-34. (blind) The restoring page stays open holding the new epoch and
-    `DEK_new`, and posts the old epoch on the vault channel once. Test:
-    `tests/browser/parts/export-import.mjs`.
+34. (blind) (walk) The restoring page stays open holding the new epoch
+    and `DEK_new`, and posts the old epoch on the vault channel once.
+    Test: `tests/browser/parts/export-import.mjs`.
 35. (blind) The import answers `vaultEpoch` as 32 lowercase hex
     characters, equal to the `vault_epochs` row afterwards and different
     from the one before. Test:
     `tests/test_vault_epoch.py::test_the_next_sign_in_after_an_import_carries_the_new_epoch`.
-36. (blind) An import with a replaced epoch answers Conflict
+36. (blind) (walk) An import with a replaced epoch answers Conflict
     `{"refused":"vault-replaced"}` and leaves `records`, `dek_wrappers`
     and `vault_epochs` row for row. Test:
     `tests/test_vault_epoch.py::test_an_import_with_a_replaced_epoch_writes_nothing`.
@@ -580,50 +582,52 @@ There is no `formatVersion` below 1.
     mid-transaction, leaves the epoch as it was. Test:
     `tests/test_vault_epoch.py::test_an_import_refused_for_another_reason_leaves_the_epoch`,
     `tests/test_vault_epoch.py::test_a_fault_mid_import_leaves_the_epoch`.
-39. (blind) An export with a replaced epoch answers Conflict
-    `{"refused":"vault-replaced"}` and writes no `attempts` row, also when
-    the import lands between the gate and the export's transaction. Test:
+39. (blind) (walk) An export with a replaced epoch answers Conflict
+    `{"refused":"vault-replaced"}` and writes no `attempts` row, also
+    when the import lands between the gate and the export's transaction.
+    Test:
     `tests/test_vault_epoch.py::test_an_export_with_a_replaced_epoch_is_refused_and_writes_no_attempt`,
     `tests/test_vault_epoch.py::test_an_import_between_the_gate_and_the_export_leaves_no_attempt_row`.
 40. (blind) An import landing mid-export cannot produce a file whose
     wrapper does not open its records. Test: no test.
-41. (blind) The checked-in `formatVersion: 1` fixture, never regenerated,
-    still imports after the format advances. Test:
+41. (blind) (walk) The checked-in `formatVersion: 1` fixture, never
+    regenerated, still imports after the format advances. Test:
     `tests/test_client.py::test_the_client_side_rules_hold`.
-42. The sensitivity warning is on screen before the download is triggered.
-    Test: `tests/browser/parts/export-import.mjs`.
-43. (blind) A top-level navigation to `GET /api/export` with a valid
-    session cookie is Forbidden and writes no file. Test:
+42. (walk) The sensitivity warning is on screen before the download is
+    triggered. Test: `tests/browser/parts/export-import.mjs`.
+43. (blind) (walk) A top-level navigation to `GET /api/export` with a
+    valid session cookie is Forbidden and writes no file. Test:
     `tests/test_guard.py::test_export_requires_the_header_despite_being_a_get`,
     `tests/browser/parts/export-import.mjs`.
 44. (blind) Over the per-user limit, export answers Too Many Requests and
     writes no `attempts` row however often it is retried, so the limit
     lifts an hour after the oldest export let through. Test:
     `tests/test_transfer.py::test_a_refused_export_writes_no_row_and_the_limit_lifts_an_hour_after_the_oldest`.
-45. At the export ceiling the button is disabled with the reason beside
-    it. Test: `tests/browser/parts/export-import.mjs`.
-46. An administrator session gets Not Found from export and import. Test:
+45. (walk) At the export ceiling the button is disabled with the reason
+    beside it. Test: `tests/browser/parts/export-import.mjs`.
+46. (walk) An administrator session gets Not Found from export and
+    import. Test:
     `tests/test_transfer.py::test_an_administrator_reaches_neither_export_nor_import`.
-47. After a restore another tab of the browser closes the vault before
-    sending a request, holds no key, and says typed input was lost. Test:
-    `tests/browser/parts/export-import.mjs`.
-48. A file already downloaded opens with its own password after a password
-    change, and the change-password screen says so. Test:
+47. (walk) After a restore another tab of the browser closes the vault
+    before sending a request, holds no key, and says typed input was
+    lost. Test: `tests/browser/parts/export-import.mjs`.
+48. (walk) A file already downloaded opens with its own password after a
+    password change, and the change-password screen says so. Test:
     `tests/browser/parts/settings.mjs`.
-49. (blind) An import whose `currentSalt` is not the credential's salt,
-    after a password change or a stale-KDF upgrade on another page,
-    answers Conflict `{"refused":"credential-changed"}` and leaves every
-    table row for row as it was. Test:
+49. (blind) (walk) An import whose `currentSalt` is not the credential's
+    salt, after a password change or a stale-KDF upgrade on another
+    page, answers Conflict `{"refused":"credential-changed"}` and leaves
+    every table row for row as it was. Test:
     `tests/test_credential_changed.py::test_an_import_after_a_password_change_elsewhere_writes_nothing`,
     `tests/test_credential_changed.py::test_an_import_after_a_kdf_upgrade_elsewhere_writes_nothing`.
-50. An import carrying both a replaced epoch and a superseded salt
-    answers `vault-replaced`. Test:
+50. (walk) An import carrying both a replaced epoch and a superseded
+    salt answers `vault-replaced`. Test:
     `tests/test_credential_changed.py::test_a_replaced_vault_is_named_before_a_changed_credential`.
-51. The page that changed the password restores afterwards without
-    unlocking again. Test:
+51. (walk) The page that changed the password restores afterwards
+    without unlocking again. Test:
     `tests/test_credential_changed.py::test_the_page_that_changed_the_password_still_restores`.
-52. A restore refused for a credential changed elsewhere locks the page
-    and says why, and unlocking returns to this screen. Test:
+52. (walk) A restore refused for a credential changed elsewhere locks
+    the page and says why, and unlocking returns to this screen. Test:
     `tests/browser/parts/export-import.mjs`.
 53. (blind) An exported file shows nothing outside its envelope but
     `format`, `formatVersion`, the salt, the KDF envelope, the wrapper
@@ -632,8 +636,9 @@ There is no `formatVersion` below 1.
     `tests/test_client.py::test_the_client_side_rules_hold`,
     `tests/browser/parts/export-import.mjs`,
     `tests/browser/parts/export-import-review-sealed.mjs`.
-54. A sealed file opens with its password to the records it sealed, and
-    restores. Test: `tests/test_client.py::test_the_client_side_rules_hold`,
+54. (walk) A sealed file opens with its password to the records it
+    sealed, and restores. Test:
+    `tests/test_client.py::test_the_client_side_rules_hold`,
     `tests/browser/parts/export-import.mjs`,
     `tests/browser/parts/export-import-review-sealed.mjs`.
 55. One byte altered in a sealed file's envelope refuses it as damaged
@@ -645,15 +650,15 @@ There is no `formatVersion` below 1.
     a damaged one, before any request. Test:
     `tests/test_client.py::test_the_client_side_rules_hold`,
     `tests/browser/parts/export-import-review-damaged.mjs`.
-57. A lock during the import starts it again at step 1, with no review,
-    no typed `ERASE` and nothing re-encrypted kept. Test:
+57. (walk) A lock during the import starts it again at step 1, with no
+    review, no typed `ERASE` and nothing re-encrypted kept. Test:
     `tests/browser/parts/export-import.mjs`,
     `tests/browser/parts/export-import-review-damaged.mjs`.
-58. The review's total of what will be deleted is the sum of the lines
-    above it: the vault's settings are not counted, readable or not, and
-    other records the vault cannot read get a line of their own. Test:
-    `tests/browser/parts/export-import.mjs`,
+58. (walk) The review's total of what will be deleted is the sum of the
+    lines above it: the vault's settings are not counted, readable or
+    not, and other records the vault cannot read get a line of their
+    own. Test: `tests/browser/parts/export-import.mjs`,
     `tests/browser/parts/export-import-review-unreadable.mjs`.
-59. The Import file picker's button is Button, secondary, not the
+59. (walk) The Import file picker's button is Button, secondary, not the
     browser's default. Test: `tests/browser/parts/export-import.mjs`,
     `tests/browser/parts/export-import-review-picker.mjs`.

@@ -43,11 +43,11 @@ a way into the code.
 
 1. Open the app in the browser you have: the Playwright tools in the
    nightly run, Claude in Chrome (load its skill first) on a desktop.
-2. Walk every criterion in the acceptance list of each feature you
-   were given, as a person would: click it, type into it, and
-   look at what comes back. A criterion only code can observe, such as
-   a stored row's shape, is the test suite's: skip it, and never list
-   it as one you could not check.
+2. Walk every criterion marked "(walk)" in the acceptance list of each
+   feature you were given, as a person would: click it, type into it,
+   and look at what comes back. The others, and the parts of a "(walk)"
+   criterion only code observes, are the test suite's: skip them, and
+   never list them as ones you could not check.
 3. Hit every state the page's screens and edge cases name, not just
    the happy one. An empty vault, a wrong password, a lost connection.
 4. Read the browser console on every screen. A page that works but
