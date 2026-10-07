@@ -1,12 +1,11 @@
-"""Files what nightly QA recorded in qa-unfiled/ (CLAUDE.md, The loop,
+"""Files what a QA hunt recorded in qa-unfiled/ (CLAUDE.md, The loop,
 Nightly and stable): a comment on the open `qa` issue a record repeats,
 or else a new issue in line with `queued`, which no run clarifies
-(CLAUDE.md, The loop, Findings). A record titled `QA could not check
-<feature>` is filed as `maintenance`. Any other is a finding, filed as
-a `bug` only with the steps that reproduce it. Each record is deleted
-once handled, so a rerun files nothing twice. With DISPATCH set, the queue
-starts, because what the workflow's token does starts no workflow by
-itself. Needs `gh` signed in to the repository.
+(CLAUDE.md, The loop, Findings). A finding is filed as a `bug` only with
+the steps that reproduce it. Each record is deleted once handled, so a
+rerun files nothing twice. With DISPATCH set, the queue starts, because
+what the workflow's token does starts no workflow by itself. Needs `gh`
+signed in to the repository.
 """
 import glob
 import json
@@ -56,8 +55,6 @@ for path in sorted(glob.glob("qa-unfiled/*.json")):
         for label in rated:
             gh("issue", "edit", str(repeats), "--add-label", label)
         gh("issue", "comment", str(repeats), "--body-file", "-", body=str(record["comment"]))
-    elif str(record["title"]).startswith("QA could not check "):
-        create(record, str(record["body"]), ["maintenance", "qa", "queued"])
     elif type(steps) is list and steps and all(type(step) is str and step.strip() for step in steps):
         listed = "\n".join(f"{n}. {step}" for n, step in enumerate(steps, 1))
         create(record, f"{record['body']}\n\nSteps to reproduce:\n\n{listed}", ["bug", "qa", "queued", *rated])
@@ -66,7 +63,7 @@ for path in sorted(glob.glob("qa-unfiled/*.json")):
     os.remove(path)
 
 # A queue that could not be started is looked at again after the next
-# run, so it never fails the night.
+# run, so it never fails the hunt.
 if os.environ.get("DISPATCH"):
     subprocess.run(["gh", "workflow", "run", "agent.yml", "--ref", "master", "-f", "issue=queue"])
 

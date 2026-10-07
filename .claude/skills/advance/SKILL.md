@@ -239,9 +239,7 @@ comments propose, they never decide.
    the report does not hold: remove `implementing`, add
    `needs-answer`, and ask the client in a comment. A code scanning
    alert is fixed where it arises, in the app or the tests, and never
-   dismissed. An issue for criteria QA could not check makes them
-   checkable, in the nightly harness, its prepared data or the
-   criterion's wording. One whose cause lay outside Solvent, such as a
+   dismissed. A report whose cause lay outside Solvent, such as a
    price source that did not answer, does not hold.
 5. Where behavior or acceptance criteria change, update the feature
    page, as `CLAUDE.md` says the spec is written. Of the spec, change

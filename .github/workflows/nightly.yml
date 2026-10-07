@@ -1,8 +1,9 @@
 name: Nightly
 
-# Tonight's master, tested end to end against the client's acceptance
-# lists, becomes a dated pre-release when it passes (CLAUDE.md, The
-# loop, Nightly and stable).
+# On a night code on master changed and its push check passed, its image
+# is built and published as a dev build of the next release. QA then
+# hunts the features that changed (CLAUDE.md, The loop, Nightly and
+# stable).
 on:
   # 1 a.m. in Switzerland in winter and 2 a.m. in summer, so a start
   # GitHub delays by hours still finishes by morning. Off the hour,
@@ -11,486 +12,122 @@ on:
   schedule:
     - cron: "7 0 * * *"
   workflow_dispatch:
-    inputs:
-      full:
-        description: Walk every feature, as promotion requires
-        type: boolean
-        default: false
 
 permissions: {}
 
-# A run by hand and the scheduled one never race for the same day.
 concurrency: nightly
 
 env:
-  GH_TOKEN: ${{ github.token }}
   IMAGE: ghcr.io/${{ github.repository }}
 
 jobs:
-  build:
-    runs-on: ubuntu-latest
-    timeout-minutes: 40
-    permissions:
-      actions: write
-      contents: read
-      packages: read
-    outputs:
-      go: ${{ steps.decide.outputs.go }}
-      existing: ${{ steps.decide.outputs.existing }}
-      today: ${{ steps.decide.outputs.today }}
-      last: ${{ steps.decide.outputs.last }}
-      commit: ${{ steps.decide.outputs.commit }}
-      image: ${{ steps.app.outputs.image }}
-      failed: ${{ steps.failed.outputs.failed }}
-    steps:
-      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
-        with:
-          ref: master
-          fetch-depth: 0
-
-      # Files any code scanning alert the route after a merge missed.
-      - run: gh workflow run agent.yml --ref master -f issue=alerts
-
-      # At most one version a day, and none for a night whose only
-      # changes are to the spec, the docs or the pipeline, unless the
-      # client asks for a full walk. A full walk on a day whose version
-      # exists walks that version and builds nothing.
-      - id: decide
-        env:
-          FULL: ${{ inputs.full }}
-        run: |
-          today=$(date -u +%F)
-          last=$(git tag --list '20[0-9][0-9]-[0-9][0-9]-[0-9][0-9]' --sort=-refname | head -n 1)
-          echo "today=$today" >> "$GITHUB_OUTPUT"
-          echo "last=$last" >> "$GITHUB_OUTPUT"
-          if [ "$last" = "$today" ] && [ "$FULL" = true ]; then
-            echo "Version $today already exists, so QA walks it in full."
-            git checkout -q "$today"
-            echo "commit=$(git rev-parse HEAD)" >> "$GITHUB_OUTPUT"
-            echo "existing=true" >> "$GITHUB_OUTPUT"
-            echo "go=true" >> "$GITHUB_OUTPUT"; exit 0
-          fi
-          echo "commit=$(git rev-parse HEAD)" >> "$GITHUB_OUTPUT"
-          if [ "$last" = "$today" ]; then
-            echo "Version $today already exists."
-            [ "${{ github.event_name }}" = workflow_dispatch ] && exit 1
-            echo "go=false" >> "$GITHUB_OUTPUT"; exit 0
-          fi
-          if [ "$FULL" != true ] && [ -n "$last" ] && [ -z "$(git diff --name-only "$last" HEAD | grep -vE '^(spec/|\.github/|\.claude/|CLAUDE\.md|README\.md)')" ]; then
-            echo "No code changed since $last."
-            echo "go=false" >> "$GITHUB_OUTPUT"; exit 0
-          fi
-          echo "go=true" >> "$GITHUB_OUTPUT"
-
-      # The suite is not run again on what it already passed on master,
-      # in the push check of the last commit that changed anything the
-      # tests read. That is everything but .claude/ and top-level docs,
-      # because tests read the spec.
-      - if: steps.decide.outputs.go == 'true' && steps.decide.outputs.existing != 'true'
-        id: tested
-        run: |
-          code=$(git log -1 --format=%H HEAD -- . ':(exclude).claude/' ':(exclude,glob)*.md')
-          # A read that fails runs the suite.
-          runs=$(gh api "repos/$GITHUB_REPOSITORY/actions/workflows/check.yml/runs?event=push&branch=master&head_sha=$code" \
-            --jq '.workflow_runs[].id' 2>/dev/null) || runs=
-          for run in $runs; do
-            passed=$(gh api "repos/$GITHUB_REPOSITORY/actions/runs/$run/jobs" \
-              --jq '.jobs[] | select(.name == "test" and .conclusion == "success") | .id' 2>/dev/null) || passed=
-            if [ -n "$passed" ]; then
-              echo "The suite passed on $code in its push check."
-              echo "passed=true" >> "$GITHUB_OUTPUT"
-              break
-            fi
-          done
-      - if: steps.decide.outputs.go == 'true' && steps.decide.outputs.existing != 'true'
-        uses: ./.github/actions/setup
-      - if: steps.decide.outputs.go == 'true' && steps.decide.outputs.existing != 'true' && steps.tested.outputs.passed != 'true'
-        id: suite
-        run: python -m pytest -q
-
-      # Built once, so every shard tests, and the release publishes, the
-      # same image. A version that exists is pulled as published.
-      - if: steps.decide.outputs.go == 'true'
-        id: app
-        env:
-          TODAY: ${{ steps.decide.outputs.today }}
-          EXISTING: ${{ steps.decide.outputs.existing }}
-        run: |
-          if [ "$EXISTING" = true ]; then
-            echo "${{ github.token }}" | docker login ghcr.io -u "${{ github.actor }}" --password-stdin
-            docker pull "$IMAGE:$TODAY"
-          else
-            docker build -t "$IMAGE:$TODAY" .
-          fi
-          echo "image=$(docker image inspect -f '{{.Id}}' "$IMAGE:$TODAY")" >> "$GITHUB_OUTPUT"
-          docker save -o image.tar "$IMAGE:$TODAY"
-
-      # What the price sources answer today, requested exactly as the app
-      # requests them, from tonight's image on the default network. A
-      # source that answers in a changed shape fails the night here,
-      # before any shard. One that does not answer is a note in the
-      # summary, and the night goes on.
-      - if: steps.decide.outputs.go == 'true'
-        id: sources
-        env:
-          TODAY: ${{ steps.decide.outputs.today }}
-        run: |
-          status=0
-          docker run --rm --read-only --cap-drop ALL --security-opt no-new-privileges:true \
-            -e PYTHONPATH=/app \
-            -v "$PWD/tools/nightly:/harness:ro" \
-            --entrypoint python \
-            "$IMAGE:$TODAY" /harness/sources.py check > sources.txt || status=$?
-          { echo '```'; cat sources.txt; echo '```'; } >> "$GITHUB_STEP_SUMMARY"
-          exit "$status"
-      - if: steps.decide.outputs.go == 'true'
-        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
-        with:
-          name: image
-          path: image.tar
-          retention-days: 1
-
-      # Which steps failed, for the failure report. Inline, because the
-      # model in this job could rewrite anything in the working tree.
-      - if: failure() || cancelled()
-        id: failed
-        env:
-          STEPS: ${{ toJSON(steps) }}
-        run: echo "failed=$(jq -r '[to_entries[] | select(.value.outcome == "failure" or .value.outcome == "cancelled") | .key] | join(" ")' <<< "$STEPS")" >> "$GITHUB_OUTPUT"
-
-  plan:
-    needs: build
-    if: needs.build.outputs.go == 'true'
+  decide:
+    if: github.ref == 'refs/heads/master'
     runs-on: ubuntu-latest
     timeout-minutes: 5
     permissions:
-      contents: read
       actions: read
+      contents: read
     outputs:
-      shards: ${{ steps.plan.outputs.shards }}
-      record: ${{ steps.plan.outputs.record }}
-      failed: ${{ steps.failed.outputs.failed }}
+      go: ${{ steps.decide.outputs.go }}
+      version: ${{ steps.decide.outputs.version }}
+      base: ${{ steps.decide.outputs.base }}
+    env:
+      GH_TOKEN: ${{ github.token }}
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
-          ref: ${{ needs.build.outputs.commit }}
           fetch-depth: 0
+          persist-credentials: false
 
-      # What the last completed walk covered, kept by the night that
-      # walked it. Without it, every feature is walked.
-      - run: |
-          id=$(gh api "repos/$GITHUB_REPOSITORY/actions/artifacts?name=qa-walked&per_page=30" \
-            --jq '[.artifacts[] | select((.expired | not) and .workflow_run.head_branch == "master" and .workflow_run.head_repository_id == .workflow_run.repository_id)][0].id // empty') &&
-            [ -n "$id" ] &&
-            gh api "repos/$GITHUB_REPOSITORY/actions/artifacts/$id/zip" > "$RUNNER_TEMP/walked.zip" &&
-            unzip -o "$RUNNER_TEMP/walked.zip" qa-walked.json ||
-            echo "No record of a last walk."
-      - id: plan
-        env:
-          FULL: ${{ inputs.full }}
-          TODAY: ${{ needs.build.outputs.today }}
-        run: python3 .github/actions/qa-plan/plan.py >> "$GITHUB_OUTPUT"
+      # At most one dev build a night, and none for a night whose only
+      # changes are to the spec, the docs or the pipeline. The push check
+      # of the last commit that changed anything the tests read must have
+      # passed, because a version is made only of a tested master.
+      - id: decide
+        run: |
+          month=$(date -u +%Y.%m)
+          last=$(git tag --list '*-dev.*' --sort=-creatordate | head -n 1)
+          stable=$(git tag --list "$month.*" | grep -vE -- '-(dev|rc)\.' | sort -V | tail -n 1)
+          n=0
+          [ -z "$stable" ] || n=$(( ${stable##*.} + 1 ))
+          version="$month.$n-dev.$(date -u +%Y%m%d)"
+          echo "version=$version" >> "$GITHUB_OUTPUT"
+          [ -z "$last" ] || echo "base=$(git rev-parse "$last^{commit}")" >> "$GITHUB_OUTPUT"
+          if [ -n "$(git tag --list "*-dev.$(date -u +%Y%m%d)")" ]; then
+            echo "Tonight's dev build exists."; echo "go=false" >> "$GITHUB_OUTPUT"; exit 0
+          fi
+          if [ -n "$last" ] && ! git diff --name-only "$last" HEAD | grep -qvE '^(spec/|\.github/|\.claude/|CLAUDE\.md|README\.md)'; then
+            echo "No code changed since $last."; echo "go=false" >> "$GITHUB_OUTPUT"; exit 0
+          fi
+          code=$(git log -1 --format=%H HEAD -- . ':(exclude).claude/' ':(exclude,glob)*.md')
+          for run in $(gh api "repos/$GITHUB_REPOSITORY/actions/workflows/check.yml/runs?event=push&branch=master&head_sha=$code" --jq '.workflow_runs[].id'); do
+            if [ -n "$(gh api "repos/$GITHUB_REPOSITORY/actions/runs/$run/jobs" --jq '.jobs[] | select(.name == "test" and .conclusion == "success") | .id')" ]; then
+              echo "go=true" >> "$GITHUB_OUTPUT"; exit 0
+            fi
+          done
+          echo "::notice::The push check of $code has not passed, so tonight makes no version."
+          echo "go=false" >> "$GITHUB_OUTPUT"
 
-      # Which steps failed, for the failure report.
-      - if: failure() || cancelled()
-        id: failed
-        env:
-          STEPS: ${{ toJSON(steps) }}
-        run: echo "failed=$(jq -r '[to_entries[] | select(.value.outcome == "failure" or .value.outcome == "cancelled") | .key] | join(" ")' <<< "$STEPS")" >> "$GITHUB_OUTPUT"
-
-  qa:
-    needs: [build, plan]
-    runs-on: ubuntu-latest
-    timeout-minutes: 90
-    environment: agent
+  build:
+    needs: decide
+    if: needs.decide.outputs.go == 'true'
+    uses: ./.github/workflows/build.yml
     permissions:
       contents: read
-      issues: read
+      packages: write
       id-token: write
-    outputs:
-      failed: ${{ steps.failed.outputs.failed }}
-    env:
-      TODAY: ${{ needs.build.outputs.today }}
-      # On every harness container (nightly-harness.md, What the workflow
-      # does). Unquoted where used, so each flag is its own argument.
-      HARDEN: --read-only --cap-drop ALL --security-opt no-new-privileges:true
-    strategy:
-      fail-fast: false
-      matrix:
-        shard: ${{ fromJSON(needs.plan.outputs.shards) }}
-    steps:
-      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
-        with:
-          ref: ${{ needs.build.outputs.commit }}
+      attestations: write
 
-      # Node and Chrome, for the generator of the prepared data.
-      - uses: ./.github/actions/setup
-
-      - uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8.0.1
-        with:
-          name: image
-      - id: image
-        env:
-          BUILT: ${{ needs.build.outputs.image }}
-        run: |
-          docker load -i image.tar
-          [ "$(docker image inspect -f '{{.Id}}' "$IMAGE:$TODAY")" = "$BUILT" ]
-
-      # The harness around tonight's image (nightly-harness.md, What the
-      # workflow does), in one step so its failure fails the shard as the
-      # harness, never as a finding. Every container runs tonight's image
-      # with its entrypoint overridden and tools/nightly/ mounted read-only.
-      - id: harness
-        timeout-minutes: 20
-        run: |
-          # The run's certificate authority, which signs once and keeps no key.
-          python3 tools/nightly/ca.py "$RUNNER_TEMP/tls"
-          mkdir "$RUNNER_TEMP/standin"
-
-          # The app's network has no route out. The relay's other leg is
-          # the runner's only way in.
-          docker network create --internal nightly
-          docker network create nightly-edge
-
-          # The price stand-in, under the providers' real names, as the
-          # runner's own user, so it reads the key and writes its request
-          # list, binding 443 without a capability.
-          docker run -d --name standin --network nightly \
-            --network-alias api.frankfurter.dev --network-alias api.nbp.pl \
-            $HARDEN --user "$(id -u):$(id -g)" \
-            --sysctl net.ipv4.ip_unprivileged_port_start=443 \
-            -v "$RUNNER_TEMP/tls:/tls:ro" \
-            -v "$PWD/tools/nightly:/harness:ro" \
-            -v "$RUNNER_TEMP/standin:/state" \
-            --entrypoint python \
-            "$IMAGE:$TODAY" /harness/standin.py --cert /tls/leaf.pem --key /tls/leaf.key --state /state
-
-          # This shard's own instance, at every default an installation
-          # has, on the internal network alone. The run's authority is the
-          # only one in its trust store, mounted over the system store.
-          docker run -d --name solvent --network nightly \
-            -e SECRET_KEY="$(openssl rand -hex 32)" \
-            -v solvent-data:/data \
-            --read-only --tmpfs /dev/shm:size=64m \
-            --cap-drop ALL --security-opt no-new-privileges:true \
-            -v "$RUNNER_TEMP/tls/trust:/etc/ssl/certs:ro" \
-            "$IMAGE:$TODAY"
-
-          # The way in: a port cannot be published from an internal network.
-          docker run -d --name relay --network nightly-edge -p 127.0.0.1:8000:8000 \
-            $HARDEN \
-            -v "$PWD/tools/nightly:/harness:ro" \
-            --entrypoint python \
-            "$IMAGE:$TODAY" /harness/relay.py --listen 0.0.0.0:8000 --to solvent:8000
-          docker network connect nightly relay
-
-          # The trust store, the aliases and the missing route out, proved
-          # together from a container that trusts what the app trusts.
-          docker run --rm --network nightly $HARDEN \
-            -e PYTHONPATH=/app \
-            -v "$RUNNER_TEMP/tls/trust:/etc/ssl/certs:ro" \
-            -v "$PWD/tools/nightly:/harness:ro" \
-            --entrypoint python \
-            "$IMAGE:$TODAY" /harness/sources.py probe
-
-          # The prepared vaults, written through the app's own browser code.
-          curl -fsS --retry 20 --retry-all-errors --retry-delay 1 -o /dev/null http://localhost:8000/login
-          invite=$(docker exec solvent flask --app app create-invite --kind administrator | tail -n 1)
-          python3 tools/nightly/prices.py prepare tools/nightly/fixtures/plan.json tools/nightly/fixtures/out
-          node tools/nightly/fixtures.mjs --base http://localhost:8000 --invite "$invite" --plan tools/nightly/fixtures/plan.json --out tools/nightly/fixtures/out
-
-          # What a promise needs time for, dated back with the app stopped.
-          docker stop solvent
-          docker run --rm --network none $HARDEN \
-            -v solvent-data:/data \
-            -v "$PWD/tools/nightly:/harness:ro" \
-            -v "$PWD/tools/nightly/fixtures/out:/out:ro" \
-            --entrypoint python \
-            "$IMAGE:$TODAY" /harness/patch.py /data/solvent.db /out/patches.json
-          docker start solvent
-          curl -fsS --retry 20 --retry-all-errors --retry-delay 1 -o /dev/null http://localhost:8000/login
-
-      # qa's own administrator invite. --force, because the generator's
-      # administrator exists.
-      - id: app
-        run: echo "invite=$(docker exec solvent flask --app app create-invite --kind administrator --force | tail -n 1)" >> "$GITHUB_OUTPUT"
-
-      - id: qa
-        timeout-minutes: 60
-        uses: anthropics/claude-code-action@12dd8d74c712f5f3669365b2369b558c495b1104 # v1.0.238
-        env:
-          CLAUDE_CODE_DISABLE_BACKGROUND_TASKS: "1"
-        with:
-          claude_code_oauth_token: ${{ secrets.CLAUDE_CODE_OAUTH_TOKEN }}
-          prompt: >-
-            Run the `nightly-qa` skill with the arguments
-            `walk http://localhost:8000 ${{ steps.app.outputs.invite }}
-            ${{ join(matrix.shard.features, ',') }}
-            tools/nightly/fixtures/out/manifest.json`.
-          # A scheduled run's actor is whoever last changed this file,
-          # which can be a bot.
-          allowed_bots: claude,github-actions,dependabot
-          bot_id: "209825114"
-          plugin_marketplaces: https://github.com/leandersabel/skald.git
-          plugins: skald@skald
-          # No shell beyond reading issues: with one, the walk would reach
-          # Docker, the database volume and the internet, and the harness
-          # tools would no longer be the only way to the server. The
-          # harness server runs with an empty environment, so no token
-          # reaches it. The first browser starts holding the aged session,
-          # and the second, for a criterion needing two sessions at once,
-          # starts with nothing stored.
-          claude_args: |
-            --model claude-opus-5-5
-            --allowedTools Read,Write,Glob,Grep,Agent,Task,Skill,TodoWrite,"Bash(gh issue list:*)","Bash(gh issue view:*)",mcp__playwright,mcp__playwright2,mcp__harness
-            --mcp-config '{"mcpServers":{"playwright":{"command":"npx","args":["-y","@playwright/mcp@0.0.83","--headless","--browser","chrome","--isolated","--caps=network","--storage-state","${{ github.workspace }}/tools/nightly/fixtures/out/storage-state.json"]},"playwright2":{"command":"npx","args":["-y","@playwright/mcp@0.0.83","--headless","--browser","chrome","--isolated"]},"harness":{"command":"env","args":["-i","PATH=/usr/bin:/bin","python3","${{ github.workspace }}/tools/nightly/mcp.py","--container","solvent","--state","${{ runner.temp }}/standin","--url","http://localhost:8000"]}}}'
-
-      - if: always()
-        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
-        with:
-          name: qa-${{ matrix.shard.id }}
-          path: |
-            qa-unfiled/
-            qa-done.txt
-          if-no-files-found: ignore
-
-      - if: failure()
-        run: |
-          docker logs solvent || true
-          docker logs standin || true
-
-      # Which steps failed, for the failure report. Inline, because the
-      # model in this job could rewrite anything in the working tree.
-      - if: failure() || cancelled()
-        id: failed
-        env:
-          STEPS: ${{ toJSON(steps) }}
-        run: echo "failed=$(jq -r '[to_entries[] | select(.value.outcome == "failure" or .value.outcome == "cancelled") | .key] | join(" ")' <<< "$STEPS")" >> "$GITHUB_OUTPUT"
-
-  finish:
-    needs: [build, plan, qa]
-    if: always() && needs.build.outputs.go == 'true'
+  publish:
+    needs: [decide, build]
+    if: always() && (needs.decide.result == 'failure' || needs.decide.outputs.go == 'true')
     runs-on: ubuntu-latest
-    timeout-minutes: 40
-    environment: agent
+    timeout-minutes: 15
     permissions:
       actions: write
       contents: write
-      packages: write
       issues: write
-      pull-requests: read
-      security-events: read
-      id-token: write
+      packages: write
+    env:
+      GH_TOKEN: ${{ github.token }}
+      VERSION: ${{ needs.decide.outputs.version }}
+      DIGEST: ${{ needs.build.outputs.digest }}
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
-          ref: ${{ needs.build.outputs.commit }}
           fetch-depth: 0
+          persist-credentials: false
 
-      # A night whose build or plan failed has no walk to judge.
-      - id: upstream
-        run: '[ "${{ needs.plan.result }}" = success ]'
-
-      - uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8.0.1
-        with:
-          pattern: qa-*
-          path: shards
-
-      # Records from different shards that report the same thing
-      # become one.
-      - if: hashFiles('shards/*/qa-unfiled/*.json') != ''
-        timeout-minutes: 15
-        uses: anthropics/claude-code-action@12dd8d74c712f5f3669365b2369b558c495b1104 # v1.0.238
-        with:
-          claude_code_oauth_token: ${{ secrets.CLAUDE_CODE_OAUTH_TOKEN }}
-          prompt: Run the `nightly-qa` skill with the arguments `merge shards`.
-          allowed_bots: claude,github-actions,dependabot
-          bot_id: "209825114"
-          claude_args: |
-            --model claude-opus-5-5
-            --allowedTools Read,Write,Glob,Skill
-
-      # The merge could write to the working tree, so what decides the
-      # night runs from the commit's own copy.
-      - if: always()
-        run: git checkout -q HEAD -- .github/actions
-
-      # A fresh run files what QA recorded, as claude[bot].
-      - if: always() && hashFiles('qa-unfiled/*.json') != ''
-        timeout-minutes: 10
-        continue-on-error: true
-        uses: anthropics/claude-code-action@12dd8d74c712f5f3669365b2369b558c495b1104 # v1.0.238
-        with:
-          claude_code_oauth_token: ${{ secrets.CLAUDE_CODE_OAUTH_TOKEN }}
-          prompt: Run `python3 .github/actions/qa-file/file.py` once and report its output.
-          allowed_bots: claude,github-actions,dependabot
-          bot_id: "209825114"
-          claude_args: |
-            --model claude-opus-5-5
-            --allowedTools "Bash(python3 .github/actions/qa-file/file.py)"
-
-      # What that run could not file, the workflow files before the
-      # night is judged.
-      - if: always()
-        uses: ./.github/actions/qa-file
-
-      # Every shard finished.
-      - id: qa-done
-        env:
-          SHARDS: ${{ needs.plan.outputs.shards }}
-        run: '[ "$(find shards -name qa-done.txt | wc -l)" -eq "$(jq length <<< "$SHARDS")" ]'
-
-      # What the completed walk covered, for the next night's plan and
-      # for promotion. Without it, the next night walks every feature.
-      - env:
-          RECORD: ${{ needs.plan.outputs.record }}
-        continue-on-error: true
-        run: printf '%s\n' "$RECORD" > qa-walked.json
-      - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
-        continue-on-error: true
-        with:
-          name: qa-walked
-          path: qa-walked.json
-
-      - id: gate
-        uses: ./.github/actions/release-gate
-        with:
-          commit: HEAD
-          since: ${{ needs.build.outputs.last }}
-
-      # A version that exists is published already.
-      - if: needs.build.outputs.existing != 'true'
-        uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8.0.1
-        with:
-          name: image
-      - if: needs.build.outputs.existing != 'true'
-        id: image
-        env:
-          TODAY: ${{ needs.build.outputs.today }}
-          BUILT: ${{ needs.build.outputs.image }}
+      - id: publish
         run: |
-          docker load -i image.tar
-          [ "$(docker image inspect -f '{{.Id}}' "$IMAGE:$TODAY")" = "$BUILT" ]
+          [ -n "$DIGEST" ]
+          echo "$GH_TOKEN" | docker login ghcr.io -u "$GITHUB_ACTOR" --password-stdin
+          docker buildx imagetools create -t "$IMAGE:$VERSION" -t "$IMAGE:nightly" "$IMAGE@$DIGEST"
+          .github/actions/notes/notes.sh "$VERSION" "$GITHUB_SHA" "$IMAGE@$DIGEST" > notes.md
+          gh release create "$VERSION" --target "$GITHUB_SHA" --prerelease --title "$VERSION" --notes-file notes.md
 
-      - if: needs.build.outputs.existing != 'true'
-        id: publish
-        env:
-          TODAY: ${{ needs.build.outputs.today }}
-          LAST: ${{ needs.build.outputs.last }}
-        run: |
-          echo "${{ github.token }}" | docker login ghcr.io -u "${{ github.actor }}" --password-stdin
-          docker tag "$IMAGE:$TODAY" "$IMAGE:nightly"
-          docker push "$IMAGE:$TODAY"
-          docker push "$IMAGE:nightly"
-          # The release creates the tag through the API: the agent step
-          # left git authenticated with a token it has since revoked.
-          python3 tools/release-notes.py "$LAST" HEAD > notes.md
-          gh release create "$TODAY" --target "$(git rev-parse HEAD)" --prerelease --title "$TODAY" --notes-file notes.md
+      # Files any code scanning alert the route after a merge missed.
+      - if: always()
+        run: gh workflow run agent.yml --ref master -f issue=alerts
 
       # A failed night always leaves an issue the loop takes up.
       - if: failure() || cancelled()
         uses: ./.github/actions/nightly-failure
         with:
-          today: ${{ needs.build.outputs.today }}
+          stage: nightly
+          today: ${{ env.VERSION }}
           steps: ${{ toJSON(steps) }}
           needs: ${{ toJSON(needs) }}
+
+  hunt:
+    needs: [decide, build, publish]
+    uses: ./.github/workflows/hunt.yml
+    permissions:
+      actions: write
+      contents: read
+      issues: write
+      packages: read
+    with:
+      digest: ${{ needs.build.outputs.digest }}
+      base: ${{ needs.decide.outputs.base }}

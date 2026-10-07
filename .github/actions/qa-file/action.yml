@@ -1,5 +1,5 @@
 name: QA file
-description: Files what nightly QA recorded and could not file itself.
+description: Files what a QA hunt recorded.
 runs:
   using: composite
   steps:

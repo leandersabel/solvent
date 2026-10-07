@@ -1,0 +1,129 @@
+name: Candidate
+
+# The client's candidate: the image under `:nightly`, or the digest
+# given, gets `:rc` and a pre-release. QA then hunts every feature of it
+# (CLAUDE.md, The loop, Nightly and stable).
+on:
+  workflow_dispatch:
+    inputs:
+      digest:
+        description: The digest to make a candidate, instead of the one under :nightly
+        type: string
+        default: ""
+
+permissions: {}
+
+concurrency: candidate
+
+env:
+  IMAGE: ghcr.io/${{ github.repository }}
+  CANDIDATE: https://github.com/${{ github.repository }}/candidate/v1
+
+jobs:
+  # The digest is fixed here, so a nightly published meanwhile changes
+  # nothing.
+  fix:
+    if: github.ref == 'refs/heads/master' && github.triggering_actor == github.repository_owner
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    permissions:
+      contents: read
+      packages: read
+      attestations: read
+    outputs:
+      digest: ${{ steps.fix.outputs.digest }}
+      commit: ${{ steps.fix.outputs.commit }}
+      version: ${{ steps.fix.outputs.version }}
+    env:
+      GH_TOKEN: ${{ github.token }}
+      GIVEN: ${{ inputs.digest }}
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+      - id: fix
+        run: |
+          echo "$GH_TOKEN" | docker login ghcr.io -u "$GITHUB_ACTOR" --password-stdin
+          digest=${GIVEN:-$(docker buildx imagetools inspect "$IMAGE:nightly" --format '{{json .Manifest}}' | jq -r .digest)}
+          [[ "$digest" =~ ^sha256:[0-9a-f]{64}$ ]] || { echo "::error::$digest is not a digest."; exit 1; }
+          commit=$(gh attestation verify "oci://$IMAGE@$digest" --repo "$GITHUB_REPOSITORY" \
+            --signer-workflow "$GITHUB_REPOSITORY/.github/workflows/build.yml" --source-ref refs/heads/master \
+            --format json --jq '.[0].verificationResult.signature.certificate.sourceRepositoryDigest')
+          dev=$(git tag --points-at "$commit" --list '*-dev.*' | sort -V | tail -n 1)
+          [ -n "$dev" ] || { echo "::error::No nightly was published of $commit."; exit 1; }
+          base=${dev%-dev.*}
+          if git rev-parse -q --verify "refs/tags/$base" > /dev/null; then
+            echo "::error::$base is released already."; exit 1
+          fi
+          {
+            echo "digest=$digest"
+            echo "commit=$commit"
+            echo "version=$base-rc.$(( $(git tag --list "$base-rc.*" | wc -l) + 1 ))"
+          } >> "$GITHUB_OUTPUT"
+
+  publish:
+    needs: fix
+    if: always() && needs.fix.result != 'skipped'
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    permissions:
+      actions: write
+      attestations: write
+      contents: write
+      id-token: write
+      issues: write
+      packages: write
+    env:
+      GH_TOKEN: ${{ github.token }}
+      VERSION: ${{ needs.fix.outputs.version }}
+      DIGEST: ${{ needs.fix.outputs.digest }}
+      COMMIT: ${{ needs.fix.outputs.commit }}
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+
+      - id: fix
+        env:
+          FIXED: ${{ needs.fix.result }}
+        run: '[ "$FIXED" = success ]'
+
+      # What the release verifies: this image is a candidate of its commit.
+      - id: record
+        run: |
+          echo "record=$(jq -cn --arg commit "$COMMIT" '{commit: $commit}')" >> "$GITHUB_OUTPUT"
+      - uses: actions/attest@1e69f48acb82d1966a394da916b4c1698aa569d6 # v4.2.2
+        with:
+          subject-name: ${{ env.IMAGE }}
+          subject-digest: ${{ env.DIGEST }}
+          predicate-type: ${{ env.CANDIDATE }}
+          predicate: ${{ steps.record.outputs.record }}
+
+      - id: publish
+        run: |
+          echo "$GH_TOKEN" | docker login ghcr.io -u "$GITHUB_ACTOR" --password-stdin
+          docker buildx imagetools create -t "$IMAGE:$VERSION" -t "$IMAGE:rc" "$IMAGE@$DIGEST"
+          .github/actions/notes/notes.sh "$VERSION" "$COMMIT" "$IMAGE@$DIGEST" > notes.md
+          gh release create "$VERSION" --target "$COMMIT" --prerelease --title "$VERSION" --notes-file notes.md
+
+      - if: failure() || cancelled()
+        uses: ./.github/actions/nightly-failure
+        with:
+          stage: candidate
+          today: ${{ env.VERSION }}
+          steps: ${{ toJSON(steps) }}
+          needs: ${{ toJSON(needs) }}
+
+  hunt:
+    needs: [fix, publish]
+    uses: ./.github/workflows/hunt.yml
+    permissions:
+      actions: write
+      contents: read
+      issues: write
+      packages: read
+    with:
+      digest: ${{ needs.fix.outputs.digest }}
+      full: true

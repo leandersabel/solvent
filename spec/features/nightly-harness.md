@@ -1,6 +1,6 @@
 # Nightly harness
 
-The tooling a QA walk puts around the image it walks, so `qa` can
+The tooling a QA hunt puts around the image it hunts, so `qa` can
 check what no browser alone can see: the price sources answering under
 their real names, data that took years to accumulate, promises that
 take hours to come due, and the server's own log.
@@ -11,12 +11,12 @@ take hours to come due, and the server's own log.
 
 It is pipeline tooling under `tools/nightly/`, never in the image, and
 nothing in the image knows it exists (CLAUDE.md, The loop, Nightly and
-stable). Every harness container of a walk runs the walked image by
+stable). Every harness container of a hunt runs the hunted image by
 its digest, unchanged, with its entrypoint overridden and
-`tools/nightly/` mounted read-only. No step of a walk builds, commits
+`tools/nightly/` mounted read-only. No step of a hunt builds, commits
 or tags an image, so the image a nightly or a candidate publishes is
-the one every shard walked. The daily source check is the one part
-outside the walk (The source checks).
+the one it hunts. The daily source check is the one part outside the
+hunt (The source checks).
 
 ### Which features it serves
 
@@ -46,7 +46,7 @@ outside the walk (The source checks).
 - **`qa` reaches the server only through the harness tools.** They have
   fixed names and argument shapes, take no command, path, container
   name or URL, and run with an empty environment, so no token reaches
-  them. The walk step holds no unrestricted shell (What the workflow
+  them. The hunt step holds no unrestricted shell (What the workflow
   does).
 - **Everything the server says is untrusted text**, returned to `qa` as
   JSON strings, never interpreted.
@@ -86,7 +86,7 @@ tests import from `tools/`, and nothing in `solvent` does.
 | `fixtures/plan.json` | what the prepared data holds, committed |
 | `fixtures/backup-format-1.json` | the older backup file, committed, never regenerated |
 | `fixtures/backup-format-1.plan.json`, `fixtures/backup-format-1.expected.json` | the plan that made it and the figures it holds, committed with it |
-| `fixtures/out/` | the shard's generated data, ignored by git |
+| `fixtures/out/` | the hunt's generated data, ignored by git |
 
 `qa` may read `fixtures/plan.json`, `fixtures/out/manifest.json` and
 the backup files, never the code. A script that runs to an end exits 0
@@ -95,7 +95,7 @@ nothing but its stated outputs.
 
 ### The network
 
-Each shard creates its own Docker networks:
+Each hunt creates its own Docker networks:
 
 - `nightly`, created with `--internal`: the app, the stand-in, and one
   leg of the relay. Nothing on it has a route out.
@@ -151,7 +151,7 @@ that moves its trust store fails the harness rather than every lookup.
 ### The stand-in
 
 `python /harness/standin.py --cert <leaf.pem> --key <leaf.key> --state
-<dir> [--port 443]`, in a container of the walked image on `nightly`.
+<dir> [--port 443]`, in a container of the hunted image on `nightly`.
 
 - HTTPS only, TLS 1.2 or later, a `ThreadingHTTPServer` behind an
   `ssl.SSLContext(PROTOCOL_TLS_SERVER)` holding the leaf alone.
@@ -247,7 +247,7 @@ opened, appended and closed under a lock per request:
 ### The relay
 
 `python /harness/relay.py --listen 0.0.0.0:8000 --to solvent:8000`,
-in a container of the walked image. It copies bytes both ways between
+in a container of the hunted image. It copies bytes both ways between
 each accepted connection and one new connection to the fixed target,
 and closes both when either side closes. It reads, logs and alters
 nothing.
@@ -288,7 +288,7 @@ It exits 1 when any source is `changed`, and 0 otherwise, so a source
 that does not answer is a note in the run's summary and no finding,
 because the outage is the source's.
 
-**`probe`** runs per shard against the stand-in, on `nightly` with
+**`probe`** runs per hunt against the stand-in, on `nightly` with
 `trust/` mounted as in the app. It exits 0 only when both sources are
 `ok` and a TCP connection to `1.1.1.1:443` does not open within 3
 seconds, which proves the trust store, the aliases and the missing
@@ -321,7 +321,7 @@ leaves out.
 | `idle-lock-out-of-range` | a vault owner used for nothing else, whose profile record carries `idleLockMinutes: 0`, which the app reads as five minutes, the nearest offered period (account-settings.md, Session and lock). It stands alone because each unlock spends a sign-in and its lock would interrupt any other check on the vault |
 | `aged-session` | `qa`'s browser starts holding a session of a prepared vault owner, issued 12 hours 5 minutes before `patch.py` ran and last active 1 minute before it |
 | `expired-invite` | a vault-owner invite that expired one day before `patch.py` ran |
-| `current-backup` | the shard's export of the `long-history` vault |
+| `current-backup` | the hunt's export of the `long-history` vault |
 | `older-backup` | `fixtures/backup-format-1.json` |
 | `harness-admin` | the administrator through whom the invites were made |
 | `cleared-date` | a recording whose figures were all cleared, its rates kept, between two recordings, with a foreign price there off the straight line between that unit's neighbors, so the date still bends the band |
@@ -454,7 +454,7 @@ else to know what is prepared.
 #### Dating back
 
 `python /harness/patch.py <database> <patches.json>`, in a one-off
-container of the walked image with `--network none`, the app's volume,
+container of the hunted image with `--network none`, the app's volume,
 and the app stopped. `patches.json`:
 
 ```json
@@ -527,7 +527,7 @@ env -i PATH=/usr/bin:/bin python3 tools/nightly/mcp.py \
 
 ### What the workflow does
 
-`.github/workflows/walk.yml`, which the nightly and the candidate call
+`.github/workflows/hunt.yml`, which the nightly and the candidate call
 with a digest, and `.github/workflows/sources.yml` are the client's
 files, and no agent writes them. So the harness's part of the contract
 that lives there reaches the client as a pull request, with the exact
@@ -538,11 +538,10 @@ harness to hold.
 **The source check**, once a day in `sources.yml`: builds an image of
 its own commit, runs `sources.py check` in a container of it on the
 default network, and appends its output to the step summary. On exit 1
-it files a `bug` rated high, or comments on the open one. The walk
-never runs it, so a source's changed shape never fails a walk.
+it files a `bug` rated high, or comments on the open one. The hunt
+never runs it, so a source's changed shape never fails a hunt.
 
-**Each QA shard**, before the walk, in steps whose failure fails the
-shard as the harness:
+**Each hunt**, before `qa` starts:
 
 1. Runs the setup action, for Node and `CHROME`, and pulls the image
    by its digest.
@@ -566,29 +565,32 @@ shard as the harness:
     `harness-admin` exists.
 
 Every harness container runs `--read-only --cap-drop ALL
---security-opt no-new-privileges:true`.
+--security-opt no-new-privileges:true`. A failure of any of these ends
+the hunt, which advises and never fails its caller.
 
-**The walk step**:
+**The hunt step**, in a fixed time box:
 
 - passes `tools/nightly/fixtures/out/manifest.json` as the manifest.
 - adds the `harness` MCP server as above, and
   `--storage-state tools/nightly/fixtures/out/storage-state.json` to the
   Playwright server's arguments.
 - adds a second Playwright server, `playwright2`, that starts with
-  nothing stored, for a criterion needing two sessions at once.
+  nothing stored, for a check needing two sessions at once.
 - allows `mcp__harness`, `mcp__playwright` and `mcp__playwright2`, and
   no `Bash` beyond
   `gh issue list` and `gh issue view`. With an unrestricted shell the
-  walk would reach Docker, the database volume and the internet, and
+  hunt would reach Docker, the database volume and the internet, and
   the harness tools would no longer be the only way to the server.
 
-On failure it prints `docker logs` of `solvent` and `standin`.
+What `qa` recorded is uploaded whether the step finished or not, and a
+job with a token that writes issues files it. On failure the hunt
+prints `docker logs` of `solvent` and `standin`.
 
 ## Edge cases
 
 - **A source does not answer the check**: the stand-in answers the
-  shards either way.
-- **The base image moves its trust store**: the probe fails the shard
+  hunt either way.
+- **The base image moves its trust store**: the probe ends the hunt
   as the harness (The run's certificate authority), rather than every
   lookup failing as a finding.
 - **`qa` sets a source down and its breaker opens**: the app skips that

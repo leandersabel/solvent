@@ -27,7 +27,7 @@ jobs:
         run: |
           if git cat-file -e "$BASE^{commit}" 2>/dev/null &&
             ! git diff --name-only "$BASE" HEAD | grep -q '^spec/features/' &&
-            [ -z "$(git diff --name-only "$BASE" HEAD | grep -vE '^(spec/|\.claude/|[^/]+\.md$)')" ]; then
+            ! git diff --name-only "$BASE" HEAD | grep -qvE '^(spec/|\.claude/|[^/]+\.md$)'; then
             echo "code=false"
           else
             echo "code=true"
@@ -67,6 +67,18 @@ jobs:
       - run: curl -fsS --retry 10 --retry-all-errors --retry-delay 1 -o /dev/null http://localhost:8000/login
       - if: failure()
         run: docker logs solvent
+
+  # Every workflow, linted for mistakes and for the weaknesses zizmor
+  # knows. Go's checksum database pins actionlint, and pip pins zizmor.
+  workflows:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - run: go run github.com/rhysd/actionlint/cmd/actionlint@v1.7.12
+      - run: pipx run zizmor==1.30.1 --offline --min-severity medium .github/workflows
 
   dependencies:
     if: github.event_name == 'pull_request'

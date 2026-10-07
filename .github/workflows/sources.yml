@@ -1,0 +1,51 @@
+name: Price sources
+
+# One real lookup to each price source a day, requested exactly as the
+# app requests them, from an image of this commit. A source that answers
+# in a changed shape gets a high bug. One that does not answer is a note
+# in the summary (CLAUDE.md, The loop, Nightly and stable).
+on:
+  schedule:
+    - cron: "0 5 * * *"
+  workflow_dispatch:
+
+permissions: {}
+
+jobs:
+  check:
+    if: github.ref == 'refs/heads/master'
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    permissions:
+      actions: write
+      contents: read
+      issues: write
+    env:
+      GH_TOKEN: ${{ github.token }}
+      RUN: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - run: docker build -t solvent .
+      - id: check
+        run: |
+          status=0
+          docker run --rm --read-only --cap-drop ALL --security-opt no-new-privileges:true \
+            -e PYTHONPATH=/app \
+            -v "$PWD/tools/nightly:/harness:ro" \
+            --entrypoint python \
+            solvent /harness/sources.py check > sources.txt || status=$?
+          { echo '```'; cat sources.txt; echo '```'; } >> "$GITHUB_STEP_SUMMARY"
+          exit "$status"
+      - if: failure() && steps.check.outcome == 'failure'
+        run: |
+          title="A price source answers in a changed shape"
+          open=$(gh issue list --state open --author app/github-actions --label bug --search "in:title \"$title\"" --json number --jq '.[0].number // empty')
+          if [ -n "$open" ]; then
+            gh issue comment "$open" --body "Still changed on $(date -u +%F): $RUN"
+          else
+            gh label create "severity: high" 2>/dev/null || true
+            url=$(gh issue create --label bug --label "severity: high" --title "$title" --body "$title: $RUN")
+            gh workflow run agent.yml --ref master -f issue="${url##*/}"
+          fi

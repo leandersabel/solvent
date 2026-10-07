@@ -10,9 +10,7 @@ inputs:
 runs:
   using: composite
   steps:
-    # What it could not read stays in release-gate.err for the failure
-    # report.
-    - run: python3 "$GITHUB_ACTION_PATH/gate.py" 2> >(tee release-gate.err >&2)
+    - run: python3 "$GITHUB_ACTION_PATH/gate.py"
       shell: bash
       env:
         COMMIT: ${{ inputs.commit }}
