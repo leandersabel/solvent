@@ -906,4 +906,5 @@ administrator), and the lost sole password (Bootstrap). The rest:
     stops working after on Invites, Type the username to confirm in the
     Remove dialog, Code, Name, Kind and Rate lookup in Add a unit, and
     each field of the password card, by the label shown beside it.
-    Test: `tests/browser/parts/admin.mjs`.
+    Test: `tests/browser/parts/admin.mjs`,
+    `tests/browser/parts/admin-review-names.mjs`.
