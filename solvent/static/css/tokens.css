@@ -2091,6 +2091,8 @@ select {
   .btn-secondary,
   .btn-destructive { min-height: 44px; }
 
+  input[type="file"]::file-selector-button { min-height: 44px; }
+
   .screen-heading { font-size: 26px; }
 
   .section-heading,

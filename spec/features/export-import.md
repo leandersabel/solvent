@@ -655,4 +655,5 @@ There is no `formatVersion` below 1.
     `tests/browser/parts/export-import.mjs`,
     `tests/browser/parts/export-import-review-unreadable.mjs`.
 59. The Import file picker's button is Button, secondary, not the
-    browser's default. Test: `tests/browser/parts/export-import.mjs`.
+    browser's default. Test: `tests/browser/parts/export-import.mjs`,
+    `tests/browser/parts/export-import-review-picker.mjs`.
