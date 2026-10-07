@@ -4,7 +4,7 @@
 // Templates: dashboard.html. Modules: view-dimensions.js, view-settings.js,
 // view-dashboard.js, writes.js, model.js, dom.js.
 import {
-  VAULT_PASSWORD, check, click, enterPassword, expectedFailures, intercept, labels, page, run, setValue, sql, story, text, unlockDashboard,
+  VAULT_PASSWORD, check, click, enterPassword, expectedFailures, fieldNames, intercept, labels, page, run, setValue, sql, story, text, unlockDashboard,
   vaultOwner,
 } from '../harness.mjs';
 
@@ -61,6 +61,12 @@ await run(async () => {
 
   await click('Create a dimension');
   await page.waitUntil("document.querySelector('.dialog input')");
+  const createFields = await fieldNames('.dialog');
+  check(
+    'a screen reader names both fields of the create dialog by the label shown beside it',
+    createFields.labels.join('|') === 'Name|First value' && createFields.names.join('|') === createFields.labels.join('|'),
+    JSON.stringify(createFields),
+  );
   await page.eval(`(() => {
     const inputs = document.querySelectorAll('.dialog input');
     inputs[0].value = 'Liquidity';
@@ -183,6 +189,16 @@ await run(async () => {
       await click('+ Add value');
       await inDialog([label], 'Add');
     });
+  await click('+ Add value');
+  await page.waitUntil("document.querySelector('.dialog input')");
+  const valueFields = await fieldNames('.dialog');
+  check(
+    'a screen reader names the field of the add value dialog by the label shown beside it',
+    valueFields.labels.join('|') === 'Label' && valueFields.names.join('|') === 'Label',
+    JSON.stringify(valueFields),
+  );
+  await page.eval("[...document.querySelectorAll('.dialog button')].find((b) => b.textContent === 'Cancel').click()");
+  await page.waitUntil("!document.querySelector('.dialog')", { label: 'the add value dialog to close' });
   const writeCounts = {
     'add a value': await addValue('Investments'),
     'add another value': await addValue('Retirement'),

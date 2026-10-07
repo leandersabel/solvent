@@ -438,6 +438,22 @@ export const confirmLook = (label, session = page) =>
 export const looksDisabled = (look) =>
   look.cursor === 'default' && look.opacity === '1' && look.petrolFill && look.petrolBorder && look.inkLabel && !look.red;
 export const looksEnabledRed = (look) => look.redFill && look.opacity === '1';
+// Each field's visible label beside the name the accessibility tree,
+// which is what a screen reader hears, gives its control, for the
+// controls inside `scope`.
+export const fieldNames = async (scope) => {
+  await page.send('Accessibility.enable');
+  const selector = `${scope} .field :is(select, input)`;
+  const labels = await page.call((s) => [...document.querySelectorAll(s)].map((c) => c.closest('.field').querySelector('label').textContent), selector);
+  const { root } = await page.send('DOM.getDocument', { depth: 0 });
+  const { nodeIds } = await page.send('DOM.querySelectorAll', { nodeId: root.nodeId, selector });
+  const names = [];
+  for (const nodeId of nodeIds) {
+    const { nodes } = await page.send('Accessibility.getPartialAXTree', { nodeId, fetchRelatives: false });
+    names.push(nodes[0].ignored ? null : nodes[0].name?.value ?? '');
+  }
+  return { labels, names };
+};
 export const text = () => page.eval('document.body.innerText');
 export const labels = (selector) =>
   page.call((query) => [...document.querySelectorAll(query)].map((n) => n.textContent.trim()), selector);
