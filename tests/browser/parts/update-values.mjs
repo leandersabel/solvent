@@ -728,7 +728,7 @@ await run(async () => {
   const kept = on(await stored('snapshot'), D6).find((s) => s.accountId === id['Current account']);
   check(
     'record-rate: with every price write failing, the figure is stored exactly and the screen says the prices were not updated',
-    kept && kept.payload.value === '20.25' && reported.includes('Prices were not updated for USD, Gold, troy ounce') &&
+    kept && kept.payload.value === '20.25' && reported.includes('Prices were not updated for USD and Gold, troy ounce') &&
       (await rowState('Current account')).state === 'Recorded for this date.' && on(await stored('rate'), D6).length === 0,
     reported,
   );

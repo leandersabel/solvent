@@ -2,7 +2,7 @@
 // (spec/features/record-snapshot.md, Snapshot entry).
 import * as decimal from './decimal.js';
 import * as writes from './writes.js';
-import { dialog, el, mount, resumable, today } from './dom.js';
+import { dialog, el, listed, mount, resumable, today } from './dom.js';
 import { dateField } from './datepicker.js';
 import { dayNumber, isoFromDay } from './model.js';
 import { closedCopy, describeConverted as showConverted, rateBlock } from './view-sweep.js';
@@ -193,7 +193,7 @@ export function snapshotDialog(vault, holding, existing, onSaved, onOpenRecordin
     // lines show, on their own requests.
     if (sit.proposals) block.showProposals(await sit.proposals);
     const { failed } = await writes.refreshPrices(vault, on, {}, (unit) => block.partFor(unit));
-    if (failed.length) return finishWith(`Saved. The prices were not updated for ${failed.map((unit) => vault.unitName(unit)).join(', ')}.`);
+    if (failed.length) return finishWith(`Saved. The prices were not updated for ${listed(failed.map((unit) => vault.unitName(unit)))}.`);
     return done();
   };
 
@@ -222,8 +222,7 @@ export function snapshotDialog(vault, holding, existing, onSaved, onOpenRecordin
     const { failed, undeleted } = result;
     const left = `The entry already on ${vault.format.longDate(on)} could not be deleted, so the date holds both until you keep one.`;
     if (!failed.length) return undeleted ? finishWith(`Moved. ${left}`) : done();
-    const names = failed.map((unit) => vault.unitName(unit));
-    const units = names.length > 1 ? `${names.slice(0, -1).join(', ')} and ${names.at(-1)}` : names[0];
+    const units = listed(failed.map((unit) => vault.unitName(unit)));
     const lost = `${failed.length > 1 ? 'The prices' : 'The price'} for ${units} on that date did not save.`;
     // The entry has moved: what the dialog shows follows it, Save stays
     // inert until something changes, and the date's own screen is where

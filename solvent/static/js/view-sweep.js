@@ -7,7 +7,7 @@
 // own age in plain language instead.
 import * as decimal from './decimal.js';
 import * as writes from './writes.js';
-import { ageInWords, counted, dialog, el, icon, mount, priceDateLine } from './dom.js';
+import { ageInWords, counted, dialog, el, icon, listed, mount, priceDateLine } from './dom.js';
 import { dayNumber } from './model.js';
 
 // One sitting per date, kept across redraws of the sweep on screen and
@@ -170,7 +170,7 @@ export function sweepView(vault, date, actions = {}) {
     }
     syncSave();
     if (failed.length) {
-      say(`Recorded. Prices were not updated for ${failed.map((unit) => vault.unitName(unit)).join(', ')}.`, { critical: true });
+      say(`Recorded. Prices were not updated for ${listed(failed.map((unit) => vault.unitName(unit)))}.`, { critical: true });
     }
   };
 
@@ -967,7 +967,7 @@ export function rateChangeCopy(vault, date, changes) {
 /** Both halves of a save that landed in part, by holding name and by
  *  unit: a count alone leaves the vault in a state nobody can see. */
 export function partialCopy(vault, result) {
-  const named = (list) => list.map((change) => vault.unitName(change.name)).join(', ');
+  const named = (list) => listed(list.map((change) => vault.unitName(change.name)));
   if (!result.failed.length) return 'Saved.';
   const landed = result.saved.length ? `Saved: ${named(result.saved)}. ` : '';
   return `${landed}Not saved: ${named(result.failed)}. Nothing was rolled back, and saving again retries only what did not land.`;

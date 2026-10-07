@@ -6,7 +6,7 @@
 // being opened is the one thing this screen must not be.
 import * as decimal from './decimal.js';
 import * as writes from './writes.js';
-import { counted, dialog, el, priceDateLine, today } from './dom.js';
+import { counted, dialog, el, listed, priceDateLine, today } from './dom.js';
 import { isRecordedDay } from './model.js';
 import { holdingsIn, provenanceChip } from './view-sweep.js';
 
@@ -141,13 +141,12 @@ function keepCell(vault, rivals, note, onChanged) {
 
 /** What a recording still holds, by holding name and by unit. */
 function named(vault, entries) {
-  return entries
+  return listed(entries
     .map((entry) =>
       entry.recordType === 'snapshot'
         ? (vault.holdings.get(entry.accountId) || { payload: { name: 'a holding' } }).payload.name
         : `the ${vault.unitName(entry.payload.symbol)} price`,
-    )
-    .join(', ');
+    ));
 }
 
 /** One confirmation, naming the two things that make this
@@ -165,13 +164,13 @@ function confirmDelete(vault, date, onDeleted, redraw) {
   else if (kept.length === figures.length) first = 'Only the prices captured that day go.';
   const body = [el('p', { text: first })];
   if (kept.length) {
-    const names = kept.map((f) => f.holding.payload.name).join(', ');
+    const names = listed(kept.map((f) => f.holding.payload.name));
     body.push(el('p', { text: `The zero recorded when you archived ${names} stays, and so does this recording, holding it.` }));
   }
   if (units.length) {
     body.push(
       el('p', {
-        text: `${counted(affected, 'holding', 'holdings')} measured in ${units.map((unit) => vault.unitName(unit)).join(' and ')} ${affected === 1 ? 'moves' : 'move'} on that date, including ones you recorded nothing for.`,
+        text: `${counted(affected, 'holding', 'holdings')} measured in ${listed(units.map((unit) => vault.unitName(unit)))} ${affected === 1 ? 'moves' : 'move'} on that date, including ones you recorded nothing for.`,
       }),
     );
   }

@@ -369,7 +369,7 @@ await run(async () => {
   const pricesFailed = await formError();
   check(
     'record-snapshot: the form keeps the figure when its prices do not save, and names the units',
-    pricesFailed === 'Saved. The prices were not updated for USD, Gold, troy ounce.' &&
+    pricesFailed === 'Saved. The prices were not updated for USD and Gold, troy ounce.' &&
       on(await stored('snapshot'), DS).some((s) => s.accountId === id.Savings) &&
       (await ev("[...document.querySelectorAll('.dialog button')].some(b => b.textContent === 'Done')")),
     pricesFailed,
@@ -658,7 +658,7 @@ await run(async () => {
     'record-snapshot: closing the form with a typed price and figure writes nothing and names both on the screen beneath',
     !(await ev("Boolean(document.querySelector('.dialog'))")) && writesSent().length === 0 &&
       on(await stored('snapshot'), DL).length === 0 && on(await stored('rate'), DL).length === 0 &&
-      (await shown()).includes(`You left the entry for ${await format('longDate', DL)} with changes that were not saved: Current account, the USD rate.`),
+      (await shown()).includes(`You left the entry for ${await format('longDate', DL)} with changes that were not saved: Current account and the USD rate.`),
   );
   await openForm('Current account');
   await set('#snapshot-value', '8');

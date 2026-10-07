@@ -2450,7 +2450,7 @@ await check('record-rate: the rate-lines save writes the rates, then deletes, an
   assert.equal(back.figures.find((f) => f.holding.payload.name === 'Dollars').snapshot.version, 1);
   const copy = views.partialCopy(vault, result);
   assert.ok(copy.includes('Not saved: Gold, troy ounce'), copy);
-  assert.ok(copy.includes('Saved: USD, Silver, troy ounce'), copy);
+  assert.ok(copy.includes('Saved: USD and Silver, troy ounce'), copy);
 });
 
 await check('record-rate: the rate-lines save at a date holding no recording issues no request and writes nothing', async () => {
@@ -3047,6 +3047,13 @@ await check('a count of exactly one takes the singular, every other count the pl
   assert.equal(counted(0, 'day', 'days'), '0 days');
   assert.equal(counted(1, 'day', 'days'), '1 day');
   assert.equal(counted(2, 'recorded value', 'recorded values'), '2 recorded values');
+});
+
+await check('names in a sentence take commas and "and" only before the last', async () => {
+  const { listed } = await load('dom.js');
+  assert.equal(listed(['USD']), 'USD');
+  assert.equal(listed(['USD', 'EUR']), 'USD and EUR');
+  assert.equal(listed(['USD', 'EUR', 'Gold, troy ounce']), 'USD, EUR and Gold, troy ounce');
 });
 
 // ---- Recorded days and addresses ---------------------------------------

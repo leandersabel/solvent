@@ -466,6 +466,12 @@ export function counted(n, one, many) {
   return `${n} ${n === 1 ? one : many}`;
 }
 
+/** Names in a sentence, "A", "A and B", "A, B and C"
+ *  (spec/design-system.md, Figures). */
+export function listed(names) {
+  return names.length > 1 ? `${names.slice(0, -1).join(', ')} and ${names.at(-1)}` : names[0];
+}
+
 /** "3 weeks ago", "about a year ago" (spec/features/record-snapshot.md,
  *  Update values, Age).
  *  Relative, because the question is how long this has been sitting

@@ -16,6 +16,7 @@ import {
   editedFields,
   el,
   enterOutsideFrame,
+  listed,
   markCurrentNav,
   mount,
   reopenDialogs,
@@ -173,7 +174,7 @@ function leftUnsaved({ of = 'recording', date, names }) {
   const on = date ? ` for ${vault.format.longDate(date)}` : '';
   container.prepend(
     el('p', { class: 'banner banner-critical', role: 'status' }, [
-      `You left the ${of}${on} with changes that were not saved: ${names.join(', ')}.`,
+      `You left the ${of}${on} with changes that were not saved: ${listed(names)}.`,
     ]),
   );
 }

@@ -6,7 +6,7 @@
 import * as api from './api.js';
 import * as decimal from './decimal.js';
 import * as writes from './writes.js';
-import { counted, dialog, el, listOption, resumable, today } from './dom.js';
+import { counted, dialog, el, listed, listOption, resumable, today } from './dom.js';
 import { newId } from './view-dimensions.js';
 
 let symbolTable = null;
@@ -596,11 +596,7 @@ export function flagFailedCopy(status, on, unpriced) {
     status === 'flagConflict'
       ? `This holding was changed in another tab. Zero is recorded for ${on}, but the holding was not archived.`
       : `Zero is recorded for ${on}, but the holding was not archived. It is still in your total, at zero.`;
-  return unpriced.length ? `${lead} The prices for ${unitList(unpriced)} did not save.` : lead;
-}
-
-function unitList(units) {
-  return units.length > 1 ? `${units.slice(0, -1).join(', ')} and ${units.at(-1)}` : units[0];
+  return unpriced.length ? `${lead} The prices for ${listed(unpriced)} did not save.` : lead;
 }
 
 /** What a purge takes with it, read off the holding's snapshots. Only a
@@ -691,7 +687,6 @@ export function archiveHoldingDialog(vault, holding, onDone, then = 'reload', sa
     close();
     archiveHoldingDialog(vault, vault.holdings.get(holding.recordId), onDone, then, text, openRecording);
   };
-  const named = unitList;
 
   const archive = el('button', {
     class: 'btn-primary',
@@ -730,7 +725,7 @@ export function archiveHoldingDialog(vault, holding, onDone, then = 'reload', sa
       if (unpriced.length) {
         // The zero is recorded and the archive went through. Nothing
         // is rolled back, and the units left without a price are named.
-        done(`Archived. The prices for ${named(unpriced.map((unit) => vault.unitName(unit)))} on ${on} did not save. Add them in the recording for that date.`);
+        done(`Archived. The prices for ${listed(unpriced.map((unit) => vault.unitName(unit)))} on ${on} did not save. Add them in the recording for that date.`);
         return;
       }
       close();

@@ -130,7 +130,7 @@ await run(async () => {
   await set('#snapshot-value', '4243');
   traffic.length = 0;
   await escape();
-  const byEscape = await on91(`You left the entry for ${await format('longDate', DA)} ${LEFT}: Current account, the USD rate.`)();
+  const byEscape = await on91(`You left the entry for ${await format('longDate', DA)} ${LEFT}: Current account and the USD rate.`)();
   check(
     'review 91: Escape with a figure and a price typed writes nothing and names the holding and the unit',
     noWrites() && on(await stored('rate'), DA).length === 0 && byEscape.ok,
