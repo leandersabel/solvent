@@ -1718,4 +1718,5 @@ Editing an existing entry).
      `tests/browser/parts/recording-detail-units.mjs`.
 105. On Update values, a screen reader names each value field by its
      holding's name and "value", such as "Mortgage value". Test:
-     `tests/browser/parts/update-values.mjs`.
+     `tests/browser/parts/update-values.mjs`,
+     `tests/browser/parts/update-values-review-field-names.mjs`.
