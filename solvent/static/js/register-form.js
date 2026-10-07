@@ -74,9 +74,10 @@ export function registerForm({ kind, token: inviteToken, currencies, kdf, onCrea
     showUsername();
   });
 
-  const password = el('input', { type: 'password', autocomplete: 'new-password', required: true });
+  const password = el('input', { type: 'password', id: 'register-password', autocomplete: 'new-password', required: true });
   const confirm = el('input', {
     type: 'password',
+    id: 'register-confirm',
     autocomplete: 'new-password',
     'aria-describedby': 'register-confirm-line',
     required: true,
@@ -169,10 +170,10 @@ export function registerForm({ kind, token: inviteToken, currencies, kdf, onCrea
       username,
       usernameLine,
     ]),
-    el('div', { class: 'field' }, [el('label', { text: 'Password' }), passwordWithToggle(password)]),
+    el('div', { class: 'field' }, [el('label', { for: 'register-password', text: 'Password' }), passwordWithToggle(password)]),
     gauge.element,
     el('div', { class: 'field' }, [
-      el('label', { text: 'Confirm password' }),
+      el('label', { for: 'register-confirm', text: 'Confirm password' }),
       passwordWithToggle(confirm),
       mismatch,
     ]),
