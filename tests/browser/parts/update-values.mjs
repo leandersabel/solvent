@@ -23,6 +23,14 @@ await run(async () => {
     'every row states whether this date holds a figure',
     (await labels('.row-state')).every((state) => state === 'Nothing recorded for this date.'),
   );
+  const fieldNames = await page.eval(
+    "[...document.querySelectorAll('.sweep-row')].map(r => [r.querySelector('.holding-name').textContent, r.querySelector('input').getAttribute('aria-label')])",
+  );
+  check(
+    'a value field is named by its holding, such as "Mortgage value"',
+    fieldNames.length === HOLDINGS.length && fieldNames.every(([name, label]) => label === `${name} value`),
+    JSON.stringify(fieldNames),
+  );
   const rateUnits = await page.eval("[...document.querySelectorAll('.rate-line')].map(n => n.dataset.unit)");
   check('one rate line per unit that needs one', rateUnits.join(',') === 'USD,XAU-ozt', rateUnits.join(','));
   check('the main currency has no rate line', !rateUnits.includes('CHF'));
