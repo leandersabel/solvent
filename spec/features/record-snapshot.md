@@ -317,6 +317,13 @@ Line states:
   outage stop somebody recording what they looked up, which this screen
   may never do.
 
+**A price typed into a line with no rate source at this date reads
+"Typed by you", and its sentence keeps only why the price is yours to
+set**: "Nobody publishes a price for m2. This one is yours to set.", or
+"Published prices for Gold, gram begin on 2 January 2013. This one is
+yours to set." It drops the earlier figure's age, "No price for m2
+yet." and the question, because the typed figure answers them.
+
 Units, dates and the main currency in all copy are computed, never
 written in.
 
@@ -1328,12 +1335,18 @@ Editing an existing entry).
     `tests/browser/parts/update-values.mjs`.
 16. A holding in a unit you made up triggers no lookup, gets no entry
     from a recording, and its line says why the price is yours to set.
-    Test: `tests/browser/parts/update-values.mjs`.
+    Once a price is typed there, the line no longer says there is no
+    price, how old the last one is, or asks for one. Test:
+    `tests/browser/parts/update-values.mjs`,
+    `tests/browser/parts/update-values-review-typed.mjs`.
 17. On a date before a published unit's prices begin, its line says when
     they begin and that the price is yours to set, starts from the last
     price before that date, asks for one when there is none, triggers no
-    lookup, and never reads like a source that did not answer. Test:
-    `tests/browser/parts/update-values.mjs`.
+    lookup, and never reads like a source that did not answer. Once a
+    price is typed there, it says only when published prices begin and
+    that the price is yours to set. Test:
+    `tests/browser/parts/update-values.mjs`,
+    `tests/browser/parts/update-values-review-typed.mjs`.
 18. A holding measured in the main currency shows no price anywhere, and
     the main currency has no rate line. Test:
     `tests/browser/parts/update-values.mjs`.

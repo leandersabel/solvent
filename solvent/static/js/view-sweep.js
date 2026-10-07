@@ -747,20 +747,26 @@ function rateLine(vault, unit, date, { sit, readOnly: blockReadOnly, fillMissing
       explanation.textContent = `No price for ${described.name} at this date.`;
       return;
     }
+    // A typed price is the line's figure now, so an owner-priced line
+    // says nothing about the earlier one or its absence.
     if (early) {
-      explanation.textContent = line.carried
-        ? `Set on ${format.fullDate(line.carried.payload.date)}. ${earlyCopy()}`
-        : line.asked
-          ? `What was ${described.one} worth in ${vault.mainCurrency} on ${format.fullDate(date)}? ${earlyCopy(false)} The figure records either way, and until a price exists the holding is listed as not priced.`
-          : earlyCopy();
+      explanation.textContent = line.changed()
+        ? earlyCopy()
+        : line.carried
+          ? `Set on ${format.fullDate(line.carried.payload.date)}. ${earlyCopy()}`
+          : line.asked
+            ? `What was ${described.one} worth in ${vault.mainCurrency} on ${format.fullDate(date)}? ${earlyCopy(false)} The figure records either way, and until a price exists the holding is listed as not priced.`
+            : earlyCopy();
       return;
     }
     if (!quotable) {
-      explanation.textContent = line.carried
-        ? `Estimated ${ageInWords(line.carried.payload.date)}. ${ownCopy()}`
-        : line.asked
-          ? askCopy()
-          : `No price for ${described.name} yet. ${ownCopy()}`;
+      explanation.textContent = line.changed()
+        ? ownCopy()
+        : line.carried
+          ? `Estimated ${ageInWords(line.carried.payload.date)}. ${ownCopy()}`
+          : line.asked
+            ? askCopy()
+            : `No price for ${described.name} yet. ${ownCopy()}`;
       return;
     }
     if (line.asked && !line.carried) {
