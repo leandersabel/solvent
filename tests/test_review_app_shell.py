@@ -7,7 +7,10 @@ schema version and everything else (Database, criterion 80). A request
 gunicorn cannot read gets Solvent's Not Found card and headers, and no
 log line keeps its address, its peer or gunicorn's reason (Error pages,
 Requests Flask never sees, criteria 27, 77, 85 and 86; spec/
-architecture.md, Storage & data handling).
+architecture.md, Storage & data handling). The factory starts one daemon
+thread that prunes, on a connection that overwrites what it deletes,
+and no test app's thread logs into a later test (Database, criteria 69
+and 70).
 
 Written from the spec alone. gunicorn runs with the Dockerfile's own
 arguments, on loopback.
@@ -17,10 +20,12 @@ from __future__ import annotations
 import http.client
 import logging
 import os
+import secrets
 import shutil
 import socket
 import subprocess
 import sys
+import threading
 import time
 from contextlib import ExitStack, contextmanager
 
@@ -432,3 +437,124 @@ def test_every_response_shape_carries_one_csp_and_one_hsts(app):
     assert len({r.headers["Strict-Transport-Security"] for r in shapes}) == 1
     assert "frame-ancestors 'none'" in shapes[0].headers["Content-Security-Policy"]
     assert "max-age=" in shapes[0].headers["Strict-Transport-Security"]
+
+
+class Started(threading.Thread):
+    """A thread the factory starts, kept rather than run, so its body
+    runs only when a test calls it and never outlives the test."""
+
+    kept: "list[Started]" = []
+
+    def start(self):
+        Started.kept.append(self)
+
+
+class Stop(Exception):
+    pass
+
+
+@pytest.mark.real_pruner
+def test_the_factory_starts_one_daemon_thread_whose_failed_pass_only_logs(
+    tmp_path, monkeypatch, caplog
+):
+    """Criterion 69: create_app starts exactly one daemon thread. Its
+    body, run with the minute between passes cut short, logs
+    `attempts.prune_failed` and the exception's type alone on a vanished
+    file, raises nothing out of the pass and creates no file."""
+    import solvent.ratelimit as ratelimit
+    from solvent import create_app
+
+    monkeypatch.setenv("SECRET_KEY", secrets.token_hex(32))
+    real_thread = threading.Thread
+    monkeypatch.setattr(threading, "Thread", Started)
+    monkeypatch.setattr(Started, "kept", [])
+    database = tmp_path / "pruned.db"
+    create_app({"DATABASE_PATH": str(database), "TESTING": True})
+    assert len(Started.kept) == 1
+    assert Started.kept[0].daemon
+
+    database.unlink()
+    sleeps = []
+
+    def sleep(seconds):
+        sleeps.append(seconds)
+        if len(sleeps) > 1:
+            raise Stop
+
+    monkeypatch.setattr(ratelimit.time, "sleep", sleep)
+    ended = []
+
+    def body():
+        try:
+            Started.kept[0].run()
+        except Stop:
+            ended.append(True)
+
+    with caplog.at_level(logging.WARNING):
+        runner = real_thread(target=body, daemon=True)
+        runner.start()
+        runner.join(5)
+    assert ended, "the factory's thread made no pass within five seconds"
+    assert sleeps[0] == 60
+    failures = [r.getMessage() for r in caplog.records if "attempts.prune_failed" in r.getMessage()]
+    assert failures == ["attempts.prune_failed OperationalError"]
+    assert list(tmp_path.iterdir()) == []
+
+
+def test_the_pruners_connection_deletes_with_secure_delete_on(app, monkeypatch):
+    """Criterion 70: the pruner's own connection reads `PRAGMA
+    secure_delete` as 1 when it deletes."""
+    import sqlite3
+
+    import solvent.ratelimit as ratelimit
+
+    seen = []
+
+    class Watched(sqlite3.Connection):
+        def execute(self, sql, *args):
+            if sql.lstrip().upper().startswith("DELETE"):
+                seen.append(super().execute("PRAGMA secure_delete").fetchone()[0])
+            return super().execute(sql, *args)
+
+    real = sqlite3.connect
+    monkeypatch.setattr(sqlite3, "connect", lambda *a, **k: real(*a, factory=Watched, **k))
+    ratelimit.prune_pass(app)
+    assert seen and set(seen) == {1}
+
+
+LATER_TEST = '''
+import os
+import time
+
+import solvent.ratelimit as ratelimit
+
+# The minute between passes, compressed so the suite's own run fits.
+ratelimit.PRUNE_INTERVAL_SECONDS = 0.05
+
+
+def test_an_app_whose_file_goes_away(app):
+    os.remove(app.config["DATABASE_PATH"])
+
+
+def test_a_later_test_hears_nothing_of_it(caplog):
+    time.sleep(1)
+    assert "attempts.prune_failed" not in caplog.text
+'''
+
+
+def test_a_test_apps_pruner_never_logs_into_a_later_test(tmp_path):
+    """Issue 429: the suite's `app` fixture leaves nothing behind that
+    prunes, or logs, once its test has ended. Two tests run in order in
+    one process under the suite's own conftest."""
+    module = tmp_path / "test_later.py"
+    module.write_text(LATER_TEST)
+    result = subprocess.run(
+        [sys.executable, "-m", "pytest", "-p", "tests.conftest", "-n", "0", "-o", "addopts=",
+         "-p", "no:cacheprovider", "--rootdir", str(tmp_path), str(module)],
+        cwd=REPO_ROOT,
+        env={**os.environ, "PYTHONPATH": str(REPO_ROOT)},
+        capture_output=True,
+        text=True,
+        timeout=120,
+    )
+    assert result.returncode == 0, result.stdout + result.stderr
