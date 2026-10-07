@@ -10,6 +10,11 @@ import {
 } from '../harness.mjs';
 
 await run(async () => {
+  // Each field's name as a screen reader hears it from its label.
+  const fieldNames = async () => JSON.parse(await page.eval(
+    "JSON.stringify([...document.querySelectorAll('#app input:not([type=checkbox])')].map((i) => i.labels[0]?.textContent ?? null))",
+  ));
+
   // ---- The administrator, from the bootstrap invite ---------------
 
   await page.goto(`${BASE}/register?invite=${BOOTSTRAP}`);
@@ -22,6 +27,10 @@ await run(async () => {
   check('no main currency on the administrator form', !(await text()).includes('Main currency'));
   check('no no-recovery acknowledgement on it', !(await text()).includes('permanently unreadable'));
   check('the token is dropped from the address bar', !(await page.eval('location.search')).includes('invite'));
+  {
+    const names = await fieldNames();
+    check('each administrator form field is named by its label', JSON.stringify(names) === JSON.stringify(['Username', 'Password', 'Confirm password']), JSON.stringify(names));
+  }
 
   await setValue('input[type=text]', 'ops.leander');
   await setValue('input[type=password]', ADMIN_PASSWORD, 0);
@@ -50,6 +59,10 @@ await run(async () => {
   }
   check('the currency warning sits at the point of choice', (await text()).includes('This cannot be changed later.'));
   check('the acknowledgement is required', (await text()).includes('permanently unreadable'));
+  {
+    const names = await fieldNames();
+    check('each vault form field is named by its label', JSON.stringify(names) === JSON.stringify(['Username', 'Password', 'Confirm password', 'Main currency']), JSON.stringify(names));
+  }
 
   await setValue('input[type=text]', 'leander');
   await setValue('input[type=password]', VAULT_PASSWORD, 0);

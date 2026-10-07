@@ -715,3 +715,6 @@ fixture prevents.
 50. Typing in the main currency's search narrows the list to the
     currencies whose code or name contains the text, ignoring case, and
     chooses none. Test: `tests/browser/parts/register.mjs`, `tests/browser/parts/register-review-currency.mjs`.
+51. On both forms, a screen reader names each field by the label beside
+    it: Username, Password, Confirm password and, on the vault form,
+    Main currency. Test: `tests/browser/parts/register.mjs`, `tests/browser/parts/register-review-names.mjs`.
