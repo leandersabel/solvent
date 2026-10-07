@@ -911,5 +911,7 @@ administrator), and the lost sole password (Bootstrap). The rest:
     unit's code, such as "Rate lookup, CHF".
     Test: `tests/browser/parts/admin.mjs`,
     `tests/browser/parts/admin-review-names.mjs`.
-60. A Restore the server refuses reads "Nothing was restored." on its
-    row, which stays retired. Test: `tests/browser/parts/admin.mjs`.
+60. A Retire or Restore the server refuses reads "Nothing was retired."
+    or "Nothing was restored." on its row, which stays as it was. Test:
+    `tests/browser/parts/admin.mjs`,
+    `tests/browser/parts/admin-review-refused.mjs`.
