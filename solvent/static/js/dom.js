@@ -72,11 +72,16 @@ export function listOption(list, search, text, onPick, selected, extra = {}) {
   });
 }
 
+const BLANK_NAME = 'A name cannot be blank.';
+// Several renames share a page, so each message line gets its own id.
+let renames = 0;
+
 // An inline rename (spec/design-system.md, Components): the label
 // with an Edit action that reveals an ordinary input in place. Only
 // Save or Enter writes, so clicking away never does. A blank name is
-// refused, and a rejected `save` keeps the field open with what was
-// typed and the message `failed` gives for the failure.
+// refused, its message gone once a name is typed, and a rejected `save`
+// keeps the field open with what was typed and the message `failed`
+// gives for the failure.
 //
 // `disabled` holds Edit, Save, Cancel and the keys while a write the
 // caller started is outstanding, as a save of its own does. A caller
@@ -85,8 +90,9 @@ export function listOption(list, search, text, onPick, selected, extra = {}) {
 // message. The draft holds only that, and nothing once the field closes.
 export function inlineRename(text, save, failed, { disabled = false, draft = {} } = {}) {
   const label = el('span', { class: 'strong', text });
-  const input = el('input', { type: 'text', 'aria-label': 'Name' });
-  const error = el('p', { class: 'field-error', hidden: true });
+  const line = `rename-line-${++renames}`;
+  const input = el('input', { type: 'text', 'aria-label': 'Name', 'aria-describedby': line });
+  const error = el('p', { id: line, class: 'field-error message-line', 'aria-live': 'polite', hidden: true });
   const view = el('span', { class: 'value-row' }, [
     label,
     el('button', { class: 'btn-inline', text: 'Edit', disabled, onclick: () => open(true) }),
@@ -98,7 +104,8 @@ export function inlineRename(text, save, failed, { disabled = false, draft = {} 
   function open(editing, typed = text) {
     view.hidden = editing;
     editor.hidden = !editing;
-    error.hidden = true;
+    error.hidden = !editing;
+    clear();
     for (const key of Object.keys(draft)) delete draft[key];
     if (editing) {
       draft.open = true;
@@ -109,14 +116,20 @@ export function inlineRename(text, save, failed, { disabled = false, draft = {} 
 
   function refuse(message) {
     error.textContent = message;
-    error.hidden = false;
+    input.setAttribute('aria-invalid', 'true');
     draft.error = message;
+  }
+
+  function clear() {
+    error.textContent = '';
+    input.removeAttribute('aria-invalid');
+    delete draft.error;
   }
 
   async function commit() {
     if (saveButton.disabled) return;
     const next = input.value.trim();
-    if (!next) return refuse('A name cannot be blank.');
+    if (!next) return refuse(BLANK_NAME);
     if (next === text) return open(false);
     saveButton.disabled = cancelButton.disabled = true;
     try {
@@ -131,7 +144,10 @@ export function inlineRename(text, save, failed, { disabled = false, draft = {} 
     }
   }
 
-  input.addEventListener('input', () => (draft.value = input.value));
+  input.addEventListener('input', () => {
+    draft.value = input.value;
+    if (draft.error === BLANK_NAME && input.value.trim()) clear();
+  });
   input.addEventListener('keydown', (event) => {
     if (event.key === 'Enter') commit();
     if (event.key === 'Escape' && !cancelButton.disabled) open(false);

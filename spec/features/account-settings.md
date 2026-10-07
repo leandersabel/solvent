@@ -1070,8 +1070,9 @@ from an administrator removing an account (`admin-invites.md`).
     `tests/browser/parts/dimensions.mjs`.
 74. (walk) Coverage counts the active holdings. Test:
     `tests/browser/parts/dimensions.mjs`.
-75. (walk) A blank rename is refused and keeps what was typed, and
-    clicking away from a rename writes nothing and leaves it open. Test:
+75. (walk) A blank rename is refused and keeps what was typed, its error
+    clears once a name is typed, and clicking away from a rename writes
+    nothing and leaves it open. Test:
     `tests/browser/parts/dimensions.mjs`.
 76. (walk) A dimension save that fails says so on its card and shows the
     stored value, and a Conflict names the other tab and reloads the

@@ -122,6 +122,10 @@ await run(async () => {
       (await text()).includes('A name cannot be blank.'),
   );
   await setValue('.card-head input', 'Liquid assets');
+  check(
+    'the blank-name error clears once a name is typed',
+    !(await text()).includes('A name cannot be blank.'),
+  );
   await renameButton('Save');
   await page.waitUntil("document.body.innerText.includes('Liquid assets')", { label: 'the renamed dimension' });
   await page.idle();
