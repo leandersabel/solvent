@@ -73,6 +73,8 @@ export function listOption(list, search, text, onPick, selected, extra = {}) {
 }
 
 const BLANK_NAME = 'A name cannot be blank.';
+// Several renames share a page, so each message line gets its own id.
+let renames = 0;
 
 // An inline rename (spec/design-system.md, Components): the label
 // with an Edit action that reveals an ordinary input in place. Only
@@ -88,8 +90,9 @@ const BLANK_NAME = 'A name cannot be blank.';
 // message. The draft holds only that, and nothing once the field closes.
 export function inlineRename(text, save, failed, { disabled = false, draft = {} } = {}) {
   const label = el('span', { class: 'strong', text });
-  const input = el('input', { type: 'text', 'aria-label': 'Name' });
-  const error = el('p', { class: 'field-error', hidden: true });
+  const line = `rename-line-${++renames}`;
+  const input = el('input', { type: 'text', 'aria-label': 'Name', 'aria-describedby': line });
+  const error = el('p', { id: line, class: 'field-error', 'aria-live': 'polite', hidden: true });
   const view = el('span', { class: 'value-row' }, [
     label,
     el('button', { class: 'btn-inline', text: 'Edit', disabled, onclick: () => open(true) }),
@@ -101,7 +104,7 @@ export function inlineRename(text, save, failed, { disabled = false, draft = {} 
   function open(editing, typed = text) {
     view.hidden = editing;
     editor.hidden = !editing;
-    error.hidden = true;
+    clear();
     for (const key of Object.keys(draft)) delete draft[key];
     if (editing) {
       draft.open = true;
@@ -113,7 +116,15 @@ export function inlineRename(text, save, failed, { disabled = false, draft = {} 
   function refuse(message) {
     error.textContent = message;
     error.hidden = false;
+    input.setAttribute('aria-invalid', 'true');
     draft.error = message;
+  }
+
+  function clear() {
+    error.textContent = '';
+    error.hidden = true;
+    input.removeAttribute('aria-invalid');
+    delete draft.error;
   }
 
   async function commit() {
@@ -136,10 +147,7 @@ export function inlineRename(text, save, failed, { disabled = false, draft = {} 
 
   input.addEventListener('input', () => {
     draft.value = input.value;
-    if (draft.error === BLANK_NAME && input.value.trim()) {
-      error.hidden = true;
-      delete draft.error;
-    }
+    if (draft.error === BLANK_NAME && input.value.trim()) clear();
   });
   input.addEventListener('keydown', (event) => {
     if (event.key === 'Enter') commit();
