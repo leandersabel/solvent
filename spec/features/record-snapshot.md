@@ -1709,4 +1709,5 @@ Editing an existing entry).
      as empty, to be filled after Update, only where a source prices
      that unit at that date. A unit with no rate source there, such as
      m2 or silver, is never named so. Test:
-     `tests/browser/parts/recording-detail.mjs`.
+     `tests/browser/parts/recording-detail.mjs`,
+     `tests/browser/parts/recording-detail-review-unpriced.mjs`.
