@@ -95,14 +95,23 @@ def clock(monkeypatch):
     return stopped
 
 
+def pytest_configure(config):
+    config.addinivalue_line("markers", "real_pruner: the app's pruning thread runs its real body")
+
+
 @pytest.fixture(autouse=True)
-def idle_pruner(monkeypatch):
+def idle_pruner(request, monkeypatch):
     """Every app a test builds starts its pruning thread, which would
     outlive the test and log a failed pass into a later test once its
     database is removed. Here the thread waits out its test and ends
-    without a pass, and a test that prunes calls `prune_pass`."""
+    without a pass, and a test that prunes calls `prune_pass`. A test
+    marked `real_pruner` keeps the real body and must not let it run
+    past the test."""
     import solvent.ratelimit as ratelimit
 
+    if request.node.get_closest_marker("real_pruner"):
+        yield
+        return
     ended = threading.Event()
     monkeypatch.setattr(ratelimit, "_prune_forever", lambda app: ended.wait())
     yield
