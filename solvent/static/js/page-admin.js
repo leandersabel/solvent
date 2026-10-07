@@ -444,6 +444,8 @@ function unitRow(row, body) {
   );
 
   const lookup = lookupControl();
+  // The column's heading is the label shown for it.
+  lookup.setAttribute('aria-label', `Rate lookup, ${row.symbol}`);
   lookup.value = String(row.lookup);
   lookup.disabled = !row.hasAdapter;
   lookup.addEventListener('change', async () => {

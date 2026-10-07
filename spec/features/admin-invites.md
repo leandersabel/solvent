@@ -905,6 +905,8 @@ administrator), and the lost sole password (Bootstrap). The rest:
 59. (blind) A screen reader names A note to yourself and This link
     stops working after on Invites, Type the username to confirm in the
     Remove dialog, Code, Name, Kind and Rate lookup in Add a unit, and
-    each field of the password card, by the label shown beside it.
+    each field of the password card, by the label shown beside it. It
+    names each Units row's Rate lookup by its column's heading and the
+    unit's code, such as "Rate lookup, CHF".
     Test: `tests/browser/parts/admin.mjs`,
     `tests/browser/parts/admin-review-names.mjs`.
