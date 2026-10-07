@@ -287,7 +287,10 @@ Line states:
   one is yours to set." With an earlier
   figure the sentence follows its age, "Estimated 14 months ago. Nobody
   publishes a price for m2. This one is yours to set.", and with none it
-  follows "No price for m2 yet."
+  follows "No price for m2 yet." Once a price is typed into the line,
+  it is "Typed by you" and the sentence drops what it said about the
+  earlier figure or its absence, because that is no longer the line's
+  figure.
 - **A published unit, on a date before its published prices begin**
   (gold in 2012). It has no rate source at this date, so it behaves as
   an owner-priced unit, and a typed figure is "Typed by you". No source
@@ -1328,7 +1331,8 @@ Editing an existing entry).
     `tests/browser/parts/update-values.mjs`.
 16. A holding in a unit you made up triggers no lookup, gets no entry
     from a recording, and its line says why the price is yours to set.
-    Test: `tests/browser/parts/update-values.mjs`.
+    Once a price is typed there, the line no longer says there is no
+    price or how old the last one is. Test: `tests/browser/parts/update-values.mjs`.
 17. On a date before a published unit's prices begin, its line says when
     they begin and that the price is yours to set, starts from the last
     price before that date, asks for one when there is none, triggers no

@@ -756,11 +756,15 @@ function rateLine(vault, unit, date, { sit, readOnly: blockReadOnly, fillMissing
       return;
     }
     if (!quotable) {
-      explanation.textContent = line.carried
-        ? `Estimated ${ageInWords(line.carried.payload.date)}. ${ownCopy()}`
-        : line.asked
-          ? askCopy()
-          : `No price for ${described.name} yet. ${ownCopy()}`;
+      // A typed price is the line's figure now, so nothing is said
+      // about the earlier one or its absence.
+      explanation.textContent = line.asked
+        ? askCopy()
+        : line.changed()
+          ? ownCopy()
+          : line.carried
+            ? `Estimated ${ageInWords(line.carried.payload.date)}. ${ownCopy()}`
+            : `No price for ${described.name} yet. ${ownCopy()}`;
       return;
     }
     if (line.asked && !line.carried) {

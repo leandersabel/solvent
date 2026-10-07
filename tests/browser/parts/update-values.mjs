@@ -157,6 +157,19 @@ await run(async () => {
   );
   const flat = await lineState('m2');
   check('record-rate: a free-text unit says nobody publishes a price for it', flat.says.includes('Nobody publishes a price for m2'), flat.says);
+  const paint = await lineState('PAINT');
+  await typeLine('m2', '9000');
+  await typeLine('PAINT', '4');
+  const typed = { flat: await lineState('m2'), paint: await lineState('PAINT') };
+  check(
+    'record-rate: a price typed into an owner-priced line drops what it said about the price before',
+    paint.says.startsWith('No price for PAINT yet. ') &&
+      typed.flat.chip === 'Typed by you' && typed.flat.says === 'Nobody publishes a price for m2. This one is yours to set.' &&
+      typed.paint.chip === 'Typed by you' && typed.paint.says === paint.says.replace('No price for PAINT yet. ', ''),
+    JSON.stringify({ paint, typed }),
+  );
+  await typeLine('m2', flat.value);
+  await typeLine('PAINT', '');
   await typeRow('Art', '3');
   const head = await ev("document.querySelector('.rate-line').dataset.unit");
   const asked = await lineState('PAINT');
