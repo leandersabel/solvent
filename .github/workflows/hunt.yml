@@ -19,6 +19,9 @@ on:
         description: Hunt every feature
         type: boolean
         default: false
+    secrets:
+      CLAUDE_CODE_OAUTH_TOKEN:
+        required: true
 
 permissions: {}
 
