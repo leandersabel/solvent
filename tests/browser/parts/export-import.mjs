@@ -301,6 +301,14 @@ await run(async () => {
     // -- Import: files and passwords that go nowhere ---------------------------
 
     await unlockAt('/settings/export-import', "document.querySelector('#import-file')");
+    const pickerLook = JSON.parse(await page.eval(`(() => {
+      const look = (s) => [s.color, s.backgroundColor, s.borderTopColor, s.borderTopStyle, s.borderRadius, s.padding, s.fontWeight].join(' ');
+      return JSON.stringify({
+        picker: look(getComputedStyle(document.querySelector('#import-file'), '::file-selector-button')),
+        secondary: look(getComputedStyle(document.querySelector('#import-card .btn-secondary'))),
+      });
+    })()`));
+    check('the Import file picker\'s button is Button, secondary', pickerLook.picker === pickerLook.secondary, JSON.stringify(pickerLook));
     // Leaving the page locks it, keys and decrypted state alike, the way
     // the idle timer does, and unlocking brings the screen back.
     await page.eval("window.dispatchEvent(new PageTransitionEvent('pagehide', { persisted: true }))");
