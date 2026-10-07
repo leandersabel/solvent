@@ -1130,7 +1130,8 @@ rule of the chart (Archived holdings, Ranges and modes).
     the day the chart reads included. Test:
     `tests/test_client.py::test_the_client_side_rules_hold`,
     `tests/browser/parts/dashboard-review-rounding.mjs`,
-    `tests/browser/parts/dashboard-net-worth.mjs`.
+    `tests/browser/parts/dashboard-net-worth.mjs`,
+    `tests/browser/parts/dashboard-review-hero-day.mjs`.
 67. (blind) With one record corrupted, the view renders the rest and
     warns "1 record could not be read.". With the corrupted record a
     price entry, its symbol still prices from the neighboring entries.
