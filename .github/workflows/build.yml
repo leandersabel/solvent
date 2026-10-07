@@ -39,7 +39,8 @@ jobs:
       # provenance for this commit on master.
       - id: existing
         run: |
-          digest=$(docker buildx imagetools inspect "$TAG" --format '{{json .Manifest}}' 2>/dev/null | jq -r .digest) || exit 0
+          digest=$(docker buildx imagetools inspect "$TAG" --format '{{json .Manifest}}' 2>/dev/null | jq -r .digest)
+          [ -n "$digest" ] || exit 0
           gh attestation verify "oci://$IMAGE@$digest" --repo "$GITHUB_REPOSITORY" \
             --signer-workflow "$GITHUB_REPOSITORY/.github/workflows/build.yml" \
             --source-ref refs/heads/master --source-digest "$GITHUB_SHA" > /dev/null
