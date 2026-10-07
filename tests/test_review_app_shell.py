@@ -453,6 +453,7 @@ class Stop(Exception):
     pass
 
 
+@pytest.mark.real_pruner
 def test_the_factory_starts_one_daemon_thread_whose_failed_pass_only_logs(
     tmp_path, monkeypatch, caplog
 ):
