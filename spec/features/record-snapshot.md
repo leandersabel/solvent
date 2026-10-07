@@ -185,7 +185,9 @@ quantity field (`design-system.md`, Components) takes a 260px column,
 its unit as the suffix and the converted figure right-aligned beneath.
 The control fills a 112px column at the right, so every row's control
 lines up whatever it reads. The converted figure uses this date's rate
-line, whatever it holds: proposed, stored or typed (Screens).
+line, whatever it holds: proposed, stored or typed (Screens). A screen
+reader names the field by its holding, as "Mortgage value", the way a
+rate line's field reads "Gold, troy ounce rate".
 
 **Every row states in words whether this date already holds a figure
 for it.** The sentence, not the field, says where the reader stands.
@@ -1714,3 +1716,6 @@ Editing an existing entry).
 104. The delete confirmation names the units it moves as "A, B and C",
      never chained with "and". Test:
      `tests/browser/parts/recording-detail-units.mjs`.
+105. On Update values, a screen reader names each value field by its
+     holding's name and "value", such as "Mortgage value". Test:
+     `tests/browser/parts/update-values.mjs`.

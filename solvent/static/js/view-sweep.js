@@ -235,7 +235,12 @@ function sweepRow(vault, holding, date, { sit, block, refused, closed, ensurePri
   // strings, so 12.50 over a stored "12.5" is an edit.
   const same = (stored) => format.readField(field.value, stored) === stored;
 
-  const field = el('input', { type: 'text', inputmode: 'decimal', class: 'quantity' });
+  const field = el('input', {
+    type: 'text',
+    inputmode: 'decimal',
+    class: 'quantity',
+    'aria-label': `${holding.payload.name} value`,
+  });
   const unit = vault.unitOf(holding.payload.unit);
   const suffix = el('span', { class: 'unit-suffix', text: unit.currency ? unit.symbol : unit.short });
   const converted = el('p', { class: 'hint numeric' });
