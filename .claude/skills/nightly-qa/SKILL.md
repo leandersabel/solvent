@@ -65,9 +65,7 @@ This shard's app is its own, and no other shard reaches it.
      and the manifest's expected totals
    - that an invite link never appears in the server log
    - how the app reads while Solvent is stopped
-   - the idle lock, in one wait, for `login` and `account-settings`. In
-     a shard walking both, the run for whichever comes first checks it
-     for both
+   - the idle lock, in one wait, for `login` and `account-settings`
    - for `account-settings`, that a password change brings a weakly
      protected vault up to current strength. On the older vault the
      manifest reserves for it, used for nothing else, `qa` signs in with

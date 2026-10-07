@@ -17,7 +17,6 @@ import pathlib
 import re
 import subprocess
 
-SHARDS = 6
 CLIENT_FACING = "\n## What the client gets\n"
 NAMES = re.compile(r"spec/features/([a-z0-9-]+)\.md")
 CODE = re.compile(r"(app\.py|requirements\.txt|Dockerfile|\.dockerignore)$|(solvent|tools/nightly)/")
@@ -63,14 +62,10 @@ else:
     rest = sorted(features.keys() - changed, key=lambda name: (walked.get(name, ""), name))
     walk = changed | set(rest[:1])
 
-# A feature costs about its page's length to walk. Each goes to the
-# shard with least so far, and there are no more shards than features.
-shards = [{"features": [], "cost": 0} for _ in range(min(SHARDS, max(1, len(walk))))]
-for name in sorted(walk, key=lambda name: (-features[name], name)):
-    shard = min(shards, key=lambda shard: shard["cost"])
-    shard["features"].append(name)
-    shard["cost"] += features[name]
+# Each feature is a shard of its own, so it has the QA step's whole time
+# limit to itself. The longest page starts first, should runners be short.
+shards = sorted(walk, key=lambda name: (-features[name], name))
 today = os.environ.get("TODAY") or datetime.date.today().isoformat()
-print("shards=" + json.dumps([{"id": i, "features": s["features"]} for i, s in enumerate(shards, 1)]))
+print("shards=" + json.dumps([{"id": i, "features": [name]} for i, name in enumerate(shards, 1)]))
 record = {"commit": git("rev-parse", "HEAD").strip(), "every": walk == features.keys(), "walked": walked | dict.fromkeys(walk, today)}
 print("record=" + json.dumps(record))
