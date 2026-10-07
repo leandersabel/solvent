@@ -587,6 +587,19 @@ function passwordCard() {
     strong = ok;
     button.disabled = !ok;
   });
+  const fields = [
+    el('div', { class: 'field' }, [el('label', { text: 'Current password' }), passwordWithToggle(current)]),
+    el('div', { class: 'field' }, [el('label', { text: 'New password' }), passwordWithToggle(next)]),
+    gauge.element,
+    el('div', { class: 'field' }, [el('label', { text: 'Confirm new password' }), passwordWithToggle(confirm)]),
+  ];
+  // The form goes quiet while both keys are derived.
+  const quiet = (on) => {
+    for (const control of fields.flatMap((f) => [...f.querySelectorAll('input, button')])) {
+      control.disabled = on;
+    }
+    button.disabled = on || !strong;
+  };
 
   const submit = async (event) => {
     event.preventDefault();
@@ -602,7 +615,7 @@ function passwordCard() {
       error.hidden = false;
       return;
     }
-    button.disabled = true;
+    quiet(true);
     button.textContent = 'Changing your password';
     try {
       await changePassword(username, current.value, next.value, kdf);
@@ -620,8 +633,8 @@ function passwordCard() {
           : 'Nothing was changed. Your current password still works.';
       error.hidden = false;
     } finally {
-      button.disabled = !strong;
       button.textContent = 'Change password';
+      quiet(false);
     }
   };
 
@@ -636,10 +649,7 @@ function passwordCard() {
     // An error sits above the first field (design-system.md, States).
     error,
     knownUsernameField(username),
-    el('div', { class: 'field' }, [el('label', { text: 'Current password' }), passwordWithToggle(current)]),
-    el('div', { class: 'field' }, [el('label', { text: 'New password' }), passwordWithToggle(next)]),
-    gauge.element,
-    el('div', { class: 'field' }, [el('label', { text: 'Confirm new password' }), passwordWithToggle(confirm)]),
+    ...fields,
     done,
     button,
   ]);

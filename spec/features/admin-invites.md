@@ -898,3 +898,6 @@ administrator), and the lost sole password (Bootstrap). The rest:
     username opens Accounts with focus on that account's username. Test:
     `tests/browser/parts/admin.mjs`,
     `tests/browser/parts/admin-review-used.mjs`.
+58. While the password card reads "Changing your password", its fields,
+    their Show toggles and its button are disabled, and typing into New
+    password enables nothing. Test: `tests/browser/parts/admin.mjs`.
