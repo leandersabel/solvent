@@ -642,6 +642,9 @@ figure that animates upward from zero reads as a slot machine. Respect
 - Visible focus ring on every interactive element, never suppressed.
 - Identity is never color-alone: charts carry a legend for ≥2 series
   and direct labels for ≤4, and status carries an icon and a label.
+- A form control's visible label is its accessible name: the label
+  names the control by its `id`, or the input inside a wrapper such as a
+  password field with Show.
 - All interactive elements are reachable and operable by keyboard. A
   dialog traps focus with Lock in its cycle and restores focus on close
   (Components, Dialog).

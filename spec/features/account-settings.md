@@ -1099,3 +1099,7 @@ from an administrator removing an account (`admin-invites.md`).
     field with autocomplete `username`, ahead of the password fields.
     Test: `tests/browser/parts/settings.mjs`,
     `tests/browser/parts/settings-review-forms.mjs`.
+85. (blind) A screen reader names each list and password field in
+    Settings, and both fields of the deletion dialog, by the label shown
+    beside it. Test: `tests/browser/parts/settings.mjs`,
+    `tests/browser/parts/settings-review-names.mjs`.
