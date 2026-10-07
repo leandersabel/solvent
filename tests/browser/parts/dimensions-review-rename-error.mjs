@@ -189,5 +189,5 @@ await run(async () => {
     label: 'the saved rename',
   });
   check('review 75: a name typed after a refusal saves in one write with no error left', puts() === before + 1
-    && !(await page.eval(`document.body.innerText.includes(${JSON.stringify(BLANK)})`)), String(puts() - before));
+    && !(await page.call((text) => document.body.innerText.includes(text), BLANK)), String(puts() - before));
 });
