@@ -604,7 +604,9 @@ stays a recording holding it, and this screen reloads to it.
   sentence. A vault holding only the main currency reaches this on
   every recording, and it is not a fault. Where a unit has no price
   because the source did not answer that day, the section names the
-  unit and says its line is empty, to be filled after Update.
+  unit and says its line is empty, to be filled after Update. A unit
+  with no rate source at this date (`rate-lookup.md`) is not named,
+  because nothing failed and no source will fill it.
 - **Error, two entries at this date**: two figures for one holding, or
   two differing prices for one unit (Moving the date onto an occupied
   date, `record-rate.md`, Two entries on one date). Both are rendered,
@@ -1703,3 +1705,9 @@ Editing an existing entry).
      `tests/browser/parts/snapshot-entry-review-first-price.mjs`,
      `tests/browser/parts/update-values-review-first-price.mjs`,
      `tests/test_client.py::test_the_client_side_rules_hold`.
+103. (blind) Recording detail names a unit with no price at its date
+     as empty, to be filled after Update, only where a source prices
+     that unit at that date. A unit with no rate source there, such as
+     m2 or silver, is never named so. Test:
+     `tests/browser/parts/recording-detail.mjs`,
+     `tests/browser/parts/recording-detail-review-unpriced.mjs`.

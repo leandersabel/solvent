@@ -213,6 +213,14 @@ await run(async () => {
       unpriced.cells === 'not priced' && unpriced.prices.includes('No prices were captured at this date.'),
     `${unpriced.cells} | ${unpriced.prices}`,
   );
+  // Recording detail, States: only a unit whose source did not answer is
+  // named. Nothing will ever fill silver, m2 or PAINT.
+  check(
+    'record-snapshot: a recording names the unit its source left empty, never one only its owner can price',
+    unpriced.prices.includes('No price for USD at this date.') &&
+      ['Silver', 'm2', 'PAINT'].every((unit) => !unpriced.prices.includes(unit)),
+    unpriced.prices,
+  );
 
   // The holding's own list reads the same way: not priced where a
   // sourced unit has no price on the row's date.
