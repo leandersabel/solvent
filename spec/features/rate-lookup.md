@@ -21,8 +21,7 @@ everything you own is in your main currency, you never meet this.
   franc holding asks the sources about dollars and gold.
 - **Where you meet a price**: the rate lines of a recording
   (`record-snapshot.md`, Update values, Snapshot entry and Recording
-  detail), a holding's history (`manage-accounts.md`, Account detail),
-  and the unit picker (`manage-accounts.md`, Account form), where
+  detail) and the unit picker (`manage-accounts.md`, Account form), where
   choosing what a holding is measured in also decides whether its price
   can be looked up. The list is maintained in the administrator's Units
   section (`admin-invites.md`, Admin).

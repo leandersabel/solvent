@@ -99,8 +99,8 @@ figures you were not looking at.
 - **No rescue for a refused recording.** Figures typed into an attempt
   that lost to another window are not kept, offered back or merged.
 - **No screen of nothing but prices, no list of recordings, and no
-  audit view across holdings.** The provenance of each price is on the
-  holding's page.
+  audit view across holdings.** Where a price came from is shown on the
+  recording that captured it (Recording detail).
 
 ## Screens
 
