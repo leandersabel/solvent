@@ -78,8 +78,8 @@ function createInvite(reload) {
       adminNote.hidden = !kindAdmin.checked;
     });
   }
-  const label = el('input', { type: 'text', placeholder: 'Sarah’s laptop' });
-  const days = el('select', {}, [1, 3, 7, 14, 30].map((n) =>
+  const label = el('input', { id: 'invite-note', type: 'text', placeholder: 'Sarah’s laptop' });
+  const days = el('select', { id: 'invite-days' }, [1, 3, 7, 14, 30].map((n) =>
     el('option', { value: String(n), text: counted(n, 'day', 'days'), selected: n === 7 }),
   ));
   const error = el('p', { class: 'field-error', hidden: true });
@@ -116,14 +116,14 @@ function createInvite(reload) {
       adminNote,
     ]),
     el('div', { class: 'field' }, [
-      el('label', { text: 'A note to yourself' }),
+      el('label', { for: 'invite-note', text: 'A note to yourself' }),
       label,
       el('p', {
         class: 'hint',
         text: 'Only administrators see this, and Solvent stores it as you typed it. It is the one thing anybody types in Solvent that the server can read, so keep it to a nickname.',
       }),
     ]),
-    el('div', { class: 'field' }, [el('label', { text: 'This link stops working after' }), days]),
+    el('div', { class: 'field' }, [el('label', { for: 'invite-days', text: 'This link stops working after' }), days]),
     error,
     button,
   ]);
@@ -333,7 +333,7 @@ async function accounts(body, focus) {
 }
 
 function removeAccount(row, body) {
-  const typed = el('input', { type: 'text' });
+  const typed = el('input', { id: 'remove-username', type: 'text' });
   const error = el('p', { class: 'field-error', hidden: true });
   const confirm = el('button', {
     class: 'btn-destructive',
@@ -382,7 +382,7 @@ function removeAccount(row, body) {
     body: [
       ...lines.map((line) => el('p', { text: line })),
       el('div', { class: 'field' }, [
-        el('label', { text: 'Type the username to confirm' }),
+        el('label', { for: 'remove-username', text: 'Type the username to confirm' }),
         typed,
       ]),
       error,
@@ -515,14 +515,15 @@ function retireUnit(row, body) {
 }
 
 function addUnit(body) {
-  const code = el('input', { type: 'text' });
-  const name = el('input', { type: 'text' });
-  const kind = el('select', {}, [
+  const code = el('input', { id: 'unit-code', type: 'text' });
+  const name = el('input', { id: 'unit-name', type: 'text' });
+  const kind = el('select', { id: 'unit-kind' }, [
     el('option', { value: 'currency', text: 'Currency' }),
     el('option', { value: 'metal', text: 'Metal' }),
   ]);
   // Every unit a source serves is seeded, so one added here has none.
   const lookup = lookupControl();
+  lookup.id = 'unit-lookup';
   lookup.value = 'false';
   lookup.disabled = true;
   const error = el('p', { class: 'field-error', hidden: true });
@@ -530,7 +531,7 @@ function addUnit(body) {
   return el('details', {}, [
     el('summary', { text: 'Add a unit' }),
     el('div', { class: 'field' }, [
-      el('label', { text: 'Code' }),
+      el('label', { for: 'unit-code', text: 'Code' }),
       code,
       el('p', {
         class: 'hint',
@@ -541,10 +542,10 @@ function addUnit(body) {
         text: METAL_SHAPE,
       }),
     ]),
-    el('div', { class: 'field' }, [el('label', { text: 'Name' }), name]),
-    el('div', { class: 'field' }, [el('label', { text: 'Kind' }), kind]),
+    el('div', { class: 'field' }, [el('label', { for: 'unit-name', text: 'Name' }), name]),
+    el('div', { class: 'field' }, [el('label', { for: 'unit-kind', text: 'Kind' }), kind]),
     el('div', { class: 'field' }, [
-      el('label', { text: 'Rate lookup' }),
+      el('label', { for: 'unit-lookup', text: 'Rate lookup' }),
       lookup,
       el('p', { class: 'hint', text: NO_SOURCE }),
     ]),
@@ -576,9 +577,9 @@ function addUnit(body) {
 }
 
 function passwordCard() {
-  const current = el('input', { type: 'password', autocomplete: 'current-password' });
-  const next = el('input', { type: 'password', autocomplete: 'new-password' });
-  const confirm = el('input', { type: 'password', autocomplete: 'new-password' });
+  const current = el('input', { id: 'password-current', type: 'password', autocomplete: 'current-password' });
+  const next = el('input', { id: 'password-new', type: 'password', autocomplete: 'new-password' });
+  const confirm = el('input', { id: 'password-confirm', type: 'password', autocomplete: 'new-password' });
   const error = el('p', { class: 'field-error', hidden: true });
   const done = el('p', { class: 'banner', hidden: true, role: 'status' });
   const button = el('button', { type: 'submit', class: 'btn-primary', text: 'Change password', disabled: true });
@@ -588,10 +589,10 @@ function passwordCard() {
     button.disabled = !ok;
   });
   const fields = [
-    el('div', { class: 'field' }, [el('label', { text: 'Current password' }), passwordWithToggle(current)]),
-    el('div', { class: 'field' }, [el('label', { text: 'New password' }), passwordWithToggle(next)]),
+    el('div', { class: 'field' }, [el('label', { for: 'password-current', text: 'Current password' }), passwordWithToggle(current)]),
+    el('div', { class: 'field' }, [el('label', { for: 'password-new', text: 'New password' }), passwordWithToggle(next)]),
     gauge.element,
-    el('div', { class: 'field' }, [el('label', { text: 'Confirm new password' }), passwordWithToggle(confirm)]),
+    el('div', { class: 'field' }, [el('label', { for: 'password-confirm', text: 'Confirm new password' }), passwordWithToggle(confirm)]),
   ];
   // The form goes quiet while both keys are derived.
   const quiet = (on) => {
