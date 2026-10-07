@@ -882,6 +882,13 @@ th.numeric {
 .stack-table .chip { white-space: nowrap; }
 .stack-table .typed { overflow-wrap: anywhere; }
 
+/* The username a used invite's link focuses in Accounts takes the
+   focus ring, however it got there (admin-invites.md, Invites). */
+.stack-table td:focus {
+  outline: 2px solid var(--petrol-600);
+  outline-offset: -2px;
+}
+
 .data-table tr.flagged td:first-child {
   border-left: 3px solid var(--status-critical);
   padding-left: 12px;
@@ -1994,7 +2001,8 @@ select {
   .stack-table td:not([data-label]) { display: block; padding-top: 8px; }
   .stack-table td:not([data-label])::before { content: none; }
   .stack-table td:empty { display: none; }
-  .stack-table .btn-inline { min-height: 44px; }
+  .stack-table .btn-inline,
+  .stack-table .link-button { min-height: 44px; }
 
   /* A recording's figures and prices as a list: the holding or unit on
      the first line, its two figures beneath it, each wrapping whole to

@@ -63,6 +63,27 @@ await run(async () => {
     (await text()).includes('The only administrator'),
   );
 
+  // A used invite names its account and the day, and its name leads there.
+  await click('Invites');
+  await page.waitUntil("[...document.querySelectorAll('tbody tr')].some((r) => r.cells[4]?.querySelector('button'))", {
+    label: 'the used invite',
+  });
+  check(
+    'a used invite reads its username and the day it was used, the username a button',
+    await page.eval(`(() => {
+      const cell = [...document.querySelectorAll('tbody tr')].map((r) => r.cells[4]).find((c) => c.querySelector('button'));
+      return cell.querySelector('button').textContent === 'leander'
+        && cell.textContent === 'Used leander on ' + cell.closest('tr').cells[2].textContent;
+    })()`),
+  );
+  await page.eval("[...document.querySelectorAll('tbody tr')].map((r) => r.cells[4]).find((c) => c.querySelector('button')).querySelector('button').click()");
+  await page.waitUntil("document.activeElement.tagName === 'TD'", { label: 'the focused account' });
+  check(
+    "the username opens Accounts with focus on that account's username",
+    await page.eval(`document.querySelector('.switcher-link.active').textContent === 'Accounts'
+      && document.activeElement.textContent === 'leander'`),
+  );
+
   // A second administrator, so the first has an account to remove.
   const { session: second, close: closeSecond } = await openBrowser();
   await register(second, mintInvite('administrator'), 'ops.second', SECOND_PASSWORD);
@@ -108,7 +129,7 @@ await run(async () => {
     'a used invite whose account is gone reads account removed, never the name',
     await page.eval(`(() => {
       const status = [...document.querySelectorAll('tbody tr')].map((r) => [r.cells[4].textContent, r.cells[5].textContent]);
-      return status.some(([cell, action]) => cell === 'Used account removed'
+      return status.some(([cell, action]) => /^Used account removed on ./.test(cell)
         && action === 'Already used. The account it created has since been removed.')
         && !status.some(([cell]) => cell.includes('sam'));
     })()`),

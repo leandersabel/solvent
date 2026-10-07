@@ -165,12 +165,19 @@ created. Columns: **Kind**, **Note**, **Created**, **Stops working**,
   when someone turns up in Accounts. The word carries it, never color.
 - **Note** shows the text, or an ink-muted "None".
 - **Status** is a chip: **Waiting**, **Used**, **Expired** or **Called
-  back**. A Used chip is followed on the same line by the username it
-  produced and the date, and the username links to that row in Accounts.
+  back**. A Used chip is followed by the username it produced, " on ",
+  and the day the link was used, in the Created column's format, so it
+  reads "Used sarah on" and the date. The username follows the chip on
+  its line where it fits, and otherwise starts the next line. The
+  username is a link button: it opens Accounts and, once the list loads,
+  scrolls to that account's row and moves focus to its username, drawn
+  with the focus ring. Accounts has no address of its own, so the link
+  is a button.
   Once that account is removed, by an administrator or by its owner, the
   username gives way to "account removed", with no link, because the
   name is free to register again and the row would credit whoever takes
-  it.
+  it. An account removed while Invites was open is simply absent when
+  Accounts opens, and nothing is focused.
   A row that is not Waiting sets its text in ink-secondary, so live links
   stand out without a second chip color.
 - The action cell offers **Call back** on a Waiting row only, with a
@@ -857,7 +864,8 @@ administrator), and the lost sole password (Bootstrap). The rest:
     `tests/test_admin.py::test_removing_an_account_clears_its_name_from_the_invite`.
 51. A used invite whose account is gone reads "account removed" and
     "Already used. The account it created has since been removed." Test:
-    `tests/browser/parts/admin.mjs`.
+    `tests/browser/parts/admin.mjs`,
+    `tests/browser/parts/admin-review-used.mjs`.
 52. The password card's fields sit in a form holding the
     administrator's username in a hidden text field with autocomplete
     `username`, ahead of the password fields. Test:
@@ -869,7 +877,8 @@ administrator), and the lost sole password (Bootstrap). The rest:
     the section links, no control is drawn past the screen's edge, and
     no word of a chip, heading or control is split across lines. Test:
     `tests/browser/parts/admin-phone.mjs`,
-    `tests/browser/parts/admin-review-phone.mjs`.
+    `tests/browser/parts/admin-review-phone.mjs`,
+    `tests/browser/parts/admin-review-used.mjs`.
 54. Adding a metal whose code names no weight, such as `XYZ`, shows
     "That is not a valid metal code. Metals are named `<code>-ozt` or
     `<code>-g`, such as `XAU-ozt`." in the add form, and the unit list
@@ -885,3 +894,7 @@ administrator), and the lost sole password (Bootstrap). The rest:
     no source serves, such as `XTS`, lists disabled at Entered by hand
     with the same reason. Test: `tests/browser/parts/admin.mjs`,
     `tests/browser/parts/admin-review-unit-lookup.mjs`.
+57. A used invite reads its username and the day it was used, and the
+    username opens Accounts with focus on that account's username. Test:
+    `tests/browser/parts/admin.mjs`,
+    `tests/browser/parts/admin-review-used.mjs`.
