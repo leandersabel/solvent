@@ -16,9 +16,11 @@ REPO_ROOT = Path(__file__).resolve().parent.parent
 
 
 def test_creating_an_invite_returns_the_token_exactly_once(app, admin):
-    created = admin.post(
+    response = admin.post(
         "/api/admin/invites", json={"kind": "vault_owner", "label": "Sarah"}, headers=CSRF
-    ).get_json()
+    )
+    assert response.status_code == 200
+    created = response.get_json()
     assert created["token"]
     assert created["url"].endswith("/register?invite=" + created["token"])
 

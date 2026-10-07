@@ -80,7 +80,7 @@ await run(async () => {
       headers: { 'X-Solvent-Request': '1', 'Content-Type': 'application/json' },
       body: JSON.stringify({ kind: 'administrator', label: note, expiresInDays: 7 }),
     })).status, NOTE);
-    check('a waiting administrator invite with a note is made', made === 201, String(made));
+    check('a waiting administrator invite with a note is made', made === 200, String(made));
 
     for (const section of ['Invites', 'Accounts', 'Units']) {
       await openSection(session, section);

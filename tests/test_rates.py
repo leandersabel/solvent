@@ -740,7 +740,7 @@ def test_a_symbol_has_one_spelling(admin):
         "/api/admin/symbols",
         json={"symbol": "XRH-ozt", "label": "Rhodium", "kind": "metal", "lookup": False},
         headers=CSRF,
-    ).status_code in (200, 201)
+    ).status_code == 200
 
 
 def test_a_metal_names_its_weight(admin):
@@ -754,8 +754,8 @@ def test_a_metal_names_its_weight(admin):
     for symbol in ("XYZ", "XYZ-kg", "XYZ-ozt\n", "XYZ-gozt"):
         assert add(symbol, "metal") == 400, symbol
     assert add("USD\n", "currency") == 400
-    assert add("XYZ", "currency") in (200, 201)
-    assert add("XYZ-g", "metal") in (200, 201)
+    assert add("XYZ", "currency") == 200
+    assert add("XYZ-g", "metal") == 200
     table = {r["symbol"] for r in admin.get("/api/admin/symbols", headers=CSRF).get_json()}
     assert "XYZ-g" in table and "XYZ-kg" not in table
 

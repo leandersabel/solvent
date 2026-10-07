@@ -169,7 +169,7 @@ def issue(admin, label) -> tuple[str, str]:
     response = admin.post(
         "/api/admin/invites", json={"expiresInDays": 7, "label": label, "kind": "vault_owner"}, headers=CSRF
     )
-    assert response.status_code == 201, response.get_data(as_text=True)
+    assert response.status_code == 200, response.get_data(as_text=True)
     created = response.get_json()
     return created["id"], created["token"]
 
@@ -320,3 +320,52 @@ def test_review_the_trigger_is_in_the_schema_after_a_start_up(app, admin):
     invite_id, _, _ = registered(restarted, admin, "sarah")
     assert remove_by_admin(admin, "sarah").status_code in (200, 204)
     assert invite_row(restarted, invite_id)["used_by"] is None
+
+
+# ---- Issue #415: every answer is one the status set names ----
+# Written from architecture.md (Status codes, Refusals) and
+# admin-invites.md (Endpoints), blind to the change.
+
+STATUS_SET = {200, 204, 400, 401, 403, 404, 409, 413, 429, 500}
+
+
+def test_review_creating_an_invite_answers_ok_with_its_body(admin):
+    response = admin.post(
+        "/api/admin/invites", json={"expiresInDays": 7, "label": "ok", "kind": "administrator"}, headers=CSRF
+    )
+    assert response.status_code == 200, response.get_data(as_text=True)
+    assert set(response.get_json()) == {"id", "token", "url", "expiresAt", "kind"}
+
+
+@pytest.mark.parametrize("caller", ["administrator", "vault_owner", "nobody"])
+def test_review_every_api_route_answers_from_the_status_set(app, caller):
+    """Every API route and method, called with bodies that succeed, fail
+    and say nothing, answers a status the set names. Pages are left out,
+    because app-shell.md designs their redirects."""
+    owner, _ = register(app, "holder")
+    admin, _ = register(app, "root", kind="administrator")
+    client = {"administrator": admin, "vault_owner": owner, "nobody": app.test_client()}[caller]
+    invite = admin.post(
+        "/api/admin/invites", json={"expiresInDays": 7, "label": "x", "kind": "vault_owner"}, headers=CSRF
+    ).get_json()
+    values = {
+        "account_id": str(uuid.uuid4()), "record_id": str(uuid.uuid4()), "username": "nobody.here",
+        "invite_id": invite["id"], "symbol": "CHF", "filename": "x",
+    }
+    bodies = (
+        None, {}, {"symbol": "XTS", "label": "Test", "kind": "currency", "lookup": False},
+        {"expiresInDays": 7, "label": "y", "kind": "vault_owner"}, {"label": "Renamed"},
+    )
+    outside = []
+    # The session routes go last, because signing out ends the caller.
+    api = sorted(
+        (rule for rule in app.url_map.iter_rules() if rule.rule.startswith("/api/")),
+        key=lambda rule: rule.rule.startswith(("/api/auth/", "/api/sessions")),
+    )
+    for rule in api:
+        for method in sorted(rule.methods - {"HEAD", "OPTIONS"}):
+            for body in bodies:
+                response = client.open(concrete(rule, values), method=method, json=body, headers=CSRF)
+                if response.status_code not in STATUS_SET:
+                    outside.append((method, rule.rule, body, response.status_code))
+    assert outside == []

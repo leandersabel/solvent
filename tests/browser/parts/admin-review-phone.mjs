@@ -37,7 +37,7 @@ const api = (method, path, body) =>
 
 const invite = async (kind, label) => {
   const made = await api('POST', '/api/admin/invites', { expiresInDays: 7, label, kind });
-  if (made.status !== 201 && made.status !== 200) throw new Error(`invite: ${JSON.stringify(made)}`);
+  if (made.status !== 200) throw new Error(`invite: ${JSON.stringify(made)}`);
   return made.body;
 };
 
