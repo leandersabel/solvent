@@ -1344,7 +1344,8 @@ Editing an existing entry).
     Once a price is typed there, the line no longer says there is no
     price, how old the last one is, or asks for one. Test:
     `tests/browser/parts/update-values.mjs`,
-    `tests/browser/parts/update-values-review-typed.mjs`.
+    `tests/browser/parts/update-values-review-typed.mjs`,
+    `tests/browser/parts/update-values-review-typed-saved.mjs`.
 17. On a date before a published unit's prices begin, its line says when
     they begin and that the price is yours to set, starts from the last
     price before that date, asks for one when there is none, triggers no
@@ -1352,7 +1353,8 @@ Editing an existing entry).
     price is typed there, it says only when published prices begin and
     that the price is yours to set, saved or not and on reopening. Test:
     `tests/browser/parts/update-values.mjs`,
-    `tests/browser/parts/update-values-review-typed.mjs`.
+    `tests/browser/parts/update-values-review-typed.mjs`,
+    `tests/browser/parts/update-values-review-typed-saved.mjs`.
 18. A holding measured in the main currency shows no price anywhere, and
     the main currency has no rate line. Test:
     `tests/browser/parts/update-values.mjs`.
