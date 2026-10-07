@@ -27,9 +27,10 @@ export function recordingView(vault, date, { onUpdate, onOpenHolding, onDeleted,
     }
     const { figures, prices } = vault.recording(date);
     const priced = new Set(prices.map((entry) => entry.payload.symbol));
-    // A unit the vault holds with nothing at this date: the source did
-    // not answer that day, and filling it in is done after Update.
-    const empty = vault.unitsToRefresh().filter((unit) => !priced.has(unit));
+    // A sourced unit the vault holds with nothing at this date: the
+    // source did not answer that day, and filling it in is done after
+    // Update. A unit no source prices at this date is not an outage.
+    const empty = vault.unitsToRefresh().filter((unit) => !priced.has(unit) && vault.quotable(unit, date));
     const error = el('p', { class: 'field-error', role: 'alert', hidden: !notice, text: notice || '' });
 
     root.replaceChildren(
