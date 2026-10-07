@@ -189,3 +189,24 @@
   stays exactly as it was.
 - A file from an older version of Solvent restores into a newer one.
 - A backup file is no way back in if you forget your password.
+
+## Installing
+
+- Solvent is safe to hand to other people, who install it however their
+  platform lets them. The image protects itself without any container
+  option, because some install paths, such as the TrueNAS Custom App
+  form, cannot set them.
+- No file in the image can raise a process to root.
+- Whatever user runs the container, `/data` is the only place in the
+  image it can write. The app cannot change its own code or the
+  JavaScript it serves, even on a writable root filesystem.
+- The image declares its user as the number `10001:10001`, so a
+  platform that refuses root can verify it.
+- Solvent refuses to run as root. The server and the `flask` command
+  line both stop at once, saying so and how to choose another user. The
+  command line is included because files it wrote to `/data` as root
+  would lock the app out.
+- Solvent works under any user other than root that the operator
+  chooses, such as 568 on TrueNAS, as long as `/data` is writable for
+  it.
+- The container options stay recommended as an extra layer.
