@@ -291,6 +291,8 @@ Every figure is grouped and pointed as Settings sets it
   reads "1 day", "1 recorded figure" and "1 holding moves", every other
   count the plural, 0 included. In "N of M holdings assigned" the noun
   agrees with M. A unit symbol never changes, so "about 1 KB".
+- **Names in a sentence read "A, B and C".** Commas between them, and
+  "and" only before the last.
 
 ### Units
 

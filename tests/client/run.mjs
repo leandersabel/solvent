@@ -3049,6 +3049,13 @@ await check('a count of exactly one takes the singular, every other count the pl
   assert.equal(counted(2, 'recorded value', 'recorded values'), '2 recorded values');
 });
 
+await check('names in a sentence take commas and "and" only before the last', async () => {
+  const { listed } = await load('dom.js');
+  assert.equal(listed(['USD']), 'USD');
+  assert.equal(listed(['USD', 'EUR']), 'USD and EUR');
+  assert.equal(listed(['USD', 'EUR', 'Gold, troy ounce']), 'USD, EUR and Gold, troy ounce');
+});
+
 // ---- Recorded days and addresses ---------------------------------------
 //
 // A figure or a price describes a day that has passed, so a date that

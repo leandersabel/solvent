@@ -6,7 +6,7 @@
 // being opened is the one thing this screen must not be.
 import * as decimal from './decimal.js';
 import * as writes from './writes.js';
-import { counted, dialog, el, priceDateLine, today } from './dom.js';
+import { counted, dialog, el, listed, priceDateLine, today } from './dom.js';
 import { isRecordedDay } from './model.js';
 import { holdingsIn, provenanceChip } from './view-sweep.js';
 
@@ -171,7 +171,7 @@ function confirmDelete(vault, date, onDeleted, redraw) {
   if (units.length) {
     body.push(
       el('p', {
-        text: `${counted(affected, 'holding', 'holdings')} measured in ${units.map((unit) => vault.unitName(unit)).join(' and ')} ${affected === 1 ? 'moves' : 'move'} on that date, including ones you recorded nothing for.`,
+        text: `${counted(affected, 'holding', 'holdings')} measured in ${listed(units.map((unit) => vault.unitName(unit)))} ${affected === 1 ? 'moves' : 'move'} on that date, including ones you recorded nothing for.`,
       }),
     );
   }

@@ -1711,3 +1711,6 @@ Editing an existing entry).
      m2 or silver, is never named so. Test:
      `tests/browser/parts/recording-detail.mjs`,
      `tests/browser/parts/recording-detail-review-unpriced.mjs`.
+104. The delete confirmation names the units it moves as "A, B and C",
+     never chained with "and". Test:
+     `tests/browser/parts/recording-detail-units.mjs`.
