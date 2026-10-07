@@ -1103,3 +1103,8 @@ from an administrator removing an account (`admin-invites.md`).
     Settings, and both fields of the deletion dialog, by the label shown
     beside it. Test: `tests/browser/parts/settings.mjs`,
     `tests/browser/parts/settings-review-names.mjs`.
+86. (blind) A screen reader names the Name and First value fields of
+    the create dialog, and the Label field of the add value dialog, on
+    Dimensions by the label shown beside each. Test:
+    `tests/browser/parts/dimensions.mjs`,
+    `tests/browser/parts/dimensions-review-names.mjs`.

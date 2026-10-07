@@ -430,8 +430,8 @@ function reorder(vault, cardId, to, count, build) {
 }
 
 function createDimension(vault) {
-  const label = el('input', { type: 'text' });
-  const first = el('input', { type: 'text' });
+  const label = el('input', { id: 'dimension-name', type: 'text' });
+  const first = el('input', { id: 'dimension-first-value', type: 'text' });
   const create = (valueLabel) => {
     close();
     const id = newId(vault);
@@ -442,8 +442,8 @@ function createDimension(vault) {
     heading: 'Create a dimension',
     resume: resumable(reopenCreateDimension),
     body: [
-      el('div', { class: 'field' }, [el('label', { text: 'Name' }), label]),
-      el('div', { class: 'field' }, [el('label', { text: 'First value' }), first]),
+      el('div', { class: 'field' }, [el('label', { for: 'dimension-name', text: 'Name' }), label]),
+      el('div', { class: 'field' }, [el('label', { for: 'dimension-first-value', text: 'First value' }), first]),
       el('p', {
         class: 'hint',
         text: 'A dimension with one value is a flag, which the holding form renders as a checkbox.',
@@ -472,11 +472,11 @@ function createDimension(vault) {
 }
 
 function addValue(vault, dimension) {
-  const label = el('input', { type: 'text' });
+  const label = el('input', { id: 'value-label', type: 'text' });
   const close = dialog({
     heading: `Add a value to ${dimension.label}`,
     resume: resumable(reopenAddValue, dimension.id),
-    body: [el('div', { class: 'field' }, [el('label', { text: 'Label' }), label])],
+    body: [el('div', { class: 'field' }, [el('label', { for: 'value-label', text: 'Label' }), label])],
     actions: [
       el('button', { class: 'btn-secondary', text: 'Cancel', onclick: () => close() }),
       el('button', {
