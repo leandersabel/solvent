@@ -129,10 +129,10 @@ function formatCard(vault, reload) {
       text: 'Display only. Every figure is stored exactly as you entered it, and every date is stored the same way for everyone, so changing any of this rewrites nothing.',
     }),
     el('div', { class: 'format-grid' }, [
-      field('Language', language),
-      field('Dates', dates),
-      field('Thousands', group),
-      field('Decimals on money', places),
+      field('Language', 'format-locale', language),
+      field('Dates', 'format-dates', dates),
+      field('Thousands', 'format-group', group),
+      field('Decimals on money', 'format-places', places),
     ]),
     el('div', { class: 'sample-strip' }, [
       el('p', { class: 'sample' }, [
@@ -193,9 +193,9 @@ function organizingCard(vault, open) {
 /** `sessions` fetches the session list again: the server ends every
  *  other session before it answers a change, so the rows shown are stale. */
 function changePasswordCard(kdf, username, sessions) {
-  const current = el('input', { type: 'password', autocomplete: 'current-password' });
-  const next = el('input', { type: 'password', autocomplete: 'new-password' });
-  const confirm = el('input', { type: 'password', autocomplete: 'new-password' });
+  const current = el('input', { id: 'password-current', type: 'password', autocomplete: 'current-password' });
+  const next = el('input', { id: 'password-new', type: 'password', autocomplete: 'new-password' });
+  const confirm = el('input', { id: 'password-confirm', type: 'password', autocomplete: 'new-password' });
   const error = el('p', { class: 'field-error', role: 'alert', hidden: true });
   const done = el('p', { class: 'banner', hidden: true, role: 'status' });
   const button = el('button', { type: 'submit', class: 'btn-primary', text: 'Change password', disabled: true });
@@ -205,9 +205,9 @@ function changePasswordCard(kdf, username, sessions) {
     button.disabled = !ok;
   });
   const fields = [
-    field('Current password', passwordWithToggle(current)),
-    field('New password', passwordWithToggle(next), gauge.element),
-    field('Confirm new password', passwordWithToggle(confirm)),
+    field('Current password', 'password-current', passwordWithToggle(current)),
+    field('New password', 'password-new', passwordWithToggle(next), gauge.element),
+    field('Confirm new password', 'password-confirm', passwordWithToggle(confirm)),
   ];
   // The form goes quiet while both keys are derived.
   const quiet = (on) => {
@@ -270,8 +270,10 @@ function changePasswordCard(kdf, username, sessions) {
   ]);
 }
 
-function field(label, control, ...after) {
-  return el('div', { class: 'field' }, [el('label', { text: label }), control, ...after]);
+/** `id` is the control's own, or the input's inside a wrapper, so the
+ *  visible label is the control's accessible name. */
+function field(label, id, control, ...after) {
+  return el('div', { class: 'field' }, [el('label', { for: id, text: label }), control, ...after]);
 }
 
 function sessionCard(vault) {
@@ -279,7 +281,7 @@ function sessionCard(vault) {
   const error = el('p', { class: 'field-error', hidden: true });
   const everywhereError = el('p', { class: 'field-error', role: 'alert', hidden: true });
 
-  const idle = el('select', {}, IDLE_LOCK_PERIODS.map((minutes) =>
+  const idle = el('select', { id: 'idle-lock' }, IDLE_LOCK_PERIODS.map((minutes) =>
     el('option', { value: String(minutes), text: `${minutes} minutes` }),
   ));
   idle.value = String(vault.idleLockMinutes);
@@ -340,7 +342,7 @@ function sessionCard(vault) {
   const card = el('section', { class: 'card' }, [
     el('h2', { class: 'section-heading', text: 'Session and lock' }),
     el('div', { class: 'idle-grid' }, [
-      field('Idle lock', idle),
+      field('Idle lock', 'idle-lock', idle),
       el('p', {
         class: 'hint',
         text: 'Shorter is safer. Every unlock costs the deliberate wait while your password becomes a key.',
@@ -403,8 +405,8 @@ function dangerZone(username, open) {
  *  confirmations the product asks for, because nothing could bring the
  *  vault back (spec/design-system.md, Dialog). */
 function deleteAccountDialog(username, open) {
-  const password = el('input', { type: 'password', autocomplete: 'current-password' });
-  const typed = el('input', { type: 'text', spellcheck: 'false' });
+  const password = el('input', { id: 'delete-password', type: 'password', autocomplete: 'current-password' });
+  const typed = el('input', { id: 'delete-username', type: 'text', spellcheck: 'false' });
   const error = el('p', { class: 'field-error', role: 'alert', hidden: true });
   const remove = el('button', { class: 'btn-destructive', text: 'Delete my vault', disabled: true });
 
@@ -443,8 +445,8 @@ function deleteAccountDialog(username, open) {
       el('form', { novalidate: true, onsubmit: (event) => event.preventDefault() }, [
         error,
         knownUsernameField(username),
-        field('Your password', passwordWithToggle(password)),
-        field('Type your username to confirm', typed),
+        field('Your password', 'delete-password', passwordWithToggle(password)),
+        field('Type your username to confirm', 'delete-username', typed),
       ]),
     ],
     actions: [

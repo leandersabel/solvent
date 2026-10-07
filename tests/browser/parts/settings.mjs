@@ -10,6 +10,22 @@ import {
   recordsOf, run, signInOn, sitting, sql, story, text, unlockDashboard, vaultOwner, watched,
 } from '../harness.mjs';
 
+// Each field's visible label beside the name the accessibility tree,
+// which is what a screen reader hears, gives its control, for the
+// controls inside `scope`.
+const fieldNames = async (scope) => {
+  const selector = `${scope} .field :is(select, input)`;
+  const labels = await page.call((s) => [...document.querySelectorAll(s)].map((c) => c.closest('.field').querySelector('label').textContent), selector);
+  const { root } = await page.send('DOM.getDocument', { depth: 0 });
+  const { nodeIds } = await page.send('DOM.querySelectorAll', { nodeId: root.nodeId, selector });
+  const names = [];
+  for (const nodeId of nodeIds) {
+    const { nodes } = await page.send('Accessibility.getPartialAXTree', { nodeId, fetchRelatives: false });
+    names.push(nodes[0].ignored ? null : nodes[0].name?.value ?? '');
+  }
+  return { labels, names };
+};
+
 await run(async () => {
   await vaultOwner();
   await story();
@@ -32,6 +48,14 @@ await run(async () => {
   check('it warns that old export files still open', (await text()).includes('still open with your old password'));
   check('the absence of IP records is volunteered', (await text()).includes('Solvent keeps no IP address readable and records no devices.'));
   check('the session list marks this one', (await text()).includes('This session'));
+  await page.send('Accessibility.enable');
+  const pageFields = await fieldNames('main');
+  check(
+    'a screen reader names each list and password field in Settings by the label shown beside it',
+    pageFields.labels.join('|') === 'Language|Dates|Thousands|Decimals on money|Current password|New password|Confirm new password|Idle lock' &&
+      pageFields.names.join('|') === pageFields.labels.join('|'),
+    JSON.stringify(pageFields),
+  );
 
   // ---- Dates and numbers -------------------------------------------------
 
@@ -280,6 +304,13 @@ await run(async () => {
   await page.eval("document.querySelector('.danger-zone').open = true");
   await page.eval("document.querySelector('.danger-zone .btn-destructive').click()");
   await page.waitUntil("document.querySelector('.dialog input')", { label: 'the deletion dialog' });
+  const dialogFields = await fieldNames('.dialog');
+  check(
+    'a screen reader names both fields of the deletion dialog by the label shown beside it',
+    dialogFields.labels.join('|') === 'Your password|Type your username to confirm' &&
+      dialogFields.names.join('|') === dialogFields.labels.join('|'),
+    JSON.stringify(dialogFields),
+  );
   const deleteState = (password, typed) =>
     page.call((secret, username) => {
       const dialog = document.querySelector('.dialog');
