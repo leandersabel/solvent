@@ -2450,7 +2450,7 @@ await check('record-rate: the rate-lines save writes the rates, then deletes, an
   assert.equal(back.figures.find((f) => f.holding.payload.name === 'Dollars').snapshot.version, 1);
   const copy = views.partialCopy(vault, result);
   assert.ok(copy.includes('Not saved: Gold, troy ounce'), copy);
-  assert.ok(copy.includes('Saved: USD, Silver, troy ounce'), copy);
+  assert.ok(copy.includes('Saved: USD and Silver, troy ounce'), copy);
 });
 
 await check('record-rate: the rate-lines save at a date holding no recording issues no request and writes nothing', async () => {

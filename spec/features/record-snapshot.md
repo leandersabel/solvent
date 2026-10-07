@@ -480,7 +480,7 @@ rule.
   what was left, by holding and by unit:
 
   > You left the recording for 31 July 2026 with changes that were not
-  > saved: Current account, the USD rate.
+  > saved: Current account and the USD rate.
 
   Nothing in the vault records a partial save, so the notice is the
   whole of it and does not come back.
@@ -790,7 +790,7 @@ The same Dialog, prefilled with the stored value, date and note.
   what was left:
 
   > You left the entry for 31 July 2026 with changes that were not
-  > saved: Current account, the USD rate.
+  > saved: Current account and the USD rate.
 
   - The holding is named when its value or note differs from what the
     form opened with, or when an existing entry's date was changed.

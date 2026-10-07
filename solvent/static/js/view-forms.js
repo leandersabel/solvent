@@ -193,7 +193,7 @@ export function snapshotDialog(vault, holding, existing, onSaved, onOpenRecordin
     // lines show, on their own requests.
     if (sit.proposals) block.showProposals(await sit.proposals);
     const { failed } = await writes.refreshPrices(vault, on, {}, (unit) => block.partFor(unit));
-    if (failed.length) return finishWith(`Saved. The prices were not updated for ${failed.map((unit) => vault.unitName(unit)).join(', ')}.`);
+    if (failed.length) return finishWith(`Saved. The prices were not updated for ${listed(failed.map((unit) => vault.unitName(unit)))}.`);
     return done();
   };
 
