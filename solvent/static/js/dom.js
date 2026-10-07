@@ -72,11 +72,14 @@ export function listOption(list, search, text, onPick, selected, extra = {}) {
   });
 }
 
+const BLANK_NAME = 'A name cannot be blank.';
+
 // An inline rename (spec/design-system.md, Components): the label
 // with an Edit action that reveals an ordinary input in place. Only
 // Save or Enter writes, so clicking away never does. A blank name is
-// refused, and a rejected `save` keeps the field open with what was
-// typed and the message `failed` gives for the failure.
+// refused, its message gone once a name is typed, and a rejected `save`
+// keeps the field open with what was typed and the message `failed`
+// gives for the failure.
 //
 // `disabled` holds Edit, Save, Cancel and the keys while a write the
 // caller started is outstanding, as a save of its own does. A caller
@@ -116,7 +119,7 @@ export function inlineRename(text, save, failed, { disabled = false, draft = {} 
   async function commit() {
     if (saveButton.disabled) return;
     const next = input.value.trim();
-    if (!next) return refuse('A name cannot be blank.');
+    if (!next) return refuse(BLANK_NAME);
     if (next === text) return open(false);
     saveButton.disabled = cancelButton.disabled = true;
     try {
@@ -131,7 +134,13 @@ export function inlineRename(text, save, failed, { disabled = false, draft = {} 
     }
   }
 
-  input.addEventListener('input', () => (draft.value = input.value));
+  input.addEventListener('input', () => {
+    draft.value = input.value;
+    if (draft.error === BLANK_NAME && input.value.trim()) {
+      error.hidden = true;
+      delete draft.error;
+    }
+  });
   input.addEventListener('keydown', (event) => {
     if (event.key === 'Enter') commit();
     if (event.key === 'Escape' && !cancelButton.disabled) open(false);
