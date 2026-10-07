@@ -19,6 +19,7 @@ jobs:
       packages: write
     env:
       GH_TOKEN: ${{ github.token }}
+      GH_REPO: ${{ github.repository }}
       VERSIONS: users/${{ github.repository_owner }}/packages/container/${{ github.event.repository.name }}/versions
     steps:
       - run: |
