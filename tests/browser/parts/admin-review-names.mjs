@@ -145,22 +145,30 @@ await run(async () => {
     await session.idle();
     expect('Add a unit', await fields(session, 'A code is permanent'), ['Code', 'Name', 'Kind', 'Rate lookup']);
 
-    // The table's own Rate lookup control sits under its column's heading,
-    // which is the label shown for it.
+    // review 59: each row's own Rate lookup is named by its column's
+    // heading and the row's code, so no two rows sound alike.
+    const column = (heading, controls) => {
+      const table = [...document.querySelectorAll('table')].find((t) => t.innerText.includes('Swiss Franc'));
+      const at = [...table.querySelectorAll('th')].findIndex((th) => th.textContent.trim() === heading);
+      return [...table.querySelectorAll('tbody tr')].map((r) => (controls ? r.children[at].querySelector(controls) : r.children[at].innerText.split('\n')[0].trim()));
+    };
+    const codes = await session.call(column, 'Code', null);
     const { result: global } = await session.send('Runtime.evaluate', { expression: 'globalThis' });
-    const { result: chf } = await session.send('Runtime.callFunctionOn', {
+    const { result: list } = await session.send('Runtime.callFunctionOn', {
       objectId: global.objectId,
-      functionDeclaration: ((unit, heading, controls) => {
-        const table = [...document.querySelectorAll('table')].find((t) => t.innerText.includes(unit));
-        const column = [...table.querySelectorAll('th')].findIndex((th) => th.textContent.trim() === heading);
-        const row = [...table.querySelectorAll('tbody tr')].find((r) => r.textContent.includes(unit));
-        return row.children[column].querySelector(controls);
-      }).toString(),
-      arguments: [{ value: 'Swiss Franc' }, { value: 'Rate lookup' }, { value: CONTROLS }],
+      functionDeclaration: column.toString(),
+      arguments: [{ value: 'Rate lookup' }, { value: CONTROLS }],
     });
-    const { nodes: [lookup] } = await session.send('Accessibility.getPartialAXTree', { objectId: chf.objectId, fetchRelatives: false });
-    check("design-system: a screen reader names a unit row's Rate lookup control by its column's heading",
-      !lookup.ignored && (lookup.name?.value ?? '').includes('Rate lookup'), JSON.stringify([lookup.role?.value, lookup.name?.value]));
+    const { result: props } = await session.send('Runtime.getProperties', { objectId: list.objectId, ownProperties: true });
+    const rows = [];
+    for (const prop of props.filter((p) => /^\d+$/.test(p.name))) {
+      const { nodes: [node] } = await session.send('Accessibility.getPartialAXTree', { objectId: prop.value.objectId, fetchRelatives: false });
+      rows.push({ code: codes[Number(prop.name)], ignored: node.ignored, name: node.name?.value ?? '' });
+    }
+    const misnamed = rows.filter((r) => r.ignored || r.name !== `Rate lookup, ${r.code}`);
+    check("review 59: a screen reader names each unit row's Rate lookup by its column's heading and the unit's code",
+      rows.length === codes.length && rows.some((r) => r.code === 'CHF') && misnamed.length === 0,
+      JSON.stringify(misnamed.length ? misnamed : rows.length));
 
     // ---- Your password -------------------------------------------------------
     await press(session, 'Your password');
