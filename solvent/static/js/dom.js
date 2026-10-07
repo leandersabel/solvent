@@ -92,7 +92,7 @@ export function inlineRename(text, save, failed, { disabled = false, draft = {} 
   const label = el('span', { class: 'strong', text });
   const line = `rename-line-${++renames}`;
   const input = el('input', { type: 'text', 'aria-label': 'Name', 'aria-describedby': line });
-  const error = el('p', { id: line, class: 'field-error', 'aria-live': 'polite', hidden: true });
+  const error = el('p', { id: line, class: 'field-error message-line', 'aria-live': 'polite', hidden: true });
   const view = el('span', { class: 'value-row' }, [
     label,
     el('button', { class: 'btn-inline', text: 'Edit', disabled, onclick: () => open(true) }),
@@ -104,6 +104,7 @@ export function inlineRename(text, save, failed, { disabled = false, draft = {} 
   function open(editing, typed = text) {
     view.hidden = editing;
     editor.hidden = !editing;
+    error.hidden = !editing;
     clear();
     for (const key of Object.keys(draft)) delete draft[key];
     if (editing) {
@@ -115,14 +116,12 @@ export function inlineRename(text, save, failed, { disabled = false, draft = {} 
 
   function refuse(message) {
     error.textContent = message;
-    error.hidden = false;
     input.setAttribute('aria-invalid', 'true');
     draft.error = message;
   }
 
   function clear() {
     error.textContent = '';
-    error.hidden = true;
     input.removeAttribute('aria-invalid');
     delete draft.error;
   }

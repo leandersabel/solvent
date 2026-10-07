@@ -612,6 +612,11 @@ svg:focus-visible {
 
 .field-error::before { content: "\26a0  "; }
 
+/* A message line holds its place while empty, so an error coming or
+   going moves nothing below it. */
+.message-line:empty { min-height: 1lh; }
+.message-line:empty::before { content: none; }
+
 fieldset {
   border: 1px solid var(--hairline);
   border-radius: var(--radius-input);
