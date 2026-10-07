@@ -14,7 +14,7 @@ requirements, a feature page and code, doing the work itself.
 | Spec and code | the `advance` run | `spec/features/*.md`, `spec/design-system.md`, `spec/architecture.md`, application code and its tests |
 | Review | `reviewer` | its own tests, and findings against the feature page and the security rules |
 | Release | `release` | `Dockerfile`, a running instance |
-| Nightly | `qa` | findings against the client's intent, filed as `qa` issues |
+| Hunt | `qa` | defects against the client's intent, filed as `qa` issues |
 
 `spec/architecture.md` bounds the screens: it sets what a screen may
 use at all, such as which assets a page can load.
@@ -69,12 +69,14 @@ when, is in the issues and the history.
     checkable statement followed by the test that asserts it, or "no
     test". An item a passing test could fake is marked "(blind)", so a
     reviewer writes their own test for it rather than trusting the one
-    beside it.
+    beside it. An item a person can check in the running app, with what
+    a QA hunt has (`.claude/agents/qa.md`), is marked "(walk)". The
+    others are the test suite's alone.
 
   A feature the client cannot see has no What the client gets: the
-  record store, the record of prices and the nightly harness. Nightly QA
-  walks every page that has one. The nightly harness is pipeline
-  tooling, never in the image (The loop, Nightly and stable). A feature
+  record store, the record of prices and the nightly harness. A QA hunt
+  covers the "(walk)" criteria of pages that have one. The nightly
+  harness is pipeline tooling, never in the image (The loop, Nightly and stable). A feature
   with no screen of its own can still be one the client sees: the app
   shell's chrome is where "looks like a private bank" is cashed out.
 
@@ -161,7 +163,7 @@ The client is `leandersabel`. No agent edits an issue body.
   event, with the issue number. The run reads the issue's state, takes
   the one next step and does the work itself, so no agent rebuilds
   context the run already holds. Repeating a run does no harm.
-  `reviewer` is its only subagent. `qa` walks the nightly and the
+  `reviewer` is its only subagent. `qa` hunts in the nightly and the
   candidate, and `release` starts an instance outside them.
 - Changes reach `master` only as pull requests from `claude[bot]` or
   Dependabot. The client changes the pipeline through an issue like any
@@ -354,7 +356,7 @@ label set by `leandersabel`, `claude[bot]` or `github-actions[bot]`
 counts, and the highest that counts wins. The workflow removes one
 anyone else adds.
 
-A problem rated high or critical holds back a version, however it was
+A problem rated high or critical holds back a release, however it was
 found.
 
 ### Findings
@@ -389,18 +391,17 @@ found.
   and moves a tag, so nothing a later stage relies on lives in workflow
   artifacts. Every job checks out its own commit and no other.
 - No model in these stages runs in a job whose token can push an image,
-  move a tag, publish a release or write the repository. A model that
-  walks holds a token that only reads. The model that files findings holds one that
-  writes issues and nothing else, so findings are filed as
-  `github-actions[bot]`.
+  move a tag, publish a release or write the repository. The model that
+  hunts holds a token that only reads. Its findings are filed by the
+  workflow, as `github-actions[bot]`.
 - The stages:
 
-  | Stage | Started by | QA walks | A pass publishes | Image tags |
+  | Stage | Started by | Publishes | Image tags | Then QA hunts |
   |---|---|---|---|---|
-  | Check | each pull request | nothing | nothing, the pull request merges | none |
-  | Nightly | the schedule, on a night code changed | the features that changed | a pre-release `YYYY.MM.N-dev.YYYYMMDD` | that version, `:nightly` |
-  | Candidate | the client | every feature | a pre-release `YYYY.MM.N-rc.N` | that version, `:rc` |
-  | Release | the client | nothing | the release `YYYY.MM.N` | that version, `:stable`, `:latest` |
+  | Check | each pull request | nothing, the pull request merges | none | nothing |
+  | Nightly | the schedule, on a night code changed | a pre-release `YYYY.MM.N-dev.YYYYMMDD` | that version, `:nightly` | the features that changed |
+  | Candidate | the client | a pre-release `YYYY.MM.N-rc.N` | that version, `:rc` | every feature |
+  | Release | the client | the release `YYYY.MM.N` | that version, `:stable`, `:latest` | nothing |
 
 - Versions are CalVer by month. A release is `YYYY.MM.N`, numbered from
   0 within the month. A nightly is a dev build of the next release,
@@ -415,56 +416,49 @@ found.
   provenance. An image that already exists for that commit is verified
   against its provenance and reused.
 - **Nightly.** Every night that code on `master` changed since the last
-  nightly, `.github/workflows/nightly.yml` builds, walks, files and
-  publishes. `qa` walks the acceptance list of each feature whose page
-  changed since the last nightly's commit, each one a changed file of
-  the image or the harness names by its page's path, and the one walked
-  longest ago. What each walk covered is read from the last nightly's
-  attestation. A changed file naming none, or no nightly yet, walks
-  every feature. A night that fails leaves its image in the registry,
-  where the next night on the same commit reuses it.
+  nightly and the push check of its commit passed,
+  `.github/workflows/nightly.yml` builds, publishes and then hunts. The
+  hunt covers each feature whose page changed since the last nightly's
+  commit, and each one a changed file of the image or the harness names
+  by its page's path. A changed file naming none, or no nightly yet,
+  covers every feature. A night that fails leaves its image in the
+  registry, where the next night on the same commit reuses it.
 - **Candidate.** The client runs `gh workflow run candidate.yml`. It
   fixes the digest under `:nightly` as it starts, or the one the client
-  passes, and walks every feature of it. A pass moves `:rc` to it and
-  publishes a pre-release. A failure files its findings and leaves
-  `:rc` where it was. The client's UAT server follows `:rc`.
+  passes, which must be a published nightly. It attests the digest as a
+  candidate of its commit, moves `:rc` to it, publishes a pre-release,
+  and then hunts every feature of it. The client's UAT server follows
+  `:rc`.
 - **Release.** The client runs `gh workflow run release.yml`. It takes
   the digest under `:rc`, verifies that `build.yml` built it on
-  `master` and that a candidate walked every feature of it, runs the
+  `master` and that `candidate.yml` made it a candidate, runs the
   release check, moves `:stable` and `:latest`, and publishes the
-  release. It never rebuilds and never walks, and refuses to run for
+  release. It never rebuilds and never hunts, and refuses to run for
   anyone but the client.
-- The walk is split into shards that run at once, on the digest, with
-  the harness from the workflow's own checkout. Each shard starts its
-  own instance of the image, hardened on a network with no route out,
-  beside a stand-in that answers as the price sources through a
-  certificate authority made for the run, on prepared data. `qa` drives
-  it in headless Chrome through the Playwright MCP server, and reaches
-  the server only through the harness tools
-  (`spec/features/nightly-harness.md`).
-- The image a stage publishes is the one it walked. Nothing of the
-  harness is in it, and Solvent has no setting naming a price source or
-  a certificate authority.
-- QA records what it finds during the walk. Once every shard has
-  finished, a short run merges the records and another files them, and
-  the workflow files what that run could not. A finding becomes a `bug`
+- **Hunt.** `.github/workflows/hunt.yml` runs `qa` once, on the digest,
+  with the harness from the workflow's own checkout, in a fixed time
+  box. It starts an instance of the image, hardened on a network with
+  no route out, beside a stand-in that answers as the price sources
+  through a certificate authority made for the run, on prepared data.
+  `qa` drives it in headless Chrome through the Playwright MCP server,
+  and reaches the server only through the harness tools
+  (`spec/features/nightly-harness.md`). It looks for defects, records
+  each as it confirms it, and waits out no real time. When the time box
+  ends, the workflow files what was recorded. A finding becomes a `bug`
   labeled `qa` as Findings says, and one without the steps that
-  reproduce it is dropped. Each feature with criteria QA could not
-  check gets a `maintenance` issue in line saying which and why.
-- A walk passes when every shard finishes. A nightly is published only
-  when its walk passed, the push check of its commit passed, and the
-  release check passes. A candidate is taken only from a published
-  nightly, and is published only when its walk and the release check
-  pass. The release check holds back a
-  version for an open problem rated high or critical, such an issue
-  closed by anyone but the client without its fix in the version, or a
-  runtime Dependabot alert rated high or critical. When it cannot read
-  one of those, it fails and says which. That check is the workflow's,
-  never a model's.
+  reproduce it is dropped. A hunt advises: what it finds or fails to do
+  never fails the stage that started it.
+- Nothing of the harness is in the image, and Solvent has no setting
+  naming a price source or a certificate authority.
+- The release check holds back a release for an open problem rated high
+  or critical, such an issue closed by anyone but the client without
+  its fix in the version, or a runtime Dependabot alert rated high or
+  critical. When it cannot read one of those, it fails and says which.
+  That check is the workflow's, never a model's.
 - A failed nightly or candidate always leaves an issue the loop takes
-  up: the open problems that held it back, or else a `bug` by
-  `github-actions[bot]` titled `The <stage> failed: <cause>`, or a
-  comment on the open one with that title.
+  up: a `bug` by `github-actions[bot]` titled
+  `The <stage> failed: <cause>`, or a comment on the open one with that
+  title.
 - Every day, `.github/workflows/sources.yml` sends one real lookup to
   each price source. A source that answers in a changed shape gets a
   `bug` rated high by `github-actions[bot]`, or a comment on the open

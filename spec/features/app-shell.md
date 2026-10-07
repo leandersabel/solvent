@@ -619,84 +619,85 @@ dashboard.
 
 ## Acceptance criteria
 
-1. A signed-in vault owner's every screen but the error page shows the
-   wordmark, the nav, Update values and Lock. Test:
+1. (walk) A signed-in vault owner's every screen but the error page
+   shows the wordmark, the nav, Update values and Lock. Test:
    `tests/test_chrome.py::test_a_vault_owners_bar_carries_update_values_and_lock`,
    `tests/browser/parts/unlock.mjs`.
-2. A vault owner's nav is exactly Dashboard and Settings. Test:
+2. (walk) A vault owner's nav is exactly Dashboard and Settings. Test:
    `tests/test_chrome.py::test_nav_is_dashboard_and_settings_for_a_vault_owner`.
-3. Neither bar has a Holdings or an Admin entry, in any state. Test:
+3. (walk) Neither bar has a Holdings or an Admin entry, in any state.
+   Test:
    `tests/test_chrome.py::test_there_is_no_holdings_entry_and_no_admin_entry_in_either_bar`.
-4. An administrator's bar carries the wordmark and Sign out and nothing
-   else. Test:
+4. (walk) An administrator's bar carries the wordmark and Sign out and
+   nothing else. Test:
    `tests/test_chrome.py::test_an_administrators_bar_carries_the_wordmark_and_sign_out_and_nothing_else`,
    `tests/test_chrome.py::test_an_administrator_has_no_nav_entries_at_all`.
-5. The password and registration screens show no top bar and no nav.
-   Test:
+5. (walk) The password and registration screens show no top bar and no
+   nav. Test:
    `tests/test_chrome.py::test_a_visitor_with_no_session_gets_the_vault_page_in_the_outside_frame`,
    `tests/browser/parts/unlock.mjs`.
-6. Every top-bar control works from the keyboard alone and shows a white
-   focus outline. Test: no test.
-7. Update values opens the sweep for today from any screen, with nothing
-   in between, the same sweep New recording reaches once a date is
-   picked. Test: `tests/browser/parts/update-values.mjs`.
-8. One press of Lock discards keys and decrypted state and shows the
-   password screen with no confirmation, and the server session
+6. (walk) Every top-bar control works from the keyboard alone and shows
+   a white focus outline. Test: no test.
+7. (walk) Update values opens the sweep for today from any screen, with
+   nothing in between, the same sweep New recording reaches once a date
+   is picked. Test: `tests/browser/parts/update-values.mjs`.
+8. (walk) One press of Lock discards keys and decrypted state and shows
+   the password screen with no confirmation, and the server session
    survives. Test: `tests/browser/parts/unlock.mjs`.
-9. After a lock the password alone returns to the app, with no username
-   asked. Test: `tests/browser/parts/unlock.mjs`.
-10. (blind) With a Record a value dialog open, at desktop width and at
-    phone width with touch, the element at Lock's center is Lock or a
-    descendant, and no scrim or sheet box intersects the bar. Every Lock
-    assertion with a dialog open uses a real click, tap or key press at
-    Lock's center, never `element.click()`, which skips hit-testing.
-    Test: `tests/browser/parts/unlock-lock.mjs`.
-11. (blind) With that dialog open and a figure typed, one click (desktop)
-    or tap (phone) on Lock leaves no dialog, no figure and no vault
-    plaintext in the DOM, and shows the password screen. Test:
+9. (walk) After a lock the password alone returns to the app, with no
+   username asked. Test: `tests/browser/parts/unlock.mjs`.
+10. (blind) (walk) With a Record a value dialog open, at desktop width
+    and at phone width with touch, the element at Lock's center is Lock
+    or a descendant, and no scrim or sheet box intersects the bar. Every
+    Lock assertion with a dialog open uses a real click, tap or key
+    press at Lock's center, never `element.click()`, which skips
+    hit-testing. Test: `tests/browser/parts/unlock-lock.mjs`.
+11. (blind) (walk) With that dialog open and a figure typed, one click
+    (desktop) or tap (phone) on Lock leaves no dialog, no figure and no
+    vault plaintext in the DOM, and shows the password screen. Test:
     `tests/browser/parts/unlock-lock.mjs`.
-12. (blind) Unlocking then reopens the dialog with the typed figure.
-    Test: `tests/browser/parts/unlock-lock.mjs`.
-13. (blind) Lock over a confirmation over a form closes both, and
+12. (blind) (walk) Unlocking then reopens the dialog with the typed
+    figure. Test: `tests/browser/parts/unlock-lock.mjs`.
+13. (blind) (walk) Lock over a confirmation over a form closes both, and
     unlocking brings back the form alone. Test:
     `tests/browser/parts/unlock-lock.mjs`.
-14. With a dialog open the nav and Update values are hidden and the
-    wordmark and Lock show. Closing the last dialog shows them again.
-    Test: `tests/browser/parts/unlock-lock.mjs`.
-15. (blind) With a dialog open, the content region and every dialog
-    beneath the topmost are `inert`, the bar is not, no dialog carries
-    `aria-modal`, and the accessibility tree exposes Lock and not the
-    content region. Test: `tests/browser/parts/unlock-lock.mjs`.
-16. (blind) With a dialog open, Tab and Shift+Tab visit only Lock and the
-    topmost dialog's controls, in both directions, and Tab then Enter on
-    Lock locks. Test: `tests/browser/parts/unlock-lock.mjs`.
-17. (blind) Escape over a confirmation on a form closes the confirmation
-    alone, with focus back on what opened it. A second Escape closes the
-    form. Test: `tests/browser/parts/unlock-lock.mjs`.
-18. (blind) At phone width with a dialog open, `--chrome-height` equals
-    the bar's height and the sheet's top the bar's bottom, before and
-    after rotating. Test: `tests/browser/parts/unlock-lock.mjs`.
-19. (blind) An administrator's dialog scrim covers the viewport from its
-    top, the bar is inert, and there is no Lock. Test:
+14. (walk) With a dialog open the nav and Update values are hidden and
+    the wordmark and Lock show. Closing the last dialog shows them
+    again. Test: `tests/browser/parts/unlock-lock.mjs`.
+15. (blind) (walk) With a dialog open, the content region and every
+    dialog beneath the topmost are `inert`, the bar is not, no dialog
+    carries `aria-modal`, and the accessibility tree exposes Lock and
+    not the content region. Test: `tests/browser/parts/unlock-lock.mjs`.
+16. (blind) (walk) With a dialog open, Tab and Shift+Tab visit only Lock
+    and the topmost dialog's controls, in both directions, and Tab then
+    Enter on Lock locks. Test: `tests/browser/parts/unlock-lock.mjs`.
+17. (blind) (walk) Escape over a confirmation on a form closes the
+    confirmation alone, with focus back on what opened it. A second
+    Escape closes the form. Test: `tests/browser/parts/unlock-lock.mjs`.
+18. (blind) (walk) At phone width with a dialog open, `--chrome-height`
+    equals the bar's height and the sheet's top the bar's bottom, before
+    and after rotating. Test: `tests/browser/parts/unlock-lock.mjs`.
+19. (blind) (walk) An administrator's dialog scrim covers the viewport
+    from its top, the bar is inert, and there is no Lock. Test:
     `tests/browser/parts/admin.mjs`.
-20. (blind) No response body from the shell contains vault plaintext, and
-    the bar and nav never show a holding's name, a figure or a note.
-    Grepping templates proves nothing: no route wired to the shell may
-    receive decrypted content. Test:
+20. (blind) (walk) No response body from the shell contains vault
+    plaintext, and the bar and nav never show a holding's name, a figure
+    or a note. Grepping templates proves nothing: no route wired to the
+    shell may receive decrypted content. Test:
     `tests/test_chrome.py::test_no_shell_response_contains_vault_plaintext`.
-21. An administrator's page loads the Argon2id worker and not the record
-    or decryption layer. Test:
+21. (walk) An administrator's page loads the Argon2id worker and not the
+    record or decryption layer. Test:
     `tests/test_chrome.py::test_an_administrator_loads_the_worker_and_not_the_record_layer`.
-22. Every screen uses the warm off-white ground, never pure white, and
-    the one petrol bar. Test: no test.
-23. No screen carries a tagline, slogan, welcome tour or promotional
-    copy. Test: no test.
-24. No number animates and nothing slides or fades in. Under reduced
-    motion, hover and focus transitions stop too. Test: no test.
-25. Money columns are right-aligned with digits of equal width. Test: no
-    test.
-26. Wherever a color carries meaning, a word or icon beside it does too.
+22. (walk) Every screen uses the warm off-white ground, never pure
+    white, and the one petrol bar. Test: no test.
+23. (walk) No screen carries a tagline, slogan, welcome tour or
+    promotional copy. Test: no test.
+24. (walk) No number animates and nothing slides or fades in. Under
+    reduced motion, hover and focus transitions stop too. Test: no test.
+25. (walk) Money columns are right-aligned with digits of equal width.
     Test: no test.
+26. (walk) Wherever a color carries meaning, a word or icon beside it
+    does too. Test: no test.
 27. (blind) A shell page, a JSON endpoint, a Not Found and a Server Error
     each carry the same CSP and carry HSTS. Test:
     `tests/test_headers.py::test_every_response_shape_carries_the_policy_byte_identically`,
@@ -704,35 +705,35 @@ dashboard.
     `tests/test_review_app_shell.py::test_every_response_shape_carries_one_csp_and_one_hsts`.
 28. The CSP refuses framing and no `X-Frame-Options` is served. Test:
     `tests/test_headers.py::test_no_separate_x_frame_options_is_served`.
-29. (blind) No screen, error pages reached by navigation included, logs a
-    console error of its own: a resource the page needs that is blocked
-    or refused, a policy violation or an uncaught exception. The
-    browser's line for a refused request the person made, such as a
-    wrong password, a used invite or too many attempts, is the product
-    answering and not such an error. Test:
+29. (blind) (walk) No screen, error pages reached by navigation
+    included, logs a console error of its own: a resource the page needs
+    that is blocked or refused, a policy violation or an uncaught
+    exception. The browser's line for a refused request the person made,
+    such as a wrong password, a used invite or too many attempts, is the
+    product answering and not such an error. Test:
     `tests/browser/parts/error-page.mjs`.
 30. The Alpine build served is the CSP-safe one. Test:
     `tests/test_chrome.py::test_the_alpine_build_served_is_the_csp_safe_one_at_its_pinned_hash`.
-31. (blind) Every shell page and every error page declares the icon from
-    the static endpoint. Test:
+31. (blind) (walk) Every shell page and every error page declares the
+    icon from the static endpoint. Test:
     `tests/test_icon.py::test_every_shell_page_declares_the_icon`,
     `tests/test_icon.py::test_every_error_page_declares_the_icon`.
-32. The icon is fetchable with no header and no session. Test:
+32. (walk) The icon is fetchable with no header and no session. Test:
     `tests/test_icon.py::test_the_icon_loads_with_no_header_and_no_session`.
-33. (blind) `/favicon.ico` is refused exactly as an invented page path,
-    and no route or exemption answers it. Test:
+33. (blind) (walk) `/favicon.ico` is refused exactly as an invented page
+    path, and no route or exemption answers it. Test:
     `tests/test_icon.py::test_favicon_is_refused_exactly_as_an_invented_page_path`,
     `tests/test_icon.py::test_there_is_no_favicon_route`.
-34. A shell page's stylesheet, `shell.js` and the Alpine bundle load with
-    no header and no session, carry the usual headers, and hold nothing
-    about any person. Test:
+34. (walk) A shell page's stylesheet, `shell.js` and the Alpine bundle
+    load with no header and no session, carry the usual headers, and
+    hold nothing about any person. Test:
     `tests/test_guard.py::test_static_assets_need_no_header_and_no_session`.
 35. A state-changing JSON request without `X-Solvent-Request` is
     Forbidden and changes nothing. Test:
     `tests/test_review_refusals.py::test_every_non_get_route_requires_header_and_changes_nothing`.
-36. A shell navigation route loads without the header. Test:
+36. (walk) A shell navigation route loads without the header. Test:
     `tests/test_guard.py::test_shell_pages_load_without_the_header`.
-37. `GET /api/export` without the header is Forbidden. Test:
+37. (walk) `GET /api/export` without the header is Forbidden. Test:
     `tests/test_guard.py::test_export_requires_the_header_despite_being_a_get`.
 38. (blind) An exempt route and a non-exempt route under the same prefix
     are told apart. Test:
@@ -785,42 +786,44 @@ dashboard.
 48. (blind) A vault owner's request that steps 1 to 6 refuse gets the
     same answer with and without `X-Solvent-Vault`. Test:
     `tests/test_vault_epoch.py::test_a_refusal_before_the_epoch_step_is_the_same_with_and_without_the_header`.
-49. (blind) In a real browser, `/admin` signed out and as a vault owner,
-    `/settings` as an administrator, and an invented path render the
-    identical Not Found. Test: `tests/browser/parts/error-page.mjs`.
-50. (blind) The Forbidden body of `GET /api/export` without the header
-    equals an invented path's Not Found body byte for byte, each the
-    same with no session, a vault owner's and an administrator's. Test:
+49. (blind) (walk) In a real browser, `/admin` signed out and as a vault
+    owner, `/settings` as an administrator, and an invented path render
+    the identical Not Found. Test: `tests/browser/parts/error-page.mjs`.
+50. (blind) (walk) The Forbidden body of `GET /api/export` without the
+    header equals an invented path's Not Found body byte for byte, each
+    the same with no session, a vault owner's and an administrator's.
+    Test:
     `tests/test_chrome.py::test_forbidden_and_not_found_are_one_body_for_every_visitor`.
 51. (blind) A stubbed Server Error has one body for all three visitors
     and with the database unavailable. Test:
     `tests/test_chrome.py::test_a_server_error_is_one_body_for_every_visitor`,
     `tests/test_chrome.py::test_a_server_error_with_the_database_unavailable_is_the_same_body`.
-52. (blind) The failure body holds its own sentence and not the missing
-    one, and the missing body the reverse, each with one button, Go to
-    Solvent. Test:
+52. (blind) (walk) The failure body holds its own sentence and not the
+    missing one, and the missing body the reverse, each with one button,
+    Go to Solvent. Test:
     `tests/test_chrome.py::test_a_server_error_is_one_body_for_every_visitor`.
 53. (blind) Each body, parsed, has the viewport meta, exactly one
     stylesheet link to `/static/css/tokens.css`, the icon link, exactly
     one `<a href="/">`, and no `<script>`, `<style>`, `style` attribute,
     `<form>` or `<nav>`. Test:
     `tests/test_chrome.py::test_both_error_bodies_carry_the_head_and_the_one_link_and_nothing_else`.
-54. Neither body names a status code or repeats the address asked for.
-    Test:
+54. (walk) Neither body names a status code or repeats the address asked
+    for. Test:
     `tests/test_chrome.py::test_an_error_body_names_no_code_and_repeats_no_address`.
-55. (blind) In a real browser, at a deep invented path and on a stubbed
-    Server Error, the background equals `--ground`, the card's font
-    equals the sign-in card's, every resource answers OK and the console
-    has no error. Test: `tests/browser/parts/error-page.mjs`.
-56. At a 390px viewport neither body overflows: `scrollWidth` does not
-    exceed `clientWidth`. Test: `tests/browser/parts/error-page.mjs`.
-57. (blind) Activating Go to Solvent, not reading its `href`, lands on the
-    sign-in card with no session, the Dashboard for a vault owner and
-    the Admin area for an administrator. Test:
+55. (blind) (walk) In a real browser, at a deep invented path and on a
+    stubbed Server Error, the background equals `--ground`, the card's
+    font equals the sign-in card's, every resource answers OK and the
+    console has no error. Test: `tests/browser/parts/error-page.mjs`.
+56. (walk) At a 390px viewport neither body overflows: `scrollWidth`
+    does not exceed `clientWidth`. Test:
     `tests/browser/parts/error-page.mjs`.
-58. An administrator gets Not Found from `/settings`, `/api/sessions` and
-    `/api/auth/logout-all`, and OK from `/api/auth/change-password`.
-    Test:
+57. (blind) (walk) Activating Go to Solvent, not reading its `href`,
+    lands on the sign-in card with no session, the Dashboard for a vault
+    owner and the Admin area for an administrator. Test:
+    `tests/browser/parts/error-page.mjs`.
+58. (walk) An administrator gets Not Found from `/settings`,
+    `/api/sessions` and `/api/auth/logout-all`, and OK from
+    `/api/auth/change-password`. Test:
     `tests/test_guard.py::test_an_administrator_reaches_change_password_and_not_settings`.
 59. (blind) Calling every registered route, read at test time, with each
     kind's session: each kind gets Not Found from the other's surface,
@@ -831,12 +834,13 @@ dashboard.
     (with the header, for API routes) and the vault navigation pages,
     over the route map under every method. Test:
     `tests/test_guard.py::test_with_no_session_the_gate_serves_exactly_the_public_routes_and_the_vault_pages`.
-61. (blind) An administrator's `GET /api/records` is Not Found, not an
-    empty list. Test:
+61. (blind) (walk) An administrator's `GET /api/records` is Not Found,
+    not an empty list. Test:
     `tests/test_guard.py::test_an_administrator_gets_not_found_from_records_not_an_empty_list`.
-62. The root path renders the Dashboard for a vault owner and the Admin
-    area for an administrator, and neither reaches the other's through
-    it. Test: `tests/test_guard.py::test_the_root_path_resolves_by_kind`.
+62. (walk) The root path renders the Dashboard for a vault owner and the
+    Admin area for an administrator, and neither reaches the other's
+    through it. Test:
+    `tests/test_guard.py::test_the_root_path_resolves_by_kind`.
 63. (blind) A real process start with `SECRET_KEY` unset or empty fails,
     naming the variable and printing no key material. A unit test of the
     loader alone is not this. Test:
@@ -914,24 +918,25 @@ dashboard.
     `tests/test_deployment.py::test_requests_held_open_as_long_as_lookups_can_be_leave_the_instance_answering`,
     `tests/test_review_app_shell.py::test_requests_held_open_as_long_as_every_lookup_slot_leave_the_sign_in_page_answering`,
     `tests/test_review_app_shell.py::test_the_control_holding_every_thread_does_stop_the_sign_in_page`.
-80. A start empties the rate cache and keeps the schema version. Test:
+80. (walk) A start empties the rate cache and keeps the schema version.
+    Test:
     `tests/test_rates.py::test_starting_the_app_empties_the_rate_cache`.
-81. At a 390px phone viewport, a real click on Settings in the bar with
-    the dashboard scrolled down, and on a holding's row far down the
-    dashboard, each opens its screen with `scrollY` 0 and the bar's top
-    at 0. Test: `tests/browser/parts/dashboard-scroll.mjs`.
-82. Back from each returns the dashboard to where it was: the same
-    `scrollY` from Settings, and the holding's row at the same height on
-    screen from the holding. Test:
+81. (walk) At a 390px phone viewport, a real click on Settings in the
+    bar with the dashboard scrolled down, and on a holding's row far
+    down the dashboard, each opens its screen with `scrollY` 0 and the
+    bar's top at 0. Test: `tests/browser/parts/dashboard-scroll.mjs`.
+82. (walk) Back from each returns the dashboard to where it was: the
+    same `scrollY` from Settings, and the holding's row at the same
+    height on screen from the holding. Test:
     `tests/browser/parts/dashboard-scroll.mjs`.
 83. (blind) Only the addresses in the route table name a screen, and a
     sweep only at a recorded day. Test:
     `tests/test_client.py::test_the_client_side_rules_hold`.
-84. An address inside the vault that names no screen, a sweep at a date
-    that does not exist or is still to come among them, shows "There is
-    no page at this address." with Go to Solvent and Lock, writes
-    nothing, and Go to Solvent opens the dashboard still unlocked. Test:
-    `tests/browser/parts/error-page.mjs`.
+84. (walk) An address inside the vault that names no screen, a sweep at
+    a date that does not exist or is still to come among them, shows
+    "There is no page at this address." with Go to Solvent and Lock,
+    writes nothing, and Go to Solvent opens the dashboard still
+    unlocked. Test: `tests/browser/parts/error-page.mjs`.
 85. (blind) gunicorn, run with the Dockerfile's arguments, answers an
     over-long request line, an over-long invite address, an over-long
     header, too many headers, an invalid request line and an invalid

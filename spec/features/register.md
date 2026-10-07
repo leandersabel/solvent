@@ -550,14 +550,14 @@ fixture prevents.
 
 ## Acceptance criteria
 
-1. The invite's kind alone decides which form renders. Neither form
-   lets the person choose the kind, and an invite for one kind never
-   produces the other. Test: `tests/test_admin.py::test_an_invite_kind_decides_the_accounts_kind`, `tests/browser/parts/register.mjs`.
-2. A valid unused vault owner invite, a compliant password and a free
-   username register a vault owner who lands at `/dashboard`
+1. (walk) The invite's kind alone decides which form renders. Neither
+   form lets the person choose the kind, and an invite for one kind
+   never produces the other. Test: `tests/test_admin.py::test_an_invite_kind_decides_the_accounts_kind`, `tests/browser/parts/register.mjs`.
+2. (walk) A valid unused vault owner invite, a compliant password and a
+   free username register a vault owner who lands at `/dashboard`
    authenticated, in the same document, with Master Key and DEK in
    memory and no password asked again. Test: `tests/browser/parts/register.mjs`.
-3. A valid administrator invite, a compliant password and a free
+3. (walk) A valid administrator invite, a compliant password and a free
    username register an administrator who lands in the admin area,
    signed in, with no currency asked for. Test: `tests/browser/parts/register.mjs`.
 4. (blind) An administrator registration leaves a `principals` row with
@@ -568,9 +568,10 @@ fixture prevents.
 5. (blind) A vault owner registration leaves exactly one `vault_epochs`
    row, equal to the answer's `vaultEpoch`, and a registration that
    fails partway leaves none. Test: `tests/test_vault_epoch.py::test_a_vault_owner_registers_with_one_epoch_and_is_told_it`, `tests/test_vault_epoch.py::test_a_registration_that_fails_leaves_no_epoch`.
-6. (blind) No request of the registration flow carries the password,
-   the Master Key or the unwrapped DEK, each asserted separately against
-   the captured request bytes, not by reading the code. Test: no test.
+6. (blind) (walk) No request of the registration flow carries the
+   password, the Master Key or the unwrapped DEK, each asserted
+   separately against the captured request bytes, not by reading the
+   code. Test: no test.
 7. After registration the database holds exactly one `credentials` row
    for the account, `method: 'password'`, with the salt, the KDF
    envelope actually used, and an Auth Key hash, never the Auth Key. A
@@ -595,8 +596,8 @@ fixture prevents.
     inserted. Test: `tests/test_schema.py::test_a_second_password_credential_cannot_be_inserted`.
 14. The stored profile record is ciphertext, and the main currency
     appears in plaintext nowhere in the database. Test: `tests/test_auth.py::test_the_main_currency_appears_in_plaintext_nowhere`.
-15. A successful registration marks the invite `used`, and a second
-    registration with the same token fails. Test: `tests/test_auth.py::test_the_invite_is_consumed_and_a_second_use_fails`.
+15. (walk) A successful registration marks the invite `used`, and a
+    second registration with the same token fails. Test: `tests/test_auth.py::test_the_invite_is_consumed_and_a_second_use_fails`.
 16. (blind) A registration carrying another account's live session
     deletes that `sessions` row, asserted against the table, and the old
     cookie answers Unauthorized. A failed registration leaves the
@@ -610,9 +611,9 @@ fixture prevents.
     minimum is a Bad Request, so no vault is ever created weaker than
     the instance requires. Test: `tests/test_auth.py::test_a_kdf_envelope_below_the_server_minimum_is_refused`.
 19. A salt that is not 16 bytes is a Bad Request. Test: `tests/test_auth.py::test_a_salt_that_is_not_sixteen_bytes_is_refused`.
-20. (blind) `GET /register` with an invalid, expired, used or revoked
-    invite renders byte-identical error pages, not merely the same
-    wording. Test: `tests/test_auth.py::test_used_revoked_and_expired_invites_produce_identical_errors`, `tests/test_auth.py::test_the_register_page_renders_one_message_for_every_bad_invite`.
+20. (blind) (walk) `GET /register` with an invalid, expired, used or
+    revoked invite renders byte-identical error pages, not merely the
+    same wording. Test: `tests/test_auth.py::test_used_revoked_and_expired_invites_produce_identical_errors`, `tests/test_auth.py::test_the_register_page_renders_one_message_for_every_bad_invite`.
 21. (blind) `POST /api/register` with an otherwise valid body and a
     token that is unknown, empty, used, expired or revoked answers Bad
     Request `{"refused":"invite"}`, byte-identical across all five in
@@ -620,34 +621,34 @@ fixture prevents.
 22. (blind) `POST /api/register` with a username outside the rule
     answers Bad Request `{"refused":"username"}`, with a usable invite
     and with an unusable one alike. Test: `tests/test_register_refusals.py::test_a_username_outside_the_rule_is_refused_by_name_with_a_usable_invite`, `tests/test_register_refusals.py::test_a_username_outside_the_rule_is_refused_by_name_with_an_unusable_invite`.
-23. (blind) `POST /api/register` with a taken username and an unusable
-    invite answers `{"refused":"invite"}`, not Conflict. Test: `tests/test_register_refusals.py::test_an_unusable_invite_is_refused_before_a_taken_username`.
+23. (blind) (walk) `POST /api/register` with a taken username and an
+    unusable invite answers `{"refused":"invite"}`, not Conflict. Test: `tests/test_register_refusals.py::test_an_unusable_invite_is_refused_before_a_taken_username`.
 24. (blind) Every other Bad Request from `POST /api/register` (an
     unknown field, `kind`, `method`, a short salt, a below-minimum KDF
     envelope, a payload that does not fit the invite's kind) carries no
     `refused` member, asserted by parsing the body. Test: `tests/test_register_refusals.py::test_every_other_bad_request_names_no_reason_and_writes_nothing`.
-25. (blind) Every refusal, Conflict included, leaves no principal row and
-    the invite `pending`, asserted against both tables. A failed
+25. (blind) (walk) Every refusal, Conflict included, leaves no principal
+    row and the invite `pending`, asserted against both tables. A failed
     registration can be retried with the same link. Test: `tests/test_register_refusals.py::test_a_taken_username_is_a_conflict_that_writes_nothing_and_leaves_the_invite`, `tests/test_register_refusals.py::test_every_other_bad_request_names_no_reason_and_writes_nothing`.
 26. (blind) A registration whose profile insert fails leaves no
     principal, credential, wrapper or epoch row and an unconsumed
     invite. A vault owner registration that succeeds leaves exactly one
     principal, one `password` credential row, one wrapper, one epoch
     row, one profile record and a `used` invite. Test: `tests/test_register_refusals.py::test_a_profile_record_the_validator_refuses_leaves_the_invite_pending`, `tests/test_vault_epoch.py::test_a_registration_that_fails_leaves_no_epoch`.
-27. Registering a username held by an account of the other kind is
-    refused with the same answer a same-kind collision gets, so the
+27. (walk) Registering a username held by an account of the other kind
+    is refused with the same answer a same-kind collision gets, so the
     attempt reveals existence but not kind. Test: `tests/test_auth.py::test_a_username_held_by_the_other_kind_is_refused_the_same_way`.
 28. (blind) Every case in `tests/fixtures/usernames.json` gets the same
     verdict, and an accepted case the same normalized value, from the
     server's normalization and from the browser's check, each run
     through the real code rather than a copy of the rule in the test. Test: `tests/test_register_refusals.py::test_the_server_accepts_what_the_fixture_accepts`, `tests/test_client.py::test_the_client_side_rules_hold`.
-29. The username's rule shows as a hint before anything is typed. A
-    character outside the set or a 33rd character is named the moment
+29. (walk) The username's rule shows as a hint before anything is typed.
+    A character outside the set or a 33rd character is named the moment
     it is typed, and 1 or 2 characters when the field is left. Test: `tests/test_register_browser.py::test_the_registration_forms_answer_each_refusal_in_its_own_words`.
-30. (blind) On both forms, a username outside the rule keeps the submit
-    button disabled, and pressing Enter in each field derives nothing
-    and sends nothing, asserted against the derivation and the captured
-    requests. Test: `tests/test_register_browser.py::test_the_registration_forms_answer_each_refusal_in_its_own_words`.
+30. (blind) (walk) On both forms, a username outside the rule keeps the
+    submit button disabled, and pressing Enter in each field derives
+    nothing and sends nothing, asserted against the derivation and the
+    captured requests. Test: `tests/test_register_browser.py::test_the_registration_forms_answer_each_refusal_in_its_own_words`.
 31. (blind) With `POST /api/register` stubbed, each of
     `{"refused":"invite"}`, `{"refused":"username"}`, Conflict, a Bad
     Request with no `refused` member, a Bad Request with a non-JSON
@@ -655,16 +656,16 @@ fixture prevents.
     dropped connection shows its own message and no other. Only the last
     three show the network wording, and every field, the password
     included, keeps its value in all but the invite's. Test: `tests/test_register_browser.py::test_the_registration_forms_answer_each_refusal_in_its_own_words`.
-32. A password of 11 characters, or one scoring below zxcvbn 3, is
-    blocked in the browser and never derives keys. Test: no test.
-33. The vault form cannot be submitted without the no-recovery
+32. (walk) A password of 11 characters, or one scoring below zxcvbn 3,
+    is blocked in the browser and never derives keys. Test: no test.
+33. (walk) The vault form cannot be submitted without the no-recovery
     acknowledgement ticked. Test: no test.
-34. The administrator form carries no no-recovery acknowledgement and no
-    main currency, and makes no claim about recovery. Test: `tests/browser/parts/register.mjs`.
-35. On either form, a confirmation that differs from the password blocks
-    the submit. Test: no test.
-36. The main-currency list holds only the symbol table's `kind: currency`
-    rows, and only the vault owner page carries it. Test: `tests/test_auth.py::test_the_register_page_offers_the_currency_list_only_for_a_vault_owner`.
+34. (walk) The administrator form carries no no-recovery acknowledgement
+    and no main currency, and makes no claim about recovery. Test: `tests/browser/parts/register.mjs`.
+35. (walk) On either form, a confirmation that differs from the password
+    blocks the submit. Test: no test.
+36. (walk) The main-currency list holds only the symbol table's
+    `kind: currency` rows, and only the vault owner page carries it. Test: `tests/test_auth.py::test_the_register_page_offers_the_currency_list_only_for_a_vault_owner`.
 37. (blind) The profile blob's AAD is `account_id ‖ record_type ‖
     record_id ‖ schema_version ‖ version` (architecture.md, Key
     management) with `account_id` empty and `version` 1, built entirely
@@ -709,12 +710,12 @@ fixture prevents.
 48. A `POST /api/register` whose profile schema version is past
     2^53 - 1 is a Bad Request that writes nothing. Test:
     `tests/test_register_refusals.py::test_a_profile_schema_version_past_two_to_the_fifty_three_is_a_bad_request`.
-49. The vault form opens with no main currency chosen, and with every
-    other field filled **Create vault** stays unusable until a currency
-    is picked from the list. Test: `tests/browser/parts/register.mjs`, `tests/browser/parts/register-review-currency.mjs`.
-50. Typing in the main currency's search narrows the list to the
+49. (walk) The vault form opens with no main currency chosen, and with
+    every other field filled **Create vault** stays unusable until a
+    currency is picked from the list. Test: `tests/browser/parts/register.mjs`, `tests/browser/parts/register-review-currency.mjs`.
+50. (walk) Typing in the main currency's search narrows the list to the
     currencies whose code or name contains the text, ignoring case, and
     chooses none. Test: `tests/browser/parts/register.mjs`, `tests/browser/parts/register-review-currency.mjs`.
-51. On both forms, a screen reader names each field by the label beside
-    it: Username, Password, Confirm password and, on the vault form,
-    Main currency. Test: `tests/browser/parts/register.mjs`, `tests/browser/parts/register-review-names.mjs`.
+51. (walk) On both forms, a screen reader names each field by the label
+    beside it: Username, Password, Confirm password and, on the vault
+    form, Main currency. Test: `tests/browser/parts/register.mjs`, `tests/browser/parts/register-review-names.mjs`.

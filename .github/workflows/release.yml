@@ -1,0 +1,83 @@
+name: Release
+
+# The client's release: the image under `:rc`, built on master and made
+# a candidate, becomes `YYYY.MM.N`, `:stable` and `:latest` once the
+# release check passes. It never rebuilds and never hunts (CLAUDE.md,
+# The loop, Nightly and stable).
+on:
+  workflow_dispatch:
+
+permissions: {}
+
+concurrency: release
+
+env:
+  IMAGE: ghcr.io/${{ github.repository }}
+  CANDIDATE: https://github.com/${{ github.repository }}/candidate/v1
+
+jobs:
+  release:
+    if: github.ref == 'refs/heads/master'
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    permissions:
+      actions: read
+      attestations: read
+      contents: write
+      issues: read
+      packages: write
+      pull-requests: read
+      security-events: read
+    env:
+      GH_TOKEN: ${{ github.token }}
+    steps:
+      - name: Only the client releases
+        env:
+          ACTOR: ${{ github.actor }}
+          TRIGGERED: ${{ github.triggering_actor }}
+          OWNER: ${{ github.repository_owner }}
+        run: '[ "$ACTOR" = "$OWNER" ] && [ "$TRIGGERED" = "$OWNER" ]'
+
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+
+      - id: rc
+        run: |
+          echo "$GH_TOKEN" | docker login ghcr.io -u "$GITHUB_ACTOR" --password-stdin
+          digest=$(docker buildx imagetools inspect "$IMAGE:rc" --format '{{json .Manifest}}' | jq -r .digest)
+          commit=$(gh attestation verify "oci://$IMAGE@$digest" --repo "$GITHUB_REPOSITORY" \
+            --signer-workflow "$GITHUB_REPOSITORY/.github/workflows/build.yml" --source-ref refs/heads/master \
+            --format json --jq '.[0].verificationResult.signature.certificate.sourceRepositoryDigest')
+          candidates=$(gh attestation verify "oci://$IMAGE@$digest" --repo "$GITHUB_REPOSITORY" \
+            --signer-workflow "$GITHUB_REPOSITORY/.github/workflows/candidate.yml" --source-ref refs/heads/master \
+            --predicate-type "$CANDIDATE" --format json)
+          jq -e --arg commit "$commit" 'any(.[].verificationResult.statement.predicate; .commit == $commit)' <<< "$candidates" > /dev/null || {
+            echo "::error::$digest is not a candidate of $commit."; exit 1; }
+          rc=$(git tag --points-at "$commit" --list '*-rc.*' | sort -V | tail -n 1)
+          [ -n "$rc" ] || { echo "::error::No candidate was published of $commit."; exit 1; }
+          version=${rc%-rc.*}
+          if git rev-parse -q --verify "refs/tags/$version" > /dev/null; then
+            echo "::error::$version is released already."; exit 1
+          fi
+          {
+            echo "digest=$digest"
+            echo "commit=$commit"
+            echo "version=$version"
+            echo "stable=$(git tag --list '[0-9]*' | grep -vE -- '-(dev|rc)\.' | sort -V | tail -n 1)"
+          } >> "$GITHUB_OUTPUT"
+
+      - uses: ./.github/actions/release-gate
+        with:
+          commit: ${{ steps.rc.outputs.commit }}
+          since: ${{ steps.rc.outputs.stable }}
+
+      - env:
+          VERSION: ${{ steps.rc.outputs.version }}
+          DIGEST: ${{ steps.rc.outputs.digest }}
+          COMMIT: ${{ steps.rc.outputs.commit }}
+        run: |
+          docker buildx imagetools create -t "$IMAGE:$VERSION" -t "$IMAGE:stable" -t "$IMAGE:latest" "$IMAGE@$DIGEST"
+          .github/actions/notes/notes.sh "$VERSION" "$COMMIT" "$IMAGE@$DIGEST" > notes.md
+          gh release create "$VERSION" --target "$COMMIT" --latest --title "$VERSION" --notes-file notes.md

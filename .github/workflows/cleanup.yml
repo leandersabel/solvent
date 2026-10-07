@@ -1,0 +1,32 @@
+name: Cleanup
+
+# Deletes the images older than 30 days that no release and no moving
+# tag points to (CLAUDE.md, The loop, Nightly and stable).
+on:
+  schedule:
+    - cron: "0 3 * * 0"
+  workflow_dispatch:
+
+permissions: {}
+
+jobs:
+  cleanup:
+    if: github.ref == 'refs/heads/master'
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    permissions:
+      contents: read
+      packages: write
+    env:
+      GH_TOKEN: ${{ github.token }}
+      VERSIONS: users/${{ github.repository_owner }}/packages/container/${{ github.event.repository.name }}/versions
+    steps:
+      - run: |
+          kept=$(gh release list --limit 1000 --json tagName --jq '[.[].tagName] + ["nightly", "rc", "stable", "latest"]')
+          cutoff=$(date -u -d '30 days ago' +%FT%TZ)
+          gh api --paginate "$VERSIONS" --jq '.[]' |
+            jq -r --argjson kept "$kept" --arg cutoff "$cutoff" \
+              'select(.created_at < $cutoff and ([.metadata.container.tags[] | IN($kept[])] | any | not)) | .id' |
+            while read -r id; do
+              gh api -X DELETE "$VERSIONS/$id"
+            done

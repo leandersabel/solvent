@@ -809,26 +809,28 @@ from an administrator removing an account (`admin-invites.md`).
    byte-identical, compared row by row rather than by counting
    requests. Test: `tests/test_auth.py::test_changing_a_password_rewrites_the_credential_and_the_wrapper_only`,
    `tests/browser/parts/settings.mjs`.
-2. An administrator changing their password rewrites their credential
-   row and creates no `dek_wrappers` row, and the new password signs
-   them in and the old one does not. Test: `tests/test_auth.py::test_an_administrator_changes_their_password_without_a_wrapper`.
+2. (walk) An administrator changing their password rewrites their
+   credential row and creates no `dek_wrappers` row, and the new
+   password signs them in and the old one does not. Test:
+   `tests/test_auth.py::test_an_administrator_changes_their_password_without_a_wrapper`.
 3. A change-password request from an administrator session carrying a
    wrapper, or from a vault owner session without one, is a Bad Request
    and writes nothing. Test: `tests/test_auth.py::test_the_change_password_wrapper_follows_the_session_kind`.
-4. After a password change, records written before it still decrypt, in
-   the same session and after a fresh sign-in. Test: `tests/browser/parts/settings.mjs`.
-5. The old password no longer signs in and the new one does. Test:
+4. (walk) After a password change, records written before it still
+   decrypt, in the same session and after a fresh sign-in. Test:
    `tests/browser/parts/settings.mjs`.
-6. The change-password request carries neither password in any form.
+5. (walk) The old password no longer signs in and the new one does.
    Test: `tests/browser/parts/settings.mjs`.
-7. (blind) A vault owner's wrong current password shows "That is not
-   your current password." above the first field and sends one
+6. (walk) The change-password request carries neither password in any
+   form. Test: `tests/browser/parts/settings.mjs`.
+7. (blind) (walk) A vault owner's wrong current password shows "That is
+   not your current password." above the first field and sends one
    `/api/auth/salt` request and nothing else between submit and the
    error, asserted from the request log. Test:
    `tests/browser/parts/settings.mjs`,
    `tests/test_client.py::test_the_client_side_rules_hold`.
-8. (blind) A successful change sends no `/api/auth/salt` request: the
-   first after sign-in, a second from the same tab, one after that
+8. (blind) (walk) A successful change sends no `/api/auth/salt` request:
+   the first after sign-in, a second from the same tab, one after that
    tab's stale-KDF upgrade, one after that tab's import, and one after a
    lock and unlock (the unlock's own request excepted), each asserted
    from the tab's request log. Test: `tests/browser/parts/settings.mjs`
@@ -839,59 +841,64 @@ from an administrator removing an account (`admin-invites.md`).
    requests differing only in `currentAuthKey` and `currentSalt`, and
    the new password then signs in. Test:
    `tests/test_client.py::test_the_client_side_rules_hold`.
-10. A change-password request answers Unauthorized when another
+10. (walk) A change-password request answers Unauthorized when another
     session's password change ended this session. Test: no test.
 11. (blind) A change-password request with a wrong `currentAuthKey`
     answers Bad Request and writes nothing but its failed sign-in,
     called directly with the client-side unwrap bypassed. Test: `tests/test_auth.py::test_a_wrong_current_auth_key_is_refused_server_side`,
     `tests/test_review_account_settings.py::test_a_wrong_current_password_is_one_failed_sign_in_and_writes_nothing_else`.
-12. (blind) A password change invalidates every other session of the
-    user and keeps the initiating one, asserted from both sides. Test:
+12. (blind) (walk) A password change invalidates every other session of
+    the user and keeps the initiating one, asserted from both sides.
+    Test:
     `tests/test_auth.py::test_a_password_change_ends_every_other_session_and_keeps_this_one`.
-13. (blind) With a second session open beforehand, the Open sessions
-    list on the page that made the change holds one row, marked This
-    session, once the change succeeds, with no navigation or reload, and
-    the request log shows a `GET /api/sessions` after the OK. Test:
-    `tests/browser/parts/settings.mjs`.
+13. (blind) (walk) With a second session open beforehand, the Open
+    sessions list on the page that made the change holds one row, marked
+    This session, once the change succeeds, with no navigation or
+    reload, and the request log shows a `GET /api/sessions` after the
+    OK. Test: `tests/browser/parts/settings.mjs`.
 14. (blind) When the session list fetch after a successful change
     fails, the card shows its load error and Retry and none of the rows
     from before. Test: `tests/browser/parts/settings.mjs`.
-15. (blind) A vault owner's change-password request carrying the epoch
-    from before an import, with a correct `currentAuthKey`, answers
-    Conflict `{"refused":"vault-replaced"}`, the `credentials`,
-    `dek_wrappers` and `sessions` rows are as they were, and the restored
-    vault still opens with the unchanged password. Test:
+15. (blind) (walk) A vault owner's change-password request carrying the
+    epoch from before an import, with a correct `currentAuthKey`,
+    answers Conflict `{"refused":"vault-replaced"}`, the `credentials`,
+    `dek_wrappers` and `sessions` rows are as they were, and the
+    restored vault still opens with the unchanged password. Test:
     `tests/test_vault_epoch.py::test_change_password_with_a_replaced_epoch_changes_nothing`.
-16. (blind) A `DELETE /api/auth/account` carrying the epoch from before
-    an import, with a correct `authKey` and `confirmUsername`, answers
-    Conflict `{"refused":"vault-replaced"}` and deletes nothing. Test:
+16. (blind) (walk) A `DELETE /api/auth/account` carrying the epoch from
+    before an import, with a correct `authKey` and `confirmUsername`,
+    answers Conflict `{"refused":"vault-replaced"}` and deletes nothing.
+    Test:
     `tests/test_vault_epoch.py::test_deleting_the_account_with_a_replaced_epoch_deletes_nothing`.
 17. Account deletion leaves no `vault_epochs` row for the account. Test:
     `tests/test_vault_epoch.py::test_deleting_the_account_leaves_no_epoch_row`.
-18. A password change on a vault at old KDF parameters leaves
+18. (walk) A password change on a vault at old KDF parameters leaves
     parameters equal to the server's current default. Test:
     `tests/test_auth.py::test_a_password_change_on_old_parameters_lands_on_the_current_default`.
 19. A change that fails after derivation changes nothing, the old
     password still works, and the screen says "Nothing was changed. Your
     current password still works." Test: no test.
-20. The main currency is shown with its reason and offers no control to
-    change it. Test: `tests/browser/parts/settings.mjs`.
-21. Reaching settings or dimensions from the top bar does not ask for
-    the password again. Test: `tests/browser/parts/settings.mjs`,
+20. (walk) The main currency is shown with its reason and offers no
+    control to change it. Test: `tests/browser/parts/settings.mjs`.
+21. (walk) Reaching settings or dimensions from the top bar does not ask
+    for the password again. Test: `tests/browser/parts/settings.mjs`,
     `tests/browser/parts/dimensions.mjs`.
-22. (blind) With main currency `CHF`, `groupSeparator` `apostrophe` and
-    `moneyPlaces` `0`, a `USD` holding valued 1000.40 shows `USD 1’000`
-    with its unit and `1’000` in its holding page's list of values, an
-    `XAU-ozt` holding stored as `"12.125"` shows `12.125` in both
-    places, one stored as `"12.50"` shows `12.50`, and an `m²` holding
-    stored as `"80"` shows `80`, each asserted where it appears on
-    screen. Test: `tests/test_client.py::test_the_client_side_rules_hold`,
+22. (blind) (walk) With main currency `CHF`, `groupSeparator`
+    `apostrophe` and `moneyPlaces` `0`, a `USD` holding valued 1000.40
+    shows `USD 1’000` with its unit and `1’000` in its holding page's
+    list of values, an `XAU-ozt` holding stored as `"12.125"` shows
+    `12.125` in both places, one stored as `"12.50"` shows `12.50`, and
+    an `m²` holding stored as `"80"` shows `80`, each asserted where it
+    appears on screen. Test:
+    `tests/test_client.py::test_the_client_side_rules_hold`,
     `tests/browser/parts/settings.mjs`.
-23. (blind) A quantity shows its stored digits under `moneyPlaces` `0`
-    and `2` alike, asserted with values rounding or padding would
-    change (`"12.125"`, `"12.50"`, `"80"`). Test: `tests/test_client.py::test_the_client_side_rules_hold`.
-24. With locale `de-DE` and `groupSeparator` `apostrophe`, an `m²`
-    holding stored as `"1234.5"` shows `1’234,5`. Test: `tests/test_client.py::test_the_client_side_rules_hold`.
+23. (blind) (walk) A quantity shows its stored digits under
+    `moneyPlaces` `0` and `2` alike, asserted with values rounding or
+    padding would change (`"12.125"`, `"12.50"`, `"80"`). Test:
+    `tests/test_client.py::test_the_client_side_rules_hold`.
+24. (walk) With locale `de-DE` and `groupSeparator` `apostrophe`, an
+    `m²` holding stored as `"1234.5"` shows `1’234,5`. Test:
+    `tests/test_client.py::test_the_client_side_rules_hold`.
 25. (blind) Under that profile `parseQuantity` reads `1’234,50` as
     `"1234.50"` and `12.5` as `"12.5"`. With locale `de-DE` and
     `groupSeparator` `period` it reads `1.234,5` as `"1234.5"` and
@@ -919,15 +926,16 @@ from an administrator removing an account (`admin-invites.md`).
     `0.797000`, and `"0.93124567"` and a twelve-place rate keep every
     digit. Test: `tests/test_client.py::test_the_client_side_rules_hold`
     (the `0.797` case only).
-31. (blind) A rate field loaded from a stored 0.9312 (shown as
+31. (blind) (walk) A rate field loaded from a stored 0.9312 (shown as
     `0.931200`) and saved untouched writes no record and keeps its
     provenance, with the stored record byte-identical. Test: no test.
 32. (blind) No client module but the formatter's calls `toFixed`,
     `toLocaleString` or `Intl.NumberFormat`, asserted by scanning the
     client source. Test: `tests/test_client.py::test_the_client_side_rules_hold`.
-33. (blind) Figures and dates on every screen are written the way the
-    settings say, the calendar included, asserted on the screens rather
-    than on the formatter. Test: `tests/browser/parts/settings.mjs`.
+33. (blind) (walk) Figures and dates on every screen are written the way
+    the settings say, the calendar included, asserted on the screens
+    rather than on the formatter. Test:
+    `tests/browser/parts/settings.mjs`.
 34. (blind) With locale `en-US` and no `dateStyle`, 2026-09-20 reads
     `09/20/2026` from `date`, `Sep 20, 2026` from `longDate`,
     `September 20, 2026` from `fullDate`, `September 20` and `Sep 20`
@@ -939,72 +947,77 @@ from an administrator removing an account (`admin-invites.md`).
     as `20.09.2026`, a moment that day starts `20.09.2026, ` in
     `dateTime`, and `monthYear` reads `September 2026`. Test:
     `tests/test_client.py::test_the_client_side_rules_hold`.
-36. The settings sample line writes its date with `longDate`, so under
-    locale `en-US` and no `dateStyle` it spells the month. Test:
+36. (walk) The settings sample line writes its date with `longDate`, so
+    under locale `en-US` and no `dateStyle` it spells the month. Test:
     `tests/browser/parts/settings.mjs`.
-37. A date typed the way the settings write it is accepted, and a date
-    that does not exist or has a two-digit year is refused rather than
-    moved. Test: `tests/test_client.py::test_the_client_side_rules_hold`.
+37. (walk) A date typed the way the settings write it is accepted, and a
+    date that does not exist or has a two-digit year is refused rather
+    than moved. Test:
+    `tests/test_client.py::test_the_client_side_rules_hold`.
 38. A locale tag the engine does not know falls back rather than
     failing. Test: `tests/test_client.py::test_the_client_side_rules_hold`.
-39. Changing a date or number setting and changing it back leaves every
-    stored figure and date as it was, and writes no record but the
+39. (walk) Changing a date or number setting and changing it back leaves
+    every stored figure and date as it was, and writes no record but the
     profile. Test: no test.
-40. The date and number settings come back the same on another browser.
-    Test: no test.
-41. (blind) With locale `de-CH` and `moneyPlaces` `0`, the edit dialog
-    for a past snapshot of a `USD` holding stored as `"1000.40"`
+40. (walk) The date and number settings come back the same on another
+    browser. Test: no test.
+41. (blind) (walk) With locale `de-CH` and `moneyPlaces` `0`, the edit
+    dialog for a past snapshot of a `USD` holding stored as `"1000.40"`
     prefills `1’000.40` and changing only its note writes `value`
     `"1000.40"`, compared byte for byte. The same dialog for an
     `XAU-ozt` snapshot stored as `"12.125"` prefills `12.125`. Test:
     `tests/browser/parts/settings.mjs`.
-42. Account deletion removes the principal row, its credential rows,
-    wrappers, records and sessions, and a later sign-in with those
+42. (walk) Account deletion removes the principal row, its credential
+    rows, wrappers, records and sessions, and a later sign-in with those
     credentials fails. Test: `tests/browser/parts/settings.mjs`,
     `tests/test_schema.py::test_deleting_a_principal_cascades_to_everything_it_owns`.
 43. (blind) A `DELETE /api/auth/account` with a wrong `authKey`, or a
     `confirmUsername` that is not the session user's, is refused
     server-side and deletes nothing, called directly without the
     dialog. Test: `tests/test_auth.py::test_deleting_an_account_needs_the_auth_key_and_the_typed_username`.
-44. Any vault owner can delete their own account, whoever else is on
-    the instance. Test: `tests/browser/parts/settings.mjs`.
+44. (walk) Any vault owner can delete their own account, whoever else is
+    on the instance. Test: `tests/browser/parts/settings.mjs`.
 45. `DELETE /api/auth/account` from an administrator session answers
     Not Found and deletes nothing, also when they are not the last
     administrator. Test: `tests/test_auth.py::test_an_administrator_cannot_delete_through_the_vault_owners_path`.
-46. An administrator session gets Not Found from `/settings`,
+46. (walk) An administrator session gets Not Found from `/settings`,
     `GET /api/sessions`, `POST /api/auth/logout-all` and
-    `DELETE /api/auth/account`. Test: `tests/test_guard.py::test_an_administrator_reaches_change_password_and_not_settings`,
+    `DELETE /api/auth/account`. Test:
+    `tests/test_guard.py::test_an_administrator_reaches_change_password_and_not_settings`,
     `tests/test_auth.py::test_an_administrator_cannot_delete_through_the_vault_owners_path`.
 47. An administrator session is unaffected by any idle period. Test:
     `tests/browser/parts/admin.mjs`.
 48. An administrator session is dead 12 hours after sign-in, asserted
     as a vault owner's is. Test: `tests/test_session.py::test_the_absolute_expiry_binds_an_administrator_the_same_way`.
-49. The deletion dialog offers Export first as the primary action and
-    Delete my vault as the destructive secondary one. Test:
+49. (walk) The deletion dialog offers Export first as the primary action
+    and Delete my vault as the destructive secondary one. Test:
     `tests/browser/parts/settings.mjs`.
-50. (blind) Delete my vault is disabled until the password is filled and
-    the typed username matches, asserted on computed style: petrol-200
-    fill and border, ink-secondary label, opacity 1 and no red while
-    disabled, red once it can act. Test: `tests/browser/parts/settings.mjs`.
-51. (blind) `GET /api/sessions` returns no IP address and no user agent,
-    asserted against the full response shape so an added field fails
-    the test, and never returns a cookie value. Test:
+50. (blind) (walk) Delete my vault is disabled until the password is
+    filled and the typed username matches, asserted on computed style:
+    petrol-200 fill and border, ink-secondary label, opacity 1 and no
+    red while disabled, red once it can act. Test:
+    `tests/browser/parts/settings.mjs`.
+51. (blind) (walk) `GET /api/sessions` returns no IP address and no user
+    agent, asserted against the full response shape so an added field
+    fails the test, and never returns a cookie value. Test:
     `tests/test_auth.py::test_sessions_report_no_ip_and_no_user_agent`.
-52. `GET /api/sessions` returns only the session user's own sessions.
-    Test: `tests/test_auth.py::test_sessions_list_only_the_callers_own`.
-53. (blind) A session row past the absolute expiry and still in the
-    table is absent from `GET /api/sessions`. Test:
+52. (walk) `GET /api/sessions` returns only the session user's own
+    sessions. Test:
+    `tests/test_auth.py::test_sessions_list_only_the_callers_own`.
+53. (blind) (walk) A session row past the absolute expiry and still in
+    the table is absent from `GET /api/sessions`. Test:
     `tests/test_session.py::test_the_session_list_leaves_off_an_expired_row_still_in_the_table`.
-54. (blind) Locking and unlocking leaves `GET /api/sessions` with the
-    same entries, the same `id` and the same `issuedAt`, compared before
-    and after. Test: `tests/test_session.py::test_unlocking_does_not_move_issued_at_so_the_expiry_counts_from_sign_in`.
-55. `POST /api/auth/logout` invalidates the calling session only, and a
-    second session of the same user still works. Test:
+54. (blind) (walk) Locking and unlocking leaves `GET /api/sessions` with
+    the same entries, the same `id` and the same `issuedAt`, compared
+    before and after. Test:
+    `tests/test_session.py::test_unlocking_does_not_move_issued_at_so_the_expiry_counts_from_sign_in`.
+55. (walk) `POST /api/auth/logout` invalidates the calling session only,
+    and a second session of the same user still works. Test:
     `tests/test_auth.py::test_logout_ends_only_the_calling_session`.
-56. Log out everywhere invalidates the current session too. Test:
+56. (walk) Log out everywhere invalidates the current session too. Test:
     `tests/test_auth.py::test_log_out_everywhere_ends_the_current_session_too`.
-57. Change password, `GET /api/sessions`, log out everywhere and account
-    deletion answer Unauthorized without a session, and
+57. (walk) Change password, `GET /api/sessions`, log out everywhere and
+    account deletion answer Unauthorized without a session, and
     `POST /api/auth/logout` without a session answers OK. Test:
     `tests/test_auth.py::test_the_settings_endpoints_need_a_session`,
     `tests/test_auth.py::test_logout_without_a_session_answers_ok`.
@@ -1013,98 +1026,103 @@ from an administrator removing an account (`admin-invites.md`).
     `tests/test_auth.py::test_the_settings_writes_need_the_request_header`.
 59. A failed sign out everywhere says so inline and leaves every
     session open, this one included. Test: `tests/browser/parts/settings.mjs`.
-60. After the configured idle period the in-memory keys are gone and
-    reading vault data asks to unlock, and after 12 hours the server
+60. (walk) After the configured idle period the in-memory keys are gone
+    and reading vault data asks to unlock, and after 12 hours the server
     session answers Unauthorized whatever the activity. Test:
     `tests/browser/parts/unlock-idle.mjs`,
     `tests/test_session.py::test_a_session_past_the_absolute_lifetime_is_refused`.
-61. (blind) The idle lock defaults to 15 minutes, survives signing out
-    and back in, follows the user to another device, and appears in
-    plaintext nowhere in the database, asserted by scanning the stored
-    rows. Test: `tests/browser/parts/unlock-idle.mjs`.
-62. (blind) A profile with `idleLockMinutes` 0, 500, 7 or 7.5 locks at
-    5, 60, 5 and 5, and the select shows that value, each asserted by
-    when the lock fires as well as by the select. Test:
+61. (blind) (walk) The idle lock defaults to 15 minutes, survives
+    signing out and back in, follows the user to another device, and
+    appears in plaintext nowhere in the database, asserted by scanning
+    the stored rows. Test: `tests/browser/parts/unlock-idle.mjs`.
+62. (blind) (walk) A profile with `idleLockMinutes` 0, 500, 7 or 7.5
+    locks at 5, 60, 5 and 5, and the select shows that value, each
+    asserted by when the lock fires as well as by the select. Test:
     `tests/browser/parts/unlock-idle.mjs`.
 63. A stored `idleLockMinutes` that is not a number locks at 15. Test:
     no test.
-64. (blind) A changed period locks at the new one with no activity after
-    the change. Test: `tests/browser/parts/unlock-idle.mjs`.
-65. No setting anywhere turns the idle lock off. Test: no test.
-66. Reordering a dimension's values reorders the chart's bands and
-    writes one record, touching no `account` record. Test:
+64. (blind) (walk) A changed period locks at the new one with no
+    activity after the change. Test:
+    `tests/browser/parts/unlock-idle.mjs`.
+65. (walk) No setting anywhere turns the idle lock off. Test: no test.
+66. (walk) Reordering a dimension's values reorders the chart's bands
+    and writes one record, touching no `account` record. Test:
     `tests/browser/parts/dimensions.mjs`.
-67. Renaming a dimension or a value writes one record and leaves every
-    `account` record byte-identical. Test: `tests/browser/parts/dimensions.mjs`.
-68. (blind) Archiving a dimension and restoring it returns every holding
-    to the band it was in, with no `account` record written either way.
-    Test: `tests/browser/parts/dimensions.mjs`.
-69. Archiving a value moves its holdings to "Unassigned", and restoring
-    it moves them back. Test: `tests/browser/parts/dimensions.mjs`.
-70. (blind) No operation on the dimensions screen writes more than one
-    record, asserted by counting `PUT`s across create, rename, reorder,
-    archive and restore and by comparing every `account` record byte for
-    byte. Test: `tests/browser/parts/dimensions.mjs`.
+67. (walk) Renaming a dimension or a value writes one record and leaves
+    every `account` record byte-identical. Test:
+    `tests/browser/parts/dimensions.mjs`.
+68. (blind) (walk) Archiving a dimension and restoring it returns every
+    holding to the band it was in, with no `account` record written
+    either way. Test: `tests/browser/parts/dimensions.mjs`.
+69. (walk) Archiving a value moves its holdings to "Unassigned", and
+    restoring it moves them back. Test:
+    `tests/browser/parts/dimensions.mjs`.
+70. (blind) (walk) No operation on the dimensions screen writes more
+    than one record, asserted by counting `PUT`s across create, rename,
+    reorder, archive and restore and by comparing every `account` record
+    byte for byte. Test: `tests/browser/parts/dimensions.mjs`.
 71. Two dimensions created in one session hold different ids, and no id
     equals a label. Test: `tests/browser/parts/dimensions.mjs`.
 72. A dimension id is drawn uniformly, redrawing bytes outside the 36
     characters. Test: `tests/browser/parts/dimensions.mjs`.
-73. A profile with no `dimensions` key renders the dashboard with
+73. (walk) A profile with no `dimensions` key renders the dashboard with
     "Total" as the only grouping and no errors. Test:
     `tests/browser/parts/dimensions.mjs`.
-74. Coverage counts the active holdings. Test: `tests/browser/parts/dimensions.mjs`.
-75. A blank rename is refused and keeps what was typed, and clicking
-    away from a rename writes nothing and leaves it open. Test:
+74. (walk) Coverage counts the active holdings. Test:
     `tests/browser/parts/dimensions.mjs`.
-76. A dimension save that fails says so on its card and shows the stored
-    value, and a Conflict names the other tab and reloads the profile.
-    Test: `tests/browser/parts/dimensions.mjs`.
-77. (blind) A wrong password at `POST /api/auth/change-password`, from
-    either kind of session, or at `DELETE /api/auth/account` counts as a
-    failed sign-in, and once the sign-in limits engage, both endpoints
-    and sign-in refuse the right password with Too Many Requests and
-    write nothing. Test: `tests/test_attempts.py::test_a_wrong_password_on_a_settings_form_is_a_failed_sign_in`.
-78. At 390 px and at 320 px wide, the "This session" chip sits on one
-    line and the page does not scroll sideways. Test:
+75. (walk) A blank rename is refused and keeps what was typed, and
+    clicking away from a rename writes nothing and leaves it open. Test:
+    `tests/browser/parts/dimensions.mjs`.
+76. (walk) A dimension save that fails says so on its card and shows the
+    stored value, and a Conflict names the other tab and reloads the
+    profile. Test: `tests/browser/parts/dimensions.mjs`.
+77. (blind) (walk) A wrong password at `POST /api/auth/change-password`,
+    from either kind of session, or at `DELETE /api/auth/account` counts
+    as a failed sign-in, and once the sign-in limits engage, both
+    endpoints and sign-in refuse the right password with Too Many
+    Requests and write nothing. Test:
+    `tests/test_attempts.py::test_a_wrong_password_on_a_settings_form_is_a_failed_sign_in`.
+78. (walk) At 390 px and at 320 px wide, the "This session" chip sits on
+    one line and the page does not scroll sideways. Test:
     `tests/browser/parts/settings.mjs`,
     `tests/browser/parts/settings-review-phone.mjs`.
 79. (blind) A `POST /api/auth/change-password` with the right current
     password and a new Auth Key of 3, 31 or 33 bytes, or not base64, is
     a Bad Request, for either kind, and leaves every row as it was.
     Test: `tests/test_auth.py::test_a_rotation_to_an_auth_key_that_is_not_thirty_two_bytes_is_refused`.
-80. (blind) After the password changed in another tab of the same
+80. (blind) (walk) After the password changed in another tab of the same
     browser, a change from this tab with the current password succeeds
     with one `/api/auth/salt` request and one change-password request,
     and the new password then opens the vault. Test:
     `tests/test_client.py::test_the_client_side_rules_hold`.
-81. (blind) A change-password request whose `currentSalt` is not the
-    credential's salt answers Conflict `{"refused":"credential-changed"}`,
-    for either kind, and writes nothing, no failed sign-in included.
-    Test:
+81. (blind) (walk) A change-password request whose `currentSalt` is not
+    the credential's salt answers Conflict
+    `{"refused":"credential-changed"}`, for either kind, and writes
+    nothing, no failed sign-in included. Test:
     `tests/test_credential_changed.py::test_a_password_change_on_a_superseded_salt_writes_nothing_and_counts_no_failure`,
     `tests/test_credential_changed.py::test_an_administrator_on_a_superseded_salt_changes_nothing`.
-82. A new password equal to the current one shows "The new password is
-    your current one." above the first field, keeps every field and
-    sends nothing. Test: `tests/browser/parts/settings.mjs`,
+82. (walk) A new password equal to the current one shows "The new
+    password is your current one." above the first field, keeps every
+    field and sends nothing. Test: `tests/browser/parts/settings.mjs`,
     `tests/browser/parts/settings-review-reuse.mjs`.
-83. After a successful password change, for a vault owner and for an
-    administrator, every field is empty, the gauge shows no filled
+83. (walk) After a successful password change, for a vault owner and for
+    an administrator, every field is empty, the gauge shows no filled
     segment and no rating, and Change password is disabled. Test:
     `tests/browser/parts/settings.mjs`,
     `tests/browser/parts/settings-review-gauge.mjs`,
     `tests/browser/parts/admin-review-cleared.mjs`,
     `tests/browser/parts/admin-review-gauge.mjs`.
-84. The Change password fields and the delete dialog's password field
-    each sit in a form holding the signed-in username in a hidden text
-    field with autocomplete `username`, ahead of the password fields.
-    Test: `tests/browser/parts/settings.mjs`,
+84. (walk) The Change password fields and the delete dialog's password
+    field each sit in a form holding the signed-in username in a hidden
+    text field with autocomplete `username`, ahead of the password
+    fields. Test: `tests/browser/parts/settings.mjs`,
     `tests/browser/parts/settings-review-forms.mjs`.
-85. (blind) A screen reader names each list and password field in
+85. (blind) (walk) A screen reader names each list and password field in
     Settings, and both fields of the deletion dialog, by the label shown
     beside it. Test: `tests/browser/parts/settings.mjs`,
     `tests/browser/parts/settings-review-names.mjs`.
-86. (blind) A screen reader names the Name and First value fields of
-    the create dialog, and the Label field of the add value dialog, on
-    Dimensions by the label shown beside each. Test:
+86. (blind) (walk) A screen reader names the Name and First value fields
+    of the create dialog, and the Label field of the add value dialog,
+    on Dimensions by the label shown beside each. Test:
     `tests/browser/parts/dimensions.mjs`,
     `tests/browser/parts/dimensions-review-names.mjs`.

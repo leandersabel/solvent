@@ -692,12 +692,12 @@ administrator), and the lost sole password (Bootstrap). The rest:
 
 ## Acceptance criteria
 
-1. Registration with no valid invite creates no account, and only an
-   administrator session can create an invite. Test:
+1. (walk) Registration with no valid invite creates no account, and only
+   an administrator session can create an invite. Test:
    `tests/test_register_refusals.py::test_the_five_bad_tokens_answer_the_same_bytes`,
    `tests/test_admin.py::test_a_vault_owner_gets_not_found_from_every_admin_route`.
-2. Creating an invite returns the token once, and the invite list carries
-   neither the token nor its hash. Test:
+2. (walk) Creating an invite returns the token once, and the invite list
+   carries neither the token nor its hash. Test:
    `tests/test_admin.py::test_creating_an_invite_returns_the_token_exactly_once`.
 3. (blind) The plaintext token appears in no table, only its hash, read
    from a dump of the whole database. Test:
@@ -706,41 +706,42 @@ administrator), and the lost sole password (Bootstrap). The rest:
    `tests/test_admin.py::test_created_by_is_stored_and_never_returned`.
 5. `expired` is derived from `expires_at`, never stored. Test:
    `tests/test_admin.py::test_expired_is_derived_and_not_stored`.
-6. A valid invite registers one account and is then `used`, and a second
-   attempt with it fails. Test:
+6. (walk) A valid invite registers one account and is then `used`, and a
+   second attempt with it fails. Test:
    `tests/test_auth.py::test_the_invite_is_consumed_and_a_second_use_fails`.
-7. A revoked invite fails registration before its expiry, and an expired
-   invite fails registration. Test:
+7. (walk) A revoked invite fails registration before its expiry, and an
+   expired invite fails registration. Test:
    `tests/test_auth.py::test_used_revoked_and_expired_invites_produce_identical_errors`.
-8. (blind) Invalid, expired, used and revoked invites yield byte-identical
-   registration errors, status, headers and body, shared with register.md.
-   Test: `tests/test_register_refusals.py::test_the_five_bad_tokens_answer_the_same_bytes`,
+8. (blind) (walk) Invalid, expired, used and revoked invites yield
+   byte-identical registration errors, status, headers and body, shared
+   with register.md. Test:
+   `tests/test_register_refusals.py::test_the_five_bad_tokens_answer_the_same_bytes`,
    `tests/test_auth.py::test_the_register_page_renders_one_message_for_every_bad_invite`.
-9. Revoking a revoked invite succeeds again, and revoking a `used` one is
-   a Conflict that leaves its status. Test:
+9. (walk) Revoking a revoked invite succeeds again, and revoking a
+   `used` one is a Conflict that leaves its status. Test:
    `tests/test_admin.py::test_revoking_is_idempotent_and_refused_on_a_used_invite`.
 10. `POST /api/admin/invites` without `kind`, or with a value other than
     the two kinds, is a Bad Request and creates nothing. Test:
     `tests/test_admin.py::test_kind_is_required_and_has_no_default`.
-11. An invite with `kind: administrator` produces an administrator with
-    no wrapper, and one with `kind: vault_owner` produces a vault owner
-    with one, asserted against the rows. Test:
+11. (walk) An invite with `kind: administrator` produces an
+    administrator with no wrapper, and one with `kind: vault_owner`
+    produces a vault owner with one, asserted against the rows. Test:
     `tests/test_admin.py::test_an_invite_kind_decides_the_accounts_kind`.
 12. The schema refuses a records row or a wrapper for an administrator.
     Test: `tests/test_schema.py::test_the_schema_refuses_a_records_row_for_an_administrator`,
     `tests/test_schema.py::test_the_schema_refuses_a_dek_wrapper_for_an_administrator`.
-13. (blind) A vault owner session gets Not Found from every `/api/admin/`
-    route, enumerated at test time under every method it answers, matching
-    an invented `/api/` path in body and headers, and nothing is created
-    or deleted. Test:
+13. (blind) (walk) A vault owner session gets Not Found from every
+    `/api/admin/` route, enumerated at test time under every method it
+    answers, matching an invented `/api/` path in body and headers, and
+    nothing is created or deleted. Test:
     `tests/test_admin.py::test_every_admin_route_is_refused_as_an_invented_api_path_is`,
     `tests/test_admin.py::test_a_vault_owner_gets_not_found_from_every_admin_route`.
 14. (blind) An `/api/admin/` request with the header and no session is
     Unauthorized, and one without the header is Forbidden whatever the
     session. Tests must send both. Test:
     `tests/test_guard.py::test_every_api_route_is_forbidden_without_the_header_and_unauthorized_without_a_session`.
-15. Opening `/admin` signed out or as a vault owner shows the same page
-    as an invented address. Test:
+15. (walk) Opening `/admin` signed out or as a vault owner shows the
+    same page as an invented address. Test:
     `tests/test_guard.py::test_the_admin_area_is_not_confirmed_to_anyone_who_may_not_reach_it`.
 16. (blind) No endpoint under `/api/admin/` returns any credential field,
     wrapper or record ciphertext, checked over every route enumerated at
@@ -750,17 +751,17 @@ administrator), and the lost sole password (Bootstrap). The rest:
 17. (blind) No request to any endpoint changes an existing account's
     kind, attempted through every route enumerated at test time. Test:
     `tests/test_admin.py::test_no_route_anywhere_changes_an_existing_accounts_kind`.
-18. (blind) Every control in the rendered admin area maps to a route under
-    `/api/admin/` or to `POST /api/auth/change-password`, asserted
-    against the rendered area. Test: no test.
-19. The admin area shows the boundary callout and the sections Invites,
-    Accounts, Units and Your password, in that order. Test:
+18. (blind) (walk) Every control in the rendered admin area maps to a
+    route under `/api/admin/` or to `POST /api/auth/change-password`,
+    asserted against the rendered area. Test: no test.
+19. (walk) The admin area shows the boundary callout and the sections
+    Invites, Accounts, Units and Your password, in that order. Test:
     `tests/browser/parts/admin.mjs`.
-20. The created link is shown once, an administrator's account row
-    reads No vault, never a zero, and only No vault is drawn in
+20. (walk) The created link is shown once, an administrator's account
+    row reads No vault, never a zero, and only No vault is drawn in
     ink-muted. Test: `tests/browser/parts/admin.mjs`,
     `tests/browser/parts/admin-review-ink.mjs`.
-21. (blind) `GET /api/admin/accounts` lists both kinds, and an
+21. (blind) (walk) `GET /api/admin/accounts` lists both kinds, and an
     administrator's row has no `itemCount` key, asserted against the
     row's full key set, not its value. Test:
     `tests/test_admin.py::test_the_account_list_carries_no_item_count_for_an_administrator`.
@@ -773,19 +774,20 @@ administrator), and the lost sole password (Bootstrap). The rest:
 23. (blind) A `principals` row with a null `last_login_at` in the file
     before start-up comes back with its `createdAt` as `lastLoginAt`.
     Test: `tests/test_last_login.py::test_a_backfilled_null_comes_back_as_created_at_through_the_admin_list`.
-24. Removing an account deletes its principal, credential, wrapper, vault
-    epoch, records and sessions in one transaction, and its next request
-    is Unauthorized and its login fails. Test:
+24. (walk) Removing an account deletes its principal, credential,
+    wrapper, vault epoch, records and sessions in one transaction, and
+    its next request is Unauthorized and its login fails. Test:
     `tests/test_admin.py::test_removing_an_account_takes_its_vault_and_leaves_every_other_alone`,
     `tests/test_schema.py::test_deleting_a_principal_cascades_to_everything_it_owns`.
 25. (blind) A removed vault owner leaves no `vault_epochs` row. Test:
     `tests/test_vault_epoch.py::test_an_administrator_removing_a_vault_owner_removes_the_epoch_and_compares_none`.
-26. (blind) An administrator's removal of a vault owner succeeds with no
-    `X-Solvent-Vault`, with a wrong one and with the owner's current one,
-    and the owner's page then meets Unauthorized, not `vault-replaced`.
-    Test: `tests/test_vault_epoch.py::test_an_administrator_removing_a_vault_owner_removes_the_epoch_and_compares_none`
+26. (blind) (walk) An administrator's removal of a vault owner succeeds
+    with no `X-Solvent-Vault`, with a wrong one and with the owner's
+    current one, and the owner's page then meets Unauthorized, not
+    `vault-replaced`. Test:
+    `tests/test_vault_epoch.py::test_an_administrator_removing_a_vault_owner_removes_the_epoch_and_compares_none`
     covers the no-header case only.
-27. Removing one account leaves every other account's records and
+27. (walk) Removing one account leaves every other account's records and
     sessions untouched, with two populated vaults. Test:
     `tests/test_admin.py::test_removing_an_account_takes_its_vault_and_leaves_every_other_alone`.
 28. (blind) A fault injected mid-delete leaves the target account intact,
@@ -796,32 +798,32 @@ administrator), and the lost sole password (Bootstrap). The rest:
 30. Removing a username that does not exist answers exactly as an invented
     `/api/` path. Test:
     `tests/test_review_refusals.py::test_unknown_username_delete_matches_invented_api_path`.
-31. The last remaining administrator cannot remove their own account: a
-    Conflict, nothing deleted. Test:
+31. (walk) The last remaining administrator cannot remove their own
+    account: a Conflict, nothing deleted. Test:
     `tests/test_admin.py::test_the_last_administrator_cannot_remove_their_own_account`.
-32. The only administrator's row has no Remove control. Test:
+32. (walk) The only administrator's row has no Remove control. Test:
     `tests/browser/parts/admin.mjs`.
 33. (blind) Two overlapping deletes, each removing one of the only two
     administrators, leave exactly one administrator. The serial case
     passes either way. Test:
     `tests/test_admin.py::test_the_guard_and_the_delete_are_one_transaction`.
-34. An administrator removes another while a third remains, and the
-    removed account can no longer sign in. Test:
+34. (walk) An administrator removes another while a third remains, and
+    the removed account can no longer sign in. Test:
     `tests/test_admin.py::test_an_administrator_removes_another_while_a_third_remains`.
-35. (blind) An administrator who is not the last removes their own
-    account and their session ends, shown by a refused next request, not
-    by the success status. Their user account is untouched. Test: no
+35. (blind) (walk) An administrator who is not the last removes their
+    own account and their session ends, shown by a refused next request,
+    not by the success status. Their user account is untouched. Test: no
     test.
-36. (blind) The disabled Remove account button shows petrol-200 fill and
-    border, an ink-secondary label, full opacity, a default cursor and no
-    red, and turns red once the username matches, asserted on computed
-    style. Test: `tests/browser/parts/admin.mjs`.
-37. An administrator changes their password through
+36. (blind) (walk) The disabled Remove account button shows petrol-200
+    fill and border, an ink-secondary label, full opacity, a default
+    cursor and no red, and turns red once the username matches, asserted
+    on computed style. Test: `tests/browser/parts/admin.mjs`.
+37. (walk) An administrator changes their password through
     `POST /api/auth/change-password` with no wrapper: the new one signs
     in and the old one does not. Test:
     `tests/test_auth.py::test_an_administrator_changes_their_password_without_a_wrapper`.
-38. A password change ends every other session of the caller and keeps
-    the current one. Test:
+38. (walk) A password change ends every other session of the caller and
+    keeps the current one. Test:
     `tests/test_auth.py::test_a_password_change_ends_every_other_session_and_keeps_this_one`.
 39. An administrator gets Not Found from `DELETE /api/auth/account`.
     Test: `tests/test_auth.py::test_an_administrator_cannot_delete_through_the_vault_owners_path`.
@@ -842,74 +844,75 @@ administrator), and the lost sole password (Bootstrap). The rest:
 44. A CLI-minted invite records `created_by` as `system:bootstrap`, and
     registering that value as a username is refused. Test:
     `tests/test_admin.py::test_the_cli_records_the_bootstrap_sentinel_and_refuses_it_as_a_username`.
-45. `/register` carries `Referrer-Policy: no-referrer`. Test:
+45. (walk) `/register` carries `Referrer-Policy: no-referrer`. Test:
     `tests/test_headers.py::test_every_register_response_says_no_referrer_in_the_header`.
-46. The register page drops the token from the address bar. Test:
+46. (walk) The register page drops the token from the address bar. Test:
     `tests/browser/parts/register.mjs`.
-47. (blind) No invite token reaches the real gunicorn's standard output or
-    standard error, run with the Dockerfile's arguments, over a token
-    from the API and one from `flask create-invite`, `/register` requests
-    for a valid, used, expired, revoked and unknown token and a
+47. (blind) (walk) No invite token reaches the real gunicorn's standard
+    output or standard error, run with the Dockerfile's arguments, over
+    a token from the API and one from `flask create-invite`, `/register`
+    requests for a valid, used, expired, revoked and unknown token and a
     registration, read after gunicorn stops. Not a source grep or the
     app's logger alone. Test:
     `tests/test_deployment.py::test_no_invite_token_reaches_the_containers_standard_output_or_error`.
-48. A freshly registered vault reads 0 items, and one holding one
+48. (walk) A freshly registered vault reads 0 items, and one holding one
     `account`, one `snapshot`, one `rate` and a second `profile` record
     reads 3. Test:
     `tests/test_admin.py::test_items_count_what_the_owner_added_and_no_profile`.
-49. The password card's error line sits above the Current password
-    field. Test: `tests/browser/parts/admin.mjs`.
-50. Removing an account, by an administrator or by its owner, clears the
-    username from the invite that created it and leaves it used, and a
-    start-up clears a stale one. Test:
+49. (walk) The password card's error line sits above the Current
+    password field. Test: `tests/browser/parts/admin.mjs`.
+50. (walk) Removing an account, by an administrator or by its owner,
+    clears the username from the invite that created it and leaves it
+    used, and a start-up clears a stale one. Test:
     `tests/test_admin.py::test_removing_an_account_clears_its_name_from_the_invite`.
-51. A used invite whose account is gone reads "account removed" and
-    "Already used. The account it created has since been removed." Test:
-    `tests/browser/parts/admin.mjs`,
+51. (walk) A used invite whose account is gone reads "account removed"
+    and "Already used. The account it created has since been removed."
+    Test: `tests/browser/parts/admin.mjs`,
     `tests/browser/parts/admin-review-used.mjs`.
-52. The password card's fields sit in a form holding the
+52. (walk) The password card's fields sit in a form holding the
     administrator's username in a hidden text field with autocomplete
     `username`, ahead of the password fields. Test:
     `tests/browser/parts/admin.mjs`,
     `tests/browser/parts/admin-review-forms.mjs`.
-53. On Invites, Accounts and Units, at 320, 390, 768, 901 and 1280px,
-    with a waiting administrator invite carrying a long note, used
-    invites and a 32-character username, nothing scrolls sideways but
-    the section links, no control is drawn past the screen's edge, and
-    no word of a chip, heading or control is split across lines. Test:
-    `tests/browser/parts/admin-phone.mjs`,
+53. (walk) On Invites, Accounts and Units, at 320, 390, 768, 901 and
+    1280px, with a waiting administrator invite carrying a long note,
+    used invites and a 32-character username, nothing scrolls sideways
+    but the section links, no control is drawn past the screen's edge,
+    and no word of a chip, heading or control is split across lines.
+    Test: `tests/browser/parts/admin-phone.mjs`,
     `tests/browser/parts/admin-review-phone.mjs`,
     `tests/browser/parts/admin-review-used.mjs`.
-54. Adding a metal whose code names no weight, such as `XYZ`, shows
-    "That is not a valid metal code. Metals are named `<code>-ozt` or
-    `<code>-g`, such as `XAU-ozt`." in the add form, and the unit list
-    stays without it. Test: `tests/browser/parts/admin.mjs`,
+54. (walk) Adding a metal whose code names no weight, such as `XYZ`,
+    shows "That is not a valid metal code. Metals are named `<code>-ozt`
+    or `<code>-g`, such as `XAU-ozt`." in the add form, and the unit
+    list stays without it. Test: `tests/browser/parts/admin.mjs`,
     `tests/browser/parts/admin-review-units.mjs`.
 55. A retired metal whose code names no weight has Restore disabled with
     its reason beside it, while a retired `XAG-g` and a retired currency
     can be restored. Test: `tests/browser/parts/admin.mjs`,
     `tests/browser/parts/admin-review-units.mjs`.
-56. Add a unit shows Rate lookup disabled at Entered by hand with "No
-    source for this unit yet. Rate lookup can be turned on once one is
-    configured on the server." beneath it, and a currency it adds that
-    no source serves, such as `XTS`, lists disabled at Entered by hand
-    with the same reason. Test: `tests/browser/parts/admin.mjs`,
+56. (walk) Add a unit shows Rate lookup disabled at Entered by hand with
+    "No source for this unit yet. Rate lookup can be turned on once one
+    is configured on the server." beneath it, and a currency it adds
+    that no source serves, such as `XTS`, lists disabled at Entered by
+    hand with the same reason. Test: `tests/browser/parts/admin.mjs`,
     `tests/browser/parts/admin-review-unit-lookup.mjs`.
-57. A used invite reads its username and the day it was used, and the
-    username opens Accounts with focus on that account's username. Test:
-    `tests/browser/parts/admin.mjs`,
-    `tests/browser/parts/admin-review-used.mjs`.
-58. While the password card reads "Changing your password", its fields,
-    their Show toggles and its button are disabled, and typing into New
-    password enables nothing. Test: `tests/browser/parts/admin.mjs`,
-    `tests/browser/parts/admin-review-working.mjs`.
-59. (blind) A screen reader names A note to yourself and This link
-    stops working after on Invites, Type the username to confirm in the
-    Remove dialog, Code, Name, Kind and Rate lookup in Add a unit, and
-    each field of the password card, by the label shown beside it. It
-    names each Units row's Rate lookup by its column's heading and the
-    unit's code, such as "Rate lookup, CHF".
+57. (walk) A used invite reads its username and the day it was used, and
+    the username opens Accounts with focus on that account's username.
     Test: `tests/browser/parts/admin.mjs`,
+    `tests/browser/parts/admin-review-used.mjs`.
+58. (walk) While the password card reads "Changing your password", its
+    fields, their Show toggles and its button are disabled, and typing
+    into New password enables nothing. Test:
+    `tests/browser/parts/admin.mjs`,
+    `tests/browser/parts/admin-review-working.mjs`.
+59. (blind) (walk) A screen reader names A note to yourself and This
+    link stops working after on Invites, Type the username to confirm in
+    the Remove dialog, Code, Name, Kind and Rate lookup in Add a unit,
+    and each field of the password card, by the label shown beside it.
+    It names each Units row's Rate lookup by its column's heading and
+    the unit's code, such as "Rate lookup, CHF". Test:
+    `tests/browser/parts/admin.mjs`,
     `tests/browser/parts/admin-review-names.mjs`.
 60. A Retire or Restore the server refuses reads "Nothing was retired."
     or "Nothing was restored." on its row, which stays as it was. Test:

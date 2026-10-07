@@ -1,0 +1,217 @@
+name: Hunt
+
+# QA hunts an image by its digest for defects, in one time-boxed run,
+# with the harness from this workflow's own checkout, then files what it
+# found (CLAUDE.md, The loop, Nightly and stable). A hunt advises and
+# never fails its caller. No model here holds a token that writes.
+on:
+  workflow_call:
+    inputs:
+      digest:
+        description: The image's digest
+        type: string
+        required: true
+      base:
+        description: The commit of the last dev version, whose changes since choose the features
+        type: string
+        default: ""
+      full:
+        description: Hunt every feature
+        type: boolean
+        default: false
+
+permissions: {}
+
+env:
+  IMAGE: ghcr.io/${{ github.repository }}
+  DIGEST: ${{ inputs.digest }}
+
+jobs:
+  hunt:
+    runs-on: ubuntu-latest
+    timeout-minutes: 75
+    continue-on-error: true
+    environment: agent
+    permissions:
+      contents: read
+      issues: read
+      packages: read
+    outputs:
+      features: ${{ steps.plan.outputs.features }}
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+
+      - id: plan
+        env:
+          BASE: ${{ inputs.base }}
+          FULL: ${{ inputs.full }}
+        run: python3 .github/actions/qa-plan/plan.py >> "$GITHUB_OUTPUT"
+
+      # Node and Chrome, for the generator of the prepared data.
+      - if: steps.plan.outputs.features != '[]'
+        uses: ./.github/actions/setup
+
+      - if: steps.plan.outputs.features != '[]'
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          echo "$GH_TOKEN" | docker login ghcr.io -u "$GITHUB_ACTOR" --password-stdin
+          docker pull "$IMAGE@$DIGEST"
+          docker logout ghcr.io
+
+      # The harness around the hunted image (nightly-harness.md, What the
+      # workflow does). Every container runs the hunted image with its
+      # entrypoint overridden and tools/nightly/ mounted read-only.
+      - if: steps.plan.outputs.features != '[]'
+        timeout-minutes: 20
+        run: |
+          # On every harness container (nightly-harness.md, What the
+          # workflow does).
+          harden=(--read-only --cap-drop ALL --security-opt no-new-privileges:true)
+
+          # The run's certificate authority, which signs once and keeps no key.
+          python3 tools/nightly/ca.py "$RUNNER_TEMP/tls"
+          mkdir "$RUNNER_TEMP/standin"
+
+          # The app's network has no route out. The relay's other leg is
+          # the runner's only way in.
+          docker network create --internal nightly
+          docker network create nightly-edge
+
+          # The price stand-in, under the providers' real names, as the
+          # runner's own user, so it reads the key and writes its request
+          # list, binding 443 without a capability.
+          docker run -d --name standin --network nightly \
+            --network-alias api.frankfurter.dev --network-alias api.nbp.pl \
+            "${harden[@]}" --user "$(id -u):$(id -g)" \
+            --sysctl net.ipv4.ip_unprivileged_port_start=443 \
+            -v "$RUNNER_TEMP/tls:/tls:ro" \
+            -v "$PWD/tools/nightly:/harness:ro" \
+            -v "$RUNNER_TEMP/standin:/state" \
+            --entrypoint python \
+            "$IMAGE@$DIGEST" /harness/standin.py --cert /tls/leaf.pem --key /tls/leaf.key --state /state
+
+          # The hunt's own instance, at every default an installation has,
+          # on the internal network alone. The run's authority is the only
+          # one in its trust store, mounted over the system store.
+          docker run -d --name solvent --network nightly \
+            -e SECRET_KEY="$(openssl rand -hex 32)" \
+            -v solvent-data:/data \
+            --read-only --tmpfs /dev/shm:size=64m \
+            --cap-drop ALL --security-opt no-new-privileges:true \
+            -v "$RUNNER_TEMP/tls/trust:/etc/ssl/certs:ro" \
+            "$IMAGE@$DIGEST"
+
+          # The way in: a port cannot be published from an internal network.
+          docker run -d --name relay --network nightly-edge -p 127.0.0.1:8000:8000 \
+            "${harden[@]}" \
+            -v "$PWD/tools/nightly:/harness:ro" \
+            --entrypoint python \
+            "$IMAGE@$DIGEST" /harness/relay.py --listen 0.0.0.0:8000 --to solvent:8000
+          docker network connect nightly relay
+
+          # The trust store, the aliases and the missing route out, proved
+          # together from a container that trusts what the app trusts.
+          docker run --rm --network nightly "${harden[@]}" \
+            -e PYTHONPATH=/app \
+            -v "$RUNNER_TEMP/tls/trust:/etc/ssl/certs:ro" \
+            -v "$PWD/tools/nightly:/harness:ro" \
+            --entrypoint python \
+            "$IMAGE@$DIGEST" /harness/sources.py probe
+
+          # The prepared vaults, written through the app's own browser code.
+          curl -fsS --retry 20 --retry-all-errors --retry-delay 1 -o /dev/null http://localhost:8000/login
+          invite=$(docker exec solvent flask --app app create-invite --kind administrator | tail -n 1)
+          python3 tools/nightly/prices.py prepare tools/nightly/fixtures/plan.json tools/nightly/fixtures/out
+          node tools/nightly/fixtures.mjs --base http://localhost:8000 --invite "$invite" --plan tools/nightly/fixtures/plan.json --out tools/nightly/fixtures/out
+
+          # What the prepared data dates back, written with the app stopped.
+          docker stop solvent
+          docker run --rm --network none "${harden[@]}" \
+            -v solvent-data:/data \
+            -v "$PWD/tools/nightly:/harness:ro" \
+            -v "$PWD/tools/nightly/fixtures/out:/out:ro" \
+            --entrypoint python \
+            "$IMAGE@$DIGEST" /harness/patch.py /data/solvent.db /out/patches.json
+          docker start solvent
+          curl -fsS --retry 20 --retry-all-errors --retry-delay 1 -o /dev/null http://localhost:8000/login
+
+      # qa's own administrator invite. --force, because the generator's
+      # administrator exists.
+      - if: steps.plan.outputs.features != '[]'
+        id: app
+        run: echo "invite=$(docker exec solvent flask --app app create-invite --kind administrator --force | tail -n 1)" >> "$GITHUB_OUTPUT"
+
+      # The time box. What qa recorded before it ends is filed all the
+      # same. The run's own token reads and nothing more.
+      - if: steps.plan.outputs.features != '[]'
+        timeout-minutes: 45
+        uses: anthropics/claude-code-action@12dd8d74c712f5f3669365b2369b558c495b1104 # v1.0.238
+        env:
+          CLAUDE_CODE_DISABLE_BACKGROUND_TASKS: "1"
+          GH_TOKEN: ${{ github.token }}
+        with:
+          claude_code_oauth_token: ${{ secrets.CLAUDE_CODE_OAUTH_TOKEN }}
+          github_token: ${{ github.token }}
+          prompt: >-
+            Run the `nightly-qa` skill with the arguments
+            `http://localhost:8000 ${{ steps.app.outputs.invite }}
+            ${{ join(fromJSON(steps.plan.outputs.features), ',') }}
+            tools/nightly/fixtures/out/manifest.json`.
+          # A scheduled run's actor is whoever last changed the caller,
+          # which can be a bot.
+          allowed_bots: claude,github-actions,dependabot
+          plugin_marketplaces: https://github.com/leandersabel/skald.git
+          plugins: skald@skald
+          # No shell beyond reading issues: with one, the hunt would reach
+          # Docker, the database volume and the internet, and the harness
+          # tools would no longer be the only way to the server. The
+          # harness server runs with an empty environment, so no token
+          # reaches it. The first browser starts holding the aged session,
+          # and the second, for a check needing two sessions at once,
+          # starts with nothing stored.
+          claude_args: |
+            --model claude-opus-5-5
+            --allowedTools Read,Write,Glob,Grep,Agent,Task,Skill,TodoWrite,"Bash(gh issue list:*)","Bash(gh issue view:*)",mcp__playwright,mcp__playwright2,mcp__harness
+            --mcp-config '{"mcpServers":{"playwright":{"command":"npx","args":["-y","@playwright/mcp@0.0.83","--headless","--browser","chrome","--isolated","--caps=network","--storage-state","${{ github.workspace }}/tools/nightly/fixtures/out/storage-state.json"]},"playwright2":{"command":"npx","args":["-y","@playwright/mcp@0.0.83","--headless","--browser","chrome","--isolated"]},"harness":{"command":"env","args":["-i","PATH=/usr/bin:/bin","python3","${{ github.workspace }}/tools/nightly/mcp.py","--container","solvent","--state","${{ runner.temp }}/standin","--url","http://localhost:8000"]}}}'
+
+      - if: always()
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: qa
+          path: qa-unfiled/
+          if-no-files-found: ignore
+
+      - if: failure()
+        run: |
+          docker logs solvent || true
+          docker logs standin || true
+
+  # The findings, filed by the workflow's token, which writes issues and
+  # starts the queue they joined.
+  file:
+    needs: hunt
+    if: always() && needs.hunt.outputs.features != '[]'
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    continue-on-error: true
+    permissions:
+      actions: write
+      contents: read
+      issues: write
+    env:
+      GH_TOKEN: ${{ github.token }}
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8.0.1
+        continue-on-error: true
+        with:
+          name: qa
+          path: qa-unfiled
+      - if: hashFiles('qa-unfiled/*.json') != ''
+        uses: ./.github/actions/qa-file

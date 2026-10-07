@@ -846,211 +846,221 @@ rule of the chart (Archived holdings, Ranges and modes).
 
 ## Acceptance criteria
 
-1. With three holdings in different units and known snapshots and
+1. (walk) With three holdings in different units and known snapshots and
    prices, the total equals the hand-computed `Σ value × price`, exactly
    in decimal, to the cent, in both pricing modes, and the two modes
-   differ. Test: `tests/test_client.py::test_the_client_side_rules_hold`.
-2. A holding last recorded in March, with a price entry from this week,
-   contributes at this week's price on latest rates and at March's price
-   on rates as of each figure. Test:
+   differ. Test:
    `tests/test_client.py::test_the_client_side_rules_hold`.
-3. Recording one franc holding changes the converted figure of every
-   dollar and gold holding, and the band of every foreign unit on that
-   date and after, without any of them gaining a snapshot. Test: no
+2. (walk) A holding last recorded in March, with a price entry from this
+   week, contributes at this week's price on latest rates and at March's
+   price on rates as of each figure. Test:
+   `tests/test_client.py::test_the_client_side_rules_hold`.
+3. (walk) Recording one franc holding changes the converted figure of
+   every dollar and gold holding, and the band of every foreign unit on
+   that date and after, without any of them gaining a snapshot. Test: no
    test.
-4. A rate written today adds a point at today and moves no earlier point
-   and no recorded quantity. Test: no test.
-5. Opening the dashboard asks no price source anything, and a revised
-   provider figure with nothing recorded changes no figure anywhere.
-   Test: `tests/browser/parts/dashboard-net-worth.mjs`.
-6. (blind) Adding, changing or deleting an interior entry in either
-   series changes only the stretch between its neighbors, asserted for
-   all three operations with every point outside the stretch compared.
-   Correcting a rate moves every band in that unit. Test:
-   `tests/test_client.py::test_the_client_side_rules_hold`.
-7. Deleting the newest entry of a series moves every point after the
-   previous entry and none before it. Test:
-   `tests/test_client.py::test_the_client_side_rules_hold`.
-8. Deleting a whole recording moves every band in the symbols it priced,
-   across the stretches those entries anchored and no further, including
-   bands with no entry at that date. Test:
-   `tests/test_client.py::test_the_client_side_rules_hold`.
-9. A date carrying rate entries and no snapshots, including a recording
-   whose figures were all cleared, still bends the bands of the symbols
-   it prices, compared with the same date with those entries removed.
+4. (walk) A rate written today adds a point at today and moves no
+   earlier point and no recorded quantity. Test: no test.
+5. (walk) Opening the dashboard asks no price source anything, and a
+   revised provider figure with nothing recorded changes no figure
+   anywhere. Test: `tests/browser/parts/dashboard-net-worth.mjs`.
+6. (blind) (walk) Adding, changing or deleting an interior entry in
+   either series changes only the stretch between its neighbors,
+   asserted for all three operations with every point outside the
+   stretch compared. Correcting a rate moves every band in that unit.
    Test: `tests/test_client.py::test_the_client_side_rules_hold`.
+7. (walk) Deleting the newest entry of a series moves every point after
+   the previous entry and none before it. Test:
+   `tests/test_client.py::test_the_client_side_rules_hold`.
+8. (walk) Deleting a whole recording moves every band in the symbols it
+   priced, across the stretches those entries anchored and no further,
+   including bands with no entry at that date. Test:
+   `tests/test_client.py::test_the_client_side_rules_hold`.
+9. (walk) A date carrying rate entries and no snapshots, including a
+   recording whose figures were all cleared, still bends the bands of
+   the symbols it prices, compared with the same date with those entries
+   removed. Test:
+   `tests/test_client.py::test_the_client_side_rules_hold`.
 10. A symbol with two differing entries on one date prices that date from
     its neighbors, and the dashboard names the fault. Test:
     `tests/browser/parts/dashboard.mjs`.
 11. When that pair is the symbol's only entry, its active holdings are
     listed as not priced. Test: `tests/browser/parts/dashboard.mjs`.
-12. (blind) An active holding with a quantity and no price is listed as
-    not priced, is excluded from the total, and its bare quantity never
-    appears in the total. Test:
+12. (blind) (walk) An active holding with a quantity and no price is
+    listed as not priced, is excluded from the total, and its bare
+    quantity never appears in the total. Test:
     `tests/test_client.py::test_the_client_side_rules_hold`.
-13. (blind) On rates as of each figure, a `USD` holding whose latest
-    quantity is at 2026-04-10, with `USD` entries only at 2010-03-31,
-    counts at the 2010-03-31 rate and its row carries 2010-03-31. A row
-    whose price sits at its quantity date carries no price date. Test:
-    `tests/browser/parts/dashboard-net-worth.mjs`.
-14. (blind) On latest rates, in a vault whose newest entry is at
+13. (blind) (walk) On rates as of each figure, a `USD` holding whose
+    latest quantity is at 2026-04-10, with `USD` entries only at
+    2010-03-31, counts at the 2010-03-31 rate and its row carries
+    2010-03-31. A row whose price sits at its quantity date carries no
+    price date. Test: `tests/browser/parts/dashboard-net-worth.mjs`.
+14. (blind) (walk) On latest rates, in a vault whose newest entry is at
     2026-04-10, a free-text holding priced only at 2024-01-15 carries
     2024-01-15, and a `USD` holding priced at 2026-04-10 carries none.
     The reference date moves between the two modes, so both are
     asserted. Test: `tests/browser/parts/dashboard-net-worth.mjs`.
-15. (blind) The price date is a line in the converted figure's cell,
-    never a column, and is absent on a row priced at its own date, on a
-    main-currency row and on a not-priced row. Test:
+15. (blind) (walk) The price date is a line in the converted figure's
+    cell, never a column, and is absent on a row priced at its own date,
+    on a main-currency row and on a not-priced row. Test:
     `tests/browser/parts/dashboard-net-worth.mjs`.
-16. A holding last valued in March shows "as of" March and still counts
-    in the total, with no warning at any age. Every figure carries its
-    quantity's date and the screen carries one rate date. Test: no test.
-17. A snapshot after the chart range's start does not appear before its
-    date, and a holding contributes nothing before its first snapshot:
-    ten years of an old holding's history make no step at the left edge.
-    Test: `tests/test_client.py::test_the_client_side_rules_hold`,
+16. (walk) A holding last valued in March shows "as of" March and still
+    counts in the total, with no warning at any age. Every figure
+    carries its quantity's date and the screen carries one rate date.
+    Test: no test.
+17. (walk) A snapshot after the chart range's start does not appear
+    before its date, and a holding contributes nothing before its first
+    snapshot: ten years of an old holding's history make no step at the
+    left edge. Test:
+    `tests/test_client.py::test_the_client_side_rules_hold`,
     `tests/browser/parts/dashboard.mjs`.
-18. A main-currency holding at 100 on 1 January 2026 and 200 on 31
-    January 2026 reads 150 on 16 January, with 1 and 31 January marked
-    and 16 January not, with nothing turned on. Nothing on screen treats
-    the months between two entries as an omission. Test:
+18. (walk) A main-currency holding at 100 on 1 January 2026 and 200 on
+    31 January 2026 reads 150 on 16 January, with 1 and 31 January
+    marked and 16 January not, with nothing turned on. Nothing on screen
+    treats the months between two entries as an omission. Test:
     `tests/test_client.py::test_the_client_side_rules_hold`.
-19. (blind) The same holding in a unit priced 1.00 on 1 January and 2.00
-    on 31 January reads 150 × 1.50 on 16 January, not the chord between
-    100 and 400. The price must change between the two snapshots, or an
-    implementation sampling only snapshot dates passes. Test:
+19. (blind) (walk) The same holding in a unit priced 1.00 on 1 January
+    and 2.00 on 31 January reads 150 × 1.50 on 16 January, not the chord
+    between 100 and 400. The price must change between the two
+    snapshots, or an implementation sampling only snapshot dates passes.
+    Test: `tests/test_client.py::test_the_client_side_rules_hold`.
+20. (walk) A chart date before a symbol's first price is priced at that
+    entry. The band neither starts at zero nor vanishes. Test:
     `tests/test_client.py::test_the_client_side_rules_hold`.
-20. A chart date before a symbol's first price is priced at that entry.
-    The band neither starts at zero nor vanishes. Test:
+21. (blind) (walk) Adding a price entry adds no tick. Ticks mark
+    quantity entries only. Test:
     `tests/test_client.py::test_the_client_side_rules_hold`.
-21. (blind) Adding a price entry adds no tick. Ticks mark quantity
-    entries only. Test:
-    `tests/test_client.py::test_the_client_side_rules_hold`.
-22. (blind) The chart loads with its entry marks showing, with nothing
-    turned on and no stored preference read. Just the line removes them
-    and changes nothing else. Test:
+22. (blind) (walk) The chart loads with its entry marks showing, with
+    nothing turned on and no stored preference read. Just the line
+    removes them and changes nothing else. Test:
     `tests/browser/parts/dashboard-net-worth.mjs`.
-23. (blind) With recordings on 15 January, 10 April and 30 June 2026 only,
-    the pointer at 5 February reads 5 February and at 3 June reads 3
-    June, and the tooltip and hero show the value model's bands and total
-    exactly in decimal, on days that are not drawing samples. Test:
+23. (blind) (walk) With recordings on 15 January, 10 April and 30 June
+    2026 only, the pointer at 5 February reads 5 February and at 3 June
+    reads 3 June, and the tooltip and hero show the value model's bands
+    and total exactly in decimal, on days that are not drawing samples.
+    Test: `tests/browser/parts/dashboard-net-worth.mjs`.
+24. (blind) (walk) A drag from 3 June back to 5 February selects 5
+    February to 3 June, and the hero and each legend entry read the
+    later day's value minus the earlier's, exactly. Asserted in both
+    drag directions. Test:
     `tests/browser/parts/dashboard-net-worth.mjs`.
-24. (blind) A drag from 3 June back to 5 February selects 5 February to 3
-    June, and the hero and each legend entry read the later day's value
-    minus the earlier's, exactly. Asserted in both drag directions. Test:
-    `tests/browser/parts/dashboard-net-worth.mjs`.
-25. (blind) Walking the pointer one pixel column at a time reads days that
-    never go backward, from the range's first day to its last, and reads
-    every day where the plot has at least as many columns as days. Test:
+25. (blind) (walk) Walking the pointer one pixel column at a time reads
+    days that never go backward, from the range's first day to its last,
+    and reads every day where the plot has at least as many columns as
+    days. Test: `tests/browser/parts/dashboard-net-worth.mjs`,
+    `tests/test_client.py::test_the_client_side_rules_hold`.
+26. (blind) (walk) Stepping one day at a time from the first day reads
+    every day once and in order to the last, with the pointer's readout
+    on each, across a daylight-saving change. The recorded-date key
+    lands on every date carrying a snapshot and on no other. Test:
     `tests/browser/parts/dashboard-net-worth.mjs`,
     `tests/test_client.py::test_the_client_side_rules_hold`.
-26. (blind) Stepping one day at a time from the first day reads every day
-    once and in order to the last, with the pointer's readout on each,
-    across a daylight-saving change. The recorded-date key lands on every
-    date carrying a snapshot and on no other. Test:
-    `tests/browser/parts/dashboard-net-worth.mjs`,
+27. (blind) (walk) A click or Enter on a day with no snapshot opens
+    nothing, and on a snapshot day or its tick opens that date's
+    recording. Test: `tests/browser/parts/dashboard-net-worth.mjs`.
+28. (blind) (walk) In a history long enough to downsample, the readout
+    at a day whose sample was dropped equals the value model, and the
+    data table lists that day. Test:
+    `tests/browser/parts/dashboard-fixtures.mjs`,
     `tests/test_client.py::test_the_client_side_rules_hold`.
-27. (blind) A click or Enter on a day with no snapshot opens nothing, and
-    on a snapshot day or its tick opens that date's recording. Test:
-    `tests/browser/parts/dashboard-net-worth.mjs`.
-28. (blind) In a history long enough to downsample, the readout at a day
-    whose sample was dropped equals the value model, and the data table
-    lists that day. Test: `tests/browser/parts/dashboard-fixtures.mjs`,
-    `tests/test_client.py::test_the_client_side_rules_hold`.
-29. Under Total the data table's columns are Date and Net worth only.
-    Under a dimension they are Date, the bands in legend order, then Net
-    worth. Test: `tests/browser/parts/dashboard-net-worth.mjs`.
-30. (blind) With snapshots on 2026-01-15 and 2026-06-30, a `USD` price on
-    2026-04-10 for a `USD` holding, and a main-currency holding archived
-    on 2026-05-20 with no snapshot that day, the table under All lists
-    exactly 2026-01-15, 2026-04-10, 2026-05-20 and 2026-06-30 in order,
-    and under 1M the range's first day and 2026-06-30 only. Test:
-    `tests/browser/parts/dashboard-fixtures.mjs`.
-31. (blind) Each table row's band cells equal the value model at its day
-    and Net worth their exact decimal sum. Two main-currency holdings in
-    different bands at `4503599627370496.25` give
+29. (walk) Under Total the data table's columns are Date and Net worth
+    only. Under a dimension they are Date, the bands in legend order,
+    then Net worth. Test: `tests/browser/parts/dashboard-net-worth.mjs`.
+30. (blind) (walk) With snapshots on 2026-01-15 and 2026-06-30, a `USD`
+    price on 2026-04-10 for a `USD` holding, and a main-currency holding
+    archived on 2026-05-20 with no snapshot that day, the table under
+    All lists exactly 2026-01-15, 2026-04-10, 2026-05-20 and 2026-06-30
+    in order, and under 1M the range's first day and 2026-06-30 only.
+    Test: `tests/browser/parts/dashboard-fixtures.mjs`.
+31. (blind) (walk) Each table row's band cells equal the value model at
+    its day and Net worth their exact decimal sum. Two main-currency
+    holdings in different bands at `4503599627370496.25` give
     `9,007,199,254,740,992.50` under `en-US`. Test:
     `tests/browser/parts/dashboard-fixtures.mjs`.
-32. (blind) Each table row's date equals `longDate` of its day and the
-    tooltip's date: 2026-01-15 reads `Jan 15, 2026` under `en-US` with no
-    `dateStyle` and `15.01.2026` under `dmy`. Test:
+32. (blind) (walk) Each table row's date equals `longDate` of its day
+    and the tooltip's date: 2026-01-15 reads `Jan 15, 2026` under
+    `en-US` with no `dateStyle` and `15.01.2026` under `dmy`. Test:
     `tests/browser/parts/dashboard-net-worth.mjs`.
-33. (blind) Hiding a band and switching to Percentage leave the table's
-    text unchanged. Test: `tests/browser/parts/dashboard-fixtures.mjs`.
+33. (blind) (walk) Hiding a band and switching to Percentage leave the
+    table's text unchanged. Test:
+    `tests/browser/parts/dashboard-fixtures.mjs`.
 34. (blind) Over single-holding totals from 0.40 to 10^10 (each 1, 2, 2.5,
     5 and 7.5 times a power of ten and the integers either side, both
     signs) at 1280px and 390px, no two tick labels read the same, every
     tick is a multiple of a 1, 2 or 5 step of at least 1, zero included,
     and each label read back through its unit equals its gridline. Test:
     `tests/test_client.py::test_the_client_side_rules_hold`.
-35. (blind) One holding at 2500, at 1280px, has ticks 0, 500, 1000, 1500,
-    2000 and 2500, with 1500 reading `1.5` and 2500 `2.5` before the
-    suffix, and `1,5` and `2,5` under a comma decimal point. Each tick is
-    an exact multiple of the step, never built by repeated addition.
-    Test: `tests/test_client.py::test_the_client_side_rules_hold`,
-    `tests/browser/parts/dashboard.mjs`.
-36. (blind) Under `de-DE` with `groupSeparator` `period`, one holding at
-    2500000 at 1280px reads `0`, `500k`, `1M`, `1,5M`, `2M`, `2,5M`. With
-    an asset and a liability holding the percentage ticks read `−100%`,
-    `−50%`, `0%`, `50%`, `100%`. Both are written by the formatter. Test:
-    `tests/browser/parts/dashboard-fixtures.mjs`.
-37. Under `de-DE`, `groupSeparator` `period` and `moneyPlaces` `0`, net
-    worth from 1000 to 1368946 gives a change of `+1.367.946` and
-    `+136.794,6%`. Test: `tests/browser/parts/dashboard-net-worth.mjs`.
-38. (blind) The change percentage rounds half-even: in the main currency
-    under `en-US`, 2000 to 2005 reads `+0.2%` and 2000 to 1995 `−0.2%`,
-    where a float or half-away rounding gives 0.3. Test:
-    `tests/test_client.py::test_the_client_side_rules_hold`.
-39. (blind) 2000 to 2001 reads `+0.0%` beside the rising arrow, −1000 to
-    −500 reads `+50.0%`, and 0 to 500 shows the amount with no
-    percentage. Test: no test.
-40. (blind) With a single recording, made today, at 1280px and 390px, under 1M, 6M, 1Y
-    and All, the point's center is at the plot's horizontal middle within
-    half a pixel and its mark's bounding box lies wholly inside the
-    drawing. The pointer at either edge and the middle reads that day.
-    Test: `tests/browser/parts/dashboard.mjs`,
-    `tests/browser/parts/dashboard-review-chart-end.mjs`.
-41. Every recorded point is drawn whole on a computer and a phone,
-    including one at the chart's first or last date. Test:
-    `tests/browser/parts/dashboard.mjs`.
-42. (blind) With snapshots only at 2026-03-01 and 2026-04-10 and a price
-    entry at 2026-01-15, 6M, 1Y and All each start at 2026-03-01. Test:
+35. (blind) (walk) One holding at 2500, at 1280px, has ticks 0, 500,
+    1000, 1500, 2000 and 2500, with 1500 reading `1.5` and 2500 `2.5`
+    before the suffix, and `1,5` and `2,5` under a comma decimal point.
+    Each tick is an exact multiple of the step, never built by repeated
+    addition. Test:
     `tests/test_client.py::test_the_client_side_rules_hold`,
     `tests/browser/parts/dashboard.mjs`.
-43. (blind) Switching the pricing mode changes the total, the list and
-    the breakdown, and no chart point, asserted over every sample of
-    every band, not only the right hand edge. Test:
+36. (blind) (walk) Under `de-DE` with `groupSeparator` `period`, one
+    holding at 2500000 at 1280px reads `0`, `500k`, `1M`, `1,5M`, `2M`,
+    `2,5M`. With an asset and a liability holding the percentage ticks
+    read `−100%`, `−50%`, `0%`, `50%`, `100%`. Both are written by the
+    formatter. Test: `tests/browser/parts/dashboard-fixtures.mjs`.
+37. (walk) Under `de-DE`, `groupSeparator` `period` and `moneyPlaces`
+    `0`, net worth from 1000 to 1368946 gives a change of `+1.367.946`
+    and `+136.794,6%`. Test:
+    `tests/browser/parts/dashboard-net-worth.mjs`.
+38. (blind) (walk) The change percentage rounds half-even: in the main
+    currency under `en-US`, 2000 to 2005 reads `+0.2%` and 2000 to 1995
+    `−0.2%`, where a float or half-away rounding gives 0.3. Test:
+    `tests/test_client.py::test_the_client_side_rules_hold`.
+39. (blind) (walk) 2000 to 2001 reads `+0.0%` beside the rising arrow,
+    −1000 to −500 reads `+50.0%`, and 0 to 500 shows the amount with no
+    percentage. Test: no test.
+40. (blind) (walk) With a single recording, made today, at 1280px and
+    390px, under 1M, 6M, 1Y and All, the point's center is at the plot's
+    horizontal middle within half a pixel and its mark's bounding box
+    lies wholly inside the drawing. The pointer at either edge and the
+    middle reads that day. Test: `tests/browser/parts/dashboard.mjs`,
+    `tests/browser/parts/dashboard-review-chart-end.mjs`.
+41. (walk) Every recorded point is drawn whole on a computer and a
+    phone, including one at the chart's first or last date. Test:
+    `tests/browser/parts/dashboard.mjs`.
+42. (blind) (walk) With snapshots only at 2026-03-01 and 2026-04-10 and
+    a price entry at 2026-01-15, 6M, 1Y and All each start at
+    2026-03-01. Test:
+    `tests/test_client.py::test_the_client_side_rules_hold`,
+    `tests/browser/parts/dashboard.mjs`.
+43. (blind) (walk) Switching the pricing mode changes the total, the
+    list and the breakdown, and no chart point, asserted over every
+    sample of every band, not only the right hand edge. Test:
     `tests/browser/parts/dashboard-net-worth.mjs`,
     `tests/browser/parts/dashboard-review-pricing-mode.mjs`.
-44. (blind) On latest rates the right hand edge equals the total exactly.
-    With a March figure and a different price this week, rates as of each
-    figure gives a total that is not the edge, and nothing on screen
-    reports it as a fault. Test:
+44. (blind) (walk) On latest rates the right hand edge equals the total
+    exactly. With a March figure and a different price this week, rates
+    as of each figure gives a total that is not the edge, and nothing on
+    screen reports it as a fault. Test:
     `tests/test_client.py::test_the_client_side_rules_hold`.
-45. Two holdings whose histories start years apart: the later one's first
-    snapshot raises only its own band. Test:
+45. (walk) Two holdings whose histories start years apart: the later
+    one's first snapshot raises only its own band. Test:
     `tests/test_client.py::test_the_client_side_rules_hold`.
-46. (blind) Archiving on D removes the holding from the total and from
-    the value at D and after, with an annotation at D naming it. Every
-    point up to and including the latest entry before D of each series
-    the archive wrote to is unchanged, compared point by point. Test:
-    `tests/test_client.py::test_the_client_side_rules_hold`,
+46. (blind) (walk) Archiving on D removes the holding from the total and
+    from the value at D and after, with an annotation at D naming it.
+    Every point up to and including the latest entry before D of each
+    series the archive wrote to is unchanged, compared point by point.
+    Test: `tests/test_client.py::test_the_client_side_rules_hold`,
     `tests/browser/parts/dashboard-net-worth.mjs`.
-47. (blind) A main-currency holding at 100 on 1 January 2026, archived on
-    31 January 2026, reads 50 on 16 January, and no vertical edge is
-    drawn at 31 January. Test:
+47. (blind) (walk) A main-currency holding at 100 on 1 January 2026,
+    archived on 31 January 2026, reads 50 on 16 January, and no vertical
+    edge is drawn at 31 January. Test:
     `tests/test_client.py::test_the_client_side_rules_hold`.
-48. (blind) A holding archived on the chart's last day leaves the
+48. (blind) (walk) A holding archived on the chart's last day leaves the
     chart's last point, the table's last row and the end of the change
     each equal to the total on latest rates, exactly. Test:
     `tests/test_client.py::test_the_client_side_rules_hold`.
-49. (blind) A holding archived after the newest recording draws the
-    chart to the archive date through its zero, and the point there
+49. (blind) (walk) A holding archived after the newest recording draws
+    the chart to the archive date through its zero, and the point there
     equals the total on latest rates. Test:
     `tests/test_client.py::test_the_client_side_rules_hold`.
-50. (blind) Changing the price at D of the unit of a holding archived on
-    D with its zero leaves its contribution at D and just before D at
-    zero, and the confirmation does not count it. Test:
+50. (blind) (walk) Changing the price at D of the unit of a holding
+    archived on D with its zero leaves its contribution at D and just
+    before D at zero, and the confirmation does not count it. Test:
     `tests/test_client.py::test_the_client_side_rules_hold`.
 51. (blind) A holding archived on D with no snapshot at D, loaded from a
     fixture, steps at D from its last quantity carried forward at D's
@@ -1058,72 +1068,73 @@ rule of the chart (Archived holdings, Ranges and modes).
     from that figure, and changing D's price moves the side before the
     step and is counted by the confirmation. Loading either writes
     nothing. Test: `tests/test_client.py::test_the_client_side_rules_hold`.
-52. An unarchived holding whose zero sits at D contributes zero from D
-    until its next snapshot and interpolates up to it. Test:
+52. (walk) An unarchived holding whose zero sits at D contributes zero
+    from D until its next snapshot and interpolates up to it. Test:
     `tests/test_client.py::test_the_client_side_rules_hold`.
-53. (blind) For every date in the chart, the visible bands sum to the net
-    worth line, in decimal, not at a sampled few. Test:
+53. (blind) (walk) For every date in the chart, the visible bands sum to
+    the net worth line, in decimal, not at a sampled few. Test:
     `tests/test_client.py::test_the_client_side_rules_hold`.
-54. Each holding appears in exactly one band of the selected dimension,
-    the bands together account for every holding, and holdings with no
-    value are in a visible, counted "Unassigned" band. Test:
-    `tests/test_client.py::test_the_client_side_rules_hold`.
-55. An active holding with no snapshots is listed as "not yet valued" and
-    not counted as 0. With holdings and no values the total, gross assets
-    and gross liabilities read `—`, with no change and no chart. Test:
-    `tests/browser/parts/dashboard.mjs`,
+54. (walk) Each holding appears in exactly one band of the selected
+    dimension, the bands together account for every holding, and
+    holdings with no value are in a visible, counted "Unassigned" band.
+    Test: `tests/test_client.py::test_the_client_side_rules_hold`.
+55. (walk) An active holding with no snapshots is listed as "not yet
+    valued" and not counted as 0. With holdings and no values the total,
+    gross assets and gross liabilities read `—`, with no change and no
+    chart. Test: `tests/browser/parts/dashboard.mjs`,
     `tests/browser/parts/dashboard-review-unvalued.mjs`.
-56. At 1280px, in a vault whose only holdings are active with no
+56. (walk) At 1280px, in a vault whose only holdings are active with no
     snapshots, no holdings table and no column heading render. Recording
     one renders the table with that holding as its only row. Test: no
     test.
-57. (blind) With every holding archived, Show archived off renders no
-    table, no column heading and the line "Every holding is archived.",
-    and on renders each archived holding as a row. The absence is
-    asserted on the rendered page, never as a table hidden by styling.
-    Test: `tests/browser/parts/dashboard-fixtures.mjs`.
+57. (blind) (walk) With every holding archived, Show archived off
+    renders no table, no column heading and the line "Every holding is
+    archived.", and on renders each archived holding as a row. The
+    absence is asserted on the rendered page, never as a table hidden by
+    styling. Test: `tests/browser/parts/dashboard-fixtures.mjs`.
 58. (blind) With holdings and no snapshots and an archived holding
     present, the active holdings are under Not yet valued and the
     archived one is an archived row reading "not yet valued" only with
     Show archived on. Test: `tests/browser/parts/dashboard.mjs`.
-59. (blind) Under a dimension every active holding carries, the coverage
-    reads "N of N holdings assigned", is neither link nor button, is not
-    focusable, and a click leaves the rows unchanged. The same at 0 of 0.
-    With one valued active holding unassigned it is a control listing
-    exactly that holding. Test:
+59. (blind) (walk) Under a dimension every active holding carries, the
+    coverage reads "N of N holdings assigned", is neither link nor
+    button, is not focusable, and a click leaves the rows unchanged. The
+    same at 0 of 0. With one valued active holding unassigned it is a
+    control listing exactly that holding. Test:
     `tests/browser/parts/dashboard-net-worth.mjs`.
-60. (blind) With the unassigned filter applied and nothing unassigned
-    left, no table and no column heading render, the line reads "Every
-    holding has a Liquidity value. Show all holdings", and Show all
-    holdings renders every listed row. Test:
+60. (blind) (walk) With the unassigned filter applied and nothing
+    unassigned left, no table and no column heading render, the line
+    reads "Every holding has a Liquidity value. Show all holdings", and
+    Show all holdings renders every listed row. Test:
     `tests/browser/parts/dashboard-net-worth.mjs`.
-61. (blind) The filter clears through Show all holdings and through Group
-    by "Total", lists archived unassigned holdings only while Show
-    archived is on, narrows the groups the same way, and its line reads
-    exactly "Showing the holdings with no Liquidity value. Show all
-    holdings". Test: `tests/browser/parts/dashboard-net-worth.mjs`.
-62. (blind) With Show archived on, in both pricing modes, an archived
-    holding in a unit with no price and one with no readable snapshot are
-    each a table row with the Archived chip and ink-secondary text, the
-    first reading its quantity and "not priced", the second "not yet
-    valued". Neither is in either group, while an active holding in the
-    first one's unit stays under not priced. With the toggle off neither
-    appears anywhere. Unarchive shows on the row at desktop width. Test:
-    `tests/browser/parts/dashboard.mjs`.
-63. (blind) At phone width no row, active or archived, carries a row
-    action. Tapping an archived row opens the holding's screen offering
-    Unarchive, and an active row's offering Record a value. Test:
-    `tests/browser/parts/dashboard.mjs`.
-64. (blind) The native-unit column shows an XAU-ozt holding stored as
-    "12.125" and an m² holding stored as "80" as typed, under
+61. (blind) (walk) The filter clears through Show all holdings and
+    through Group by "Total", lists archived unassigned holdings only
+    while Show archived is on, narrows the groups the same way, and its
+    line reads exactly "Showing the holdings with no Liquidity value.
+    Show all holdings". Test:
+    `tests/browser/parts/dashboard-net-worth.mjs`.
+62. (blind) (walk) With Show archived on, in both pricing modes, an
+    archived holding in a unit with no price and one with no readable
+    snapshot are each a table row with the Archived chip and
+    ink-secondary text, the first reading its quantity and "not priced",
+    the second "not yet valued". Neither is in either group, while an
+    active holding in the first one's unit stays under not priced. With
+    the toggle off neither appears anywhere. Unarchive shows on the row
+    at desktop width. Test: `tests/browser/parts/dashboard.mjs`.
+63. (blind) (walk) At phone width no row, active or archived, carries a
+    row action. Tapping an archived row opens the holding's screen
+    offering Unarchive, and an active row's offering Record a value.
+    Test: `tests/browser/parts/dashboard.mjs`.
+64. (blind) (walk) The native-unit column shows an XAU-ozt holding
+    stored as "12.125" and an m² holding stored as "80" as typed, under
     `moneyPlaces` 0 and 2, while the converted column follows
     `moneyPlaces`. Test:
     `tests/test_client.py::test_the_client_side_rules_hold`.
-65. A negative-balance holding reduces the net figure and appears under
-    liabilities. Test:
+65. (walk) A negative-balance holding reduces the net figure and appears
+    under liabilities. Test:
     `tests/test_client.py::test_the_client_side_rules_hold`,
     `tests/browser/parts/dashboard.mjs`.
-66. The breakdown sums to exactly the net worth total, with no
+66. (walk) The breakdown sums to exactly the net worth total, with no
     disclaimer, and bars of 1,234.50, 4,133.26, 41,373.46 and 340,000
     read 1'235, 4'133, 41'373 and 340'000 under a total of 386'741.
     Gross assets and liabilities as shown add up to the total as shown,
@@ -1132,55 +1143,56 @@ rule of the chart (Archived holdings, Ranges and modes).
     `tests/browser/parts/dashboard-review-rounding.mjs`,
     `tests/browser/parts/dashboard-net-worth.mjs`,
     `tests/browser/parts/dashboard-review-hero-day.mjs`.
-67. (blind) With one record corrupted, the view renders the rest and
-    warns "1 record could not be read.". With the corrupted record a
+67. (blind) (walk) With one record corrupted, the view renders the rest
+    and warns "1 record could not be read.". With the corrupted record a
     price entry, its symbol still prices from the neighboring entries.
     Asserted with a real corrupted record. Test:
     `tests/browser/parts/dashboard-net-worth.mjs`.
-68. (blind) Switching range, dimension, absolute and percentage, pricing
-    mode or band visibility issues no network request and never waits,
-    captured as requests. Test:
+68. (blind) (walk) Switching range, dimension, absolute and percentage,
+    pricing mode or band visibility issues no network request and never
+    waits, captured as requests. Test:
     `tests/browser/parts/dashboard-net-worth.mjs`.
-69. A holding named `<script>alert(1)</script>` renders as literal text
-    in the list, and a dimension value so named in the legend and every
-    tooltip.
+69. (walk) A holding named `<script>alert(1)</script>` renders as
+    literal text in the list, and a dimension value so named in the
+    legend and every tooltip.
     Test: `tests/browser/parts/dashboard-net-worth.mjs`.
-70. With no holdings the screen says so and offers to add one, with no
-    zero total. Test: `tests/browser/parts/register.mjs`.
-71. The chart can be driven from the keyboard, and the same numbers are
-    available as a plain table. Test:
+70. (walk) With no holdings the screen says so and offers to add one,
+    with no zero total. Test: `tests/browser/parts/register.mjs`.
+71. (walk) The chart can be driven from the keyboard, and the same
+    numbers are available as a plain table. Test:
     `tests/browser/parts/dashboard-net-worth.mjs`,
     `tests/browser/parts/dashboard.mjs`.
-72. (blind) With the mouse resting anywhere on the chart, focus, Home,
-    End, the arrow keys and Enter behave as they do with the mouse
-    elsewhere. Test: `tests/browser/parts/dashboard-review-keyboard.mjs`.
-73. At 320px, 375px, 601px, 901px and 1280px wide, a holding in the
-    table and one under Not yet valued, each named with no space and
+72. (blind) (walk) With the mouse resting anywhere on the chart, focus,
+    Home, End, the arrow keys and Enter behave as they do with the mouse
+    elsewhere. Test:
+    `tests/browser/parts/dashboard-review-keyboard.mjs`.
+73. (walk) At 320px, 375px, 601px, 901px and 1280px wide, a holding in
+    the table and one under Not yet valued, each named with no space and
     wider than the screen, are shown whole inside the screen, and the
     page never pans sideways. Test:
     `tests/browser/parts/dashboard-long-name.mjs`,
     `tests/browser/parts/dashboard-review-long-name.mjs`.
-74. With no decimals on money, three holdings of 0.40 alone in their
-    bands read 1, 0 and 0 in the holdings table and in the breakdown,
-    under a total of 1. Test:
+74. (walk) With no decimals on money, three holdings of 0.40 alone in
+    their bands read 1, 0 and 0 in the holdings table and in the
+    breakdown, under a total of 1. Test:
     `tests/test_client.py::test_the_client_side_rules_hold`.
-75. (blind) The legend adds up to the chart's right hand edge as shown,
-    the legend's changes over a selected span to the change as shown,
-    and the readout's rows to its net as shown. Test:
+75. (blind) (walk) The legend adds up to the chart's right hand edge as
+    shown, the legend's changes over a selected span to the change as
+    shown, and the readout's rows to its net as shown. Test:
     `tests/browser/parts/dashboard-review-shown-parts.mjs`.
-76. With the last recording on 2026-09-15 and today 2026-10-03, the
-    chart ends on 2026-10-03, the last figure runs level to it, 1M
+76. (walk) With the last recording on 2026-09-15 and today 2026-10-03,
+    the chart ends on 2026-10-03, the last figure runs level to it, 1M
     starts on 2026-09-03 and All on the first recording. Test:
     `tests/test_client.py::test_the_client_side_rules_hold`,
     `tests/test_review_net_worth_view.py::test_the_chart_ends_today_and_every_range_counts_back_from_it`,
     `tests/browser/parts/dashboard-review-chart-end.mjs`.
-77. With every holding archived, the total, gross assets and gross
-    liabilities read `—` with no change, and hovering the chart fills
-    its tooltip and leaves the hero a dash with no date. Test:
+77. (walk) With every holding archived, the total, gross assets and
+    gross liabilities read `—` with no change, and hovering the chart
+    fills its tooltip and leaves the hero a dash with no date. Test:
     `tests/browser/parts/dashboard-fixtures.mjs`,
     `tests/browser/parts/dashboard-review-unvalued.mjs`.
-78. With no active dimension, a "Create a dimension" link sits beside
-    Group by and opens the Dimensions screen without asking for the
-    password, and once a dimension is active the link is gone. Test:
+78. (walk) With no active dimension, a "Create a dimension" link sits
+    beside Group by and opens the Dimensions screen without asking for
+    the password, and once a dimension is active the link is gone. Test:
     `tests/browser/parts/dimensions.mjs`,
     `tests/browser/parts/dashboard-review-create-dimension.mjs`.

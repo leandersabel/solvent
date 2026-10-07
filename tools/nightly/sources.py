@@ -6,7 +6,7 @@ what the app requests: the same URLs, headers, default TLS context, no
 redirects, timeout and size cap.
 
     python sources.py check   # the real sources, once a day
-    python sources.py probe   # the stand-in, per shard
+    python sources.py probe   # the stand-in, per hunt
 """
 from __future__ import annotations
 
