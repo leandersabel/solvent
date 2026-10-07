@@ -78,6 +78,21 @@ const fieldState = (baseline = []) =>
   }, baseline);
 const rowLines = () => page.call(() => window.__field.closest('tr').innerText.split('\n').map((l) => l.trim()).filter(Boolean));
 
+// The top edge of what sits below the open field and outside its message
+// line: the nearest visible text under it. The message line holds its
+// place, so an error that comes or goes moves none of it
+// (spec/design-system.md, Components, Input).
+const belowTop = () =>
+  page.call(() => {
+    const f = window.__field;
+    const bottom = f.getBoundingClientRect().bottom;
+    const lines = (f.getAttribute('aria-describedby') || '').split(/\s+/).map((id) => document.getElementById(id)).filter(Boolean);
+    const tops = [...document.querySelectorAll('#app *')]
+      .filter((n) => n.children.length === 0 && n.checkVisibility() && n.textContent.trim() && !lines.some((l) => l.contains(n)))
+      .map((n) => n.getBoundingClientRect().top).filter((top) => top >= bottom);
+    return Math.round(Math.min(...tops));
+  });
+
 await run(async () => {
   await administrator();
   await openUnits();
@@ -98,10 +113,13 @@ await run(async () => {
   expectedFailures.add(`/api/admin/symbols/${CODE}`);
   await openRename();
   const baseline = await rowLines();
+  const still = await belowTop();
   await typeOver('   ');
   await press('Save');
   await page.idle();
   const blank = await fieldState(baseline);
+  const shifted = await belowTop();
+  check('design-system Input: the unit rename\'s error moves nothing below the field', shifted === still, `${still} -> ${shifted}`);
   check('Units: a blank name is not stored', stored() === name, stored());
   check('Units: a blank Save says why on the row, the field open with what was typed',
     blank.open && blank.value === '   ' && blank.lines.length > 0, JSON.stringify(blank));
@@ -109,6 +127,8 @@ await run(async () => {
     blank.invalid && blank.onLine, JSON.stringify(blank));
   await typeOver('D');
   const typed = await fieldState(baseline);
+  const back = await belowTop();
+  check('design-system Input: the unit rename\'s error clearing moves nothing below the field', back === still, `${still} -> ${back}`);
   check('Units: the rename\'s error returns to the hint the moment a name is typed',
     typed.open && !typed.invalid && typed.lines.length === 0 && typed.value === 'D', JSON.stringify(typed));
   expectedFailures.delete(`/api/admin/symbols/${CODE}`);

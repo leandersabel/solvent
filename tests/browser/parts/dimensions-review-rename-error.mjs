@@ -93,13 +93,31 @@ const refused = (s) => s.open && s.shown;
 const wired = (s) => s.invalid && s.onLine && s.critical;
 const cleared = (s) => s.open && !s.invalid && !s.shown && !s.critical;
 
+// The top edge of what sits below the open field and outside its message
+// line: the nearest visible text under it. The message line holds its
+// place, so an error that comes or goes moves none of it
+// (spec/design-system.md, Components, Input).
+const belowTop = () =>
+  page.call(() => {
+    const f = window.__field;
+    const bottom = f.getBoundingClientRect().bottom;
+    const lines = (f.getAttribute('aria-describedby') || '').split(/\s+/).map((id) => document.getElementById(id)).filter(Boolean);
+    const tops = [...document.querySelectorAll('#app *')]
+      .filter((n) => n.children.length === 0 && n.checkVisibility() && n.textContent.trim() && !lines.some((l) => l.contains(n)))
+      .map((n) => n.getBoundingClientRect().top).filter((top) => top >= bottom);
+    return Math.round(Math.min(...tops));
+  });
+
 const renameCase = async (what, label, commit) => {
   await openRename(label);
   const before = puts();
+  const still = await belowTop();
   await typeOver('   ');
   await commit();
   await page.idle();
   const blank = await fieldState();
+  const shifted = await belowTop();
+  check(`design-system Input: the ${what} rename's error moves nothing below the field`, shifted === still, `${still} -> ${shifted}`);
   check(`review 75: a blank ${what} rename committed with ${commit.name} is refused and keeps what was typed`,
     refused(blank) && blank.value === '   ' && puts() === before, JSON.stringify(blank));
   check(`design-system Input: the blank ${what} rename's error is on the message line the field names, and the field is invalid`,
@@ -111,6 +129,8 @@ const renameCase = async (what, label, commit) => {
 
   await typeOver('N');
   const typed = await fieldState();
+  const back = await belowTop();
+  check(`design-system Input: the ${what} rename's error clearing moves nothing below the field`, back === still, `${still} -> ${back}`);
   check(`review 75: the ${what} rename's error clears the moment a name is typed, before any save`,
     cleared(typed) && typed.value === 'N' && puts() === before, JSON.stringify(typed));
 
