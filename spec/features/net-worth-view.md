@@ -1126,10 +1126,11 @@ rule of the chart (Archived holdings, Ranges and modes).
 66. The breakdown sums to exactly the net worth total, with no
     disclaimer, and bars of 1,234.50, 4,133.26, 41,373.46 and 340,000
     read 1'235, 4'133, 41'373 and 340'000 under a total of 386'741.
-    Gross assets and liabilities as shown add up to the total as shown.
-    Test:
+    Gross assets and liabilities as shown add up to the total as shown,
+    the day the chart reads included. Test:
     `tests/test_client.py::test_the_client_side_rules_hold`,
-    `tests/browser/parts/dashboard-review-rounding.mjs`.
+    `tests/browser/parts/dashboard-review-rounding.mjs`,
+    `tests/browser/parts/dashboard-net-worth.mjs`.
 67. (blind) With one record corrupted, the view renders the rest and
     warns "1 record could not be read.". With the corrupted record a
     price entry, its symbol still prices from the neighboring entries.
