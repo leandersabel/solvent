@@ -86,9 +86,10 @@ Settings) reaches the same export, warning included.
 A flow in one card, each step revealed as the previous completes.
 Replace-only, and nothing on the screen may imply a merge exists.
 
-1. **Choose file.** Drag-drop or picker. Validated client-side for size
-   before parse, then for `format`, `formatVersion` and the rest of what
-   the file shows without its password. Nothing is decrypted first.
+1. **Choose file.** Drag-drop or picker, whose button is Button,
+   secondary. Validated client-side for size before parse, then for
+   `format`, `formatVersion` and the rest of what the file shows
+   without its password. Nothing is decrypted first.
 2. **Password for that file.** Labeled "The password this file was
    exported under", never "your password", because they can differ and
    this is the feature's most confusing point. It opens the file's
@@ -653,3 +654,5 @@ There is no `formatVersion` below 1.
     other records the vault cannot read get a line of their own. Test:
     `tests/browser/parts/export-import.mjs`,
     `tests/browser/parts/export-import-review-unreadable.mjs`.
+59. The Import file picker's button is Button, secondary, not the
+    browser's default. Test: `tests/browser/parts/export-import.mjs`.

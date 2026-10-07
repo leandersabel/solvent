@@ -335,6 +335,8 @@ outside it use, are `app-shell.md`'s (The chrome).
   screen region.
 - **Button, secondary**: transparent, petrol-700 text, rule border.
   For the light ground only.
+  A file input's own button wears it too, so no picker shows the
+  browser's default.
 - **Button, chrome**: transparent, white text, petrol-400 border, white
   focus ring. The secondary button on the petrol-800 top bar, where
   petrol-700 text measures 1.33:1 and petrol-600 focus 1.88:1, under
