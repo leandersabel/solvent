@@ -189,3 +189,11 @@
   stays exactly as it was.
 - A file from an older version of Solvent restores into a newer one.
 - A backup file is no way back in if you forget your password.
+
+## Installing
+
+- Installing Solvent asks for as few settings as possible.
+- On TrueNAS, Solvent installs entirely through the TrueNAS screens.
+- Solvent protects itself however it is installed, without any
+  container option.
+- Solvent never runs as root.
