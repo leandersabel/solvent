@@ -477,7 +477,7 @@ function unitRow(row, body) {
         class: 'btn-inline',
         text: row.retired ? 'Restore' : 'Retire',
         disabled: weightless,
-        onclick: () => retireUnit(row, body),
+        onclick: () => retireUnit(row, body, error),
       }),
       weightless
         ? el('span', { class: 'hint', text: `It names no weight, so it cannot be restored. ${METAL_SHAPE}` })
@@ -486,7 +486,7 @@ function unitRow(row, body) {
   ]);
 }
 
-function retireUnit(row, body) {
+function retireUnit(row, body, error) {
   const restoring = row.retired;
   const close = dialog({
     heading: restoring ? `Restore ${row.symbol}?` : `Retire ${row.symbol}?`,
@@ -508,7 +508,13 @@ function retireUnit(row, body) {
         text: restoring ? 'Restore' : 'Retire',
         onclick: async () => {
           close();
-          await api.patch(`/api/admin/symbols/${row.symbol}`, { retired: !restoring });
+          try {
+            await api.patch(`/api/admin/symbols/${row.symbol}`, { retired: !restoring });
+          } catch {
+            error.textContent = restoring ? 'Nothing was restored.' : 'Nothing was retired.';
+            error.hidden = false;
+            return;
+          }
           unitTable(body);
         },
       }),

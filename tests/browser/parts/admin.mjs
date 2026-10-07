@@ -225,8 +225,10 @@ await run(async () => {
   );
 
   const unit = (symbol, kind) => ({ symbol, label: symbol, kind, lookup: false, retired: true, hasAdapter: false });
-  const releaseUnits = await intercept(page, '*/api/admin/symbols', (request) =>
-    request.method === 'GET' ? { status: 200, body: JSON.stringify([unit('XYZ', 'metal'), unit('XAG-g', 'metal'), unit('XYZ', 'currency')]) } : null,
+  const releaseUnits = await intercept(page, '*/api/admin/symbols*', (request) =>
+    request.method === 'GET'
+      ? { status: 200, body: JSON.stringify([unit('XYZ', 'metal'), unit('XAG-g', 'metal'), unit('XYZ', 'currency')]) }
+      : { status: 400 },
   );
   await click('Invites');
   await click('Units');
@@ -240,6 +242,19 @@ await run(async () => {
         && document.querySelector('#app').textContent.includes('It names no weight, so it cannot be restored. Metals are named <code>-ozt or <code>-g, such as XAU-ozt.');
     })()`),
   );
+  expectedFailures.add('/api/admin/symbols/XAG-g');
+  await page.eval("[...document.querySelectorAll('tr')].find((tr) => tr.textContent.includes('XAG-g')).querySelector('td:last-child button').click()");
+  await page.waitUntil("document.querySelector('.dialog')", { label: 'the restore dialog' });
+  await page.eval("[...document.querySelectorAll('.dialog button')].find((b) => b.textContent === 'Restore').click()");
+  await page.waitUntil(
+    "[...document.querySelectorAll('tr')].find((tr) => tr.textContent.includes('XAG-g')).textContent.includes('Nothing was restored.')",
+    { label: 'the failed restore on its row' },
+  );
+  check(
+    'a failed restore says so on its row, which stays retired',
+    (await page.eval("[...document.querySelectorAll('tr')].find((tr) => tr.textContent.includes('XAG-g')).querySelector('td:last-child button').textContent")) === 'Restore',
+  );
+  expectedFailures.delete('/api/admin/symbols/XAG-g');
   await releaseUnits();
 
   await click('Your password');

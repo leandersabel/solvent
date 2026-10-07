@@ -407,7 +407,8 @@ Units:
   Use letters, digits, dots, dashes and underscores, starting with a
   letter or digit." For a metal: "That is not a valid metal code.
   Metals are named `<code>-ozt` or `<code>-g`, such as `XAU-ozt`."
-- **Error, retire or restore failed**: inline on the row, unchanged.
+- **Error, retire or restore failed**: inline on the row, unchanged:
+  "Nothing was retired." or "Nothing was restored."
 
 Your password:
 - **Error, the new password is the current one**: inline, refused before
@@ -910,3 +911,7 @@ administrator), and the lost sole password (Bootstrap). The rest:
     unit's code, such as "Rate lookup, CHF".
     Test: `tests/browser/parts/admin.mjs`,
     `tests/browser/parts/admin-review-names.mjs`.
+60. A Retire or Restore the server refuses reads "Nothing was retired."
+    or "Nothing was restored." on its row, which stays as it was. Test:
+    `tests/browser/parts/admin.mjs`,
+    `tests/browser/parts/admin-review-refused.mjs`.
