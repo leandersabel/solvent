@@ -2301,6 +2301,7 @@ select {
 /* ---- Export and import ---- */
 
 .callout .icon { vertical-align: -3px; color: var(--status-critical); }
+.checkbox.callout .icon { flex: none; margin-top: 3px; }
 
 .drop-zone {
   border: 1px dashed var(--rule);

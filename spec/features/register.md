@@ -719,3 +719,5 @@ fixture prevents.
 51. (walk) On both forms, a screen reader names each field by the label
     beside it: Username, Password, Confirm password and, on the vault
     form, Main currency. Test: `tests/browser/parts/register.mjs`, `tests/browser/parts/register-review-names.mjs`.
+52. (walk) The vault form's no-recovery acknowledgement sits in a
+    tinted callout that opens with the critical icon, in critical. Test: `tests/browser/parts/register.mjs`.
