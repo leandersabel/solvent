@@ -162,6 +162,11 @@ await run(async () => {
         && row('XAG-ozt').querySelector('select').disabled;
     })()`),
   );
+  check(
+    "a screen reader names each unit row's Rate lookup by its column's heading and the unit's code",
+    await page.eval(`[...document.querySelectorAll('#app table tbody tr')].filter((r) => r.querySelector('select')).every((r) =>
+      r.querySelector('select').getAttribute('aria-label') === 'Rate lookup, ' + r.firstElementChild.textContent.trim())`),
+  );
   await page.eval("[...document.querySelectorAll('summary')].find((s) => s.textContent === 'Add a unit').parentElement.open = true");
   await names('#app details[open]', ['Code', 'Name', 'Kind', 'Rate lookup']);
   await page.call(
