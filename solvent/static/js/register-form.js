@@ -13,7 +13,7 @@
 // (page-register.js).
 import * as api from './api.js';
 import * as crypto from './crypto.js';
-import { el, listOption } from './dom.js';
+import { el, icon, listOption } from './dom.js';
 import { SCHEMA_VERSION } from './model.js';
 import { WAIT_NOTE, passwordWithToggle } from './unlock.js';
 import { MIN_LENGTH, strengthGauge } from './strength.js';
@@ -188,6 +188,7 @@ export function registerForm({ kind, token: inviteToken, currencies, kdf, onCrea
       : null,
     isVault
       ? el('label', { class: 'checkbox callout callout-critical' }, [
+          icon('alert'),
           acknowledge,
           el('span', {
             text: 'I understand that if I lose this password, my data is permanently unreadable. Solvent has no way to reset it or recover my vault.',

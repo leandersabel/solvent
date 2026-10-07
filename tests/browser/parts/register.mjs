@@ -60,6 +60,18 @@ await run(async () => {
   check('the currency warning sits at the point of choice', (await text()).includes('This cannot be changed later.'));
   check('the acknowledgement is required', (await text()).includes('permanently unreadable'));
   {
+    // The icon leads the callout, in the color the critical token resolves to.
+    const icon = JSON.parse(await page.eval(`(() => {
+      const first = document.querySelector('label.callout').firstElementChild;
+      const probe = document.body.appendChild(document.createElement('span'));
+      probe.style.color = 'var(--status-critical)';
+      const critical = getComputedStyle(probe).color;
+      probe.remove();
+      return JSON.stringify({ alert: first.matches('svg.icon-alert'), color: getComputedStyle(first).color, critical });
+    })()`));
+    check('the acknowledgement opens with the critical icon', icon.alert && icon.color === icon.critical, JSON.stringify(icon));
+  }
+  {
     const names = await fieldNames();
     check('each vault form field is named by its label', JSON.stringify(names) === JSON.stringify(['Username', 'Password', 'Confirm password', 'Main currency']), JSON.stringify(names));
   }

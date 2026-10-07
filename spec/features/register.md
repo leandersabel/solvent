@@ -659,7 +659,7 @@ fixture prevents.
 32. (walk) A password of 11 characters, or one scoring below zxcvbn 3,
     is blocked in the browser and never derives keys. Test: no test.
 33. (walk) The vault form cannot be submitted without the no-recovery
-    acknowledgement ticked. Test: no test.
+    acknowledgement ticked. Test: `tests/browser/parts/register-review-acknowledgement.mjs`.
 34. (walk) The administrator form carries no no-recovery acknowledgement
     and no main currency, and makes no claim about recovery. Test: `tests/browser/parts/register.mjs`.
 35. (walk) On either form, a confirmation that differs from the password
@@ -719,3 +719,5 @@ fixture prevents.
 51. (walk) On both forms, a screen reader names each field by the label
     beside it: Username, Password, Confirm password and, on the vault
     form, Main currency. Test: `tests/browser/parts/register.mjs`, `tests/browser/parts/register-review-names.mjs`.
+52. (walk) The vault form's no-recovery acknowledgement sits in a
+    tinted callout that opens with the critical icon, in critical. Test: `tests/browser/parts/register.mjs`, `tests/browser/parts/register-review-acknowledgement.mjs`.
