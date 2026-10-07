@@ -145,6 +145,10 @@
   dimensions, with every part labeled.
 - The chart marks the dates you actually recorded something.
 - Every figure states how old it is. Nothing flags a figure as too old.
+- A change follows the figures as shown, not the unrounded value. A
+  figure that rounds to zero reads as zero, with no sign. When the
+  amount rounds to zero, the change shows no arrow and no up or down
+  color.
 - The chart can be used from the keyboard, and its numbers are also
   available as a plain table.
 
