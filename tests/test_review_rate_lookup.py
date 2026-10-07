@@ -1945,7 +1945,7 @@ def unserved(request, app, admin):
         json={"symbol": UNSERVED, "label": "Argentine Peso", "kind": "currency", "lookup": False},
         headers=CSRF,
     )
-    assert response.status_code in (200, 201), response.get_data(as_text=True)
+    assert response.status_code == 200, response.get_data(as_text=True)
     conn = connect(app)
     try:
         conn.execute("UPDATE symbols SET lookup = ? WHERE symbol = ?", (STORED[request.param], UNSERVED))
@@ -2961,7 +2961,7 @@ def test_a_unit_no_source_serves_cannot_be_turned_to_automatic(app, admin, symbo
         json={"symbol": symbol, "label": "Test unit", "kind": kind, "lookup": False},
         headers=CSRF,
     )
-    assert added.status_code in (200, 201), added.get_data(as_text=True)
+    assert added.status_code == 200, added.get_data(as_text=True)
 
     alone = admin.patch(f"/api/admin/symbols/{symbol}", json={"lookup": True}, headers=CSRF)
     renamed = admin.patch(f"/api/admin/symbols/{symbol}", json={"lookup": True, "label": "Renamed"}, headers=CSRF)
@@ -3002,7 +3002,7 @@ def test_has_adapter_is_the_registry_on_every_row_seeded_or_added(app, admin):
             json={"symbol": symbol, "label": "Test unit", "kind": kind, "lookup": False},
             headers=CSRF,
         )
-        assert added.status_code in (200, 201), added.get_data(as_text=True)
+        assert added.status_code == 200, added.get_data(as_text=True)
 
     table = admin_rows(admin)
 
@@ -3012,3 +3012,16 @@ def test_has_adapter_is_the_registry_on_every_row_seeded_or_added(app, admin):
     assert [symbol for symbol, row in table.items() if row["lookup"] and not row["hasAdapter"]] == []
     assert table["XAU-g"]["hasAdapter"] is True
     assert all(table[symbol]["hasAdapter"] is False for symbol, _ in UNSERVED_UNITS)
+
+
+def test_adding_a_unit_answers_ok_with_a_body(app, admin):
+    """architecture.md, Status codes: a success that adds a row is OK,
+    which carries a body, and the row is in the table after it."""
+    added = admin.post(
+        "/api/admin/symbols",
+        json={"symbol": "XTS", "label": "Test unit", "kind": "currency", "lookup": False},
+        headers=CSRF,
+    )
+    assert added.status_code == 200, added.get_data(as_text=True)
+    assert added.get_json() is not None
+    assert admin_rows(admin)["XTS"]["label"] == "Test unit"
