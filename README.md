@@ -4,38 +4,56 @@ A self-hosted net worth tracker with an end-to-end encrypted vault. The
 server stores only ciphertext. Balances are decrypted in the browser
 with a key derived from your password.
 
-## Stack
+## Install
+
+Solvent is one container, `ghcr.io/leandersabel/solvent:stable`. Serve
+it over HTTPS, because the browser only runs the vault's encryption on
+a secure page.
+
+### TrueNAS
+
+1. Datasets > Add Dataset, with the preset **Apps**.
+2. Apps > Discover Apps > Custom App:
+   - Image: repository `ghcr.io/leandersabel/solvent`, tag `stable`.
+   - Environment Variables: `SECRET_KEY`, a long random string that
+     never changes.
+   - Security Context: Custom User, user and group `568`.
+   - Ports: container port `8000`.
+   - Storage: Host Path, the dataset, mount path `/data`.
+3. Once it runs, open its Shell under Workloads and create the first
+   administrator:
+   ```
+   flask --app app create-invite --kind administrator
+   ```
+   Open the path it prints. From there, the administrator invites
+   everybody else.
+
+### Docker
+
+```
+docker run -d --name solvent -p 8000:8000 \
+  -e SECRET_KEY=<a long random string that never changes> \
+  -v solvent-data:/data \
+  ghcr.io/leandersabel/solvent:stable
+docker exec solvent flask --app app create-invite --kind administrator
+```
+
+Behind a reverse proxy, also set `TRUSTED_PROXY_HOPS` to the number of
+proxies in front of Solvent.
+
+## Develop
 
 Flask + Jinja2 + htmx for the app shell, vanilla JS / Alpine.js for the
-client-side crypto and rendering, SQLite for storage. Deployed as a
-container.
-
-## Run it
+client-side crypto and rendering, SQLite for storage.
 
 ```
 python3 -m venv .venv && .venv/bin/pip install -r requirements-dev.txt
 export SECRET_KEY=$(python3 -c "import secrets; print(secrets.token_urlsafe(32))")
 .venv/bin/python -m flask --app app run
-```
-
-The app refuses to start without `SECRET_KEY` (spec/features/app-shell.md,
-Configuration). `DATABASE_PATH` defaults to `instance/solvent.db`, which
-is created on first start.
-
-Behind a reverse proxy, set `TRUSTED_PROXY_HOPS` to the number of
-proxies in front of the app. At the default of 0 every client counts as
-the proxy's address, so one person's failed sign-ins lock everyone out
-together. Set too high, a client chooses its own address.
-
-The first account is created out of band, because registration needs
-an invite and invites need an administrator:
-
-```
 .venv/bin/python -m flask --app app create-invite --kind administrator
 ```
 
-It prints a path to open in the browser. From there an administrator
-invites everybody else.
+The database is `instance/solvent.db`, created on first start.
 
 Tests: `.venv/bin/python -m pytest`, which runs on every core. The
 suite covers the server, the client-side rules that two implementations
@@ -50,21 +68,7 @@ each on a server of its own. One part alone, serially:
 .venv/bin/python -m pytest -n 0 "tests/test_browser.py::test_the_workflows_hold_in_a_browser[unlock]"
 ```
 
-## Build it
-
-The image is what deploys (spec/architecture.md, Tech stack). It runs as
-a non-root user on a read-only root filesystem, with `/data` as the only
-writable path.
-
-```
-docker build -t solvent .
-docker run --rm -p 8000:8000 \
-  -e SECRET_KEY="$SECRET_KEY" \
-  -v solvent-data:/data \
-  --read-only --tmpfs /dev/shm:size=64m \
-  --cap-drop ALL --security-opt no-new-privileges:true \
-  solvent
-```
+The image: `docker build -t solvent .`
 
 ## Layout and workflow
 
