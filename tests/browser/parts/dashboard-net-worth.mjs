@@ -336,9 +336,11 @@ await run(async () => {
     }, type, across);
   await go('#/');
   const total = await ev("document.querySelector('.hero-amount').textContent");
+  const parts = await ev("JSON.stringify([...document.querySelectorAll('.hero-part-value')].map(p => p.textContent))");
   await pointer('pointermove', 0.5);
   const hovered = await ev(`JSON.stringify({
     hero: document.querySelector('.hero-amount').textContent,
+    parts: [...document.querySelectorAll('.hero-part-value')].map(p => p.textContent),
     at: document.querySelector('.hero-at').textContent,
     rows: [...document.querySelectorAll('.chart-readout p')].map(p => p.className),
     net: document.querySelector('.readout-net').textContent,
@@ -351,6 +353,13 @@ await run(async () => {
       hovered.at.startsWith('on ') && Math.round(figure(hovered.net)) === figure(hovered.hero) &&
       (await ev("document.querySelector('.hero-amount').textContent")) === total,
     JSON.stringify(hovered),
+  );
+  const signed = (shown) => figure(String(shown).replace('−', '-'));
+  check(
+    'net-worth-view: gross assets and liabilities follow the hovered day, add up to its total, and return on leaving',
+    signed(hovered.parts[0]) + signed(hovered.parts[1]) === signed(hovered.hero) &&
+      (await ev("JSON.stringify([...document.querySelectorAll('.hero-part-value')].map(p => p.textContent))")) === parts,
+    JSON.stringify({ hovered, parts }),
   );
   await rec.frames();
 

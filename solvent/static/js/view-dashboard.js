@@ -191,7 +191,7 @@ function hero(vault, state, render, actions, history, dimension) {
 function heroPart(label, figure) {
   return el('div', { class: 'hero-part' }, [
     el('p', { class: 'eyebrow', text: label }),
-    el('p', { class: 'hero-part-value', text: figure }),
+    el('p', { class: 'hero-part-value', text: figure, dataset: { total: figure } }),
   ]);
 }
 
@@ -382,10 +382,12 @@ function chartSection(vault, state, render, dimension, actions, { days, bands })
         onHover: (day, across) => {
           const heroAt = document.querySelector('.dashboard .hero-at');
           const heroAmount = document.querySelector('.dashboard .hero-amount');
+          const partValues = [...document.querySelectorAll('.dashboard .hero-part-value')];
           if (day === null) {
             readout.hidden = true;
             if (heroAt) heroAt.hidden = true;
             if (heroAmount) heroAmount.textContent = heroAmount.dataset.total;
+            for (const part of partValues) part.textContent = part.dataset.total;
             return;
           }
           const shown = vault.valuesAt(dimension, day).filter((band) => !state.hidden.has(band.id));
@@ -413,10 +415,14 @@ function chartSection(vault, state, render, dimension, actions, { days, bands })
           readout.style.setProperty('--at', String(across));
           readout.hidden = false;
           // The hero follows the cursor: the value first, its date
-          // beneath it.
-          if (heroAmount) heroAmount.textContent = vault.format.whole(net);
-          // A dashed total has no figure for the date to belong to.
+          // beneath it, and gross assets and liabilities adding up to
+          // it. A dashed total has no figure for the date to belong to.
           if (heroAt && heroAmount) {
+            heroAmount.textContent = vault.format.whole(net);
+            const side = (name) => shown.reduce((sum, band) => sum + band[name], 0n);
+            heroParts({ assets: side('assets'), liabilities: side('liabilities') }).forEach((figure, i) => {
+              partValues[i].textContent = vault.mainWhole(figure);
+            });
             heroAt.textContent = `on ${date}`;
             heroAt.hidden = false;
           }

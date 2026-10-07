@@ -661,7 +661,13 @@ export class Vault {
    *  read. Any day is readable, sample or not, from the same model the
    *  drawing is built on (net-worth-view.md, Reading a date). */
   valuesAt(dimension, day) {
-    return this._bandsAt(dimension, [day]).map(({ id, label, points }) => ({ id, label, value: points[0] }));
+    return this._bandsAt(dimension, [day]).map(({ id, label, points, assets, liabilities }) => ({
+      id,
+      label,
+      value: points[0],
+      assets: assets[0],
+      liabilities: liabilities[0],
+    }));
   }
 
   _bandsAt(dimension, days) {
