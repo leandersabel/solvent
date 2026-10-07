@@ -706,6 +706,9 @@ function rateLine(vault, unit, date, { sit, readOnly: blockReadOnly, fillMissing
   const earlyCopy = (yours = true) =>
     `Published prices for ${described.name} begin on ${format.fullDate(publishedFrom)}.${yours ? ' This one is yours to set.' : ''}`;
 
+  /** Why a line with no rate source at this date is its owner's to set. */
+  const whyYours = () => (early ? earlyCopy() : ownCopy());
+
   /** Chip and wording for what the field holds now. Never touches the
    *  field itself, so typing is never overwritten. */
   line.describe = () => {
@@ -729,7 +732,9 @@ function rateLine(vault, unit, date, { sit, readOnly: blockReadOnly, fillMissing
         figure !== null && figure !== parsed(stored.rate) && original !== null
           ? editedFrom(original, format)
           : provenanceChip(stored, format);
-      explanation.textContent = !readOnly && !line.value() ? 'Cleared. Saving removes this price.' : '';
+      // A typed price keeps why it is the owner's to set, saved or not.
+      explanation.textContent =
+        readOnly ? '' : !line.value() ? 'Cleared. Saving removes this price.' : stored.rateSource === 'manual' && !quotable ? whyYours() : '';
       return;
     }
     if (line.pending) {

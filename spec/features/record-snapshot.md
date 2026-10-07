@@ -324,7 +324,9 @@ Line states:
 set**: "Nobody publishes a price for m2. This one is yours to set.", or
 "Published prices for Gold, gram begin on 2 January 2013. This one is
 yours to set." It drops the earlier figure's age, "No price for m2
-yet." and the question, because the typed figure answers them.
+yet." and the question, because the typed figure answers them. The
+line reads the same once the price is saved, and on every reopening of
+the recording.
 
 Units, dates and the main currency in all copy are computed, never
 written in.
@@ -1348,7 +1350,7 @@ Editing an existing entry).
     price before that date, asks for one when there is none, triggers no
     lookup, and never reads like a source that did not answer. Once a
     price is typed there, it says only when published prices begin and
-    that the price is yours to set. Test:
+    that the price is yours to set, saved or not and on reopening. Test:
     `tests/browser/parts/update-values.mjs`,
     `tests/browser/parts/update-values-review-typed.mjs`.
 18. A holding measured in the main currency shows no price anywhere, and

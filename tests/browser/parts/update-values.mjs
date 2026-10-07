@@ -961,6 +961,18 @@ await run(async () => {
     !earlyReopened.lookup && earlyReopened.says.startsWith('Published prices for Gold, troy ounce begin on') && rateAsks().length === 0,
     JSON.stringify(earlyReopened),
   );
+  const earlyWhy = `Published prices for Gold, troy ounce begin on ${begins}. This one is yours to set.`;
+  await typeLine('XAU-ozt', '1300');
+  await press('Save the rate lines');
+  const earlySaved = await lineState('XAU-ozt');
+  await go(`#/sweep/${EARLY}`);
+  const earlySavedReopened = await lineState('XAU-ozt');
+  check(
+    'record-rate: a price typed for gold before its published prices, once saved and on reopening, still says why it is yours to set',
+    earlySaved.chip === 'Typed by you' && earlySaved.says === earlyWhy &&
+      earlySavedReopened.chip === 'Typed by you' && earlySavedReopened.says === earlyWhy,
+    JSON.stringify({ earlySaved, earlySavedReopened }),
+  );
   await home();
 
   // The sweep keeps its columns while its block is 720px wide, under
