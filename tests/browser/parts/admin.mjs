@@ -243,6 +243,32 @@ await run(async () => {
     })()`),
   );
 
+  // The change is held mid-flight, then refused, so the password stays.
+  let releaseChange;
+  const held = new Promise((resolve) => {
+    releaseChange = resolve;
+  });
+  expectedFailures.add('/api/auth/');
+  const unhold = await intercept(page, '*/api/auth/*', async () => {
+    await held;
+    return { status: 503 };
+  });
+  await setValue('input[autocomplete=current-password]', ADMIN_PASSWORD);
+  await setValue('input[autocomplete=new-password]', SECOND_PASSWORD, 0);
+  await setValue('input[autocomplete=new-password]', SECOND_PASSWORD, 1);
+  await page.eval("document.querySelector('input[autocomplete=new-password]').focus()");
+  await page.eval("document.querySelector('form.card .btn-primary').click()");
+  await page.waitUntil("document.querySelector('form.card .btn-primary').textContent === 'Changing your password'", { label: 'the working state' });
+  await page.send('Input.insertText', { text: 'x' });
+  check(
+    'while the password changes, its fields and button are disabled, and typing a new password enables nothing',
+    await page.eval("[...document.querySelector('form.card').querySelectorAll('input:not([hidden]), button')].every((c) => c.disabled)"),
+  );
+  releaseChange();
+  await page.waitUntil("document.querySelector('form.card').textContent.includes('Nothing was changed.')", { label: 'the refused change' });
+  await unhold();
+  expectedFailures.delete('/api/auth/');
+
   // ---- A dialog over the area --------------------------------------
 
   // app-shell.md, The bar above a dialog: an administrator's dialog is
