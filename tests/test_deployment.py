@@ -293,7 +293,7 @@ def test_no_invite_token_reaches_the_containers_standard_output_or_error(tmp_pat
             status, data, _ = call(
                 "POST", "/api/admin/invites", {"kind": "vault_owner"}, admin_cookie
             )
-            assert status == 201
+            assert status == 200
             return json.loads(data)
 
         valid, used, expired, revoked = (create() for _ in range(4))

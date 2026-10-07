@@ -856,7 +856,7 @@ def admin_create_symbol():
             "INSERT INTO symbols (symbol, label, kind, lookup) VALUES (?, ?, ?, ?)",
             (body.symbol, body.label, body.kind, int(body.lookup)),
         )
-    return jsonify({"symbol": body.symbol}), 201
+    return jsonify({"symbol": body.symbol})
 
 
 @bp.patch("/api/admin/symbols/<symbol>")

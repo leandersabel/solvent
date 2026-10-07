@@ -85,7 +85,7 @@ def create_invite():
             conn, body.kind, body.expiresInDays, body.label, g.principal["username"]
         )
     invite["url"] = request.host_url.rstrip("/") + "/register?invite=" + invite["token"]
-    return jsonify(invite), 201
+    return jsonify(invite)
 
 
 @bp.get("/api/admin/invites")
