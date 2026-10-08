@@ -303,7 +303,7 @@ action.
   > unit a holding is measured in, and Solvent cannot read those to
   > change it afterwards. Check it before you add it.
 
-  For a metal a second line gives the shape: "Metals are named
+  While Kind is Metal, a second line gives the shape: "Metals are named
   `<code>-ozt` or `<code>-g`, such as `XAU-ozt`."
 - **Name.**
 - **Kind**, currency or metal, fixed once the unit exists.
@@ -934,3 +934,7 @@ administrator), and the lost sole password (Bootstrap). The rest:
     ended, opening Accounts goes to the sign-in screen. Test:
     `tests/browser/parts/admin-accounts-error.mjs`,
     `tests/browser/parts/admin-review-accounts-error.mjs`.
+63. (walk) Add a unit shows "Metals are named `<code>-ozt` or `<code>-g`,
+    such as `XAU-ozt`." beneath Code only while Kind is Metal. Test:
+    `tests/browser/parts/admin-unit-shape.mjs`,
+    `tests/browser/parts/admin-review-unit-shape.mjs`.
