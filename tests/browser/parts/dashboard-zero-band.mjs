@@ -1,8 +1,8 @@
 // The breakdown draws a bar for every band of the stack, a band at
 // zero included (spec/features/net-worth-view.md, Dashboard, Breakdown
-// by dimension).
+// by dimension), and no bar while nothing is valued.
 // Templates: dashboard.html. Modules: view-dashboard.js, model.js.
-import { check, holdings, page, recording, run, setProfile, unlockDashboard, vaultOwner } from '../harness.mjs';
+import { check, holdings, page, recording, reloadModel, run, setProfile, unlockDashboard, vaultOwner } from '../harness.mjs';
 
 const LIQUIDITY = {
   id: 'liq00001', label: 'Liquidity', archivedAt: null,
@@ -18,8 +18,13 @@ await run(async () => {
     ['Spent deposit', 'CHF', { [LIQUIDITY.id]: 'fixd0001' }],
     ['Unvalued account', 'CHF'],
   ]);
-  await recording(new Date().toISOString().slice(0, 10), { 'Current account': '100.00', 'Spent deposit': '0' });
   await setProfile({ dimensions: [LIQUIDITY] });
+  await reloadModel(`#/unassigned/${LIQUIDITY.id}`);
+  await page.waitUntil("document.querySelector('.dashboard .hero-figure')", { label: 'the dashboard grouped by Liquidity' });
+  const unvalued = await page.eval("document.querySelector('.dashboard .bars') === null");
+  check('net-worth-view: with no holding valued the breakdown is absent', unvalued, String(unvalued));
+
+  await recording(new Date().toISOString().slice(0, 10), { 'Current account': '100.00', 'Spent deposit': '0' });
   await unlockDashboard('the dashboard with bands at zero');
 
   await page.call((value) => {

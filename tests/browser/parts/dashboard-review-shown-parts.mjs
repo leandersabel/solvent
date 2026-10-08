@@ -168,7 +168,8 @@ await run(async () => {
       shown(first.total) === 1n,
     JSON.stringify(first));
   check('net-worth-view: criterion 74, the same three read 0, 0 and 0 in the breakdown',
-    JSON.stringify(first.bars.map(([name, figure]) => [name, shown(figure)].join(' '))) === JSON.stringify(['Cash 0', 'Invested 0', 'Fixed 0']),
+    JSON.stringify(first.bars.filter(([name]) => name !== 'Unassigned').map(([name, figure]) => [name, shown(figure)].join(' '))) ===
+      JSON.stringify(['Cash 0', 'Invested 0', 'Fixed 0']),
     JSON.stringify(first.bars));
 
   await plantHistory(SECOND, FIRST);

@@ -64,7 +64,8 @@ export function dashboardView(vault, actions, { unassignedOf = null, replaced = 
       duplicateBanner(vault, actions),
       hero(vault, state, render, actions, history, dimension),
       history ? chartSection(vault, state, render, dimension, actions, history) : null,
-      dimension ? breakdown(vault, dimension, state) : null,
+      // Bars under a total of no figure would claim a sum.
+      dimension && vault.totals(state.mode).valued ? breakdown(vault, dimension, state) : null,
       holdingsTable(vault, state, render, actions, dimension),
     ]);
   };
