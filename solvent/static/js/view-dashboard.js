@@ -480,15 +480,15 @@ function groupBySelect(vault, state, render) {
 
 /** Under the plot, beneath a hairline: each band with its swatch and
  *  its figure at the right-hand edge, and the key to the entry marks
- *  while they are drawn. One band needs no legend, since the heading
- *  names it.
+ *  while they are drawn. "Total" needs no legend, since the heading
+ *  names it, but a dimension's band always takes one.
  *
  *  Each entry is a button that hides or shows its band. Hovering or
  *  focusing one highlights its band and dims the rest, by class alone,
  *  so nothing is redrawn. */
 function legend(vault, bands, state, render, dimension) {
   const marksShown = !state.justTheLine;
-  if (bands.length < 2 && !marksShown) return null;
+  if (!dimension && !marksShown) return null;
   const last = bands.length ? bands[0].points.length - 1 : 0;
   // Each band's value at the two days of a selected span.
   const [early, late] = state.selection
@@ -506,7 +506,7 @@ function legend(vault, bands, state, render, dimension) {
     }
   };
   return el('div', { class: 'legend-row' }, [
-    bands.length > 1
+    dimension
       ? el(
           'div',
           { class: 'legend' },
