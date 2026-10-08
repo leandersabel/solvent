@@ -926,4 +926,5 @@ Unarchiving and archiving it again writes the zero at the new D.
     `tests/browser/parts/dashboard-review-whole-units.mjs`.
 67. (walk) Typed text under "Something else…" that matches a listed
     symbol offers that symbol, and the form no longer says you enter
-    its price yourself. Test: `tests/browser/parts/account-form.mjs`.
+    its price yourself. Test: `tests/browser/parts/account-form.mjs`,
+    `tests/browser/parts/account-form-review-offer.mjs`.
