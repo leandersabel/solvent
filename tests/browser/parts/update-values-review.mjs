@@ -620,13 +620,12 @@ await run(async () => {
   );
   await home();
 
-  // ---- 66: Confirm copies the stored string under moneyPlaces 0 --------
+  // ---- 66: Confirm copies the stored string, cents included, though -----
+  // money shows whole units
 
   const DG = ago(22);
   const DH = ago(21);
-  const profile = await model(({ v }) => ({ recordId: v.profileRecord.recordId, version: v.profileRecord.version, payload: v.profile }));
   await plantHere([
-    { type: 'profile', recordId: profile.recordId, version: profile.version + 1, payload: { ...profile.payload, moneyPlaces: '0' } },
     r.snap('Gold bars', DG, '12.125'),
     r.snap('Brokerage', DG, '1000.40'),
     r.snap('Current account', DG, '1000.40'),
@@ -637,7 +636,7 @@ await run(async () => {
   for (const name of ['Gold bars', 'Brokerage', 'Current account', 'Flat']) await pressRow(name);
   const confirmed = Object.fromEntries((await snapshotsAt(DH)).map((s) => [s.accountId, s.payload.value]));
   check(
-    'review 66: Confirm writes the stored string character for character under moneyPlaces 0',
+    'review 66: Confirm writes the stored string character for character, cents included',
     confirmed[id['Gold bars']] === '12.125' && confirmed[id.Brokerage] === '1000.40' &&
       confirmed[id['Current account']] === '1000.40' && confirmed[id.Flat] === '95.50',
     JSON.stringify(confirmed),

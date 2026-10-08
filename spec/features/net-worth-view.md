@@ -976,7 +976,8 @@ rule of the chart (Archived holdings, Ranges and modes).
     `4,503,599,627,370,496` each and `9,007,199,254,740,993` under
     `en-US`, where a float sum or a sum of the rounded cells gives
     `…992`. Test:
-    `tests/browser/parts/dashboard-fixtures.mjs`.
+    `tests/browser/parts/dashboard-fixtures.mjs`,
+    `tests/browser/parts/dashboard-review-whole-units.mjs`.
 32. (blind) (walk) Each table row's date equals `longDate` of its day
     and the tooltip's date: 2026-01-15 reads `Jan 15, 2026` under
     `en-US` with no `dateStyle` and `15.01.2026` under `dmy`. Test:
@@ -1127,7 +1128,8 @@ rule of the chart (Archived holdings, Ranges and modes).
 64. (blind) (walk) The native-unit column shows an XAU-ozt holding
     stored as "12.125" and an m² holding stored as "80" as typed, while
     the converted column reads in whole units. Test:
-    `tests/test_client.py::test_the_client_side_rules_hold`.
+    `tests/test_client.py::test_the_client_side_rules_hold`,
+    `tests/browser/parts/dashboard-review-whole-units.mjs`.
 65. (walk) A negative-balance holding reduces the net figure and appears
     under liabilities. Test:
     `tests/test_client.py::test_the_client_side_rules_hold`,
@@ -1172,7 +1174,8 @@ rule of the chart (Archived holdings, Ranges and modes).
     `tests/browser/parts/dashboard-review-long-name.mjs`.
 74. (walk) Three holdings of 0.40 alone in their bands read 0, 0 and 0
     in the holdings table and in the breakdown, under a total of 1. Test:
-    `tests/test_client.py::test_the_client_side_rules_hold`.
+    `tests/test_client.py::test_the_client_side_rules_hold`,
+    `tests/browser/parts/dashboard-review-shown-parts.mjs`.
 75. (blind) (walk) Each legend figure, each of the legend's changes over
     a selected span and each of the readout's rows reads its own exact
     figure rounded half-even to whole units, where sharing out a total

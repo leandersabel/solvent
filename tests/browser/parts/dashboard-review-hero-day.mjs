@@ -2,9 +2,9 @@
 // spec/features/net-worth-view.md alone (Hero figure; Trend chart card,
 // Hover and Keyboard; Legend; acceptance criterion 66): the hero follows
 // the day, its total the readout's net, and gross assets and gross
-// liabilities as shown add up to that total as shown, by the spec's
-// rounding. With a band hidden the total covers only the visible bands,
-// and so do its parts. Leaving the chart returns the hero.
+// liabilities are that day's, each rounded on its own, half-even, to
+// whole units. With a band hidden the total covers only the visible
+// bands, and so do its parts. Leaving the chart returns the hero.
 // Templates: dashboard.html. Modules: view-dashboard.js, decimal.js,
 // model.js, format.js.
 import { check, holdToday, holdings, page, plant, reloadModel, run, setProfile, vaultOwner } from '../harness.mjs';
@@ -18,17 +18,8 @@ const halfEvenDiv = (a, b) => {
   const twice = (a - q * b) * 2n;
   return twice > b || (twice === b && q % 2n !== 0n) ? q + 1n : q;
 };
-// The spec's method in whole units: the whole rounds once, half-even,
-// each part toward minus infinity, and the units missing go to the
-// largest remainders, ties to the earlier part.
-const shares = (parts) => {
-  const floors = parts.map((p) => floorDiv(p, ONE));
-  const rests = parts.map((p, i) => p - floors[i] * ONE);
-  let missing = halfEvenDiv(parts.reduce((a, b) => a + b, 0n), ONE) - floors.reduce((a, b) => a + b, 0n);
-  const order = parts.map((_, i) => i).sort((a, b) => (rests[b] > rests[a] ? 1 : rests[b] < rests[a] ? -1 : a - b));
-  for (const i of order) if (missing-- > 0n) floors[i] += 1n;
-  return floors;
-};
+// The spec's method: each figure to whole units on its own, half-even.
+const whole = (exact) => halfEvenDiv(exact, ONE);
 const exactOf = (decimal) => {
   const [whole, frac = ''] = decimal.replace('-', '').split('.');
   const n = BigInt(whole) * ONE + BigInt(frac.padEnd(SCALE, '0'));
@@ -71,8 +62,9 @@ const HOLDINGS = [
   ['Debt', 'CHF', { liq: 'fixed' }, 'Fixed'],
   ['Loan', 'CHF', {}, 'Unassigned'],
 ];
-// On the first day assets are 110.60 and liabilities −50.40, so the net
-// of 60.20 reads 60 where each side rounded alone reads 111 and −50.
+// On the first day assets are 110.60 and liabilities −50.40, so each
+// side rounded alone reads 111 and −50 over a net of 60.20 that reads 60,
+// where sharing the net out would read 111 and −51.
 const HISTORY = {
   Fund: [['2026-01-01', '100.15'], ['2026-01-10', '300.20']],
   Gold: [['2026-01-01', '10.45']],
@@ -110,12 +102,10 @@ const wrongOn = (h, bands) => {
   const day = dayOfShown(h.readout);
   if (Number.isNaN(day)) return 'no day read';
   const [assets, liabilities] = sidesAt(day, bands);
-  const [wantAssets, wantLiabilities] = shares([assets, liabilities]);
-  const wantTotal = halfEvenDiv(assets + liabilities, ONE);
+  const [wantAssets, wantLiabilities, wantTotal] = [assets, liabilities, assets + liabilities].map(whole);
   const got = [shown(h.total), shown(h.assets), owed(h.liabilities)];
   if (got[0] !== wantTotal) return `total ${h.total}, wants ${wantTotal}`;
   if (got[1] !== wantAssets || got[2] !== wantLiabilities) return `assets ${h.assets} and liabilities ${h.liabilities}, want ${wantAssets} and ${wantLiabilities}`;
-  if (got[1] + got[2] !== got[0]) return 'the sides do not add up to the total as shown';
   return null;
 };
 
@@ -173,7 +163,6 @@ await run(async () => {
   await setProfile({
     dimensions: [{ id: 'liq', label: 'Liquidity', values: [{ id: 'cash', label: 'Cash' }, { id: 'inv', label: 'Invested' }, { id: 'fixed', label: 'Fixed' }] }],
     locale: 'en-US',
-    moneyPlaces: '2',
   });
   await plant(Object.entries(HISTORY).flatMap(([name, figures]) =>
     figures.map(([date, value]) => ({ type: 'snapshot', accountId: ids[name], payload: { date, value, note: null } }))));
@@ -182,14 +171,14 @@ await run(async () => {
   const ALL = ['Cash', 'Invested', 'Fixed', 'Unassigned'];
 
   const atRest = await hero();
-  check('net-worth-view 66: at rest, gross assets and liabilities read as the spec rounds today\'s figures and add up to the total as shown',
+  check('net-worth-view 66: at rest, gross assets and liabilities each read today\'s exact figure rounded on its own',
     atRest.date === '' && wrongOn({ ...atRest, readout: 'Jan 14, 2026' }, ALL) === null, JSON.stringify(atRest));
 
   // Under Total, one band holding both signs: the sides are the gross
   // figures of the day, never today's.
   const total = await walk();
   const totalWrong = total.days.map((h) => [h.readout, wrongOn(h, ALL)]).filter(([, w]) => w);
-  check('net-worth-view 66: under Total, on every day the keyboard reads, the hero\'s gross assets and liabilities are that day\'s and add up to its total as shown',
+  check('net-worth-view 66: under Total, on every day the keyboard reads, the hero\'s gross assets and liabilities are that day\'s, each rounded on its own',
     total.days.length === 14 && totalWrong.length === 0, `${total.days.length} days: ${JSON.stringify(totalWrong.slice(0, 3))}`);
   check('net-worth-view Trend chart card, Keyboard: on each day read the hero carries the readout\'s date',
     total.days.every((h) => h.date !== '' && h.date.includes(h.readout)), JSON.stringify(total.days.map((h) => [h.readout, h.date])));
@@ -197,8 +186,8 @@ await run(async () => {
     same(total.after, atRest), JSON.stringify({ before: total.before, after: total.after, atRest: resting(atRest) }));
 
   const first = await hover('2026-01-01');
-  check('net-worth-view 66: hovering 1 January, gross assets read 111 and liabilities −51 under a total of 60, where each rounded alone gives 111 and −50',
-    first.on.readout === 'Jan 1, 2026' && shown(first.on.total) === 60n && shown(first.on.assets) === 111n && owed(first.on.liabilities) === -51n,
+  check('net-worth-view 66: hovering 1 January, gross assets read 111 and liabilities −50 under a total of 60, each rounded on its own',
+    first.on.readout === 'Jan 1, 2026' && shown(first.on.total) === 60n && shown(first.on.assets) === 111n && owed(first.on.liabilities) === -50n,
     JSON.stringify(first.on));
   check('net-worth-view Trend chart card, Hover: leaving the plot returns the hero, gross assets and liabilities included',
     same(first.off, atRest), JSON.stringify({ off: resting(first.off), atRest: resting(atRest) }));
@@ -216,12 +205,14 @@ await run(async () => {
     await page.frames();
     const visible = ALL.filter((b) => b !== hidden);
     const rest = await hero();
-    check(`net-worth-view 66: with ${hidden} hidden, at rest, gross assets and liabilities add up to the total as shown`,
-      shown(rest.assets) !== null && owed(rest.liabilities) !== null && shown(rest.assets) + owed(rest.liabilities) === shown(rest.total),
-      JSON.stringify(rest));
+    // The spec leaves open whether the hero at rest covers every band or
+    // the visible ones, so either passes, each figure rounded on its own.
+    const today = { ...rest, readout: 'Jan 14, 2026' };
+    check(`net-worth-view 66: with ${hidden} hidden, at rest, the total and both sides are today's, each rounded on its own`,
+      wrongOn(today, visible) === null || wrongOn(today, ALL) === null, `${JSON.stringify(rest)}: ${wrongOn(today, ALL)}`);
     const read = await walk();
     const wrong = read.days.map((h) => [h.readout, wrongOn(h, visible)]).filter(([, w]) => w);
-    check(`net-worth-view 66: with ${hidden} hidden, on every day the keyboard reads, the hero's total and both sides cover only the visible bands and add up as shown`,
+    check(`net-worth-view 66: with ${hidden} hidden, on every day the keyboard reads, the hero's total and both sides cover only the visible bands`,
       read.days.length === 14 && wrong.length === 0, `${read.days.length} days: ${JSON.stringify(wrong.slice(0, 3))}`);
     const pointed = await hover('2026-01-10');
     check(`net-worth-view 66: with ${hidden} hidden, hovering 10 January the hero's total and both sides cover only the visible bands`,

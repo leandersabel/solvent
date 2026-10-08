@@ -7,7 +7,7 @@
 // accessibility tree, which is what a screen reader hears.
 import { check, page, run, vaultOwner } from '../harness.mjs';
 
-const LISTS = ['Language', 'Dates', 'Thousands', 'Decimals on money', 'Idle lock'];
+const LISTS = ['Language', 'Dates', 'Thousands', 'Idle lock'];
 const PASSWORD_CARD = 'Change password';
 const DIALOG = 'Delete your account';
 
@@ -69,6 +69,10 @@ await run(async () => {
     lists.length >= LISTS.length && lists.every(beside),
     JSON.stringify(lists.filter((c) => !beside(c))),
   );
+  // requirements.md, Dates and numbers: money shows whole units, so no
+  // setting chooses its decimals.
+  const pageText = await page.eval('document.body.innerText');
+  check('review: Settings offers no setting for decimals on money', !/decimals/i.test(pageText), pageText.slice(0, 600));
 
   // ---- Change password -------------------------------------------------------
   const passwordsIn = (words) => [...[...document.querySelectorAll('.card')].find((c) => c.textContent.includes(words))

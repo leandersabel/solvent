@@ -84,7 +84,7 @@ column at the left, a hairline rule between pairs.
 
 A 13px note first: "Display only. Every figure is stored exactly as you
 entered it, and every date is stored the same way for everyone, so
-changing any of this rewrites nothing." Then four selects in two
+changing any of this rewrites nothing." Then three selects in two
 columns, Language and Dates on the first row:
 
 - **Language**. A short list rather than free text, because a tag
@@ -184,7 +184,7 @@ the dialog.
 #### At phone width
 
 Everything set side by side stacks. A profile pair puts its label above
-its value, the four selects run in one column, and the idle lock
+its value, the three selects run in one column, and the idle lock
 tradeoff moves beneath its select. The sample strip wraps, with
 **Save** beneath the sample when the width runs out. Open sessions
 keeps its three columns: the first is as wide as the "This session"
@@ -882,7 +882,9 @@ from an administrator removing an account (`admin-invites.md`).
     an `m²` holding stored as `"80"` shows `80`, each asserted where it
     appears on screen. Test:
     `tests/test_client.py::test_the_client_side_rules_hold`,
-    `tests/browser/parts/settings.mjs`.
+    `tests/browser/parts/settings.mjs`,
+    `tests/browser/parts/dashboard-review-whole-units.mjs`,
+    `tests/test_review_account_settings.py::test_the_formatter_writes_money_whole_and_everything_else_as_it_was`.
 23. (blind) (walk) A quantity shows its stored digits, asserted with
     values rounding or padding would change (`"12.125"`, `"12.50"`, `"80"`). Test:
     `tests/test_client.py::test_the_client_side_rules_hold`.
@@ -949,12 +951,13 @@ from an administrator removing an account (`admin-invites.md`).
     profile. Test: no test.
 40. (walk) The date and number settings come back the same on another
     browser. Test: no test.
-41. (blind) (walk) With locale `de-CH`, the edit
+41. (blind) (walk) With locale `de-CH` and `groupSeparator` `apostrophe`, the edit
     dialog for a past snapshot of a `USD` holding stored as `"1000.40"`
     prefills `1’000.40` and changing only its note writes `value`
     `"1000.40"`, compared byte for byte. The same dialog for an
     `XAU-ozt` snapshot stored as `"12.125"` prefills `12.125`. Test:
-    `tests/browser/parts/settings.mjs`.
+    `tests/browser/parts/settings.mjs`,
+    `tests/browser/parts/dashboard-review-whole-units.mjs`.
 42. (walk) Account deletion removes the principal row, its credential
     rows, wrappers, records and sessions, and a later sign-in with those
     credentials fails. Test: `tests/browser/parts/settings.mjs`,

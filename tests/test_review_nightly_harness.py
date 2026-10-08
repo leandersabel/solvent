@@ -225,7 +225,7 @@ def test_with_no_holding_valued_the_total_and_the_sides_are_null(holdings, snaps
     from decimal import Decimal
 
     snapshots = {k: [(d, Decimal(v)) for d, v in s] for k, s in snapshots.items()}
-    result = prices.expected("CHF", holdings, snapshots, {}, 2)
+    result = prices.expected("CHF", holdings, snapshots, {})
     for mode in ("latest", "asRecorded"):
         assert [result[mode][key] for key in ("total", "assets", "debts")] == [None] * 3, mode
 
@@ -235,7 +235,7 @@ def test_a_valued_vault_keeps_a_total_even_when_it_sums_to_zero():
 
     holdings = {"Cash": {"unit": "CHF", "archived": False}, "Loan": {"unit": "CHF", "archived": False}}
     snapshots = {"Cash": [(D1, Decimal(5))], "Loan": [(D1, Decimal(-5))]}
-    assert prices.expected("CHF", holdings, snapshots, {}, 2)["latest"]["total"] == ZERO
+    assert prices.expected("CHF", holdings, snapshots, {})["latest"]["total"] == ZERO
 
 
 # ---- the committed plan against the new coverage rows -----------------
@@ -797,3 +797,28 @@ def test_a_refused_invite_fails_the_generator_naming_the_address_and_what_the_pa
     assert INVALID_INVITE in said, said
     assert "Cannot set properties of undefined" not in said, said
     assert not (out / "manifest.json").exists()
+
+
+# ---- expected figures in whole units ----------------------------------
+
+
+@pytest.mark.parametrize(
+    "values, total, assets, debts",
+    [
+        pytest.param(["0.40", "0.40", "0.40"], "1", "1", "0", id="parts-of-0.40"),
+        pytest.param(["2.5"], "2", "2", "0", id="half-to-even-down"),
+        pytest.param(["3.5"], "4", "4", "0", id="half-to-even-up"),
+        pytest.param(["1000.40", "-2.5"], "998", "1000", "-2", id="negative-half"),
+        pytest.param(["0.1", "-0.5"], "0", "0", "0", id="rounds-to-zero-unsigned"),
+    ],
+)
+def test_display_rounds_each_figure_half_even_to_whole_units(values, total, assets, debts):
+    """nightly-harness.md, Expected figures: `display` rounds `exact`
+    half-even to whole units, the total from the exact figures."""
+    from decimal import Decimal
+
+    names = [f"Cash {i}" for i in range(len(values))]
+    holdings = {name: {"unit": "CHF", "archived": False} for name in names}
+    snapshots = {name: [(D1, Decimal(value))] for name, value in zip(names, values)}
+    latest = prices.expected("CHF", holdings, snapshots, {})["latest"]
+    assert [latest[key]["display"] for key in ("total", "assets", "debts")] == [total, assets, debts]

@@ -359,7 +359,9 @@ detail's act.
 - A converted figure can move without this holding being touched,
   because correcting a price in a recording moves every holding in that
   unit on that date. The screen states no caveat: it shows the quantity
-  recorded times the price recorded.
+  recorded times the price recorded. Each figure reads in whole units, rounded on
+  its own, so it matches the dashboard's holdings table
+  (`design-system.md`, Figures).
 - The table is this holding's values only. A cross-holding price audit
   is not here.
 
@@ -915,3 +917,8 @@ Unarchiving and archiving it again writes the zero at the new D.
 65. (walk) Once "Add a note" is open, the note box is announced by its
     visible label, "Note". Test: `tests/browser/parts/account-form.mjs`,
     `tests/browser/parts/account-form-review-note.mjs`.
+66. (blind) (walk) 2.5 of an `XAU-ozt` holding at 1688.254004 in `CHF`
+    reads `CHF 4,221` on the holding's screen, in its list of values
+    and in the dashboard's holdings table, in both pricing modes. Test:
+    `tests/test_client.py::test_the_client_side_rules_hold`,
+    `tests/browser/parts/dashboard-review-whole-units.mjs`.
