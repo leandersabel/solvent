@@ -180,7 +180,9 @@ date.
 
 **A row** carries the name, unit, what the holding holds now, its age,
 the value field and one control, in three columns. The name holds the
-fluid left column with the row's sentence and age beneath it. The
+fluid left column with the row's sentence and age beneath it, and
+wraps inside it, breaking a word only where it has to, so it is shown
+whole and never runs under the field. The
 quantity field (`design-system.md`, Components) takes a 260px column,
 its unit as the suffix and the converted figure right-aligned beneath.
 The control fills a 112px column at the right, so every row's control
@@ -1744,3 +1746,8 @@ Editing an existing entry).
      its holding's name and "value", such as "Mortgage value". Test:
      `tests/browser/parts/update-values.mjs`,
      `tests/browser/parts/update-values-review-field-names.mjs`.
+106. (walk) At 320px, 375px, 601px, 901px and 1280px wide, a holding
+     name with no break in it wraps on Update values, is shown whole
+     inside its card and pans nothing sideways. Test:
+     `tests/browser/parts/update-values-long-name.mjs`,
+     `tests/browser/parts/update-values-review-long-name.mjs`.

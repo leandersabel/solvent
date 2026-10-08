@@ -405,6 +405,7 @@ h1, h2, h3 {
   border-radius: var(--radius-input);
   padding: 12px 16px;
   margin-bottom: 16px;
+  overflow-wrap: anywhere;
 }
 
 .banner-critical {
@@ -1356,6 +1357,7 @@ th.numeric {
   display: block;
   font-size: 15px;
   font-weight: 600;
+  overflow-wrap: anywhere;
 }
 
 .row-status {
