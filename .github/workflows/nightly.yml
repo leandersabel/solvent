@@ -103,7 +103,7 @@ jobs:
         run: |
           [ -n "$DIGEST" ]
           echo "$GH_TOKEN" | docker login ghcr.io -u "$GITHUB_ACTOR" --password-stdin
-          docker buildx imagetools create -t "$IMAGE:$VERSION" -t "$IMAGE:nightly" "$IMAGE@$DIGEST"
+          docker buildx imagetools create --prefer-index=false -t "$IMAGE:$VERSION" -t "$IMAGE:nightly" "$IMAGE@$DIGEST"
           .github/actions/notes/notes.sh "$VERSION" "$GITHUB_SHA" "$IMAGE@$DIGEST" > notes.md
           gh release create "$VERSION" --target "$GITHUB_SHA" --prerelease --title "$VERSION" --notes-file notes.md
 
