@@ -337,10 +337,22 @@ or kinds.
   version is written, and CI tests on that same version, so Dependabot
   moves the image and the tests together. Chosen over alpine,
   distroless and Chainguard for the broadest pip wheel compatibility.
-- **Container hardening**: runs as non-root, read-only root filesystem
-  with one writable volume for the SQLite database, minimal Linux
-  capabilities. Secrets are injected through the environment, never
-  baked into the image or committed.
+- **Container hardening**: the image holds it without any container
+  option, because an install form such as TrueNAS's Custom App drops
+  capabilities and privilege options and offers no read-only root
+  filesystem. No file in the image carries a setuid or setgid bit, so
+  the process has no route to root, and nothing in it is owned by a user
+  other than root. `/data`, the volume for the SQLite database, is the
+  only path in the image a non-root user can write, whatever its user
+  and group IDs, so the app cannot change its own code or the
+  JavaScript it serves. The image declares its user as `10001:10001`,
+  a number a platform can verify is not root, with no account or home
+  directory behind it. Any other non-root user works, given a `/data`
+  it can write. The app refuses to start as root (app-shell.md,
+  Configuration). `--read-only`, `--cap-drop ALL` and
+  `no-new-privileges` stay a layer on top. `/dev/shm` is the runtime's
+  mount, outside the image. Secrets are injected through the
+  environment, never baked into the image or committed.
 - **Backend framework**: Flask, over FastAPI and Django. The app is
   small with no external API consumers, so FastAPI's async and
   generated docs don't pay for their ceremony, and Django's admin,

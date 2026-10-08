@@ -232,6 +232,11 @@ one (architecture.md, Application hardening).
   and silently invalidates every session row. A committed default is
   forgeable.
 - No secret reaches a log line or an error page.
+- **The server and the `flask` command line refuse to start as root**,
+  before anything is read or written. The message says Solvent must not
+  run as root, and names a user to run as and that `/data` must be
+  writable for it. Files the command line wrote to `/data` as root
+  would be unwritable for the app.
 
 Every other setting is an environment variable read once at start. Each
 default lives with the rule it tunes:
@@ -950,3 +955,21 @@ dashboard.
     `failure` body, and the log names only the exception's class. Test:
     `tests/test_chrome.py::test_a_failure_before_flask_answers_with_the_failure_body_and_logs_only_its_class`,
     `tests/test_review_app_shell.py::test_a_failure_before_the_app_answers_is_the_failure_card_and_logs_only_its_class`.
+87. (blind) The app started as root exits without creating its
+    database, with a message that it must not run as root and that
+    `/data` must be writable for the user it runs as. Test:
+    `tests/test_config.py::test_the_app_refuses_to_start_as_root_and_writes_nothing`,
+    `tests/test_deployment.py::test_the_image_refuses_to_start_as_root`.
+88. (blind) No file in the image carries a setuid or setgid bit. Test:
+    `tests/test_deployment.py::test_no_file_in_the_image_can_raise_a_process_to_root`.
+89. (blind) In the image, `/data` is the only path its own user can
+    write, and another non-root user, root's group included, can write
+    none. Test:
+    `tests/test_deployment.py::test_data_is_the_only_path_any_user_can_write_in_the_image`.
+90. The Dockerfile declares the user as `10001:10001`. Test:
+    `tests/test_deployment.py::test_the_image_declares_its_user_as_a_number_that_is_not_root`.
+91. (blind) The image run with no container option as user `568:568`,
+    with a host directory it can write as `/data`, serves the sign-in
+    page, and `flask --app app create-invite` there prints an invite and
+    writes the database as that user. Test:
+    `tests/test_deployment.py::test_the_image_serves_as_another_user_without_container_options`.
