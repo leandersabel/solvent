@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import fcntl
 import threading
+from contextlib import contextmanager
 from datetime import datetime, timedelta, timezone
 
 import pytest
@@ -9,17 +10,60 @@ import pytest
 from tests.helpers import EpochClient, register
 
 
+@contextmanager
+def network_held(request, exclusive: bool):
+    """Holds the network lock across workers, shared or exclusive. An
+    exclusive waiter holds the gate, which keeps new shared holders out,
+    so a stream of them cannot starve it."""
+    base = request.getfixturevalue("tmp_path_factory").getbasetemp().parent
+    with (base / "network.gate").open("a") as gate, (base / "network.lock").open("a") as held:
+        fcntl.flock(gate, fcntl.LOCK_EX)
+        if exclusive:
+            fcntl.flock(held, fcntl.LOCK_EX)
+        else:
+            fcntl.flock(held, fcntl.LOCK_SH)
+            fcntl.flock(gate, fcntl.LOCK_UN)
+        yield
+
+
+def module_wide(request) -> bool:
+    """Whether the module has a fixture outliving a test, which may start
+    Chrome, so the lock has to span the module."""
+    return any(
+        definition.scope != "function"
+        for item in request.session.items
+        if item.module is request.module
+        for name, definitions in item._fixtureinfo.name2fixturedefs.items()
+        if name not in ("network_lock", "tmp_path_factory")
+        for definition in definitions
+    )
+
+
 @pytest.fixture(scope="module", autouse=True)
-def network_lock(request, tmp_path_factory):
-    """A module with a test that starts Docker containers runs while no
-    other module does, across workers. Each container adds and removes a
-    network interface, and Chrome fails every request in flight when one
-    comes or goes. The lock spans the module because its module-scoped
-    fixtures start Chrome too."""
+def network_lock(request):
+    """A test that starts Docker containers runs while no other test
+    does, across workers. Each container adds and removes a network
+    interface, and Chrome fails every request in flight when one comes
+    or goes. A Docker module holds the lock exclusive for the whole
+    module, because its module-scoped fixtures start Chrome too. Another
+    module holds it shared, for the whole module only where a fixture
+    outlives a test, and per test otherwise (network_lock_per_test), so
+    a Docker module waits for the tests in flight rather than for whole
+    modules."""
     docker = any(item.module is request.module and "python_image" in item.fixturenames for item in request.session.items)
-    lock = tmp_path_factory.getbasetemp().parent / "network.lock"
-    with lock.open("a") as held:
-        fcntl.flock(held, fcntl.LOCK_EX if docker else fcntl.LOCK_SH)
+    if docker or module_wide(request):
+        with network_held(request, docker):
+            yield False
+    else:
+        yield True
+
+
+@pytest.fixture(autouse=True)
+def network_lock_per_test(request, network_lock):
+    if network_lock:
+        with network_held(request, False):
+            yield
+    else:
         yield
 
 
