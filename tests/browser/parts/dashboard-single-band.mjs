@@ -16,7 +16,7 @@ const legendAfterGrouping = async (id) => {
   }, id);
   await page.waitUntil(`${JSON.stringify(id)} === document.querySelector('.chart-card select').value`, { label: 'the grouping' });
   await page.frames();
-  return page.eval("[...document.querySelectorAll('.legend .legend-name')].map(n => n.textContent)");
+  return page.eval("document.querySelector('.legend') && [...document.querySelectorAll('.legend .legend-name')].map(n => n.textContent)");
 };
 
 await run(async () => {
@@ -29,7 +29,7 @@ await run(async () => {
   const unassigned = await legendAfterGrouping(LIQUIDITY.id);
   check('net-worth-view: a dimension no holding carries names its one band "Unassigned" in the legend', unassigned.join() === 'Unassigned', unassigned.join());
   const total = await legendAfterGrouping('');
-  check('net-worth-view: grouped by Total the chart has no legend box', total.length === 0, total.join());
+  check('net-worth-view: grouped by Total the chart has no legend box', total === null, String(total));
   const valued = await legendAfterGrouping(KIND.id);
   check('net-worth-view: a dimension whose one value every holding carries names that band in the legend', valued.join() === 'Money', valued.join());
 });

@@ -1208,4 +1208,5 @@ rule of the chart (Archived holdings, Ranges and modes).
 80. (walk) Under a dimension that draws one band, "Unassigned" or a
     value every holding carries, the legend names that band, and under
     "Total" the chart has no legend box. Test:
-    `tests/browser/parts/dashboard-single-band.mjs`.
+    `tests/browser/parts/dashboard-single-band.mjs`,
+    `tests/browser/parts/dashboard-review-single-band.mjs`.
