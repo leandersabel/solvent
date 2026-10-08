@@ -108,7 +108,9 @@ so it stacks at phone width.
     case kept, because `m²` is not `M²`. Where it matches a listed
     symbol ignoring case, the form offers that symbol instead, because a
     holding in `usd` and one in `USD` look identical everywhere and only
-    one is ever priced. Where it matches a retired symbol ignoring
+    one is ever priced. While it offers one, the consequence line and
+    "Not listed?" are hidden, because neither is true of a listed
+    symbol. Where it matches a retired symbol ignoring
     case, it is refused with "XAG-ozt is no longer offered for new
     holdings.", naming the symbol.
   - **A unit the picker does not offer** still shows as the current
@@ -922,3 +924,7 @@ Unarchiving and archiving it again writes the zero at the new D.
     and in the dashboard's holdings table, in both pricing modes. Test:
     `tests/test_client.py::test_the_client_side_rules_hold`,
     `tests/browser/parts/dashboard-review-whole-units.mjs`.
+67. (walk) Typed text under "Something else…" that matches a listed
+    symbol offers that symbol, and the form no longer says you enter
+    its price yourself. Test: `tests/browser/parts/account-form.mjs`,
+    `tests/browser/parts/account-form-review-offer.mjs`.
