@@ -296,7 +296,10 @@ async function accounts(body, focus) {
   try {
     rows = await api.get('/api/admin/accounts');
   } catch {
-    mount(body, el('p', { class: 'field-error', text: 'The account list would not load.' }));
+    mount(body, [
+      el('p', { class: 'field-error', text: 'The account list would not load.' }),
+      el('button', { class: 'btn-secondary', text: 'Retry', onclick: () => accounts(body, focus) }),
+    ]);
     return;
   }
   const administrators = rows.filter((row) => row.kind === 'administrator').length;
@@ -680,6 +683,12 @@ function passwordCard() {
     button,
   ]);
 }
+
+// A session that ended, by its time limit or by a password change
+// elsewhere, leaves nothing here to act on, so the page goes to sign-in.
+api.whenUnauthorized(() => {
+  window.location.href = '/login';
+});
 
 const signOutButton = document.getElementById('chrome-signout');
 if (signOutButton) {
