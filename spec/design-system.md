@@ -259,24 +259,24 @@ decimal point, because the requirements ask for right-aligned columns.
 Every figure is grouped and pointed as Settings sets it
 (`account-settings.md`, Dates and numbers).
 
-- **Money** shows the places Decimals on money sets.
+- **Money shows whole units**, each figure rounded half-even on its
+  own, so a figure reads the same on every screen and the parts of a
+  total need not add up to it as shown.
 - **A price shows every digit it has, padded to at least six decimal
   places**, as text and in a field alike, never rounded. 0.9312 reads
   0.931200, 0.93124567 reads 0.93124567, and "Edited from 0.931200"
-  names it the same way. Decimals on money does not reach it, because a
-  price is not money (`account-settings.md`, Dates and numbers,
+  names it the same way. A price keeps its decimals, because there they
+  matter most (`account-settings.md`, Dates and numbers,
   `editable`).
 - **A quantity in a unit that is not a currency shows exactly the
   decimals it was entered with**, as text and in a field alike. 12.125,
-  12.5, 12.50 and 80 read as typed, never rounded and never padded.
-  Decimals on money does not reach it, because rounding 12.5 ounces of
+  12.5, 12.50 and 80 read as typed, never rounded and never padded,
+  because rounding 12.5 ounces of
   gold to 13 loses part of the holding, and padding it to 12.50 claims
   a precision nobody recorded.
 - **A percentage shows one decimal place**, grouped and pointed like
   every other figure, so a change reads "+136,794.6%" by default and
   "+136.794,6%" under German with a period as the thousands mark.
-  Decimals on money does not reach it, because a percentage is not
-  money.
 - **A chart's value tick is the one figure that abbreviates.** From a
   thousand up it reads in short form, "2.5k" or "1.5M", grouped and
   pointed as Settings sets it, so a reader with a decimal comma sees
@@ -305,7 +305,7 @@ symbol table (`rate-lookup.md`, Seeded symbols).
   A unit the table does not list is free text and reads exactly as
   typed.
 - **A figure carries a unit in short**: a currency's code ahead of it,
-  "USD 12,450.00", a price included, "CHF 2,500.000000", and any
+  "USD 12,450", a price included, "CHF 2,500.000000", and any
   other unit after it, by the part of the
   symbol after the hyphen or the free text as typed, "12.5 ozt".
 - **No screen outside the unit picker and the administrator's symbol

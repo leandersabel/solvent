@@ -171,23 +171,19 @@ def _scale12(value: Decimal) -> Decimal:
     return value.quantize(SCALE, context=EXACT)
 
 
-def _places(value: Decimal, places: int) -> Decimal:
-    return value.quantize(Decimal(1).scaleb(-places), context=EXACT)
-
-
 def _exact(value: Decimal) -> str:
     return format(value.normalize(), "f") if value else "0"
 
 
-def _display(value: Decimal, places: int) -> str:
-    rounded = _places(value, places)
+def _display(value: Decimal) -> str:
+    rounded = value.quantize(Decimal(1), context=EXACT)
     if not rounded:
         rounded = abs(rounded)
     return format(rounded, "f")
 
 
-def _figure(value: Decimal, places: int) -> dict:
-    return {"exact": _exact(value), "display": _display(value, places)}
+def _figure(value: Decimal) -> dict:
+    return {"exact": _exact(value), "display": _display(value)}
 
 
 def usable_latest(snapshots: "list[tuple[str, Decimal]]") -> "tuple[str, Decimal] | None":
@@ -201,14 +197,14 @@ def usable_latest(snapshots: "list[tuple[str, Decimal]]") -> "tuple[str, Decimal
     return usable[-1] if usable else None
 
 
-def figures(main_currency: str, holdings: "dict[str, dict]", snapshots: "dict[str, list]", prices: "dict[str, list]", places: int, mode: str) -> dict:
+def figures(main_currency: str, holdings: "dict[str, dict]", snapshots: "dict[str, list]", prices: "dict[str, list]", mode: str) -> dict:
     """One vault's expected figures under one pricing mode.
 
     `holdings` maps a name to {"unit", "archived": bool}, `snapshots` a
     name to [(date, Decimal)], `prices` a unit to [(date, Decimal)]. A
     holding's figure is its latest quantity times its price, rounded
-    half to even at scale 12. The aggregates are shown whole, as the
-    dashboard's hero and gross sides are, and each holding at `places`.
+    half to even at scale 12. Every figure is shown in whole units, as
+    the app shows money.
     """
     total = assets = debts = Decimal(0)
     shown: "dict[str, dict]" = {}
@@ -234,7 +230,7 @@ def figures(main_currency: str, holdings: "dict[str, dict]", snapshots: "dict[st
                 continue
             price = series[-1][1]
         value = _scale12(quantity * price)
-        shown[name] = _figure(value, places)
+        shown[name] = _figure(value)
         total += value
         if value < 0:
             debts += value
@@ -242,17 +238,17 @@ def figures(main_currency: str, holdings: "dict[str, dict]", snapshots: "dict[st
             assets += value
     return {
         # No holding valued: the dashboard shows "—" for all three, not a zero.
-        "total": _figure(total, 0) if shown else None,
-        "assets": _figure(assets, 0) if shown else None,
-        "debts": _figure(debts, 0) if shown else None,
+        "total": _figure(total) if shown else None,
+        "assets": _figure(assets) if shown else None,
+        "debts": _figure(debts) if shown else None,
         "holdings": shown,
         "excluded": excluded,
     }
 
 
-def expected(main_currency: str, holdings: dict, snapshots: dict, prices: dict, places: int) -> dict:
+def expected(main_currency: str, holdings: dict, snapshots: dict, prices: dict) -> dict:
     return {
-        mode: figures(main_currency, holdings, snapshots, prices, places, mode)
+        mode: figures(main_currency, holdings, snapshots, prices, mode)
         for mode in ("latest", "asRecorded")
     }
 
@@ -437,8 +433,7 @@ def build_vault(account: dict, today: date) -> "tuple[dict, dict]":
         if not any(_off_the_line(series, on) for series in held.values()):
             raise PlanError(f"{kind} on {on}: no price there lies off its neighbors' line")
 
-    places = 0 if profile.get("moneyPlaces") == "0" else 2
-    return {"ops": ops}, expected(main, holdings, snapshots, prices, places)
+    return {"ops": ops}, expected(main, holdings, snapshots, prices)
 
 
 def _off_the_line(series: "dict[str, Decimal]", on: str) -> bool:

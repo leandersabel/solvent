@@ -49,8 +49,12 @@ cannot tell two colors apart loses nothing.
   no Holdings entry (`app-shell.md`, The chrome). Its as-of date sorts,
   so you find what you have not touched in a while without the app
   deciding what counts as too long.
-- **The breakdown** adds up to exactly your net worth, so it needs no
-  small print.
+- **The breakdown's bars** add up to exactly your net worth, so they
+  need no small print.
+- **Money shows whole units, each figure rounded on its own**, so a
+  holding reads the same here as on its own page. The figures beneath a
+  total need not add up to it as shown, because the total is counted
+  from the exact figures.
 - From the chart, the date picker and the list, any recording opens on
   its own screen, which is how a wrong figure from last year gets put
   right (`record-snapshot.md`, Recording detail).
@@ -95,11 +99,8 @@ the chart reads, so reading a day never moves the chart under the
 pointer. At the right, level with the foot of the total, sit gross
 assets and gross liabilities under their own section labels, each set off
 by a hairline rule at its left, then New recording. Which rates takes its
-own row beneath, at the left. Summary figures (the total, the change,
-gross assets and liabilities, the legend and the breakdown) are written
-by the formatter's `whole`. The holdings table and the data table carry
-the money places, because that is where a figure is checked against a
-statement.
+own row beneath, at the left. Every money figure on the screen is
+written by the formatter's `money`, in whole units.
 
 While no active holding is valued, the total, gross assets and gross
 liabilities each read `—`, with no change beneath them, and the hero
@@ -107,18 +108,12 @@ follows neither hover nor keyboard, because a sum of nothing is no
 figure and 0 is a real one. A side with no holdings beside valued ones
 reads 0, because that sum is real.
 
-Every set of figures shown as the parts of a figure adds up to that
-figure as shown: gross assets and liabilities to the total, the bars to
-the total, the holdings table's converted figures to the total at the
-money places, the legend to the chart's right hand edge, the legend's
-changes over a span to the change, and the readout's rows to its net.
-Rounding each part alone misses, because three parts of 0.40 make 1 and
-would each show 0. The whole rounds once, half-even. Each part rounds
-toward minus infinity, and the units still missing go to the parts with
-the largest remainders, ties to the earlier part in screen order, so a
-part never moves a whole unit from its exact value. Each set is shared
-out from exact figures, so a band's bar can differ by a unit from the
-sum of its holdings as the table shows them.
+Every figure rounds on its own, half-even, from its exact value, the
+total from the exact sum of its parts. So a holding reads the same in
+the holdings table as on its own page, and the parts of a figure need
+not add up to it as shown: three parts of 0.40 each read 0 under a
+total of 1. Nothing shares rounding out across a set, because a part
+shown off its own figure reads as a wrong figure.
 
 - **The change** over the selected range or selection: an arrow icon, the
   signed amount and the percentage (one decimal place), in status good or
@@ -210,8 +205,7 @@ Interaction, each reading one calendar day (Reading a date):
 - **View as table**: a Table (design-system.md, Components) of "Date",
   each band under its legend name in band order, then "Net worth" (under
   "Total" only the first and last). Dates read as the tooltip writes
-  them, figures carry the places Decimals on money sets, and rows are The
-  data table's.
+  them, figures read in whole units, and rows are The data table's.
 - No control here issues a network request: range, dimension, mode,
   pricing, band visibility, selection.
 
@@ -303,8 +297,7 @@ its bar's row grows to hold it. A band can be net negative
 (a mortgage under "Fixed"), so negative bands run leftward. When every
 band is positive the baseline sits at the left edge, and the layout never
 changes shape with the data. The bars sum to exactly the net-worth total,
-as a signed sum, and their amounts as shown add up to the total as
-shown (Hero figure). Under "Total" the section is absent, because one
+as a signed sum, and each amount rounds on its own (Hero figure). Under "Total" the section is absent, because one
 bar equal to the hero says nothing.
 
 #### Holdings table
@@ -325,7 +318,8 @@ archived" toggle the right. Columns: Name, Dimensions, Latest value
   the column is absent.
 - Latest value and In main currency are figure columns
   (design-system.md, Typography). The native figure shows the digits it
-  was entered with, and the converted figure follows Decimals on money.
+  was entered with, and the converted figure reads in whole units, as on
+  the holding's own page.
 - **A holding's name wraps wherever it must**, in the table and in both
   groups, and is shown whole. A name with no space breaks inside the word
   rather than widen the page, at any width.
@@ -852,7 +846,7 @@ rule of the chart (Archived holdings, Ranges and modes).
 
 1. (walk) With three holdings in different units and known snapshots and
    prices, the total equals the hand-computed `Σ value × price`, exactly
-   in decimal, to the cent, in both pricing modes, and the two modes
+   in decimal before any rounding, in both pricing modes, and the two modes
    differ. Test:
    `tests/test_client.py::test_the_client_side_rules_hold`.
 2. (walk) A holding last recorded in March, with a price entry from this
@@ -978,8 +972,10 @@ rule of the chart (Archived holdings, Ranges and modes).
     Test: `tests/browser/parts/dashboard-fixtures.mjs`.
 31. (blind) (walk) Each table row's band cells equal the value model at
     its day and Net worth their exact decimal sum. Two main-currency
-    holdings in different bands at `4503599627370496.25` give
-    `9,007,199,254,740,992.50` under `en-US`. Test:
+    holdings in different bands at `4503599627370496.4` give
+    `4,503,599,627,370,496` each and `9,007,199,254,740,993` under
+    `en-US`, where a float sum or a sum of the rounded cells gives
+    `…992`. Test:
     `tests/browser/parts/dashboard-fixtures.mjs`.
 32. (blind) (walk) Each table row's date equals `longDate` of its day
     and the tooltip's date: 2026-01-15 reads `Jan 15, 2026` under
@@ -1006,8 +1002,7 @@ rule of the chart (Archived holdings, Ranges and modes).
     `2,5M`. With an asset and a liability holding the percentage ticks
     read `−100%`, `−50%`, `0%`, `50%`, `100%`. Both are written by the
     formatter. Test: `tests/browser/parts/dashboard-fixtures.mjs`.
-37. (walk) Under `de-DE`, `groupSeparator` `period` and `moneyPlaces`
-    `0`, net worth from 1000 to 1368946 gives a change of `+1.367.946`
+37. (walk) Under `de-DE` and `groupSeparator` `period`, net worth from 1000 to 1368946 gives a change of `+1.367.946`
     and `+136.794,6%`. Test:
     `tests/browser/parts/dashboard-net-worth.mjs`.
 38. (blind) (walk) The change percentage rounds half-even: in the main
@@ -1130,9 +1125,8 @@ rule of the chart (Archived holdings, Ranges and modes).
     offering Unarchive, and an active row's offering Record a value.
     Test: `tests/browser/parts/dashboard.mjs`.
 64. (blind) (walk) The native-unit column shows an XAU-ozt holding
-    stored as "12.125" and an m² holding stored as "80" as typed, under
-    `moneyPlaces` 0 and 2, while the converted column follows
-    `moneyPlaces`. Test:
+    stored as "12.125" and an m² holding stored as "80" as typed, while
+    the converted column reads in whole units. Test:
     `tests/test_client.py::test_the_client_side_rules_hold`.
 65. (walk) A negative-balance holding reduces the net figure and appears
     under liabilities. Test:
@@ -1140,9 +1134,9 @@ rule of the chart (Archived holdings, Ranges and modes).
     `tests/browser/parts/dashboard.mjs`.
 66. (walk) The breakdown sums to exactly the net worth total, with no
     disclaimer, and bars of 1,234.50, 4,133.26, 41,373.46 and 340,000
-    read 1'235, 4'133, 41'373 and 340'000 under a total of 386'741.
-    Gross assets and liabilities as shown add up to the total as shown,
-    the day the chart reads included. Test:
+    read 1'234, 4'133, 41'373 and 340'000 under a total of 386'741.
+    Gross assets and liabilities each round on their own, the day the
+    chart reads included. Test:
     `tests/test_client.py::test_the_client_side_rules_hold`,
     `tests/browser/parts/dashboard-review-rounding.mjs`,
     `tests/browser/parts/dashboard-net-worth.mjs`,
@@ -1176,13 +1170,13 @@ rule of the chart (Archived holdings, Ranges and modes).
     page never pans sideways. Test:
     `tests/browser/parts/dashboard-long-name.mjs`,
     `tests/browser/parts/dashboard-review-long-name.mjs`.
-74. (walk) With no decimals on money, three holdings of 0.40 alone in
-    their bands read 1, 0 and 0 in the holdings table and in the
-    breakdown, under a total of 1. Test:
+74. (walk) Three holdings of 0.40 alone in their bands read 0, 0 and 0
+    in the holdings table and in the breakdown, under a total of 1. Test:
     `tests/test_client.py::test_the_client_side_rules_hold`.
-75. (blind) (walk) The legend adds up to the chart's right hand edge as
-    shown, the legend's changes over a selected span to the change as
-    shown, and the readout's rows to its net as shown. Test:
+75. (blind) (walk) Each legend figure, each of the legend's changes over
+    a selected span and each of the readout's rows reads its own exact
+    figure rounded half-even to whole units, where sharing out a total
+    would read otherwise. Test:
     `tests/browser/parts/dashboard-review-shown-parts.mjs`.
 76. (walk) With the last recording on 2026-09-15 and today 2026-10-03,
     the chart ends on 2026-10-03, the last figure runs level to it, 1M

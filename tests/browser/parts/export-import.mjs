@@ -15,7 +15,7 @@ await run(async () => {
   await story();
   // The way this vault's owner writes dates and numbers, which a restore
   // brings back.
-  await setProfile({ locale: 'de-CH', groupSeparator: 'apostrophe', moneyPlaces: '0', dateStyle: 'dmy' });
+  await setProfile({ locale: 'de-CH', groupSeparator: 'apostrophe', dateStyle: 'dmy' });
 
   // ---- Export, then import it back ---------------------------------------
 

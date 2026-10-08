@@ -180,7 +180,7 @@ moment it is stopped:
   width it is on screen together with the confirm button. Where the
   date already holds a zero in any form, there is no such line.
 
-  > This replaces the USD 12,450.00 recorded for 3 October 2026.
+  > This replaces the USD 12,450 recorded for 3 October 2026.
 
 The same confirmation opens from Account detail's **Archive** action,
 the only way a holding with no values reaches it.
@@ -320,7 +320,7 @@ action is a 44px target, and nothing on the screen pans sideways.
 
 A single confirm:
 
-> Delete the value of USD 12,450.00 for 31 July? Your net worth for
+> Delete the value of USD 12,450 for 31 July? Your net worth for
 > the period around this date will change.
 
 For the holding's only snapshot, the copy says instead that the holding

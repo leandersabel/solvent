@@ -226,10 +226,10 @@ await run(async () => {
     const edge = document.querySelector('.net-line').getAttribute('points').split(' ').map((p) => p.split(',').map(Number));
     const [x, y] = edge.at(-1);
     return JSON.stringify({
-      headline: document.querySelector('.hero-amount').textContent === v.format.whole(total),
+      headline: document.querySelector('.hero-amount').textContent === v.format.money(total),
       lastRow: rows.at(-1).cells[1].textContent === v.format.money(total),
       lastDate: rows.at(-1).cells[0].textContent === v.format.longDate(v.chartLastDate()),
-      change: document.querySelector('.hero-delta').textContent.startsWith('CHF ' + (total - first > 0n ? '+' : '') + v.format.whole(total - first)),
+      change: document.querySelector('.hero-delta').textContent.startsWith('CHF ' + (total - first > 0n ? '+' : '') + v.format.money(total - first)),
       edgeDot: Number(document.querySelector('.net-end').getAttribute('cy')) === y,
       // The zero is recorded at the archive date, so the holding is on neither side of it.
       zeroRecorded: v.snapshotsFor(holdingId).some((s) => s.payload.value === '0' && s.payload.date === v.holdings.get(holdingId).payload.archivedAt),

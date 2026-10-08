@@ -539,14 +539,14 @@ def hand_vault():
 
 
 def test_expected_figures_match_a_hand_computed_vault_under_both_modes():
-    result = prices.expected("CHF", *hand_vault(), 2)
+    result = prices.expected("CHF", *hand_vault())
     latest, recorded = result["latest"], result["asRecorded"]
-    # Dollars: 30.5 x 0.875 = 26.6875, rounded half to even at 2 places.
+    # Dollars: 30.5 x 0.875 = 26.6875, rounded half to even to whole units.
     assert latest["holdings"] == {
-        "Cash": {"exact": "200.125", "display": "200.12"},
-        "Dollars": {"exact": "26.6875", "display": "26.69"},
-        "Mortgage": {"exact": "-1000", "display": "-1000.00"},
-        "Old gold": {"exact": "100.24691356", "display": "100.25"},
+        "Cash": {"exact": "200.125", "display": "200"},
+        "Dollars": {"exact": "26.6875", "display": "27"},
+        "Mortgage": {"exact": "-1000", "display": "-1000"},
+        "Old gold": {"exact": "100.24691356", "display": "100"},
     }
     # An archived holding is listed as archived whether or not it is also
     # unpriced ("Old flat") or has no quantity ("Shut").
@@ -567,9 +567,9 @@ def test_expected_figures_match_a_hand_computed_vault_under_both_modes():
     assert recorded["holdings"] == latest["holdings"]
     series = hand_vault()[2]
     series["USD"].append(("2026-03-31", Decimal("0.5")))
-    later = prices.expected("CHF", *hand_vault()[:2], series, 2)
-    assert later["latest"]["holdings"]["Dollars"]["display"] == "15.25"
-    assert later["asRecorded"]["holdings"]["Dollars"]["display"] == "26.69"
+    later = prices.expected("CHF", *hand_vault()[:2], series)
+    assert later["latest"]["holdings"]["Dollars"]["display"] == "15"
+    assert later["asRecorded"]["holdings"]["Dollars"]["display"] == "27"
 
 
 def test_a_date_carrying_two_snapshots_is_dropped_from_a_holdings_series():
@@ -683,7 +683,7 @@ def test_prepare_refuses_a_cleared_date_whose_prices_lie_on_the_line():
 
 def test_with_nothing_valued_the_total_and_the_sides_are_none():
     holdings = {"Savings": {"unit": "CHF", "archived": True}}
-    result = prices.figures("CHF", holdings, {"Savings": [("2026-01-31", Decimal(5))]}, {}, 2, "latest")
+    result = prices.figures("CHF", holdings, {"Savings": [("2026-01-31", Decimal(5))]}, {}, "latest")
     assert result["total"] is result["assets"] is result["debts"] is None
     assert result["excluded"] == {"Savings": "archived"}
 

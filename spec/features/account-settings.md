@@ -17,10 +17,10 @@ a different account's job (`admin-invites.md`).
   beside it.
 - **Dates and numbers are written your way**, and nothing stored
   changes, so any choice can be changed back. Language sets the
-  defaults, and dates, the thousands mark and decimals on money can each
-  be set against it, because a language is a coarse guess at taste: a
-  Swiss reader may want an apostrophe between thousands and no
-  centimes. Decimals on money rounds what is shown, never what is held.
+  defaults, and dates and the thousands mark can each be set against
+  it, because a language is a coarse guess at taste: a Swiss reader may
+  want an apostrophe between thousands. Money shows whole units, and
+  rates keep their decimals (`design-system.md`, Figures).
   The settings follow you to any browser you sign in from.
 - **Changing your password is instant**, because nothing is
   re-encrypted. Every other session is signed out and you stay signed
@@ -98,8 +98,6 @@ columns, Language and Dates on the first row:
 - **Thousands**. The language's own mark (the default), then each
   option shown as the figure it produces: 1 234 567, 1'234'567,
   1,234,567, 1.234.567, 1234567.
-- **Decimals on money**. The currency's own (the default, two), none,
-  or two.
 
 Beneath them, a sample line in a tinted petrol-50 strip under its own
 section label, with **Save** at the strip's right end. It applies the
@@ -410,7 +408,6 @@ registration. The complete payload:
   "locale": "de-CH",
   "dateStyle": "dmy",
   "groupSeparator": "apostrophe",
-  "moneyPlaces": "0",
   "dimensions": []
 }
 ```
@@ -427,9 +424,6 @@ registration. The complete payload:
   `ymd`, `mdy`.
 - **`groupSeparator`**: optional, one of `locale` (the default),
   `thin`, `apostrophe`, `comma`, `period`, `none`.
-- **`moneyPlaces`**: optional, one of `locale` (the default, meaning
-  two), `0`, `2`. A string, so `locale` and a count share one field
-  with no second one to disagree with it.
 - **`dimensions`**: optional, shape in Dimensions below. Absent or empty
   means none, so the feature costs nothing until it is used.
 
@@ -445,19 +439,16 @@ ciphertext and never learns any of it.
 
 Every figure reaches the screen through one formatter built from the
 profile, so a setting cannot apply on one screen and not another.
-`money`, `whole`, `percent` and `compact` each take a value exact at
+`money`, `percent` and `compact` each take a value exact at
 scale 12 (`record-snapshot.md`, Record shape) and round it half-even,
 like every rounding in the product. Every entry writes a negative with
 the true minus, `−`, decided on the figure as written, so a value that
-rounds to zero carries no sign. Only `money` reads `moneyPlaces`, for
-the reasons design-system.md, Figures, gives. The entries:
+rounds to zero carries no sign. The entries:
 
-- **money**: a figure in any currency at `moneyPlaces`, grouped and
-  pointed as configured. That is the main currency and a holding's unit
+- **money**: a figure in any currency in whole units, grouped as
+  configured (`design-system.md`, Figures). That is the main currency and a holding's unit
   whose `kind` in the symbol table is `currency` (`rate-lookup.md`, The
   symbol table).
-- **whole**: a summary figure in the main currency, in whole units,
-  where the screen names one (`net-worth-view.md`, Dashboard).
 - **percent(value, places)**: `value` is already the percentage, written
   at `places`, grouped and pointed, followed by `%` with no space, so
   12.5 writes `12.5%`.
@@ -533,7 +524,7 @@ room for the chosen mark, because that would change how every figure
 reads and which input a field accepts.
 
 **A field that edits a stored `value` prefills it through `quantity`,
-whatever the unit**, money included, because a prefill at `moneyPlaces`
+whatever the unit**, money included, because a prefill in whole units
 saved untouched would write the rounding. A field whose text still
 equals its prefill is untouched and never parsed, so it saves the
 stored string itself (`record-snapshot.md`, Confirming a previous
@@ -884,7 +875,7 @@ from an administrator removing an account (`admin-invites.md`).
     for the password again. Test: `tests/browser/parts/settings.mjs`,
     `tests/browser/parts/dimensions.mjs`.
 22. (blind) (walk) With main currency `CHF`, `groupSeparator`
-    `apostrophe` and `moneyPlaces` `0`, a `USD` holding valued 1000.40
+    `apostrophe`, a `USD` holding valued 1000.40
     shows `USD 1’000` with its unit and `1’000` in its holding page's
     list of values, an `XAU-ozt` holding stored as `"12.125"` shows
     `12.125` in both places, one stored as `"12.50"` shows `12.50`, and
@@ -892,9 +883,8 @@ from an administrator removing an account (`admin-invites.md`).
     appears on screen. Test:
     `tests/test_client.py::test_the_client_side_rules_hold`,
     `tests/browser/parts/settings.mjs`.
-23. (blind) (walk) A quantity shows its stored digits under
-    `moneyPlaces` `0` and `2` alike, asserted with values rounding or
-    padding would change (`"12.125"`, `"12.50"`, `"80"`). Test:
+23. (blind) (walk) A quantity shows its stored digits, asserted with
+    values rounding or padding would change (`"12.125"`, `"12.50"`, `"80"`). Test:
     `tests/test_client.py::test_the_client_side_rules_hold`.
 24. (walk) With locale `de-DE` and `groupSeparator` `apostrophe`, an
     `m²` holding stored as `"1234.5"` shows `1’234,5`. Test:
@@ -905,24 +895,22 @@ from an administrator removing an account (`admin-invites.md`).
     refuses `12.5` rather than reading 125. Test: `tests/test_client.py::test_the_client_side_rules_hold`.
 26. (blind) A clashing group mark is asserted both ways: with locale
     `en-US` and `groupSeparator` `period`, `money` writes 1234567.89 as
-    `1,234,567.89` (CHF 1,234,567.89 on screen), and `parseQuantity`
+    `1,234,568` (CHF 1,234,568 on screen), and `parseQuantity`
     reads `12.5` as `"12.5"` and refuses `12,5`. With locale `de-DE` and
     `groupSeparator` `comma`, `money` writes 1234567.89 as
-    `1.234.567,89`. Test: `tests/test_client.py::test_the_client_side_rules_hold`.
+    `1.234.568`. Test: `tests/test_client.py::test_the_client_side_rules_hold`.
 27. (blind) With locale `de-DE` and `groupSeparator` `period`, `percent`
-    at one place writes 136794.6 as `136.794,6%` under `moneyPlaces` `0`
-    and `2` alike, 0.25 as `0,2%`, 0.35 as `0,4%`, −0.25 as `−0,2%` and
+    at one place writes 136794.6 as `136.794,6%`, 0.25 as `0,2%`, 0.35 as `0,4%`, −0.25 as `−0,2%` and
     −0.04 as `0,0%`, and at no places writes −50 as `−50%`. Test:
     `tests/test_client.py::test_the_client_side_rules_hold`.
-28. With locale `de-CH`, `groupSeparator` `apostrophe` and `moneyPlaces`
-    `0`, `percent` at one place writes 10957493 as `10’957’493.0%`.
+28. With locale `de-CH` and `groupSeparator` `apostrophe`, `percent` at one place writes 10957493 as `10’957’493.0%`.
     Test: `tests/test_client.py::test_the_client_side_rules_hold`.
 29. (blind) With locale `de-DE` and `groupSeparator` `apostrophe`,
     `compact` writes 999 as `999`, 1500 as `1,5k`, 2000000 as `2M`,
     −2500000 as `−2,5M` and 1500000000000 as `1’500B`. Test:
     `tests/test_client.py::test_the_client_side_rules_hold`.
-30. (blind) `editable` keeps every digit and pads to the places asked,
-    identically under `moneyPlaces` `0` and `2`: `"0.797"` at six reads
+30. (blind) `editable` keeps every digit and pads to the places asked:
+    `"0.797"` at six reads
     `0.797000`, and `"0.93124567"` and a twelve-place rate keep every
     digit. Test: `tests/test_client.py::test_the_client_side_rules_hold`
     (the `0.797` case only).
@@ -961,7 +949,7 @@ from an administrator removing an account (`admin-invites.md`).
     profile. Test: no test.
 40. (walk) The date and number settings come back the same on another
     browser. Test: no test.
-41. (blind) (walk) With locale `de-CH` and `moneyPlaces` `0`, the edit
+41. (blind) (walk) With locale `de-CH`, the edit
     dialog for a past snapshot of a `USD` holding stored as `"1000.40"`
     prefills `1’000.40` and changing only its note writes `value`
     `"1000.40"`, compared byte for byte. The same dialog for an

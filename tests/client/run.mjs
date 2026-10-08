@@ -541,41 +541,35 @@ await check('a record written through the write path carries its payload', async
 await check('the locale supplies the defaults and each control overrules it', async () => {
   const { formatter } = await load('format.js');
   const million = 1234567890000000000n;
-  assert.equal(formatter({ locale: 'de-DE' }).money(million), '1.234.567,89');
-  assert.equal(formatter({ locale: 'en-US' }).money(million), '1,234,567.89');
-  assert.equal(
-    formatter({ locale: 'de-CH', groupSeparator: 'apostrophe', moneyPlaces: '0' }).money(million),
-    '1\u2019234\u2019568',
-  );
-  assert.equal(formatter({ locale: 'en-US', groupSeparator: 'none' }).money(million), '1234567.89');
+  assert.equal(formatter({ locale: 'de-DE' }).money(million), '1.234.568');
+  assert.equal(formatter({ locale: 'en-US' }).money(million), '1,234,568');
+  assert.equal(formatter({ locale: 'de-CH', groupSeparator: 'apostrophe' }).money(million), '1\u2019234\u2019568');
+  assert.equal(formatter({ locale: 'en-US', groupSeparator: 'none' }).money(million), '1234568');
 });
 
-await check('a quantity shows digit for digit whatever money is set to', async () => {
+await check('a quantity shows digit for digit while money shows whole units', async () => {
   const { formatter } = await load('format.js');
-  for (const moneyPlaces of ['0', '2']) {
-    const shape = formatter({ locale: 'en-US', moneyPlaces });
-    // Rounding 12.125 ounces would misstate the holding, padding 80 m2
-    // would claim a precision nobody measured.
-    assert.equal(shape.quantity('12.125'), '12.125');
-    assert.equal(shape.quantity('12.50'), '12.50');
-    assert.equal(shape.quantity('12.5'), '12.5');
-    assert.equal(shape.quantity('80'), '80');
-    assert.equal(shape.quantity('1234567.000000000001'), '1,234,567.000000000001');
-    assert.equal(shape.quantity('-1234.5'), '−1,234.5');
-    assert.equal(shape.quantity('0.10'), '0.10');
-  }
+  const shape = formatter({ locale: 'en-US' });
+  // Rounding 12.125 ounces would misstate the holding, padding 80 m2
+  // would claim a precision nobody measured.
+  assert.equal(shape.quantity('12.125'), '12.125');
+  assert.equal(shape.quantity('12.50'), '12.50');
+  assert.equal(shape.quantity('12.5'), '12.5');
+  assert.equal(shape.quantity('80'), '80');
+  assert.equal(shape.quantity('1234567.000000000001'), '1,234,567.000000000001');
+  assert.equal(shape.quantity('-1234.5'), '−1,234.5');
+  assert.equal(shape.quantity('0.10'), '0.10');
   // 12 rather than 13: display rounding is half-even like every other
   // rounding in the product, and 12.5 lies on the tie.
-  const shape = formatter({ locale: 'en-US', moneyPlaces: '0' });
   assert.equal(shape.money(12500000000000n), '12');
   assert.equal(shape.money(12600000000000n), '13');
   assert.equal(formatter({ locale: 'de-DE', groupSeparator: 'apostrophe' }).quantity('1234.5'), '1’234,5');
   assert.equal(formatter({ locale: 'de-CH', groupSeparator: 'apostrophe' }).quantity('1234567'), '1’234’567');
 });
 
-await check('a holding in any currency follows money places and one in any other unit shows its stored digits', () => {
+await check('a holding in any currency shows whole units and one in any other unit shows its stored digits', () => {
   const vault = new Vault(null);
-  vault.profile = { mainCurrency: 'CHF', locale: 'en-US', groupSeparator: 'apostrophe', moneyPlaces: '0' };
+  vault.profile = { mainCurrency: 'CHF', locale: 'en-US', groupSeparator: 'apostrophe' };
   vault.symbols = new Map([
     ['CHF', { symbol: 'CHF', label: 'Swiss Franc', kind: 'currency' }],
     ['USD', { symbol: 'USD', label: 'United States Dollar', kind: 'currency' }],
@@ -588,12 +582,10 @@ await check('a holding in any currency follows money places and one in any other
   assert.equal(vault.amount('80', 'm²'), '80 m²');
   assert.equal(vault.figure('1000.40', 'USD'), '1’000');
   assert.equal(vault.figure('12.125', 'XAU-ozt'), '12.125');
-  // Back at two places every currency keeps its cents, and a quantity
-  // is the same.
+  // A profile from before money lost its decimals keeps its key, which
+  // changes nothing.
   vault.profile = { ...vault.profile, moneyPlaces: '2' };
-  assert.equal(vault.amount('1000.40', 'USD'), 'USD 1’000.40');
-  assert.equal(vault.amount('12.125', 'XAU-ozt'), '12.125 ozt');
-  assert.equal(vault.amount('80', 'm²'), '80 m²');
+  assert.equal(vault.amount('1000.40', 'USD'), 'USD 1’000');
 });
 
 await check('a typed quantity is read to its canonical decimal string', async () => {
@@ -632,7 +624,7 @@ await check('a typed quantity is read to its canonical decimal string', async ()
 
 await check('a field that edits a stored figure reads back the stored string itself while untouched', async () => {
   const { formatter } = await load('format.js');
-  const swiss = formatter({ locale: 'de-CH', groupSeparator: 'apostrophe', moneyPlaces: '0' });
+  const swiss = formatter({ locale: 'de-CH', groupSeparator: 'apostrophe' });
   for (const stored of ['1000.40', '12.125', '12.5', '80', '-1234567.50', '0.000000000001']) {
     const prefill = swiss.quantity(stored);
     assert.equal(swiss.readField(prefill, stored), stored, prefill);
@@ -651,38 +643,36 @@ await check('a thousands separator never collides with the decimal point', async
   // the figure ambiguous. The locale's own pairing wins.
   const shape = formatter({ locale: 'de-DE', groupSeparator: 'period' });
   assert.notEqual(shape.group, shape.point);
-  assert.equal(shape.money(1234567890000000000n), '1.234.567,89');
+  assert.equal(shape.money(1234567890000000000n), '1.234.568');
 });
 
 await check('a thousands mark equal to the language\u2019s decimal point gives way to the language\u2019s own', async () => {
   const { formatter } = await load('format.js');
   const million = 1234567890000000000n;
   // The point is always the language's. Swapping it to make room would
-  // turn 1,234,567.89 into 1.234.567,89 and flip which input a field takes.
+  // turn 1,234,568 into 1.234.568 and flip which input a field takes.
   const english = formatter({ locale: 'en-US', groupSeparator: 'period' });
-  assert.equal(english.money(million), '1,234,567.89');
+  assert.equal(english.money(million), '1,234,568');
   assert.equal(english.parseQuantity('12.5'), '12.5');
   assert.equal(english.parseQuantity('12,5'), null);
   const german = formatter({ locale: 'de-DE', groupSeparator: 'comma' });
-  assert.equal(german.money(million), '1.234.567,89');
+  assert.equal(german.money(million), '1.234.568');
   assert.equal(german.parseQuantity('12,5'), '12.5');
   assert.equal(german.parseQuantity('12.5'), null);
 });
 
-await check('percent writes a percentage grouped, pointed and half-even at the places asked, whatever Decimals says', async () => {
+await check('percent writes a percentage grouped, pointed and half-even at the places asked', async () => {
   const { formatter } = await load('format.js');
   const p = (text) => decimal.parse(text);
-  for (const moneyPlaces of ['0', '2']) {
-    const german = formatter({ locale: 'de-DE', groupSeparator: 'period', moneyPlaces });
-    assert.equal(german.percent(p('136794.6'), 1), '136.794,6%');
-    assert.equal(german.percent(p('0.25'), 1), '0,2%');
-    assert.equal(german.percent(p('0.35'), 1), '0,4%');
-    assert.equal(german.percent(p('-0.25'), 1), '\u22120,2%');
-    assert.equal(german.percent(p('-0.04'), 1), '0,0%');
-    assert.equal(german.percent(p('-50'), 0), '\u221250%');
-    assert.equal(german.percent(p('12.5'), 1), '12,5%');
-  }
-  const swiss = formatter({ locale: 'de-CH', groupSeparator: 'apostrophe', moneyPlaces: '0' });
+  const german = formatter({ locale: 'de-DE', groupSeparator: 'period' });
+  assert.equal(german.percent(p('136794.6'), 1), '136.794,6%');
+  assert.equal(german.percent(p('0.25'), 1), '0,2%');
+  assert.equal(german.percent(p('0.35'), 1), '0,4%');
+  assert.equal(german.percent(p('-0.25'), 1), '\u22120,2%');
+  assert.equal(german.percent(p('-0.04'), 1), '0,0%');
+  assert.equal(german.percent(p('-50'), 0), '\u221250%');
+  assert.equal(german.percent(p('12.5'), 1), '12,5%');
+  const swiss = formatter({ locale: 'de-CH', groupSeparator: 'apostrophe' });
   assert.equal(swiss.percent(p('10957493'), 1), '10\u2019957\u2019493.0%');
 });
 
@@ -786,7 +776,7 @@ await check('an unknown language falls back rather than throwing', async () => {
 
 await check('a negative figure takes the true minus sign', async () => {
   const { formatter } = await load('format.js');
-  assert.equal(formatter({ locale: 'en-GB' }).money(-18400000000000000n), '\u221218,400.00');
+  assert.equal(formatter({ locale: 'en-GB' }).money(-18400000000000000n), '\u221218,400');
 });
 
 // ---- Figures typed into a field ------------------------------------------
@@ -1939,8 +1929,8 @@ await check('net-worth-view: the breakdown sums to the total exactly, in both mo
   }
 });
 
-await check('net-worth-view: the shown bars and the shown assets and liabilities add up to the shown total', async () => {
-  const { breakdownTotals, heroParts } = await load('view-dashboard.js');
+await check('net-worth-view: every money figure rounds to whole units on its own, whatever its parts add up to', async () => {
+  const { breakdownTotals } = await load('view-dashboard.js');
   const values = ['a', 'b', 'c', 'e'].map((id) => ({ id, label: id.toUpperCase() }));
   const dimension = { id: 'd', label: 'D', values };
   const vault = model({
@@ -1953,51 +1943,37 @@ await check('net-worth-view: the shown bars and the shown assets and liabilities
       ['e', '2026-01-01', '340000'],
     ],
   });
-  const whole = (n) => decimal.parse(String(n));
-  const bars = breakdownTotals(vault, dimension, 'latest');
-  assert.deepEqual(bars.map((b) => b.shown), [1235, 4133, 41373, 340000, 0].map(whole));
-  assert.equal(decimal.toDisplay(vault.totals('latest').net, 0, ''), '386741');
+  const shown = (list) => list.map((value) => decimal.toDisplay(value, 0, ''));
+  assert.deepEqual(shown(breakdownTotals(vault, dimension, 'latest').map((b) => b.total)), ['1234', '4133', '41373', '340000', '0']);
+  assert.equal(vault.format.money(vault.totals('latest').net).replace(/\D/g, ''), '386741');
 
   const debt = model({
     holdings: [{ name: 'cash', unit: 'CHF' }, { name: 'loan', unit: 'CHF' }],
     figures: [['cash', '2026-01-01', '100.6'], ['loan', '2026-01-01', '-50.6']],
   });
-  assert.deepEqual(heroParts(debt.totals('latest')), [whole(101), whole(-51)]);
+  const totals = debt.totals('latest');
+  assert.deepEqual([totals.assets, totals.liabilities, totals.net].map(debt.format.money), ['101', '\u221251', '50']);
 
-  // A holding alone in its band shows one figure in the list and the bar.
+  // Three parts of 0.40 each read 0 under a total of 1.
   const small = model({
     dimensions: [dimension],
     holdings: values.map((v) => ({ name: v.id, unit: 'CHF', dims: { d: v.id } })),
     figures: [['a', '2026-01-01', '0.4'], ['b', '2026-01-01', '0.4'], ['c', '2026-01-01', '0.4'], ['e', '2026-01-01', '0']],
   });
-  small.profile = { ...small.profile, moneyPlaces: '0' };
-  assert.deepEqual([...small.shownFigures('latest').values()], [1, 0, 0, 0].map(whole));
-  assert.deepEqual(breakdownTotals(small, dimension, 'latest').map((b) => b.shown), [1, 0, 0, 0, 0].map(whole));
-  assert.deepEqual(heroParts(small.totals('latest')), [whole(1), 0n]);
+  assert.deepEqual(breakdownTotals(small, dimension, 'latest').map((b) => small.format.money(b.total)), ['0', '0', '0', '0', '0']);
+  assert.equal(small.format.money(small.totals('latest').net), '1');
 });
 
-await check('decimal: apportion rounds the total once and shares its units out by largest remainder, ties to the earlier part', () => {
-  const p = (list) => list.map((text) => decimal.parse(text));
-  assert.deepEqual(decimal.apportion(p(['0.4', '0.4', '0.4']), 0), p(['1', '0', '0']));
-  assert.deepEqual(decimal.apportion(p(['-0.4', '-0.4', '-0.4']), 0), p(['0', '0', '-1']));
-  assert.deepEqual(decimal.apportion(p(['0.25', '0.25']), 1), p(['0.3', '0.2']));
-  assert.deepEqual(decimal.apportion(p(['2.5', '0.5']), 0), p(['3', '0']));
-  assert.deepEqual(decimal.apportion(p(['10.004', '-3.001']), 2), p(['10', '-3']));
-  assert.deepEqual(decimal.apportion([], 0), []);
-  for (let seed = 1; seed < 200; seed += 1) {
-    const parts = Array.from({ length: 1 + (seed % 7) }, (_, i) =>
-      BigInt(((seed * 7919 + i * 104729) % 2000003) - 1000001) * 10n ** 9n);
-    for (const places of [0, 2]) {
-      const shown = decimal.apportion(parts, places);
-      const unit = 10n ** BigInt(decimal.SCALE - places);
-      const sum = (list) => list.reduce((a, b) => a + b, 0n);
-      assert.equal(decimal.toDisplay(sum(shown), places), decimal.toDisplay(sum(parts), places));
-      shown.forEach((value, i) => {
-        assert.equal(value % unit, 0n);
-        const gap = value - parts[i];
-        assert.ok(gap > -unit && gap < unit);
-      });
-    }
+await check('manage-accounts: 2.5 ozt of gold at 1,688.254004 reads CHF 4,221 in both pricing modes, as on its own page', () => {
+  const vault = model({
+    holdings: [{ name: 'Gold', unit: 'XAU-ozt' }],
+    figures: [['Gold', '2026-10-01', '2.5']],
+    prices: [['XAU-ozt', '2026-10-01', '1688.254004']],
+  });
+  vault.profile = { ...vault.profile, locale: 'en-US', groupSeparator: 'comma' };
+  const gold = vault.activeHoldings()[0];
+  for (const mode of ['latest', 'asRecorded']) {
+    assert.equal(vault.mainMoney(vault.valueOf(gold, mode).converted), 'CHF 4,221');
   }
 });
 

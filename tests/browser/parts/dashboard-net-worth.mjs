@@ -399,7 +399,7 @@ await run(async () => {
       const dimension = v.activeDimensions().find(d => d.id === id) || null;
       const bands = v.valuesAt(dimension, day);
       const net = bands.reduce((sum, band) => sum + band.value, 0n);
-      return { rows: bands.map(b => b.label + v.format.money(b.value)), net: 'Net' + v.format.money(net), hero: v.format.whole(net) };
+      return { rows: bands.map(b => b.label + v.format.money(b.value)), net: 'Net' + v.format.money(net), hero: v.format.money(net) };
     }, dimensionId, first + k)),
   });
   const sameAs = (got, want) =>
@@ -662,13 +662,13 @@ await run(async () => {
       })`)),
       want: {
         since: `from ${await format('longDate', isoOf(first + lo))} to ${await format('longDate', isoOf(first + hi))}`,
-        ...(await model(({ v, decimal }, earlyDay, lateDay) => {
+        ...(await model(({ v }, earlyDay, lateDay) => {
           const dimension = v.activeDimensions().find(d => d.id === 'liq');
           const early = v.valuesAt(dimension, earlyDay);
           const late = v.valuesAt(dimension, lateDay);
           const total = (bands) => bands.reduce((sum, band) => sum + band.value, 0n);
-          const sign = (n) => (n > 0n ? '+' : '') + v.format.whole(n);
-          return { delta: v.mainCurrency + ' ' + sign(total(late) - total(early)), deltas: decimal.apportion(late.map((band, i) => band.value - early[i].value), 0).map(sign) };
+          const sign = (n) => (n > 0n ? '+' : '') + v.format.money(n);
+          return { delta: v.mainCurrency + ' ' + sign(total(late) - total(early)), deltas: late.map((band, i) => sign(band.value - early[i].value)) };
         }, first + lo, first + hi)),
       },
     });
@@ -887,7 +887,7 @@ await run(async () => {
     type: 'profile',
     recordId: profile.recordId,
     version: profile.version + 1,
-    payload: { ...profile.payload, locale: 'de-DE', groupSeparator: 'period', moneyPlaces: '0' },
+    payload: { ...profile.payload, locale: 'de-DE', groupSeparator: 'period' },
   }]);
   await reread();
   await go('#/');
