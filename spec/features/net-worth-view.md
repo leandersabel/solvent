@@ -191,7 +191,8 @@ Interaction, each reading one calendar day (Reading a date):
   change of range or dimension, clears it.
 - **Legend** entries toggle a band, and hovering one highlights it and
   dims the rest. With a band hidden, a line under the chart states that
-  the total covers only the visible bands.
+  the total covers only the visible bands. A band name too long for its
+  entry wraps, breaking a word only where it has to.
 - **A click on a marked date, or on its tick, opens that date's
   recording** (`record-snapshot.md`, Recording detail), and on any other
   day nothing. A date with prices and no figures takes no tick and is
@@ -295,7 +296,10 @@ Horizontal bars, one per band of the Group by dimension, in the same
 order as the stack, "Unassigned" a bar like any other and "Other" folding
 the fifth and beyond. Color, direct labels and the signed zero baseline
 are design-system.md's (Colors by chart job). The bars run the card's
-width less the room the labels take at the outboard ends. A band can be net negative
+width less the room the labels take at the outboard ends, a room that
+narrows with the card so the bars keep width of their own. A label longer
+than its room wraps inside it, breaking a word only where it has to, and
+its bar's row grows to hold it. A band can be net negative
 (a mortgage under "Fixed"), so negative bands run leftward. When every
 band is positive the baseline sits at the left edge, and the layout never
 changes shape with the data. The bars sum to exactly the net-worth total,
@@ -1196,3 +1200,10 @@ rule of the chart (Archived holdings, Ranges and modes).
     the password, and once a dimension is active the link is gone. Test:
     `tests/browser/parts/dimensions.mjs`,
     `tests/browser/parts/dashboard-review-create-dimension.mjs`.
+79. (walk) At 320px, 375px, 601px, 901px and 1280px wide, under a Group
+    by whose values are wider than the screen, one with no space and one
+    holding `<img src=x onerror=alert(1)>`, each band's name lies inside
+    its card in the legend and the breakdown, beside a positive bar and a
+    negative one, and the page never pans sideways. Test:
+    `tests/browser/parts/dashboard-long-value.mjs`,
+    `tests/browser/parts/dashboard-review-long-value.mjs`.
