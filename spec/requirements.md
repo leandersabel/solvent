@@ -113,7 +113,8 @@
 - Any figure or rate you recorded can be corrected later.
 - Nothing recalculates your history behind you. A rate published later
   never changes a figure or a rate already recorded.
-- A figure reads back exactly as you entered it, on any machine.
+- Solvent keeps every figure exactly as you entered it, on any machine.
+  Correcting one starts from what you entered, cents included.
 
 ## Exchange rates and prices
 
@@ -140,7 +141,8 @@
 
 - The main screen shows your net worth in your main currency, with your
   assets and your debts beside it.
-- The total is exact to the cent and can be checked by hand.
+- The total is counted from the exact figures, not from the rounded ones
+  shown.
 - A chart shows your net worth over time, split by any of your
   dimensions, with every part labeled.
 - The chart marks the dates you actually recorded something.
@@ -154,8 +156,13 @@
 
 ## Dates and numbers
 
+- Money is shown in whole units, without cents, on every screen. Each
+  figure is rounded on its own, so a holding shows the same figure
+  everywhere, and the figures in a list need not add up to their total.
+- Exchange rates and prices keep their decimals, because there the
+  decimals matter most.
 - You choose how dates and numbers are written: the language, the date
-  order, the thousands mark, and whether money shows cents.
+  order and the thousands mark.
 - Those choices change only how things are shown, never what is stored.
 
 ## Accounts and administration
