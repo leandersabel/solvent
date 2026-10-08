@@ -369,3 +369,35 @@ def test_review_every_api_route_answers_from_the_status_set(app, caller):
                 if response.status_code not in STATUS_SET:
                     outside.append((method, rule.rule, body, response.status_code))
     assert outside == []
+
+
+# ---- Issue #451: calling back a link used while Invites was open ----
+# Written from admin-invites.md (Endpoints, the revoke route; States,
+# Invites; criteria 9 and 61) and architecture.md (CSRF), blind to the
+# change.
+
+
+def test_review_calling_back_a_used_link_is_a_conflict_that_leaves_it_used(app, admin):
+    invite_id, _, _ = registered(app, admin, "sarah")
+    before = invite_row(app, invite_id)
+    listed_before = listed_invites(admin)[invite_id]
+    response = admin.post(f"/api/admin/invites/{invite_id}/revoke", headers=CSRF)
+    assert response.status_code == 409, response.get_data(as_text=True)
+    assert invite_row(app, invite_id) == before
+    listed = listed_invites(admin)[invite_id]
+    assert listed == listed_before
+    assert listed["status"] == "used" and listed["usedBy"] == "sarah" and listed["usedAt"]
+
+
+def test_review_calling_back_twice_succeeds_both_times(app, admin):
+    invite_id, _ = issue(admin, "twice")
+    for _ in range(2):
+        response = admin.post(f"/api/admin/invites/{invite_id}/revoke", headers=CSRF)
+        assert response.status_code in (200, 204), response.get_data(as_text=True)
+        assert invite_row(app, invite_id)["status"] == "revoked"
+
+
+def test_review_a_call_back_without_the_request_header_is_forbidden_and_changes_nothing(app, admin):
+    invite_id, _ = issue(admin, "no header")
+    assert admin.post(f"/api/admin/invites/{invite_id}/revoke").status_code == 403
+    assert invite_row(app, invite_id)["status"] == "pending"

@@ -178,7 +178,9 @@ const STATUS_WORDS = {
   revoked: 'Called back',
 };
 
-async function loadInvites(list) {
+// `calledBack` is the invite whose Call back found it already used,
+// which its row says in place of the usual line.
+async function loadInvites(list, calledBack) {
   let rows;
   try {
     rows = await api.get('/api/admin/invites');
@@ -194,8 +196,12 @@ async function loadInvites(list) {
     list,
     stackTable(
       ['Kind', 'Note', 'Created', 'Stops working', 'Status', ''],
-      rows.map((row) =>
-        el('tr', { class: row.status === 'pending' ? null : 'dimmed' }, [
+      rows.map((row) => {
+        const error =
+          row.status === 'pending'
+            ? el('p', { class: 'field-error', hidden: true, text: 'The link was not called back. Try again.' })
+            : null;
+        return el('tr', { class: row.status === 'pending' ? null : 'dimmed' }, [
           el('td', {}, [
             el('span', {
               class: 'chip',
@@ -212,23 +218,26 @@ async function loadInvites(list) {
             ]),
           ]),
           el('td', {}, [
+            error,
             row.status === 'pending'
               ? el('button', {
                   class: 'btn-inline',
                   text: 'Call back',
-                  onclick: () => callBack(row, list),
+                  onclick: () => callBack(row, list, error),
                 })
               : row.status === 'used'
                 ? el('span', {
                     class: 'hint',
-                    text: row.usedBy
-                      ? 'Already used. Remove the account instead.'
-                      : 'Already used. The account it created has since been removed.',
+                    text: !row.usedBy
+                      ? 'Already used. The account it created has since been removed.'
+                      : row.id === calledBack
+                        ? 'This link has already been used. Remove the account instead.'
+                        : 'Already used. Remove the account instead.',
                   })
                 : null,
           ]),
-        ]),
-      ),
+        ]);
+      }),
     ),
   );
 }
@@ -250,7 +259,7 @@ function usedBy(row) {
   ]);
 }
 
-function callBack(row, list) {
+function callBack(row, list, error) {
   const close = dialog({
     heading: 'Call back this link?',
     body: [
@@ -265,7 +274,15 @@ function callBack(row, list) {
         text: 'Call it back',
         onclick: async () => {
           close();
-          await api.post(`/api/admin/invites/${row.id}/revoke`, {});
+          error.hidden = true;
+          try {
+            await api.post(`/api/admin/invites/${row.id}/revoke`, {});
+          } catch (failure) {
+            // A Conflict means the link was used while the table was open.
+            if (failure.status === 409) loadInvites(list, row.id);
+            else error.hidden = false;
+            return;
+          }
           loadInvites(list);
         },
       }),
