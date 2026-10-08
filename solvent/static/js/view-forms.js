@@ -19,7 +19,7 @@ export function snapshotDialog(vault, holding, existing, onSaved, onOpenRecordin
     value: existing ? vault.format.quantity(existing.payload.value) : '',
     id: 'snapshot-value',
   });
-  const note = el('textarea', { rows: '2', text: existing ? existing.payload.note || '' : '' });
+  const note = el('textarea', { id: 'snapshot-note', rows: '2', text: existing ? existing.payload.note || '' : '' });
   const unit = holding.payload.unit;
   const converted = el('p', { class: 'hint numeric' });
   const error = el('p', { class: 'field-error', hidden: true });
@@ -330,7 +330,10 @@ export function snapshotDialog(vault, holding, existing, onSaved, onOpenRecordin
         value,
         converted,
       ]),
-      el('details', {}, [el('summary', { text: 'Add a note' }), note]),
+      el('details', {}, [
+        el('summary', { text: 'Add a note' }),
+        el('div', { class: 'field' }, [el('label', { for: 'snapshot-note', text: 'Note' }), note]),
+      ]),
       el('details', { class: 'prices-fold' }, [pricesLine, pricesBody]),
       error,
     ],

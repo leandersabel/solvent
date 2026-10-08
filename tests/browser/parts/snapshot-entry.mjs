@@ -31,6 +31,10 @@ await run(async () => {
   await page.idle();
   await page.eval("document.querySelectorAll('.dialog details').forEach(d => (d.open = true))");
   await page.frames();
+  check(
+    'record-snapshot: the note box is named by its visible label',
+    await page.eval("[...document.querySelector('.dialog textarea').labels].map(l => l.textContent).join() === 'Note'"),
+  );
   const tabular = (selector) => page.call((s) => {
     const nodes = [...document.querySelectorAll(s)];
     return nodes.length > 0 && nodes.every((n) => getComputedStyle(n).fontVariantNumeric === 'tabular-nums');
