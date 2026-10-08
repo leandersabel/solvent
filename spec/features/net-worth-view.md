@@ -287,9 +287,10 @@ age is stated in words.
 #### Breakdown by dimension
 
 What the money is made of now, where the chart shows how it moved.
-Horizontal bars, one per band of the Group by dimension, in the same
-order as the stack, "Unassigned" a bar like any other and "Other" folding
-the fifth and beyond. Color, direct labels and the signed zero baseline
+Horizontal bars, one per band of the stack and in its order, so the
+breakdown and the legend list the same bands. "Unassigned" is a bar like
+any other, "Other" folds the fifth and beyond, and a band at zero keeps
+its bar. Color, direct labels and the signed zero baseline
 are design-system.md's (Colors by chart job). The bars run the card's
 width less the room the labels take at the outboard ends, a room that
 narrows with the card so the bars keep width of their own. A label longer
@@ -299,7 +300,9 @@ its bar's row grows to hold it. A band can be net negative
 band is positive the baseline sits at the left edge, and the layout never
 changes shape with the data. The bars sum to exactly the net-worth total,
 as a signed sum, and each amount rounds on its own (Hero figure). Under "Total" the section is absent, because one
-bar equal to the hero says nothing.
+bar equal to the hero says nothing. While no active holding is valued
+and the total reads `—`, it is absent too, because bars of 0 would claim
+a sum.
 
 #### Holdings table
 
@@ -1210,3 +1213,9 @@ rule of the chart (Archived holdings, Ranges and modes).
     "Total" the chart has no legend box. Test:
     `tests/browser/parts/dashboard-single-band.mjs`,
     `tests/browser/parts/dashboard-review-single-band.mjs`.
+81. (walk) Under a dimension, while an active holding is valued, the
+    breakdown has a bar for every band the legend lists and in its order,
+    a band at zero and an "Unassigned" band of holdings not yet valued
+    included. While none is, the breakdown is absent. Test:
+    `tests/browser/parts/dashboard-zero-band.mjs`,
+    `tests/browser/parts/dashboard-review-zero-band.mjs`.
