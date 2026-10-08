@@ -401,3 +401,103 @@ def test_review_a_call_back_without_the_request_header_is_forbidden_and_changes_
     invite_id, _ = issue(admin, "no header")
     assert admin.post(f"/api/admin/invites/{invite_id}/revoke").status_code == 403
     assert invite_row(app, invite_id)["status"] == "pending"
+
+
+# ---- Issue #456: calling back a used link names its reason ----
+# Written from admin-invites.md (Endpoints, the revoke route; States,
+# Invites; criterion 9) and architecture.md (Status codes; Refusals;
+# CSRF), blind to the change.
+
+INVITE_USED = {"refused": "invite-used"}
+
+
+def call_back(client, invite_id, headers=CSRF):
+    return client.post(f"/api/admin/invites/{invite_id}/revoke", headers=headers)
+
+
+def refusal_fingerprint(response):
+    headers = sorted((k, v) for k, v in response.headers.items() if k not in ("Date", "Set-Cookie"))
+    return response.status_code, headers, response.get_data()
+
+
+def test_review_calling_back_a_used_link_is_a_conflict_naming_invite_used(app, admin):
+    invite_id, _, _ = registered(app, admin, "sarah")
+    before = invite_row(app, invite_id)
+    response = call_back(admin, invite_id)
+    assert response.status_code == 409, response.get_data(as_text=True)
+    assert response.is_json, response.headers.get("Content-Type")
+    assert response.get_json() == INVITE_USED
+    assert invite_row(app, invite_id) == before
+    assert listed_invites(admin)[invite_id]["status"] == "used"
+
+
+def test_review_calling_back_a_used_link_again_answers_the_same_and_changes_nothing(app, admin):
+    invite_id, _, _ = registered(app, admin, "sarah")
+    before = invite_row(app, invite_id)
+    answers = {call_back(admin, invite_id).get_data() for _ in range(3)}
+    assert len(answers) == 1 and json.loads(answers.pop()) == INVITE_USED
+    assert invite_row(app, invite_id) == before
+
+
+def test_review_a_used_link_whose_account_is_gone_still_names_invite_used(app, admin):
+    invite_id, _, _ = registered(app, admin, "sarah")
+    assert remove_by_admin(admin, "sarah").status_code in (200, 204)
+    before = invite_row(app, invite_id)
+    response = call_back(admin, invite_id)
+    assert (response.status_code, response.get_json()) == (409, INVITE_USED)
+    assert invite_row(app, invite_id) == before
+
+
+def test_review_a_used_link_past_its_expiry_still_names_invite_used(app, admin):
+    invite_id, _, _ = registered(app, admin, "sarah")
+    conn = connect(app)
+    try:
+        conn.execute("UPDATE invites SET expires_at = ? WHERE id = ?", ("2000-01-01T00:00:00+00:00", invite_id))
+        conn.commit()
+    finally:
+        conn.close()
+    before = invite_row(app, invite_id)
+    response = call_back(admin, invite_id)
+    assert (response.status_code, response.get_json()) == (409, INVITE_USED)
+    assert invite_row(app, invite_id) == before
+
+
+def test_review_a_link_an_administrator_used_names_invite_used_to_its_peer(app, admin):
+    response = admin.post(
+        "/api/admin/invites", json={"expiresInDays": 7, "label": "peer", "kind": "administrator"}, headers=CSRF
+    )
+    created = response.get_json()
+    register(app, "peer", kind="administrator", invite_token=created["token"])
+    response = call_back(admin, created["id"])
+    assert (response.status_code, response.get_json()) == (409, INVITE_USED)
+    assert invite_row(app, created["id"])["status"] == "used"
+
+
+def test_review_a_successful_call_back_names_no_refusal(app, admin):
+    invite_id, _ = issue(admin, "fresh")
+    for _ in range(2):
+        response = call_back(admin, invite_id)
+        assert response.status_code in (200, 204), response.get_data(as_text=True)
+        body = response.get_json(silent=True)
+        assert not (isinstance(body, dict) and "refused" in body), body
+    assert invite_row(app, invite_id)["status"] == "revoked"
+
+
+@pytest.mark.parametrize("caller", ["vault owner", "no session", "no header"])
+def test_review_invite_used_reaches_nobody_the_route_refuses(app, admin, caller):
+    """A refusal depends only on the namespace, the header and the
+    session (architecture.md, Refusals), so whether an id names a used
+    link is learned by nobody but an administrator."""
+    invite_id, _, _ = registered(app, admin, "sarah")
+    before = invite_row(app, invite_id)
+    if caller == "vault owner":
+        client, _ = register(app, "mallory")
+    else:
+        client = app.test_client()
+    headers = {} if caller == "no header" else CSRF
+    used = call_back(client, invite_id, headers)
+    invented = client.post(f"/api/admin/invites/{uuid.uuid4().hex}/invented", headers=headers)
+    assert used.status_code in (401, 403, 404)
+    assert b"invite-used" not in used.get_data()
+    assert refusal_fingerprint(used) == refusal_fingerprint(invented)
+    assert invite_row(app, invite_id) == before
