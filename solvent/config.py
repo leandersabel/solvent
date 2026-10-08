@@ -98,10 +98,19 @@ def _number(env: "dict[str, str]", name: str, default: int, minimum: int = 1) ->
 def load_config(env: "dict[str, str] | None" = None) -> Config:
     """Read configuration from the environment.
 
-    Raises ConfigurationError when SECRET_KEY is missing or empty.
-    create_app lets it propagate, so the process exits rather than
-    serving a request.
+    Raises ConfigurationError when the process runs as root or
+    SECRET_KEY is missing or empty. create_app lets it propagate, so the
+    process exits rather than serving a request or writing a file.
     """
+    if os.geteuid() == 0:
+        # Files written to the data directory as root would be
+        # unwritable for the app once it runs as its own user.
+        raise ConfigurationError(
+            "Solvent must not run as root. Run it as another user, such "
+            "as 10001:10001 (docker run --user, or the platform's user "
+            "setting), with /data writable for that user."
+        )
+
     env = os.environ if env is None else env
 
     secret_key = env.get("SECRET_KEY", "")

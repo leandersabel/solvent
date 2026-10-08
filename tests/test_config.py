@@ -156,3 +156,21 @@ def test_the_proxy_count_defaults_to_none_and_the_address_limit_to_the_spec():
         config.login_address_window_minutes,
         config.login_address_lock_minutes,
     ) == (30, 15, 15)
+
+
+def test_the_app_refuses_to_start_as_root_and_writes_nothing(tmp_path):
+    database = tmp_path / "solvent.db"
+    env = {**os.environ, "SECRET_KEY": _SENTINEL_KEY, "DATABASE_PATH": str(database)}
+    result = subprocess.run(
+        [sys.executable, "-c", "import os; os.geteuid = lambda: 0; import app"],
+        cwd=REPO_ROOT,
+        env=env,
+        capture_output=True,
+        text=True,
+        timeout=30,
+    )
+
+    assert result.returncode != 0
+    assert "Solvent must not run as root" in result.stderr
+    assert "/data writable" in result.stderr
+    assert not database.exists()

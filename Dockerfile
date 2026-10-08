@@ -18,13 +18,18 @@ RUN pip install -r requirements.txt
 COPY app.py ./
 COPY solvent ./solvent
 
-# Non-root, and the writable volume is the only path it owns. The root
-# filesystem is mounted read-only at run time (architecture.md, Tech
-# stack, Container hardening); nothing in the image is written to.
-RUN useradd --create-home --uid 10001 solvent \
- && mkdir -p /data \
- && chown solvent:solvent /data
-USER solvent
+# The image carries its own hardening, so an install that sets no
+# container option still has it (architecture.md, Tech stack, Container
+# hardening). No file can raise a process to root, and /data is the one
+# path in the image its user can write. The user is a number,
+# so a platform can verify it is not root, and no account or home
+# directory exists for it.
+RUN find / -xdev ! -user 0 -exec chown -h 0:0 {} + \
+ && find / -xdev -type f -perm /6000 -exec chmod ug-s {} + \
+ && find / -xdev ! -type l -perm /0022 -exec chmod go-w {} + \
+ && mkdir -m 775 /data \
+ && chgrp 10001 /data
+USER 10001:10001
 VOLUME ["/data"]
 
 EXPOSE 8000

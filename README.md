@@ -34,9 +34,15 @@ a secure page.
 docker run -d --name solvent -p 8000:8000 \
   -e SECRET_KEY=<a long random string that never changes> \
   -v solvent-data:/data \
+  --read-only --cap-drop ALL --security-opt no-new-privileges \
   ghcr.io/leandersabel/solvent:stable
 docker exec solvent flask --app app create-invite --kind administrator
 ```
+
+The image protects itself without `--read-only`, `--cap-drop` and
+`--security-opt`, which add a layer on top. It runs as user
+`10001:10001` and refuses root. Any other user works when `/data` is
+writable for it.
 
 Behind a reverse proxy, also set `TRUSTED_PROXY_HOPS` to the number of
 proxies in front of Solvent.

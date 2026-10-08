@@ -35,10 +35,10 @@ def test_base_image_is_pinned_by_digest():
     assert re.fullmatch(r"FROM python:\d+\.\d+-slim@sha256:[0-9a-f]{64}", from_line)
 
 
-def test_the_image_does_not_run_as_root():
+def test_the_image_declares_its_user_as_a_number_that_is_not_root():
     users = re.findall(r"^USER (.+)$", DOCKERFILE, re.MULTILINE)
     assert users, "no USER instruction, so the image runs as root"
-    assert users[-1].strip() not in ("root", "0")
+    assert users[-1].strip() == "10001:10001"
 
 
 def test_the_image_holds_the_app_and_nothing_of_the_tests_or_tools():
@@ -319,3 +319,4 @@ def test_no_invite_token_reaches_the_containers_standard_output_or_error(tmp_pat
     assert 'GET /register' in out, "the access log held no /register line to inspect"
     for token in tokens:
         assert token not in out + err
+
