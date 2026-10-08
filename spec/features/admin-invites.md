@@ -932,4 +932,5 @@ administrator), and the lost sole password (Bootstrap). The rest:
 62. (walk) An account list the server fails reads "The account list
     would not load." with a Retry that loads it, and with the session
     ended, opening Accounts goes to the sign-in screen. Test:
-    `tests/browser/parts/admin-accounts-error.mjs`.
+    `tests/browser/parts/admin-accounts-error.mjs`,
+    `tests/browser/parts/admin-review-accounts-error.mjs`.
