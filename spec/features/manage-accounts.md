@@ -913,4 +913,5 @@ Unarchiving and archiving it again writes the zero at the new D.
     `tests/browser/parts/account-form-retired.mjs`,
     `tests/browser/parts/account-form-review-retired.mjs`.
 65. (walk) Once "Add a note" is open, the note box is announced by its
-    visible label, "Note". Test: `tests/browser/parts/account-form.mjs`.
+    visible label, "Note". Test: `tests/browser/parts/account-form.mjs`,
+    `tests/browser/parts/account-form-review-note.mjs`.
