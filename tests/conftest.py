@@ -61,7 +61,10 @@ def network_lock(request):
     outlives a test, and per test otherwise (network_lock_per_test), so
     a Docker module waits for the tests in flight rather than for whole
     modules."""
-    docker = any(item.module is request.module and "python_image" in item.fixturenames for item in request.session.items)
+    docker = any(
+        item.module is request.module and {"python_image", "solvent_image"} & set(item.fixturenames)
+        for item in request.session.items
+    )
     if docker or module_wide(request):
         with network_held(request, docker):
             yield False

@@ -27,8 +27,8 @@ COPY solvent ./solvent
 RUN find / -xdev ! -user 0 -exec chown -h 0:0 {} + \
  && find / -xdev -type f -perm /6000 -exec chmod ug-s {} + \
  && find / -xdev ! -type l -perm /0022 -exec chmod go-w {} + \
- && mkdir /data \
- && chown 10001:10001 /data
+ && mkdir -m 775 /data \
+ && chgrp 10001 /data
 USER 10001:10001
 VOLUME ["/data"]
 

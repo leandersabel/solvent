@@ -329,8 +329,9 @@ def _docker(*args: str, timeout: int = 60) -> subprocess.CompletedProcess:
 
 
 @pytest.fixture(scope="session")
-def image() -> str:
-    """The image built from this checkout, by its ID."""
+def solvent_image() -> str:
+    """The image built from this checkout, by its ID. Its name holds the
+    suite's network lock (conftest.py)."""
     if shutil.which("docker") is None or _docker("info").returncode != 0:
         pytest.skip("needs a Docker daemon")
     built = _docker("build", "-q", str(REPO_ROOT), timeout=600)
@@ -338,9 +339,9 @@ def image() -> str:
     return built.stdout.strip()
 
 
-def test_no_file_in_the_image_can_raise_a_process_to_root(image):
+def test_no_file_in_the_image_can_raise_a_process_to_root(solvent_image):
     found = _docker(
-        "run", "--rm", "--user", "0", "--entrypoint", "find", image,
+        "run", "--rm", "--user", "0", "--entrypoint", "find", solvent_image,
         "/", "-xdev", "-type", "f", "-perm", "/6000",
     )
     assert found.returncode == 0, found.stderr
@@ -351,19 +352,20 @@ def test_no_file_in_the_image_can_raise_a_process_to_root(image):
     "user, writable",
     [("10001:10001", ["/data"]), ("568:568", []), ("568:0", []), ("42:8", [])],
 )
-def test_data_is_the_only_path_any_user_can_write_in_the_image(image, user, writable):
+def test_data_is_the_only_path_any_user_can_write_in_the_image(solvent_image, user, writable):
     """`42:8` is `_apt` in the group `mail`, which own paths in the base
-    image, and `568:0` a user in root's group. `/data` is the image's
-    own, so only its user writes it until the operator mounts another."""
+    image, and `568:0` a user in root's group. `/data` is writable for the
+    image's group, so only its user writes it until the operator mounts
+    another."""
     found = _docker(
-        "run", "--rm", "--user", user, "--entrypoint", "find", image,
+        "run", "--rm", "--user", user, "--entrypoint", "find", solvent_image,
         "/", "-xdev", "-writable", "!", "-type", "l",
     )
     assert found.stdout.split() == writable
 
 
-def test_the_image_refuses_to_start_as_root(image):
-    started = _docker("run", "-d", "--user", "0", "-e", "SECRET_KEY=x", image)
+def test_the_image_refuses_to_start_as_root(solvent_image):
+    started = _docker("run", "-d", "--user", "0", "-e", "SECRET_KEY=x", solvent_image)
     assert started.returncode == 0, started.stderr
     container = started.stdout.strip()
     try:
@@ -375,13 +377,13 @@ def test_the_image_refuses_to_start_as_root(image):
         _docker("rm", "-f", container)
 
 
-def test_the_image_serves_as_another_user_without_container_options(image, tmp_path):
+def test_the_image_serves_as_another_user_without_container_options(solvent_image, tmp_path):
     """568 is the `apps` user on TrueNAS, whose Custom App form sets no
     container option, with a host directory as `/data`."""
     tmp_path.chmod(0o777)
     started = _docker(
         "run", "-d", "--user", "568:568", "-e", "SECRET_KEY=x",
-        "-v", f"{tmp_path}:/data", "-p", "127.0.0.1::8000", image,
+        "-v", f"{tmp_path}:/data", "-p", "127.0.0.1::8000", solvent_image,
     )
     assert started.returncode == 0, started.stderr
     container = started.stdout.strip()

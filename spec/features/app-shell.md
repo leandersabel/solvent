@@ -959,17 +959,25 @@ dashboard.
     database, with a message that it must not run as root and that
     `/data` must be writable for the user it runs as. Test:
     `tests/test_config.py::test_the_app_refuses_to_start_as_root_and_writes_nothing`,
-    `tests/test_deployment.py::test_the_image_refuses_to_start_as_root`.
+    `tests/test_deployment.py::test_the_image_refuses_to_start_as_root`,
+    `tests/test_review_app_shell.py::test_the_server_started_as_root_exits_before_writing_anything`,
+    `tests/test_review_app_shell.py::test_the_command_line_run_as_root_exits_before_writing_anything`.
 88. (blind) No file in the image carries a setuid or setgid bit. Test:
-    `tests/test_deployment.py::test_no_file_in_the_image_can_raise_a_process_to_root`.
+    `tests/test_deployment.py::test_no_file_in_the_image_can_raise_a_process_to_root`,
+    `tests/test_review_app_shell.py::test_no_file_in_the_image_carries_a_setuid_or_setgid_bit`.
 89. (blind) In the image, `/data` is the only path its own user can
     write, and another non-root user, root's group included, can write
     none. Test:
-    `tests/test_deployment.py::test_data_is_the_only_path_any_user_can_write_in_the_image`.
-90. The Dockerfile declares the user as `10001:10001`. Test:
-    `tests/test_deployment.py::test_the_image_declares_its_user_as_a_number_that_is_not_root`.
+    `tests/test_deployment.py::test_data_is_the_only_path_any_user_can_write_in_the_image`,
+    `tests/test_review_app_shell.py::test_data_is_the_only_path_any_non_root_user_can_write_in_the_image`.
+90. The Dockerfile declares the user as `10001:10001`, and nothing in the
+    image is owned by a user other than root. Test:
+    `tests/test_deployment.py::test_the_image_declares_its_user_as_a_number_that_is_not_root`,
+    `tests/test_review_app_shell.py::test_the_image_declares_10001_with_no_account_or_home_behind_it`,
+    `tests/test_review_app_shell.py::test_nothing_in_the_image_is_owned_by_a_user_other_than_root`.
 91. (blind) The image run with no container option as user `568:568`,
     with a host directory it can write as `/data`, serves the sign-in
     page, and `flask --app app create-invite` there prints an invite and
     writes the database as that user. Test:
-    `tests/test_deployment.py::test_the_image_serves_as_another_user_without_container_options`.
+    `tests/test_deployment.py::test_the_image_serves_as_another_user_without_container_options`,
+    `tests/test_review_app_shell.py::test_the_image_serves_as_568_with_no_container_option`.
