@@ -374,7 +374,8 @@ Invites:
 - **Empty**: "No invite links yet." beneath the create card.
 - **Error, create failed**: inline above the button. No link was made,
   nothing was consumed, every field is kept.
-- **Error, call back failed**: inline on the row, status unchanged.
+- **Error, call back failed**: inline on the row, status unchanged:
+  "The link was not called back. Try again."
 - **Error, the link was used while the table was open**: the row
   refreshes to Used and reads "This link has already been used. Remove
   the account instead."
@@ -918,3 +919,8 @@ administrator), and the lost sole password (Bootstrap). The rest:
     or "Nothing was restored." on its row, which stays as it was. Test:
     `tests/browser/parts/admin.mjs`,
     `tests/browser/parts/admin-review-refused.mjs`.
+61. (walk) Calling back an invite that was used while Invites was open
+    refreshes its row to Used, reading "This link has already been
+    used. Remove the account instead.", and a call back the server
+    fails reads "The link was not called back. Try again." on a row
+    still Waiting. Test: `tests/browser/parts/admin-callback.mjs`.
