@@ -1356,6 +1356,7 @@ th.numeric {
   display: block;
   font-size: 15px;
   font-weight: 600;
+  overflow-wrap: anywhere;
 }
 
 .row-status {
