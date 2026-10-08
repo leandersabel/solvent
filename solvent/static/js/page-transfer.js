@@ -159,11 +159,20 @@ function importCard(vault, reload) {
 
   // 3. Review, and 4. Confirm.
   const review = el('div', { class: 'review', hidden: true });
-  const erase = el('input', { type: 'text', id: 'import-erase', placeholder: 'ERASE' });
+  const erase = el('input', { type: 'text', id: 'import-erase', placeholder: 'ERASE', 'aria-describedby': 'import-erase-line' });
+  const eraseLine = el('p', { id: 'import-erase-line', class: 'field-error', hidden: true, 'aria-live': 'polite', text: 'Type ERASE to confirm that your current vault is replaced.' });
+  const eraseRefused = (refused) => {
+    eraseLine.hidden = !refused;
+    if (refused) erase.setAttribute('aria-invalid', 'true');
+    else erase.removeAttribute('aria-invalid');
+  };
+  erase.addEventListener('input', () => {
+    if (erase.value === 'ERASE') eraseRefused(false);
+  });
   const replace = el('button', { class: 'btn-destructive', text: 'Replace my vault', type: 'button' });
   const stepConfirm = el('div', { class: 'confirm-step', hidden: true }, [
     holdsData
-      ? el('div', { class: 'field' }, [el('label', { for: 'import-erase', text: 'Type ERASE to confirm' }), erase])
+      ? el('div', { class: 'field' }, [el('label', { for: 'import-erase', text: 'Type ERASE to confirm' }), erase, eraseLine])
       : null,
     replace,
   ]);
@@ -182,6 +191,7 @@ function importCard(vault, reload) {
       openButton.disabled = false;
       opened = null;
       erase.value = '';
+      eraseRefused(false);
       review.hidden = true;
       stepConfirm.hidden = true;
       phase.hidden = true;
@@ -321,7 +331,8 @@ function importCard(vault, reload) {
     if (!parsed || !opened) return;
     // Required whenever the vault holds anything, and never skipped.
     if (holdsData && erase.value !== 'ERASE') {
-      fail('Type ERASE to confirm that your current vault is replaced.');
+      eraseRefused(true);
+      erase.focus();
       return;
     }
     replace.disabled = true;
