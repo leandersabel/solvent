@@ -39,6 +39,17 @@ def module_wide(request) -> bool:
     )
 
 
+def pytest_runtest_setup(item):
+    """Fails a test using a session- or package-scoped fixture of the
+    suite's own, before its fixtures start. Such a fixture is set up
+    before the module's network lock and lives past it, and holding the
+    lock that long would keep Docker tests out for the run."""
+    for definitions in item._fixtureinfo.name2fixturedefs.values():
+        for definition in definitions:
+            if definition.scope in ("session", "package") and definition.func.__module__.split(".")[0] not in ("_pytest", "xdist"):
+                pytest.fail(f"fixture {definition.argname} outlives its module's network lock, scope it to the module", pytrace=False)
+
+
 @pytest.fixture(scope="module", autouse=True)
 def network_lock(request):
     """A test that starts Docker containers runs while no other test
