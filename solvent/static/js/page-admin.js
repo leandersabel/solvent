@@ -218,6 +218,7 @@ async function loadInvites(list, calledBack) {
             ]),
           ]),
           el('td', {}, [
+            error,
             row.status === 'pending'
               ? el('button', {
                   class: 'btn-inline',
@@ -234,7 +235,6 @@ async function loadInvites(list, calledBack) {
                         : 'Already used. Remove the account instead.',
                   })
                 : null,
-            error,
           ]),
         ]);
       }),
