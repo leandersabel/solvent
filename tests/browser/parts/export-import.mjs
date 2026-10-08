@@ -400,9 +400,9 @@ await run(async () => {
       review,
     );
     await replaceVault();
-    await page.holds("!document.querySelector('#import-erase-line').hidden");
+    await page.holds("document.querySelector('#import-erase-line').textContent !== ''");
     const eraseLine = () =>
-      page.eval("(({ hidden, textContent }, field) => ({ hidden, text: textContent, invalid: field.getAttribute('aria-invalid'), describedBy: field.getAttribute('aria-describedby') }))(document.querySelector('#import-erase-line'), document.querySelector('#import-erase'))");
+      page.eval("(({ textContent }, field) => ({ text: textContent, invalid: field.getAttribute('aria-invalid'), describedBy: field.getAttribute('aria-describedby') }))(document.querySelector('#import-erase-line'), document.querySelector('#import-erase'))");
     const refused = await eraseLine();
     check(
       'a vault holding records is not replaced without ERASE typed, and the ERASE field says so on its own message line',
@@ -412,7 +412,7 @@ await run(async () => {
     );
     await setValue('#import-erase', 'ERASE');
     const fits = await eraseLine();
-    check('the ERASE error goes the moment ERASE is typed', fits.hidden && fits.invalid === null, JSON.stringify(fits));
+    check('the ERASE error goes the moment ERASE is typed', fits.text === '' && fits.invalid === null, JSON.stringify(fits));
 
     const altered = JSON.parse(formatOne());
     const target = altered.records.find((record) => record.recordType === 'snapshot');

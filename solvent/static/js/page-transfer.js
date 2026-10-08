@@ -160,9 +160,9 @@ function importCard(vault, reload) {
   // 3. Review, and 4. Confirm.
   const review = el('div', { class: 'review', hidden: true });
   const erase = el('input', { type: 'text', id: 'import-erase', placeholder: 'ERASE', 'aria-describedby': 'import-erase-line' });
-  const eraseLine = el('p', { id: 'import-erase-line', class: 'field-error', hidden: true, 'aria-live': 'polite', text: 'Type ERASE to confirm that your current vault is replaced.' });
+  const eraseLine = el('p', { id: 'import-erase-line', class: 'field-error message-line', 'aria-live': 'polite' });
   const eraseRefused = (refused) => {
-    eraseLine.hidden = !refused;
+    eraseLine.textContent = refused ? 'Type ERASE to confirm that your current vault is replaced.' : '';
     if (refused) erase.setAttribute('aria-invalid', 'true');
     else erase.removeAttribute('aria-invalid');
   };
