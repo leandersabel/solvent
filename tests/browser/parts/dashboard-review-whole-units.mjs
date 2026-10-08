@@ -123,7 +123,7 @@ await run(async () => {
     const header = flat(seen.header);
     const cell = seen.rows[0] && bare(flat(seen.rows[0][IN_MAIN]));
     check(`review manage-accounts Account detail: ${name}'s header shows ${converted}, as the dashboard's holdings table does`,
-      header.includes(converted) && !new RegExp(`${converted.replace(/[.,]/g, '\\$&')}[.,]\\d`).test(header), header);
+      header.includes(converted) && !new RegExp(`${converted.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}[.,]\\d`).test(header), header);
     check(`review manage-accounts Account detail: ${name}'s list of values shows ${converted} for ${D1}, as the dashboard's holdings table does`,
       cell === bare(converted), JSON.stringify(seen.rows));
   }
