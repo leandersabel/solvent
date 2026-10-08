@@ -40,12 +40,14 @@ await run(async () => {
       const html = document.documentElement;
       const message = [...document.querySelectorAll('.dialog .field-error')].find((m) => m.textContent.includes(name));
       if (!message) return JSON.stringify({ message: false });
-      const dialog = message.closest('.dialog').getBoundingClientRect();
+      const box = message.closest('.dialog');
+      const dialog = box.getBoundingClientRect();
       const b = message.getBoundingClientRect();
       return JSON.stringify({
         message: true,
         width: html.clientWidth,
         scrollWidth: html.scrollWidth,
+        dialogPans: box.scrollWidth > box.clientWidth + 0.5,
         dialog: { left: dialog.left, right: dialog.right },
         box: { left: b.left, right: b.right },
         spill: message.scrollWidth > message.clientWidth + 0.5,
@@ -54,7 +56,7 @@ await run(async () => {
     const where = `at ${width}px`;
     check(`snapshot-entry: the archived-elsewhere message names the holding ${where}`, seen.message, JSON.stringify(seen));
     if (!seen.message) continue;
-    check(`snapshot-entry: nothing pans sideways ${where}`, seen.scrollWidth <= seen.width, JSON.stringify(seen));
+    check(`snapshot-entry: nothing pans sideways ${where}`, seen.scrollWidth <= seen.width && !seen.dialogPans, JSON.stringify(seen));
     check(
       `snapshot-entry: a long holding name wraps inside the Dialog ${where}`,
       !seen.spill && seen.box.left >= seen.dialog.left - 0.5 && seen.box.right <= seen.dialog.right + 0.5,

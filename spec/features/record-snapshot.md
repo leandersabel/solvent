@@ -1759,4 +1759,5 @@ Editing an existing entry).
 108. (walk) At 320px and 375px wide, the message that a holding was
      archived in another window wraps a holding name with no break in it
      inside the Dialog. Test:
-     `tests/browser/parts/snapshot-entry-long-name.mjs`.
+     `tests/browser/parts/snapshot-entry-long-name.mjs`,
+     `tests/browser/parts/snapshot-entry-review-long-name.mjs`.
