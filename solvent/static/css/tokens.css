@@ -1131,7 +1131,7 @@ th.numeric {
 .readout-net { border-top: 1px solid var(--hairline); margin-top: 4px !important; padding-top: 4px; font-weight: 600; }
 .crosshair { stroke: var(--ink-secondary); stroke-width: 1; stroke-dasharray: 2 3; pointer-events: none; }
 .trend .selection { fill: var(--petrol-100); fill-opacity: 0.6; pointer-events: none; }
-.legend-delta { font-variant-numeric: tabular-nums; color: var(--ink-secondary); }
+.legend-delta { font-variant-numeric: tabular-nums; color: var(--ink-secondary); white-space: nowrap; }
 .hero-at-line { min-height: 1lh; margin: 4px 0 0; color: var(--ink-secondary); font-size: 13px; }
 
 .legend-row {
@@ -1149,17 +1149,21 @@ th.numeric {
   display: flex;
   flex-wrap: wrap;
   gap: 10px 28px;
+  min-width: 0;
 }
 
 .legend-entry {
   display: flex;
   align-items: center;
   gap: 8px;
+  min-width: 0;
+  max-width: 100%;
   padding: 0;
   border: 0;
   background: transparent;
   font: inherit;
   font-size: 13px;
+  text-align: start;
   color: var(--ink-primary);
   cursor: pointer;
 }
@@ -1173,8 +1177,8 @@ th.numeric {
 .legend-entry.is-hidden .legend-name { text-decoration: line-through; }
 
 .hidden-bands { margin: 8px 0 0; }
-.legend-name { font-weight: 500; }
-.legend-value { color: var(--ink-secondary); }
+.legend-name { font-weight: 500; min-width: 0; overflow-wrap: anywhere; }
+.legend-value { color: var(--ink-secondary); white-space: nowrap; }
 
 .legend-key {
   margin-left: auto;
@@ -1271,12 +1275,15 @@ th.numeric {
 
 .bar {
   position: relative;
-  height: 22px;
+  min-height: 22px;
+  display: flex;
+  align-items: center;
 }
 
 .bar-track {
   position: absolute;
-  inset: 0;
+  inset: calc(50% - 11px) 0 auto;
+  height: 22px;
 }
 
 .bar-fill {
@@ -1292,22 +1299,23 @@ th.numeric {
 
 .bar.negative .bar-fill { opacity: 0.45; }
 
+/* The label takes the room from the bar's outboard end to the edge of
+   the room kept for it, and wraps there, the bar growing to hold it. */
 .bar-label {
-  position: absolute;
-  top: 50%;
-  transform: translateY(-50%);
-  left: calc((var(--start) + var(--len)) * 100% + 12px);
-  white-space: nowrap;
+  min-width: 0;
+  margin: 0 calc(-1 * var(--room-right)) 0 calc((var(--start) + var(--len)) * 100% + 12px);
+  overflow-wrap: anywhere;
   font-size: 14px;
 }
 
 .bar.negative .bar-label {
-  left: auto;
-  right: calc((1 - var(--start)) * 100% + 12px);
+  flex: 1;
+  margin: 0 calc((1 - var(--start)) * 100% + 12px) 0 calc(-1 * var(--room-left));
+  text-align: right;
 }
 
-.bar-name { font-weight: 600; }
-.bar-amount { color: var(--ink-secondary); margin-left: 6px; }
+.bar-name { font-weight: 600; min-width: 0; }
+.bar-amount { color: var(--ink-secondary); margin-left: 6px; white-space: nowrap; }
 
 /* ---- Sweep ---- */
 
@@ -2175,8 +2183,8 @@ select {
   /* Bars with the label above each one, name left and figure right. */
   .bars { padding: 0; gap: 14px; }
   .bars::before { display: none; }
-  .bar { height: auto; display: flex; flex-direction: column-reverse; gap: 4px; }
-  .bar-track { position: relative; height: 14px; }
+  .bar { flex-direction: column-reverse; align-items: stretch; gap: 4px; }
+  .bar-track { position: relative; inset: auto; height: 14px; }
 
   .bar-track::before {
     content: "";
@@ -2192,8 +2200,8 @@ select {
 
   .bar-label,
   .bar.negative .bar-label {
-    position: static;
-    transform: none;
+    margin: 0;
+    text-align: left;
     display: flex;
     justify-content: space-between;
     gap: 12px;
