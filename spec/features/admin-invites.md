@@ -370,6 +370,10 @@ render at once, since they fetch nothing. Accounts is never empty (the
 reader's own row is always there), and neither is Units (the table is
 seeded).
 
+A request refused because the session ended, by its time limit or by a
+password change in another session, takes the page to the sign-in
+screen (login.md), because nothing here can act without a session.
+
 Invites:
 - **Empty**: "No invite links yet." beneath the create card.
 - **Error, create failed**: inline above the button. No link was made,
@@ -381,8 +385,9 @@ Invites:
   the account instead."
 
 Accounts:
-- **Error, list failed**: inline above the table, with a retry. No
-  partial table.
+- **Error, list failed**: "The account list would not load." inline
+  where the table goes, with a Retry that loads it again. No partial
+  table.
 - **Error, remove failed**: inline in the dialog, which stays open:
   "Nothing was removed." The account is still there and can sign in.
 - **Error, the last administrator**: if the account became the only
@@ -924,3 +929,8 @@ administrator), and the lost sole password (Bootstrap). The rest:
     used. Remove the account instead.", and a call back the server
     fails reads "The link was not called back. Try again." on a row
     still Waiting. Test: `tests/browser/parts/admin-callback.mjs`.
+62. (walk) An account list the server fails reads "The account list
+    would not load." with a Retry that loads it, and with the session
+    ended, opening Accounts goes to the sign-in screen. Test:
+    `tests/browser/parts/admin-accounts-error.mjs`,
+    `tests/browser/parts/admin-review-accounts-error.mjs`.
