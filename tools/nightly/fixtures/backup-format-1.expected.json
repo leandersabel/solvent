@@ -15,19 +15,19 @@
   "holdings": {
    "Checking": {
     "exact": "6400",
-    "display": "6400.00"
+    "display": "6400"
    },
    "Dollar account": {
     "exact": "1705.099053",
-    "display": "1705.10"
+    "display": "1705"
    },
    "Gold bars": {
     "exact": "4445.16640865",
-    "display": "4445.17"
+    "display": "4445"
    },
    "Mortgage": {
     "exact": "-149800",
-    "display": "-149800.00"
+    "display": "-149800"
    }
   },
   "excluded": {}
@@ -48,19 +48,19 @@
   "holdings": {
    "Checking": {
     "exact": "6400",
-    "display": "6400.00"
+    "display": "6400"
    },
    "Dollar account": {
     "exact": "1705.099053",
-    "display": "1705.10"
+    "display": "1705"
    },
    "Gold bars": {
     "exact": "4445.16640865",
-    "display": "4445.17"
+    "display": "4445"
    },
    "Mortgage": {
     "exact": "-149800",
-    "display": "-149800.00"
+    "display": "-149800"
    }
   },
   "excluded": {}

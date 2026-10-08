@@ -762,12 +762,12 @@ The same Dialog, prefilled with the stored value, date and note.
   Recording detail, where empty lines are filled after Update. Save is
   inert until something changes.
 - **Duplicate date, entering**: on save, a confirm rather than a
-  rejection: "You already recorded USD 12,450.00 for 31 July. Replace
+  rejection: "You already recorded USD 12,450 for 31 July. Replace
   it?", naming the stored value in the holding's own unit (Same
   holding, same date: upsert). Confirming updates in place. Declining
   leaves the original untouched and returns to the form.
 - **Duplicate date, moving**: different copy, because a second record
-  dies: "30 July already holds a value of USD 12,100.00. Moving this
+  dies: "30 July already holds a value of USD 12,100. Moving this
   entry there will delete it." Destructive styling on the confirm
   (Moving the date onto an occupied date).
 - **The date became taken while you were working**: refused whole,
@@ -1548,7 +1548,7 @@ Editing an existing entry).
 66. (blind) Confirming writes the holding's last recorded `value` string
     character for character at the new date, for a holding in the main
     currency, one with a rate source and one without, with no branch
-    between them. Under `moneyPlaces` `0`, an `XAU-ozt` holding stored as
+    between them. An `XAU-ozt` holding stored as
     `"12.125"` writes `"12.125"` and a `USD` holding stored as
     `"1000.40"` writes `"1000.40"`, read from the written record, not
     the screen. Test: `tests/browser/parts/update-values.mjs`,

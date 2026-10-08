@@ -180,7 +180,7 @@ moment it is stopped:
   width it is on screen together with the confirm button. Where the
   date already holds a zero in any form, there is no such line.
 
-  > This replaces the USD 12,450.00 recorded for 3 October 2026.
+  > This replaces the USD 12,450 recorded for 3 October 2026.
 
 The same confirmation opens from Account detail's **Archive** action,
 the only way a holding with no values reaches it.
@@ -320,7 +320,7 @@ action is a 44px target, and nothing on the screen pans sideways.
 
 A single confirm:
 
-> Delete the value of USD 12,450.00 for 31 July? Your net worth for
+> Delete the value of USD 12,450 for 31 July? Your net worth for
 > the period around this date will change.
 
 For the holding's only snapshot, the copy says instead that the holding
@@ -359,7 +359,9 @@ detail's act.
 - A converted figure can move without this holding being touched,
   because correcting a price in a recording moves every holding in that
   unit on that date. The screen states no caveat: it shows the quantity
-  recorded times the price recorded.
+  recorded times the price recorded. Each figure reads in whole units, rounded on
+  its own, so it matches the dashboard's holdings table
+  (`design-system.md`, Figures).
 - The table is this holding's values only. A cross-holding price audit
   is not here.
 
@@ -915,3 +917,8 @@ Unarchiving and archiving it again writes the zero at the new D.
 65. (walk) Once "Add a note" is open, the note box is announced by its
     visible label, "Note". Test: `tests/browser/parts/account-form.mjs`,
     `tests/browser/parts/account-form-review-note.mjs`.
+66. (blind) (walk) 2.5 of an `XAU-ozt` holding at 1688.254004 in `CHF`
+    reads `CHF 4,221` on the holding's screen, in its list of values
+    and in the dashboard's holdings table, in both pricing modes. Test:
+    `tests/test_client.py::test_the_client_side_rules_hold`,
+    `tests/browser/parts/dashboard-review-whole-units.mjs`.

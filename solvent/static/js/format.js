@@ -3,8 +3,8 @@
 //
 // The locale supplies defaults and the reader overrides what they
 // care about, because a locale is a coarse guess about taste: a Swiss
-// reader may want an apostrophe between thousands and no centimes at
-// all, which no locale tag expresses. Every setting here is display
+// reader may want an apostrophe between thousands, which no locale tag
+// expresses. Every setting here is display
 // only. Stored figures stay exact at scale 12 and stored dates stay
 // ISO, so changing any of this rewrites nothing.
 import * as decimal from './decimal.js';
@@ -16,12 +16,6 @@ export const GROUPS = [
   { value: 'comma', label: '1,234,567', separator: ',' },
   { value: 'period', label: '1.234.567', separator: '.' },
   { value: 'none', label: '1234567', separator: '' },
-];
-
-export const PLACES = [
-  { value: 'locale', label: 'The currency\u2019s own' },
-  { value: '0', label: 'None' },
-  { value: '2', label: 'Two' },
 ];
 
 export const DATE_STYLES = [
@@ -92,10 +86,6 @@ export function formatter(profile) {
   const point = fromLocale.point;
   const group = picked === point ? fromLocale.group : picked;
 
-  const places = settings.moneyPlaces === '0' || settings.moneyPlaces === '2'
-    ? Number(settings.moneyPlaces)
-    : 2;
-
   const style = DATE_STYLES.find((d) => d.value === settings.dateStyle);
   // A style the reader chose applies to every date that shows a day,
   // prose and headings included. Only under the language's own order
@@ -107,21 +97,14 @@ export function formatter(profile) {
     locale,
     group,
     point,
-    places,
     dateOrder: date.order,
     dateSeparator: date.sep,
 
-    /** A figure denominated in a currency, at the reader's precision. */
-    money: (value) => decimal.toDisplay(value, places, group, point),
-
-    /** A summary figure, rounded to whole units: the hero, the gross
-     *  sides, the legend and the breakdown, where the tables beneath
-     *  carry the exact amounts. */
-    whole: (value) => decimal.toDisplay(value, 0, group, point),
+    /** A figure denominated in a currency, in whole units. */
+    money: (value) => decimal.toDisplay(value, 0, group, point),
 
     /** A percentage at `places`, already a percentage: 12.5 writes
-     *  12.5%. It keeps the places its caller asks for, because Decimals
-     *  covers money only. */
+     *  12.5%. It keeps the places its caller asks for. */
     percent: (value, places) => decimal.toDisplay(value, places, group, point) + '%',
 
     /** A value tick on the trend chart, in its short form. */
@@ -142,10 +125,9 @@ export function formatter(profile) {
 
     /** A stored decimal string, digit for digit: ounces of gold,
      *  square metres, and every figure a field prefills for editing,
-     *  money included. Its digits are what was typed, never the money
-     *  setting's, because rounding 12.125 ounces misstates the holding
-     *  and a prefill at money places, saved untouched, writes the
-     *  rounding. */
+     *  money included. Its digits are what was typed, because rounding
+     *  12.125 ounces misstates the holding and a prefill in whole
+     *  units, saved untouched, writes the rounding. */
     quantity: (stored) => decimal.toStoredDisplay(stored, group, point),
 
     /** What the reader typed into a quantity field, as the canonical

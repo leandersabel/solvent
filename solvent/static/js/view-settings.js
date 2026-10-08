@@ -84,20 +84,18 @@ function formatCard(vault, reload) {
     return select;
   };
   const group = choose('format-group', format.GROUPS, settings.groupSeparator);
-  const places = choose('format-places', format.PLACES, settings.moneyPlaces);
   const dates = choose('format-dates', format.DATE_STYLES, settings.dateStyle);
 
   const preview = () => {
     const shape = format.formatter({
       locale: language.value || undefined,
       groupSeparator: group.value,
-      moneyPlaces: places.value,
       dateStyle: dates.value,
     });
     sampleFigure.textContent = `${vault.mainCurrency} ${shape.money(1234567890000000000n)}`;
     sampleDate.textContent = shape.longDate(today());
   };
-  for (const control of [language, group, places, dates]) {
+  for (const control of [language, group, dates]) {
     control.addEventListener('change', preview);
   }
   preview();
@@ -111,7 +109,6 @@ function formatCard(vault, reload) {
         ...vault.profile,
         locale: language.value || null,
         groupSeparator: group.value,
-        moneyPlaces: places.value,
         dateStyle: dates.value,
       });
       reload();
@@ -132,7 +129,6 @@ function formatCard(vault, reload) {
       field('Language', 'format-locale', language),
       field('Dates', 'format-dates', dates),
       field('Thousands', 'format-group', group),
-      field('Decimals on money', 'format-places', places),
     ]),
     el('div', { class: 'sample-strip' }, [
       el('p', { class: 'sample' }, [

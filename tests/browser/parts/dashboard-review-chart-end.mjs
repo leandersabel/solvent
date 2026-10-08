@@ -10,6 +10,9 @@
 // model.js, format.js.
 import { check, holdToday, holdings, page, plant, reloadModel, run, setProfile, vaultOwner } from '../harness.mjs';
 
+// 250 as money reads, in whole units (design-system.md, Figures).
+const WHOLE_250 = /^(CHF\s?)?250$/;
+
 const ZONE = 'Europe/Zurich';
 const FIRST = '2026-06-01';
 const LAST = '2026-09-15';
@@ -128,7 +131,7 @@ await run(async () => {
   );
   check(
     'net-worth-view 76: the last figure runs level to today',
-    /250\.00/.test(atEnd.net || '') && /250\.00/.test(level.net || ''),
+    WHOLE_250.test(atEnd.net || '') && WHOLE_250.test(level.net || ''),
     JSON.stringify({ atEnd, level }),
   );
   const g = await geometry();
@@ -163,7 +166,7 @@ await run(async () => {
     [...document.querySelectorAll('.chart-card .data-table tbody tr')].map((tr) => [...tr.cells].map((td) => td.textContent)));
   check(
     "net-worth-view 76: under 1M the data table runs from 2026-09-03 to today, the last recording between",
-    JSON.stringify(rows.map(([date]) => date)) === JSON.stringify([monthBack, last, today]) && /250\.00/.test(rows.at(-1)?.at(-1) || ''),
+    JSON.stringify(rows.map(([date]) => date)) === JSON.stringify([monthBack, last, today]) && WHOLE_250.test(rows.at(-1)?.at(-1) || ''),
     JSON.stringify(rows),
   );
 }, { signsIn: false });

@@ -443,12 +443,11 @@ console.log(JSON.stringify(cases.map(([profile, stored, places]) => {
 
 
 @pytest.mark.skipif(shutil.which("node") is None, reason="node is not installed")
-@pytest.mark.parametrize("money_places", ["0", "2"])
-def test_editable_keeps_every_digit_of_a_rate_and_pads_to_six(money_places):
-    """Criterion 30: identical under either money setting, a short rate
-    is padded to six places and a rate of ten digits or twelve places
-    keeps every one, and each reads back as the stored figure."""
-    profile = {"locale": "en-GB", "groupSeparator": "apostrophe", "moneyPlaces": money_places}
+def test_editable_keeps_every_digit_of_a_rate_and_pads_to_six():
+    """Criterion 30: though money shows whole units, a short rate is
+    padded to six places and a rate of ten digits or twelve places keeps
+    every one, and each reads back as the stored figure."""
+    profile = {"locale": "en-GB", "groupSeparator": "apostrophe"}
     shown = {
         "0.797": "0.797000",
         "0.93124567": "0.93124567",
@@ -468,3 +467,75 @@ def test_editable_keeps_every_digit_of_a_rate_and_pads_to_six(money_places):
     )
     assert result.returncode == 0, result.stderr
     assert json.loads(result.stdout) == [[text, stored] for stored, text in shown.items()]
+
+
+FIGURES = """
+const { formatter } = await import(process.argv[1]);
+const decimal = await import(process.argv[2]);
+const [profile, entry, stored, places] = JSON.parse(process.argv[3]);
+const shape = formatter(profile);
+console.log(JSON.stringify(entry === 'quantity' ? shape.quantity(stored) : shape[entry](decimal.parse(stored), places)));
+"""
+
+
+def written(profile, entry, stored, places):
+    """What the page's formatter writes for a stored figure."""
+    result = subprocess.run(
+        [
+            "node", "--input-type=module", "-e", FIGURES,
+            (JS / "format.js").as_uri(), (JS / "decimal.js").as_uri(),
+            json.dumps([profile, entry, stored, places]),
+        ],
+        capture_output=True,
+        text=True,
+        timeout=60,
+    )
+    assert result.returncode == 0, result.stderr
+    return json.loads(result.stdout)
+
+
+EN_US_PERIOD = {"locale": "en-US", "groupSeparator": "period"}
+DE_DE_COMMA = {"locale": "de-DE", "groupSeparator": "comma"}
+DE_DE_PERIOD = {"locale": "de-DE", "groupSeparator": "period"}
+DE_CH_APOSTROPHE = {"locale": "de-CH", "groupSeparator": "apostrophe"}
+CH = {"locale": "en-US", "groupSeparator": "apostrophe"}
+
+
+@pytest.mark.skipif(shutil.which("node") is None, reason="node is not installed")
+@pytest.mark.parametrize(
+    "profile, entry, stored, places, text",
+    [
+        # Criterion 26: a clashing group mark gives way to the locale's.
+        pytest.param(EN_US_PERIOD, "money", "1234567.89", None, "1,234,568", id="26-en-US-period"),
+        pytest.param(DE_DE_COMMA, "money", "1234567.89", None, "1.234.568", id="26-de-DE-comma"),
+        # design-system.md, Figures: whole units, each rounded half-even.
+        pytest.param(CH, "money", "0.5", None, "0", id="half-to-even-down"),
+        pytest.param(CH, "money", "1.5", None, "2", id="half-to-even-up"),
+        pytest.param(CH, "money", "2.5", None, "2", id="two-and-a-half"),
+        pytest.param(CH, "money", "4220.63501", None, "4’221", id="the-gold-case"),
+        pytest.param(CH, "money", "4220.499999999999", None, "4’220", id="just-under-half"),
+        pytest.param(CH, "money", "-2.5", None, "−2", id="negative-half"),
+        pytest.param(CH, "money", "-1000.6", None, "−1’001", id="negative"),
+        pytest.param(CH, "money", "-0.4", None, "0", id="rounds-to-zero-unsigned"),
+        pytest.param(CH, "money", "-0.5", None, "0", id="half-to-zero-unsigned"),
+        pytest.param(CH, "money", "1000.40", None, "1’000", id="criterion-22"),
+        # Criterion 27 and 28: a percentage keeps the places asked.
+        pytest.param(DE_DE_PERIOD, "percent", "136794.6", 1, "136.794,6%", id="27-large"),
+        pytest.param(DE_DE_PERIOD, "percent", "0.25", 1, "0,2%", id="27-quarter"),
+        pytest.param(DE_DE_PERIOD, "percent", "0.35", 1, "0,4%", id="27-up"),
+        pytest.param(DE_DE_PERIOD, "percent", "-0.25", 1, "−0,2%", id="27-negative"),
+        pytest.param(DE_DE_PERIOD, "percent", "-0.04", 1, "0,0%", id="27-unsigned-zero"),
+        pytest.param(DE_DE_PERIOD, "percent", "-50", 0, "−50%", id="27-whole"),
+        pytest.param(DE_CH_APOSTROPHE, "percent", "10957493", 1, "10’957’493.0%", id="28"),
+        # Criterion 23: a quantity keeps its stored digits.
+        pytest.param(CH, "quantity", "12.125", None, "12.125", id="23-three-places"),
+        pytest.param(CH, "quantity", "12.50", None, "12.50", id="23-trailing-zero"),
+        pytest.param(CH, "quantity", "80", None, "80", id="23-whole"),
+    ],
+)
+def test_the_formatter_writes_money_whole_and_everything_else_as_it_was(profile, entry, stored, places, text):
+    """Criteria 22, 23, 26, 27 and 28, and design-system.md, Figures:
+    money in whole units, each figure rounded half-even on its own, a
+    figure that rounds to zero unsigned, and percentages and quantities
+    untouched by it."""
+    assert written(profile, entry, stored, places) == text

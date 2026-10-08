@@ -162,8 +162,9 @@ await run(async () => {
   await recording(BACKDATE, {
     [NAME]: '1234567.89', [MARKUP_NAME]: '2500000.00', 'Euro savings': '3400000.00', [UNBROKEN_NAME]: '1500000.00',
   });
-  // A second seven-digit figure for the holding, and a second, differing
-  // price for another unit, both on the date.
+  // A second seven-digit figure for the holding, shown in whole units as
+  // 9,876,543 beside 1,234,568, and a second, differing price for another
+  // unit, both on the date.
   await plant([
     { type: 'snapshot', accountId: ids[NAME], payload: { date: BACKDATE, value: '9876543.21', note: null } },
     {
@@ -186,7 +187,7 @@ await run(async () => {
     const digits = seen.text.replace(/\D/g, '');
     check(`both figures and both prices show Keep this one ${at}`, seen.keeps === 4, String(seen.keeps));
     check(`the date, the holding, both figures, the unit and the provenance show ${at}`,
-      seen.heading !== '' && seen.text.includes(NAME) && digits.includes('123456789') && digits.includes('987654321') &&
+      seen.heading !== '' && seen.text.includes(NAME) && digits.includes('1234568') && digits.includes('9876543') &&
       seen.text.includes('USD') && seen.text.includes('EUR') && seen.text.includes('Market rate') && seen.text.includes('Edited from'),
       seen.text.slice(0, 400));
     check(`a holding's name is shown as text, never run as markup ${at}`, seen.text.includes(MARKUP_NAME) && !seen.markupRan);

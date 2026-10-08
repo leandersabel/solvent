@@ -35,7 +35,7 @@ await run(async () => {
   const pageFields = await fieldNames('main');
   check(
     'a screen reader names each list and password field in Settings by the label shown beside it',
-    pageFields.labels.join('|') === 'Language|Dates|Thousands|Decimals on money|Current password|New password|Confirm new password|Idle lock' &&
+    pageFields.labels.join('|') === 'Language|Dates|Thousands|Current password|New password|Confirm new password|Idle lock' &&
       pageFields.names.join('|') === pageFields.labels.join('|'),
     JSON.stringify(pageFields),
   );
@@ -66,11 +66,10 @@ await run(async () => {
   );
   await setSelect('format-locale', 'de-CH');
   await setSelect('format-group', 'apostrophe');
-  await setSelect('format-places', '0');
   await setSelect('format-dates', 'dmy');
   await page.frames();
   const sample = await page.eval(
-    "[...document.querySelectorAll('#format-places')][0].closest('.card').querySelector('.hint ~ .hint, .hint').textContent",
+    "[...document.querySelectorAll('#format-group')][0].closest('.card').querySelector('.hint ~ .hint, .hint').textContent",
   );
   check('the card previews the choice before it is saved', true, sample);
 
@@ -103,8 +102,7 @@ await run(async () => {
     !(await page.eval("Boolean(document.querySelector('#unlock-password'))")),
   );
 
-  // Decimals on money = None: a holding in a currency loses its cents
-  // (8300.50 is a tie and rounds to the even franc), one in another unit
+  // A holding in a currency shows whole units (8300.50 is a tie and rounds to the even franc), one in another unit
   // shows exactly the digits stored (12.125 ounces must not read 12.12).
   const nativeFigure = (name) => page.call((holding) => {
     const row = [...document.querySelectorAll('.data-table tbody tr')]
@@ -237,8 +235,8 @@ await run(async () => {
   // Something chosen in another card, unsaved, which a retry of this
   // card alone leaves where it is.
   await page.eval(`(() => {
-    const select = document.getElementById('format-places');
-    select.value = '2';
+    const select = document.getElementById('format-group');
+    select.value = 'comma';
     select.dispatchEvent(new Event('change', { bubbles: true }));
   })()`);
   await page.call((words) => {
@@ -248,7 +246,7 @@ await run(async () => {
   await page.waitUntil("document.body.innerText.includes('This session')", { label: 'the list after a retry' });
   check(
     'a retry reloads the session card alone',
-    (await page.eval("document.getElementById('format-places').value")) === '2',
+    (await page.eval("document.getElementById('format-group').value")) === 'comma',
   );
 
   // At phone width the chip keeps "This session" whole, on one line.

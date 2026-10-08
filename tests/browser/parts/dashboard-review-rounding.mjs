@@ -1,11 +1,10 @@
-// The summary figures add up as shown, written from
+// The summary figures each round on their own, written from
 // spec/features/net-worth-view.md (Hero figure, Breakdown by dimension
 // and acceptance criterion 66) without reading how the screen is built
-// or tested. The total rounds once, half-even. Each bar, and each of
-// gross assets and gross liabilities, rounds toward minus infinity, and
-// the units still missing go to the largest remainders, ties to the
-// earlier one. So the figures as shown add up to the total as shown, and
-// none moves a whole unit from its exact value.
+// or tested. The total rounds the exact sum once, half-even, to whole
+// units, and each bar and each of gross assets and gross liabilities
+// rounds its own exact figure the same way, so the parts as shown need
+// not add up to the total as shown.
 // Templates: dashboard.html. Modules: view-dashboard.js, decimal.js,
 // format.js.
 import { check, holdings, page, plant, reloadModel, run, setProfile, vaultOwner } from '../harness.mjs';
@@ -18,15 +17,6 @@ const halfEven = (exact) => {
   const q = floorDiv(exact, UNIT);
   const twice = (exact - q * UNIT) * 2n;
   return twice > UNIT || (twice === UNIT && q % 2n !== 0n) ? q + 1n : q;
-};
-// The spec's method, over exact parts, in the order shown.
-const shares = (parts) => {
-  const floors = parts.map((p) => floorDiv(p, UNIT));
-  const rests = parts.map((p, i) => p - floors[i] * UNIT);
-  let missing = halfEven(parts.reduce((a, b) => a + b, 0n)) - floors.reduce((a, b) => a + b, 0n);
-  const order = parts.map((_, i) => i).sort((a, b) => (rests[b] > rests[a] ? 1 : rests[b] < rests[a] ? -1 : a - b));
-  for (const i of order) if (missing-- > 0n) floors[i] += 1n;
-  return floors;
 };
 const exactOf = (decimal) => {
   const [whole, frac = ''] = decimal.replace('-', '').split('.');
@@ -83,29 +73,18 @@ const verify = (where, shown, bands, assets, liabilities) => {
     `bars ${JSON.stringify(names)}, bands ${JSON.stringify(Object.keys(bands))}`);
   if (known) {
     const got = shown.bars.map(([, amount]) => shownValue(amount));
-    const want = shares(names.map((n) => bands[n]));
-    check(`net-worth-view: each bar reads as the spec's rounding gives ${where}`,
+    const want = names.map((n) => halfEven(bands[n]));
+    check(`net-worth-view: each bar reads its own exact figure rounded half-even ${where}`,
       got.every((g, i) => g === want[i]),
       `shows ${JSON.stringify(shown.bars)}, exact ${JSON.stringify(names.map((n) => asDecimal(bands[n])))}, wants ${want.join(', ')}`);
-    check(`net-worth-view: the bars as shown add up to the total as shown ${where}`,
-      got.every((g) => g !== null) && got.reduce((a, b) => a + b, 0n) === gotTotal,
-      `${JSON.stringify(shown.bars)} against ${shown.total}`);
-    check(`net-worth-view: no bar moves a whole unit from its exact value ${where}`,
-      got.every((g, i) => g !== null && g * UNIT - bands[names[i]] < UNIT && bands[names[i]] - g * UNIT < UNIT),
-      JSON.stringify(shown.bars));
   }
 
-  // Gross liabilities may be written signed or as a magnitude: either
-  // way it is the magnitude that is subtracted.
+  // Gross liabilities may be written signed or as a magnitude.
   const [a, l] = shown.parts.map((p) => shownValue(p || ''));
-  const [wantA, wantL] = shares([assets, liabilities]);
   const magnitude = (n) => (n < 0n ? -n : n);
-  check(`net-worth-view: gross assets and liabilities as shown add up to the total as shown ${where}`,
-    a !== null && l !== null && a - magnitude(l) === gotTotal,
-    `${JSON.stringify(shown.parts)} against ${shown.total}`);
-  check(`net-worth-view: gross assets and liabilities read as the spec's rounding gives ${where}`,
-    a === wantA && l !== null && magnitude(l) === magnitude(wantL),
-    `shows ${JSON.stringify(shown.parts)}, exact ${asDecimal(assets)} and ${asDecimal(liabilities)}, wants ${wantA} and ${wantL}`);
+  check(`net-worth-view: gross assets and liabilities each read their own exact figure rounded half-even ${where}`,
+    a === halfEven(assets) && l !== null && magnitude(l) === magnitude(halfEven(liabilities)),
+    `shows ${JSON.stringify(shown.parts)}, exact ${asDecimal(assets)} and ${asDecimal(liabilities)}`);
 };
 
 // A seeded generator, so a failing round is the same round next time.
@@ -119,7 +98,7 @@ await run(async () => {
   await vaultOwner();
   const fourBands = { id: 'four', label: 'Four', values: ['a', 'b', 'c', 'd'].map((v) => ({ id: v, label: `Band ${v.toUpperCase()}` })) };
   const sixValues = { id: 'six', label: 'Six', values: ['p', 'q', 'r', 's', 't', 'u'].map((v) => ({ id: v, label: `Value ${v.toUpperCase()}` })) };
-  await setProfile({ dimensions: [fourBands, sixValues], locale: 'de-CH', groupSeparator: 'apostrophe', moneyPlaces: '0' });
+  await setProfile({ dimensions: [fourBands, sixValues], locale: 'de-CH', groupSeparator: 'apostrophe' });
 
   const first = await holdings([
     ['Holding A', 'CHF', { four: 'a', six: 'p' }],
@@ -141,21 +120,21 @@ await run(async () => {
     values.filter((v) => v < 0n).reduce((a, b) => a + b, 0n),
   ];
 
-  // Criterion 66, under de-CH with an apostrophe and no decimals on money.
+  // Criterion 66, under de-CH with an apostrophe.
   const c66 = { 'Holding A': '1234.50', 'Holding B': '4133.26', 'Holding C': '41373.46', 'Holding D': '340000' };
   await record(byName(first)(c66));
   await groupBy('four');
   const shown66 = await read();
   const plain = (s) => (s || '').replace(/[’']/g, "'").replace(/^[^0-9−-]*/, '').trim();
-  check('net-worth-view: criterion 66 reads 1\'235, 4\'133, 41\'373 and 340\'000 under 386\'741',
-    JSON.stringify(shown66.bars.map(([, amount]) => plain(amount))) === JSON.stringify(["1'235", "4'133", "41'373", "340'000"]) &&
+  check('net-worth-view: criterion 66 reads 1\'234, 4\'133, 41\'373 and 340\'000 under 386\'741',
+    JSON.stringify(shown66.bars.map(([, amount]) => plain(amount))) === JSON.stringify(["1'234", "4'133", "41'373", "340'000"]) &&
       plain(shown66.total) === "386'741",
     JSON.stringify(shown66));
   const values66 = Object.values(c66).map(exactOf);
   verify('in criterion 66', shown66, Object.fromEntries(values66.map((v, i) => [`Band ${'ABCD'[i]}`, v])), ...gross(values66));
 
-  // The spec's own example: three bands of 0.40 make a total of 1, and
-  // the one unit goes to the earliest of the tied bars.
+  // The spec's own example: three bands of 0.40 each read 0 under a
+  // total of 1.
   await record(byName(first)({ 'Holding A': '0.40', 'Holding B': '0.40', 'Holding C': '0.40', 'Holding D': '0' }));
   await groupBy('four');
   const forties = await read();
@@ -163,14 +142,14 @@ await run(async () => {
   verify('with three bands of 0.40', forties, exactly({ 'Band A': '0.40', 'Band B': '0.40', 'Band C': '0.40', 'Band D': '0' }),
     exactOf('1.20'), 0n);
 
-  // Gross figures alone: 0.60 of assets and 0.30 of liabilities show a
-  // total of 0, and 0.50 against 0.50 too, with no minus on a zero.
+  // Gross figures alone: 3.10 of assets and 2.80 of liabilities show 3
+  // and 3 under a total of 0, with no minus on a zero.
   await record(byName(first)({ 'Holding A': '0.60', 'Holding B': '-0.30', 'Holding C': '2.50', 'Holding D': '-2.50' }));
   await groupBy('four');
   verify('with assets and liabilities under a unit apart', await read(),
     exactly({ 'Band A': '0.60', 'Band B': '-0.30', 'Band C': '2.50', 'Band D': '-2.50' }), exactOf('3.10'), exactOf('-2.80'));
 
-  // A total of exactly 3.50 shows 4, which takes three units shared out.
+  // A total of exactly 3.50 shows 4 over bars of 2, 2, 0 and 0.
   await record(byName(first)({ 'Holding A': '1.75', 'Holding B': '1.75', 'Holding C': '-0.25', 'Holding D': '0.25' }));
   await groupBy('four');
   verify('with a total of exactly 3.50', await read(),

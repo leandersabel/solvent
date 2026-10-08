@@ -124,14 +124,14 @@ await run(async () => {
   await show({
     ...bands,
     today: '2026-03-01',
-    figures: [['First', '2026-03-01', '4503599627370496.25'], ['Second', '2026-03-01', '4503599627370496.25']],
+    figures: [['First', '2026-03-01', '4503599627370496.4'], ['Second', '2026-03-01', '4503599627370496.4']],
   });
   await group();
   const exact = await table();
   check(
-    'net-worth-view: two holdings at 4503599627370496.25 in different bands give a data table Net worth of 9,007,199,254,740,992.50',
-    exact.rows.length === 1 && exact.rows[0].at(-1) === '9,007,199,254,740,992.50' &&
-      exact.rows[0].slice(1, -1).every((cell) => cell === '4,503,599,627,370,496.25'),
+    'net-worth-view: two holdings at 4503599627370496.4 in different bands give a data table Net worth of 9,007,199,254,740,993',
+    exact.rows.length === 1 && exact.rows[0].at(-1) === '9,007,199,254,740,993' &&
+      exact.rows[0].slice(1, -1).every((cell) => cell === '4,503,599,627,370,496'),
     JSON.stringify(exact),
   );
 

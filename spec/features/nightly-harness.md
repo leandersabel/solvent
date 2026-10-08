@@ -367,8 +367,8 @@ record-rate.md, Reading, computed independently of the app in
 - With no holding valued the total, `assets` and `debts` are `null`,
   because the dashboard shows `—` for each.
 - Each is given `exact`, at scale 12 without trailing zeros, and
-  `display`, rounded half-even to the places the vault's profile shows,
-  with no grouping and `-` for a negative.
+  `display`, rounded half-even to whole units, with no grouping and `-`
+  for a negative.
 
 Archived holdings, holdings with no quantity and holdings with no price
 are listed by name under `excluded`, with the reason. An archived

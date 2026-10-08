@@ -164,11 +164,6 @@ export class Vault {
     return `${this.mainCurrency} ${this.format.money(value)}`;
   }
 
-  /** The same, rounded to whole units for a summary figure. */
-  mainWhole(value) {
-    return `${this.mainCurrency} ${this.format.whole(value)}`;
-  }
-
   /** How a unit reads, from the symbol table (design-system.md,
    *  Units). A currency is named by its code, written ahead of a
    *  figure. Any other listed unit is named by its whole label ("Gold,
@@ -190,7 +185,7 @@ export class Vault {
     return this.unitOf(symbol).name;
   }
 
-  /** A stored value as its unit shows it: money places for a currency,
+  /** A stored value as its unit shows it: whole units for a currency,
    *  and for any other unit exactly the stored digits, where rounding
    *  12.125 ounces would misstate the holding. */
   figure(stored, symbol) {
@@ -439,17 +434,6 @@ export class Vault {
       priceDate: price.date,
       converted: decimal.multiply(quantity, price.rate),
     };
-  }
-
-  /** Each valued active holding's converted figure as shown, at the
-   *  money places, shared out so the figures add up to the net as
-   *  shown (net-worth-view.md, Shown figures). Keyed by holding. */
-  shownFigures(mode = 'latest') {
-    const valued = this.activeHoldings()
-      .map((holding) => [holding, this.valueOf(holding, mode)])
-      .filter(([, value]) => value.state === 'valued');
-    const shown = decimal.apportion(valued.map(([, value]) => value.converted), this.format.places);
-    return new Map(valued.map(([holding], i) => [holding, shown[i]]));
   }
 
   /** A signed sum. Gross assets and gross liabilities are carried
