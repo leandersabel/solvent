@@ -783,7 +783,7 @@ The same Dialog, prefilled with the stored value, date and note.
   > Fund 2 was archived in another window. Nothing was saved.
 
   A move reads "Nothing was moved.", and a holding that is gone
-  "deleted".
+  "deleted". A holding name with no break in it wraps inside the Dialog.
 - **Validation**: the quantity field's and the Date field's own rules
   (Refusing a date).
 - **Archived holding**: the entry point does not exist for it, at any
@@ -1756,3 +1756,7 @@ Editing an existing entry).
      announced by its visible label, "Note". Test:
      `tests/browser/parts/snapshot-entry.mjs`,
      `tests/browser/parts/snapshot-entry-review-note.mjs`.
+108. (walk) At 320px and 375px wide, the message that a holding was
+     archived in another window wraps a holding name with no break in it
+     inside the Dialog. Test:
+     `tests/browser/parts/snapshot-entry-long-name.mjs`.
