@@ -55,8 +55,12 @@ function render(focus) {
   if (section === 'password') mount(body, passwordCard());
 }
 
+// A table on its way is skeleton rows, never a word (design-system.md,
+// States, Loading).
+const skeletonRows = () => [1, 2, 3].map(() => el('div', { class: 'skeleton-row', 'aria-hidden': 'true' }));
+
 function invites(body) {
-  const list = el('div', {}, [el('p', { class: 'hint', text: 'Loading…' })]);
+  const list = el('div', {}, skeletonRows());
   const outstanding = el('section', { class: 'card' }, [
     el('h2', { class: 'section-heading', text: 'Outstanding invites' }),
     list,
@@ -291,7 +295,7 @@ function callBack(row, list, error) {
 }
 
 async function accounts(body, focus) {
-  mount(body, el('p', { class: 'hint', text: 'Loading…' }));
+  mount(body, skeletonRows());
   let rows;
   try {
     rows = await api.get('/api/admin/accounts');
@@ -426,7 +430,7 @@ function lookupControl() {
 }
 
 async function unitTable(body) {
-  mount(body, el('p', { class: 'hint', text: 'Loading…' }));
+  mount(body, skeletonRows());
   let rows;
   try {
     rows = await api.get('/api/admin/symbols');
