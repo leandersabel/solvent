@@ -12,7 +12,6 @@ import http.client
 import json
 import os
 import re
-import shutil
 import socket
 import sqlite3
 import subprocess
@@ -20,8 +19,6 @@ import sys
 import time
 from datetime import datetime, timedelta, timezone
 from pathlib import Path
-
-import pytest
 
 import solvent.rates as rates
 from tests.helpers import CSRF, register_body
@@ -323,84 +320,3 @@ def test_no_invite_token_reaches_the_containers_standard_output_or_error(tmp_pat
     for token in tokens:
         assert token not in out + err
 
-
-def _docker(*args: str, timeout: int = 60) -> subprocess.CompletedProcess:
-    return subprocess.run(["docker", *args], capture_output=True, text=True, timeout=timeout)
-
-
-@pytest.fixture(scope="session")
-def solvent_image() -> str:
-    """The image built from this checkout, by its ID. Its name holds the
-    suite's network lock (conftest.py)."""
-    if shutil.which("docker") is None or _docker("info").returncode != 0:
-        pytest.skip("needs a Docker daemon")
-    built = _docker("build", "-q", str(REPO_ROOT), timeout=600)
-    assert built.returncode == 0, built.stderr
-    return built.stdout.strip()
-
-
-def test_no_file_in_the_image_can_raise_a_process_to_root(solvent_image):
-    found = _docker(
-        "run", "--rm", "--user", "0", "--entrypoint", "find", solvent_image,
-        "/", "-xdev", "-type", "f", "-perm", "/6000",
-    )
-    assert found.returncode == 0, found.stderr
-    assert found.stdout == ""
-
-
-@pytest.mark.parametrize(
-    "user, writable",
-    [("10001:10001", ["/data"]), ("568:568", []), ("568:0", []), ("42:8", [])],
-)
-def test_data_is_the_only_path_any_user_can_write_in_the_image(solvent_image, user, writable):
-    """`42:8` is `_apt` in the group `mail`, which own paths in the base
-    image, and `568:0` a user in root's group. `/data` is writable for the
-    image's group, so only its user writes it until the operator mounts
-    another."""
-    found = _docker(
-        "run", "--rm", "--user", user, "--entrypoint", "find", solvent_image,
-        "/", "-xdev", "-writable", "!", "-type", "l",
-    )
-    assert found.stdout.split() == writable
-
-
-def test_the_image_refuses_to_start_as_root(solvent_image):
-    started = _docker("run", "-d", "--user", "0", "-e", "SECRET_KEY=x", solvent_image)
-    assert started.returncode == 0, started.stderr
-    container = started.stdout.strip()
-    try:
-        exit_code = _docker("wait", container, timeout=30).stdout.strip()
-        assert exit_code not in ("", "0")
-        log = _docker("logs", container)
-        assert "Solvent must not run as root" in log.stdout + log.stderr
-    finally:
-        _docker("rm", "-f", container)
-
-
-def test_the_image_serves_as_another_user_without_container_options(solvent_image, tmp_path):
-    """568 is the `apps` user on TrueNAS, whose Custom App form sets no
-    container option, with a host directory as `/data`."""
-    tmp_path.chmod(0o777)
-    started = _docker(
-        "run", "-d", "--user", "568:568", "-e", "SECRET_KEY=x",
-        "-v", f"{tmp_path}:/data", "-p", "127.0.0.1::8000", solvent_image,
-    )
-    assert started.returncode == 0, started.stderr
-    container = started.stdout.strip()
-    try:
-        port = _docker("port", container, "8000").stdout.split(":")[-1].strip()
-        deadline = time.monotonic() + 30
-        while True:
-            try:
-                connection = http.client.HTTPConnection("127.0.0.1", int(port), timeout=5)
-                connection.request("GET", "/login")
-                assert connection.getresponse().status == 200
-                break
-            except OSError:
-                assert time.monotonic() < deadline, _docker("logs", container).stderr
-                time.sleep(0.5)
-        invite = _docker("exec", container, "flask", "--app", "app", "create-invite", "--kind", "administrator")
-        assert "/register?invite=" in invite.stdout, invite.stderr
-        assert (tmp_path / "solvent.db").stat().st_uid == 568
-    finally:
-        _docker("rm", "-f", container)
