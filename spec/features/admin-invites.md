@@ -535,8 +535,9 @@ Refusals).
 - `POST /api/admin/invites/<id>/revoke` sets `status: revoked`, and a
   revoked link already sent is refused at once. Idempotent on a revoked
   invite. An administrator may revoke their own invites with no special
-  case. A used one is a Conflict, its status unchanged, with a message
-  pointing at removing the account.
+  case. A used one is a Conflict `{"refused":"invite-used"}`, its status
+  unchanged, because removing the account is the only remedy and the
+  reason lets the screen say so (Admin, States).
 - `GET /api/admin/accounts` returns, per account, `{ username, kind,
   createdAt, lastLoginAt }`, plus `itemCount` **for a vault owner
   only**. Both kinds are listed, because an administrator needs to see
@@ -724,7 +725,8 @@ administrator), and the lost sole password (Bootstrap). The rest:
    `tests/test_register_refusals.py::test_the_five_bad_tokens_answer_the_same_bytes`,
    `tests/test_auth.py::test_the_register_page_renders_one_message_for_every_bad_invite`.
 9. (walk) Revoking a revoked invite succeeds again, and revoking a
-   `used` one is a Conflict that leaves its status. Test:
+   `used` one is a Conflict `{"refused":"invite-used"}` that leaves its
+   status. Test:
    `tests/test_admin.py::test_revoking_is_idempotent_and_refused_on_a_used_invite`.
 10. `POST /api/admin/invites` without `kind`, or with a value other than
     the two kinds, is a Bad Request and creates nothing. Test:

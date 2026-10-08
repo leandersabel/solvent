@@ -15,7 +15,7 @@ import uuid
 from datetime import datetime, timedelta, timezone
 from typing import Literal, Optional
 
-from flask import Blueprint, abort, g, jsonify, request
+from flask import Blueprint, abort, g, jsonify, make_response, request
 
 from . import crypto
 from .db import get_db, utcnow, write_transaction
@@ -124,7 +124,7 @@ def revoke_invite(invite_id: str):
         if row is None:
             abort(404)
         if row["status"] == "used":
-            abort(409)
+            abort(make_response(jsonify(refused="invite-used"), 409))
         conn.execute(
             "UPDATE invites SET status = 'revoked' WHERE id = ?", (invite_id,)
         )

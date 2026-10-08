@@ -83,6 +83,7 @@ def test_revoking_is_idempotent_and_refused_on_a_used_invite(app, admin):
     register(app, "sarah", invite_token=used["token"])
     response = admin.post(f"/api/admin/invites/{used['id']}/revoke", json={}, headers=CSRF)
     assert response.status_code == 409
+    assert response.get_json() == {"refused": "invite-used"}
     assert rows(app, "SELECT status FROM invites WHERE id = ?", (used["id"],))[0]["status"] == "used"
 
 
