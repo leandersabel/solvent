@@ -1749,4 +1749,5 @@ Editing an existing entry).
 106. (walk) At 320px, 375px, 601px, 901px and 1280px wide, a holding
      name with no break in it wraps on Update values, is shown whole
      inside its card and pans nothing sideways. Test:
-     `tests/browser/parts/update-values-long-name.mjs`.
+     `tests/browser/parts/update-values-long-name.mjs`,
+     `tests/browser/parts/update-values-review-long-name.mjs`.
