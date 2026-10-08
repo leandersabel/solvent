@@ -200,6 +200,7 @@ await run(async () => {
       await page.eval("!document.body.innerText.includes('Choose a unit, or type one') && document.body.innerText.includes('Use it from there') && document.querySelector('#holding-unit-other').getAttribute('aria-invalid') === 'true'"),
     );
     check('typed text matching a listed symbol offers that symbol', (await text()).includes('USD is on the list'));
+    check('and no longer says you enter its price yourself', !(await text()).includes('You enter the price yourself'));
     await page.eval("document.querySelector('.dialog button[type=submit]').click()");
     await page.holds("document.body.innerText.includes('Use it from there')");
     check('and that free text is not accepted', (await writesSeen()).length === 0 && (await text()).includes('Use it from there'));

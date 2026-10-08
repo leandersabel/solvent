@@ -203,11 +203,11 @@ function unitPicker(vault, current, locked) {
     list.replaceChildren(...children);
     list.hidden = false;
     freeText.hidden = !other;
-    freeNote.hidden = !other;
     freeNote.textContent =
       'You enter the price yourself each time you record a value. Not listed? This list is set up for the whole instance by an administrator, not per vault.';
-    if (other) offerListed();
-    else listed.hidden = true;
+    // Neither sentence is true of a listed symbol the form offers.
+    freeNote.hidden = !other || Boolean(offerListed());
+    if (!other) listed.hidden = true;
     commitment.textContent =
       'You can change this until you record a value for this holding. After that it is fixed, and the only way to a different unit is to archive this holding and start a new one.';
     const shown = value && !other ? describe(value) : '';
