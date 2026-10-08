@@ -103,7 +103,7 @@ await run(async () => {
       const { result } = await page.send('Runtime.evaluate', { expression: "document.querySelector('#import-file')" });
       await page.send('DOM.setFileInputFiles', { files: [path], objectId: result.objectId });
       await page.send('Runtime.releaseObject', { objectId: result.objectId });
-      await page.waitUntil("window.__taken && (!document.querySelector('#import-card .field-error').hidden || !document.querySelector('#import-password').closest('[hidden]'))", { label: 'the file to be taken' });
+      await page.waitUntil("window.__taken && (!document.querySelector('#import-card > .field-error').hidden || !document.querySelector('#import-password').closest('[hidden]'))", { label: 'the file to be taken' });
     };
     const openWith = async (password) => {
       await page.waitUntil("!document.querySelector('#import-password').closest('[hidden]')", { label: 'the password step' });
@@ -112,7 +112,7 @@ await run(async () => {
     };
     const replaceVault = () =>
       page.eval("[...document.querySelectorAll('#import-card button')].find(b => b.textContent === 'Replace my vault').click()");
-    const importError = () => page.eval("document.querySelector('#import-card .field-error').hidden ? '' : document.querySelector('#import-card .field-error').textContent");
+    const importError = () => page.eval("document.querySelector('#import-card > .field-error').hidden ? '' : document.querySelector('#import-card > .field-error').textContent");
     // Everything the vault decrypts to, keyed by record id.
     const decrypted = () =>
       inPage(async ({ v, c }) => {
@@ -362,7 +362,7 @@ await run(async () => {
     ]) {
       await chooseFile(fixture(name, JSON.stringify(file)));
       await openWith(VAULT_PASSWORD);
-      await page.waitUntil((words) => document.querySelector('#import-card .field-error').textContent.includes(words), { args: [says], timeout: 60000, label: name });
+      await page.waitUntil((words) => document.querySelector('#import-card > .field-error').textContent.includes(words), { args: [says], timeout: 60000, label: name });
       check(
         `a sealed file that ${says} is refused once its password opens it, uploading nothing`,
         (await uploads()) === 0 && (await page.eval("document.querySelector('.review').hidden")) && vaultRows() === rowsBefore,
@@ -373,7 +373,7 @@ await run(async () => {
     await chooseFile(exportedPath);
     const callsBefore = await apiCalls('/api/');
     await openWith('not the password of this file');
-    await page.waitUntil("document.querySelector('#import-card .field-error').textContent.includes('does not open')", { timeout: 60000, label: 'the wrong password' });
+    await page.waitUntil("document.querySelector('#import-card > .field-error').textContent.includes('does not open')", { timeout: 60000, label: 'the wrong password' });
     check(
       'a wrong password for the file stops there, sends nothing, and keeps the file chosen',
       (await apiCalls('/api/')) === callsBefore &&
@@ -400,11 +400,19 @@ await run(async () => {
       review,
     );
     await replaceVault();
-    await page.holds("!document.querySelector('#import-card .field-error').hidden");
+    await page.holds("document.querySelector('#import-erase-line').textContent !== ''");
+    const eraseLine = () =>
+      page.eval("(({ textContent }, field) => ({ text: textContent, invalid: field.getAttribute('aria-invalid'), describedBy: field.getAttribute('aria-describedby') }))(document.querySelector('#import-erase-line'), document.querySelector('#import-erase'))");
+    const refused = await eraseLine();
     check(
-      'a vault holding records is not replaced without ERASE typed',
-      (await importError()).includes('Type ERASE') && (await uploads()) === 0 && vaultRows() === rowsBefore,
+      'a vault holding records is not replaced without ERASE typed, and the ERASE field says so on its own message line',
+      refused.text.includes('Type ERASE') && refused.invalid === 'true' && refused.describedBy === 'import-erase-line' &&
+        (await importError()) === '' && (await uploads()) === 0 && vaultRows() === rowsBefore,
+      JSON.stringify(refused),
     );
+    await setValue('#import-erase', 'ERASE');
+    const fits = await eraseLine();
+    check('the ERASE error goes the moment ERASE is typed', fits.text === '' && fits.invalid === null, JSON.stringify(fits));
 
     const altered = JSON.parse(formatOne());
     const target = altered.records.find((record) => record.recordType === 'snapshot');
@@ -413,7 +421,7 @@ await run(async () => {
     target.ciphertext = bytes.toString('base64');
     await chooseFile(fixture('altered.json', JSON.stringify(altered)));
     await openWith(VAULT_PASSWORD);
-    await page.waitUntil("document.querySelector('#import-card .field-error').textContent.includes('damaged')", { timeout: 60000, label: 'the refused record' });
+    await page.waitUntil("document.querySelector('#import-card > .field-error').textContent.includes('damaged')", { timeout: 60000, label: 'the refused record' });
     check(
       'one byte altered in one record is refused before the review, counted and not named, uploading nothing',
       (await importError()) === 'This file is damaged and cannot be restored. 1 record in it could not be read. Your vault is unchanged.' &&
@@ -468,7 +476,7 @@ await run(async () => {
     provoked.push('/api/import');
     await answering((r) => r.url.endsWith('/api/import'), 500, async () => {
       await replaceVault();
-      await page.waitUntil("document.querySelector('#import-card .field-error').textContent.includes('fully intact')", { timeout: 60000, label: 'the refused upload' });
+      await page.waitUntil("document.querySelector('#import-card > .field-error').textContent.includes('fully intact')", { timeout: 60000, label: 'the refused upload' });
     });
     check('an import the server refuses says the original vault is intact, and it is', vaultRows() === rowsBefore);
 

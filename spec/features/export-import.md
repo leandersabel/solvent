@@ -524,7 +524,8 @@ There is no `formatVersion` below 1.
 22. (walk) Into a non-empty vault, an import without the typed `ERASE`
     is refused and changes nothing. Test:
     `tests/browser/parts/export-import.mjs`,
-    `tests/browser/parts/export-import-review-unreadable.mjs`.
+    `tests/browser/parts/export-import-review-unreadable.mjs`,
+    `tests/browser/parts/export-import-review-erase.mjs`.
 23. (walk) The review sets the file against what will be deleted, in the
     same kinds, prices on their own line. Test:
     `tests/browser/parts/export-import.mjs`,
