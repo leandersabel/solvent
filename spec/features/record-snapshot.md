@@ -672,7 +672,8 @@ Account detail).
   live result converts for **the date on the form**: the date's own
   price where one exists, else the proposal for that date, else the
   price at that date (Screens).
-- **Note**: optional, collapsed behind "Add a note".
+- **Note**: optional, collapsed behind "Add a note" and labelled
+  "Note" once open.
 - **The prices line**, folded, below.
 - Primary **Save**.
 
@@ -1751,3 +1752,7 @@ Editing an existing entry).
      inside its card and pans nothing sideways. Test:
      `tests/browser/parts/update-values-long-name.mjs`,
      `tests/browser/parts/update-values-review-long-name.mjs`.
+107. (walk) Once "Add a note" is open on the value form, the note box is
+     announced by its visible label, "Note". Test:
+     `tests/browser/parts/snapshot-entry.mjs`,
+     `tests/browser/parts/snapshot-entry-review-note.mjs`.
