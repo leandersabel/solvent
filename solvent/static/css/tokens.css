@@ -609,6 +609,7 @@ svg:focus-visible {
   color: var(--status-critical);
   font-size: 13px;
   margin: 4px 0;
+  overflow-wrap: anywhere;
 }
 
 .field-error::before { content: "\26a0  "; }
