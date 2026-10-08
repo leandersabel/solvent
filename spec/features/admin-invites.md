@@ -535,8 +535,9 @@ Refusals).
 - `POST /api/admin/invites/<id>/revoke` sets `status: revoked`, and a
   revoked link already sent is refused at once. Idempotent on a revoked
   invite. An administrator may revoke their own invites with no special
-  case. A used one is a Conflict, its status unchanged, with a message
-  pointing at removing the account.
+  case. A used one is a Conflict `{"refused":"invite-used"}`, its status
+  unchanged, because removing the account is the only remedy and the
+  reason lets the screen say so (Admin, States).
 - `GET /api/admin/accounts` returns, per account, `{ username, kind,
   createdAt, lastLoginAt }`, plus `itemCount` **for a vault owner
   only**. Both kinds are listed, because an administrator needs to see
@@ -724,8 +725,10 @@ administrator), and the lost sole password (Bootstrap). The rest:
    `tests/test_register_refusals.py::test_the_five_bad_tokens_answer_the_same_bytes`,
    `tests/test_auth.py::test_the_register_page_renders_one_message_for_every_bad_invite`.
 9. (walk) Revoking a revoked invite succeeds again, and revoking a
-   `used` one is a Conflict that leaves its status. Test:
-   `tests/test_admin.py::test_revoking_is_idempotent_and_refused_on_a_used_invite`.
+   `used` one is a Conflict `{"refused":"invite-used"}` that leaves its
+   status. Test:
+   `tests/test_admin.py::test_revoking_is_idempotent_and_refused_on_a_used_invite`,
+   `tests/test_review_admin_invites.py::test_review_calling_back_a_used_link_is_a_conflict_naming_invite_used`.
 10. `POST /api/admin/invites` without `kind`, or with a value other than
     the two kinds, is a Bad Request and creates nothing. Test:
     `tests/test_admin.py::test_kind_is_required_and_has_no_default`.
@@ -928,7 +931,9 @@ administrator), and the lost sole password (Bootstrap). The rest:
     refreshes its row to Used, reading "This link has already been
     used. Remove the account instead.", and a call back the server
     fails reads "The link was not called back. Try again." on a row
-    still Waiting. Test: `tests/browser/parts/admin-callback.mjs`.
+    still Waiting, a Conflict that names no `invite-used` included.
+    Test: `tests/browser/parts/admin-callback.mjs`,
+    `tests/browser/parts/admin-review-invite-used.mjs`.
 62. (walk) An account list the server fails reads "The account list
     would not load." with a Retry that loads it, and with the session
     ended, opening Accounts goes to the sign-in screen. Test:
