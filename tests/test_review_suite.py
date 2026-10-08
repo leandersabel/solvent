@@ -242,7 +242,7 @@ def test_docker(python_image):
 OWN_WORK = {"test_a_docker": 1.5, "test_c_mixed": 0.75}
 
 
-def stand_in_run(tmp_path: Path, modules: dict[str, str], workers: int) -> list[dict]:
+def stand_in_run(tmp_path: Path, modules: dict[str, str], workers: int) -> tuple[str, list[dict]]:
     suite = tmp_path / "suite"
     suite.mkdir()
     for name, source in {"spans.py": SPANS, "conftest.py": STAND_IN_CONFTEST, **modules}.items():
@@ -254,8 +254,8 @@ def stand_in_run(tmp_path: Path, modules: dict[str, str], workers: int) -> list[
          "-n", str(workers), "--dist", "worksteal", "--basetemp", str(tmp_path / "base"), str(suite)],
         cwd=suite, env=env, capture_output=True, text=True, timeout=300,
     )
-    assert done.returncode == 0, done.stdout + done.stderr
-    return [json.loads(line) for line in log.read_text().splitlines()]
+    spans = [json.loads(line) for line in log.read_text().splitlines()] if log.exists() else []
+    return done.stdout + done.stderr, spans
 
 
 def clashes(spans: list[dict]) -> list[tuple[dict, dict]]:
@@ -279,7 +279,8 @@ def test_no_docker_test_overlaps_a_browser_on_another_worker_and_none_waits_out_
         "test_c_mixed.py": MIXED_MODULE,
     }
     modules.update({f"test_e_browser_{n}.py": BROWSER_MODULE for n in range(12)})
-    spans = stand_in_run(tmp_path, modules, workers=4)
+    output, spans = stand_in_run(tmp_path, modules, workers=4)
+    assert "passed" in output and "failed" not in output and "error" not in output, output
     assert not clashes(spans), f"a Docker test ran while another worker had Chrome open: {clashes(spans)}"
     for where, own in OWN_WORK.items():
         first_docker = min((s for s in spans if s["kind"] == "docker" and s["where"] == where), key=lambda s: s["start"])
@@ -291,9 +292,12 @@ def test_no_docker_test_overlaps_a_browser_on_another_worker_and_none_waits_out_
         assert waited < 3, f"{where} waited {waited:.1f}s for its Docker test while browser tests kept starting"
 
 
-def test_a_session_fixture_opening_chrome_never_overlaps_a_docker_test(tmp_path):
-    """A test whose session-scoped fixture opens Chrome has Chrome in
-    flight as much as one that opens it in its body."""
+def test_a_session_fixture_is_refused_before_it_opens_chrome(tmp_path):
+    """A session-scoped fixture is set up before its module's lock and
+    lives past it, so a test using one fails before the fixture starts,
+    and its Chrome never opens beside a Docker test."""
     modules = {"test_a_docker.py": LONG_DOCKER_MODULE, "test_d_session.py": SESSION_MODULE}
-    spans = stand_in_run(tmp_path, modules, workers=2)
-    assert not clashes(spans), f"a Docker test ran while another worker had Chrome open: {clashes(spans)}"
+    output, spans = stand_in_run(tmp_path, modules, workers=2)
+    assert "1 passed, 5 errors" in output, output
+    assert "shared_browser outlives its module's network lock" in output, output
+    assert [s["kind"] for s in spans if s["kind"] != "asked"] == ["docker"], spans
