@@ -1754,4 +1754,5 @@ Editing an existing entry).
      `tests/browser/parts/update-values-review-long-name.mjs`.
 107. (walk) Once "Add a note" is open on the value form, the note box is
      announced by its visible label, "Note". Test:
-     `tests/browser/parts/snapshot-entry.mjs`.
+     `tests/browser/parts/snapshot-entry.mjs`,
+     `tests/browser/parts/snapshot-entry-review-note.mjs`.
