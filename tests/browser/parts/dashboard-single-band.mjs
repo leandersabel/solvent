@@ -14,7 +14,7 @@ const legendAfterGrouping = async (id) => {
     select.value = value;
     select.dispatchEvent(new Event('change', { bubbles: true }));
   }, id);
-  await page.waitUntil(`${JSON.stringify(id)} === document.querySelector('.chart-card select').value`, { label: 'the grouping' });
+  await page.waitUntil((value) => document.querySelector('.chart-card select').value === value, { args: [id], label: 'the grouping' });
   await page.frames();
   return page.eval("document.querySelector('.legend') && [...document.querySelectorAll('.legend .legend-name')].map(n => n.textContent)");
 };
