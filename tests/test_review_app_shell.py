@@ -10,14 +10,22 @@ Requests Flask never sees, criteria 27, 77, 85 and 86; spec/
 architecture.md, Storage & data handling). The factory starts one daemon
 thread that prunes, on a connection that overwrites what it deletes,
 and no test app's thread logs into a later test (Database, criteria 69
-and 70).
+and 70). The image logs as the spec says and holds only the app
+(criteria 75 and 76), and holds its own hardening with no container
+option: no setuid or setgid file, nothing owned by another user, `/data`
+the only path a non-root user can write, a numeric user with no account,
+a refusal to start as root, and a working instance as another user
+(Configuration, criteria 87 to 91; spec/architecture.md, Tech stack,
+Container hardening).
 
 Written from the spec alone. gunicorn runs with the Dockerfile's own
 arguments, on loopback.
 """
 from __future__ import annotations
 
+import functools
 import http.client
+import json
 import logging
 import os
 import secrets
@@ -25,6 +33,7 @@ import shutil
 import socket
 import subprocess
 import sys
+import tarfile
 import threading
 import time
 from contextlib import ExitStack, contextmanager
@@ -36,6 +45,7 @@ import solvent.rates as rates
 from solvent.guard import navigation
 from tests.helpers import CSRF, connect, register, rows
 from tests.test_deployment import REPO_ROOT, image_command
+from tests.test_review_nightly_harness import python_image  # noqa: F401
 
 
 def parsed(argv: "list[str]") -> Config:
@@ -558,3 +568,224 @@ def test_a_test_apps_pruner_never_logs_into_a_later_test(tmp_path):
         timeout=120,
     )
     assert result.returncode == 0, result.stdout + result.stderr
+
+
+ACCESS_LOG_FORMAT = '%(t)s "%(m)s %(U)s" %(s)s %(b)s %(M)s'
+
+
+def test_the_image_logs_access_in_the_spec_format_and_only_errors():
+    """Criterion 75, read through gunicorn's parser."""
+    config = parsed(image_command()[1:])
+
+    assert config.access_log_format == ACCESS_LOG_FORMAT
+    assert config.loglevel == "error"
+
+
+def dockerfile_instructions() -> "list[list[str]]":
+    """Each instruction of the Dockerfile as its words, continuation
+    lines joined and comments dropped."""
+    text = (REPO_ROOT / "Dockerfile").read_text().replace("\\\n", " ")
+    return [line.split() for line in text.splitlines() if line.strip() and not line.lstrip().startswith("#")]
+
+
+def test_the_image_copies_exactly_the_app_and_ignores_the_tests_and_tools():
+    """Criterion 76. Flags such as `--chmod` are not sources, and ADD
+    copies as much as COPY does."""
+    sources = []
+    for words in dockerfile_instructions():
+        if words[0].upper() in ("COPY", "ADD"):
+            sources += [word for word in words[1:-1] if not word.startswith("--")]
+
+    assert sorted(sources) == ["app.py", "requirements.txt", "solvent"]
+    ignored = (REPO_ROOT / ".dockerignore").read_text().splitlines()
+    assert {"tests", "tools"} <= set(ignored)
+
+
+@functools.cache
+def built_image() -> str:
+    done = subprocess.run(
+        ["docker", "build", "-q", str(REPO_ROOT)], capture_output=True, text=True, timeout=600,
+    )
+    assert done.returncode == 0, done.stderr
+    return done.stdout.strip()
+
+
+@pytest.fixture
+def image(python_image) -> str:
+    """The image built from this checkout. Depending on `python_image`
+    skips without Docker and holds the suite's network lock."""
+    return built_image()
+
+
+def docker(*args: str, timeout: float = 120) -> subprocess.CompletedProcess:
+    return subprocess.run(["docker", *args], capture_output=True, text=True, timeout=timeout)
+
+
+def image_files(image: str) -> "list[tarfile.TarInfo]":
+    """Every entry of a container's filesystem made from the image."""
+    container = docker("create", image).stdout.strip()
+    try:
+        export = subprocess.Popen(["docker", "export", container], stdout=subprocess.PIPE)
+        with tarfile.open(fileobj=export.stdout, mode="r|") as archive:
+            members = list(archive)
+        assert export.wait(timeout=120) == 0
+        return members
+    finally:
+        docker("rm", container)
+
+
+def test_no_file_in_the_image_carries_a_setuid_or_setgid_bit(image):
+    """Criterion 88."""
+    raising = [m.name for m in image_files(image) if m.isfile() and m.mode & 0o6000]
+
+    assert raising == []
+
+
+def test_nothing_in_the_image_is_owned_by_a_user_other_than_root(image):
+    """architecture.md, Tech stack, Container hardening."""
+    owned = [f"{m.name} {m.uid}" for m in image_files(image) if m.uid != 0]
+
+    assert owned == []
+
+
+def test_the_image_declares_10001_with_no_account_or_home_behind_it(image):
+    """Criterion 90, as written and as built, and Container hardening's
+    'no account or home directory behind it'."""
+    users = [words[1] for words in dockerfile_instructions() if words[0].upper() == "USER"]
+    assert users[-1] == "10001:10001"
+    assert docker("inspect", "--format", "{{.Config.User}}", image).stdout.strip() == "10001:10001"
+
+    listing = docker("run", "--rm", "--entrypoint", "cat", image, "/etc/passwd", "/etc/group").stdout
+    assert [line for line in listing.splitlines() if line.split(":")[2] == "10001"] == []
+    assert [m.name for m in image_files(image) if m.name.startswith("home/")] == []
+
+
+# Run as root inside the container: lists every path once, then checks
+# each as every (uid, gid) given in argv, in a child that has dropped to
+# it, so os.access answers as that user does. A path on another device
+# is checked but not entered, which keeps /proc, /sys and /dev out.
+WRITABLE_AS = r"""
+import json, os, sys
+
+root = os.stat("/").st_dev
+paths = []
+for top, dirs, files in os.walk("/"):
+    for name in list(dirs):
+        path = os.path.join(top, name)
+        if os.lstat(path).st_dev != root:
+            dirs.remove(name)
+            paths.append(path)
+    paths += [os.path.join(top, name) for name in dirs + files]
+paths = [path for path in paths if not os.path.islink(path)]
+
+found = {}
+for user in sys.argv[1:]:
+    uid, gid = map(int, user.split(":"))
+    read, write = os.pipe()
+    child = os.fork()
+    if child == 0:
+        os.close(read)
+        os.setgroups([])
+        os.setgid(gid)
+        os.setuid(uid)
+        os.write(write, json.dumps([p for p in paths if os.access(p, os.W_OK)]).encode())
+        os._exit(0)
+    os.close(write)
+    with os.fdopen(read) as answer:
+        found[user] = json.loads(answer.read())
+    os.waitpid(child, 0)
+print(json.dumps(found))
+"""
+
+
+def test_data_is_the_only_path_any_non_root_user_can_write_in_the_image(image):
+    """Criterion 89 and Container hardening: `/data` is the only path a
+    non-root user can write, whatever its user and group IDs. Checked
+    for the image's own user, for another user in every group the image
+    names, root's included, and for every account the image holds."""
+    own = docker("inspect", "--format", "{{.Config.User}}", image).stdout.strip()
+    listing = docker("run", "--rm", "--entrypoint", "cat", image, "/etc/passwd", "/etc/group").stdout
+    fields = [line.split(":") for line in listing.splitlines()]
+    groups = {f[2] for f in fields if len(f) == 4}
+    accounts = {f"{f[2]}:{f[3]}" for f in fields if len(f) == 7 and f[2] != "0"}
+    users = sorted({own, "568:568", "65534:65534", *(f"568:{gid}" for gid in groups), *accounts})
+
+    done = docker("run", "--rm", "--user", "0", "--entrypoint", "python", image, "-c", WRITABLE_AS, *users)
+    assert done.returncode == 0, done.stderr
+    writable = json.loads(done.stdout)
+
+    assert writable[own] == ["/data"]
+    assert {user: paths for user, paths in writable.items() if set(paths) - {"/data"}} == {}
+
+
+def writable_dir(tmp_path) -> str:
+    data = tmp_path / "data"
+    data.mkdir()
+    data.chmod(0o777)
+    return str(data)
+
+
+def assert_refused_as_root(done: subprocess.CompletedProcess, data: str):
+    output = done.stdout + done.stderr
+    assert done.returncode != 0, output
+    assert "root" in output and "/data" in output, output
+    assert "invite=" not in output
+    assert os.listdir(data) == []
+
+
+@pytest.mark.parametrize("user", ["0", "0:0", "0:568"])
+def test_the_server_started_as_root_exits_before_writing_anything(image, tmp_path, user):
+    """Criterion 87, and Configuration: the server refuses to start as
+    root, with a message, before anything is written."""
+    data = writable_dir(tmp_path)
+    done = docker(
+        "run", "--rm", "--user", user, "-e", "SECRET_KEY=review-root-key", "-v", f"{data}:/data", image,
+        timeout=60,
+    )
+
+    assert_refused_as_root(done, data)
+
+
+def test_the_command_line_run_as_root_exits_before_writing_anything(image, tmp_path):
+    """Criterion 87 and Configuration: `flask` as root writes nothing to
+    /data the app could not write afterwards."""
+    data = writable_dir(tmp_path)
+    done = docker(
+        "run", "--rm", "--user", "0", "-e", "SECRET_KEY=review-root-key", "-v", f"{data}:/data", image,
+        "flask", "--app", "app", "create-invite", "--kind", "administrator", "--expires-days", "1",
+        timeout=60,
+    )
+
+    assert_refused_as_root(done, data)
+
+
+def test_the_image_serves_as_568_with_no_container_option(image, tmp_path):
+    """Criterion 91: no --read-only, --cap-drop, --security-opt or
+    --tmpfs, only the user, the secret, the volume and a port."""
+    data = writable_dir(tmp_path)
+    container = docker(
+        "run", "-d", "--user", "568:568", "-e", "SECRET_KEY=review-568-key",
+        "-v", f"{data}:/data", "-p", "127.0.0.1::8000", image,
+    ).stdout.strip()
+    try:
+        port = int(docker("port", container, "8000/tcp").stdout.split(":")[-1])
+        status = None
+        for _ in range(60):
+            try:
+                status = sign_in_page(port, timeout=2)
+                break
+            except OSError:
+                time.sleep(0.5)
+        assert status == 200, docker("logs", container).stderr
+
+        invite = docker(
+            "exec", container, "flask", "--app", "app", "create-invite",
+            "--kind", "administrator", "--expires-days", "1",
+        )
+        assert invite.returncode == 0, invite.stderr
+        assert "/register?invite=" in invite.stdout
+        database = os.path.join(data, "solvent.db")
+        assert os.stat(database).st_uid == 568
+        assert {os.stat(os.path.join(data, name)).st_uid for name in os.listdir(data)} == {568}
+    finally:
+        docker("rm", "-f", container)
