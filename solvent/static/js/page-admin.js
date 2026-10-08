@@ -549,6 +549,10 @@ function addUnit(body) {
     el('option', { value: 'currency', text: 'Currency' }),
     el('option', { value: 'metal', text: 'Metal' }),
   ]);
+  const shape = el('p', { class: 'hint', text: METAL_SHAPE, hidden: true });
+  kind.addEventListener('change', () => {
+    shape.hidden = kind.value !== 'metal';
+  });
   // Every unit a source serves is seeded, so one added here has none.
   const lookup = lookupControl();
   lookup.id = 'unit-lookup';
@@ -565,10 +569,7 @@ function addUnit(body) {
         class: 'hint',
         text: 'A code is permanent. It is written inside people’s vaults as the unit a holding is measured in, and Solvent cannot read those to change it afterwards. Check it before you add it.',
       }),
-      el('p', {
-        class: 'hint',
-        text: METAL_SHAPE,
-      }),
+      shape,
     ]),
     el('div', { class: 'field' }, [el('label', { for: 'unit-name', text: 'Name' }), name]),
     el('div', { class: 'field' }, [el('label', { for: 'unit-kind', text: 'Kind' }), kind]),
