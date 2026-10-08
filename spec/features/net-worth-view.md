@@ -171,8 +171,9 @@ wrapping beneath the heading when the row runs out:
 The plot spans the card, value ticks at the left. Beneath it, under a
 hairline rule, the legend runs as one row of swatch, band name and
 figure, with the key to the entry marks at its right end. "View as table"
-closes the card. A single band ("Total") has no legend box, and the
-section heading names it.
+closes the card. Under "Total" the chart has no legend box, and the
+section heading names its band. Under a dimension every band has a
+legend entry, a lone one included, whether "Unassigned" or a value.
 
 Interaction, each reading one calendar day (Reading a date):
 
@@ -1204,3 +1205,8 @@ rule of the chart (Archived holdings, Ranges and modes).
     negative one, and the page never pans sideways. Test:
     `tests/browser/parts/dashboard-long-value.mjs`,
     `tests/browser/parts/dashboard-review-long-value.mjs`.
+80. (walk) Under a dimension that draws one band, "Unassigned" or a
+    value every holding carries, the legend names that band, and under
+    "Total" the chart has no legend box. Test:
+    `tests/browser/parts/dashboard-single-band.mjs`,
+    `tests/browser/parts/dashboard-review-single-band.mjs`.
