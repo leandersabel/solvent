@@ -1249,11 +1249,15 @@ th.numeric {
 /* ---- Breakdown: nominal bars on a shared zero baseline ---- */
 
 /* Room is kept at each end for the direct label on a bar's outboard
-   end, on the left only when a band runs negative. The baseline sits
-   at the share of the scale the widest negative band takes. */
+   end, on the left only when a band runs negative, and narrows with
+   the card so the bars keep room of their own. The baseline sits at
+   the share of the scale the widest negative band takes. */
+.card:has(> .bars) { container-type: inline-size; }
+
 .bars {
+  --room: min(240px, 30cqi);
   --room-left: 0px;
-  --room-right: 240px;
+  --room-right: var(--room);
   position: relative;
   list-style: none;
   margin: 0;
@@ -1263,7 +1267,7 @@ th.numeric {
   gap: 22px;
 }
 
-.bars.has-negative { --room-left: 240px; }
+.bars.has-negative { --room-left: var(--room); }
 
 .bars::before {
   content: "";

@@ -296,7 +296,8 @@ Horizontal bars, one per band of the Group by dimension, in the same
 order as the stack, "Unassigned" a bar like any other and "Other" folding
 the fifth and beyond. Color, direct labels and the signed zero baseline
 are design-system.md's (Colors by chart job). The bars run the card's
-width less the room the labels take at the outboard ends. A label longer
+width less the room the labels take at the outboard ends, a room that
+narrows with the card so the bars keep width of their own. A label longer
 than its room wraps inside it, breaking a word only where it has to, and
 its bar's row grows to hold it. A band can be net negative
 (a mortgage under "Fixed"), so negative bands run leftward. When every
@@ -1204,4 +1205,5 @@ rule of the chart (Archived holdings, Ranges and modes).
     holding `<img src=x onerror=alert(1)>`, each band's name lies inside
     its card in the legend and the breakdown, beside a positive bar and a
     negative one, and the page never pans sideways. Test:
-    `tests/browser/parts/dashboard-long-value.mjs`.
+    `tests/browser/parts/dashboard-long-value.mjs`,
+    `tests/browser/parts/dashboard-review-long-value.mjs`.
