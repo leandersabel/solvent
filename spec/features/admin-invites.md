@@ -936,4 +936,5 @@ administrator), and the lost sole password (Bootstrap). The rest:
     `tests/browser/parts/admin-review-accounts-error.mjs`.
 63. (walk) Add a unit shows "Metals are named `<code>-ozt` or `<code>-g`,
     such as `XAU-ozt`." beneath Code only while Kind is Metal. Test:
-    `tests/browser/parts/admin-unit-shape.mjs`.
+    `tests/browser/parts/admin-unit-shape.mjs`,
+    `tests/browser/parts/admin-review-unit-shape.mjs`.
