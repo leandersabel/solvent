@@ -19,17 +19,27 @@ await run(async () => {
   await plantHere([{ ...snap('Savings', NOTED, '5100'), payload: { ...snap('Savings', NOTED, '5100').payload, note: NOTE } }]);
   await reread();
 
-  const inForm = "[...document.querySelectorAll('.dialog')].find((d) => d.querySelector('#snapshot-value'))";
+  // The first visible element of the value form matching the query,
+  // with the given text when one is given. Run in the page.
+  const inForm = (query, text) => [...([...document.querySelectorAll('.dialog')].find((d) => d.querySelector('#snapshot-value'))
+    ?.querySelectorAll(query) ?? [])].find((e) => e.checkVisibility() && (text === null || e.textContent.trim() === text)) ?? null;
+  const element = async (query, text) => {
+    const { result: global } = await rec.send('Runtime.evaluate', { expression: 'globalThis' });
+    const { result } = await rec.send('Runtime.callFunctionOn', {
+      objectId: global.objectId,
+      functionDeclaration: inForm.toString(),
+      arguments: [{ value: query }, { value: text }],
+    });
+    return result.objectId;
+  };
   // The value form's visible multi-line text box, its accessible name,
   // and the visible label that names it by the box's id.
   const noteBox = async () => {
-    const { result } = await rec.send('Runtime.evaluate', {
-      expression: `[...(${inForm}?.querySelectorAll('textarea, [role=textbox][aria-multiline=true]') ?? [])].find((e) => e.checkVisibility()) ?? null`,
-    });
-    if (!result.objectId) return null;
-    const { nodes } = await rec.send('Accessibility.getPartialAXTree', { objectId: result.objectId, fetchRelatives: false });
+    const objectId = await element('textarea, [role=textbox][aria-multiline=true]', null);
+    if (!objectId) return null;
+    const { nodes } = await rec.send('Accessibility.getPartialAXTree', { objectId, fetchRelatives: false });
     const { result: dom } = await rec.send('Runtime.callFunctionOn', {
-      objectId: result.objectId,
+      objectId,
       functionDeclaration: function () {
         const label = this.id ? document.querySelector(`label[for="${CSS.escape(this.id)}"]`) : null;
         return {
@@ -45,10 +55,10 @@ await run(async () => {
     });
     return { ...dom.value, ignored: nodes[0].ignored, name: (nodes[0].name?.value ?? '').trim() };
   };
-  const addNote = `[...(${inForm}?.querySelectorAll('button, summary') ?? [])].find((e) => e.textContent.trim() === 'Add a note' && e.checkVisibility())`;
+  const ADD_NOTE = ['button, summary', 'Add a note'];
   const openNote = async () => {
-    await rec.waitUntil(`Boolean(${addNote})`, { label: 'Add a note' });
-    await rec.send('Runtime.evaluate', { expression: `${addNote}.click()` });
+    await rec.waitUntil(inForm, { args: ADD_NOTE, label: 'Add a note' });
+    await rec.send('Runtime.callFunctionOn', { objectId: await element(...ADD_NOTE), functionDeclaration: function () { this.click(); }.toString() });
     await quiet();
   };
   const named = (box) => box !== null && !box.ignored && box.name === 'Note' && box.label === 'Note' && box.idCount === 1 && !box.ariaLabel && !box.labelledBy;
