@@ -499,7 +499,7 @@ export function holdingForm(vault, existing, onSaved, { onCancel = null, onConfl
     if (name.value.trim()) nameRefused(false);
   });
   const unit = unitPicker(vault, payload.unit, locked);
-  const note = el('textarea', { rows: '3', text: payload.note || '' });
+  const note = el('textarea', { id: 'holding-note', rows: '3', text: payload.note || '' });
   const error = el('p', { class: 'field-error', hidden: true, role: 'alert' });
 
   const save = el('button', { type: 'submit', class: 'btn-primary', text: 'Save' });
@@ -512,7 +512,10 @@ export function holdingForm(vault, existing, onSaved, { onCancel = null, onConfl
     ]),
     unit.element,
     dimensionBlock(vault, dims),
-    el('details', {}, [el('summary', { text: 'Add a note' }), note]),
+    el('details', {}, [
+      el('summary', { text: 'Add a note' }),
+      el('div', { class: 'field' }, [el('label', { for: 'holding-note', text: 'Note' }), note]),
+    ]),
     error,
     el('div', { class: 'form-actions' }, [
       onCancel ? el('button', { type: 'button', class: 'btn-secondary', text: 'Cancel', onclick: onCancel }) : null,

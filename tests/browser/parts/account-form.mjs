@@ -211,6 +211,10 @@ await run(async () => {
     );
 
     await page.eval("document.querySelectorAll('.dialog details').forEach(d => (d.open = true))");
+    check(
+      'the note box is named by its visible label',
+      await page.eval("[...document.querySelector('.dialog textarea').labels].map(l => l.textContent).join() === 'Note'"),
+    );
     await setValue('.dialog textarea', NOTE);
     // A value made inline, then a dimension made inline: each writes the
     // profile first, and the holding is written once, last.
