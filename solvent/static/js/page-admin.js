@@ -278,8 +278,8 @@ function callBack(row, list, error) {
           try {
             await api.post(`/api/admin/invites/${row.id}/revoke`, {});
           } catch (failure) {
-            // A Conflict means the link was used while the table was open.
-            if (failure.status === 409) loadInvites(list, row.id);
+            // The link was used while the table was open.
+            if (failure.body?.refused === 'invite-used') loadInvites(list, row.id);
             else error.hidden = false;
             return;
           }
