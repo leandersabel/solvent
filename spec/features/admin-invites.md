@@ -945,4 +945,5 @@ administrator), and the lost sole password (Bootstrap). The rest:
     `tests/browser/parts/admin-review-unit-shape.mjs`.
 64. (walk) While its list loads, each of Invites, Accounts and Units
     shows skeleton rows and no word, then its table. Test:
-    `tests/browser/parts/admin-loading.mjs`.
+    `tests/browser/parts/admin-loading.mjs`,
+    `tests/browser/parts/admin-review-loading.mjs`.

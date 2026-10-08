@@ -5,7 +5,7 @@ import { administrator, check, click, intercept, page, run } from '../harness.mj
 
 const SECTIONS = [
   ['Accounts', 'accounts', 'ops.leander'],
-  ['Units', 'symbols', 'XAU-ozt'],
+  ['Units', 'symbols', 'CHF'],
   ['Invites', 'invites', 'Outstanding invites'],
 ];
 
@@ -34,10 +34,12 @@ await run(async () => {
       release();
       await stop();
     }
-    await page.waitUntil(
-      (words) => document.querySelector('#app').innerText.includes(words) && !document.querySelector('#app .skeleton-row'),
+    const shown = await page.waitUntil(
+      (words) => document.querySelector('#app').innerText.includes(words)
+        && Boolean(document.querySelector('#app table'))
+        && !document.querySelector('#app .skeleton-row'),
       { args: [loaded], timeout: 30000, label: `the ${section} table` },
-    ).catch(() => {});
-    check(`${section} replaces its skeleton rows with the table`, !(await page.call(() => !!document.querySelector('#app .skeleton-row'))));
+    ).then(() => true, () => false);
+    check(`${section} replaces its skeleton rows with its table`, shown);
   }
 }, { signsIn: false });
