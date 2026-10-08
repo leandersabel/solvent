@@ -78,6 +78,6 @@ jobs:
           DIGEST: ${{ steps.rc.outputs.digest }}
           COMMIT: ${{ steps.rc.outputs.commit }}
         run: |
-          docker buildx imagetools create -t "$IMAGE:$VERSION" -t "$IMAGE:stable" -t "$IMAGE:latest" "$IMAGE@$DIGEST"
+          docker buildx imagetools create --prefer-index=false -t "$IMAGE:$VERSION" -t "$IMAGE:stable" -t "$IMAGE:latest" "$IMAGE@$DIGEST"
           .github/actions/notes/notes.sh "$VERSION" "$COMMIT" "$IMAGE@$DIGEST" > notes.md
           gh release create "$VERSION" --target "$COMMIT" --latest --title "$VERSION" --notes-file notes.md

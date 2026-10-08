@@ -104,7 +104,7 @@ jobs:
       - id: publish
         run: |
           echo "$GH_TOKEN" | docker login ghcr.io -u "$GITHUB_ACTOR" --password-stdin
-          docker buildx imagetools create -t "$IMAGE:$VERSION" -t "$IMAGE:rc" "$IMAGE@$DIGEST"
+          docker buildx imagetools create --prefer-index=false -t "$IMAGE:$VERSION" -t "$IMAGE:rc" "$IMAGE@$DIGEST"
           .github/actions/notes/notes.sh "$VERSION" "$COMMIT" "$IMAGE@$DIGEST" > notes.md
           gh release create "$VERSION" --target "$COMMIT" --prerelease --title "$VERSION" --notes-file notes.md
 
