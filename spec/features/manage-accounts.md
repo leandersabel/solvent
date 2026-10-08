@@ -142,7 +142,8 @@ so it stacks at phone width.
     holding referencing an id that does not exist.
   - With no dimensions configured, `dims` is `{}` and the block
     collapses to the `+ New dimension` link.
-- **Note**: optional free text, collapsed behind "Add a note".
+- **Note**: optional free text, collapsed behind "Add a note" and
+  labelled "Note" once open.
 - Primary "Save", secondary "Cancel".
 
 #### Unit, once there are snapshots
@@ -911,3 +912,6 @@ Unarchiving and archiving it again writes the zero at the new D.
     whose unit is fixed by a recorded value. Test:
     `tests/browser/parts/account-form-retired.mjs`,
     `tests/browser/parts/account-form-review-retired.mjs`.
+65. (walk) Once "Add a note" is open, the note box is announced by its
+    visible label, "Note". Test: `tests/browser/parts/account-form.mjs`,
+    `tests/browser/parts/account-form-review-note.mjs`.
