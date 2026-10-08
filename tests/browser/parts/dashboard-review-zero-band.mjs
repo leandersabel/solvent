@@ -7,7 +7,9 @@
 // to zero, an "Unassigned" band of a holding not yet valued and "Other"
 // folding the fifth value and beyond all keep their bar. Each bar reads
 // the legend's figure, the bars sum to the total, and under "Total" the
-// breakdown is absent.
+// breakdown is absent. While no active holding is valued, before
+// anything is recorded and once every holding is archived, the breakdown
+// is absent too.
 // Templates: dashboard.html. Modules: view-dashboard.js.
 import { check, holdToday, holdings, page, plant, reloadModel, run, setProfile, vaultOwner } from '../harness.mjs';
 
@@ -76,7 +78,8 @@ const screen = () =>
   page.call(() => {
     const t = (node) => (node ? node.textContent.trim() : null);
     return {
-      total: t(document.querySelector('.dashboard .hero-amount')),
+      total: t(document.querySelector('.dashboard .hero-figure')),
+      breakdown: [...document.querySelectorAll('.dashboard .section-heading')].some((h) => h.textContent.trim().endsWith(' today')),
       bars: [...document.querySelectorAll('.bars .bar-label')].map((b) => [t(b.querySelector('.bar-name')), t(b.querySelector('.bar-amount'))]),
       legend: [...document.querySelectorAll('.chart-card .legend-entry')].map((e) => [t(e.querySelector('.legend-name')), t(e.querySelector('.legend-value'))]),
     };
@@ -92,6 +95,14 @@ const groupBy = async (id) => {
   await page.frames();
 };
 
+const absent = (seen) => !seen.breakdown && seen.bars.length === 0;
+const opened = async (hash) => {
+  await reloadModel(hash);
+  await page.waitUntil("document.querySelector('.dashboard .hero-figure')", { label: 'the dashboard' });
+  await page.frames();
+  return screen();
+};
+
 const read = (pairs) => pairs.map(([name, figure]) => `${name} ${shown(figure)}`);
 
 await run(async () => {
@@ -99,6 +110,13 @@ await run(async () => {
   await holdToday('2026-03-10');
   const ids = await holdings(HOLDINGS.map(([name, dims]) => [name, 'CHF', dims]));
   await setProfile({ dimensions: [LIQUIDITY, REGION], locale: 'en-US' });
+
+  // Nothing recorded yet, opened grouped by Liquidity from its coverage
+  // link's route.
+  const unrecorded = await opened('#/unassigned/liq');
+  check('net-worth-view: criterion 81, with holdings and nothing recorded, under Liquidity the total reads — and the breakdown is absent',
+    unrecorded.total === '—' && absent(unrecorded), JSON.stringify(unrecorded));
+
   await plant(HOLDINGS.filter(([, , value]) => value !== null).map(([name, , value]) =>
     ({ type: 'snapshot', accountId: ids[name], payload: { date: '2026-03-01', value, note: null } })));
   await reloadModel('#/');
@@ -138,4 +156,19 @@ await run(async () => {
   check('net-worth-view: criterion 81, back under Liquidity the breakdown lists the legend\'s bands again',
     JSON.stringify(read(back.bars)) === JSON.stringify(EXPECTED.map(([name, value]) => `${name} ${value}`)),
     JSON.stringify(back.bars));
+
+  // Every holding archived: the chart and its legend still draw, the
+  // total reads — and the breakdown is absent.
+  await page.call(async (list) => {
+    const s = await import('/static/js/session.js');
+    const writes = await import('/static/js/writes.js');
+    const v = s.currentVault();
+    for (const id of list) {
+      const h = v.holdings.get(id);
+      await writes.saveHolding(v, h, { ...h.payload, archivedAt: '2026-03-05' });
+    }
+  }, Object.values(ids));
+  const archived = await opened('#/unassigned/liq');
+  check('net-worth-view: criterion 81, with every holding archived, under Liquidity the legend lists its bands, the total reads — and the breakdown is absent',
+    archived.legend.length > 0 && archived.total === '—' && absent(archived), JSON.stringify(archived));
 }, { signsIn: false });
