@@ -1944,7 +1944,7 @@ await check('net-worth-view: every money figure rounds to whole units on its own
     ],
   });
   const shown = (list) => list.map((value) => decimal.toDisplay(value, 0, ''));
-  assert.deepEqual(shown(breakdownTotals(vault, dimension, 'latest').map((b) => b.total)), ['1234', '4133', '41373', '340000', '0']);
+  assert.deepEqual(shown(breakdownTotals(vault, dimension, 'latest').map((b) => b.total)), ['1234', '4133', '41373', '340000']);
   assert.equal(vault.format.money(vault.totals('latest').net).replace(/\D/g, ''), '386741');
 
   const debt = model({
@@ -1960,7 +1960,7 @@ await check('net-worth-view: every money figure rounds to whole units on its own
     holdings: values.map((v) => ({ name: v.id, unit: 'CHF', dims: { d: v.id } })),
     figures: [['a', '2026-01-01', '0.4'], ['b', '2026-01-01', '0.4'], ['c', '2026-01-01', '0.4'], ['e', '2026-01-01', '0']],
   });
-  assert.deepEqual(breakdownTotals(small, dimension, 'latest').map((b) => small.format.money(b.total)), ['0', '0', '0', '0', '0']);
+  assert.deepEqual(breakdownTotals(small, dimension, 'latest').map((b) => small.format.money(b.total)), ['0', '0', '0', '0']);
   assert.equal(small.format.money(small.totals('latest').net), '1');
 });
 

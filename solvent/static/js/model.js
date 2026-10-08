@@ -682,7 +682,14 @@ export class Vault {
         ({ assets, liabilities })[side][index] += value;
       });
     }
-    return orderBands(bands, dimension);
+    const sum = (rest, pick) =>
+      days.map((_, index) => rest.reduce((total, band) => total + pick(band)[index], 0n));
+    return orderBands(bands, dimension, (rest) => ({
+      points: sum(rest, (band) => band.points),
+      assets: sum(rest, (band) => band.assets),
+      liabilities: sum(rest, (band) => band.liabilities),
+      before: { assets: sum(rest, (band) => band.before.assets), liabilities: sum(rest, (band) => band.before.liabilities) },
+    }));
   }
 }
 
@@ -708,8 +715,9 @@ function duplicateDates(entries) {
 
 /** Band order is the dimension's configured value order, never sorted
  *  by size: a stack whose bands reorder over time cannot be read.
- *  Past four, the remainder folds into "Other". */
-function orderBands(bands, dimension) {
+ *  Past four, the remainder folds into "Other", whose fields `fold`
+ *  sums from the folded bands. */
+export function orderBands(bands, dimension, fold) {
   if (!dimension) return [...bands.values()];
   const ordered = [];
   for (const value of dimension.values) {
@@ -718,19 +726,7 @@ function orderBands(bands, dimension) {
   }
   const rest = ordered.splice(4);
   if (bands.has('unassigned')) ordered.push(bands.get('unassigned'));
-  if (rest.length) {
-    const sum = (pick) =>
-      rest[0].points.map((_, index) => rest.reduce((total, band) => total + pick(band)[index], 0n));
-    const other = {
-      id: 'other',
-      label: 'Other',
-      points: sum((band) => band.points),
-      assets: sum((band) => band.assets),
-      liabilities: sum((band) => band.liabilities),
-      before: { assets: sum((band) => band.before.assets), liabilities: sum((band) => band.before.liabilities) },
-    };
-    ordered.push(other);
-  }
+  if (rest.length) ordered.push({ id: 'other', label: 'Other', ...fold(rest) });
   return ordered;
 }
 

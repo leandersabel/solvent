@@ -7,7 +7,7 @@ import * as decimal from './decimal.js';
 import { chartTable, fillFor, trendChart } from './chart.js';
 import { counted, dialog, el, icon, mount, priceDateLine, REPLACED_SINCE_OPEN, replacedCallout, resumable, today } from './dom.js';
 import { dateGrid } from './datepicker.js';
-import { isoFromDay } from './model.js';
+import { isoFromDay, orderBands } from './model.js';
 import * as writes from './writes.js';
 import { snapshotDialog } from './view-forms.js';
 
@@ -746,40 +746,29 @@ function group(title, holdings, vault, actions, explanation) {
   ]);
 }
 
-/** Each band's signed total right now, in the dimension's configured
- *  order with "Unassigned" last. Summed from the same per-holding
- *  figures as the hero, so the bars add up to the total exactly. */
+/** Each band's signed total right now, the stack's bands in the
+ *  stack's order, a band at zero included. Summed from the same
+ *  per-holding figures as the hero, so the bars add up to the total
+ *  exactly. */
 export function breakdownTotals(vault, dimension, mode) {
   const bands = new Map();
-  for (const value of dimension.values.filter((v) => !v.archivedAt)) {
-    bands.set(value.id, { label: value.label, total: decimal.ZERO });
-  }
-  bands.set('unassigned', { label: 'Unassigned', total: decimal.ZERO });
-
-  for (const holding of vault.activeHoldings()) {
-    const figure = vault.valueOf(holding, mode);
-    if (figure.state !== 'valued') continue;
+  for (const holding of vault.holdings.values()) {
     const band = vault.bandOf(holding, dimension);
-    const target = bands.get(band.id) || bands.get('unassigned');
-    target.total += figure.converted;
+    if (!bands.has(band.id)) bands.set(band.id, { label: band.label, total: decimal.ZERO });
+    if (holding.payload.archivedAt) continue;
+    const figure = vault.valueOf(holding, mode);
+    if (figure.state === 'valued') bands.get(band.id).total += figure.converted;
   }
-  // Past four, the rest fold into "Other", after "Unassigned", which is
-  // the order the chart stacks them in.
-  const all = [...bands.values()];
-  const unassigned = all.pop();
-  const rest = all.splice(4);
-  const other = rest.length
-    ? [{ label: 'Other', total: rest.reduce((sum, band) => sum + band.total, decimal.ZERO) }]
-    : [];
-  return [...all, unassigned, ...other];
+  return orderBands(bands, dimension, (rest) => ({
+    total: rest.reduce((sum, band) => sum + band.total, decimal.ZERO),
+  }));
 }
 
 /** Where the chart shows how composition moved, this shows what it is
  *  made of right now. Every bar takes chart slot 1: these are nominal
  *  categories and the bar length already carries the value. */
 function breakdown(vault, dimension, state) {
-  const rows = breakdownTotals(vault, dimension, state.mode).filter((band) => band.total !== 0n);
-  if (!rows.length) return null;
+  const rows = breakdownTotals(vault, dimension, state.mode);
 
   // One scale for every bar: the widest negative band to the left of
   // the shared zero baseline, the widest positive one to its right.
