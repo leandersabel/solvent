@@ -12,7 +12,7 @@ await run(async () => {
   const r = await startRecorder();
   await r.register();
   await r.seed();
-  const { rec, T, ago, D1, dayOf, isoOf, id, traffic, rateAsks, ev, quiet, go, format, realClick, realKey, stored } = r;
+  const { rec, T, ago, D1, dayOf, isoOf, id, traffic, rateAsks, ev, quiet, go, format, realClick, realKey, stored, proposalsFor } = r;
 
   const asked = () => rateAsks().map((a) => new URL(a.url).searchParams.get('date'));
   const closeDialogs = async () => {
@@ -205,6 +205,58 @@ await run(async () => {
       'review 110 and Date field: a date typed without leading zeros and saved with one press of Save is saved at that date, its prices asked for once',
       closed && all.length === 1 && all[0] === iso && saved.length === 1,
       JSON.stringify({ iso, loose, all, saved: saved.length, left }),
+    );
+  }
+  // A dollar figure, then its date typed without leading zeros, focus
+  // left in the field: once typing pauses, the converted figure is the
+  // one for the typed date, the same as after the field is left
+  // (Snapshot entry: it converts for the date on the form).
+  {
+    const iso = `${Number(T.slice(0, 4)) - 1}-05-08`;
+    const loose = (await format('date', iso)).replace(/(^|[^0-9])0+(?=[0-9])/g, '$1');
+    await openForm('Dollar cash');
+    await rec.call((v) => {
+      const input = document.querySelector('#snapshot-value');
+      input.value = v;
+      input.dispatchEvent(new Event('input', { bubbles: true }));
+    }, '100');
+    await quiet();
+    const before = await ev("document.querySelector('.dialog #snapshot-value').parentElement.querySelector('.numeric').textContent");
+    await realClick('#snapshot-date');
+    await rec.send('Input.dispatchKeyEvent', { type: 'rawKeyDown', key: 'a', code: 'KeyA', windowsVirtualKeyCode: 65, modifiers: 2, commands: ['selectAll'] });
+    await rec.send('Input.dispatchKeyEvent', { type: 'keyUp', key: 'a', code: 'KeyA', windowsVirtualKeyCode: 65, modifiers: 2 });
+    await rec.send('Input.insertText', { text: loose });
+    await new Promise((resolve) => setTimeout(resolve, 1500));
+    await quiet();
+    const typing = await ev("document.querySelector('.dialog #snapshot-value').parentElement.querySelector('.numeric').textContent");
+    await rec.key('Tab');
+    await quiet();
+    const left = await ev("document.querySelector('.dialog #snapshot-value').parentElement.querySelector('.numeric').textContent");
+    check(
+      'review Snapshot entry: a date typed without leading zeros converts the figure for that date once typing pauses, before the field is left',
+      typing === left && typing !== before,
+      JSON.stringify({ loose, before, typing, left }),
+    );
+    await closeDialogs();
+  }
+  // A dollar entry moved by typing its new date, and Save pressed with
+  // focus still in the field: the move asks once, for the new date, and
+  // writes the dollar's price there from that answer (criterion 74).
+  {
+    const iso = ago(12);
+    await editEntry('Dollar cash', D1);
+    traffic.length = 0;
+    await typeDate(iso);
+    await realClick('.dialog button', 'Save');
+    const closed = await rec.holds("!document.querySelector('#snapshot-value')", { label: 'the form to close' });
+    await quiet();
+    if (!closed) await closeDialogs();
+    const all = asked();
+    const usd = (await stored('rate')).filter((row) => row.payload && row.payload.date === iso && row.payload.symbol === 'USD');
+    check(
+      'review 74: an entry moved by typing its date and saved at once asks once, for the new date, and writes the dollar price there',
+      closed && all.length === 1 && all[0] === iso && usd.length === 1 && usd[0].payload.rate === proposalsFor(iso).USD.rate,
+      JSON.stringify({ iso, closed, all, usd: usd.map((row) => row.payload.rate) }),
     );
   }
   // What the proxy learns is the date and the main currency
