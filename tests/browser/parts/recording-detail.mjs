@@ -30,6 +30,11 @@ await run(async () => {
     JSON.stringify(priceUnits),
   );
   check('the recording offers Update and Delete', (await labels('.form-actions button')).join(',') === 'Update,Delete');
+  // account-settings.md, Dates and numbers: a heading writes the month in full.
+  const heading = await page.eval("document.querySelector('.screen-heading').textContent");
+  const fullDate = await page.call(async (day) => (await import('/static/js/session.js')).currentVault().format.fullDate(day),
+    await page.eval("location.hash.slice('#/recording/'.length)"));
+  check('the heading writes the date with the month in full', heading === fullDate, heading);
   const beforeOpen = rateCalls();
   await page.eval("location.hash = '#/'");
   await page.waitUntil("document.querySelector('.entry-mark')", { label: 'the dashboard' });

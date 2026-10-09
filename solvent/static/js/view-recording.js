@@ -17,7 +17,7 @@ export function recordingView(vault, date, { onUpdate, onOpenHolding, onDeleted,
     // rendering a shell of a recording it no longer has.
     if (!vault.holdsRecording(date)) {
       root.replaceChildren(
-        el('h1', { class: 'screen-heading', text: vault.format.longDate(date) }),
+        el('h1', { class: 'screen-heading', text: vault.format.fullDate(date) }),
         el('div', { class: 'card card-centered' }, [
           el('p', { class: 'empty-line', text: `${vault.format.longDate(date)} holds no recording.` }),
           el('button', { class: 'btn-primary', text: 'Pick a date', onclick: () => onPickDate && onPickDate() }),
@@ -37,7 +37,7 @@ export function recordingView(vault, date, { onUpdate, onOpenHolding, onDeleted,
     const error = el('p', { class: 'field-error', role: 'alert', hidden: !notice, text: notice || '' });
 
     root.replaceChildren(
-      el('h1', { class: 'screen-heading', text: vault.format.longDate(date) }),
+      el('h1', { class: 'screen-heading', text: vault.format.fullDate(date) }),
       error,
       el('section', { class: 'card' }, [
         el('h2', { class: 'section-heading', text: 'Figures' }),

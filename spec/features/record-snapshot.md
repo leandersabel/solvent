@@ -1489,8 +1489,9 @@ Editing an existing entry).
     straight to the sweep. Test:
     `tests/browser/parts/recording-detail.mjs`,
     `tests/browser/parts/update-values.mjs`.
-52. (walk) Recording detail shows its date, every figure with its
-    holding, and every price with its unit and provenance. Test:
+52. (walk) Recording detail shows its date as its heading, the month
+    written in full, every figure with its holding, and every price with
+    its unit and provenance. Test:
     `tests/browser/parts/recording-detail.mjs`.
 53. (walk) A holding named on Recording detail opens that holding.
     Test: no
