@@ -32,15 +32,19 @@ export async function putRecord(vault, slot, payload) {
   return entry;
 }
 
+/** Resolves to false when the record was already gone. */
 export async function deleteRecord(vault, entry) {
+  let found = true;
   try {
     await api.del(`/api/records/${entry.recordId}`);
   } catch (error) {
     // Gone is what was asked for, and another session having got
     // there first is not a failure the person can act on.
     if (error.status !== 404) throw error;
+    found = false;
   }
   applyDelete(vault, entry);
+  return found;
 }
 
 function applyWrite(vault, entry) {
@@ -412,18 +416,19 @@ export async function saveRateLines(vault, sit, plan) {
   // Deletions last, so a save that fails partway has destroyed nothing
   // and the person still holds every price the screen offered to
   // remove.
+  let gone = false;
   for (const { entry, name } of deletes) {
     try {
-      await deleteRecord(vault, entry);
+      if (!(await deleteRecord(vault, entry))) gone = true;
       saved.push({ kind: 'deleted', name });
     } catch (error) {
       failed.push({ kind: 'deleted', name, status: error.status });
     }
   }
-  if (failed.some((f) => f.status === 409)) {
+  if (gone || failed.some((f) => f.status === 409)) {
     // A recording another window deleted fails every update with a
-    // Conflict, so the date is read again to tell that from a price
-    // changed there.
+    // Conflict and finds every deletion done, so the date is read
+    // again to tell that from a price changed or cleared there.
     const fresh = await reloadCreateTypes(vault).catch(() => null);
     if (fresh) {
       vault.replaceType('rate', fresh.rate);
