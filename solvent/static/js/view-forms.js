@@ -63,9 +63,9 @@ export function snapshotDialog(vault, holding, existing, onSaved, onOpenRecordin
   // nothing up.
   const moving = () => Boolean(existing) && date.value !== existing.payload.date;
   // The field settles every keystroke that forms a date, so the lookup
-  // waits until typing pauses or the field is left: "2.03.2025" on the
-  // way to "25.03.2025" asks for nothing (record-snapshot.md, The prices
-  // line). Save asks at once for what is still waiting.
+  // waits until typing pauses or the field is left, and a date passed on
+  // the way to the one typed asks for nothing. Save asks at once for
+  // what is still waiting.
   let waitingLookup = null;
   const lookUpNow = () => {
     if (!waitingLookup) return;
