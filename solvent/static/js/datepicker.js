@@ -76,14 +76,11 @@ export function dateField(
 
   text.addEventListener('input', () => {
     const iso = format.parseDate(text.value);
-    // Typing is not finished until the field reads as it writes the
-    // date, so "2.03.2025" on the way to "25.03.2025" reports no value
-    // rather than a date nobody chose. Blur settles a date written
-    // another way. A refusal on show stays until the value fits, and a
-    // new one waits for blur.
+    // Typing is not finished until it parses, so an unparseable field
+    // reports no value rather than an old one. A refusal on show stays
+    // until the value fits, and a new one waits for blur.
     if (line.classList.contains('field-error')) show(refusal());
-    const written = iso && text.value.trim() === format.date(iso);
-    settle(written && inRange(iso, null, max, keep) ? iso : '', { redraw: false });
+    settle(iso && inRange(iso, null, max, keep) ? iso : '', { redraw: false });
   });
 
   text.addEventListener('blur', () => {
