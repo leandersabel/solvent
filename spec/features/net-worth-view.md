@@ -1013,17 +1013,20 @@ rule of the chart (Archived holdings, Ranges and modes).
     formatter. Test: `tests/browser/parts/dashboard-fixtures.mjs`.
 37. (walk) Under `de-DE` and `groupSeparator` `period`, net worth from 1000 to 1368946 gives a change of `+1.367.946`
     and `+136.794,6%`. Test:
-    `tests/browser/parts/dashboard-net-worth.mjs`.
+    `tests/browser/parts/dashboard-net-worth.mjs`,
+    `tests/browser/parts/dashboard-review-zero-change.mjs`.
 38. (blind) (walk) The change percentage rounds half-even: in the main
     currency under `en-US`, 2000 to 2005 reads `+0.2%` and 2000 to 1995
     `−0.2%`, where a float or half-away rounding gives 0.3. Test:
-    `tests/test_client.py::test_the_client_side_rules_hold`.
+    `tests/test_client.py::test_the_client_side_rules_hold`,
+    `tests/browser/parts/dashboard-review-zero-change.mjs`.
 39. (blind) (walk) 2000 to 2001 reads `CHF +1 · 0.0%` beside the rising
     arrow, 10000 to 9997 reads `CHF −3 · 0.0%` beside the falling arrow,
     10000 to 9999.6 and to 10000.4 read `CHF 0 · 0.0%` with no arrow in
     the flat tone, −1000 to −500 reads `+50.0%`, and 0 to 500 shows the
     amount with no percentage. Test:
-    `tests/browser/parts/dashboard-zero-change.mjs`.
+    `tests/browser/parts/dashboard-zero-change.mjs`,
+    `tests/browser/parts/dashboard-review-zero-change.mjs`.
 40. (blind) (walk) With a single recording, made today, at 1280px and
     390px, under 1M, 6M, 1Y and All, the point's center is at the plot's
     horizontal middle within half a pixel and its mark's bounding box
