@@ -379,7 +379,8 @@ export function confirmFigure(vault, holding, date) {
  *  independent, and abandoning the rest would turn one failed write
  *  into several unattempted ones.
  *
- *  Refused at a date holding no recording, before any request. */
+ *  Refused at a date holding no recording, before any request, and
+ *  `emptied` when a failed save finds the date deleted elsewhere. */
 export async function saveRateLines(vault, sit, plan) {
   // A price alone never makes a recording: at a date the model holds
   // none, typed prices wait for the first quantity. Checked here as
@@ -417,6 +418,20 @@ export async function saveRateLines(vault, sit, plan) {
       saved.push({ kind: 'deleted', name });
     } catch (error) {
       failed.push({ kind: 'deleted', name, status: error.status });
+    }
+  }
+  if (failed.some((f) => f.status === 409)) {
+    // A recording another window deleted fails every update with a
+    // Conflict, so the date is read again to tell that from a price
+    // changed there.
+    const fresh = await reloadCreateTypes(vault).catch(() => null);
+    if (fresh) {
+      vault.replaceType('rate', fresh.rate);
+      const held = [...fresh.snapshot, ...fresh.rate].some((r) => r.payload.date === sit.date);
+      if (!held) {
+        vault.replaceType('snapshot', fresh.snapshot);
+        return { refused: true, date: sit.date, emptied: true, saved, failed };
+      }
     }
   }
   return { refused: false, saved, failed };
