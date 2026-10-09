@@ -132,7 +132,7 @@ await run(async () => {
   const before = stored();
   const [requestsBefore, asksBefore] = [watched[0].requests.length, proxyAsks.length];
   await page.call((date) => { location.hash = `#/recording/${date}`; }, BACKDATE);
-  await page.waitUntil(`document.body.innerText.includes(${JSON.stringify(LONG)})`, { label: 'the recording' });
+  await page.waitUntil((name) => document.body.innerText.includes(name), { args: [LONG], label: 'the recording' });
   await page.idle();
   const sent = watched[0].requests.slice(requestsBefore);
   check('opening the recording issues no PUT and no DELETE',
