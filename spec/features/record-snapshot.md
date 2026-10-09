@@ -685,7 +685,8 @@ about the date.
 
 Recording writes the date's prices as the sweep does (`record-rate.md`,
 The refresh), so the form says what it is about to write. One folded
-line, ink-secondary, opening into the same rate lines the sweep carries:
+line, ink-secondary, opening into the same rate lines the sweep carries,
+and scrolling them into view when the Dialog is too short to show them:
 
 - **A date holding no recording**: "Prices for 31 July will be recorded
   with this", opening to the proposals. A 2019 figure takes 2019's
@@ -785,7 +786,9 @@ The same Dialog, prefilled with the stored value, date and note.
   A move reads "Nothing was moved.", and a holding that is gone
   "deleted". A holding name with no break in it wraps inside the Dialog.
 - **Validation**: the quantity field's and the Date field's own rules
-  (Refusing a date).
+  (Refusing a date). A refused value is refused on the value field's
+  own message line, never the Dialog's general line, and the refusal
+  clears as soon as the value fits, before Save.
 - **Archived holding**: the entry point does not exist for it, at any
   date.
 - **Saved**: the Dialog closes and the dashboard updates from local
@@ -1763,3 +1766,10 @@ Editing an existing entry).
      inside the Dialog. Test:
      `tests/browser/parts/snapshot-entry-long-name.mjs`,
      `tests/browser/parts/snapshot-entry-review-long-name.mjs`.
+109. (blind) (walk) Save on a value with more than twelve decimal places
+     shows the refusal on the value field's own line, with
+     `aria-invalid="true"` and an `aria-describedby` naming that line,
+     and the Dialog's general line stays empty. Correcting the value to
+     one that fits clears the refusal and `aria-invalid` before Save.
+     Test: `tests/browser/parts/snapshot-entry.mjs`,
+     `tests/browser/parts/snapshot-entry-review-value.mjs`.

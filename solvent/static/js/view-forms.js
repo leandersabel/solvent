@@ -18,7 +18,16 @@ export function snapshotDialog(vault, holding, existing, onSaved, onOpenRecordin
     inputmode: 'decimal',
     value: existing ? vault.format.quantity(existing.payload.value) : '',
     id: 'snapshot-value',
+    'aria-describedby': 'snapshot-value-line',
   });
+  // The value's own message line, cleared as soon as the value fits.
+  // It holds its place while empty, so a refusal moves nothing below it.
+  const valueLine = el('p', { id: 'snapshot-value-line', class: 'field-error message-line', 'aria-live': 'polite' });
+  const refuseValue = (reason) => {
+    valueLine.textContent = reason;
+    if (reason) value.setAttribute('aria-invalid', 'true');
+    else value.removeAttribute('aria-invalid');
+  };
   const note = el('textarea', { id: 'snapshot-note', rows: '2', text: existing ? existing.payload.note || '' : '' });
   const unit = holding.payload.unit;
   const converted = el('p', { class: 'hint numeric' });
@@ -142,6 +151,9 @@ export function snapshotDialog(vault, holding, existing, onSaved, onOpenRecordin
     },
   });
   value.addEventListener('input', describeConverted);
+  value.addEventListener('input', () => {
+    if (typedValue() !== null) refuseValue('');
+  });
   value.addEventListener('input', changed);
   note.addEventListener('input', changed);
 
@@ -254,7 +266,8 @@ export function snapshotDialog(vault, holding, existing, onSaved, onOpenRecordin
       error.hidden = true;
       const stored = typedValue();
       if (stored === null) {
-        return fail('Enter a number, with at most twelve decimal places.');
+        refuseValue('Enter a number, with at most twelve decimal places.');
+        return value.focus();
       }
       if (!date.validate()) return;
       const on = date.value;
@@ -328,13 +341,18 @@ export function snapshotDialog(vault, holding, existing, onSaved, onOpenRecordin
       el('div', { class: 'field' }, [
         el('label', { for: 'snapshot-value', text: `Value in ${vault.unitName(holding.payload.unit)}` }),
         value,
+        valueLine,
         converted,
       ]),
       el('details', {}, [
         el('summary', { text: 'Add a note' }),
         el('div', { class: 'field' }, [el('label', { for: 'snapshot-note', text: 'Note' }), note]),
       ]),
-      el('details', { class: 'prices-fold' }, [pricesLine, pricesBody]),
+      // Opened, the fold brings its lines into a short Dialog's view.
+      el('details', { class: 'prices-fold', ontoggle: (event) => event.target.open && pricesBody.scrollIntoView({ block: 'nearest' }) }, [
+        pricesLine,
+        pricesBody,
+      ]),
       error,
     ],
     actions: [cancel, submit],

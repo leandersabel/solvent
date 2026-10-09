@@ -120,7 +120,7 @@ await run(async () => {
     await ev("[...document.querySelectorAll('.dialog button')].find(b => b.textContent === 'Save').click()");
     await quiet();
   };
-  const formError = () => ev("(() => { const n = document.querySelector('.dialog .field-error:not([hidden])'); return n ? n.textContent : ''; })()");
+  const formError = () => ev("(() => { const n = document.querySelector('.dialog .field-error:not([hidden]):not(:empty)'); return n ? n.textContent : ''; })()");
   // By Escape, which closes the topmost dialog and puts the page back
   // as it was, where removing the scrim would leave the page inert.
   const closeDialogs = async () => {
@@ -189,11 +189,26 @@ await run(async () => {
   );
   proxy.mode = 'answer';
 
+  // The value's refusal sits on the value field's own line, never in the
+  // dialog's general one, and clears as soon as the value fits.
+  const valueState = () => ev(`(() => {
+    const input = document.querySelector('#snapshot-value');
+    const line = document.querySelector('#snapshot-value-line');
+    const general = [...document.querySelectorAll('.dialog .field-error:not([hidden])')].filter((n) => n !== line);
+    return {
+      line: line ? line.textContent : null,
+      linked: Boolean(line) && (input.getAttribute('aria-describedby') || '').split(' ').includes(line.id),
+      invalid: input.getAttribute('aria-invalid'),
+      general: general.map((n) => n.textContent).join(' '),
+    };
+  })()`);
   traffic.length = 0;
   await openForm('Current account');
   await set('#snapshot-value', '1.1234567890123');
   await formSave();
-  const fine = await formError();
+  const fine = await valueState();
+  await set('#snapshot-value', '1234.5');
+  const valueFitted = await valueState();
   await closeDialogs();
   await openForm('Current account');
   await set('#snapshot-date', await format('date', isoOf(dayOf(T) + 1)));
@@ -202,7 +217,17 @@ await run(async () => {
   await set('#snapshot-value', '5');
   await formSave();
   await closeDialogs();
-  check('record-snapshot: a value with more than twelve decimal places is refused at input', fine.includes('at most twelve decimal places'), fine);
+  check(
+    'record-snapshot: a value with more than twelve decimal places is refused on the value field and nothing is written',
+    fine.line === 'Enter a number, with at most twelve decimal places.' && fine.linked && fine.invalid === 'true' && fine.general === '' &&
+      writesSent().length === 0,
+    JSON.stringify(fine),
+  );
+  check(
+    'record-snapshot: a value that fits clears its refusal before Save',
+    valueFitted.line === '' && valueFitted.invalid === null && valueFitted.general === '',
+    JSON.stringify(valueFitted),
+  );
   check('record-snapshot: a future date is refused inline and nothing is written', future === 'That date is in the future.' && writesSent().length === 0, future);
 
   // Every date refusal sits on the date field's own line, never in the
