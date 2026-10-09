@@ -184,7 +184,7 @@ await run(async () => {
   await pressRow('Savings');
   check('review rate 32: recording the first row then writes the typed price', (await ratesAt(F)).PAINT?.rate === '800');
 
-  // ---- A clear on a recording deleted elsewhere --------------------------
+  // ---- 43: a clear on a recording deleted elsewhere ----------------------
 
   const G = ago(55);
   await sweepOn(G);
@@ -194,8 +194,37 @@ await run(async () => {
   await typeLine('USD', '');
   await saveLines();
   check(
-    'review snapshot: a rate-lines save clearing a price on a recording another window deleted shows the date emptied',
-    (await atDate(G)).length === 0 && (await deletedSays(G)) && !(await offersLineSave()),
+    'review rate 43: a rate-lines save clearing a price on a recording another window deleted shows the date emptied',
+    (await atDate(G)).length === 0 && (await deletedSays(G)) && !(await offersLineSave()) &&
+      !/Saved\./.test(await outsideLines()) && (await rowState('Current account')).state.includes('Nothing recorded'),
+    JSON.stringify({ callout: await callout(), banner: (await outsideLines()).slice(0, 400), row: await rowState('Current account') }),
+  );
+  traffic.length = 0;
+  await typeRow('Savings', '5300');
+  await pressRow('Savings');
+  const afterClear = await ratesAt(G);
+  const clearOrder = writesSent().map((w) => (bodyOf(w) || {}).recordType);
+  check(
+    'review rate 43: after the cleared save, recording the next row writes its quantity first, then the proposals at the date',
+    on(await stored('snapshot'), G).length === 1 && clearOrder[0] === 'snapshot' &&
+      afterClear['XAU-ozt']?.rateSource === 'proposed' && afterClear['XAU-ozt'].rate === proposalsFor(G)['XAU-ozt'].rate,
+    JSON.stringify({ clearOrder, afterClear }),
+  );
+
+  // ---- A clear of a price another window cleared, the recording kept ----
+
+  const K = ago(56);
+  await sweepOn(K);
+  await typeRow('Current account', '1500');
+  await pressRow('Current account');
+  const usdK = on(await stored('rate'), K).find((p) => p.payload.symbol === 'USD');
+  await unwatched(() => rec.call(async (recordId) => (await import('/static/js/api.js')).del('/api/records/' + recordId), usdK.recordId));
+  await typeLine('USD', '');
+  await saveLines();
+  check(
+    'review rate: clearing a price another window already cleared, on a recording that still stands, keeps the recording and calls nothing deleted',
+    on(await stored('snapshot'), K).length === 1 && !on(await stored('rate'), K).some((p) => p.payload.symbol === 'USD') &&
+      !(await callout()) && (await rowState('Current account')).state.includes('Recorded for this date'),
     JSON.stringify({ callout: await callout(), banner: (await outsideLines()).slice(0, 400), row: await rowState('Current account') }),
   );
 
