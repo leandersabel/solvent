@@ -1472,6 +1472,49 @@ await check('net-worth-view: grouped by a dimension, the later holding\'s band s
   assert.deepEqual(at(before.layers, 'p').lower[1], at(main.layers, 'p').lower[1]);
 });
 
+await check('net-worth-view: in percentage, a stretch whose assets run down to zero stays at the shares it starts from', async () => {
+  const { stack } = await load('chart.js');
+  const vault = model({
+    dimensions: [{ id: 'd', label: 'D', values: [{ id: 'a', label: 'A' }, { id: 'b', label: 'B' }] }],
+    holdings: [
+      { name: 'A', unit: 'CHF', dims: { d: 'a' } },
+      { name: 'B', unit: 'CHF', dims: { d: 'b' } },
+      { name: 'C', unit: 'CHF', dims: { d: 'b' } },
+    ],
+    figures: [
+      ['A', '2026-01-31', '300'],
+      ['C', '2026-01-31', '100'],
+      ['A', '2026-05-31', '0'],
+      ['C', '2026-05-31', '0'],
+      ['B', '2026-05-31', '1234'],
+    ],
+  });
+  for (const dimension of [null, vault.dimensions[0]]) {
+    const { days, bands } = vault.series(dimension, day('2026-01-31'), day('2026-05-31'));
+    const last = days.indexOf(day('2026-05-31'));
+    const before = stack(bands, true, 'before');
+    const main = stack(bands, true);
+    // Total assets are above zero on every day up to 31 May, so the bands fill the plot on both sides of it.
+    for (const { layers } of [before, main]) {
+      assert.equal(layers[layers.length - 1].upper[last][1], 100);
+    }
+    if (dimension) assert.deepEqual(before.layers[0].upper[last], main.layers[0].upper[last - 1]);
+  }
+});
+
+await check('net-worth-view: in percentage, a stretch whose assets rise from zero takes the shares it ends at', async () => {
+  const { stack } = await load('chart.js');
+  const vault = model({
+    holdings: [{ name: 'A', unit: 'CHF' }],
+    figures: [
+      ['A', '2026-01-31', '0'],
+      ['A', '2026-05-31', '500'],
+    ],
+  });
+  const { bands } = vault.series(null, day('2026-01-31'), day('2026-05-31'));
+  assert.deepEqual(stack(bands, true).layers[0].upper[0], [0, 100]);
+});
+
 await check('net-worth-view: a holding archived without a zero at D is on the side just before archivedAt and off the value at it', async () => {
   const vault = model({
     holdings: [
