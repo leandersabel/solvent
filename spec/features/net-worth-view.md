@@ -1236,4 +1236,5 @@ rule of the chart (Archived holdings, Ranges and modes).
 82. (blind) (walk) In Percentage, the asset bands fill the plot on every
     day with assets above zero, also beside a recording that puts every
     holding at zero, and under a dimension. Test:
-    `tests/test_client.py::test_the_client_side_rules_hold`.
+    `tests/test_client.py::test_the_client_side_rules_hold`,
+    `tests/browser/parts/dashboard-review-percentage-fill.mjs`.
