@@ -65,10 +65,13 @@ export function dateField(
     return null;
   };
 
+  // Only a date that differs reaches onChange: a blur settles the date
+  // typed already, and its prices must not be asked for again.
   const settle = (iso, { redraw = true } = {}) => {
+    const changed = iso !== current;
     current = iso;
     if (redraw) text.value = format.date(iso);
-    if (onChange) onChange(iso);
+    if (onChange && changed) onChange(iso);
   };
 
   text.addEventListener('input', () => {
