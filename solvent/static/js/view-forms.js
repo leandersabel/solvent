@@ -7,6 +7,9 @@ import { dateField } from './datepicker.js';
 import { dayNumber, isoFromDay } from './model.js';
 import { closedCopy, describeConverted as showConverted, rateBlock } from './view-sweep.js';
 
+// How long typing in the date field pauses before its prices are asked for.
+const TYPING_PAUSE = 400;
+
 /** One holding, one date: the small form for an odd date or a
  *  backfill. There is no rate field on it, because a price belongs to
  *  a unit rather than to a holding. Its prices line says what the save
@@ -59,7 +62,19 @@ export function snapshotDialog(vault, holding, existing, onSaved, onOpenRecordin
   // which ensures no price: those read the stored prices and look
   // nothing up.
   const moving = () => Boolean(existing) && date.value !== existing.payload.date;
-  const describePrices = () => {
+  // The field settles every keystroke that forms a date, so the lookup
+  // waits until typing pauses or the field is left, and a date passed on
+  // the way to the one typed asks for nothing. Save asks at once for
+  // what is still waiting.
+  let waitingLookup = null;
+  const lookUpNow = () => {
+    if (!waitingLookup) return;
+    clearTimeout(waitingLookup.timer);
+    waitingLookup.ask();
+  };
+  const describePrices = ({ typing = false } = {}) => {
+    if (waitingLookup) clearTimeout(waitingLookup.timer);
+    waitingLookup = null;
     const on = date.value;
     if (!on) {
       pricesLine.textContent = 'Prices';
@@ -107,17 +122,24 @@ export function snapshotDialog(vault, holding, existing, onSaved, onOpenRecordin
         : null,
     ]);
     if (sit && writes.needsLookup(vault, on, unit)) {
-      sit.proposals = writes.fetchProposals(vault, on);
       block.waiting();
       // The rate lines' own skeletons sit inside the fold, so the folded
       // line carries one too (record-snapshot.md, States).
       const skeleton = el('span', { class: 'skeleton', 'aria-label': 'Looking up the prices' });
       pricesLine.append(skeleton);
       const shownFor = block;
-      sit.proposals.then((proposals) => {
-        skeleton.remove();
-        if (block === shownFor) block.showProposals(proposals);
-      });
+      const asking = sit;
+      const ask = () => {
+        waitingLookup = null;
+        if (!pricesLine.isConnected) return;
+        asking.proposals = writes.fetchProposals(vault, on);
+        asking.proposals.then((proposals) => {
+          skeleton.remove();
+          if (block === shownFor) block.showProposals(proposals);
+        });
+      };
+      if (typing) waitingLookup = { ask, timer: setTimeout(ask, TYPING_PAUSE) };
+      else ask();
     }
   };
   // The live result converts at the price for the date on the form: the
@@ -146,10 +168,12 @@ export function snapshotDialog(vault, holding, existing, onSaved, onOpenRecordin
     value: existing ? existing.payload.date : today(),
     onChange: () => {
       if (moving()) changed();
-      describePrices();
+      // A calendar pick settles with focus still in the calendar.
+      describePrices({ typing: document.activeElement === date.input });
       describeConverted();
     },
   });
+  date.input.addEventListener('blur', lookUpNow);
   value.addEventListener('input', describeConverted);
   value.addEventListener('input', () => {
     if (typedValue() !== null) refuseValue('');
@@ -185,6 +209,7 @@ export function snapshotDialog(vault, holding, existing, onSaved, onOpenRecordin
   };
 
   const create = async (on, stored) => {
+    lookUpNow();
     const claim = sit || writes.sitting(vault, on);
     const refusal = await writes.claimDate(vault, claim, {
       snapshots: [holding.recordId],
@@ -219,6 +244,7 @@ export function snapshotDialog(vault, holding, existing, onSaved, onOpenRecordin
   // are the lines' own, after the quantity: a proposal still in flight
   // is waited for here, and Save never waited on it.
   const editEntry = async (on, payload, displaced) => {
+    lookUpNow();
     if (sit && sit.proposals) block.showProposals(await sit.proposals);
     const result = await writes.editSnapshot(vault, holding, existing, payload, {
       sit,

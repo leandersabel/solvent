@@ -691,7 +691,8 @@ and scrolling them into view when the Dialog is too short to show them:
 - **A date holding no recording**: "Prices for 31 July will be recorded
   with this", opening to the proposals. A 2019 figure takes 2019's
   prices. A line changed here fills in a missing price, as on the
-  sweep at a new date, so saving asks nothing.
+  sweep at a new date, so saving asks nothing. Choosing the date asks
+  for its prices once, and opening the line asks nothing more.
 - **A date that holds a recording**: "31 July already holds prices.
   This figure joins them." It opens to that recording's stored prices,
   read only, with a link to its Recording detail, where they are
@@ -1773,3 +1774,7 @@ Editing an existing entry).
      one that fits clears the refusal and `aria-invalid` before Save.
      Test: `tests/browser/parts/snapshot-entry.mjs`,
      `tests/browser/parts/snapshot-entry-review-value.mjs`.
+110. (blind) (walk) On the single-holding form, choosing a date holding no
+     recording issues exactly one request to `/api/rates`, and pressing
+     the folded prices line to open it issues none. Test:
+     `tests/browser/parts/snapshot-entry.mjs`.

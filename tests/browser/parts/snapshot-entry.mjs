@@ -176,6 +176,8 @@ await run(async () => {
   proxy.mode = 'down';
   await openForm('Current account');
   await set('#snapshot-date', await format('date', D8));
+  // Leaving the field asks for the date's prices without the typing pause.
+  await ev("document.querySelector('#snapshot-date').blur()");
   await ev("document.querySelectorAll('.dialog details').forEach(d => (d.open = true))");
   await quiet();
   const formOutage = await lineState('USD');
@@ -287,6 +289,12 @@ await run(async () => {
   const formBody = await ev("document.querySelector('.dialog .prices-body').textContent");
   // innerText, which leaves out what a closed fold hides.
   const folded = await ev("(f => !f.open && f.innerText)(document.querySelector('.dialog .prices-fold'))");
+  // Pressing the fold takes focus off the date field, which settles the
+  // date already chosen and must not ask for its prices again.
+  await ev("document.querySelector('#snapshot-date').focus()");
+  await realClick('.dialog .prices-fold summary');
+  const foldOpened = await ev("document.querySelector('.dialog .prices-fold').open");
+  const datedAsks = rateAsks().length;
   await set('#snapshot-value', '31415.92');
   await formSave();
   check(
@@ -296,6 +304,11 @@ await run(async () => {
     formLine,
   );
   check('record-snapshot: the folded prices line shows what the save writes without being opened', folded === formLine, folded);
+  check(
+    'record-snapshot: choosing a date asks for its prices once, and opening the folded prices line asks nothing more',
+    foldOpened && datedAsks === 1,
+    String(datedAsks),
+  );
   check(
     'record-snapshot: no request during the form carries the entered figure, in any field or encoding',
     traffic.every((r) => !['31415.92', 'MzE0MTUuOTI='].some((s) => (r.url + JSON.stringify(r.headers) + r.body).includes(s))),
