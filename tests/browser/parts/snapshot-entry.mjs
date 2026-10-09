@@ -120,7 +120,7 @@ await run(async () => {
     await ev("[...document.querySelectorAll('.dialog button')].find(b => b.textContent === 'Save').click()");
     await quiet();
   };
-  const formError = () => ev("(() => { const n = document.querySelector('.dialog .field-error:not([hidden])'); return n ? n.textContent : ''; })()");
+  const formError = () => ev("(() => { const n = document.querySelector('.dialog .field-error:not([hidden]):not(:empty)'); return n ? n.textContent : ''; })()");
   // By Escape, which closes the topmost dialog and puts the page back
   // as it was, where removing the scrim would leave the page inert.
   const closeDialogs = async () => {

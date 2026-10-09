@@ -21,10 +21,10 @@ export function snapshotDialog(vault, holding, existing, onSaved, onOpenRecordin
     'aria-describedby': 'snapshot-value-line',
   });
   // The value's own message line, cleared as soon as the value fits.
-  const valueLine = el('p', { id: 'snapshot-value-line', class: 'field-error', 'aria-live': 'polite', hidden: true });
+  // It holds its place while empty, so a refusal moves nothing below it.
+  const valueLine = el('p', { id: 'snapshot-value-line', class: 'field-error message-line', 'aria-live': 'polite' });
   const refuseValue = (reason) => {
     valueLine.textContent = reason;
-    valueLine.hidden = !reason;
     if (reason) value.setAttribute('aria-invalid', 'true');
     else value.removeAttribute('aria-invalid');
   };
@@ -348,7 +348,11 @@ export function snapshotDialog(vault, holding, existing, onSaved, onOpenRecordin
         el('summary', { text: 'Add a note' }),
         el('div', { class: 'field' }, [el('label', { for: 'snapshot-note', text: 'Note' }), note]),
       ]),
-      el('details', { class: 'prices-fold' }, [pricesLine, pricesBody]),
+      // Opened, the fold brings its lines into a short Dialog's view.
+      el('details', { class: 'prices-fold', ontoggle: (event) => event.target.open && pricesBody.scrollIntoView({ block: 'nearest' }) }, [
+        pricesLine,
+        pricesBody,
+      ]),
       error,
     ],
     actions: [cancel, submit],

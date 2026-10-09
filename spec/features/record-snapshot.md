@@ -685,7 +685,8 @@ about the date.
 
 Recording writes the date's prices as the sweep does (`record-rate.md`,
 The refresh), so the form says what it is about to write. One folded
-line, ink-secondary, opening into the same rate lines the sweep carries:
+line, ink-secondary, opening into the same rate lines the sweep carries,
+and scrolling them into view when the Dialog is too short to show them:
 
 - **A date holding no recording**: "Prices for 31 July will be recorded
   with this", opening to the proposals. A 2019 figure takes 2019's
@@ -1770,4 +1771,5 @@ Editing an existing entry).
      `aria-invalid="true"` and an `aria-describedby` naming that line,
      and the Dialog's general line stays empty. Correcting the value to
      one that fits clears the refusal and `aria-invalid` before Save.
-     Test: `tests/browser/parts/snapshot-entry.mjs`.
+     Test: `tests/browser/parts/snapshot-entry.mjs`,
+     `tests/browser/parts/snapshot-entry-review-value.mjs`.
