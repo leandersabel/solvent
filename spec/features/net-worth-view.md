@@ -117,8 +117,9 @@ shown off its own figure reads as a wrong figure.
 
 - **The change** over the selected range or selection: an arrow icon, the
   signed amount and the percentage (one decimal place), in status good or
-  critical, the arrow carrying the sign so color is never the only
-  signal (The change).
+  critical, the arrow carrying the direction so color is never the only
+  signal. An amount that reads zero has no arrow and the flat tone, ink
+  secondary (The change).
 - **Which rates**, a segmented control with both positions named, neither
   an unlabeled off state: **"Latest rates, 31 July"** (the vault's one
   rate date) and **"Rates as of each figure"** (no date, because each
@@ -772,10 +773,13 @@ earlier's, exact.
   magnitude keeps a debt shrinking from −1000 to −500 a rise of 50%.
 - **No percentage when the earlier net worth is zero**, because nothing
   is a share of zero. The amount stands alone.
-- **The sign is the amount's own**: `+` before a rise, `−` before a fall,
-  on the amount and the percentage alike, each written from its
-  magnitude. So the arrow, amount and percentage never disagree, even
-  where a figure rounds to zero. A change of zero carries no sign.
+- **The change follows the figures as shown**: each is written from its
+  magnitude, with `+` before a rise and `−` before a fall only where it
+  shows a digit other than zero. So a fall of 3 on 10000 reads
+  `−3 · 0.0%`. A legend entry's change across a selection follows the
+  same rule.
+- **An amount that reads zero is no change**: no arrow, in the flat
+  tone, as an exact zero is.
 
 #### The data table
 
@@ -1014,9 +1018,12 @@ rule of the chart (Archived holdings, Ranges and modes).
     currency under `en-US`, 2000 to 2005 reads `+0.2%` and 2000 to 1995
     `−0.2%`, where a float or half-away rounding gives 0.3. Test:
     `tests/test_client.py::test_the_client_side_rules_hold`.
-39. (blind) (walk) 2000 to 2001 reads `+0.0%` beside the rising arrow,
-    −1000 to −500 reads `+50.0%`, and 0 to 500 shows the amount with no
-    percentage. Test: no test.
+39. (blind) (walk) 2000 to 2001 reads `CHF +1 · 0.0%` beside the rising
+    arrow, 10000 to 9997 reads `CHF −3 · 0.0%` beside the falling arrow,
+    10000 to 9999.6 and to 10000.4 read `CHF 0 · 0.0%` with no arrow in
+    the flat tone, −1000 to −500 reads `+50.0%`, and 0 to 500 shows the
+    amount with no percentage. Test:
+    `tests/browser/parts/dashboard-zero-change.mjs`.
 40. (blind) (walk) With a single recording, made today, at 1280px and
     390px, under 1M, 6M, 1Y and All, the point's center is at the plot's
     horizontal middle within half a pixel and its mark's bounding box

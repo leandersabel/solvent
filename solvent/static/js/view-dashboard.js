@@ -196,6 +196,8 @@ function heroPart(label, figure) {
 }
 
 const abs = (n) => (n < 0n ? -n : n);
+/** Whether a written figure shows anything but zero. */
+const shown = (text) => /[1-9]/.test(text);
 
 /** The change over the chart's selected range, or across a selected
  *  span, read at its two days from the value model. The arrow carries
@@ -207,18 +209,22 @@ function heroChange(vault, { days }, range, selection, dimension) {
   const [from, to] = selection || [days[0], days[days.length - 1]];
   const start = netAt(from);
   const change = netAt(to) - start;
-  // The sign is the amount's own and the figures after it are
-  // magnitudes, so the arrow, the amount and the percentage agree.
-  const sign = change > 0n ? '+' : change < 0n ? '\u2212' : '';
+  // Each figure is written from its magnitude and signed only when it
+  // shows a digit other than zero. The arrow and the tone follow the
+  // amount as shown, so a change that rounds to zero reads as none.
+  const amount = vault.format.money(abs(change));
+  const sign = change > 0n ? '+' : '\u2212';
+  const signedIf = (text) => (shown(text) ? sign + text : text);
   const percentage = start === 0n
     ? ''
-    : ` \u00b7 ${sign}${vault.format.percent(decimal.divide(abs(change) * 100n, abs(start)), 1)}`;
-  const tone = change > 0n ? 'good' : change < 0n ? 'critical' : 'flat';
+    : ` \u00b7 ${signedIf(vault.format.percent(decimal.divide(abs(change) * 100n, abs(start)), 1))}`;
+  const direction = shown(amount) ? (change > 0n ? 'up' : 'down') : null;
+  const tone = { up: 'good', down: 'critical' }[direction] || 'flat';
   return el('p', { class: `hero-change ${tone}` }, [
-    change === 0n ? null : icon(change > 0n ? 'up' : 'down'),
+    direction && icon(direction),
     el('span', {
       class: 'hero-delta',
-      text: `${vault.mainCurrency} ${sign}${vault.format.money(abs(change))}${percentage}`,
+      text: `${vault.mainCurrency} ${signedIf(amount)}${percentage}`,
     }),
     el('span', {
       class: 'hero-since',
@@ -550,7 +556,8 @@ function legend(vault, bands, state, render, dimension) {
 }
 
 function signed(vault, value) {
-  return `${value > 0n ? '+' : ''}${vault.format.money(value)}`;
+  const text = vault.format.money(value);
+  return value > 0n && shown(text) ? `+${text}` : text;
 }
 
 /** The holdings the table lists. Archived comes first: an archived
