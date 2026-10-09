@@ -913,6 +913,13 @@ th.numeric {
   outline-offset: -2px;
 }
 
+/* A recording's holding or unit breaks anywhere it must, so a name with
+   no break in it never squeezes the two figures beside it, and neither
+   figure breaks (record-snapshot.md, Recording detail). */
+.recording-table td:first-child { overflow-wrap: anywhere; }
+.recording-table td:nth-child(2),
+.recording-table td:nth-child(3) { white-space: nowrap; }
+
 .data-table tr.flagged td:first-child {
   border-left: 3px solid var(--status-critical);
   padding-left: 12px;
@@ -2068,9 +2075,8 @@ select {
   }
 
   .recording-table tr.flagged td:first-child { border-left: 0; padding-left: 0; }
-  .recording-table td:first-child { flex-basis: 100%; overflow-wrap: anywhere; }
-  .recording-table td:nth-child(2) { white-space: nowrap; }
-  .recording-table td:nth-child(3) { margin-left: auto; white-space: nowrap; }
+  .recording-table td:first-child { flex-basis: 100%; }
+  .recording-table td:nth-child(3) { margin-left: auto; }
   .recording-table td:last-child { flex-basis: 100%; }
   .recording-table td:last-child:empty { display: none; }
 

@@ -1694,10 +1694,13 @@ Editing an existing entry).
     holding two seven-digit figures for one holding on its date pans no
     screen or box sideways. Every control, Keep this one included, lies
     on screen and takes a tap at its center, and each control in its
-    lists is at least 44px tall at phone width. A holding name with no
-    break in it wraps rather than pans. Test:
+    lists is at least 44px tall at phone width. At those widths and
+    1280px, a holding name with no break in it wraps rather than pans,
+    and each figure beside it stays on one line. Test:
     `tests/browser/parts/recording-detail.mjs`,
-    `tests/browser/parts/recording-detail-review-phone.mjs`.
+    `tests/browser/parts/recording-detail-review-phone.mjs`,
+    `tests/browser/parts/recording-detail-long-name.mjs`,
+    `tests/browser/parts/recording-detail-review-unbroken.mjs`.
 95. (walk) On the single-holding form, the folded prices line shows what
     the save writes, such as "Prices for 31 July will be recorded with
     this", without being opened. Test:
