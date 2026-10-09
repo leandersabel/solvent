@@ -698,6 +698,10 @@ otherwise looks like a lost value or a bad entry.
 - **Absolute / percentage**: the percentage view normalizes asset bands
   against total assets and liability bands against total liabilities,
   because a share of a signed net figure is meaningless near zero.
+  Every figure moves in a line between two samples, so a side whose
+  total is zero at one end of the stretch is drawn at the shares of the
+  other end. The bands then fill the plot on every day of the stretch
+  that has a total, rather than ramping down to a sample that has none.
 
 #### Value ticks
 
@@ -1229,3 +1233,7 @@ rule of the chart (Archived holdings, Ranges and modes).
     included. While none is, the breakdown is absent. Test:
     `tests/browser/parts/dashboard-zero-band.mjs`,
     `tests/browser/parts/dashboard-review-zero-band.mjs`.
+82. (blind) (walk) In Percentage, the asset bands fill the plot on every
+    day with assets above zero, also beside a recording that puts every
+    holding at zero, and under a dimension. Test:
+    `tests/test_client.py::test_the_client_side_rules_hold`.

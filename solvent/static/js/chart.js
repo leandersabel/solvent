@@ -69,28 +69,40 @@ export function trendChart(options) {
  *  `phase` stacks a band's `before` side instead, the one just before
  *  a day (see `Vault.series`).
  *
+ *  Every figure moves in a line between two samples, so a side whose
+ *  total is zero at one end of the stretch holds the shares of its
+ *  other end across it. A percentage side with no total takes those
+ *  shares rather than drawing a ramp to zero through days that have
+ *  some.
+ *
  *  Pure, so the arithmetic is tested without a page. */
 export function stack(bands, percentage = false, phase = null) {
   const count = bands.length ? bands[0].points.length : 0;
   const layers = bands.map((band) => ({ band, upper: [], lower: [] }));
   const net = [];
+  const sidesAt = (side, index) => bands.map((band) => {
+    const { assets, liabilities } = side ? band[side] : band;
+    return [toNumber(assets[index]), toNumber(liabilities[index])];
+  });
+  const totals = (sides) => [0, 1].map((at) => sides.reduce((sum, side) => sum + Math.abs(side[at]), 0));
   for (let index = 0; index < count; index += 1) {
-    const sides = layers.map(({ band }) => {
-      const { assets, liabilities } = phase ? band[phase] : band;
-      return [toNumber(assets[index]), toNumber(liabilities[index])];
-    });
-    const assetTotal = sides.reduce((sum, [asset]) => sum + asset, 0);
-    const liabilityTotal = sides.reduce((sum, [, liability]) => sum - liability, 0);
+    const sides = sidesAt(phase, index);
+    let shares = sides;
+    if (percentage) {
+      const other = phase ? index - 1 : index + 1;
+      const across = other >= 0 && other < count ? sidesAt(phase ? null : 'before', other) : sides;
+      const [own, far] = [totals(sides), totals(across)];
+      shares = sides.map((side, at) => [0, 1].map((part) => {
+        const [from, total] = own[part] ? [side, own[part]] : [across[at], far[part]];
+        return total ? (from[part] / total) * 100 : 0;
+      }));
+    }
     let up = 0;
     let down = 0;
     let line = 0;
     layers.forEach((layer, at) => {
-      let [asset, liability] = sides[at];
-      line += asset + liability;
-      if (percentage) {
-        asset = assetTotal ? (asset / assetTotal) * 100 : 0;
-        liability = liabilityTotal ? (liability / liabilityTotal) * 100 : 0;
-      }
+      const [asset, liability] = shares[at];
+      line += sides[at][0] + sides[at][1];
       layer.upper[index] = [up, up + asset];
       layer.lower[index] = [down, down + liability];
       up += asset;
