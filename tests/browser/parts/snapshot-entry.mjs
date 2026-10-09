@@ -176,6 +176,8 @@ await run(async () => {
   proxy.mode = 'down';
   await openForm('Current account');
   await set('#snapshot-date', await format('date', D8));
+  // Leaving the field asks for the date's prices without the typing pause.
+  await ev("document.querySelector('#snapshot-date').blur()");
   await ev("document.querySelectorAll('.dialog details').forEach(d => (d.open = true))");
   await quiet();
   const formOutage = await lineState('USD');

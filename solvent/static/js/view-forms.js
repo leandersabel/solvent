@@ -72,7 +72,7 @@ export function snapshotDialog(vault, holding, existing, onSaved, onOpenRecordin
     clearTimeout(waitingLookup.timer);
     waitingLookup.ask();
   };
-  const describePrices = () => {
+  const describePrices = ({ typing = false } = {}) => {
     if (waitingLookup) clearTimeout(waitingLookup.timer);
     waitingLookup = null;
     const on = date.value;
@@ -138,7 +138,8 @@ export function snapshotDialog(vault, holding, existing, onSaved, onOpenRecordin
           if (block === shownFor) block.showProposals(proposals);
         });
       };
-      waitingLookup = { ask, timer: setTimeout(ask, TYPING_PAUSE) };
+      if (typing) waitingLookup = { ask, timer: setTimeout(ask, TYPING_PAUSE) };
+      else ask();
     }
   };
   // The live result converts at the price for the date on the form: the
@@ -167,7 +168,8 @@ export function snapshotDialog(vault, holding, existing, onSaved, onOpenRecordin
     value: existing ? existing.payload.date : today(),
     onChange: () => {
       if (moving()) changed();
-      describePrices();
+      // A calendar pick settles with focus still in the calendar.
+      describePrices({ typing: document.activeElement === date.input });
       describeConverted();
     },
   });
