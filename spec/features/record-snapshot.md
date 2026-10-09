@@ -1699,7 +1699,8 @@ Editing an existing entry).
     and each figure beside it stays on one line. Test:
     `tests/browser/parts/recording-detail.mjs`,
     `tests/browser/parts/recording-detail-review-phone.mjs`,
-    `tests/browser/parts/recording-detail-long-name.mjs`.
+    `tests/browser/parts/recording-detail-long-name.mjs`,
+    `tests/browser/parts/recording-detail-review-unbroken.mjs`.
 95. (walk) On the single-holding form, the folded prices line shows what
     the save writes, such as "Prices for 31 July will be recorded with
     this", without being opened. Test:
