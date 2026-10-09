@@ -64,7 +64,9 @@ export function sweepView(vault, date, actions = {}) {
   const callout = el('p', { class: 'callout callout-critical', role: 'status', hidden: true });
   const emptied = (restore) => {
     restore();
-    sit.dateWasEmpty = true;
+    // The date holds nothing again, so the first row recorded claims it
+    // and writes its prices as on any empty date.
+    Object.assign(sit, { dateWasEmpty: true, claimed: false, refreshed: false });
     syncSave();
     mount(callout, [
       icon('alert'),
@@ -1011,7 +1013,6 @@ function saveRates(vault, sit, block, { say, refused, syncSave, emptied, keepTyp
       return;
     }
     const conflicts = result.failed.filter((f) => f.status === 409).map((f) => f.name);
-    if (conflicts.length) await writes.reloadType(vault, 'rate').catch(() => {});
     const failed = new Set(result.failed.map((f) => f.name));
     // What landed shows what is stored. What did not keeps what
     // was typed, except after a Conflict, where the line shows the

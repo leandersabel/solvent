@@ -924,6 +924,42 @@ await run(async () => {
   );
   await home();
 
+  // A rate-lines save that only changes a stored price, after another
+  // window deleted the recording this sitting made, is the same emptied
+  // date, and the next row recorded writes the prices again.
+  const DI = ago(47);
+  await newRecording(DI);
+  await rec.waitUntil((query) => document.querySelector(query).querySelector('input').value !== '', { args: [line('USD')], label: 'the proposals for the emptied date' });
+  await typeRow('Current account', '10');
+  await pressRow('Current account');
+  for (const record of [...on(await stored('snapshot'), DI), ...on(await stored('rate'), DI)]) {
+    await rec.call(async (id) => (await import('/static/js/api.js')).del(`/api/records/${id}`), record.recordId);
+  }
+  await typeLine('USD', '0.77');
+  await press('Save the rate lines');
+  await press('Save the prices', '.dialog');
+  const updateEmptied = await rec.call(() => ({
+    callout: document.querySelector('.sweep .callout').hidden ? '' : document.querySelector('.sweep .callout').textContent.trim(),
+    states: [...document.querySelectorAll('.row-state')].map((n) => n.textContent),
+  }));
+  check(
+    'record-snapshot: a rate-lines save changing a price at a date another window emptied says so under the date heading and keeps the typed price',
+    updateEmptied.callout === `Another window deleted the recording for ${await format('dayMonth', DI)}. Your prices were not saved. They are still here and are saved with the first holding you record for this date.` &&
+      updateEmptied.states.every((state) => state === 'Nothing recorded for this date.') && !(await saveOffered()) &&
+      figure((await lineState('USD')).value) === 0.77 && on(await stored('rate'), DI).length === 0,
+    JSON.stringify({ updateEmptied, usd: await lineState('USD') }),
+  );
+  await typeRow('Savings', '5001');
+  await pressRow('Savings');
+  const repriced = on(await stored('rate'), DI).map((r) => r.payload);
+  check(
+    'record-snapshot: after that save, the first row recorded writes the typed price and the proposals again',
+    on(await stored('snapshot'), DI).length === 1 && repriced.find((p) => p.symbol === 'USD')?.rate === '0.77' &&
+      repriced.some((p) => p.symbol === 'XAU-ozt'),
+    JSON.stringify(repriced),
+  );
+  await home();
+
   // ---- record-rate: a published unit before its published prices begin -
 
   proxy.mode = 'answer';

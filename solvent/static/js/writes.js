@@ -32,15 +32,19 @@ export async function putRecord(vault, slot, payload) {
   return entry;
 }
 
+/** Resolves to false when the record was already gone. */
 export async function deleteRecord(vault, entry) {
+  let found = true;
   try {
     await api.del(`/api/records/${entry.recordId}`);
   } catch (error) {
     // Gone is what was asked for, and another session having got
     // there first is not a failure the person can act on.
     if (error.status !== 404) throw error;
+    found = false;
   }
   applyDelete(vault, entry);
+  return found;
 }
 
 function applyWrite(vault, entry) {
@@ -379,7 +383,8 @@ export function confirmFigure(vault, holding, date) {
  *  independent, and abandoning the rest would turn one failed write
  *  into several unattempted ones.
  *
- *  Refused at a date holding no recording, before any request. */
+ *  Refused at a date holding no recording, before any request, and
+ *  `emptied` when a failed save finds the date deleted elsewhere. */
 export async function saveRateLines(vault, sit, plan) {
   // A price alone never makes a recording: at a date the model holds
   // none, typed prices wait for the first quantity. Checked here as
@@ -411,12 +416,27 @@ export async function saveRateLines(vault, sit, plan) {
   // Deletions last, so a save that fails partway has destroyed nothing
   // and the person still holds every price the screen offered to
   // remove.
+  let gone = false;
   for (const { entry, name } of deletes) {
     try {
-      await deleteRecord(vault, entry);
+      if (!(await deleteRecord(vault, entry))) gone = true;
       saved.push({ kind: 'deleted', name });
     } catch (error) {
       failed.push({ kind: 'deleted', name, status: error.status });
+    }
+  }
+  if (gone || failed.some((f) => f.status === 409)) {
+    // A recording another window deleted fails every update with a
+    // Conflict and finds every deletion done, so the date is read
+    // again to tell that from a price changed or cleared there.
+    const fresh = await reloadCreateTypes(vault).catch(() => null);
+    if (fresh) {
+      vault.replaceType('rate', fresh.rate);
+      const held = [...fresh.snapshot, ...fresh.rate].some((r) => r.payload.date === sit.date);
+      if (!held) {
+        vault.replaceType('snapshot', fresh.snapshot);
+        return { refused: true, date: sit.date, emptied: true, saved, failed };
+      }
     }
   }
   return { refused: false, saved, failed };

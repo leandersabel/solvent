@@ -193,6 +193,11 @@ records (`record-api.md`), so the order is the whole guarantee.
     model takes the reloaded records, and the typed prices stay on
     screen for the first quantity (`record-snapshot.md`, Update values,
     States).
+  - **A rate-lines save whose update met a Conflict, or whose deletion
+    found its entry gone, reads the date again**, because that is how a
+    recording deleted elsewhere answers, not with a refusal. A date
+    found holding no record is the same emptied date, and the next
+    quantity recorded writes the prices as at any date holding none.
 
 Against the concurrency rule in `record-api.md`:
 
@@ -616,3 +621,11 @@ silently.
     has a rate source at any date and a recording asks the proxy
     nothing. Test: `tests/test_client.py::test_the_client_side_rules_hold`,
     `tests/browser/parts/update-values-review-unquoted.mjs`.
+43. (walk) With a sweep that recorded a row at a date holding nothing,
+    and a second session then deleting every record at that date, a
+    rate-lines save changing or clearing a stored price writes nothing,
+    shows the Callout saying another window deleted the recording, and
+    keeps the typed price on its line. Recording the next row then
+    writes that price and the proposals at the date. Test:
+    `tests/browser/parts/update-values.mjs`,
+    `tests/browser/parts/update-values-review-emptied.mjs`.
