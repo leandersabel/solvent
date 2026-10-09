@@ -12,7 +12,7 @@ await run(async () => {
   const r = await startRecorder();
   await r.register();
   await r.seed();
-  const { rec, T, ago, D1, dayOf, isoOf, id, traffic, rateAsks, ev, quiet, go, format, realClick, realKey } = r;
+  const { rec, T, ago, D1, dayOf, isoOf, id, traffic, rateAsks, ev, quiet, go, format, realClick, realKey, stored } = r;
 
   const asked = () => rateAsks().map((a) => new URL(a.url).searchParams.get('date'));
   const closeDialogs = async () => {
@@ -168,6 +168,44 @@ await run(async () => {
       JSON.stringify({ iso, opened, all }),
     );
     await closeDialogs();
+  }
+  // A date typed without its leading zeros, focus still in the field,
+  // and Save pressed: the date is accepted as typed (design-system.md,
+  // Date field), its prices asked for once, and the figure saved there.
+  {
+    const iso = `${Number(T.slice(0, 4)) - 1}-04-07`;
+    const loose = (await format('date', iso)).replace(/(^|[^0-9])0+(?=[0-9])/g, '$1');
+    await openForm('Brokerage');
+    traffic.length = 0;
+    await realClick('#snapshot-date');
+    await rec.send('Input.dispatchKeyEvent', { type: 'rawKeyDown', key: 'a', code: 'KeyA', windowsVirtualKeyCode: 65, modifiers: 2, commands: ['selectAll'] });
+    await rec.send('Input.dispatchKeyEvent', { type: 'keyUp', key: 'a', code: 'KeyA', windowsVirtualKeyCode: 65, modifiers: 2 });
+    await rec.send('Input.insertText', { text: loose });
+    await quiet();
+    await rec.call((v) => {
+      const input = document.querySelector('#snapshot-value');
+      input.value = v;
+      input.dispatchEvent(new Event('input', { bubbles: true }));
+    }, '777');
+    const folded = await ev("(f => f && f.innerText)(document.querySelector('.dialog .prices-fold'))");
+    const named = [await format('dayMonth', iso), await format('longDate', iso)].some((d) => folded.includes(`Prices for ${d} will be recorded with this`));
+    check(
+      'review 95: a date typed without leading zeros is named on the folded prices line before the field is left',
+      named,
+      JSON.stringify({ loose, folded }),
+    );
+    await realClick('.dialog button', 'Save');
+    const closed = await rec.holds("!document.querySelector('#snapshot-value')", { label: 'the form to close' });
+    await quiet();
+    const left = closed ? null : await ev("(() => { const d = document.querySelector('.dialog'); return d && { text: d.innerText, date: document.querySelector('#snapshot-date').value }; })()");
+    if (!closed) await closeDialogs();
+    const all = asked();
+    const saved = (await stored('snapshot')).filter((row) => row.payload && row.payload.date === iso && row.payload.value === '777');
+    check(
+      'review 110 and Date field: a date typed without leading zeros and saved with one press of Save is saved at that date, its prices asked for once',
+      closed && all.length === 1 && all[0] === iso && saved.length === 1,
+      JSON.stringify({ iso, loose, all, saved: saved.length, left }),
+    );
   }
   // What the proxy learns is the date and the main currency
   // (spec/architecture.md, Threat model; rate-lookup.md), never a figure.
