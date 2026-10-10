@@ -275,10 +275,12 @@ Line states:
   asks about a past date. Every row in that unit reads not priced, and
   the dashboard's total carries on at the most recent price it has
   (`net-worth-view.md`, Current net worth). The line fills in as soon as
-  the source answers. Nobody is asked to type a dollar price to record a
-  franc holding. The last price is not written again under this date,
-  because that would put a figure nobody published into the history
-  under a date it was not published for, invisibly.
+  the source answers. A row recorded in the unit keeps this wording,
+  because the unit has a market and only its source is down. Nobody is
+  asked to type a dollar price to record a franc holding. The last price
+  is not written again under this date, because that would put a figure
+  nobody published into the history under a date it was not published
+  for, invisibly.
 - **A unit only its owner can price** (free text, or a symbol the proxy
   has no provider for). Shows the last figure and when it was set,
   "estimated 14 months ago", and writes nothing unless changed
@@ -307,9 +309,9 @@ Line states:
   worth in CHF on 31 December 2012? Published prices for Gold, gram
   begin on 2 January 2013. The figure records either way, and until a price
   exists the holding is listed as not priced."
-- **A unit with no price at all, where this sitting records a quantity
-  in it.** A price is asked for, because twelve troy ounces with no gold
-  price is not a figure. The line moves to the head of the block: "What
+- **A unit with no rate source at this date and no price at all, where
+  this sitting records a quantity in it.** A price is asked for, because
+  twelve troy ounces with no gold price is not a figure. The line moves to the head of the block: "What
   is 1 PAINT worth in CHF? Nothing prices PAINT yet. The figure records
   either way, and until a price exists the holding is listed as not
   priced." A sourced unit in a vault whose main currency no source
@@ -1339,7 +1341,8 @@ Editing an existing entry).
     `tests/browser/parts/snapshot-entry.mjs`.
 14. (walk) With the rate proxy down, the value still saves, every row
     still records, nothing is written for that unit, and the line says
-    so quietly rather than blocking. Test:
+    so quietly rather than blocking, also once a figure is typed or
+    recorded in that unit. Test:
     `tests/browser/parts/update-values.mjs`,
     `tests/browser/parts/snapshot-entry.mjs`.
 15. (blind) (walk) A quantity in a unit with no price at all, none

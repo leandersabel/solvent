@@ -778,6 +778,19 @@ await run(async () => {
     JSON.stringify(reopenedOutage),
   );
 
+  // Before the first recording, so the dollar carries no price.
+  await home();
+  await newRecording(ago(220));
+  await typeRow('Dollar cash', '250');
+  const typedOutage = await lineState('USD');
+  await pressRow('Dollar cash');
+  const recordedOutage = await lineState('USD');
+  check(
+    'record-snapshot: with the proxy down, a figure typed and recorded in a published unit keeps the outage wording',
+    [typedOutage, recordedOutage].every((s) => s.says === 'No market rate came back for USD. Nothing will be recorded for it for this date.'),
+    JSON.stringify([typedOutage, recordedOutage]),
+  );
+
   proxy.mode = 'none';
   await plantHere([{
     type: 'account',
