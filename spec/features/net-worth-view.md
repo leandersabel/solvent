@@ -970,7 +970,9 @@ rule of the chart (Archived holdings, Ranges and modes).
 27. (blind) (walk) A click or Enter on a day with no snapshot opens
     nothing, and on a snapshot day or its tick opens that date's
     recording. A click 8px beside a lone tick, at 1280px and 390px,
-    opens its recording too. Test: `tests/browser/parts/dashboard-net-worth.mjs`.
+    opens its recording too. Test:
+    `tests/browser/parts/dashboard-net-worth.mjs`,
+    `tests/browser/parts/dashboard-review-tick-target.mjs`.
 28. (blind) (walk) In a history long enough to downsample, the readout
     at a day whose sample was dropped equals the value model, and the
     data table lists that day. Test:
