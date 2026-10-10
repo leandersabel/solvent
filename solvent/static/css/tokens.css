@@ -1096,6 +1096,8 @@ th.numeric {
   display: block;
   width: 100%;
   height: auto;
+  /* An entry mark's target at the plot's edge reaches past the drawing. */
+  overflow: visible;
 }
 
 .gridline { stroke: var(--hairline); stroke-width: 1; }
