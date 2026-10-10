@@ -249,7 +249,9 @@ function sweepRow(vault, holding, date, { sit, block, refused, closed, ensurePri
   const converted = el('p', { class: 'hint numeric' });
   const status = el('span', { class: 'row-state' });
   const age = el('span', { class: 'row-age' });
-  const message = el('p', { id: `sweep-line-${holding.recordId}`, class: 'field-error', 'aria-live': 'polite', hidden: true });
+  // The row's message line holds its place while empty, so a refusal
+  // moves nothing below it.
+  const message = el('p', { id: `sweep-line-${holding.recordId}`, class: 'field-error message-line', 'aria-live': 'polite' });
   const savedNote = el('p', { class: 'row-saved', hidden: true, role: 'status' });
   const pair = el('div', { class: 'sweep-pair', hidden: true });
   const control = el('button', { class: 'btn-secondary' });
@@ -386,7 +388,7 @@ function sweepRow(vault, holding, date, { sit, block, refused, closed, ensurePri
       showError(message, 'Enter a number, with at most twelve decimal places.');
     } else if (field.hasAttribute('aria-invalid')) {
       field.removeAttribute('aria-invalid');
-      message.hidden = true;
+      message.textContent = '';
     }
   };
 
@@ -424,7 +426,7 @@ function sweepRow(vault, holding, date, { sit, block, refused, closed, ensurePri
 
   control.addEventListener('click', async () => {
     refuseValue(false);
-    message.hidden = true;
+    message.textContent = '';
     savedNote.hidden = true;
     const [stored] = atDate();
     const text = field.value.trim();

@@ -45,9 +45,22 @@ await run(async () => {
 
   const TOO_MANY = '1.1234567890123';
   const FITS = '1.123456789012';
+  // Where the row ends, which a line that holds its place never moves.
+  const rowEnd = (name) =>
+    rec.call((holding) => {
+      const row = [...document.querySelectorAll('.sweep-row')].find((x) => x.querySelector('.holding-name').textContent === holding);
+      return row.getBoundingClientRect().bottom + scrollY;
+    }, name);
   await typeAndSettle('Savings', TOO_MANY);
+  const endTyped = await rowEnd('Savings');
   const writesBefore = writesSent().length;
   await pressRow('Savings');
+  const endRefused = await rowEnd('Savings');
+  check(
+    'review invalid value: the refusal takes the place of its line, so the row neither grows nor moves the rows below it',
+    endRefused === endTyped,
+    JSON.stringify({ endTyped, endRefused }),
+  );
   const onRecord = await read('Savings');
   const others = await read('Fund 1');
   check(
