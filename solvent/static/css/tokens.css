@@ -1387,6 +1387,10 @@ th.numeric {
 
 .sweep-input .hint:empty { display: none; }
 
+/* A row's refusal wraps to two lines beside a field this narrow, so its
+   line holds two, and a refusal moves no row below it. */
+.sweep-input .message-line { min-height: 2lh; }
+
 .rate-section .section-heading { margin-bottom: 12px; }
 
 /* The container the lines' breakpoint measures. */
