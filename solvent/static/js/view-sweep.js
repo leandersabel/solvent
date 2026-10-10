@@ -167,10 +167,10 @@ export function sweepView(vault, date, actions = {}) {
     // A refused price wrote nothing, so it did not save either.
     for (const line of block.lines) if (line.invalid() && !failed.includes(line.unit)) failed.push(line.unit);
     // A line that did not save keeps what it shows, for the lines' own
-    // save to retry.
+    // save to retry, and so does one the refresh never wrote.
     for (const line of block.lines) {
       if (failed.includes(line.unit)) line.unsaved = true;
-      else line.reset();
+      else if (missing.includes(line.unit)) line.reset();
     }
     syncSave();
     if (failed.length) {

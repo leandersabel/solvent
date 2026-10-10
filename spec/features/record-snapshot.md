@@ -428,7 +428,9 @@ rule.
   and even with a proposal on an untouched line.
 - **A reopened recording saves one control at a time**, and no save
   spans a quantity, prices and deletions (`record-rate.md`, Saving at
-  a date that holds a recording).
+  a date that holds a recording). Recording a row writes only the
+  prices the date lacks, and an unsaved edit to a stored price keeps
+  its line until the lines' own save or leaving.
 - No record shape changes for this screen. A confirmed figure is an
   ordinary entry.
 
@@ -1807,3 +1809,8 @@ Editing an existing entry).
      where it is when the prices it looked up arrive. Test:
      `tests/browser/parts/snapshot-entry.mjs`,
      `tests/browser/parts/snapshot-entry-review-steady.mjs`.
+114. (walk) On a reopened recording, an unsaved edit to a stored price
+     stays on its line when a row is recorded, the stored price is
+     unchanged, and leaving names the price as unsaved. Test:
+     `tests/browser/parts/update-values.mjs`,
+     `tests/browser/parts/update-values-review-unsaved-price.mjs`.
