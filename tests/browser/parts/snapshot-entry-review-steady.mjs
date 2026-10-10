@@ -1,7 +1,7 @@
 // Reviewer's checks that the single-holding form's folded prices line
 // keeps its place when the prices it looked up land
 // (spec/features/record-snapshot.md, Snapshot entry, States, Proposals in
-// flight, and criteria 112, 110 and 95), written from the feature page
+// flight, and criteria 113, 110 and 95), written from the feature page
 // alone. The proposals are held while the line is measured and a press
 // is aimed at its sentence, then let through; the press lands after
 // they have, as a person's would when the answer beats their hand.
@@ -109,12 +109,12 @@ await run(async () => {
     // Opening the form asks for today's prices at once.
     const opening = await flight(() => opener('Brokerage'));
     check(
-      `review 112: at ${at}, the folded prices line of a form just opened stays where it was when today's prices land`,
+      `review 113: at ${at}, the folded prices line of a form just opened stays where it was when today's prices land`,
       opening.asked === 1 && still(opening.before, opening.after),
       JSON.stringify(opening),
     );
     check(
-      `review 112: at ${at}, a press aimed at the folded line while today's prices were in flight opens it once they have landed`,
+      `review 113: at ${at}, a press aimed at the folded line while today's prices were in flight opens it once they have landed`,
       opening.opened,
       JSON.stringify(opening),
     );
@@ -136,12 +136,12 @@ await run(async () => {
     await quiet();
     const typed = await flight(() => typeDate(ago(3), { stay: true }));
     check(
-      `review 112: at ${at}, a date holding no recording typed into the field: the folded line stays where it was when its prices land`,
+      `review 113: at ${at}, a date holding no recording typed into the field: the folded line stays where it was when its prices land`,
       typed.asked === 1 && still(typed.before, typed.after),
       JSON.stringify(typed),
     );
     check(
-      `review 112: at ${at}, a date holding no recording typed into the field: a press aimed at the folded line in flight opens it once its prices have landed`,
+      `review 113: at ${at}, a date holding no recording typed into the field: a press aimed at the folded line in flight opens it once its prices have landed`,
       typed.opened,
       JSON.stringify(typed),
     );
@@ -155,12 +155,12 @@ await run(async () => {
   await quiet();
   const missing = await flight(() => typeDate(D2));
   check(
-    'review 112: a date holding a recording that misses prices: the folded line stays where it was when the missing ones land',
+    'review 113: a date holding a recording that misses prices: the folded line stays where it was when the missing ones land',
     missing.asked === 1 && still(missing.before, missing.after),
     JSON.stringify(missing),
   );
   check(
-    'review 112: a date holding a recording that misses prices: a press aimed at the folded line in flight opens it once they have landed',
+    'review 113: a date holding a recording that misses prices: a press aimed at the folded line in flight opens it once they have landed',
     missing.opened,
     JSON.stringify(missing),
   );
@@ -171,7 +171,7 @@ await run(async () => {
   await quiet();
   const main = await flight(() => typeDate(ago(5)));
   check(
-    'review 112: a holding in the main currency: the folded line stays where it was when the date\'s prices land',
+    'review 113: a holding in the main currency: the folded line stays where it was when the date\'s prices land',
     main.asked === 1 && still(main.before, main.after),
     JSON.stringify(main),
   );
@@ -195,12 +195,12 @@ await run(async () => {
   await editEntry('Brokerage', D1);
   const moved = await flight(() => typeDate(ago(7)));
   check(
-    'review 112: a stored entry moved to a date holding no recording: the folded line stays where it was when that date\'s prices land',
+    'review 113: a stored entry moved to a date holding no recording: the folded line stays where it was when that date\'s prices land',
     moved.asked === 1 && still(moved.before, moved.after),
     JSON.stringify(moved),
   );
   check(
-    'review 112: a stored entry moved to a date holding no recording: a press aimed at the folded line in flight opens it once the prices have landed',
+    'review 113: a stored entry moved to a date holding no recording: a press aimed at the folded line in flight opens it once the prices have landed',
     moved.opened,
     JSON.stringify(moved),
   );
