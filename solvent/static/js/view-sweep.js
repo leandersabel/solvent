@@ -599,9 +599,9 @@ export function rateBlock(
       const carried = line.prefilled && shown === decimal.parse(line.carried.payload.rate);
       return { rate: shown, date: carried ? line.carried.payload.date : date };
     },
-    /** A row in this unit is being recorded. A unit with no price at
-     *  all asks for one, at the head of the block, and never blocks the
-     *  row. */
+    /** A row in this unit is being recorded. A unit with no rate source
+     *  at this date and no price at all asks for one, at the head of the
+     *  block, and never blocks the row. */
     ask: (unit) => {
       const line = lineFor(unit);
       if (!line || !line.ask()) return;
@@ -801,9 +801,7 @@ function rateLine(vault, unit, date, { sit, readOnly: blockReadOnly, fillMissing
             : `No price for ${described.name} yet. ${ownCopy()}`;
       return;
     }
-    if (line.asked && !line.carried) {
-      explanation.textContent = askCopy();
-    } else if (reopened()) {
+    if (reopened()) {
       explanation.textContent = `No rate was recorded for ${described.name} on this date.`;
     } else {
       explanation.textContent = `No market rate came back for ${described.name}. Nothing will be recorded for it for this date.`;
@@ -889,7 +887,7 @@ function rateLine(vault, unit, date, { sit, readOnly: blockReadOnly, fillMissing
   };
 
   line.ask = () => {
-    if (line.asked || line.stored || line.rivals.length || line.proposal || line.carried || line.pending) return false;
+    if (quotable || line.asked || line.stored || line.rivals.length || line.proposal || line.carried || line.pending) return false;
     line.asked = true;
     line.describe();
     return true;
