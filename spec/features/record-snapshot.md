@@ -754,6 +754,8 @@ The same Dialog, prefilled with the stored value, date and note.
 
 - **Proposals in flight**: an inline skeleton on the folded prices line.
   The value field is usable at once, and saving never waits on prices.
+  When the proposals land, the skeleton's room stays, so the line never
+  moves under a press aimed at it.
 - **A price source is unavailable**: the affected line says so in
   ink-secondary, nothing is written for that unit, and saving is never
   blocked (Update values owns the line states).
@@ -1801,3 +1803,6 @@ Editing an existing entry).
      that fits clears the refusal and `aria-invalid`. Test:
      `tests/browser/parts/update-values.mjs`,
      `tests/browser/parts/update-values-review-rate-refusal.mjs`.
+113. (walk) On the single-holding form, the folded prices line stays
+     where it is when the prices it looked up arrive. Test:
+     `tests/browser/parts/snapshot-entry.mjs`.

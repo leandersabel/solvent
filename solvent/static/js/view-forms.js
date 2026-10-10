@@ -134,7 +134,9 @@ export function snapshotDialog(vault, holding, existing, onSaved, onOpenRecordin
         if (!pricesLine.isConnected) return;
         asking.proposals = writes.fetchProposals(vault, on);
         asking.proposals.then((proposals) => {
-          skeleton.remove();
+          // Hidden rather than removed: its room keeps the folded line
+          // from moving under a press aimed at it.
+          skeleton.classList.add('landed');
           if (block === shownFor) block.showProposals(proposals);
         });
       };

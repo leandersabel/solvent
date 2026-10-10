@@ -1462,6 +1462,7 @@ th.numeric {
 }
 
 .prices-line .skeleton { margin-left: 8px; vertical-align: middle; }
+.prices-line .skeleton.landed { visibility: hidden; }
 
 .rate-line > .rate-pair,
 .rate-line > .field-error { grid-column: 1 / -1; margin: 0; }
