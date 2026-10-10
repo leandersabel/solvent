@@ -624,12 +624,15 @@ function rateLine(vault, unit, date, { sit, readOnly: blockReadOnly, fillMissing
     inputmode: 'decimal',
     class: 'quantity',
     'aria-label': `${described.name} rate`,
+    'aria-describedby': `rate-line-${unit}`,
   });
   const shown = el('span', { class: 'rate-figure' });
   const provenance = el('span', { class: 'chip' });
   const skeleton = el('span', { class: 'skeleton', hidden: true, 'aria-label': 'Looking up the rate' });
   const explanation = el('p', { class: 'hint' });
-  const error = el('p', { class: 'field-error', hidden: true });
+  // Never hidden, only emptied: a live region announces a change only
+  // while it is in the accessibility tree.
+  const error = el('p', { id: `rate-line-${unit}`, class: 'field-error', 'aria-live': 'polite' });
   const pair = el('div', { class: 'rate-pair', hidden: true });
   const lookup = el('button', { class: 'btn-inline', text: 'Look it up', hidden: true });
   const box = el('div', { class: 'quantity-field' }, [
@@ -734,8 +737,9 @@ function rateLine(vault, unit, date, { sit, readOnly: blockReadOnly, fillMissing
   /** Chip and wording for what the field holds now. Never touches the
    *  field itself, so typing is never overwritten. */
   line.describe = () => {
-    error.hidden = !line.invalid();
-    if (line.invalid()) error.textContent = 'Enter a number, with at most twelve decimal places.';
+    if (line.invalid()) field.setAttribute('aria-invalid', 'true');
+    else field.removeAttribute('aria-invalid');
+    error.textContent = line.invalid() ? 'Enter a number, with at most twelve decimal places.' : '';
     skeleton.hidden = !line.pending;
     provenance.hidden = line.pending;
     lookup.hidden = true;

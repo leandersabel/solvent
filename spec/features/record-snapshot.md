@@ -447,6 +447,8 @@ rule.
   vanishing rows make a list jump under the cursor.
 - **Row, invalid value**: the quantity field's own rules, inline. The
   refusal clears as soon as the value fits, before Record.
+- **Rate line, invalid price**: the price field's own rules, inline,
+  as on a value row. The refusal clears as soon as the price fits.
 - **Row, save failed**: inline, critical, the typed input kept, other
   rows unaffected.
 - **Row, Conflict**: "This figure was changed in another window." The
@@ -1792,3 +1794,9 @@ Editing an existing entry).
      that fits clears the refusal and `aria-invalid` before Record. Test:
      `tests/browser/parts/update-values.mjs`,
      `tests/browser/parts/update-values-review-refusal.mjs`.
+112. (blind) (walk) On Update values, a price with more than twelve
+     decimal places shows the refusal on its rate line's own line, a
+     polite live region, with `aria-invalid="true"` on the field and an
+     `aria-describedby` naming that line. Correcting the price to one
+     that fits clears the refusal and `aria-invalid`. Test:
+     `tests/browser/parts/update-values.mjs`.

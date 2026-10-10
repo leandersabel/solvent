@@ -470,8 +470,22 @@ await run(async () => {
   check('record-rate: editing an edited entry again keeps the original proposal', usdTwice.rate === '0.94' && usdTwice.proposedRate === '0.92', JSON.stringify(usdTwice));
 
   traffic.length = 0;
+  // What a screen reader meets on the line: the field invalid, described
+  // by the line holding the refusal, which is a polite live region.
+  const lineAria = (unit) =>
+    rec.call((query) => {
+      const l = document.querySelector(query);
+      const field = l.querySelector('input');
+      const said = document.getElementById(field.getAttribute('aria-describedby'));
+      return {
+        invalid: field.getAttribute('aria-invalid'),
+        said: said && l.contains(said) && !said.hidden ? said.textContent : null,
+        live: said ? said.getAttribute('aria-live') : null,
+      };
+    }, line(unit));
   await typeLine('USD', '0.1234567890123');
   const tooFine = await lineState('USD');
+  const tooFineAria = await lineAria('USD');
   await press('Save the rate lines');
   check(
     'record-rate: a rate with more than twelve decimal places is refused at input rather than truncated',
@@ -479,6 +493,13 @@ await run(async () => {
     JSON.stringify(tooFine),
   );
   await typeLine('USD', '0.123456789012');
+  const fitsAria = await lineAria('USD');
+  check(
+    'record-rate: a refused rate line marks its field invalid and describes it by the refusal, a polite live region, until the rate fits',
+    tooFineAria.invalid === 'true' && tooFineAria.said === tooFine.error && tooFineAria.live === 'polite'
+      && fitsAria.invalid === null && fitsAria.said === '' && fitsAria.live === 'polite',
+    JSON.stringify([tooFineAria, fitsAria]),
+  );
   await press('Save the rate lines');
   await press('Save the prices', '.dialog');
   check(
