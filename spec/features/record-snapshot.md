@@ -1812,4 +1812,5 @@ Editing an existing entry).
 114. (walk) On a reopened recording, an unsaved edit to a stored price
      stays on its line when a row is recorded, the stored price is
      unchanged, and leaving names the price as unsaved. Test:
-     `tests/browser/parts/update-values.mjs`.
+     `tests/browser/parts/update-values.mjs`,
+     `tests/browser/parts/update-values-review-unsaved-price.mjs`.
