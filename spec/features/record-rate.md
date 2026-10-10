@@ -164,7 +164,9 @@ records (`record-api.md`), so the order is the whole guarantee.
 - **A price write failure is never silent.** The row reads as recorded
   with the price not updated, and names the symbol when the person typed
   that price. A line whose write failed keeps what it showed, typed
-  figure included, for the lines' own save to retry.
+  figure included, for the lines' own save to retry. A refused price is
+  a write that failed: it is written nowhere, and its line keeps the
+  figure and the refusal.
 - **The order is not interchangeable.** Prices first and the quantity
   failing would reprice every holding in those symbols while losing the
   number the person went and looked up. The expensive half goes first.
@@ -629,3 +631,8 @@ silently.
     writes that price and the proposals at the date. Test:
     `tests/browser/parts/update-values.mjs`,
     `tests/browser/parts/update-values-review-emptied.mjs`.
+44. A price refused at input on the sweep at a date holding nothing,
+    left refused while a row is recorded, is not written, its line
+    keeps the typed figure and the refusal, the screen names the unit
+    as not updated, and the rate-lines save is offered once the price
+    fits. Test: `tests/browser/parts/update-values.mjs`.

@@ -776,6 +776,24 @@ await run(async () => {
     JSON.stringify(typedLine),
   );
 
+  const DR = ago(23);
+  await home();
+  await newRecording(DR);
+  await typeLine('USD', '0.1234567890123');
+  await typeRow('Current account', '21');
+  await pressRow('Current account');
+  const refusedReport = await ev("document.querySelector('.sweep .banner').textContent");
+  const refusedLine = await lineState('USD');
+  const refusedStored = on(await stored('rate'), DR).map((r) => r.payload.symbol);
+  await typeLine('USD', '0.95');
+  check(
+    'record-rate: a refused price is not dropped by recording a row: its line keeps the figure and the refusal, the screen names the unit, and the lines\' own save takes it once it fits',
+    refusedLine.value === '0.1234567890123' && refusedLine.error.includes('at most twelve decimal places') &&
+      refusedReport.includes('Prices were not updated for USD') && !refusedStored.includes('USD') &&
+      !(await ev("document.querySelector('.sweep .rate-section .btn-primary').hidden")),
+    `${refusedReport} ${JSON.stringify(refusedLine)} ${refusedStored}`,
+  );
+
   proxy.mode = 'down';
   await home();
   await newRecording(D7);
