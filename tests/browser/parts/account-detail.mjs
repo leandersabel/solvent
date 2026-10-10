@@ -467,7 +467,7 @@ await run(async () => {
         line: line ? line.textContent : null,
         linked: Boolean(line) && (input.getAttribute('aria-describedby') || '').split(' ').includes(line.id),
         invalid: input.getAttribute('aria-invalid'),
-        general: general.map((n) => n.textContent).join(' '),
+        general: general.map((n) => n.textContent).join(''),
       };
     })()`);
     const typeDay = async (day) =>

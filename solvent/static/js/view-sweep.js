@@ -619,12 +619,14 @@ function rateLine(vault, unit, date, { sit, readOnly: blockReadOnly, fillMissing
   // asked, so the line reads as one only its owner can price.
   const publishedFrom = vault.publishedFrom(unit);
   const early = !quotable && Boolean(publishedFrom);
+  // Encoded, because a free-text unit can hold a space and an id cannot.
+  const lineId = `rate-line-${encodeURIComponent(unit)}`;
   const field = el('input', {
     type: 'text',
     inputmode: 'decimal',
     class: 'quantity',
     'aria-label': `${described.name} rate`,
-    'aria-describedby': `rate-line-${unit}`,
+    'aria-describedby': lineId,
   });
   const shown = el('span', { class: 'rate-figure' });
   const provenance = el('span', { class: 'chip' });
@@ -632,7 +634,7 @@ function rateLine(vault, unit, date, { sit, readOnly: blockReadOnly, fillMissing
   const explanation = el('p', { class: 'hint' });
   // Never hidden, only emptied: a live region announces a change only
   // while it is in the accessibility tree.
-  const error = el('p', { id: `rate-line-${unit}`, class: 'field-error', 'aria-live': 'polite' });
+  const error = el('p', { id: lineId, class: 'field-error', 'aria-live': 'polite' });
   const pair = el('div', { class: 'rate-pair', hidden: true });
   const lookup = el('button', { class: 'btn-inline', text: 'Look it up', hidden: true });
   const box = el('div', { class: 'quantity-field' }, [

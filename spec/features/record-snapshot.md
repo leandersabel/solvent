@@ -1799,4 +1799,5 @@ Editing an existing entry).
      polite live region, with `aria-invalid="true"` on the field and an
      `aria-describedby` naming that line. Correcting the price to one
      that fits clears the refusal and `aria-invalid`. Test:
-     `tests/browser/parts/update-values.mjs`.
+     `tests/browser/parts/update-values.mjs`,
+     `tests/browser/parts/update-values-review-rate-refusal.mjs`.
