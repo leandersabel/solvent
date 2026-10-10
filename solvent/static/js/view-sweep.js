@@ -164,6 +164,8 @@ export function sweepView(vault, date, actions = {}) {
     if (!sit.proposals && unanswered) sit.proposals = writes.fetchProposals(vault, date);
     if (sit.proposals) block.showProposals(await sit.proposals);
     const { failed } = await writes.refreshPrices(vault, date, {}, (unit) => block.partFor(unit));
+    // A refused price wrote nothing, so it did not save either.
+    for (const line of block.lines) if (line.invalid() && !failed.includes(line.unit)) failed.push(line.unit);
     // A line that did not save keeps what it shows, for the lines' own
     // save to retry.
     for (const line of block.lines) {
