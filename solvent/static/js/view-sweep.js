@@ -242,13 +242,14 @@ function sweepRow(vault, holding, date, { sit, block, refused, closed, ensurePri
     inputmode: 'decimal',
     class: 'quantity',
     'aria-label': `${holding.payload.name} value`,
+    'aria-describedby': `sweep-line-${holding.recordId}`,
   });
   const unit = vault.unitOf(holding.payload.unit);
   const suffix = el('span', { class: 'unit-suffix', text: unit.currency ? unit.symbol : unit.short });
   const converted = el('p', { class: 'hint numeric' });
   const status = el('span', { class: 'row-state' });
   const age = el('span', { class: 'row-age' });
-  const message = el('p', { class: 'field-error', hidden: true });
+  const message = el('p', { id: `sweep-line-${holding.recordId}`, class: 'field-error', 'aria-live': 'polite', hidden: true });
   const savedNote = el('p', { class: 'row-saved', hidden: true, role: 'status' });
   const pair = el('div', { class: 'sweep-pair', hidden: true });
   const control = el('button', { class: 'btn-secondary' });
@@ -378,16 +379,20 @@ function sweepRow(vault, holding, date, { sit, block, refused, closed, ensurePri
     const reference = atDate()[0] || carriedInto();
     return format.readField(field.value.trim(), reference ? reference.payload.value : null);
   };
-  // Set while the message line holds a refused value, which clears as
-  // soon as the value fits.
-  let refusedValue = false;
+  /** Show or clear a refused value on the row's message line. */
+  const refuseValue = (refused) => {
+    if (refused) {
+      field.setAttribute('aria-invalid', 'true');
+      showError(message, 'Enter a number, with at most twelve decimal places.');
+    } else if (field.hasAttribute('aria-invalid')) {
+      field.removeAttribute('aria-invalid');
+      message.hidden = true;
+    }
+  };
 
   field.addEventListener('input', () => {
     savedNote.hidden = true;
-    if (refusedValue && typedValue() !== null) {
-      refusedValue = false;
-      message.hidden = true;
-    }
+    if (typedValue() !== null) refuseValue(false);
     if (field.value.trim()) onTyped();
     row.describe();
   });
@@ -418,8 +423,8 @@ function sweepRow(vault, holding, date, { sit, block, refused, closed, ensurePri
   };
 
   control.addEventListener('click', async () => {
+    refuseValue(false);
     message.hidden = true;
-    refusedValue = false;
     savedNote.hidden = true;
     const [stored] = atDate();
     const text = field.value.trim();
@@ -441,8 +446,7 @@ function sweepRow(vault, holding, date, { sit, block, refused, closed, ensurePri
 
     const value = typedValue();
     if (value === null) {
-      refusedValue = true;
-      showError(message, 'Enter a number, with at most twelve decimal places.');
+      refuseValue(true);
       return;
     }
     control.disabled = true;

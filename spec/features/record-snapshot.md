@@ -1782,7 +1782,10 @@ Editing an existing entry).
      recording issues exactly one request to `/api/rates`, and pressing
      the folded prices line to open it issues none. Test:
      `tests/browser/parts/snapshot-entry.mjs`.
-111. (walk) On Update values, Record on a value with more than twelve
-     decimal places shows the refusal under its row, and correcting the
-     value to one that fits clears it before Record. Test:
-     `tests/browser/parts/update-values.mjs`.
+111. (blind) (walk) On Update values, Record on a value with more than
+     twelve decimal places shows the refusal on its row's own line, a
+     polite live region, with `aria-invalid="true"` and an
+     `aria-describedby` naming that line. Correcting the value to one
+     that fits clears the refusal and `aria-invalid` before Record. Test:
+     `tests/browser/parts/update-values.mjs`,
+     `tests/browser/parts/update-values-review-refusal.mjs`.
