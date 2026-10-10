@@ -763,7 +763,9 @@ the sub-pixel bound, and the figure shown is the model's.
   change or time zone cannot skip or repeat a day.
 - **Only a date carrying a snapshot opens a recording.** The tick under
   the axis is a click target of its own, so a recording stays reachable
-  where a day is narrower than a pixel.
+  where a day is narrower than a pixel. The target is 24px square around
+  the drawn mark, because a 1.5px line cannot be hit on a touch screen,
+  and splits halfway with a neighboring tick nearer than that.
 
 #### The change
 
@@ -967,7 +969,8 @@ rule of the chart (Archived holdings, Ranges and modes).
     `tests/test_client.py::test_the_client_side_rules_hold`.
 27. (blind) (walk) A click or Enter on a day with no snapshot opens
     nothing, and on a snapshot day or its tick opens that date's
-    recording. Test: `tests/browser/parts/dashboard-net-worth.mjs`.
+    recording. A click 8px beside a lone tick, at 1280px and 390px,
+    opens its recording too. Test: `tests/browser/parts/dashboard-net-worth.mjs`.
 28. (blind) (walk) In a history long enough to downsample, the readout
     at a day whose sample was dropped equals the value model, and the
     data table lists that day. Test:

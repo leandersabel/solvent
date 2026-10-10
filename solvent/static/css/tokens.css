@@ -1107,6 +1107,7 @@ th.numeric {
 .trend.highlighting .band:not(.is-highlighted) { opacity: 0.2; }
 .net-end { fill: var(--ink-primary); stroke: #ffffff; stroke-width: 2; }
 .entry-mark { stroke: var(--ink-muted); stroke-width: 1.5; cursor: pointer; }
+.entry-mark-target { fill: transparent; cursor: pointer; }
 .archive-annotation {
   stroke: var(--ink-muted);
   stroke-width: 1;
