@@ -2240,6 +2240,8 @@ select {
   .idle-grid { grid-template-columns: minmax(0, 1fr); gap: 6px; }
   .idle-grid .hint { padding-top: 0; }
   .format-grid { grid-template-columns: minmax(0, 1fr); }
+  .sessions-table th,
+  .sessions-table td { padding-left: 4px; padding-right: 4px; }
   .link-list { padding: 0; }
   .link-row { padding: 16px; }
   .danger-zone { padding: 16px; }

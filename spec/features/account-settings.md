@@ -189,7 +189,7 @@ tradeoff moves beneath its select. The sample strip wraps, with
 **Save** beneath the sample when the width runs out. Open sessions
 keeps its three columns: the first is as wide as the "This session"
 chip on one line, and the headings and dates wrap between words in
-theirs.
+theirs, a date in a fixed order also after each of its separators.
 
 #### States
 
@@ -1075,7 +1075,8 @@ from an administrator removing an account (`admin-invites.md`).
     Requests and write nothing. Test:
     `tests/test_attempts.py::test_a_wrong_password_on_a_settings_form_is_a_failed_sign_in`.
 78. (walk) At 390 px and at 320 px wide, the "This session" chip sits on
-    one line and the page does not scroll sideways. Test:
+    one line and the page does not scroll sideways, under every Dates
+    setting. Test:
     `tests/browser/parts/settings.mjs`,
     `tests/browser/parts/settings-review-phone.mjs`.
 79. (blind) A `POST /api/auth/change-password` with the right current

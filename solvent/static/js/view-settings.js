@@ -272,8 +272,19 @@ function field(label, id, control, ...after) {
   return el('div', { class: 'field' }, [el('label', { for: id, text: label }), control, ...after]);
 }
 
+/** A date in a fixed order may wrap after its separators, since
+ *  "20.09.2026," on one line leaves no room for both date columns
+ *  beside the chip at phone width. The time after the comma never
+ *  wraps inside itself. */
+const breakable = (text, fixed) => {
+  if (!fixed) return text;
+  const end = text.indexOf(',');
+  return [...text.slice(0, end).split(/(?<=[./-])/).flatMap((part, i) => (i ? [el('wbr'), part] : part)), text.slice(end)];
+};
+
 function sessionCard(vault) {
   const list = el('div', { class: 'session-list' });
+  const fixedOrder = format.DATE_STYLES.some((d) => d.value === vault.profile?.dateStyle && d.value !== 'locale');
   const error = el('p', { class: 'field-error', hidden: true });
   const everywhereError = el('p', { class: 'field-error', role: 'alert', hidden: true });
 
@@ -319,8 +330,8 @@ function sessionCard(vault) {
         el('tbody', {}, sessions.map((session) =>
           el('tr', {}, [
             el('td', {}, [session.current ? el('span', { class: 'chip', text: 'This session' }) : null]),
-            el('td', { text: vault.format.dateTime(session.issuedAt) }),
-            el('td', { text: session.current ? 'Just now' : vault.format.dateTime(session.lastActiveAt) }),
+            el('td', {}, breakable(vault.format.dateTime(session.issuedAt), fixedOrder)),
+            el('td', {}, session.current ? 'Just now' : breakable(vault.format.dateTime(session.lastActiveAt), fixedOrder)),
           ]),
         )),
       ]));
