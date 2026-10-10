@@ -318,6 +318,27 @@ await run(async () => {
     !/null/i.test(formBody),
     formBody,
   );
+  // The folded line keeps its place when the lookup ends, so a press
+  // aimed at it while the skeleton shows still lands on it.
+  {
+    await openForm('Brokerage');
+    await ev("document.querySelector('#snapshot-date').focus()");
+    await set('#snapshot-date', await format('date', ago(3)));
+    const where = () => ev("(() => { const b = document.querySelector('.dialog .prices-fold summary').getBoundingClientRect(); return [b.top, b.height].join(); })()");
+    await rec.frames();
+    const waiting = await ev("Boolean(document.querySelector('.dialog .prices-line .skeleton:not(.landed)'))");
+    const before = await where();
+    await ev("document.querySelector('#snapshot-date').blur()");
+    await quiet();
+    const after = await where();
+    check(
+      'record-snapshot: the folded prices line stays where it is when the prices it looked up arrive',
+      waiting && rateAsks().length > 0 && before === after,
+      JSON.stringify({ waiting, before, after }),
+    );
+    await closeDialogs();
+    traffic.length = 0;
+  }
   const firstEntry = on(await stored('snapshot'), D11).find((s) => s.accountId === id['Current account']);
   traffic.length = 0;
   await openForm('Current account');
