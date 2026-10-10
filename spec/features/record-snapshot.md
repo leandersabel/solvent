@@ -1805,4 +1805,5 @@ Editing an existing entry).
      `tests/browser/parts/update-values-review-rate-refusal.mjs`.
 113. (walk) On the single-holding form, the folded prices line stays
      where it is when the prices it looked up arrive. Test:
-     `tests/browser/parts/snapshot-entry.mjs`.
+     `tests/browser/parts/snapshot-entry.mjs`,
+     `tests/browser/parts/snapshot-entry-review-steady.mjs`.

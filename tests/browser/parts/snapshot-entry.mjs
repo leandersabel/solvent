@@ -326,7 +326,7 @@ await run(async () => {
     await set('#snapshot-date', await format('date', ago(3)));
     const where = () => ev("(() => { const b = document.querySelector('.dialog .prices-fold summary').getBoundingClientRect(); return [b.top, b.height].join(); })()");
     await rec.frames();
-    const waiting = await ev("Boolean(document.querySelector('.dialog .prices-line .skeleton'))");
+    const waiting = await ev("Boolean(document.querySelector('.dialog .prices-line .skeleton:not(.landed)'))");
     const before = await where();
     await ev("document.querySelector('#snapshot-date').blur()");
     await quiet();
