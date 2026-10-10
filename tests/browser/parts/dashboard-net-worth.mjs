@@ -283,7 +283,7 @@ await run(async () => {
   await chartDrawn();
   const marksOn = await ev(`(() => {
     const copy = document.querySelector('svg.trend').cloneNode(true);
-    copy.querySelectorAll('.entry-mark').forEach(n => n.remove());
+    copy.querySelectorAll('.entry-mark, .entry-mark-target').forEach(n => n.remove());
     return copy.innerHTML;
   })()`);
   await ev("document.querySelector('.chart-card input[type=checkbox]').click()");
@@ -636,6 +636,39 @@ await run(async () => {
     'net-worth-view: a click on a day carrying no snapshot opens nothing, and on a snapshot day and on its tick opens that date\'s recording',
     plainClick === '#/' && markedClick === `#/recording/${D10}` && tickClick === `#/recording/${D10}`,
     JSON.stringify({ plainClick, markedClick, tickClick }),
+  );
+  // A click 8px beside a lone tick, at desktop and phone width, opens
+  // its recording, because the drawn mark is only 1.5px wide.
+  const beside = [];
+  for (const width of [1280, 390]) {
+    await go('#/');
+    await viewport(width);
+    await chartDrawn();
+    const spot = JSON.parse(await ev(`(() => {
+      document.querySelector('svg.trend').scrollIntoView({ block: 'center' });
+      const boxes = [...document.querySelectorAll('.entry-mark')].map(m => ({ m, box: m.getBoundingClientRect() }));
+      const middle = ({ box }) => box.left + box.width / 2;
+      const lone = boxes.find((b, i) => (i === 0 || middle(b) - middle(boxes[i - 1]) >= 24) &&
+        (i === boxes.length - 1 || middle(boxes[i + 1]) - middle(b) >= 24));
+      return JSON.stringify(lone && {
+        x: middle(lone) + 8,
+        y: lone.box.top + lone.box.height / 2,
+        label: lone.m.querySelector('title').textContent,
+      });
+    })()`));
+    if (spot) await rec.mouseClick(spot.x, spot.y);
+    await rec.frames();
+    const hash = await ev('location.hash');
+    const date = hash.startsWith('#/recording/') ? hash.split('/').pop() : null;
+    beside.push({ width, spot, hash, opened: Boolean(spot && date) && spot.label.startsWith(await format('longDate', date)) });
+  }
+  await viewport(1280);
+  await go('#/');
+  await chartDrawn();
+  check(
+    'net-worth-view: a click 8px beside a lone tick opens its recording at 1280px and 390px',
+    beside.every((b) => b.opened),
+    JSON.stringify(beside),
   );
   await go('#/');
   await ev(`(() => { const s = document.querySelector('.chart-card select'); s.value = 'liq'; s.dispatchEvent(new Event('change', { bubbles: true })); })()`);

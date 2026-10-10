@@ -239,11 +239,11 @@ function drawChart({
   // drawing is the one nobody should have to ask for, and the tick is
   // also the way into that date's recording.
   if (!justTheLine) {
-    for (const date of marks) {
-      const day = dayNumber(date);
-      if (day < firstDay || day > lastDay) continue;
+    const ticks = marks
+      .filter((date) => dayNumber(date) >= firstDay && dayNumber(date) <= lastDay)
       // Kept whole at the plot's two edges rather than cut in half.
-      const at = Math.min(Math.max(x(day), pad.left + 0.75), width - pad.right - 0.75);
+      .map((date) => ({ date, at: Math.min(Math.max(x(dayNumber(date)), pad.left + 0.75), width - pad.right - 0.75) }));
+    ticks.forEach(({ date, at }, index) => {
       const tick = svg('line', {
         x1: at,
         x2: at,
@@ -251,12 +251,26 @@ function drawChart({
         y2: plotBottom + 14,
         class: 'entry-mark',
       });
-      tick.addEventListener('click', () => onPickDate && onPickDate(date));
-      const title = svg('title');
-      title.textContent = `${formatDate(date)}, recorded. Open this recording.`;
-      tick.append(title);
-      root.append(tick);
-    }
+      // The drawn mark is too thin to hit on a touch screen, so a
+      // clear target 24px square takes the click, split halfway with
+      // a neighboring tick nearer than that.
+      const left = index > 0 ? Math.min(12, (at - ticks[index - 1].at) / 2) : 12;
+      const right = index < ticks.length - 1 ? Math.min(12, (ticks[index + 1].at - at) / 2) : 12;
+      const target = svg('rect', {
+        x: at - left,
+        y: plotBottom + 1,
+        width: left + right,
+        height: 24,
+        class: 'entry-mark-target',
+      });
+      for (const node of [tick, target]) {
+        node.addEventListener('click', () => onPickDate && onPickDate(date));
+        const title = svg('title');
+        title.textContent = `${formatDate(date)}, recorded. Open this recording.`;
+        node.append(title);
+      }
+      root.append(tick, target);
+    });
   }
 
   for (const annotation of annotations) {
@@ -344,7 +358,7 @@ function drawChart({
   let pressed = false;
   root.addEventListener('pointerdown', (event) => {
     pressed = true;
-    if (event.button !== 0 || event.target.classList.contains('entry-mark')) return;
+    if (event.button !== 0 || event.target.matches('.entry-mark, .entry-mark-target')) return;
     const { day, onPlot } = place(event);
     if (!onPlot) return;
     anchor = day;
