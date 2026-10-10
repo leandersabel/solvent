@@ -794,6 +794,28 @@ await run(async () => {
     `${refusedReport} ${JSON.stringify(refusedLine)} ${refusedStored}`,
   );
 
+  // A stored price edited and not saved, while a row's record fills the
+  // date's missing prices.
+  const DS = ago(24);
+  await plantHere([snap('Dollar cash', DS, '10'), price('USD', DS, '0.92', 'proposed')]);
+  await reread();
+  await go(`#/recording/${DS}`);
+  await press('Update');
+  await rec.waitUntil("document.querySelector('.sweep-row')", { label: 'the sweep' });
+  await quiet();
+  await typeLine('USD', '0.95');
+  await typeRow('Current account', '21');
+  await pressRow('Current account');
+  const keptEdit = await lineState('USD');
+  const usdStored = on(await stored('rate'), DS).filter((r) => r.payload.symbol === 'USD').map((r) => r.payload.rate);
+  await home();
+  check(
+    'record-snapshot: recording a row keeps an unsaved edit to a stored price, and leaving names it as unsaved',
+    keptEdit.value === '0.95' && keptEdit.chip === 'Edited from 0.920000' && usdStored.join() === '0.92' &&
+      (await text()).includes(`You left the recording for ${await format('longDate', DS)} with changes that were not saved: the USD rate.`),
+    `${JSON.stringify(keptEdit)} ${usdStored}`,
+  );
+
   proxy.mode = 'down';
   await home();
   await newRecording(D7);
