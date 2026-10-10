@@ -125,16 +125,16 @@ const measure = (fixed) => page.call((fixedOrder) => {
   });
 }, fixed).then(JSON.parse);
 
-const selectLabeled = (name) => `[...document.querySelectorAll('select')].find((s) => s.labels[0]?.textContent.trim() === ${JSON.stringify(name)})`;
-const optionsOf = (name) => page.eval(`[...${selectLabeled(name)}.options].map((o) => o.textContent.trim())`);
+const optionsOf = (name) => page.call((label) => [...[...document.querySelectorAll('select')]
+  .find((s) => s.labels[0]?.textContent.trim() === label).options].map((o) => o.textContent.trim()), name);
 
 // Chooses an option by its index in the select and saves it.
 const save = async (name, index) => {
-  await page.eval(`(() => {
-    const s = ${selectLabeled(name)};
-    s.selectedIndex = ${index};
+  await page.call((label, at) => {
+    const s = [...document.querySelectorAll('select')].find((n) => n.labels[0]?.textContent.trim() === label);
+    s.selectedIndex = at;
     s.dispatchEvent(new Event('change', { bubbles: true }));
-  })()`);
+  }, name, index);
   await page.eval("[...[...document.querySelectorAll('.card')].find((c) => c.textContent.includes('Dates and numbers')).querySelectorAll('button')].find((b) => b.textContent.trim() === 'Save').click()");
   await page.idle();
   await page.frames();
@@ -170,7 +170,7 @@ await run(async () => {
       const fixed = /^[\d./-]+$/.test(order);
       const under = `under ${language}, Dates ${order}`;
       if (fixed) {
-        const shape = new RegExp(order.replace(/\d/g, '\\d').replace(/[./]/g, '\\$&'));
+        const shape = new RegExp(order.replace(/[.*+?^${}()|[\]\\]/g, '\\$&').replace(/\d/g, '\\d'));
         const shown = await firstDate();
         check(`the session list writes its dates as ${order} ${under}`, shape.test(shown), shown);
       }
