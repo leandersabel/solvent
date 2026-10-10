@@ -210,7 +210,16 @@ await run(async () => {
   );
   check('record-snapshot: the row stays live while its unit has no price', (await rowState('Art')).disabled === false);
   await typeRow('Art', '');
+  await typeRow('Current account', '1234.1234567890123');
+  await pressRow('Current account');
+  const refusedRow = await rowState('Current account');
   await typeRow('Current account', '1234.56');
+  const correctedRow = await rowState('Current account');
+  check(
+    'record-snapshot: a row refuses a value with more than twelve decimal places, and clears the refusal once the value fits, before Record',
+    refusedRow.error === 'Enter a number, with at most twelve decimal places.' && correctedRow.error === '',
+    JSON.stringify([refusedRow.error, correctedRow.error]),
+  );
   await pressRow('Current account');
   const savedRow = await rowState('Current account');
   check(

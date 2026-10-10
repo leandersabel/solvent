@@ -372,8 +372,22 @@ function sweepRow(vault, holding, date, { sit, block, refused, closed, ensurePri
     return Boolean(field.value.trim()) && !(carried && same(carried.payload.value));
   };
 
+  /** The typed figure as Record would store it, or null when it does
+   *  not read as one. */
+  const typedValue = () => {
+    const reference = atDate()[0] || carriedInto();
+    return format.readField(field.value.trim(), reference ? reference.payload.value : null);
+  };
+  // Set while the message line holds a refused value, which clears as
+  // soon as the value fits.
+  let refusedValue = false;
+
   field.addEventListener('input', () => {
     savedNote.hidden = true;
+    if (refusedValue && typedValue() !== null) {
+      refusedValue = false;
+      message.hidden = true;
+    }
     if (field.value.trim()) onTyped();
     row.describe();
   });
@@ -405,6 +419,7 @@ function sweepRow(vault, holding, date, { sit, block, refused, closed, ensurePri
 
   control.addEventListener('click', async () => {
     message.hidden = true;
+    refusedValue = false;
     savedNote.hidden = true;
     const [stored] = atDate();
     const text = field.value.trim();
@@ -424,10 +439,9 @@ function sweepRow(vault, holding, date, { sit, block, refused, closed, ensurePri
       return;
     }
 
-    const carried = carriedInto();
-    const reference = stored || carried;
-    const value = format.readField(text, reference ? reference.payload.value : null);
+    const value = typedValue();
     if (value === null) {
+      refusedValue = true;
       showError(message, 'Enter a number, with at most twelve decimal places.');
       return;
     }

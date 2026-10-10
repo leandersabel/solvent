@@ -443,7 +443,8 @@ rule.
 - **Row, saved**: a quiet inline confirmation, and the figure, age and
   sentence update in place. The row does not disappear, because
   vanishing rows make a list jump under the cursor.
-- **Row, invalid value**: the quantity field's own rules, inline.
+- **Row, invalid value**: the quantity field's own rules, inline. The
+  refusal clears as soon as the value fits, before Record.
 - **Row, save failed**: inline, critical, the typed input kept, other
   rows unaffected.
 - **Row, Conflict**: "This figure was changed in another window." The
@@ -1781,3 +1782,7 @@ Editing an existing entry).
      recording issues exactly one request to `/api/rates`, and pressing
      the folded prices line to open it issues none. Test:
      `tests/browser/parts/snapshot-entry.mjs`.
+111. (walk) On Update values, Record on a value with more than twelve
+     decimal places shows the refusal under its row, and correcting the
+     value to one that fits clears it before Record. Test:
+     `tests/browser/parts/update-values.mjs`.
