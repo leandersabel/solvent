@@ -272,6 +272,11 @@ function field(label, id, control, ...after) {
   return el('div', { class: 'field' }, [el('label', { for: id, text: label }), control, ...after]);
 }
 
+/** A date may wrap after a separator of its fixed order, since
+ *  "20.09.2026," on one line leaves no room for both date columns
+ *  beside the chip at phone width. */
+const breakable = (text) => text.split(/(?<=[./-])/).flatMap((part, i) => (i ? [el('wbr'), part] : part));
+
 function sessionCard(vault) {
   const list = el('div', { class: 'session-list' });
   const error = el('p', { class: 'field-error', hidden: true });
@@ -319,8 +324,8 @@ function sessionCard(vault) {
         el('tbody', {}, sessions.map((session) =>
           el('tr', {}, [
             el('td', {}, [session.current ? el('span', { class: 'chip', text: 'This session' }) : null]),
-            el('td', { text: vault.format.dateTime(session.issuedAt) }),
-            el('td', { text: session.current ? 'Just now' : vault.format.dateTime(session.lastActiveAt) }),
+            el('td', {}, breakable(vault.format.dateTime(session.issuedAt))),
+            el('td', {}, session.current ? 'Just now' : breakable(vault.format.dateTime(session.lastActiveAt))),
           ]),
         )),
       ]));
