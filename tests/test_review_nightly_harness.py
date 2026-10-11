@@ -883,6 +883,7 @@ class Standin:
 
     def exchange(self, raw: bytes, sni: str = "api.nbp.pl") -> "tuple[int, dict, bytes]":
         context = ssl.create_default_context(cafile=str(self.tls / "ca.pem"))
+        context.minimum_version = ssl.TLSVersion.TLSv1_2
         with socket.create_connection(("127.0.0.1", self.port), timeout=10) as plain:
             with context.wrap_socket(plain, server_hostname=sni) as conn:
                 conn.sendall(raw)
