@@ -179,10 +179,12 @@ appear only on a reopened recording where one holds a figure at that
 date.
 
 **A row** carries the name, unit, what the holding holds now, its age,
-the value field and one control, in three columns. The name holds the
-fluid left column with the row's sentence and age beneath it, and
-wraps inside it, breaking a word only where it has to, so it is shown
-whole and never runs under the field. The
+the value field and one control, in three columns while the card is at
+least 720px wide. The name holds the fluid left column with the row's
+sentence and age beneath it, and wraps inside it, breaking a word only
+where it has to, so it is shown whole and never runs under the field.
+Below 720px of card width the row stacks (At phone width), because the
+field and control columns leave the name too narrow to read. The
 quantity field (`design-system.md`, Components) takes a 260px column,
 its unit as the suffix and the converted figure right-aligned beneath.
 The control fills a 112px column at the right, so every row's control
@@ -405,8 +407,8 @@ never silently kept.
 On a phone this screen changes shape rather than only narrowing. A
 phone may walk through one holding at a time: the same sweep, not a
 cut-down one (`app-shell.md`, What the client gets), because every
-question it asks belongs to one holding or one unit. A row stacks into
-one column: the name with its sentence and age, then the quantity field
+question it asks belongs to one holding or one unit. Below 720px of card
+width a row stacks into one column: the name with its sentence and age, then the quantity field
 with the converted figure and any price date line beneath it at the
 left, then the control at full width. The rate lines stack by their own
 rule.
@@ -1766,9 +1768,10 @@ Editing an existing entry).
      its holding's name and "value", such as "Mortgage value". Test:
      `tests/browser/parts/update-values.mjs`,
      `tests/browser/parts/update-values-review-field-names.mjs`.
-106. (walk) At 320px, 375px, 601px, 901px and 1280px wide, a holding
-     name with no break in it wraps on Update values, is shown whole
-     inside its card and pans nothing sideways. Test:
+106. (walk) At 320px, 375px, 601px, 640px, 719px, 901px and 1280px
+     wide, a holding name with no break in it wraps on Update values, is
+     shown whole inside its card and pans nothing sideways, and a name
+     of ordinary words breaks only between them. Test:
      `tests/browser/parts/update-values-long-name.mjs`,
      `tests/browser/parts/update-values-review-long-name.mjs`.
 107. (walk) Once "Add a note" is open on the value form, the note box is
