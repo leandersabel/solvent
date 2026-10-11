@@ -1,10 +1,10 @@
 // The hero's arrangement, written from spec/features/net-worth-view.md
 // alone (Hero figure; At phone width; acceptance criterion 83) and
-// design-system.md (Typography). Wherever the hero holds one row, gross
-// assets and gross liabilities sit at the right, level with the foot of
-// the total, each behind a hairline rule, with New recording after them
-// and the change and the date line beneath the total. Which rates takes
-// its own row beneath, at the left. Reading a day moves neither the
+// design-system.md (Typography). While the dashboard is at least 1100px
+// wide, gross assets and gross liabilities sit at the right, level with
+// the foot of the total, each behind a hairline rule, with New recording
+// after them and the change and the date line beneath the total. Which
+// rates takes its own row beneath, at the left. Reading a day moves neither the
 // chart nor the gross figures. At phone width the gross figures sit
 // side by side in two equal columns beneath the change, Which rates
 // spans the width beneath them and New recording beneath that, 48px
@@ -16,7 +16,10 @@
 // Styles: tokens.css.
 import { BACKDATE, check, holdings, idNamed, openHolding, page, recording, reloadModel, run, vaultOwner } from '../harness.mjs';
 
-const WIDE = [1920, 1440, 1280, 1200, 1100, 1000, 901];
+// Windows around the one where the dashboard, inside its gutters and
+// beside a scrollbar, reaches 1100px, and below it down to 901px.
+const WIDE = [1920, 1440, 1280, 1220, 1200, 1195, 1190, 1180, 1179, 1100, 1000, 950, 901];
+const LEVEL_FROM = 1100;
 const NARROW = [900, 760, 601];
 const PHONE = 390;
 
@@ -84,6 +87,7 @@ const layout = () =>
       action: box(action),
       rates: box(rates),
       chart: box(document.querySelector('.dashboard svg.trend')),
+      dashboard: document.querySelector('.dashboard').getBoundingClientRect().width,
       scrollWidth: document.documentElement.scrollWidth,
       clientWidth: document.documentElement.clientWidth,
     };
@@ -127,9 +131,9 @@ await run(async () => {
   for (const width of WIDE) {
     const l = await atWidth(width);
     const [assets, liabilities] = l.parts;
-    // The hero holds one row where the gross figures sit beside the total.
-    const oneRow = assets && liabilities && assets.box.left >= l.total.right && l.action.left >= liabilities.box.right - 0.5;
-    if (!oneRow) continue;
+    check(`net-worth-view: at ${width}px no part of the hero lies over another`, apart(l).length === 0, `${apart(l).join(', ')} ${JSON.stringify({ total: l.totalInk, assets: assets.box })}`);
+    // Below 1100px of dashboard the hero's arrangement is not criterion 83's.
+    if (l.dashboard < LEVEL_FROM) continue;
     rows += 1;
     const level = (part) => near(part.foot.baseline, l.totalFoot.baseline, 4) || near(part.foot.ink, l.totalFoot.ink, 4);
     check(
@@ -152,9 +156,8 @@ await run(async () => {
       l.rates.top >= Math.max(l.total.bottom, assets.box.bottom, liabilities.box.bottom, l.action.bottom) - 0.5 && near(l.rates.left, l.hero.left, 1),
       JSON.stringify({ rates: l.rates, hero: l.hero, action: l.action }),
     );
-    check(`net-worth-view: at ${width}px no part of the hero lies over another`, apart(l).length === 0, `${apart(l).join(', ')} ${JSON.stringify({ total: l.totalInk, assets: assets.box })}`);
   }
-  check('net-worth-view: on a wide window the hero holds one row', rows > 0 && (await atWidth(1440)).parts[0].box.left >= (await layout()).total.right);
+  check('net-worth-view: some window gives a dashboard at least 1100px wide', rows > 0);
 
   // Reading a day moves neither the chart nor the gross figures.
   const before = await atWidth(1440);
@@ -234,7 +237,7 @@ await run(async () => {
   await reloadModel('#/');
   await page.waitUntil("document.querySelector('.dashboard svg.trend') && document.querySelector('.dashboard .hero-change')", { label: 'the dashboard in the millions' });
   await page.idle();
-  for (const width of [1440, 1100, 1000, 950, 901, 760]) {
+  for (const width of [1440, 1195, 1180, 1100, 1000, 950, 901, 760]) {
     const l = await atWidth(width);
     check(`net-worth-view: at ${width}px, with a net worth in the millions, no part of the hero lies over another`, apart(l).length === 0, `${apart(l).join(', ')} ${JSON.stringify({ total: l.totalInk, assets: l.parts[0].box })}`);
   }
