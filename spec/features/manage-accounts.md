@@ -137,8 +137,8 @@ so it stacks at phone width.
     click.
   - **`+ New value`** at the foot of each select appends a value to that
     dimension in the profile and selects it. **`+ New dimension`**
-    beneath the block asks for a dimension label and a first value, each
-    on a row of its own above Add and Cancel.
+    beneath the block asks for a dimension label and a first value. Each
+    field takes a row of its own above Add and Cancel.
     Add with a field blank is refused on that field's message line
     (design-system.md, Components, Input), with the first refused field
     focused: "A value needs a name.", "A dimension needs a name." or "A
