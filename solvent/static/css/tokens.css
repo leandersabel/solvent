@@ -1034,6 +1034,27 @@ th.numeric {
   white-space: nowrap;
 }
 
+/* Below 1000px of dashboard width a total and gross figures in the tens
+   of millions no longer fit on one row beside New recording, so the
+   figure and its change take a row of their own, with its two sides and
+   the action beneath. A container is as wide as it is told, never as its
+   content, so the dashboard takes the full width it is given. */
+.dashboard { container: dashboard / inline-size; width: 100%; }
+
+@container dashboard (max-width: 999.98px) {
+  .hero {
+    grid-template-columns: auto minmax(0, 1fr);
+    grid-template-areas:
+      "main main"
+      "parts action"
+      "rates rates";
+  }
+
+  .hero-parts { border-left: 0; }
+  .hero-part:first-child { padding-left: 0; }
+  .hero-action { justify-self: end; }
+}
+
 /* The holding screen's header figure, a size down from the hero. */
 .detail-header .hero-figure {
   display: inline;
@@ -1987,19 +2008,6 @@ select {
 /* ---- Below the width the full table and hero row need ---- */
 
 @media (max-width: 900px) {
-  /* The figure on its own row, its two sides and the action beneath. */
-  .hero {
-    grid-template-columns: auto minmax(0, 1fr);
-    grid-template-areas:
-      "main main"
-      "parts action"
-      "rates rates";
-  }
-
-  .hero-parts { border-left: 0; }
-  .hero-part:first-child { padding-left: 0; }
-  .hero-action { justify-self: end; }
-
   /* A holding's values as a list, headings included: the date, its
      note toggle and any flag on the first line, the two figures beneath
      it, each wrapping whole to a line of its own when they do not fit

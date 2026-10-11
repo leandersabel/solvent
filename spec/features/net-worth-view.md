@@ -99,7 +99,11 @@ the chart reads, so reading a day never moves the chart under the
 pointer. At the right, level with the foot of the total, sit gross
 assets and gross liabilities under their own section labels, each set off
 by a hairline rule at its left, then New recording. Which rates takes its
-own row beneath, at the left. Every money figure on the screen is
+own row beneath, at the left. While the dashboard is narrower than
+1000px, the total and the change take a row of their own, with gross
+assets and gross liabilities at the left beneath them and New recording
+at the right, because a total and gross figures in the tens of millions
+fit beside New recording only from that width. Every money figure on the screen is
 written by the formatter's `money`, in whole units.
 
 While no active holding is valued, the total, gross assets and gross
@@ -1266,3 +1270,7 @@ rule of the chart (Archived holdings, Ranges and modes).
     again. The screen opens on Order added. Test:
     `tests/browser/parts/dashboard-fixtures.mjs`,
     `tests/browser/parts/dashboard-review-sort.mjs`.
+84. (walk) Above phone width, with a total in the millions or the tens
+    of millions, the total stays clear of gross assets, and the change's
+    arrow, amount and percentage read on one line. Test:
+    `tests/browser/parts/dashboard-hero-change-line.mjs`.
