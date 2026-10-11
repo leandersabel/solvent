@@ -67,6 +67,48 @@ await run(async () => {
     createFields.labels.join('|') === 'Name|First value' && createFields.names.join('|') === createFields.labels.join('|'),
     JSON.stringify(createFields),
   );
+
+  // Presses `button` in the open dialog, and reads whether it stayed open,
+  // the profile as it stands, what has focus and each field's message line.
+  const pressInDialog = (button) =>
+    page.call(async (label) => {
+      [...document.querySelectorAll('.dialog button')].find((b) => b.textContent === label).click();
+      const v = (await import('/static/js/session.js')).currentVault();
+      return {
+        open: Boolean(document.querySelector('.dialog')),
+        profile: JSON.stringify(v.profile),
+        focused: document.activeElement.id,
+        fields: [...document.querySelectorAll('.dialog input')].map((i) => [
+          i.getAttribute('aria-invalid') === 'true',
+          document.getElementById(i.getAttribute('aria-describedby'))?.textContent ?? '',
+        ]),
+      };
+    }, button);
+  const profileNow = () => page.call(async () => JSON.stringify((await import('/static/js/session.js')).currentVault().profile));
+  const unchanged = await profileNow();
+  const bothBlank = await pressInDialog('Create');
+  check(
+    'Create with Name and First value blank keeps the dialog, writes nothing, and refuses both on their message lines',
+    bothBlank.open && bothBlank.profile === unchanged && bothBlank.focused === 'dimension-name'
+      && JSON.stringify(bothBlank.fields) === JSON.stringify([[true, 'A name cannot be blank.'], [true, 'A value cannot be blank.']]),
+    JSON.stringify(bothBlank),
+  );
+  await setValue('.dialog input', 'Liquidity', 0);
+  const firstBlank = await pressInDialog('Create');
+  check(
+    'a typed Name clears its error, and Create with First value blank refuses that field alone',
+    firstBlank.open && firstBlank.profile === unchanged && firstBlank.focused === 'dimension-first-value'
+      && JSON.stringify(firstBlank.fields) === JSON.stringify([[false, ''], [true, 'A value cannot be blank.']]),
+    JSON.stringify(firstBlank),
+  );
+  await setValue('.dialog input', '', 0);
+  const flagBlank = await pressInDialog('Create a flag');
+  check(
+    'Create a flag with Name blank keeps the dialog, writes nothing, and refuses Name',
+    flagBlank.open && flagBlank.profile === unchanged && flagBlank.focused === 'dimension-name'
+      && flagBlank.fields[0][0] && flagBlank.fields[0][1] === 'A name cannot be blank.',
+    JSON.stringify(flagBlank),
+  );
   await page.eval(`(() => {
     const inputs = document.querySelectorAll('.dialog input');
     inputs[0].value = 'Liquidity';
@@ -200,6 +242,15 @@ await run(async () => {
     'a screen reader names the field of the add value dialog by the label shown beside it',
     valueFields.labels.join('|') === 'Label' && valueFields.names.join('|') === 'Label',
     JSON.stringify(valueFields),
+  );
+  const beforeBlankValue = await profileNow();
+  await setValue('.dialog input', '   ');
+  const valueBlank = await pressInDialog('Add');
+  check(
+    'Add with Label blank keeps the dialog, writes nothing, and refuses Label on its message line',
+    valueBlank.open && valueBlank.profile === beforeBlankValue && valueBlank.focused === 'value-label'
+      && JSON.stringify(valueBlank.fields) === JSON.stringify([[true, 'A name cannot be blank.']]),
+    JSON.stringify(valueBlank),
   );
   await page.eval("[...document.querySelectorAll('.dialog button')].find((b) => b.textContent === 'Cancel').click()");
   await page.waitUntil("!document.querySelector('.dialog')", { label: 'the add value dialog to close' });

@@ -293,6 +293,12 @@ not a limit on the data.
   is the shape of a yes or no tag ("Emergency fund"), and is as fast as
   typing a tag: one field, one button.
 - Ids are generated, never asked for, never shown.
+- A blank or whitespace-only field is refused, in both this dialog and
+  Add a value. Create, Create a flag or Add keeps the dialog open,
+  writes nothing, puts the error on each refused field's message line
+  and focuses the first one. A blank Name or Label reads "A name cannot
+  be blank." and a blank First value reads "A value cannot be blank."
+  An error clears once something is typed in its field.
 
 #### Editing a label
 
@@ -1119,3 +1125,8 @@ from an administrator removing an account (`admin-invites.md`).
     on Dimensions by the label shown beside each. Test:
     `tests/browser/parts/dimensions.mjs`,
     `tests/browser/parts/dimensions-review-names.mjs`.
+87. (walk) Create, Create a flag or Add with a blank field keeps the
+    dialog open, writes nothing, shows the error on the field's message
+    line with `aria-invalid` and focuses the first refused field, and a
+    typed field clears its error. Test:
+    `tests/browser/parts/dimensions.mjs`.
