@@ -1129,4 +1129,5 @@ from an administrator removing an account (`admin-invites.md`).
     dialog open, writes nothing, shows the error on the field's message
     line with `aria-invalid` and focuses the first refused field, and a
     typed field clears its error. Test:
-    `tests/browser/parts/dimensions.mjs`.
+    `tests/browser/parts/dimensions.mjs`,
+    `tests/browser/parts/dimensions-review-blank-create.mjs`.
