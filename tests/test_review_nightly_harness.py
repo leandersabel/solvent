@@ -918,6 +918,7 @@ def test_review_a_default_context_with_the_ca_alone_trusts_the_stand_in(standin,
     """Criterion 4: a 3.13 default context holding ca.pem alone, strict
     X.509 checking on, completes the handshake under both names."""
     context = ssl.create_default_context(cafile=str(standin.tls / "ca.pem"))
+    context.minimum_version = ssl.TLSVersion.TLSv1_2
     assert sys.version_info[:2] >= (3, 13)
     assert context.verify_flags & ssl.VERIFY_X509_STRICT
     assert context.check_hostname and context.verify_mode == ssl.CERT_REQUIRED
