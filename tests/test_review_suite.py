@@ -242,7 +242,7 @@ def test_docker(python_image):
 OWN_WORK = {"test_a_docker": 1.5, "test_c_mixed": 0.75}
 
 
-def stand_in_run(tmp_path: Path, modules: dict[str, str], workers: int) -> tuple[str, list[dict]]:
+def stand_in_run(tmp_path: Path, modules: dict[str, str], workers: int, basetemp: bool = True) -> tuple[str, list[dict]]:
     suite = tmp_path / "suite"
     suite.mkdir()
     for name, source in {"spans.py": SPANS, "conftest.py": STAND_IN_CONFTEST, **modules}.items():
@@ -251,7 +251,7 @@ def stand_in_run(tmp_path: Path, modules: dict[str, str], workers: int) -> tuple
     env = dict(os.environ, PYTHONPATH=str(REPO_ROOT), REVIEW_SPAN_LOG=str(log))
     done = subprocess.run(
         [sys.executable, "-m", "pytest", "-q", "-p", "no:cacheprovider", "-p", "tests.conftest",
-         "-n", str(workers), "--dist", "worksteal", "--basetemp", str(tmp_path / "base"), str(suite)],
+         "-n", str(workers), "--dist", "worksteal", *(["--basetemp", str(tmp_path / "base")] if basetemp else []), str(suite)],
         cwd=suite, env=env, capture_output=True, text=True, timeout=300,
     )
     spans = [json.loads(line) for line in log.read_text().splitlines()] if log.exists() else []
@@ -290,6 +290,43 @@ def test_no_docker_test_overlaps_a_browser_on_another_worker_and_none_waits_out_
         )
         waited = first_docker["start"] - asked - own
         assert waited < 3, f"{where} waited {waited:.1f}s for its Docker test while browser tests kept starting"
+
+
+def test_no_docker_test_overlaps_a_browser_under_the_default_temporary_directory(tmp_path):
+    """Issue 552: a parallel run in pytest's own temporary directory, as
+    the suite runs by default, keeps Docker tests and browser tests on
+    other workers apart."""
+    modules = {"test_a_docker.py": DOCKER_MODULE}
+    modules.update({f"test_e_browser_{n}.py": BROWSER_MODULE for n in range(4)})
+    output, spans = stand_in_run(tmp_path, modules, workers=4, basetemp=False)
+    assert "passed" in output and "failed" not in output and "error" not in output, output
+    assert len({s["worker"] for s in spans if s["kind"] == "chrome"}) > 1, spans
+    assert not clashes(spans), f"a Docker test ran while another worker had Chrome open: {clashes(spans)}"
+
+
+STARTS_A_SERIAL_PYTEST = """
+import subprocess
+import sys
+
+
+def test_docker_starts_a_serial_pytest(python_image, tmp_path):
+    inner = tmp_path / "test_inner.py"
+    inner.write_text("def test_inner():\\n    pass\\n")
+    done = subprocess.run(
+        [sys.executable, "-m", "pytest", "-q", "-p", "no:cacheprovider", "-p", "tests.conftest",
+         "-n", "0", "-o", "addopts=", "--rootdir", str(tmp_path), str(inner)],
+        cwd=tmp_path, capture_output=True, text=True, timeout=60,
+    )
+    assert done.returncode == 0, done.stdout + done.stderr
+"""
+
+
+def test_a_serial_pytest_started_inside_a_serial_docker_test_finishes(tmp_path):
+    """Issue 552: a serial run, in pytest's own temporary directory,
+    whose Docker test holds the lock starts a second serial pytest under
+    the suite's conftest, which finishes rather than waiting on it."""
+    output, _ = stand_in_run(tmp_path, {"test_a_nesting.py": STARTS_A_SERIAL_PYTEST}, workers=0, basetemp=False)
+    assert "1 passed" in output and "failed" not in output, output
 
 
 def test_a_session_fixture_is_refused_before_it_opens_chrome(tmp_path):

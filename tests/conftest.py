@@ -14,8 +14,12 @@ from tests.helpers import EpochClient, register
 def network_held(request, exclusive: bool):
     """Holds the network lock across workers, shared or exclusive. An
     exclusive waiter holds the gate, which keeps new shared holders out,
-    so a stream of them cannot starve it."""
-    base = request.getfixturevalue("tmp_path_factory").getbasetemp().parent
+    so a stream of them cannot starve it. The lock lives in the run's own
+    base directory, a worker's parent, so a pytest a test starts takes a
+    lock of its own."""
+    base = request.getfixturevalue("tmp_path_factory").getbasetemp()
+    if hasattr(request.config, "workerinput"):
+        base = base.parent
     with (base / "network.gate").open("a") as gate, (base / "network.lock").open("a") as held:
         fcntl.flock(gate, fcntl.LOCK_EX)
         if exclusive:
