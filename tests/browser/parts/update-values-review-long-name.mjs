@@ -1,13 +1,15 @@
-// Reviewer's checks of a holding name with no space on Update values,
-// written from spec/features/record-snapshot.md (Update values, Layout,
-// a row, and At phone width; criterion 106) and net-worth-view.md (a
-// holding's name wraps wherever it must), without reading how the sweep
-// is built. Measured on the boxes the browser draws: the name wraps
+// Reviewer's checks of holding names on Update values, written from
+// spec/features/record-snapshot.md (Update values, Layout, a row, and
+// At phone width; criterion 106) and net-worth-view.md (a holding's name
+// wraps wherever it must), without reading how the sweep is built.
+// Measured on the boxes the browser draws: a name with no space wraps
 // inside its own column, is shown whole inside its card, never runs
-// under the field or the control, the rows' columns stay in line, and
-// nothing pans sideways, on a new recording and a reopened one alike,
-// and in the banner a row raises when its holding was archived in
-// another window (Update values, States).
+// under the field or the control, a name of ordinary words breaks only
+// between them, a row keeps three lined-up columns while its card is at
+// least 720px wide and stacks below that, and nothing pans sideways, on
+// a new recording and a reopened one alike, and in the banner a row
+// raises when its holding was archived in another window (Update
+// values, States).
 import { check, run } from '../harness.mjs';
 import { startRecorder } from '../recorder.mjs';
 
@@ -16,12 +18,14 @@ import { startRecorder } from '../recorder.mjs';
 const LONG = 'Unterschleissheimerstrassenverkehrsgesellschaftsbeteiligungsanteil_ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789';
 // Never valued, so its row carries no figure to confirm.
 const NEVER = `${LONG}_never`;
-const WIDTHS = [320, 375, 601, 901, 1280];
-// Widths that are a phone's and a desktop's under any reading of the
-// phone breakpoint. 601px sits on the edge, so only the checks that
-// hold at every width apply there.
-const PHONE = 375;
-const DESKTOP = 901;
+// Names of ordinary words, the one from the issue among them, which must
+// never break inside a word.
+const WORDY = ['Dollar account', 'Pension fund of the cantonal employees association'];
+// The widths criterion 106 lists, and the ones around a card 720px wide,
+// where the row changes shape.
+const WIDTHS = [320, 375, 601, 640, 719, 760, 800, 816, 817, 901, 1000, 1280];
+// The card width at which the row has three columns (Update values, Layout).
+const COLUMNS = 720;
 
 await run(async () => {
   const r = await startRecorder();
@@ -31,6 +35,7 @@ await run(async () => {
   const [id] = await plantHere([
     { type: 'account', payload: { name: LONG, unit: 'CHF', dims: {}, note: null, archivedAt: null, createdAt: '2020-01-02T00:00:00Z' } },
     { type: 'account', payload: { name: NEVER, unit: 'CHF', dims: {}, note: null, archivedAt: null, createdAt: '2020-01-02T00:00:01Z' } },
+    ...WORDY.map((name, i) => ({ type: 'account', payload: { name, unit: 'USD', dims: {}, note: null, archivedAt: null, createdAt: `2020-01-02T00:00:0${2 + i}Z` } })),
   ]);
   // Recorded at D1, so the reopened recording shows it with Save, and
   // later, so today's sweep shows it with its last figure and Confirm.
@@ -93,12 +98,26 @@ await run(async () => {
       out.nameBottom = Math.max(...rects.map((b) => b.bottom));
       out.underField = Boolean(field) && rects.some((b) => meets(b, box(field)));
       out.underControl = Boolean(control) && rects.some((b) => meets(b, box(control)));
+      // Each word of the name, on how many lines it is drawn.
+      out.brokenWords = [];
+      out.words = 0;
+      const texts = document.createTreeWalker(nameBox, NodeFilter.SHOW_TEXT);
+      for (let text = texts.nextNode(); text; text = texts.nextNode()) {
+        for (const m of text.textContent.matchAll(/\S+/g)) {
+          out.words += 1;
+          const word = document.createRange();
+          word.setStart(text, m.index);
+          word.setEnd(text, m.index + m[0].length);
+          const tops = new Set([...word.getClientRects()].filter((b) => b.width > 0).map((b) => Math.round(b.top)));
+          if (tops.size > 1) out.brokenWords.push(m[0]);
+        }
+      }
       return out;
     });
     return JSON.stringify({ width, pans, rows });
   }, [LONG, NEVER]).then(JSON.parse);
 
-  const holds = (seen, where, px) => {
+  const holds = (seen, where) => {
     check(`review 106: nothing pans sideways ${where}`, seen.pans.length === 0, seen.pans.join('; '));
     const longRows = seen.rows.filter((row) => row.long);
     check(`review 106: both long-named rows are on the sweep ${where}`, longRows.length === 2, JSON.stringify(seen.rows.map((row) => row.name)));
@@ -114,13 +133,26 @@ await run(async () => {
       check(`review layout: the name ${tag} never runs under the field ${where}`, !row.underField, JSON.stringify(row));
       check(`review layout: the name ${tag} never runs under the control ${where}`, !row.underControl, JSON.stringify(row));
     }
-    const withControl = seen.rows.filter((row) => row.control && row.field);
-    if (px >= DESKTOP) {
+    // A name of ordinary words, every seeded one included, breaks only
+    // between its words.
+    const wordy = seen.rows.filter((row) => !row.long);
+    check(`review 106: the ordinary names are on the sweep ${where}`,
+      WORDY.every((name) => wordy.some((row) => row.name === name)), JSON.stringify(wordy.map((row) => row.name)));
+    for (const row of wordy) {
+      check(`review 106: the name "${row.name}" breaks only between words ${where}`, row.words > 0 && row.brokenWords.length === 0,
+        `${row.brokenWords.join(', ')} at a card ${row.card && row.card.width}px wide`);
+    }
+    const withControl = seen.rows.filter((row) => row.control && row.field && row.card);
+    const cardWidth = withControl.length ? withControl[0].card.width : 0;
+    check(`review layout: the rows have a field and a control ${where}`, withControl.length > 0, JSON.stringify(seen.rows));
+    if (cardWidth >= COLUMNS + 0.5) {
       // Three columns: the name left of the field, and every row's field
       // and control in line whatever its name or its control reads.
-      for (const row of longRows) {
-        check(`review layout: the name "${row.name.slice(-12)}" stays in the column left of the field ${where}`,
-          row.field && row.nameRight <= row.field.left + 0.5, JSON.stringify(row));
+      for (const row of withControl) {
+        check(`review layout: the name "${row.name.slice(-12)}" stays in the column left of the field at a ${cardWidth}px card ${where}`,
+          row.nameRight <= row.field.left + 0.5, JSON.stringify(row));
+        check(`review layout: the field of "${row.name.slice(-12)}" shares the name's line at a ${cardWidth}px card ${where}`,
+          row.field.top < row.nameBottom, JSON.stringify(row));
       }
       const lefts = (pick) => new Set(withControl.map((row) => Math.round(pick(row).left)));
       check(`review layout: every row's field lines up ${where}`, lefts((row) => row.field).size === 1,
@@ -131,10 +163,10 @@ await run(async () => {
         withControl.every((row) => Math.abs(row.control.width - 112) <= 1),
         JSON.stringify(withControl.map((row) => [row.name.slice(-12), row.control.width])));
     }
-    if (px <= PHONE) {
+    if (cardWidth > 0 && cardWidth < COLUMNS - 0.5) {
       // One column: the name, then the field, then the control at full width.
-      for (const row of longRows.filter((x) => x.field && x.control)) {
-        const tag = `"${row.name.slice(-12)}"`;
+      for (const row of withControl) {
+        const tag = `"${row.name.slice(-12)}" at a ${cardWidth}px card`;
         check(`review phone: the field sits beneath the name ${tag} ${where}`, row.field.top >= row.nameBottom - 0.5, JSON.stringify(row));
         check(`review phone: the control sits beneath the field ${tag} ${where}`, row.control.top >= row.field.bottom - 0.5, JSON.stringify(row));
         check(`review phone: the control fills the row's width ${tag} ${where}`,
@@ -147,10 +179,10 @@ await run(async () => {
     await viewport(px);
     await home();
     await sweepToday();
-    holds(await measure(), `on today's sweep at ${px}px`, px);
+    holds(await measure(), `on today's sweep at ${px}px`);
     await go(`#/sweep/${D1}`);
     const reopened = await measure();
-    holds(reopened, `on the recording at ${D1} at ${px}px`, px);
+    holds(reopened, `on the recording at ${D1} at ${px}px`);
     check(`review 106: the long-named row reads Save on the recording at ${D1} at ${px}px`,
       reopened.rows.some((row) => row.name === LONG && row.controlText === 'Save'), JSON.stringify(reopened.rows.map((row) => [row.name.slice(-12), row.controlText])));
   }

@@ -1484,10 +1484,10 @@ th.numeric {
 
 /* Below 720px of card width the field and control columns leave the
    name too narrow to read whole, so the row stacks, as the rate lines
-   do. */
+   do. The query measures inside the card's two 1px borders. */
 .sweep-rows { container-type: inline-size; }
 
-@container (max-width: 719.98px) {
+@container (max-width: 717.98px) {
   .sweep-row { grid-template-columns: minmax(0, 1fr); gap: 10px; padding: 16px; }
   .sweep-input .hint { text-align: left; }
   .sweep-pair { grid-column: 1 / -1; }
