@@ -10,6 +10,9 @@
 // and typing in a field clears its own error and no other. A filled Add
 // after a refusal then creates what it was asked to.
 //
+// Every round runs at the default window, where the form is its full
+// width, and at phone width.
+//
 // Fields are found by the names a screen reader gives them, text goes in
 // as real typing and Add is pressed with the mouse, so the checks hold
 // whichever event the form listens to.
@@ -139,33 +142,32 @@ const chooseNewValue = async () => {
 };
 const openNewDimension = () => pressAt("[...document.querySelectorAll('button')].find((b) => b.checkVisibility() && b.textContent.trim() === '+ New dimension')");
 
-await run(async () => {
-  await vaultOwner();
-  await holdings([['Lone account', 'CHF']]);
-  await recording(new Date().toISOString().slice(0, 10), { 'Lone account': '100.00' });
-  await setProfile({ dimensions: [LIQUIDITY] });
-  await unlockDashboard('the dashboard');
+// Each round at window width `width`, or at the default window with null.
+const rounds = async (width) => {
+  const at = width ? `${width}px` : 'default width';
+  if (width) await page.send('Emulation.setDeviceMetricsOverride', { width, height: 800, deviceScaleFactor: 2, mobile: false });
+  await page.frames();
   const startProfile = await profileNow();
 
   // ---- + New value, blank then whitespace ----------------------------------
   for (const [what, text] of [['blank', ''], ['whitespace-only', '   ']]) {
     await openAdd();
     await chooseNewValue();
-    check(`review 68: + New value opens a field named "${NEW_VALUE}"`, await pick(NEW_VALUE));
+    check(`${at}: review 68: + New value opens a field named "${NEW_VALUE}"`, await pick(NEW_VALUE));
     const still = await saveTop();
     await typeOver(NEW_VALUE, text);
     const before = puts();
     await addAfter(NEW_VALUE);
     const value = await fieldState(NEW_VALUE, VALUE_BLANK);
-    check(`review 68: Add with a ${what} + New value writes nothing`,
+    check(`${at}: review 68: Add with a ${what} + New value writes nothing`,
       puts() === before && (await profileNow()) === startProfile, String(puts() - before));
-    check(`review 68: Add with a ${what} + New value shows "${VALUE_BLANK}" on the field's own message line with aria-invalid`,
+    check(`${at}: review 68: Add with a ${what} + New value shows "${VALUE_BLANK}" on the field's own message line with aria-invalid`,
       refused(value), JSON.stringify(value));
-    check(`manage-accounts Fields: Add with a ${what} + New value focuses the refused field`, value.focused, JSON.stringify(value));
-    check(`design-system Input: the ${what} + New value refusal moves nothing beneath it`, (await saveTop()) === still, `${still} -> ${await saveTop()}`);
+    check(`${at}: manage-accounts Fields: Add with a ${what} + New value focuses the refused field`, value.focused, JSON.stringify(value));
+    check(`${at}: design-system Input: the ${what} + New value refusal moves nothing beneath it`, (await saveTop()) === still, `${still} -> ${await saveTop()}`);
     await typeOver(NEW_VALUE, 'L');
     const typed = await fieldState(NEW_VALUE, VALUE_BLANK);
-    check(`design-system Input: typing in + New value clears its error after a ${what} Add`, clear(typed) && typed.value === 'L', JSON.stringify(typed));
+    check(`${at}: design-system Input: typing in + New value clears its error after a ${what} Add`, clear(typed) && typed.value === 'L', JSON.stringify(typed));
     await closeForm();
   }
 
@@ -174,19 +176,19 @@ await run(async () => {
   await chooseNewValue();
   await typeOver(NEW_VALUE, ' ');
   await addAfter(NEW_VALUE);
-  await typeOver(NEW_VALUE, 'Locked');
+  await typeOver(NEW_VALUE, `Locked ${at}`);
   await addAfter(NEW_VALUE);
-  await page.waitUntil(async () => (await import('/static/js/session.js')).currentVault().profile.dimensions
-    .some((d) => d.values.some((v) => v.label === 'Locked')), { label: 'the new value in the profile' });
-  check('review 68: a + New value Add filled in after a refusal adds the value and selects it',
-    await page.call(() => [...document.querySelectorAll('select')].some((s) => s.selectedOptions[0]?.textContent.trim() === 'Locked')));
+  await page.waitUntil(async (wanted) => (await import('/static/js/session.js')).currentVault().profile.dimensions
+    .some((d) => d.values.some((v) => v.label === wanted)), { args: [`Locked ${at}`], label: 'the new value in the profile' });
+  check(`${at}: review 68: a + New value Add filled in after a refusal adds the value and selects it`,
+    await page.call((wanted) => [...document.querySelectorAll('select')].some((s) => s.selectedOptions[0]?.textContent.trim() === wanted), `Locked ${at}`));
   await closeForm();
 
   // ---- + New dimension, both blank then both whitespace --------------------
   for (const [what, text] of [['blank', ''], ['whitespace-only', '  ']]) {
     await openAdd();
     await openNewDimension();
-    check(`review 68: + New dimension opens fields named "${DIMENSION_NAME}" and "${FIRST_VALUE}"`,
+    check(`${at}: review 68: + New dimension opens fields named "${DIMENSION_NAME}" and "${FIRST_VALUE}"`,
       (await pick(DIMENSION_NAME)) && (await pick(FIRST_VALUE)));
     const still = await saveTop();
     const profileBefore = await profileNow();
@@ -196,23 +198,23 @@ await run(async () => {
     await addAfter(FIRST_VALUE);
     const name = await fieldState(DIMENSION_NAME, NAME_BLANK);
     const first = await fieldState(FIRST_VALUE, FIRST_BLANK);
-    check(`review 68: Add with a ${what} Dimension name and First value writes nothing`,
+    check(`${at}: review 68: Add with a ${what} Dimension name and First value writes nothing`,
       puts() === before && (await profileNow()) === profileBefore, String(puts() - before));
-    check(`review 68: Add with a ${what} Dimension name shows "${NAME_BLANK}" on its own message line with aria-invalid`,
+    check(`${at}: review 68: Add with a ${what} Dimension name shows "${NAME_BLANK}" on its own message line with aria-invalid`,
       refused(name), JSON.stringify(name));
-    check(`review 68: Add with a ${what} First value shows "${FIRST_BLANK}" on its own message line with aria-invalid`,
+    check(`${at}: review 68: Add with a ${what} First value shows "${FIRST_BLANK}" on its own message line with aria-invalid`,
       refused(first), JSON.stringify(first));
-    check(`manage-accounts Fields: Add with both fields ${what} focuses Dimension name, the first refused field`, name.focused, JSON.stringify(name));
-    check(`design-system Input: the ${what} + New dimension refusals move nothing beneath them`, (await saveTop()) === still, `${still} -> ${await saveTop()}`);
+    check(`${at}: manage-accounts Fields: Add with both fields ${what} focuses Dimension name, the first refused field`, name.focused, JSON.stringify(name));
+    check(`${at}: design-system Input: the ${what} + New dimension refusals move nothing beneath them`, (await saveTop()) === still, `${still} -> ${await saveTop()}`);
 
     await typeOver(DIMENSION_NAME, 'G');
     const typedName = await fieldState(DIMENSION_NAME, NAME_BLANK);
     const standing = await fieldState(FIRST_VALUE, FIRST_BLANK);
-    check(`design-system Input: typing in Dimension name clears its error after a ${what} Add`, clear(typedName) && typedName.value === 'G', JSON.stringify(typedName));
-    check(`design-system Input: typing in Dimension name leaves the First value error standing after a ${what} Add`, refused(standing), JSON.stringify(standing));
+    check(`${at}: design-system Input: typing in Dimension name clears its error after a ${what} Add`, clear(typedName) && typedName.value === 'G', JSON.stringify(typedName));
+    check(`${at}: design-system Input: typing in Dimension name leaves the First value error standing after a ${what} Add`, refused(standing), JSON.stringify(standing));
     await typeOver(FIRST_VALUE, 'S');
     const typedFirst = await fieldState(FIRST_VALUE, FIRST_BLANK);
-    check(`design-system Input: typing in First value clears its error after a ${what} Add`, clear(typedFirst) && typedFirst.value === 'S', JSON.stringify(typedFirst));
+    check(`${at}: design-system Input: typing in First value clears its error after a ${what} Add`, clear(typedFirst) && typedFirst.value === 'S', JSON.stringify(typedFirst));
     await closeForm();
   }
 
@@ -220,15 +222,15 @@ await run(async () => {
   await openAdd();
   await openNewDimension();
   const profileBefore = await profileNow();
-  await typeOver(DIMENSION_NAME, 'Growth');
+  await typeOver(DIMENSION_NAME, `Growth ${at}`);
   let before = puts();
   await addAfter(FIRST_VALUE);
   let name = await fieldState(DIMENSION_NAME, NAME_BLANK);
   let first = await fieldState(FIRST_VALUE, FIRST_BLANK);
-  check('review 68: Add with only First value blank writes nothing', puts() === before && (await profileNow()) === profileBefore, String(puts() - before));
-  check('review 68: Add with only First value blank refuses First value alone',
-    refused(first) && clear(name) && name.value === 'Growth', JSON.stringify({ name, first }));
-  check('manage-accounts Fields: Add with only First value blank focuses First value', first.focused, JSON.stringify(first));
+  check(`${at}: review 68: Add with only First value blank writes nothing`, puts() === before && (await profileNow()) === profileBefore, String(puts() - before));
+  check(`${at}: review 68: Add with only First value blank refuses First value alone`,
+    refused(first) && clear(name) && name.value === `Growth ${at}`, JSON.stringify({ name, first }));
+  check(`${at}: manage-accounts Fields: Add with only First value blank focuses First value`, first.focused, JSON.stringify(first));
 
   await typeOver(DIMENSION_NAME, '');
   await typeOver(FIRST_VALUE, 'Stable');
@@ -236,15 +238,25 @@ await run(async () => {
   await addAfter(FIRST_VALUE);
   name = await fieldState(DIMENSION_NAME, NAME_BLANK);
   first = await fieldState(FIRST_VALUE, FIRST_BLANK);
-  check('review 68: Add with only Dimension name blank writes nothing', puts() === before && (await profileNow()) === profileBefore, String(puts() - before));
-  check('review 68: Add with only Dimension name blank refuses Dimension name alone',
+  check(`${at}: review 68: Add with only Dimension name blank writes nothing`, puts() === before && (await profileNow()) === profileBefore, String(puts() - before));
+  check(`${at}: review 68: Add with only Dimension name blank refuses Dimension name alone`,
     refused(name) && clear(first) && first.value === 'Stable', JSON.stringify({ name, first }));
-  check('manage-accounts Fields: Add with only Dimension name blank focuses Dimension name', name.focused, JSON.stringify(name));
+  check(`${at}: manage-accounts Fields: Add with only Dimension name blank focuses Dimension name`, name.focused, JSON.stringify(name));
 
   // A refused Add, then the name typed, creates the dimension.
-  await typeOver(DIMENSION_NAME, 'Growth');
+  await typeOver(DIMENSION_NAME, `Growth ${at}`);
   await addAfter(FIRST_VALUE);
-  await page.waitUntil(async () => (await import('/static/js/session.js')).currentVault().profile.dimensions
-    .some((d) => d.label === 'Growth' && d.values.some((v) => v.label === 'Stable')), { label: 'the new dimension in the profile' });
-  check('review 68: a + New dimension Add filled in after a refusal adds the dimension with its first value', true);
+  await page.waitUntil(async (wanted) => (await import('/static/js/session.js')).currentVault().profile.dimensions
+    .some((d) => d.label === wanted && d.values.some((v) => v.label === 'Stable')), { args: [`Growth ${at}`], label: 'the new dimension in the profile' });
+  check(`${at}: review 68: a + New dimension Add filled in after a refusal adds the dimension with its first value`, true);
+  await closeForm();
+};
+
+await run(async () => {
+  await vaultOwner();
+  await holdings([['Lone account', 'CHF']]);
+  await recording(new Date().toISOString().slice(0, 10), { 'Lone account': '100.00' });
+  await setProfile({ dimensions: [LIQUIDITY] });
+  await unlockDashboard('the dashboard');
+  for (const width of [null, 390, 320]) await rounds(width);
 });
