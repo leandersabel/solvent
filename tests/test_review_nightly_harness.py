@@ -1045,3 +1045,50 @@ def test_review_seq_continues_across_a_restart(standin):
     standin.start()
     standin.get("api.nbp.pl", "/api/cenyzlota/2024-03-11/2024-03-15?format=json")
     assert [r["seq"] for r in standin.records()] == [1, 2, 3]
+
+
+TLS_CONTEXTS = {"create_default_context", "SSLContext"}
+MODERN = {"TLSv1_2", "TLSv1_3"}
+
+
+def contexts_without_a_modern_floor(path) -> "list[int]":
+    """Lines in `path` that build a TLS context in a function that never
+    sets that context's `minimum_version` to TLS 1.2 or later."""
+    bare = []
+    for function in ast.walk(ast.parse(path.read_text())):
+        if not isinstance(function, (ast.FunctionDef, ast.AsyncFunctionDef)):
+            continue
+        floored = {
+            ast.unparse(target.value)
+            for node in ast.walk(function)
+            if isinstance(node, ast.Assign) and isinstance(node.value, ast.Attribute) and node.value.attr in MODERN
+            for target in node.targets
+            if isinstance(target, ast.Attribute) and target.attr == "minimum_version"
+        }
+        for node in ast.walk(function):
+            if (
+                isinstance(node, ast.Assign)
+                and isinstance(node.value, ast.Call)
+                and isinstance(node.value.func, ast.Attribute)
+                and node.value.func.attr in TLS_CONTEXTS
+                and not {ast.unparse(t) for t in node.targets} & floored
+            ):
+                bare.append(node.lineno)
+    return bare
+
+
+@pytest.mark.parametrize(
+    "path",
+    [
+        *sorted(TOOLS.glob("*.py")),
+        REPO_ROOT / "tests" / "test_nightly_tools.py",
+        REPO_ROOT / "tests" / "test_review_nightly_harness.py",
+    ],
+    ids=lambda p: p.name,
+)
+def test_review_every_harness_tls_context_refuses_versions_before_1_2(path):
+    """architecture.md, Security, and the code scanning rule
+    `py/insecure-protocol`: no TLS endpoint of the harness, nor any test
+    client of it, offers TLS 1.0 or 1.1, whatever the interpreter's
+    default."""
+    assert contexts_without_a_modern_floor(path) == []
