@@ -6,7 +6,7 @@
 import * as api from './api.js';
 import * as decimal from './decimal.js';
 import * as writes from './writes.js';
-import { counted, dialog, el, listed, listOption, resumable, today } from './dom.js';
+import { counted, dialog, el, listed, listOption, requiredField, resumable, takeAll, today } from './dom.js';
 import { newId } from './view-dimensions.js';
 
 let symbolTable = null;
@@ -348,19 +348,19 @@ function dimensionBlock(vault, dims) {
   };
 
   const newValue = (dimension, select) => {
-    const label = el('input', { type: 'text', 'aria-label': `New ${dimension.label} value` });
+    const label = requiredField(`new-value-${dimension.id}`, 'A value needs a name.', {
+      'aria-label': `New ${dimension.label} value`,
+    });
     const row = el('div', { class: 'inline-create' }, [
-      label,
+      label.field,
       el('button', {
         type: 'button',
         class: 'btn-inline',
         text: 'Add',
         onclick: async () => {
-          const text = label.value.trim();
-          if (!text) {
-            said('A value needs a name.');
-            return;
-          }
+          const texts = takeAll(label);
+          if (!texts) return;
+          const [text] = texts;
           const id = newId(vault);
           const ok = await addToProfile((all) =>
             all.map((d) =>
@@ -422,26 +422,28 @@ function dimensionBlock(vault, dims) {
   };
 
   const newDimension = () => {
-    const label = el('input', { type: 'text', 'aria-label': 'Dimension name', placeholder: 'Liquidity' });
-    const first = el('input', { type: 'text', 'aria-label': 'First value', placeholder: 'Cash' });
+    const label = requiredField('new-dimension-name', 'A dimension needs a name.', {
+      'aria-label': 'Dimension name', placeholder: 'Liquidity',
+    });
+    const first = requiredField('new-dimension-first-value', 'A dimension needs a first value.', {
+      'aria-label': 'First value', placeholder: 'Cash',
+    });
     const row = el('div', { class: 'inline-create' }, [
-      label,
-      first,
+      label.field,
+      first.field,
       el('button', {
         type: 'button',
         class: 'btn-inline',
         text: 'Add',
         onclick: async () => {
-          if (!label.value.trim() || !first.value.trim()) {
-            said('A dimension needs a name and a first value.');
-            return;
-          }
+          const texts = takeAll(label, first);
+          if (!texts) return;
           const id = newId(vault);
           const dimension = {
             id,
-            label: label.value.trim(),
+            label: texts[0],
             archivedAt: null,
-            values: [{ id: newId(vault, [id]), label: first.value.trim(), archivedAt: null }],
+            values: [{ id: newId(vault, [id]), label: texts[1], archivedAt: null }],
           };
           const ok = await addToProfile((all) => [...all, dimension]);
           if (!ok) {

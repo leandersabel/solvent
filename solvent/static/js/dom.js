@@ -72,6 +72,41 @@ export function listOption(list, search, text, onPick, selected, extra = {}) {
   });
 }
 
+// A field that refuses a blank commit on its own message line
+// (design-system.md, Components, Input), the error gone once something
+// is typed. Without a `label`, the caller names the input in `attrs`.
+export function requiredField(id, blank, { label = null, ...attrs } = {}) {
+  const line = el('p', { id: `${id}-line`, class: 'field-error message-line', 'aria-live': 'polite' });
+  const input = el('input', { id, type: 'text', 'aria-describedby': line.id, ...attrs });
+  const show = (message) => {
+    line.textContent = message;
+    if (message) input.setAttribute('aria-invalid', 'true');
+    else input.removeAttribute('aria-invalid');
+  };
+  input.addEventListener('input', () => {
+    if (input.value.trim()) show('');
+  });
+  return {
+    input,
+    field: el('div', { class: label ? 'field' : 'inline-field' }, [
+      label ? el('label', { for: id, text: label }) : null,
+      input,
+      line,
+    ]),
+    // The trimmed text, or '' with the field refused.
+    take: () => input.value.trim() || (show(blank), ''),
+  };
+}
+
+// Takes every field, focusing the first one refused. The texts, or null.
+export function takeAll(...fields) {
+  const texts = fields.map((f) => f.take());
+  const refused = fields.find((f, i) => !texts[i]);
+  if (!refused) return texts;
+  refused.input.focus();
+  return null;
+}
+
 const BLANK_NAME = 'A name cannot be blank.';
 // Several renames share a page, so each message line gets its own id.
 let renames = 0;

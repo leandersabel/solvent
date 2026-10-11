@@ -2328,12 +2328,12 @@ select {
 .inline-create {
   display: flex;
   flex-wrap: wrap;
-  align-items: center;
+  align-items: baseline;
   gap: 8px;
   margin-top: 8px;
 }
 
-.inline-create input { flex: 1 1 140px; width: auto; }
+.inline-field { flex: 1 1 140px; }
 .new-dimension { margin-bottom: 16px; }
 
 .choice-group { display: flex; gap: 24px; margin-bottom: 16px; }

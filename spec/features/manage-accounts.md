@@ -138,6 +138,10 @@ so it stacks at phone width.
   - **`+ New value`** at the foot of each select appends a value to that
     dimension in the profile and selects it. **`+ New dimension`**
     beneath the block asks for a dimension label and a first value.
+    Add with a field blank is refused on that field's message line
+    (design-system.md, Components, Input), with the first refused field
+    focused: "A value needs a name.", "A dimension needs a name." or "A
+    dimension needs a first value."
     Either writes the profile first and then the holding, two
     single-record writes. If the profile write fails, the form keeps
     every field, says the value was not created, and never saves a
@@ -928,3 +932,7 @@ Unarchiving and archiving it again writes the zero at the new D.
     symbol offers that symbol, and the form no longer says you enter
     its price yourself. Test: `tests/browser/parts/account-form.mjs`,
     `tests/browser/parts/account-form-review-offer.mjs`.
+68. (walk) Add with a blank `+ New value` field, or a blank Dimension
+    name or First value under `+ New dimension`, refuses each blank
+    field on its own message line, marks it invalid and writes nothing.
+    Test: `tests/browser/parts/account-form.mjs`.
