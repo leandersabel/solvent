@@ -15,6 +15,7 @@ import io
 import json
 import os
 import re
+import select
 import shutil
 import signal
 import socket
@@ -48,12 +49,6 @@ import standin  # noqa: E402
 import solvent.rates as rates  # noqa: E402
 
 needs_openssl = pytest.mark.skipif(shutil.which("openssl") is None, reason="needs the openssl command line")
-
-
-def free_port() -> int:
-    with socket.socket() as probe:
-        probe.bind(("127.0.0.1", 0))
-        return probe.getsockname()[1]
 
 
 def openssl(*args: str) -> str:
@@ -199,8 +194,8 @@ def test_the_ca_refuses_a_directory_that_is_not_empty(tmp_path):
 
 class Standin:
     def __init__(self, pki_dir: Path, state: Path) -> None:
-        self.pki, self.state, self.port = pki_dir, state, free_port()
-        self.process = None
+        self.pki, self.state = pki_dir, state
+        self.process = self.port = None
         self.context = ssl.create_default_context(cafile=str(pki_dir / "ca.pem"))
         self.context.minimum_version = ssl.TLSVersion.TLSv1_2
 
@@ -208,16 +203,18 @@ class Standin:
         self.process = subprocess.Popen(
             [
                 sys.executable, str(TOOLS / "standin.py"), "--cert", str(self.pki / "leaf.pem"),
-                "--key", str(self.pki / "leaf.key"), "--state", str(self.state), "--port", str(self.port),
+                "--key", str(self.pki / "leaf.key"), "--state", str(self.state), "--port", "0",
             ],
-            stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL,
+            stdout=subprocess.PIPE, stderr=subprocess.DEVNULL, text=True,
         )
-        for _ in range(200):
-            with contextlib.suppress(OSError):
-                socket.create_connection(("127.0.0.1", self.port), timeout=1).close()
-                return
-            time.sleep(0.05)
-        raise AssertionError("the stand-in did not come up")
+        # Port 0 has the stand-in bind a free port itself, so no other test
+        # worker can take it between choosing it and binding it.
+        ready, _, _ = select.select([self.process.stdout], [], [], 30)
+        line = self.process.stdout.readline() if ready else ""
+        self.process.stdout.close()
+        if not line.startswith("standin listening on "):
+            raise AssertionError("the stand-in did not come up")
+        self.port = int(line.split()[-1])
 
     def stop(self) -> None:
         self.process.terminate()
