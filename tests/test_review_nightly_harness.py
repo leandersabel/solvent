@@ -4,9 +4,10 @@
 69), of the gold window it takes from the app (Known prices, The
 source checks; Acceptance criteria 13 and 40), of the source checks'
 exit codes and route-out test (Acceptance criteria 17 and 18), of the
-composition its oracle applies (Known prices; rate-lookup.md,
-Providers), and of a registration form that never shows (fixtures.mjs;
-Acceptance criterion 45), written from the spec alone.
+stand-in's trust, answers, modes and request list (Acceptance criteria
+4 to 10), of the composition its oracle applies (Known prices;
+rate-lookup.md, Providers), and of a registration form that never shows
+(fixtures.mjs; Acceptance criterion 45), written from the spec alone.
 """
 from __future__ import annotations
 
@@ -822,3 +823,222 @@ def test_display_rounds_each_figure_half_even_to_whole_units(values, total, asse
     snapshots = {name: [(D1, Decimal(value))] for name, value in zip(names, values)}
     latest = prices.expected("CHF", holdings, snapshots, {})["latest"]
     assert [latest[key]["display"] for key in ("total", "assets", "debts")] == [total, assets, debts]
+
+
+# ---- the stand-in: trust, answers, modes and the request list ---------
+#
+# Acceptance criteria 4 to 10. The stand-in binds port 0 and the test
+# reads the port it prints, so no parallel worker can take it first.
+
+import socket  # noqa: E402
+import ssl  # noqa: E402
+import threading  # noqa: E402
+
+NAMES = ("api.frankfurter.dev", "api.nbp.pl")
+RECORD_FIELDS = {"seq", "at", "sni", "host", "method", "target", "headers", "body", "mode", "status"}
+
+
+@pytest.fixture(scope="module")
+def tls(tmp_path_factory):
+    out = tmp_path_factory.mktemp("review-ca") / "tls"
+    subprocess.run([sys.executable, str(TOOLS / "ca.py"), str(out)], check=True, capture_output=True, timeout=60)
+    return out
+
+
+class Standin:
+    """One stand-in process on an OS-chosen port, over a state directory."""
+
+    def __init__(self, tls, state) -> None:
+        self.tls, self.state = tls, state
+        self.process = None
+        self.port = None
+
+    def start(self) -> None:
+        log = (self.state.parent / "standin.err").open("ab")
+        self.process = subprocess.Popen(
+            [sys.executable, str(TOOLS / "standin.py"), "--cert", str(self.tls / "leaf.pem"),
+             "--key", str(self.tls / "leaf.key"), "--state", str(self.state), "--port", "0"],
+            stdout=subprocess.PIPE, stderr=log, text=True,
+        )
+        log.close()
+        deadline = threading.Timer(30, self.process.kill)
+        deadline.start()
+        try:
+            line = self.process.stdout.readline()
+        finally:
+            deadline.cancel()
+        match = re.fullmatch(r"standin listening on (\d+)\n", line)
+        if not match:
+            self.stop()
+            pytest.fail(f"the stand-in did not come up: {line!r}\n{(self.state.parent / 'standin.err').read_text()}")
+        self.port = int(match[1])
+
+    def stop(self) -> None:
+        self.process.terminate()
+        try:
+            self.process.wait(10)
+        except subprocess.TimeoutExpired:
+            self.process.kill()
+            self.process.wait()
+
+    def exchange(self, raw: bytes, sni: str = "api.nbp.pl") -> "tuple[int, dict, bytes]":
+        context = ssl.create_default_context(cafile=str(self.tls / "ca.pem"))
+        with socket.create_connection(("127.0.0.1", self.port), timeout=10) as plain:
+            with context.wrap_socket(plain, server_hostname=sni) as conn:
+                conn.sendall(raw)
+                chunks = []
+                while chunk := conn.recv(65536):
+                    chunks.append(chunk)
+        head, _, body = b"".join(chunks).partition(b"\r\n\r\n")
+        status_line, *header_lines = head.decode("latin-1").split("\r\n")
+        headers = {k.strip().lower(): v.strip() for k, v in (h.split(":", 1) for h in header_lines)}
+        return int(status_line.split()[1]), headers, body
+
+    def get(self, host: str, target: str) -> "tuple[int, dict, bytes]":
+        sni = host if host in NAMES else "api.nbp.pl"
+        return self.exchange(f"GET {target} HTTP/1.1\r\nHost: {host}\r\nConnection: close\r\n\r\n".encode(), sni)
+
+    def records(self) -> "list[dict]":
+        path = self.state / "requests.jsonl"
+        return [json.loads(line) for line in path.read_text().splitlines()] if path.exists() else []
+
+
+@pytest.fixture
+def standin(tls, tmp_path):
+    state = tmp_path / "state"
+    state.mkdir()
+    running = Standin(tls, state)
+    running.start()
+    yield running
+    running.stop()
+
+
+@pytest.mark.parametrize("name", NAMES)
+def test_review_a_default_context_with_the_ca_alone_trusts_the_stand_in(standin, name):
+    """Criterion 4: a 3.13 default context holding ca.pem alone, strict
+    X.509 checking on, completes the handshake under both names."""
+    context = ssl.create_default_context(cafile=str(standin.tls / "ca.pem"))
+    assert sys.version_info[:2] >= (3, 13)
+    assert context.verify_flags & ssl.VERIFY_X509_STRICT
+    assert context.check_hostname and context.verify_mode == ssl.CERT_REQUIRED
+    assert context.cert_store_stats()["x509_ca"] == 1
+    with socket.create_connection(("127.0.0.1", standin.port), timeout=10) as plain:
+        with context.wrap_socket(plain, server_hostname=name) as conn:
+            assert conn.version() in {"TLSv1.2", "TLSv1.3"}
+            assert ("DNS", name) in conn.getpeercert()["subjectAltName"]
+
+
+@pytest.mark.parametrize(
+    "name", ["frankfurter.dev", "nbp.pl", "api.frankfurter.dev.example", "www.api.nbp.pl", "localhost", "127.0.0.1"]
+)
+def test_review_the_handshake_fails_under_any_other_name(standin, name):
+    """Criterion 5."""
+    context = ssl.create_default_context(cafile=str(standin.tls / "ca.pem"))
+    with socket.create_connection(("127.0.0.1", standin.port), timeout=10) as plain:
+        with pytest.raises(ssl.SSLCertVerificationError):
+            context.wrap_socket(plain, server_hostname=name)
+
+
+def test_review_the_stand_in_answers_every_row_of_the_table(standin):
+    """Criterion 6, a weekend D at the preceding Friday and a range
+    holding no weekday as 404 included."""
+    status, headers, body = standin.get("api.frankfurter.dev", "/v1/2024-03-16?base=CHF")
+    assert status == 200 and headers["content-type"] == "application/json; charset=utf-8"
+    answer = json.loads(body)
+    assert answer["amount"] == 1.0 and answer["base"] == "CHF" and answer["date"] == "2024-03-15"
+    assert answer["rates"] == {c: prices.json_number(v) for c, v in prices.frankfurter_rates("2024-03-15", "CHF").items()}
+    assert "CHF" not in answer["rates"] and "EUR" in answer["rates"]
+
+    early = json.loads(standin.get("api.frankfurter.dev", "/v1/1999-06-30?base=EUR")[2])
+    assert "BRL" not in early["rates"] and "USD" in early["rates"]
+
+    for target in ["/v1/2000-01-12?base=BRL", "/v1/2024-03-15?base=XYZ", "/v1/latest", "/v1/2024-03-15"]:
+        status, headers, body = standin.get("api.frankfurter.dev", target)
+        assert (status, json.loads(body)) == (404, {"message": "not found"}), target
+        assert headers["content-type"] == "application/json; charset=utf-8"
+
+    status, headers, body = standin.get("api.nbp.pl", "/api/cenyzlota/2024-03-11/2024-03-17?format=json")
+    assert status == 200 and headers["content-type"] == "application/json; charset=utf-8"
+    days = [row["data"] for row in json.loads(body)]
+    assert days == ["2024-03-11", "2024-03-12", "2024-03-13", "2024-03-14", "2024-03-15"]
+    assert json.loads(body)[0]["cena"] == prices.json_number(prices.nbp_cena("2024-03-11"))
+
+    for target, expected in [
+        ("/api/cenyzlota/2024-03-16/2024-03-17?format=json", (404, b"Not Found - Brak danych")),
+        ("/api/cenyzlota/2024-03-15/2024-03-11?format=json", (400, b"Bad Request")),
+        ("/api/cenyzlota/2024-01-01/2024-06-30?format=json", (400, b"Bad Request")),
+        ("/api/exchangerates/tables/A?format=json", (404, b"Not Found")),
+    ]:
+        status, headers, body = standin.get("api.nbp.pl", target)
+        assert (status, body) == expected, target
+        assert headers["content-type"].startswith("text/plain"), target
+
+    status, _, body = standin.get("example.com", "/v1/2024-03-15?base=EUR")
+    assert (status, body) == (421, b"")
+
+
+@pytest.mark.parametrize("down", ["frankfurter", "nbp"])
+def test_review_a_down_source_answers_503_and_is_recorded_down(standin, down):
+    """Criterion 7: every request to the down source, a well-formed one or
+    not, is 503 with an empty body and recorded with mode "down"; the
+    other source still answers."""
+    (standin.state / "modes.json").write_text(json.dumps({down: "down"}))
+    host = {"frankfurter": "api.frankfurter.dev", "nbp": "api.nbp.pl"}
+    good = {"frankfurter": "/v1/2024-03-15?base=EUR", "nbp": "/api/cenyzlota/2024-03-11/2024-03-15?format=json"}
+    up = "nbp" if down == "frankfurter" else "frankfurter"
+    for target in [good[down], "/nothing-here"]:
+        assert standin.get(host[down], target)[:3:2] == (503, b""), target
+    assert standin.get(host[up], good[up])[0] == 200
+    first, second, third = standin.records()
+    assert [(r["mode"], r["status"]) for r in (first, second)] == [("down", 503), ("down", 503)]
+    assert (third["mode"], third["status"]) == ("up", 200)
+
+
+@pytest.mark.parametrize("modes", [None, "{not json", "[]", '{"frankfurter": 7}'])
+def test_review_absent_or_malformed_modes_leave_both_sources_up(standin, modes):
+    """Criterion 8."""
+    if modes is not None:
+        (standin.state / "modes.json").write_text(modes)
+    assert standin.get("api.frankfurter.dev", "/v1/2024-03-15?base=EUR")[0] == 200
+    assert standin.get("api.nbp.pl", "/api/cenyzlota/2024-03-11/2024-03-15?format=json")[0] == 200
+
+
+def test_review_every_request_a_malformed_one_included_is_a_line_with_every_field(standin):
+    """Criterion 9: target and headers exactly as received and in order,
+    the body as Latin-1, and an unparsable request still a line."""
+    target = "/api/cenyzlota/2024-03-11/2024-03-15?format=json"
+    sent = [("Host", "api.nbp.pl"), ("X-Second", "b"), ("Accept", "application/json"), ("Connection", "close")]
+    head = "".join(f"{k}: {v}\r\n" for k, v in sent)
+    assert standin.exchange(f"GET {target} HTTP/1.1\r\n{head}\r\n".encode())[0] == 200
+
+    body = b"\xff\x00caf\xe9"
+    post_head = [("Host", "api.frankfurter.dev"), ("Content-Length", str(len(body))), ("Connection", "close")]
+    raw = b"POST /v1/2024-03-15?base=EUR HTTP/1.1\r\n" + "".join(f"{k}: {v}\r\n" for k, v in post_head).encode() + b"\r\n" + body
+    post_status = standin.exchange(raw, sni="api.frankfurter.dev")[0]
+
+    garbage_status = standin.exchange(b"THIS IS NOT HTTP\r\n\r\n")[0]
+
+    lines = (standin.state / "requests.jsonl").read_text().splitlines()
+    records = [json.loads(line) for line in lines]
+    assert len(records) == 3
+    for record in records:
+        assert RECORD_FIELDS <= record.keys(), record
+        assert datetime.fromisoformat(record["at"]).utcoffset() == timedelta(0)
+    get, post, garbage = records
+    assert [r["seq"] for r in records] == [1, 2, 3]
+    assert (get["sni"], get["host"], get["method"], get["target"]) == ("api.nbp.pl", "api.nbp.pl", "GET", target)
+    assert [tuple(pair) for pair in get["headers"]] == sent
+    assert (get["body"], get["mode"], get["status"]) == ("", "up", 200)
+    assert (post["method"], post["sni"], post["status"]) == ("POST", "api.frankfurter.dev", post_status)
+    assert post["body"] == body.decode("latin-1")
+    assert (garbage["sni"], garbage["status"]) == ("api.nbp.pl", garbage_status)
+
+
+def test_review_seq_continues_across_a_restart(standin):
+    """Criterion 10."""
+    for _ in range(2):
+        standin.get("api.frankfurter.dev", "/v1/2024-03-15?base=EUR")
+    standin.stop()
+    standin.start()
+    standin.get("api.nbp.pl", "/api/cenyzlota/2024-03-11/2024-03-15?format=json")
+    assert [r["seq"] for r in standin.records()] == [1, 2, 3]
