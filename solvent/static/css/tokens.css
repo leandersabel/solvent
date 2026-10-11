@@ -1984,6 +1984,28 @@ select {
   border: 0;
 }
 
+/* While the hero holds one row, the figure's lines join its grid, so
+   the two sides and the action sit level with the foot of the total
+   rather than of the change and the date line beneath it. */
+@media (min-width: 901px) {
+  .hero {
+    grid-template-areas:
+      "label . ."
+      "figure parts action"
+      "change . ."
+      "at . ."
+      "rates rates rates";
+    row-gap: 0;
+  }
+
+  .hero-main { display: contents; }
+  .hero-main > .eyebrow { grid-area: label; }
+  .hero-main > .hero-figure { grid-area: figure; margin-top: 10px; }
+  .hero-main > .hero-change { grid-area: change; margin-top: 10px; }
+  .hero-main > .hero-at-line { grid-area: at; margin-top: 14px; }
+  .hero-rates { margin-top: 20px; }
+}
+
 /* ---- Below the width the full table and hero row need ---- */
 
 @media (max-width: 900px) {
