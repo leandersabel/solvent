@@ -1244,6 +1244,82 @@ th.numeric {
 .holdings-table .cell-action { text-align: right; }
 .holdings-table tbody tr { cursor: pointer; }
 
+/* Below 890px of card width the figure, date and action columns leave
+   the name and chips too narrow to break only between words, so the table
+   becomes a list. The query measures inside the card's 24px padding and
+   1px borders. */
+.holdings-card { container-type: inline-size; }
+
+@container (max-width: 839.98px) {
+  /* Holdings as a list: name and chips at the left, the converted
+     figure and its date at the right. */
+  .holdings-table thead { display: none; }
+
+  .holdings-table,
+  .holdings-table tbody { display: block; }
+
+  .holdings-table tr {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) auto auto;
+    column-gap: 0;
+    row-gap: 4px;
+    padding: 14px 0;
+    border-top: 1px solid var(--hairline);
+  }
+
+  .holdings-table tr:first-child { border-top: 0; padding-top: 0; }
+
+  .holdings-table td {
+    display: block;
+    padding: 0;
+    border: 0;
+  }
+
+  /* The native figure and its date share one line under the converted
+     figure. */
+  .holdings-table .cell-name { grid-column: 1; grid-row: 1; padding-right: 12px; }
+  .holdings-table .cell-dims { grid-column: 1; grid-row: 2 / span 2; padding-right: 12px; }
+  .holdings-table .cell-converted { grid-column: 2 / span 2; grid-row: 1; text-align: right; font-weight: 500; }
+
+  .holdings-table .cell-native,
+  .holdings-table .cell-asof {
+    grid-row: 2;
+    text-align: right;
+    font-size: 12px;
+    color: var(--ink-secondary);
+  }
+
+  .holdings-table .cell-native { grid-column: 2; }
+  .holdings-table .cell-asof { grid-column: 3; }
+  .holdings-table .cell-native:not(.same-unit) ~ .cell-asof::before { content: "\00a0\00b7\00a0"; }
+  .holdings-table .cell-native.same-unit { display: none; }
+  .holdings-table .cell-native ~ .cell-asof:empty::before { content: none; }
+
+  /* A unit with no price: the quantity leads and "not priced" sits
+     beneath it. */
+  .holdings-table tr.unpriced .cell-native {
+    grid-column: 2 / span 2;
+    grid-row: 1;
+    font-size: inherit;
+    font-weight: 500;
+    color: inherit;
+  }
+
+  .holdings-table tr.unpriced .cell-converted {
+    grid-column: 2;
+    grid-row: 2;
+    font-size: 12px;
+    font-weight: 400;
+    color: var(--ink-secondary);
+  }
+
+  .holdings-table .cell-action {
+    grid-column: 2 / span 2;
+    text-align: right;
+    margin-top: 4px;
+  }
+}
+
 .filter-line {
   display: flex;
   flex-wrap: wrap;
@@ -1922,74 +1998,6 @@ select {
   .hero-parts { border-left: 0; }
   .hero-part:first-child { padding-left: 0; }
   .hero-action { justify-self: end; }
-
-  /* Holdings as a list: name and chips at the left, the converted
-     figure and its date at the right. */
-  .holdings-table thead { display: none; }
-
-  .holdings-table,
-  .holdings-table tbody { display: block; }
-
-  .holdings-table tr {
-    display: grid;
-    grid-template-columns: minmax(0, 1fr) auto auto;
-    column-gap: 0;
-    row-gap: 4px;
-    padding: 14px 0;
-    border-top: 1px solid var(--hairline);
-  }
-
-  .holdings-table tr:first-child { border-top: 0; padding-top: 0; }
-
-  .holdings-table td {
-    display: block;
-    padding: 0;
-    border: 0;
-  }
-
-  /* The native figure and its date share one line under the converted
-     figure. */
-  .holdings-table .cell-name { grid-column: 1; grid-row: 1; padding-right: 12px; }
-  .holdings-table .cell-dims { grid-column: 1; grid-row: 2 / span 2; padding-right: 12px; }
-  .holdings-table .cell-converted { grid-column: 2 / span 2; grid-row: 1; text-align: right; font-weight: 500; }
-
-  .holdings-table .cell-native,
-  .holdings-table .cell-asof {
-    grid-row: 2;
-    text-align: right;
-    font-size: 12px;
-    color: var(--ink-secondary);
-  }
-
-  .holdings-table .cell-native { grid-column: 2; }
-  .holdings-table .cell-asof { grid-column: 3; }
-  .holdings-table .cell-native:not(.same-unit) ~ .cell-asof::before { content: "\00a0\00b7\00a0"; }
-  .holdings-table .cell-native.same-unit { display: none; }
-  .holdings-table .cell-native ~ .cell-asof:empty::before { content: none; }
-
-  /* A unit with no price: the quantity leads and "not priced" sits
-     beneath it. */
-  .holdings-table tr.unpriced .cell-native {
-    grid-column: 2 / span 2;
-    grid-row: 1;
-    font-size: inherit;
-    font-weight: 500;
-    color: inherit;
-  }
-
-  .holdings-table tr.unpriced .cell-converted {
-    grid-column: 2;
-    grid-row: 2;
-    font-size: 12px;
-    font-weight: 400;
-    color: var(--ink-secondary);
-  }
-
-  .holdings-table .cell-action {
-    grid-column: 2 / span 2;
-    text-align: right;
-    margin-top: 4px;
-  }
 
   /* A holding's values as a list, headings included: the date, its
      note toggle and any flag on the first line, the two figures beneath

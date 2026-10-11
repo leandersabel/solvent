@@ -309,7 +309,10 @@ a sum.
 
 The section heading holds the left of the card's head row and the "Show
 archived" toggle the right. Columns: Name, Dimensions, Latest value
-(native unit), In main currency, As of, row action.
+(native unit), In main currency, As of, row action, while the card is at
+least 890px wide. Below that the table becomes the list At phone width
+describes, because the figure, date and action columns leave the name
+and chips too narrow to break only between words.
 
 - **The table renders only when it lists at least one row.** A listed row
   is an active holding with a figure in the selected mode, or an archived
@@ -379,13 +382,15 @@ The regions keep their order and stack, 20px apart.
   inside the card, never the page.
 - **Breakdown**: each bar's label moves above it, name left and amount
   right, over the shared zero baseline.
-- **Holdings table**: a list with no column headings. Each row holds the
+- **Holdings table**: below 890px of card width, a list with no column
+  headings. Each row holds the
   name with its chips beneath it at the left, and at the right the
   main-currency figure with any price date line, then the as-of date,
   preceded by the native figure where the unit is not the main currency.
-  An archived row reads as at desktop width. No row carries a row action:
-  a tap opens the holding's screen, which offers Record a value or
-  Unarchive.
+  An archived row reads as at desktop width. Above phone width the row
+  action sits beneath the figures at the right. At phone width no row
+  carries one: a tap opens the holding's screen, which offers Record a
+  value or Unarchive.
 
 #### States
 
@@ -1147,7 +1152,8 @@ rule of the chart (Archived holdings, Ranges and modes).
 63. (blind) (walk) At phone width no row, active or archived, carries a
     row action. Tapping an archived row opens the holding's screen
     offering Unarchive, and an active row's offering Record a value.
-    Test: `tests/browser/parts/dashboard.mjs`.
+    Test: `tests/browser/parts/dashboard.mjs`,
+    `tests/browser/parts/dashboard-review-ordinary-name.mjs`.
 64. (blind) (walk) The native-unit column shows an XAU-ozt holding
     stored as "12.125" and an m² holding stored as "80" as typed, while
     the converted column reads in whole units. Test:
@@ -1192,9 +1198,14 @@ rule of the chart (Archived holdings, Ranges and modes).
 73. (walk) At 320px, 375px, 601px, 901px and 1280px wide, a holding in
     the table and one under Not yet valued, each named with no space and
     wider than the screen, are shown whole inside the screen, and the
-    page never pans sideways. Test:
+    page never pans sideways. At 601px, 901px, 915px, 960px, 1024px and
+    1280px wide, holdings named "Cash account" or "Old dollar savings",
+    some in USD, and chips reading "Liquidity: Liquid investments" break
+    only between words. Test:
     `tests/browser/parts/dashboard-long-name.mjs`,
-    `tests/browser/parts/dashboard-review-long-name.mjs`.
+    `tests/browser/parts/dashboard-review-long-name.mjs`,
+    `tests/browser/parts/dashboard-ordinary-name.mjs`,
+    `tests/browser/parts/dashboard-review-ordinary-name.mjs`.
 74. (walk) Three holdings of 0.40 alone in their bands read 0, 0 and 0
     in the holdings table and in the breakdown, under a total of 1. Test:
     `tests/test_client.py::test_the_client_side_rules_hold`,
