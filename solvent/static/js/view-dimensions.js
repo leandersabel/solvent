@@ -429,21 +429,52 @@ function reorder(vault, cardId, to, count, build) {
   return writeProfile(vault, build(), cardId);
 }
 
+// A dialog field that refuses a blank commit on its own message line
+// (design-system.md, Components, Input), the error gone once something
+// is typed.
+function requiredField(id, name, blank) {
+  const line = el('p', { id: `${id}-line`, class: 'field-error message-line', 'aria-live': 'polite' });
+  const input = el('input', { id, type: 'text', 'aria-describedby': line.id });
+  const show = (message) => {
+    line.textContent = message;
+    if (message) input.setAttribute('aria-invalid', 'true');
+    else input.removeAttribute('aria-invalid');
+  };
+  input.addEventListener('input', () => {
+    if (input.value.trim()) show('');
+  });
+  return {
+    input,
+    field: el('div', { class: 'field' }, [el('label', { for: id, text: name }), input, line]),
+    // The trimmed text, or '' with the field refused.
+    take: () => input.value.trim() || (show(blank), ''),
+  };
+}
+
+// Takes every field, focusing the first one refused. The texts, or null.
+function takeAll(...fields) {
+  const texts = fields.map((f) => f.take());
+  const refused = fields.find((f, i) => !texts[i]);
+  if (!refused) return texts;
+  refused.input.focus();
+  return null;
+}
+
 function createDimension(vault) {
-  const label = el('input', { id: 'dimension-name', type: 'text' });
-  const first = el('input', { id: 'dimension-first-value', type: 'text' });
-  const create = (valueLabel) => {
+  const label = requiredField('dimension-name', 'Name', 'A name cannot be blank.');
+  const first = requiredField('dimension-first-value', 'First value', 'A value cannot be blank.');
+  const create = (name, valueLabel) => {
     close();
     const id = newId(vault);
     const value = { id: newId(vault, [id]), label: valueLabel, archivedAt: null };
-    writeProfile(vault, [...vault.dimensions, { id, label: label.value.trim(), archivedAt: null, values: [value] }], id);
+    writeProfile(vault, [...vault.dimensions, { id, label: name, archivedAt: null, values: [value] }], id);
   };
   const close = dialog({
     heading: 'Create a dimension',
     resume: resumable(reopenCreateDimension),
     body: [
-      el('div', { class: 'field' }, [el('label', { for: 'dimension-name', text: 'Name' }), label]),
-      el('div', { class: 'field' }, [el('label', { for: 'dimension-first-value', text: 'First value' }), first]),
+      label.field,
+      first.field,
       el('p', {
         class: 'hint',
         text: 'A dimension with one value is a flag, which the holding form renders as a checkbox.',
@@ -457,14 +488,16 @@ function createDimension(vault) {
         class: 'btn-secondary',
         text: 'Create a flag',
         onclick: () => {
-          if (label.value.trim()) create(label.value.trim());
+          const texts = takeAll(label);
+          if (texts) create(texts[0], texts[0]);
         },
       }),
       el('button', {
         class: 'btn-primary',
         text: 'Create',
         onclick: () => {
-          if (label.value.trim() && first.value.trim()) create(first.value.trim());
+          const texts = takeAll(label, first);
+          if (texts) create(...texts);
         },
       }),
     ],
@@ -472,22 +505,23 @@ function createDimension(vault) {
 }
 
 function addValue(vault, dimension) {
-  const label = el('input', { id: 'value-label', type: 'text' });
+  const label = requiredField('value-label', 'Label', 'A name cannot be blank.');
   const close = dialog({
     heading: `Add a value to ${dimension.label}`,
     resume: resumable(reopenAddValue, dimension.id),
-    body: [el('div', { class: 'field' }, [el('label', { for: 'value-label', text: 'Label' }), label])],
+    body: [label.field],
     actions: [
       el('button', { class: 'btn-secondary', text: 'Cancel', onclick: () => close() }),
       el('button', {
         class: 'btn-primary',
         text: 'Add',
         onclick: () => {
-          if (!label.value.trim()) return;
+          const texts = takeAll(label);
+          if (!texts) return;
           close();
           patch(vault, dimension.id, (d) => ({
             ...d,
-            values: [...d.values, { id: newId(vault), label: label.value.trim(), archivedAt: null }],
+            values: [...d.values, { id: newId(vault), label: texts[0], archivedAt: null }],
           }));
         },
       }),
