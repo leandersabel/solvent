@@ -218,8 +218,8 @@ await run(async () => {
     );
     await setValue('.dialog textarea', NOTE);
     // A value made inline, then a dimension made inline: each writes the
-    // profile first, and the holding is written once, last.
-    // Add with a field blank refuses that field on its own message line.
+    // profile first, and the holding is written once, last. Add with a
+    // field blank refuses that field on its own message line.
     const writesCount = () => page.eval('window.__writes.length');
     const refusal = (id) =>
       page.call((at) => {
