@@ -934,6 +934,7 @@ def test_review_a_default_context_with_the_ca_alone_trusts_the_stand_in(standin,
 def test_review_the_handshake_fails_under_any_other_name(standin, name):
     """Criterion 5."""
     context = ssl.create_default_context(cafile=str(standin.tls / "ca.pem"))
+    context.minimum_version = ssl.TLSVersion.TLSv1_2
     with socket.create_connection(("127.0.0.1", standin.port), timeout=10) as plain:
         with pytest.raises(ssl.SSLCertVerificationError):
             context.wrap_socket(plain, server_hostname=name)
