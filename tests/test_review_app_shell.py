@@ -43,7 +43,7 @@ from gunicorn.config import Config
 
 import solvent.rates as rates
 from solvent.guard import navigation
-from tests.helpers import CSRF, connect, register, rows
+from tests.helpers import CSRF, connect, register, rows, start_gunicorn
 from tests.test_deployment import REPO_ROOT, image_command
 from tests.test_review_nightly_harness import python_image  # noqa: F401
 
@@ -67,27 +67,18 @@ def test_the_image_runs_one_gthread_process_with_more_threads_than_lookups():
     assert config.threads > rates.LOOKUP_CONCURRENCY
 
 
-def free_port() -> int:
-    with socket.socket() as probe:
-        probe.bind(("127.0.0.1", 0))
-        return probe.getsockname()[1]
-
-
 @contextmanager
 def gunicorn(tmp_path, launcher: "list[str] | None" = None):
     """The image's gunicorn on a free loopback port, booted. Yields the
     port and the process, and leaves everything it printed on
     `process.output` once stopped."""
-    port = free_port()
-    argv = image_command()[1:]
-    argv[argv.index("--bind") + 1] = f"127.0.0.1:{port}"
     env = dict(
         os.environ,
         SECRET_KEY="review-app-shell-key",
         DATABASE_PATH=str(tmp_path / "solvent.db"),
     )
-    process = subprocess.Popen(
-        [sys.executable, *(launcher or ["-m", "gunicorn"]), *argv],
+    process, port = start_gunicorn(
+        [sys.executable, *(launcher or ["-m", "gunicorn"]), *image_command()[1:]],
         cwd=REPO_ROOT, env=env, stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True,
     )
     try:
@@ -321,9 +312,7 @@ def test_the_image_hands_gunicorn_solvents_server_config():
 def provoke(tmp_path, argv: "list[str]") -> str:
     """Run gunicorn with argv on loopback, send it every unreadable
     request and a wrong Auth Key from PEER, and return all it printed."""
-    port = free_port()
-    argv[argv.index("--bind") + 1] = f"127.0.0.1:{port}"
-    process = subprocess.Popen(
+    process, port = start_gunicorn(
         [sys.executable, "-m", "gunicorn", *argv],
         cwd=REPO_ROOT,
         env=dict(os.environ, SECRET_KEY="review-app-shell-key", DATABASE_PATH=str(tmp_path / "solvent.db")),

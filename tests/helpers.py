@@ -11,6 +11,7 @@ import contextlib
 import json
 import re
 import secrets
+import socket
 import sqlite3
 import subprocess
 import sys
@@ -290,3 +291,16 @@ def serve(env, log_path):
         finally:
             server.terminate()
             server.wait(timeout=10)
+
+
+def start_gunicorn(argv: "list[str]", **popen) -> "tuple[subprocess.Popen, int]":
+    """Start gunicorn with argv on a loopback port the kernel picks, and
+    return the process and the port. The socket is bound here and handed
+    over as `fd://`, so no other test worker can take the port between
+    picking it and gunicorn listening on it."""
+    with socket.socket() as held:
+        held.bind(("127.0.0.1", 0))
+        argv = list(argv)
+        argv[argv.index("--bind") + 1] = f"fd://{held.fileno()}"
+        process = subprocess.Popen(argv, pass_fds=[held.fileno()], **popen)
+        return process, held.getsockname()[1]

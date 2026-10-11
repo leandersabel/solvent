@@ -301,3 +301,126 @@ def test_a_session_fixture_is_refused_before_it_opens_chrome(tmp_path):
     assert "1 passed, 5 errors" in output, output
     assert "shared_browser outlives its module's network lock" in output, output
     assert [s["kind"] for s in spans if s["kind"] != "asked"] == ["docker"], spans
+
+
+# Loaded into a run of the real tests that start gunicorn. Each launch
+# is checked at the moment it starts: an address gunicorn binds itself
+# is a port any other worker could take first, and a socket handed down
+# must already hold its port in the test's own process.
+PORT_AUDIT = """
+import json
+import os
+import socket
+import subprocess
+
+OPTIONS = ("--bind", "-b")
+
+
+def binds(args):
+    found = []
+    for i, token in enumerate(args):
+        if token in OPTIONS and i + 1 < len(args):
+            found.append(args[i + 1])
+        elif token.startswith("--bind="):
+            found.append(token.split("=", 1)[1])
+        elif token.startswith("-b") and len(token) > 2 and not token.startswith("--"):
+            found.append(token[2:])
+    return found
+
+
+def taken(family, host, port, reuse):
+    other = socket.socket(family, socket.SOCK_STREAM)
+    try:
+        if reuse:
+            other.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
+        other.bind((host, port))
+    except OSError:
+        return True
+    finally:
+        other.close()
+    return False
+
+
+def problem(args, pass_fds, env):
+    if "bind" in (env or {}).get("GUNICORN_CMD_ARGS", ""):
+        return "binds through GUNICORN_CMD_ARGS"
+    addresses = binds(args)
+    if not addresses:
+        return "no bind, so gunicorn takes its fixed default port"
+    for address in addresses:
+        if address.startswith("unix:"):
+            continue
+        if not address.startswith("fd://"):
+            host, _, port = address.rpartition(":")
+            if not taken(socket.AF_INET, host.strip("[]") or "0.0.0.0", int(port), reuse=False):
+                return f"{address} was free when gunicorn started, so another worker could take it"
+            continue
+        fd = int(address[len("fd://"):])
+        if fd not in pass_fds:
+            return f"{address} is not handed to the child"
+        held = socket.socket(fileno=os.dup(fd))
+        try:
+            if held.type != socket.SOCK_STREAM or held.family not in (socket.AF_INET, socket.AF_INET6):
+                return f"{address} is not a TCP socket"
+            host, port = held.getsockname()[:2]
+            if not port:
+                return f"{address} holds no port"
+            for reuse in (False, True):
+                if not taken(held.family, host, port, reuse):
+                    return f"{address} holds port {port} loosely: another socket bound it (SO_REUSEADDR {reuse})"
+        finally:
+            held.close()
+    return None
+
+
+class Audited(subprocess.Popen):
+    def __init__(self, args, *rest, **kwargs):
+        listed = [str(a) for a in args] if isinstance(args, (list, tuple)) else [str(args)]
+        if any("gunicorn" in a for a in listed):
+            entry = {
+                "test": os.environ.get("PYTEST_CURRENT_TEST", ""),
+                "problem": problem(listed, tuple(kwargs.get("pass_fds", ())), kwargs.get("env")),
+            }
+            with open(os.environ["REVIEW_PORT_LOG"], "a") as log:
+                log.write(json.dumps(entry) + "\\n")
+        super().__init__(args, *rest, **kwargs)
+
+
+subprocess.Popen = Audited
+"""
+
+
+def gunicorn_test_files() -> list[str]:
+    """Every test file that starts gunicorn, itself or through another
+    file's helper."""
+    return sorted(
+        str(path.relative_to(REPO_ROOT)) for path in (REPO_ROOT / "tests").glob("test_*.py")
+        if path.name != Path(__file__).name
+        and "gunicorn" in (source := path.read_text())
+        and ("subprocess" in source or "from tests.test_review_app_shell import" in source)
+    )
+
+
+def test_no_test_that_starts_gunicorn_can_lose_its_port_to_another_worker(tmp_path):
+    """Issue 550: the real tests that start gunicorn, run in parallel,
+    with every launch checked as it starts. A port the test only named,
+    or a socket another bind could still share, fails the launch."""
+    files = gunicorn_test_files()
+    assert {"tests/test_deployment.py", "tests/test_review_app_shell.py"} <= set(files), files
+    (tmp_path / "port_audit.py").write_text(PORT_AUDIT)
+    log = tmp_path / "ports.jsonl"
+    env = dict(
+        os.environ,
+        PYTHONPATH=os.pathsep.join([str(tmp_path), str(REPO_ROOT)]),
+        REVIEW_PORT_LOG=str(log),
+    )
+    done = subprocess.run(
+        [sys.executable, "-m", "pytest", "-q", "-p", "no:cacheprovider", "-p", "port_audit",
+         "-n", "2", "--basetemp", str(tmp_path / "base"), *files],
+        cwd=REPO_ROOT, env=env, capture_output=True, text=True, timeout=600,
+    )
+    launches = [json.loads(line) for line in log.read_text().splitlines()] if log.exists() else []
+    assert launches, f"no gunicorn launch was seen:\n{done.stdout[-3000:]}"
+    failing = [launch for launch in launches if launch["problem"]]
+    assert not failing, failing
+    assert done.returncode == 0, done.stdout[-5000:] + done.stderr[-2000:]
