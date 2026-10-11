@@ -1152,7 +1152,8 @@ rule of the chart (Archived holdings, Ranges and modes).
 63. (blind) (walk) At phone width no row, active or archived, carries a
     row action. Tapping an archived row opens the holding's screen
     offering Unarchive, and an active row's offering Record a value.
-    Test: `tests/browser/parts/dashboard.mjs`.
+    Test: `tests/browser/parts/dashboard.mjs`,
+    `tests/browser/parts/dashboard-review-ordinary-name.mjs`.
 64. (blind) (walk) The native-unit column shows an XAU-ozt holding
     stored as "12.125" and an m² holding stored as "80" as typed, while
     the converted column reads in whole units. Test:
@@ -1203,7 +1204,8 @@ rule of the chart (Archived holdings, Ranges and modes).
     only between words. Test:
     `tests/browser/parts/dashboard-long-name.mjs`,
     `tests/browser/parts/dashboard-review-long-name.mjs`,
-    `tests/browser/parts/dashboard-ordinary-name.mjs`.
+    `tests/browser/parts/dashboard-ordinary-name.mjs`,
+    `tests/browser/parts/dashboard-review-ordinary-name.mjs`.
 74. (walk) Three holdings of 0.40 alone in their bands read 0, 0 and 0
     in the holdings table and in the breakdown, under a total of 1. Test:
     `tests/test_client.py::test_the_client_side_rules_hold`,
