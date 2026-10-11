@@ -3,10 +3,12 @@
 // spec/features/net-worth-view.md alone (Hero figure, At phone width,
 // and acceptance criterion 83). Above phone width the total stays clear
 // of gross assets and the change's arrow, amount and percentage share
-// one line. While the dashboard is narrower than 1000px the total and
-// the change hold a row of their own, gross assets and gross
-// liabilities sit at the left beneath them and New recording at the
-// right; from 1000px gross assets sit beside the total. At phone width
+// one line, and New recording stays clear of gross liabilities. While
+// the dashboard is narrower than 1100px the total and the change hold a
+// row of their own, gross assets and gross liabilities sit at the left
+// beneath them and New recording at the right, beside them or, when it
+// does not fit there, on a row of its own beneath them; from 1100px gross
+// assets sit beside the total. At phone width
 // the gross figures sit side by side in two equal columns, Which rates
 // spans the width beneath them and New recording, 48px tall, beneath
 // that. The page never pans sideways.
@@ -15,8 +17,8 @@ import { check, holdToday, holdings, page, plant, reloadModel, run, setProfile, 
 
 const PHONE = 600;
 // Window widths around the phone edge, the reported 901px and either
-// side of 1000px of dashboard width behind 40px gutters.
-const WIDE = [601, 700, 768, 820, 900, 901, 950, 1000, 1024, 1079, 1080, 1095, 1100, 1280, 1440];
+// side of 1100px of dashboard width behind 40px gutters.
+const WIDE = [601, 700, 768, 820, 900, 901, 950, 1000, 1024, 1080, 1100, 1150, 1179, 1180, 1181, 1200, 1280, 1440];
 const NARROW = [320, 375, 414, 600];
 
 // Each hero item's box, and the change's parts.
@@ -141,24 +143,27 @@ const heroHolds = async (width, scene) => {
   check(`net-worth-view 83: the change's arrow, amount and percentage read on one line, ${at}`,
     s.arrow && oneLine(s.pieces), `${s.changeText}: ${JSON.stringify(s.pieces)}`);
   check(`net-worth-view Hero figure: the total is drawn whole, ${at}`, !s.totalClipped, s.totalText);
-  check(`net-worth-view Hero figure: gross liabilities' figure stays clear of New recording, ${at}`,
+  check(`net-worth-view 83: New recording stays clear of gross liabilities, ${at}`,
     apart(s.liabilitiesInk, s.newRecording), JSON.stringify({ liabilities: s.liabilitiesInk, newRecording: s.newRecording }));
   for (const [name, other] of [['gross liabilities', s.liabilities], ['New recording', s.newRecording]]) {
     check(`net-worth-view Hero figure: the total and the change stay clear of ${name}, ${at}`,
       apart(s.total, other) && apart(s.change, other), detail);
   }
-  if (s.hero.width < 1000) {
+  if (s.hero.width < 1100) {
     const foot = Math.max(s.total.bottom, s.change.bottom);
-    check(`net-worth-view Hero figure: below 1000px the total and the change take a row of their own, ${at}`,
+    check(`net-worth-view Hero figure: below 1100px the total and the change take a row of their own, ${at}`,
       [s.assets, s.liabilities, s.newRecording].every((b) => b.top >= foot - 0.5), detail);
-    check(`net-worth-view Hero figure: below 1000px gross assets and liabilities sit at the left, side by side, ${at}`,
+    check(`net-worth-view Hero figure: below 1100px gross assets and liabilities sit at the left, side by side, ${at}`,
       s.assets.left < s.hero.left + s.hero.width / 4 && s.assets.right <= s.liabilities.left + 0.5 && near(s.assets.top, s.liabilities.top, 8), detail);
-    check(`net-worth-view Hero figure: below 1000px New recording sits at the right, ${at}`,
-      s.newRecording.left >= s.liabilities.right - 0.5 && near(s.newRecording.right, s.hero.right), detail);
+    const grossFoot = Math.max(s.assets.bottom, s.liabilities.bottom);
+    const beside = s.newRecording.left >= s.liabilities.right - 0.5 && s.newRecording.top < grossFoot;
+    const ownRow = s.newRecording.top >= grossFoot - 0.5;
+    check(`net-worth-view Hero figure: below 1100px New recording sits at the right, beside the gross figures or on a row of its own beneath them, ${at}`,
+      (beside || ownRow) && near(s.newRecording.right, s.hero.right), detail);
   } else {
-    check(`net-worth-view Hero figure: from 1000px gross assets sit beside the total, at its right, ${at}`,
+    check(`net-worth-view Hero figure: from 1100px gross assets sit beside the total, at its right, ${at}`,
       s.assets.left >= Math.max(s.total.right, s.change.right) - 0.5, detail);
-    check(`net-worth-view Hero figure: from 1000px the gross figures sit level with the foot of the total, ${at}`,
+    check(`net-worth-view Hero figure: from 1100px the gross figures sit level with the foot of the total, ${at}`,
       near(s.assetsInk.bottom, s.total.bottom, 8) && near(s.liabilitiesInk.bottom, s.total.bottom, 8),
       JSON.stringify({ total: s.total, assets: s.assetsInk, liabilities: s.liabilitiesInk }));
   }
