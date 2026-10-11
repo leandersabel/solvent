@@ -1288,7 +1288,7 @@ rule of the chart (Archived holdings, Ranges and modes).
     inside the plot, from 0% to 100%. Test:
     `tests/browser/parts/dashboard-one-day-percentage.mjs`,
     `tests/browser/parts/dashboard-review-one-day-percentage.mjs`.
-87. (walk) Where the hero holds one row, gross assets and gross
-    liabilities sit level with the foot of the total, and the change and
-    the date line beneath it. Test:
+87. (walk) While the dashboard is at least 1100px wide, gross assets
+    and gross liabilities sit level with the foot of the total, and the
+    change and the date line beneath it. Test:
     `tests/browser/parts/dashboard-hero-gross-level.mjs`.

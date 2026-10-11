@@ -1,4 +1,4 @@
-// Above phone width, wide enough for the hero to hold one row, gross
+// While the dashboard is at least 1100px wide, gross
 // assets and gross liabilities sit level with the foot of the total,
 // with the change and the date line beneath the total
 // (spec/features/net-worth-view.md, Hero figure, criterion 83).

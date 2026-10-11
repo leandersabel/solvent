@@ -1986,8 +1986,11 @@ select {
 
 /* While the hero holds one row, the figure's lines join its grid, so
    the two sides and the action sit level with the foot of the total
-   rather than of the change and the date line beneath it. */
-@media (min-width: 901px) {
+   rather than of the change and the date line beneath it. Only from
+   1100px of dashboard width, inside 40px gutters, does a total in the
+   tens of millions fit beside them, and narrower the total would run
+   over gross assets. */
+@media (min-width: 1180px) {
   .hero {
     grid-template-areas:
       "label . ."
