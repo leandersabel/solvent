@@ -1034,14 +1034,14 @@ th.numeric {
   white-space: nowrap;
 }
 
-/* Below 1000px of dashboard width a total and gross figures in the tens
+/* Below 1100px of dashboard width a total and gross figures in the tens
    of millions no longer fit on one row beside New recording, so the
    figure and its change take a row of their own, with its two sides and
    the action beneath. A container is as wide as it is told, never as its
    content, so the dashboard takes the full width it is given. */
 .dashboard { container: dashboard / inline-size; width: 100%; }
 
-@container dashboard (max-width: 999.98px) {
+@container dashboard (max-width: 1099.98px) {
   .hero {
     grid-template-columns: auto minmax(0, 1fr);
     grid-template-areas:

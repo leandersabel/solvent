@@ -100,7 +100,7 @@ pointer. At the right, level with the foot of the total, sit gross
 assets and gross liabilities under their own section labels, each set off
 by a hairline rule at its left, then New recording. Which rates takes its
 own row beneath, at the left. While the dashboard is narrower than
-1000px, the total and the change take a row of their own, with gross
+1100px, the total and the change take a row of their own, with gross
 assets and gross liabilities at the left beneath them and New recording
 at the right, because a total and gross figures in the tens of millions
 fit beside New recording only from that width. Every money figure on the screen is
