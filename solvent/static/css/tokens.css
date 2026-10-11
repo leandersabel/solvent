@@ -2328,12 +2328,13 @@ select {
 .inline-create {
   display: flex;
   flex-wrap: wrap;
-  align-items: center;
+  align-items: baseline;
   gap: 8px;
   margin-top: 8px;
 }
 
-.inline-create input { flex: 1 1 140px; width: auto; }
+/* A row each, so a refusal fits its message line on one line. */
+.inline-field { flex: 1 1 100%; }
 .new-dimension { margin-bottom: 16px; }
 
 .choice-group { display: flex; gap: 24px; margin-bottom: 16px; }

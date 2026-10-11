@@ -5,7 +5,7 @@
 // Nothing on this screen reads or writes an account record, so no
 // operation can fail partway across several of them.
 import * as writes from './writes.js';
-import { counted, dialog, el, inlineRename, resumable } from './dom.js';
+import { counted, dialog, el, inlineRename, requiredField, resumable, takeAll } from './dom.js';
 
 const CONFLICT = 'Your settings were changed in another tab.';
 const SAVE_FAILED = 'That did not save. Nothing changed.';
@@ -429,40 +429,9 @@ function reorder(vault, cardId, to, count, build) {
   return writeProfile(vault, build(), cardId);
 }
 
-// A dialog field that refuses a blank commit on its own message line
-// (design-system.md, Components, Input), the error gone once something
-// is typed.
-function requiredField(id, name, blank) {
-  const line = el('p', { id: `${id}-line`, class: 'field-error message-line', 'aria-live': 'polite' });
-  const input = el('input', { id, type: 'text', 'aria-describedby': line.id });
-  const show = (message) => {
-    line.textContent = message;
-    if (message) input.setAttribute('aria-invalid', 'true');
-    else input.removeAttribute('aria-invalid');
-  };
-  input.addEventListener('input', () => {
-    if (input.value.trim()) show('');
-  });
-  return {
-    input,
-    field: el('div', { class: 'field' }, [el('label', { for: id, text: name }), input, line]),
-    // The trimmed text, or '' with the field refused.
-    take: () => input.value.trim() || (show(blank), ''),
-  };
-}
-
-// Takes every field, focusing the first one refused. The texts, or null.
-function takeAll(...fields) {
-  const texts = fields.map((f) => f.take());
-  const refused = fields.find((f, i) => !texts[i]);
-  if (!refused) return texts;
-  refused.input.focus();
-  return null;
-}
-
 function createDimension(vault) {
-  const label = requiredField('dimension-name', 'Name', 'A name cannot be blank.');
-  const first = requiredField('dimension-first-value', 'First value', 'A value cannot be blank.');
+  const label = requiredField('dimension-name', 'A name cannot be blank.', { label: 'Name' });
+  const first = requiredField('dimension-first-value', 'A value cannot be blank.', { label: 'First value' });
   const create = (name, valueLabel) => {
     close();
     const id = newId(vault);
@@ -505,7 +474,7 @@ function createDimension(vault) {
 }
 
 function addValue(vault, dimension) {
-  const label = requiredField('value-label', 'Label', 'A name cannot be blank.');
+  const label = requiredField('value-label', 'A name cannot be blank.', { label: 'Label' });
   const close = dialog({
     heading: `Add a value to ${dimension.label}`,
     resume: resumable(reopenAddValue, dimension.id),

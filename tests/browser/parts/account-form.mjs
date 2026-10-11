@@ -218,12 +218,35 @@ await run(async () => {
     );
     await setValue('.dialog textarea', NOTE);
     // A value made inline, then a dimension made inline: each writes the
-    // profile first, and the holding is written once, last.
+    // profile first, and the holding is written once, last. Add with a
+    // field blank refuses that field on its own message line.
+    const writesCount = () => page.eval('window.__writes.length');
+    const refusal = (id) =>
+      page.call((at) => {
+        const input = document.getElementById(at);
+        const line = document.getElementById(input.getAttribute('aria-describedby'));
+        return `${input.getAttribute('aria-invalid')}|${line?.getAttribute('aria-live')}|${line?.textContent}`;
+      }, id);
     await choose('.dialog select[aria-label="Region"]', '__new__');
+    await inDialog('Add');
+    check(
+      'a blank new value is refused on its own field, writing nothing',
+      (await refusal('new-value-region01')) === 'true|polite|A value needs a name.' && (await writesCount()) === 0,
+      await refusal('new-value-region01'),
+    );
     await setValue('.dialog .inline-create input', 'Offshore');
     await inDialog('Add');
     await page.waitUntil("[...document.querySelectorAll('.dialog select[aria-label=\"Region\"] option')].some(o => o.textContent === 'Offshore' && o.selected)", { label: 'the new value, selected' });
     await page.eval("[...document.querySelectorAll('.dialog button')].find(b => b.textContent === '+ New dimension').click()");
+    await inDialog('Add');
+    check(
+      'a blank new dimension refuses its name and its first value on their own fields, the name focused',
+      (await refusal('new-dimension-name')) === 'true|polite|A dimension needs a name.' &&
+        (await refusal('new-dimension-first-value')) === 'true|polite|A dimension needs a first value.' &&
+        (await page.eval("document.activeElement.id")) === 'new-dimension-name' &&
+        (await writesCount()) === 1,
+      `${await refusal('new-dimension-name')} ${await refusal('new-dimension-first-value')}`,
+    );
     await page.call((axisLabel, bandLabel) => {
       const inputs = document.querySelectorAll('.dialog .new-dimension input');
       inputs[0].value = axisLabel;
