@@ -2335,6 +2335,8 @@ select {
 
 .inline-field { flex: 1 1 140px; }
 .new-dimension { margin-bottom: 16px; }
+/* A row each, so a refusal fits its message line on one line. */
+.new-dimension .inline-field { flex-basis: 100%; }
 
 .choice-group { display: flex; gap: 24px; margin-bottom: 16px; }
 .choice-section { margin-bottom: 8px; }

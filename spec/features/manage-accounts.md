@@ -137,7 +137,8 @@ so it stacks at phone width.
     click.
   - **`+ New value`** at the foot of each select appends a value to that
     dimension in the profile and selects it. **`+ New dimension`**
-    beneath the block asks for a dimension label and a first value.
+    beneath the block asks for a dimension label and a first value, each
+    on a row of its own above Add and Cancel.
     Add with a field blank is refused on that field's message line
     (design-system.md, Components, Input), with the first refused field
     focused: "A value needs a name.", "A dimension needs a name." or "A
@@ -935,4 +936,5 @@ Unarchiving and archiving it again writes the zero at the new D.
 68. (walk) Add with a blank `+ New value` field, or a blank Dimension
     name or First value under `+ New dimension`, refuses each blank
     field on its own message line, marks it invalid and writes nothing.
-    Test: `tests/browser/parts/account-form.mjs`.
+    Test: `tests/browser/parts/account-form.mjs`,
+    `tests/browser/parts/account-form-review-blank-create.mjs`.
