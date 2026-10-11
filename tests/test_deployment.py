@@ -20,8 +20,10 @@ import time
 from datetime import datetime, timedelta, timezone
 from pathlib import Path
 
+import pytest
+
 import solvent.rates as rates
-from tests.helpers import CSRF, register_body
+from tests.helpers import CSRF, register_body, start_gunicorn
 
 REPO_ROOT = Path(__file__).resolve().parent.parent
 DOCKERFILE = (REPO_ROOT / "Dockerfile").read_text()
@@ -83,22 +85,32 @@ def test_one_gthread_process_serves_more_requests_than_lookups_can_hold():
     assert int(command[command.index("--threads") + 1]) > rates.LOOKUP_CONCURRENCY
 
 
+def test_no_other_socket_can_take_a_test_servers_port_before_it_listens():
+    """Issue 550: the port start_gunicorn returns is already bound to
+    the server it started, here one that has not listened yet."""
+    server, port = start_gunicorn(
+        [sys.executable, "-c", "import time; time.sleep(60)", "--bind", "unset"],
+    )
+    try:
+        with socket.socket() as other, pytest.raises(OSError):
+            other.bind(("127.0.0.1", port))
+    finally:
+        server.kill()
+        server.wait()
+
+
 def test_requests_held_open_as_long_as_lookups_can_be_leave_the_instance_answering(tmp_path):
     """The real gunicorn, started with the image's arguments, with as
     many requests stalled halfway as lookups can send at once. Each holds
     a request thread as a lookup waiting on a slow source does, and the
     sign-in page still answers at once."""
-    with socket.socket() as probe:
-        probe.bind(("127.0.0.1", 0))
-        port = probe.getsockname()[1]
     argv = image_command()[1:]
-    argv[argv.index("--bind") + 1] = f"127.0.0.1:{port}"
     env = dict(
         os.environ,
         SECRET_KEY="deployment-test-key",
         DATABASE_PATH=str(tmp_path / "solvent.db"),
     )
-    server = subprocess.Popen(
+    server, port = start_gunicorn(
         [sys.executable, "-m", "gunicorn", *argv],
         cwd=REPO_ROOT, env=env, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL,
     )
@@ -141,11 +153,7 @@ def serve_and_provoke(tmp_path, *, log_level: "str | None" = None, stock: bool =
     Key, and return everything it printed and each raw answer by name.
     `stock` drops Solvent's server config, leaving gunicorn's own error
     handler."""
-    with socket.socket() as probe:
-        probe.bind(("127.0.0.1", 0))
-        port = probe.getsockname()[1]
     argv = image_command()[1:]
-    argv[argv.index("--bind") + 1] = f"127.0.0.1:{port}"
     if log_level:
         argv[argv.index("--log-level") + 1] = log_level
     if stock:
@@ -155,7 +163,7 @@ def serve_and_provoke(tmp_path, *, log_level: "str | None" = None, stock: bool =
         SECRET_KEY="deployment-test-key",
         DATABASE_PATH=str(tmp_path / "solvent.db"),
     )
-    server = subprocess.Popen(
+    server, port = start_gunicorn(
         [sys.executable, "-m", "gunicorn", *argv],
         cwd=REPO_ROOT, env=env, stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True,
     )
@@ -242,11 +250,7 @@ def test_no_invite_token_reaches_the_containers_standard_output_or_error(tmp_pat
     """The real gunicorn, started with the image's arguments, over both
     ways to make an invite and every state /register can answer. Read
     only after it stops, so a late line is still a line."""
-    with socket.socket() as probe:
-        probe.bind(("127.0.0.1", 0))
-        port = probe.getsockname()[1]
     argv = image_command()[1:]
-    argv[argv.index("--bind") + 1] = f"127.0.0.1:{port}"
     database = str(tmp_path / "solvent.db")
     env = dict(os.environ, SECRET_KEY="deployment-test-key", DATABASE_PATH=database)
 
@@ -276,7 +280,7 @@ def test_no_invite_token_reaches_the_containers_standard_output_or_error(tmp_pat
         return cookie
 
     first = cli("--kind", "administrator")
-    server = subprocess.Popen(
+    server, port = start_gunicorn(
         [sys.executable, "-m", "gunicorn", *argv],
         cwd=REPO_ROOT, env=env, stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True,
     )
