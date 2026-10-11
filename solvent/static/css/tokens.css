@@ -1036,23 +1036,20 @@ th.numeric {
 
 /* Below 1100px of dashboard width a total and gross figures in the tens
    of millions no longer fit on one row beside New recording, so the
-   figure and its change take a row of their own, with its two sides and
-   the action beneath. A container is as wide as it is told, never as its
+   figure and its change take a row of their own, with its two sides
+   beneath and the action at their right, or on a row of its own when
+   both do not fit. A container is as wide as it is told, never as its
    content, so the dashboard takes the full width it is given. */
 .dashboard { container: dashboard / inline-size; width: 100%; }
 
 @container dashboard (max-width: 1099.98px) {
-  .hero {
-    grid-template-columns: auto minmax(0, 1fr);
-    grid-template-areas:
-      "main main"
-      "parts action"
-      "rates rates";
-  }
+  .hero { display: flex; flex-wrap: wrap; align-items: flex-end; }
+  .hero-main,
+  .hero-rates { flex-basis: 100%; }
 
   .hero-parts { border-left: 0; }
   .hero-part:first-child { padding-left: 0; }
-  .hero-action { justify-self: end; }
+  .hero-action { margin-left: auto; }
 }
 
 /* The holding screen's header figure, a size down from the hero. */
@@ -2175,6 +2172,7 @@ select {
   .dashboard { gap: 20px; }
 
   .hero {
+    display: grid;
     grid-template-columns: minmax(0, 1fr);
     grid-template-areas: "main" "parts" "rates" "action";
     gap: 12px;
@@ -2198,7 +2196,7 @@ select {
   .hero-part { padding: 0; gap: 4px; }
   .hero-part + .hero-part { border-left: 0; }
   .hero-part-value { font-size: 16px; white-space: normal; }
-  .hero-action { justify-self: stretch; }
+  .hero-action { justify-self: stretch; margin-left: 0; }
   .hero-action .btn-primary { width: 100%; min-height: 48px; }
 
   .switch { display: flex; width: 100%; }
