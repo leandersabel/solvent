@@ -1482,6 +1482,17 @@ th.numeric {
 .sweep-pair { grid-column: 2 / -1; }
 .sweep-pair .flag-note { display: flex; justify-content: space-between; gap: 8px; }
 
+/* Below 720px of card width the field and control columns leave the
+   name too narrow to read whole, so the row stacks, as the rate lines
+   do. */
+.sweep-rows { container-type: inline-size; }
+
+@container (max-width: 719.98px) {
+  .sweep-row { grid-template-columns: minmax(0, 1fr); gap: 10px; padding: 16px; }
+  .sweep-input .hint { text-align: left; }
+  .sweep-pair { grid-column: 1 / -1; }
+}
+
 .value-row {
   display: flex;
   align-items: center;
@@ -2237,9 +2248,7 @@ select {
 
   .sweep-head { margin-bottom: 20px; }
 
-  .sweep-row { grid-template-columns: minmax(0, 1fr); gap: 10px; padding: 16px; }
   .quantity-field { min-height: 44px; }
-  .sweep-input .hint { text-align: left; }
 
   .pair { grid-template-columns: minmax(0, 1fr); gap: 4px; }
   .idle-grid { grid-template-columns: minmax(0, 1fr); gap: 6px; }
