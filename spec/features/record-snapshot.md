@@ -478,8 +478,10 @@ rule.
 - **The date was emptied while you were working**: another window
   deleted this recording before a rate-lines save. Nothing is written,
   and the screen reloads to a date holding nothing, with no rate-lines
-  save. What was typed stays, on the lines and in the rows. A Callout
-  under the date heading, with the critical icon:
+  save. Its rate lines read as on such a date, with its proposals, so a
+  price typed over a proposal still reads "Edited from" it and no line
+  says no rate was recorded. What was typed stays, on the lines and in
+  the rows. A Callout under the date heading, with the critical icon:
 
   > Another window deleted the recording for 31 July. Your prices were
   > not saved. They are still here and are saved with the first holding

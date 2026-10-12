@@ -63,10 +63,12 @@ export function sweepView(vault, date, actions = {}) {
   // row recorded to carry.
   const callout = el('p', { class: 'callout callout-critical', role: 'status', hidden: true });
   const emptied = (restore) => {
-    restore();
     // The date holds nothing again, so the first row recorded claims it
-    // and writes its prices as on any empty date.
+    // and writes its prices as on any empty date, and the lines read as
+    // on one, proposals included.
     Object.assign(sit, { dateWasEmpty: true, claimed: false, refreshed: false });
+    restore();
+    propose();
     syncSave();
     mount(callout, [
       icon('alert'),
@@ -147,13 +149,16 @@ export function sweepView(vault, date, actions = {}) {
   // A date holding nothing arrives with its rate lines filled in by the
   // proposals for it. A reopened recording asks the source nothing on
   // arrival: the figures there may be ones the person chose.
-  if (sit.dateWasEmpty && !sit.proposals && writes.needsLookup(vault, date)) {
-    sit.proposals = writes.fetchProposals(vault, date);
-  }
-  if (sit.proposals) {
-    block.waiting();
-    sit.proposals.then((proposals) => block.showProposals(proposals));
-  }
+  const propose = () => {
+    if (sit.dateWasEmpty && !sit.proposals && writes.needsLookup(vault, date)) {
+      sit.proposals = writes.fetchProposals(vault, date);
+    }
+    if (sit.proposals) {
+      block.waiting();
+      sit.proposals.then((proposals) => block.showProposals(proposals));
+    }
+  };
+  propose();
 
   const ensurePrices = async () => {
     if (sit.refreshed) return;

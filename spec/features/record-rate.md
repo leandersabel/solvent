@@ -636,3 +636,11 @@ silently.
     keeps the typed figure and the refusal, the screen names the unit
     as not updated, and the rate-lines save is offered once the price
     fits. Test: `tests/browser/parts/update-values.mjs`.
+45. (walk) With a sweep reopened on a recording, a price typed over its
+    proposal, and a second session then deleting every record at that
+    date, a rate-lines save leaves the line reading "Edited from" the
+    date's proposal, with no Look it up and no sentence that no rate was
+    recorded. Recording the next row then stores that price as `edited`
+    with that proposal as `proposedRate`. Test:
+    `tests/browser/parts/update-values.mjs`,
+    `tests/browser/parts/update-values-review-reopened-emptied.mjs`.
