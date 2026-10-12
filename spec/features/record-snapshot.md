@@ -823,7 +823,9 @@ The same Dialog, prefilled with the stored value, date and note.
   - Once a save writes the figure, closing names nothing, because the
     form's own message already named what did not save.
   - A lock is not leaving: the form comes back after the unlock with
-    what was typed and no notice (`login.md`, Rules).
+    what was typed and no notice (`login.md`, Rules). When the address
+    changed while locked, the form was left with its screen, and the
+    screen the unlock lands on names what it held.
 
   The notice is shown once and never stored.
 
@@ -1688,9 +1690,11 @@ Editing an existing entry).
 91. (walk) Closing the single-holding form with a typed price or figure
     unsaved writes nothing, and the screen it closes onto names the
     holding and the unit left. Back or an address changed by hand
-    closes it the same way. A lock and unlock in between shows no
-    notice. Test: `tests/browser/parts/snapshot-entry.mjs`,
+    closes it the same way, also while locked. A lock and unlock in
+    between at the same address shows no notice. Test:
+    `tests/browser/parts/snapshot-entry.mjs`,
     `tests/browser/parts/snapshot-entry-back.mjs`,
+    `tests/browser/parts/snapshot-entry-review-back.mjs`,
     `tests/browser/parts/snapshot-entry-review-leave.mjs`,
     `tests/browser/parts/unlock-lock.mjs`.
 92. (walk) A move to a date that held no record when the Dialog showed

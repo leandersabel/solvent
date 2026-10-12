@@ -1,9 +1,9 @@
 // Snapshot entry, Closing with changes unsaved
 // (spec/features/record-snapshot.md, criterion 91): Back, or an address
-// changed by hand, leaves the single-holding form as a link would. The
-// form closes, writes nothing, and the screen arrived at names what was
-// left.
-import { check, run } from '../harness.mjs';
+// changed by hand, leaves the single-holding form as a link would, also
+// while locked. The form closes, writes nothing, and the screen arrived
+// at names what was left.
+import { RECORDER_PASSWORD, check, enterPasswordOn, run } from '../harness.mjs';
 import { startRecorder } from '../recorder.mjs';
 
 await run(async () => {
@@ -33,18 +33,29 @@ await run(async () => {
   const DA = ago(37);
   const expected = `You left the entry for ${await format('longDate', DA)} ${LEFT}: Current account.`;
 
+  const backLocked = async () => {
+    await ev("document.querySelector('.btn-lock').click()");
+    await rec.waitUntil("document.querySelector('#unlock-password')", { label: 'the password card' });
+    await leave('history.back()', `#/recording/${D1}`);
+    await enterPasswordOn(rec, RECORDER_PASSWORD);
+    await rec.waitUntil("!document.querySelector('#unlock-password')", { timeout: 90000, label: 'the vault after unlocking' });
+    await rec.frames();
+    await quiet();
+  };
+
   const cases = [
-    ['Back', 'history.back()', `#/recording/${D1}`],
-    ['an address typed by hand', `location.hash = '#/recording/${D1}'`, `#/recording/${D1}`],
+    ['Back', () => leave('history.back()', `#/recording/${D1}`)],
+    ['an address typed by hand', () => leave(`location.hash = '#/recording/${D1}'`, `#/recording/${D1}`)],
+    ['Back while locked', backLocked],
   ];
-  for (const [name, how, hash] of cases) {
+  for (const [name, how] of cases) {
     await go(`#/recording/${D1}`);
     await go(`#/holding/${id['Current account']}`);
     await openForm('Current account');
     await setDate(DA);
     await set('#snapshot-value', '123');
     traffic.length = 0;
-    await leave(how, hash);
+    await how();
     const dialogs = await ev("document.querySelectorAll('.dialog').length");
     const shown = await leftNotices();
     check(
@@ -53,4 +64,4 @@ await run(async () => {
       JSON.stringify({ dialogs, shown, writes: writesSent().map((t) => t.method) }),
     );
   }
-}, { signsIn: false });
+});

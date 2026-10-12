@@ -391,9 +391,12 @@ function actionsFor(vault) {
 
 /** Back where the lock found the person: the same screen, which the
  *  address already restores, with what they had typed into it, and
- *  each form they had open reopened against the new vault. The values
- *  wait a turn for the parts of a form that fill in asynchronously,
- *  such as the unit list. */
+ *  each form they had open reopened against the new vault. Where the
+ *  address moved while locked, the forms were left with their screen:
+ *  each reopens only to close as leaving it would, so the screen
+ *  arrived at names what it held unsaved. The values wait a turn for
+ *  the parts of a form that fill in asynchronously, such as the unit
+ *  list. */
 function resumeHeld() {
   if (!held) return;
   const { hash, fields, dialogs } = held;
@@ -401,8 +404,10 @@ function resumeHeld() {
   const vault = currentVault();
   setTimeout(() => {
     if (!isUnlocked()) return;
-    if (hash === window.location.hash) restoreFields(container, fields);
+    const stayed = hash === window.location.hash;
+    if (stayed) restoreFields(container, fields);
     reopenDialogs(dialogs, { vault, ...actionsFor(vault) });
+    if (!stayed) closeDialogs();
   }, 0);
 }
 
