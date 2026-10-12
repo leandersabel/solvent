@@ -37,6 +37,7 @@ export function dashboardView(vault, actions, { unassignedOf = null, replaced = 
     justTheLine: false,
     mode: 'latest',
     showArchived: false,
+    sort: 'added',
     hidden: new Set(),
     unassignedOnly: Boolean(known),
     // A span dragged across the chart, as its earlier and later day.
@@ -585,6 +586,7 @@ export function holdingGroups(vault, state, grouping) {
 function holdingsTable(vault, state, render, actions, grouping) {
   const dimensions = vault.activeDimensions();
   const { rows, unpriced, unvalued } = holdingGroups(vault, state, grouping);
+  sortRows(rows, state.sort);
   const newestRate = vault.newestRateDate();
   const filtering = state.unassignedOnly && grouping;
   const listed = rows.length + unpriced.length + unvalued.length > 0;
@@ -601,12 +603,18 @@ function holdingsTable(vault, state, render, actions, grouping) {
   return el('section', { class: 'card holdings-card' }, [
     el('div', { class: 'card-head' }, [
       el('h2', { class: 'section-heading', text: 'Holdings' }),
-      el('label', { class: 'checkbox checkbox-inline' }, [
-        checkbox(state.showArchived, (on) => {
-          state.showArchived = on;
-          render();
-        }),
-        el('span', { text: 'Show archived' }),
+      el('div', { class: 'holdings-controls' }, [
+        el('label', { class: 'field-inline' }, [
+          el('span', { text: 'Sort' }),
+          sortSelect(state, render),
+        ]),
+        el('label', { class: 'checkbox checkbox-inline' }, [
+          checkbox(state.showArchived, (on) => {
+            state.showArchived = on;
+            render();
+          }),
+          el('span', { text: 'Show archived' }),
+        ]),
       ]),
     ]),
     filtering
@@ -732,6 +740,32 @@ function holdingsTable(vault, state, render, actions, grouping) {
       }),
     ]),
   ]);
+}
+
+function sortSelect(state, render) {
+  const select = el('select', {}, [
+    el('option', { value: 'added', text: 'Order added' }),
+    el('option', { value: 'oldest', text: 'As of, oldest first' }),
+    el('option', { value: 'newest', text: 'As of, newest first' }),
+  ]);
+  select.value = state.sort;
+  select.addEventListener('change', () => {
+    state.sort = select.value;
+    render();
+  });
+  return select;
+}
+
+/** Orders the rows by As of in place. The sort is stable, so rows of
+ *  one date keep the order added, and a row with no As of, an archived
+ *  holding never valued, comes last either way. */
+function sortRows(rows, order) {
+  if (order === 'added') return;
+  const sign = order === 'oldest' ? 1 : -1;
+  rows.sort(({ value: a }, { value: b }) => {
+    if (!a.asOf || !b.asOf) return Boolean(b.asOf) - Boolean(a.asOf);
+    return a.asOf < b.asOf ? -sign : a.asOf > b.asOf ? sign : 0;
+  });
 }
 
 function group(title, holdings, vault, actions, explanation) {

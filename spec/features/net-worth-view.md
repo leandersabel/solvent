@@ -307,8 +307,8 @@ a sum.
 
 #### Holdings table
 
-The section heading holds the left of the card's head row and the "Show
-archived" toggle the right. Columns: Name, Dimensions, Latest value
+The section heading holds the left of the card's head row, and Sort and
+the "Show archived" toggle the right, in that order. Columns: Name, Dimensions, Latest value
 (native unit), In main currency, As of, row action, while the card is at
 least 890px wide. Below that the table becomes the list At phone width
 describes, because the figure, date and action columns leave the name
@@ -331,8 +331,13 @@ and chips too narrow to break only between words.
 - **A holding's name wraps wherever it must**, in the table and in both
   groups, and is shown whole. A name with no space breaks inside the word
   rather than widen the page, at any width.
-- Rows in creation order, oldest first. A row never moves because its
-  figure changed.
+- **Sort** is a select labeled "Sort" that orders the rows at every
+  width: "Order added", oldest first, "As of, oldest first" and "As of,
+  newest first". The screen opens on Order added. Rows with the same As
+  of keep the order they were added in, and an archived row with no As
+  of comes last in both As of orders. Under Order added a row never
+  moves because its figure changed. The groups keep the order added,
+  because they carry no date.
 - **As of is the date of the quantity, never of the rate**, shown plainly
   at any age.
 - **A price date line** (design-system.md, Components) sits beneath the
@@ -1254,3 +1259,9 @@ rule of the chart (Archived holdings, Ranges and modes).
     holding at zero, and under a dimension. Test:
     `tests/test_client.py::test_the_client_side_rules_hold`,
     `tests/browser/parts/dashboard-review-percentage-fill.mjs`.
+83. (walk) At 1280px and at 375px, Sort "As of, oldest first" lists the
+    rows by As of from the oldest, rows of the same As of in the order
+    added, "As of, newest first" from the newest, an archived row with no
+    As of last in both, and "Order added" lists them in the order added
+    again. The screen opens on Order added. Test:
+    `tests/browser/parts/dashboard-fixtures.mjs`.

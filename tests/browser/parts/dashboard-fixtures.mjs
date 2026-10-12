@@ -1,11 +1,12 @@
 // The dashboard drawn over vaults built to the byte, in the page's own
 // modules (spec/features/net-worth-view.md): the chart's data table, its
-// value ticks and the holdings card with every holding archived. No
+// value ticks, the holdings card with every holding archived and its
+// Sort. No
 // account is signed in; each fixture is the model's, handed straight to
 // the dashboard view the app renders.
 // Templates: dashboard.html. Modules: view-dashboard.js, chart.js,
 // model.js, format.js.
-import { BASE, check, click, page, run } from '../harness.mjs';
+import { BASE, check, choose, click, page, run } from '../harness.mjs';
 
 await run(async () => {
   await page.goto(`${BASE}/login`);
@@ -265,4 +266,37 @@ await run(async () => {
       shownArchive.rows.join('|') === 'Gone one:true|Gone two:true',
     JSON.stringify(shownArchive),
   );
+
+  // ---- Sort ------------------------------------------------------------------
+
+  // Added in this order, with two holdings of one As of and an archived
+  // holding never valued.
+  await show({
+    today: '2026-06-30',
+    holdings: [
+      { name: 'Late', unit: 'CHF' },
+      { name: 'Early', unit: 'CHF' },
+      { name: 'Never', unit: 'CHF', archivedAt: '2026-03-01' },
+      { name: 'Tie', unit: 'CHF' },
+      { name: 'Middle', unit: 'CHF' },
+    ],
+    figures: [['Late', '2026-05-01', '1'], ['Early', '2025-01-01', '1'], ['Tie', '2025-01-01', '1'], ['Middle', '2025-06-01', '1']],
+  });
+  const opened = await page.eval("document.querySelector('.holdings-card select').value");
+  await page.eval("document.querySelector('.holdings-card input[type=checkbox]').click()");
+  const ORDERS = [
+    ['added', 'Late|Early|Never|Tie|Middle'],
+    ['oldest', 'Early|Tie|Middle|Late|Never'],
+    ['newest', 'Late|Middle|Early|Tie|Never'],
+    ['added', 'Late|Early|Never|Tie|Middle'],
+  ];
+  for (const width of [1280, 375]) {
+    await page.send('Emulation.setDeviceMetricsOverride', { width, height: 900, deviceScaleFactor: 1, mobile: width < 600 });
+    for (const [order, expected] of ORDERS) {
+      await choose('.holdings-card select', order);
+      const listed = await page.eval("[...document.querySelectorAll('.holdings-card tbody .row-name')].map((n) => n.textContent).join('|')");
+      check(`net-worth-view 83: at ${width}px Sort ${order} lists ${expected}`, listed === expected, listed);
+    }
+  }
+  check('net-worth-view 83: the screen opens on Order added', opened === 'added', opened);
 }, { signsIn: false });
