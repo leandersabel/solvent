@@ -639,7 +639,8 @@ silently.
 45. (walk) With a sweep reopened on a recording, a price typed over its
     proposal, and a second session then deleting every record at that
     date, a rate-lines save leaves the line reading "Edited from" the
-    proposal, with no Look it up and no sentence that no rate was
+    date's proposal, with no Look it up and no sentence that no rate was
     recorded. Recording the next row then stores that price as `edited`
-    with the proposal as `proposedRate`. Test:
-    `tests/browser/parts/update-values.mjs`.
+    with that proposal as `proposedRate`. Test:
+    `tests/browser/parts/update-values.mjs`,
+    `tests/browser/parts/update-values-review-reopened-emptied.mjs`.
