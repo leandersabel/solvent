@@ -296,7 +296,9 @@ function draw() {
   const vault = currentVault();
   const arrived = drawnHash !== window.location.hash;
   drawnHash = window.location.hash;
-  const shown = route(window.location.hash, today(), (date) => vault.holdsRecording(date));
+  const named = route(window.location.hash, today(), (date) => vault.holdsRecording(date));
+  // A filtered dashboard names a dimension the vault holds, or no page.
+  const shown = named?.view === 'unassigned' && !vault.activeDimensions().some((d) => d.id === named.argument) ? null : named;
   // The notice is the dashboard's, and goes once the person leaves it.
   if (shown?.view !== 'dashboard' && shown?.view !== 'unassigned') sinceOpen = null;
   if (!shown) {

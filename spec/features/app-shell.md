@@ -581,12 +581,14 @@ Every screen past the unlock gate is a hash route of the one vault
 page. The hash is input the person, a link or a bookmark can set to
 anything, so `routes.js` reads it against a closed table before any
 screen draws, a pure function of the hash, the device's today and
-whether a stored record carries a given date:
+whether a stored record carries a given date. The vault page then
+checks a filtered dashboard's dimension against the vault's active
+dimensions:
 
 | Hash | Screen |
 |---|---|
 | empty, `#/` | Dashboard |
-| `#/unassigned/<dimension>` | Dashboard, filtered |
+| `#/unassigned/<dimension>` | Dashboard, filtered, when `<dimension>` is an active dimension of the vault |
 | `#/settings`, `#/settings/dimensions`, `#/settings/export-import` | Settings and its pages |
 | `#/holding/<id>`, `#/holding/<id>/edit` | The holding |
 | `#/sweep/<date>` | Update values, when `<date>` is a recorded day |
@@ -938,7 +940,8 @@ dashboard.
     sweep only at a recorded day. Test:
     `tests/test_client.py::test_the_client_side_rules_hold`.
 84. (walk) An address inside the vault that names no screen, a sweep at
-    a date that does not exist or is still to come among them, shows
+    a date that does not exist or is still to come and a filtered
+    dashboard naming no dimension of the vault among them, shows
     "There is no page at this address." with Go to Solvent and Lock,
     writes nothing, and Go to Solvent opens the dashboard still
     unlocked. Test: `tests/browser/parts/error-page.mjs`.

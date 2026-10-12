@@ -25,21 +25,20 @@ const RANGES = [
  *  above everything else: the vault was replaced from a file while this
  *  page was locked or its session had ended. */
 export function dashboardView(vault, actions, { unassignedOf = null, replaced = null } = {}) {
-  const known = unassignedOf && vault.activeDimensions().some((d) => d.id === unassignedOf);
   // A year of history or more opens on a year, anything shorter on all
   // of it. History is what the chart draws, from the oldest snapshot.
   const history = vault.chartRange(null);
   const short = !history || history.lastDay - history.fromDay < 365;
   const state = {
     range: short ? 'All' : '1Y',
-    dimensionId: known ? unassignedOf : '',
+    dimensionId: unassignedOf ?? '',
     percentage: false,
     justTheLine: false,
     mode: 'latest',
     showArchived: false,
     sort: 'added',
     hidden: new Set(),
-    unassignedOnly: Boolean(known),
+    unassignedOnly: Boolean(unassignedOf),
     // A span dragged across the chart, as its earlier and later day.
     selection: null,
   };

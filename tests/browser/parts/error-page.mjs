@@ -81,10 +81,11 @@ await run(async () => {
       // app-shell.md, Addresses inside the vault: an address the vault
       // page has no screen for shows the missing variant in place, with
       // the vault still unlocked, and a sweep at a day that has not
-      // passed, or does not exist, is no screen.
+      // passed, or does not exist, is no screen, and so is a filtered
+      // dashboard naming no dimension the vault holds.
       const records = () => sql(`SELECT COUNT(*) AS n FROM records ${OWN}`)[0].n;
       const before = records();
-      for (const hash of ['#/nonsense', '#/holdings', '#/admin', '#/sweep/garbage', '#/sweep/2099-01-01', '#/sweep/2026-02-30']) {
+      for (const hash of ['#/nonsense', '#/holdings', '#/admin', '#/sweep/garbage', '#/sweep/2099-01-01', '#/sweep/2026-02-30', '#/unassigned/doesnotexist']) {
         await owner.session.call((to) => { location.hash = to; }, hash);
         await owner.session.waitUntil(
           () => document.querySelector('#app h1')?.textContent === 'There is no page at this address.',
