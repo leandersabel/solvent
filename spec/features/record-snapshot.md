@@ -805,11 +805,11 @@ The same Dialog, prefilled with the stored value, date and note.
   date.
 - **Saved**: the Dialog closes and the dashboard updates from local
   state with no refetch.
-- **Closing with changes unsaved**: by Cancel, by Escape, or by a link
-  that opens a recording. Nothing blocks leaving and nothing is
-  written, as on the sweep. The screen the form closes onto, or the
-  recording it opens, carries a critical notice at its head naming
-  what was left:
+- **Closing with changes unsaved**: by Cancel, by Escape, by a link
+  that opens a recording, or by Back, Forward or an address changed by
+  hand. Nothing blocks leaving and nothing is written, as on the sweep.
+  The screen the form closes onto, or the one the address now names,
+  carries a critical notice at its head naming what was left:
 
   > You left the entry for 31 July 2026 with changes that were not
   > saved: Current account and the USD rate.
@@ -823,7 +823,9 @@ The same Dialog, prefilled with the stored value, date and note.
   - Once a save writes the figure, closing names nothing, because the
     form's own message already named what did not save.
   - A lock is not leaving: the form comes back after the unlock with
-    what was typed and no notice (`login.md`, Rules).
+    what was typed and no notice (`login.md`, Rules). When the address
+    changed while locked, the form was left with its screen, and the
+    screen the unlock lands on names what it held.
 
   The notice is shown once and never stored.
 
@@ -1687,8 +1689,12 @@ Editing an existing entry).
     `tests/browser/parts/update-values-review-unquoted.mjs`.
 91. (walk) Closing the single-holding form with a typed price or figure
     unsaved writes nothing, and the screen it closes onto names the
-    holding and the unit left. A lock and unlock in between shows no
-    notice. Test: `tests/browser/parts/snapshot-entry.mjs`,
+    holding and the unit left. Back or an address changed by hand
+    closes it the same way, also while locked. A lock and unlock in
+    between at the same address shows no notice. Test:
+    `tests/browser/parts/snapshot-entry.mjs`,
+    `tests/browser/parts/snapshot-entry-back.mjs`,
+    `tests/browser/parts/snapshot-entry-review-back.mjs`,
     `tests/browser/parts/snapshot-entry-review-leave.mjs`,
     `tests/browser/parts/unlock-lock.mjs`.
 92. (walk) A move to a date that held no record when the Dialog showed

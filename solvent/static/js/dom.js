@@ -379,6 +379,7 @@ export function dialog({ heading, body, actions, resume = null, unsaved = null }
 
   const entry = { panel, scrim, resume, close: null };
   const close = ({ refocus = true, locking = false } = {}) => {
+    if (!openDialogs.has(entry)) return;
     // Read before focus leaves the form, whose blur handlers may redraw
     // it. A lock is not leaving: the form comes back after the unlock.
     const left = !locking && unsaved ? unsaved() : null;
@@ -474,18 +475,25 @@ export function editedFields(root) {
 
 /** Put kept values back into a form rebuilt the same way, announcing
  *  each so whatever is derived from a field (the converted figure under
- *  a quantity) follows it. A field that is no longer the same kind at
- *  that position is left alone rather than guessed at. */
+ *  a quantity) follows it. The fields are read again for each value,
+ *  because an announced one can rebuild others (a date redraws the rate
+ *  lines). A field that is no longer the same kind at that position is
+ *  left alone rather than guessed at. */
 export function restoreFields(root, kept) {
-  const fields = fieldsOf(root);
   for (const { index, kind, value } of kept) {
-    const field = fields[index];
+    const field = fieldsOf(root)[index];
     if (!field || kindOf(field) !== kind) continue;
     if (field.type === 'checkbox' || field.type === 'radio') field.checked = value === 'true';
     else field.value = value;
     field.dispatchEvent(new Event('input', { bubbles: true }));
     field.dispatchEvent(new Event('change', { bubbles: true }));
   }
+}
+
+/** On a change of address: close every dialog, topmost first, as
+ *  leaving it would. Focus stays where the new screen puts it. */
+export function closeDialogs() {
+  for (const entry of [...openDialogs].reverse()) entry.close({ refocus: false });
 }
 
 /** On a lock: close every dialog without handing focus back to a

@@ -496,6 +496,9 @@ outside it use, are `app-shell.md`'s (The chrome).
   - **Escape closes the topmost dialog only.** Closing a dialog, by
     Escape or by its own controls, returns focus to whatever opened
     it.
+  - **A dialog belongs to the screen it was opened on.** Back, Forward
+    or an address changed by hand closes every open dialog, as leaving
+    by a link would, and focus goes where the screen arrived at puts it.
   - **A destructive dialog** names the consequence in its body and
     carries the filled critical confirm (Button, destructive). One
     confirmation, never a ladder.
