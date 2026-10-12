@@ -1,6 +1,6 @@
 // The hero with a net worth in the millions and the tens of millions
 // (spec/features/net-worth-view.md, Hero figure, acceptance criterion
-// 83): above phone width the total stays in its column, New recording
+// 84): above phone width the total stays in its column, New recording
 // stays clear of gross liabilities, and the change's arrow, amount and
 // percentage read on one line.
 // Templates: dashboard.html. Modules: view-dashboard.js.
@@ -59,11 +59,11 @@ await run(async () => {
       await page.frames();
       const seen = await measure();
       const detail = JSON.stringify(seen);
-      check(`net-worth-view 83: the change reads "${text}" at ${width}px`, seen.text === text, detail);
-      check(`net-worth-view 83: a total of ${end} stays in its column at ${width}px`, seen.figureFits, detail);
-      check(`net-worth-view 83: New recording stays clear of gross liabilities at ${width}px`, seen.actionClear, detail);
-      check(`net-worth-view 83: the arrow, amount and percentage share one line at ${width}px`, seen.arrowOnLine, detail);
-      check(`net-worth-view 83: the dashboard never pans sideways at ${width}px`, seen.scrollWidth <= seen.width, detail);
+      check(`net-worth-view 84: the change reads "${text}" at ${width}px`, seen.text === text, detail);
+      check(`net-worth-view 84: a total of ${end} stays in its column at ${width}px`, seen.figureFits, detail);
+      check(`net-worth-view 84: New recording stays clear of gross liabilities at ${width}px`, seen.actionClear, detail);
+      check(`net-worth-view 84: the arrow, amount and percentage share one line at ${width}px`, seen.arrowOnLine, detail);
+      check(`net-worth-view 84: the dashboard never pans sideways at ${width}px`, seen.scrollWidth <= seen.width, detail);
     }
     await page.send('Emulation.clearDeviceMetricsOverride');
   }

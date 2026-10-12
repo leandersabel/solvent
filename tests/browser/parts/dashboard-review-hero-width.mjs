@@ -1,7 +1,7 @@
 // The hero's layout across window widths with a total in the millions
 // and in the tens of millions, written from
 // spec/features/net-worth-view.md alone (Hero figure, At phone width,
-// and acceptance criterion 83). Above phone width the total stays clear
+// and acceptance criterion 84). Above phone width the total stays clear
 // of gross assets and the change's arrow, amount and percentage share
 // one line, and New recording stays clear of gross liabilities. While
 // the dashboard is narrower than 1100px the total and the change hold a
@@ -138,12 +138,12 @@ const heroHolds = async (width, scene) => {
       s.newRecording.top >= s.rates.bottom - 0.5 && near(s.newRecording.height, 48), JSON.stringify(s.newRecording));
     return;
   }
-  // Criterion 83.
-  check(`net-worth-view 83: the total stays clear of gross assets, ${at}`, apart(s.total, s.assets) && apart(s.change, s.assets), JSON.stringify({ total: s.total, assets: s.assets, text: s.totalText }));
-  check(`net-worth-view 83: the change's arrow, amount and percentage read on one line, ${at}`,
+  // Criterion 84.
+  check(`net-worth-view 84: the total stays clear of gross assets, ${at}`, apart(s.total, s.assets) && apart(s.change, s.assets), JSON.stringify({ total: s.total, assets: s.assets, text: s.totalText }));
+  check(`net-worth-view 84: the change's arrow, amount and percentage read on one line, ${at}`,
     s.arrow && oneLine(s.pieces), `${s.changeText}: ${JSON.stringify(s.pieces)}`);
   check(`net-worth-view Hero figure: the total is drawn whole, ${at}`, !s.totalClipped, s.totalText);
-  check(`net-worth-view 83: New recording stays clear of gross liabilities, ${at}`,
+  check(`net-worth-view 84: New recording stays clear of gross liabilities, ${at}`,
     apart(s.liabilitiesInk, s.newRecording), JSON.stringify({ liabilities: s.liabilitiesInk, newRecording: s.newRecording }));
   for (const [name, other] of [['gross liabilities', s.liabilities], ['New recording', s.newRecording]]) {
     check(`net-worth-view Hero figure: the total and the change stay clear of ${name}, ${at}`,
@@ -197,7 +197,7 @@ await run(async () => {
   ]);
   await settle();
   const issue = await measure();
-  check('net-worth-view 83: the millions scene shows the issue\'s total and change',
+  check('net-worth-view 84: the millions scene shows the issue\'s total and change',
     /7,331,239/.test(issue.totalText) && /6,362,771/.test(issue.changeText) && /657\.0%/.test(issue.changeText), `${issue.totalText} / ${issue.changeText}`);
   for (const width of [...WIDE, ...NARROW]) await heroHolds(width, 'millions, rising');
 
@@ -214,7 +214,7 @@ await run(async () => {
   await clickRange('1M');
   await page.frames();
   const falling = await measure();
-  check('net-worth-view 83: the falling scene reads a fall in the tens of millions', /[−-]/.test(falling.changeText), falling.changeText);
+  check('net-worth-view 84: the falling scene reads a fall in the tens of millions', /[−-]/.test(falling.changeText), falling.changeText);
   for (const width of [...WIDE, ...NARROW]) await heroHolds(width, 'tens of millions, falling');
   await page.send('Emulation.clearDeviceMetricsOverride');
 }, { signsIn: false });
