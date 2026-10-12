@@ -1264,4 +1264,5 @@ rule of the chart (Archived holdings, Ranges and modes).
     added, "As of, newest first" from the newest, an archived row with no
     As of last in both, and "Order added" lists them in the order added
     again. The screen opens on Order added. Test:
-    `tests/browser/parts/dashboard-fixtures.mjs`.
+    `tests/browser/parts/dashboard-fixtures.mjs`,
+    `tests/browser/parts/dashboard-review-sort.mjs`.
