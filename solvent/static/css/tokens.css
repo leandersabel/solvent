@@ -1223,6 +1223,7 @@ th.numeric {
 /* ---- The holdings table ---- */
 
 .holdings-card .card-head { margin-bottom: 16px; }
+.holdings-controls { display: flex; flex-wrap: wrap; align-items: center; gap: 12px 24px; }
 
 .holdings-table .row-name {
   color: var(--ink-primary);
