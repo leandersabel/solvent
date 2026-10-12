@@ -217,4 +217,40 @@ await run(async () => {
     writesSent().length === 0 && over.hash === '#/' && over.dialogs === 0,
     JSON.stringify({ over, notices: await notices(), writes: writesSent().map((t) => t.method) }),
   );
+  const byLockedBack = await named(`You left the entry for ${dA} ${LEFT}: Current account.`);
+  check(
+    'review 91: the screen the unlock lands on after Back on the card names the holding at its head',
+    byLockedBack.ok,
+    JSON.stringify(byLockedBack),
+  );
+  await go(CA);
+  check('review 91: the notice after a locked Back is shown once', (await leftNotice()).length === 0, JSON.stringify(await notices()));
+
+  // ---- 91: an address changed by hand while locked, a price and a figure typed
+
+  await go(CA);
+  await openForm();
+  await setDate(DA);
+  await ev("document.querySelectorAll('.dialog details').forEach(d => (d.open = true))");
+  await quiet();
+  await rec.waitUntil((query) => { const l = document.querySelector(query); return l && l.querySelector('input'); }, { args: [line('USD')], label: 'the form USD line' });
+  await typeLine('USD', '0.7779');
+  await set('#snapshot-value', '4248');
+  traffic.length = 0;
+  await ev("document.querySelector('.btn-lock').click()");
+  await rec.waitUntil("document.querySelector('#unlock-password')", { label: 'the password card' });
+  await ev(`location.hash = ${JSON.stringify(SAV)}`);
+  await rec.waitUntil((to) => location.hash === to, { args: [SAV], label: SAV });
+  await rec.waitUntil("document.querySelector('#unlock-password')", { label: 'the password card at Savings' });
+  await enterPasswordOn(rec, RECORDER_PASSWORD);
+  await rec.waitUntil("!document.querySelector('#unlock-password')", { timeout: 90000, label: 'the vault after unlocking' });
+  await rec.frames();
+  await quiet();
+  const byLockedAddress = await named(`You left the entry for ${dA} ${LEFT}: Current account and the USD rate.`);
+  check(
+    'review 91: an address changed while locked closes the kept form, writes nothing, and the screen the unlock lands on names the holding and the unit',
+    (await dialogs()) === 0 && (await hash()) === SAV && writesSent().length === 0 &&
+      on(await stored('rate'), DA).length === 0 && byLockedAddress.ok,
+    JSON.stringify({ dialogs: await dialogs(), hash: await hash(), writes: writesSent().map((t) => t.method), byLockedAddress }),
+  );
 }, { signsIn: true });
