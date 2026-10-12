@@ -1043,6 +1043,38 @@ await run(async () => {
   );
   await home();
 
+  // The same on a recording reopened from an earlier sitting: a price
+  // changed from the proposal keeps that provenance once the date is
+  // emptied, and the line reads as on a date holding nothing.
+  const DJ = ago(48);
+  const proposedUsd = proposalsFor(DJ).USD.rate;
+  const plantedJ = await plantHere([snap('Current account', DJ, '10'), price('USD', DJ, proposedUsd, 'proposed')]);
+  await reread();
+  await go(`#/recording/${DJ}`);
+  await press('Update');
+  await typeLine('USD', '0.81');
+  const editedChip = `Edited from ${await asRate(proposedUsd)}`;
+  const typedOver = (await lineState('USD')).chip;
+  for (const recordId of plantedJ) await rec.call(async (id) => (await import('/static/js/api.js')).del(`/api/records/${id}`), recordId);
+  await press('Save the rate lines');
+  await press('Save the prices', '.dialog');
+  await rec.waitUntil((query) => !document.querySelector(query).querySelector('.skeleton:not([hidden])'), { args: [line('USD')], label: 'the proposals for the emptied date' });
+  const emptiedUsd = await lineState('USD');
+  check(
+    'record-snapshot: on a reopened recording another window emptied, a price typed over the proposal still reads as edited from it, never as a gap in a recording',
+    typedOver === editedChip && figure(emptiedUsd.value) === 0.81 && emptiedUsd.chip === editedChip && emptiedUsd.says === '' && !emptiedUsd.lookup,
+    JSON.stringify({ typedOver, emptiedUsd }),
+  );
+  await typeRow('Savings', '5001');
+  await pressRow('Savings');
+  const repricedUsd = on(await stored('rate'), DJ).map((r) => r.payload).find((p) => p.symbol === 'USD');
+  check(
+    'record-rate: the first row recorded then writes that price as edited from the proposal',
+    repricedUsd?.rate === '0.81' && repricedUsd.rateSource === 'edited' && repricedUsd.proposedRate === proposedUsd,
+    JSON.stringify(repricedUsd),
+  );
+  await home();
+
   // ---- record-rate: a published unit before its published prices begin -
 
   proxy.mode = 'answer';
