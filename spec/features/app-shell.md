@@ -938,13 +938,15 @@ dashboard.
     `tests/browser/parts/dashboard-scroll.mjs`.
 83. (blind) Only the addresses in the route table name a screen, and a
     sweep only at a recorded day. Test:
-    `tests/test_client.py::test_the_client_side_rules_hold`.
+    `tests/test_client.py::test_the_client_side_rules_hold`,
+    `tests/browser/parts/error-page-review-unassigned.mjs`.
 84. (walk) An address inside the vault that names no screen, a sweep at
     a date that does not exist or is still to come and a filtered
     dashboard naming no dimension of the vault among them, shows
     "There is no page at this address." with Go to Solvent and Lock,
     writes nothing, and Go to Solvent opens the dashboard still
-    unlocked. Test: `tests/browser/parts/error-page.mjs`.
+    unlocked. Test: `tests/browser/parts/error-page.mjs`,
+    `tests/browser/parts/error-page-review-unassigned.mjs`.
 85. (blind) gunicorn, run with the Dockerfile's arguments, answers an
     over-long request line, an over-long invite address, an over-long
     header, too many headers, an invalid request line and an invalid
