@@ -13,8 +13,8 @@ await run(async () => {
   const { rec, ago, D1, id, traffic, writesSent, ev, set, press, quiet, go, format } = r;
 
   const LEFT = 'with changes that were not saved';
-  const leftNotices = () => ev(`[...document.querySelectorAll('.banner-critical')]
-    .map((n) => n.textContent.trim()).filter((t) => t.includes(${JSON.stringify(LEFT)}))`);
+  const leftNotices = () => rec.call((left) => [...document.querySelectorAll('.banner-critical')]
+    .map((n) => n.textContent.trim()).filter((t) => t.includes(left)), LEFT);
   const openForm = async (name) => {
     await press('Record a value', '.form-actions');
     await rec.waitUntil("document.querySelector('#snapshot-value')", { label: `the form for ${name}` });

@@ -239,7 +239,7 @@ await run(async () => {
   traffic.length = 0;
   await ev("document.querySelector('.btn-lock').click()");
   await rec.waitUntil("document.querySelector('#unlock-password')", { label: 'the password card' });
-  await ev(`location.hash = ${JSON.stringify(SAV)}`);
+  await rec.call((next) => { location.hash = next; }, SAV);
   await rec.waitUntil((to) => location.hash === to, { args: [SAV], label: SAV });
   await rec.waitUntil("document.querySelector('#unlock-password')", { label: 'the password card at Savings' });
   await enterPasswordOn(rec, RECORDER_PASSWORD);
