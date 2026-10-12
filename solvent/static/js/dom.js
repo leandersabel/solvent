@@ -475,12 +475,13 @@ export function editedFields(root) {
 
 /** Put kept values back into a form rebuilt the same way, announcing
  *  each so whatever is derived from a field (the converted figure under
- *  a quantity) follows it. A field that is no longer the same kind at
- *  that position is left alone rather than guessed at. */
+ *  a quantity) follows it. The fields are read again for each value,
+ *  because an announced one can rebuild others (a date redraws the rate
+ *  lines). A field that is no longer the same kind at that position is
+ *  left alone rather than guessed at. */
 export function restoreFields(root, kept) {
-  const fields = fieldsOf(root);
   for (const { index, kind, value } of kept) {
-    const field = fields[index];
+    const field = fieldsOf(root)[index];
     if (!field || kindOf(field) !== kind) continue;
     if (field.type === 'checkbox' || field.type === 'radio') field.checked = value === 'true';
     else field.value = value;
