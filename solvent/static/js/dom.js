@@ -379,6 +379,7 @@ export function dialog({ heading, body, actions, resume = null, unsaved = null }
 
   const entry = { panel, scrim, resume, close: null };
   const close = ({ refocus = true, locking = false } = {}) => {
+    if (!openDialogs.has(entry)) return;
     // Read before focus leaves the form, whose blur handlers may redraw
     // it. A lock is not leaving: the form comes back after the unlock.
     const left = !locking && unsaved ? unsaved() : null;
@@ -486,6 +487,12 @@ export function restoreFields(root, kept) {
     field.dispatchEvent(new Event('input', { bubbles: true }));
     field.dispatchEvent(new Event('change', { bubbles: true }));
   }
+}
+
+/** On a change of address: close every dialog, topmost first, as
+ *  leaving it would. Focus stays where the new screen puts it. */
+export function closeDialogs() {
+  for (const entry of [...openDialogs].reverse()) entry.close({ refocus: false });
 }
 
 /** On a lock: close every dialog without handing focus back to a

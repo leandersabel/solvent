@@ -11,6 +11,7 @@
 // long by design (login.md, Unlock).
 import {
   clear,
+  closeDialogs,
   closeDialogsForLock,
   dialog,
   editedFields,
@@ -433,7 +434,14 @@ function reopenAddHolding({ vault }) {
   addHoldingDialog(vault);
 }
 
-window.addEventListener('hashchange', render);
+// A dialog belongs to the screen it was opened on, so Back, Forward or
+// an address typed by hand closes it, and what it held unsaved is named
+// on the screen arrived at. A form that navigates itself has already
+// closed by the time this runs, because the event comes after it.
+window.addEventListener('hashchange', () => {
+  closeDialogs();
+  render();
+});
 
 // The chrome reaches the data layer through this store and knows
 // nothing of what it holds (static/js/shell.js).
