@@ -1272,4 +1272,5 @@ rule of the chart (Archived holdings, Ranges and modes).
 84. (blind) (walk) With a band hidden, the hero on the day the chart
     reads, its total, gross assets and gross liabilities, counts every
     band, while the tooltip's net total drops the hidden one. Test:
-    `tests/browser/parts/dashboard-net-worth.mjs`.
+    `tests/browser/parts/dashboard-net-worth.mjs`,
+    `tests/browser/parts/dashboard-review-hero-day.mjs`.
