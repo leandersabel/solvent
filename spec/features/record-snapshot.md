@@ -1825,3 +1825,10 @@ Editing an existing entry).
      unchanged, and leaving names the price as unsaved. Test:
      `tests/browser/parts/update-values.mjs`,
      `tests/browser/parts/update-values-review-unsaved-price.mjs`.
+115. (walk) On a reopened recording, saving the rate lines with a price
+     typed into a line another window filled in meanwhile writes
+     nothing, the line shows the stored price, and the banner says
+     "The USD rate was filled in another window, and the line shows
+     what is stored now." for that unit, never that the date already
+     has a recording. Test: `tests/browser/parts/update-values.mjs`,
+     `tests/browser/parts/update-values-review-filled-elsewhere.mjs`.

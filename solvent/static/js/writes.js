@@ -399,8 +399,11 @@ export async function saveRateLines(vault, sit, plan) {
   const refusal = creates.length ? await claimDate(vault, sit, { rates: creates, held: true }) : null;
   if (refusal) {
     // Refused whole, before a single write. The person is looking at
-    // a screen that no longer describes the vault.
-    return { ...refusal, saved: [], failed: [] };
+    // a screen that no longer describes the vault. `taken` names the
+    // units another session priced meanwhile.
+    const missing = vault.missingUnits(sit.date);
+    const taken = refusal.emptied ? [] : creates.filter((unit) => !missing.includes(unit));
+    return { ...refusal, taken, saved: [], failed: [] };
   }
 
   const saved = [];

@@ -58,6 +58,17 @@ export function sweepView(vault, date, actions = {}) {
     });
   };
 
+  // A slot another window filled refuses a rate-lines save whole, but
+  // at a date this screen already shows recorded, so the lines and the
+  // rows converted through them take what is stored, and the banner
+  // names each unit taken.
+  const filledElsewhere = (units) => {
+    block.refresh();
+    syncSave();
+    for (const row of rows) row.describe();
+    say(units.map((unit) => filledCopy(vault, unit)).join(' '));
+  };
+
   // Another window deleted the recording before a rate-lines save: the
   // screen shows the empty date, and what was typed stays for the first
   // row recorded to carry.
@@ -137,14 +148,14 @@ export function sweepView(vault, date, actions = {}) {
       syncSave();
       for (const row of rows) row.describe();
       const notes = [
-        ...result.taken.map((unit) => `The ${vault.unitName(unit)} rate was filled in another window, and the line shows what is stored now.`),
+        ...result.taken.map((unit) => filledCopy(vault, unit)),
         ...result.failed.map((unit) => `The ${vault.unitName(unit)} rate did not save. Save the rate lines to try again.`),
       ];
       if (notes.length) say(notes.join(' '), { critical: result.failed.length > 0 });
     }
     return Boolean(proposals[pressed.unit]);
   };
-  saveAll.addEventListener('click', () => saveRates(vault, sit, block, { say, refused, syncSave, emptied, keepTyped }));
+  saveAll.addEventListener('click', () => saveRates(vault, sit, block, { say, refused, filledElsewhere, syncSave, emptied, keepTyped }));
 
   // A date holding nothing arrives with its rate lines filled in by the
   // proposals for it. A reopened recording asks the source nothing on
@@ -1016,11 +1027,15 @@ export function partialCopy(vault, result) {
   return `${landed}Not saved: ${named(result.failed)}. Nothing was rolled back, and saving again retries only what did not land.`;
 }
 
+/** The banner for a price slot another window filled meanwhile. */
+const filledCopy = (vault, unit) =>
+  `The ${vault.unitName(unit)} rate was filled in another window, and the line shows what is stored now.`;
+
 /** A rate line on a reopened recording saves by itself: filling in the
  *  price that was missing is a complete act and needs no holding
  *  touched alongside it. One confirmation covers every line it updates
  *  or clears. */
-function saveRates(vault, sit, block, { say, refused, syncSave, emptied, keepTyped }) {
+function saveRates(vault, sit, block, { say, refused, filledElsewhere, syncSave, emptied, keepTyped }) {
   const changed = block.lines.filter((line) => line.changed());
   if (changed.some((line) => line.invalid())) {
     for (const line of changed) line.describe();
@@ -1040,6 +1055,7 @@ function saveRates(vault, sit, block, { say, refused, syncSave, emptied, keepTyp
     const result = await writes.saveRateLines(vault, sit, plan);
     if (result.refused) {
       if (result.emptied) emptied(restore);
+      else if (result.taken?.length) filledElsewhere(result.taken);
       else refused();
       return;
     }

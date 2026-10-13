@@ -737,6 +737,18 @@ await run(async () => {
     'record-snapshot: inside a reopened recording, a holding another window filled is refused the same way',
     (await ev("document.querySelector('.sweep .banner').textContent")).startsWith(`${longD5} already has a recording.`) && writesSent().length === 0,
   );
+  await typeLine('USD', '0.9');
+  await plantHere([price('USD', D5, '0.8', 'proposed')]);
+  const usdFilledElsewhere = bytes(on(await stored('rate'), D5));
+  traffic.length = 0;
+  await press('Save the rate lines');
+  const filledBanner = await ev("document.querySelector('.sweep .banner').textContent");
+  check(
+    'record-snapshot: a typed price another window filled in meanwhile is left as stored, and the banner names its unit',
+    filledBanner === 'The USD rate was filled in another window, and the line shows what is stored now.' && writesSent().length === 0 &&
+      bytes(on(await stored('rate'), D5)) === usdFilledElsewhere && figure((await lineState('USD')).value) === 0.8,
+    `${filledBanner} ${JSON.stringify(await lineState('USD'))}`,
+  );
 
   // ---- record-rate: writes that fail ------------------------------------
 
