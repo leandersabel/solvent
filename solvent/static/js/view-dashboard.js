@@ -396,7 +396,8 @@ function chartSection(vault, state, render, dimension, actions, { days, bands })
             for (const part of partValues) part.textContent = part.dataset.total;
             return;
           }
-          const shown = vault.valuesAt(dimension, day).filter((band) => !state.hidden.has(band.id));
+          const every = vault.valuesAt(dimension, day);
+          const shown = every.filter((band) => !state.hidden.has(band.id));
           const net = shown.reduce((sum, band) => sum + band.value, 0n);
           const date = vault.format.longDate(isoFromDay(day));
           readout.replaceChildren(
@@ -420,12 +421,13 @@ function chartSection(vault, state, render, dimension, actions, { days, bands })
           readout.style.setProperty('--at', String(across));
           readout.hidden = false;
           // The hero follows the cursor: the value first, its date
-          // beneath it, and gross assets and liabilities beside it. A
-          // dashed total has no figure for the date to belong to.
+          // beneath it, and gross assets and liabilities beside it. It
+          // counts every band, hidden ones too, because it is the net
+          // worth. A dashed total has no figure for the date to belong to.
           if (heroAt && heroAmount) {
-            heroAmount.textContent = vault.format.money(net);
+            heroAmount.textContent = vault.format.money(every.reduce((sum, band) => sum + band.value, 0n));
             ['assets', 'liabilities'].forEach((name, i) => {
-              partValues[i].textContent = vault.mainMoney(shown.reduce((sum, band) => sum + band[name], 0n));
+              partValues[i].textContent = vault.mainMoney(every.reduce((sum, band) => sum + band[name], 0n));
             });
             heroAt.textContent = `on ${date}`;
             heroAt.hidden = false;

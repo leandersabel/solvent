@@ -182,13 +182,16 @@ Interaction, each reading one calendar day (Reading a date):
   top of the plot: the date, every visible band with its value, then the
   net total on a separated row, value first and date second, because
   the value is what the reader came for. The hero
-  follows. Leaving the plot removes the crosshair and returns the hero.
+  follows, counting every band, hidden ones too, because it is the net
+  worth and hiding a band changes only the chart. Leaving the plot
+  removes the crosshair and returns the hero.
 - **Drag** selects a span that stays after release. The hero shows the
   change across it and each legend entry its own. A plain click, or a
   change of range or dimension, clears it.
 - **Legend** entries toggle a band, and hovering one highlights it and
-  dims the rest. With a band hidden, a line under the chart states that
-  the total covers only the visible bands. A band name too long for its
+  dims the rest. With a band hidden, the tooltip's net total covers only
+  the visible bands, and a line under the chart says so. The hero still
+  counts every band (Hover). A band name too long for its
   entry wraps, breaking a word only where it has to.
 - **A click on a marked date, or on its tick, opens that date's
   recording** (`record-snapshot.md`, Recording detail), and on any other
@@ -1266,3 +1269,8 @@ rule of the chart (Archived holdings, Ranges and modes).
     again. The screen opens on Order added. Test:
     `tests/browser/parts/dashboard-fixtures.mjs`,
     `tests/browser/parts/dashboard-review-sort.mjs`.
+84. (blind) (walk) With a band hidden, the hero on the day the chart
+    reads, its total, gross assets and gross liabilities, counts every
+    band, while the tooltip's net total drops the hidden one. Test:
+    `tests/browser/parts/dashboard-net-worth.mjs`,
+    `tests/browser/parts/dashboard-review-hero-day.mjs`.
