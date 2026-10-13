@@ -1,7 +1,7 @@
 // While the dashboard is at least 1100px wide, gross
 // assets and gross liabilities sit level with the foot of the total,
 // with the change and the date line beneath the total
-// (spec/features/net-worth-view.md, Hero figure, criterion 83).
+// (spec/features/net-worth-view.md, Hero figure, criterion 86).
 // Templates: dashboard.html. Modules: view-dashboard.js.
 import { check, holdToday, holdings, page, plant, reloadModel, run, setProfile, vaultOwner } from '../harness.mjs';
 
