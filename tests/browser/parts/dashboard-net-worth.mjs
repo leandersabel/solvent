@@ -363,6 +363,30 @@ await run(async () => {
   );
   await rec.frames();
 
+  // A hidden band leaves the chart's net, never the hero's.
+  const heroOnHover = async () => {
+    await pointer('pointermove', 0.5);
+    const read = await ev(`JSON.stringify({
+      hero: [document.querySelector('.hero-amount').textContent, ...[...document.querySelectorAll('.hero-part-value')].map(p => p.textContent)],
+      net: document.querySelector('.readout-net').textContent,
+    })`).then(JSON.parse);
+    await pointer('pointerleave', 0.5);
+    return read;
+  };
+  await ev(`(() => { const s = document.querySelector('.chart-card select'); s.value = 'liq'; s.dispatchEvent(new Event('change', { bubbles: true })); })()`);
+  await rec.frames();
+  const allBands = await heroOnHover();
+  await ev("document.querySelector('.legend-entry').click()");
+  await rec.frames();
+  const oneHidden = await heroOnHover();
+  await ev(`(() => { const s = document.querySelector('.chart-card select'); s.value = ''; s.dispatchEvent(new Event('change', { bubbles: true })); })()`);
+  await rec.frames();
+  check(
+    'net-worth-view: with a band hidden, the hovered day\'s hero still counts every band while the readout\'s net drops it',
+    JSON.stringify(oneHidden.hero) === JSON.stringify(allBands.hero) && oneHidden.net !== allBands.net,
+    JSON.stringify({ allBands, oneHidden }),
+  );
+
   // ---- Reading a date: every calendar day in the range is readable ----
   // The recorder's history has snapshots on four dates, 200 days apart
   // at most, and nothing between.
