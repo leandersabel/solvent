@@ -1830,4 +1830,5 @@ Editing an existing entry).
      nothing, the line shows the stored price, and the banner says
      "The USD rate was filled in another window, and the line shows
      what is stored now." for that unit, never that the date already
-     has a recording. Test: `tests/browser/parts/update-values.mjs`.
+     has a recording. Test: `tests/browser/parts/update-values.mjs`,
+     `tests/browser/parts/update-values-review-filled-elsewhere.mjs`.

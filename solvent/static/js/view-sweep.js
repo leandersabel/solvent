@@ -58,6 +58,17 @@ export function sweepView(vault, date, actions = {}) {
     });
   };
 
+  // A slot another window filled refuses a rate-lines save whole, but
+  // at a date this screen already shows recorded, so the lines and the
+  // rows converted through them take what is stored, and the banner
+  // names each unit taken.
+  const filledElsewhere = (units) => {
+    block.refresh();
+    syncSave();
+    for (const row of rows) row.describe();
+    say(units.map((unit) => filledCopy(vault, unit)).join(' '));
+  };
+
   // Another window deleted the recording before a rate-lines save: the
   // screen shows the empty date, and what was typed stays for the first
   // row recorded to carry.
@@ -144,7 +155,7 @@ export function sweepView(vault, date, actions = {}) {
     }
     return Boolean(proposals[pressed.unit]);
   };
-  saveAll.addEventListener('click', () => saveRates(vault, sit, block, { say, refused, syncSave, emptied, keepTyped }));
+  saveAll.addEventListener('click', () => saveRates(vault, sit, block, { say, refused, filledElsewhere, syncSave, emptied, keepTyped }));
 
   // A date holding nothing arrives with its rate lines filled in by the
   // proposals for it. A reopened recording asks the source nothing on
@@ -1024,15 +1035,7 @@ const filledCopy = (vault, unit) =>
  *  price that was missing is a complete act and needs no holding
  *  touched alongside it. One confirmation covers every line it updates
  *  or clears. */
-function saveRates(vault, sit, block, { say, refused, syncSave, emptied, keepTyped }) {
-  // A slot another window filled refuses the save whole, but at a date
-  // this screen already shows recorded, so the lines take what is
-  // stored and the banner names each unit taken.
-  const filledElsewhere = (units) => {
-    block.refresh();
-    syncSave();
-    say(units.map((unit) => filledCopy(vault, unit)).join(' '));
-  };
+function saveRates(vault, sit, block, { say, refused, filledElsewhere, syncSave, emptied, keepTyped }) {
   const changed = block.lines.filter((line) => line.changed());
   if (changed.some((line) => line.invalid())) {
     for (const line of changed) line.describe();
