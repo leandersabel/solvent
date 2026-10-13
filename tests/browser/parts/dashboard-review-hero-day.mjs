@@ -1,10 +1,11 @@
 // The hero while the chart reads a day, written from
 // spec/features/net-worth-view.md alone (Hero figure; Trend chart card,
-// Hover and Keyboard; Legend; acceptance criterion 66): the hero follows
-// the day, its total the readout's net, and gross assets and gross
-// liabilities are that day's, each rounded on its own, half-even, to
-// whole units. With a band hidden the total covers only the visible
-// bands, and so do its parts. Leaving the chart returns the hero.
+// Hover, Drag, Keyboard and Legend; acceptance criteria 66 and 84): the
+// hero follows the day, and its total, gross assets and gross liabilities
+// are that day's, each rounded on its own, half-even, to whole units.
+// With a band hidden the hero still counts every band, while the
+// tooltip's net total covers only the visible ones. Leaving the chart
+// returns the hero.
 // Templates: dashboard.html. Modules: view-dashboard.js, decimal.js,
 // model.js, format.js.
 import { check, holdToday, holdings, page, plant, reloadModel, run, setProfile, vaultOwner } from '../harness.mjs';
@@ -93,6 +94,8 @@ const hero = () =>
       assets: labelled('Assets'),
       liabilities: labelled('Liabilities'),
       date: at && !at.hidden ? at.textContent.trim() : '',
+      change: root.querySelector('.hero-change')?.textContent.replace(/\s+/g, ' ').trim() ?? null,
+      net: document.querySelector('.chart-readout .readout-net .numeric')?.textContent.trim() ?? null,
       readout: document.querySelector('.chart-readout .readout-date')?.textContent.trim() || '',
     };
   });
@@ -107,6 +110,14 @@ const wrongOn = (h, bands) => {
   if (got[0] !== wantTotal) return `total ${h.total}, wants ${wantTotal}`;
   if (got[1] !== wantAssets || got[2] !== wantLiabilities) return `assets ${h.assets} and liabilities ${h.liabilities}, want ${wantAssets} and ${wantLiabilities}`;
   return null;
+};
+
+// What is wrong with the tooltip's net total in `h`, over `bands`.
+const netWrongOn = (h, bands) => {
+  const day = dayOfShown(h.readout);
+  if (Number.isNaN(day)) return 'no day read';
+  const want = whole(sidesAt(day, bands).reduce((a, b) => a + b, 0n));
+  return shown(h.net) === want ? null : `net ${h.net}, wants ${want}`;
 };
 
 // Focus on the chart, Home, then every day to the last, with the hero
@@ -153,7 +164,42 @@ const hover = async (iso) => {
   return { on, off: await hero() };
 };
 
-const resting = (h) => ({ total: h.total, assets: h.assets, liabilities: h.liabilities, date: h.date });
+// A span dragged from `from` to `to`, then the hero, the span left in
+// place.
+const drag = async (from, to) => {
+  const plot = await page.call(() => {
+    const svg = document.querySelector('.chart-frame svg.trend');
+    svg.scrollIntoView({ block: 'center' });
+    const box = svg.getBoundingClientRect();
+    const zero = svg.querySelector('.zero-line');
+    return { left: box.left, y: box.top + box.height / 2, scale: box.width / svg.viewBox.baseVal.width, x0: Number(zero.getAttribute('x1')), x1: Number(zero.getAttribute('x2')) };
+  });
+  const span = dayOf(TODAY) - dayOf('2026-01-01');
+  const x = (iso) => plot.left + (plot.x0 + ((dayOf(iso) - dayOf('2026-01-01')) * (plot.x1 - plot.x0)) / span) * plot.scale;
+  await page.send('Input.dispatchMouseEvent', { type: 'mousePressed', x: x(from), y: plot.y, button: 'left', buttons: 1, clickCount: 1 });
+  await page.send('Input.dispatchMouseEvent', { type: 'mouseMoved', x: x(to), y: plot.y, button: 'left', buttons: 1 });
+  await page.send('Input.dispatchMouseEvent', { type: 'mouseReleased', x: x(to), y: plot.y, button: 'left', buttons: 0, clickCount: 1 });
+  await page.send('Input.dispatchMouseEvent', { type: 'mouseMoved', x: 1, y: 1 });
+  await page.frames();
+  return hero();
+};
+
+// The chart grouped by Liquidity, after a fresh load when `fresh`, which
+// clears any selection and shows every band.
+const byLiquidity = async (fresh = false) => {
+  if (fresh) {
+    await reloadModel('#/');
+    await page.waitUntil("document.querySelector('.dashboard .hero-amount') && document.querySelector('.chart-frame svg.trend')", { label: 'the dashboard' });
+  }
+  await page.call(() => {
+    const s = document.querySelector('.chart-card select');
+    s.value = 'liq';
+    s.dispatchEvent(new Event('change', { bubbles: true }));
+  });
+  await page.frames();
+};
+
+const resting = (h) => ({ total: h.total, assets: h.assets, liabilities: h.liabilities, date: h.date, change: h.change });
 const same = (a, b) => JSON.stringify(resting(a)) === JSON.stringify(resting(b));
 
 await run(async () => {
@@ -192,34 +238,40 @@ await run(async () => {
   check('net-worth-view Trend chart card, Hover: leaving the plot returns the hero, gross assets and liabilities included',
     same(first.off, atRest), JSON.stringify({ off: resting(first.off), atRest: resting(atRest) }));
 
-  // Under a dimension with a band hidden, the total read on the chart
-  // covers only the visible bands, and so do its two sides.
-  await page.call(() => {
-    const s = document.querySelector('.chart-card select');
-    s.value = 'liq';
-    s.dispatchEvent(new Event('change', { bubbles: true }));
-  });
-  await page.frames();
+  // Under a dimension with a band hidden, the hero still counts every
+  // band, on the day the chart reads too, while the tooltip's net total
+  // covers only the visible bands.
+  await byLiquidity();
+  const shownAll = await hero();
+  const draggedAll = await drag('2026-01-03', '2026-01-12');
+  await byLiquidity(true);
+  const toggle = (name) => page.call((n) => [...document.querySelectorAll('.legend-entry')].find((e) => e.querySelector('.legend-name').textContent === n).click(), name);
   for (const hidden of ['Cash', 'Fixed']) {
-    await page.call((name) => [...document.querySelectorAll('.legend-entry')].find((e) => e.querySelector('.legend-name').textContent === name).click(), hidden);
+    await toggle(hidden);
     await page.frames();
     const visible = ALL.filter((b) => b !== hidden);
     const rest = await hero();
-    // The spec leaves open whether the hero at rest covers every band or
-    // the visible ones, so either passes, each figure rounded on its own.
-    const today = { ...rest, readout: 'Jan 14, 2026' };
-    check(`net-worth-view 66: with ${hidden} hidden, at rest, the total and both sides are today's, each rounded on its own`,
-      wrongOn(today, visible) === null || wrongOn(today, ALL) === null, `${JSON.stringify(rest)}: ${wrongOn(today, ALL)}`);
+    check(`net-worth-view Trend chart card, Legend: with ${hidden} hidden, the hero at rest reads as with every band shown, its change included`,
+      same(rest, shownAll), JSON.stringify({ rest: resting(rest), shownAll: resting(shownAll) }));
     const read = await walk();
-    const wrong = read.days.map((h) => [h.readout, wrongOn(h, visible)]).filter(([, w]) => w);
-    check(`net-worth-view 66: with ${hidden} hidden, on every day the keyboard reads, the hero's total and both sides cover only the visible bands`,
+    const wrong = read.days.map((h) => [h.readout, wrongOn(h, ALL)]).filter(([, w]) => w);
+    check(`net-worth-view 84: with ${hidden} hidden, on every day the keyboard reads, the hero's total and both sides count every band, each rounded on its own`,
       read.days.length === 14 && wrong.length === 0, `${read.days.length} days: ${JSON.stringify(wrong.slice(0, 3))}`);
+    const netWrong = read.days.map((h) => [h.readout, netWrongOn(h, visible)]).filter(([, w]) => w);
+    check(`net-worth-view 84: with ${hidden} hidden, on every day the keyboard reads, the tooltip's net total covers only the visible bands`,
+      read.days.length === 14 && netWrong.length === 0, `${read.days.length} days: ${JSON.stringify(netWrong.slice(0, 3))}`);
+    check(`net-worth-view Trend chart card, Keyboard: with ${hidden} hidden, leaving the chart returns the hero as it rested`,
+      same(read.after, rest), JSON.stringify({ after: resting(read.after), rest: resting(rest) }));
     const pointed = await hover('2026-01-10');
-    check(`net-worth-view 66: with ${hidden} hidden, hovering 10 January the hero's total and both sides cover only the visible bands`,
-      pointed.on.readout === 'Jan 10, 2026' && wrongOn(pointed.on, visible) === null, `${JSON.stringify(pointed.on)}: ${wrongOn(pointed.on, visible)}`);
+    check(`net-worth-view 84: with ${hidden} hidden, hovering 10 January the hero's total and both sides count every band`,
+      pointed.on.readout === 'Jan 10, 2026' && wrongOn(pointed.on, ALL) === null, `${JSON.stringify(pointed.on)}: ${wrongOn(pointed.on, ALL)}`);
+    check(`net-worth-view 84: with ${hidden} hidden, hovering 10 January the tooltip's net total drops the hidden band`,
+      pointed.on.readout === 'Jan 10, 2026' && netWrongOn(pointed.on, visible) === null, `${JSON.stringify(pointed.on)}: ${netWrongOn(pointed.on, visible)}`);
     check(`net-worth-view Trend chart card, Hover: with ${hidden} hidden, leaving the plot returns the hero as it rested`,
       same(pointed.off, rest), JSON.stringify({ off: resting(pointed.off), rest: resting(rest) }));
-    await page.call((name) => [...document.querySelectorAll('.legend-entry')].find((e) => e.querySelector('.legend-name').textContent === name).click(), hidden);
-    await page.frames();
+    const dragged = await drag('2026-01-03', '2026-01-12');
+    check(`net-worth-view Trend chart card, Drag: with ${hidden} hidden, the hero's change across a span reads as with every band shown`,
+      dragged.change !== null && same(dragged, draggedAll), JSON.stringify({ dragged: resting(dragged), draggedAll: resting(draggedAll) }));
+    await byLiquidity(true);
   }
 }, { signsIn: false });
