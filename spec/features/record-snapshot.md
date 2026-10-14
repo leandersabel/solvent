@@ -488,6 +488,10 @@ rule.
   > Another window deleted the recording for 31 July. Your prices were
   > not saved. They are still here and are saved with the first holding
   > you record for this date.
+
+  It takes the place of any banner about the recording as it stood, and
+  goes once the first holding recorded for the date has saved the
+  prices, because then it is no longer true.
 - **A rate-lines save that landed in part**: the screen stays open,
   every line keeps its own state with what was typed still there, and
   the message names by unit what landed and what did not. Retrying
@@ -1849,3 +1853,9 @@ Editing an existing entry).
      `tests/browser/parts/update-values-lock-order.mjs`,
      `tests/browser/parts/update-values-review-lock-order.mjs`,
      `tests/browser/parts/snapshot-entry-review-lock-order.mjs`.
+117. (walk) On a reopened recording another window deleted during a
+     rate-lines save, a banner shown before that save is gone, and the
+     Callout saying the prices were not saved is gone once the first
+     holding recorded for the date has saved them. Test:
+     `tests/browser/parts/update-values.mjs`,
+     `tests/browser/parts/update-values-review-emptied-notice.mjs`.

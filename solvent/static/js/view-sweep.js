@@ -71,7 +71,8 @@ export function sweepView(vault, date, actions = {}) {
 
   // Another window deleted the recording before a rate-lines save: the
   // screen shows the empty date, and what was typed stays for the first
-  // row recorded to carry.
+  // row recorded to carry. A banner about the recording as it stood goes
+  // with it, and the Callout goes once that row's prices are written.
   const callout = el('p', { class: 'callout callout-critical', role: 'status', hidden: true });
   const emptied = (restore) => {
     // The date holds nothing again, so the first row recorded claims it
@@ -81,6 +82,7 @@ export function sweepView(vault, date, actions = {}) {
     restore();
     propose();
     syncSave();
+    banner.hidden = true;
     mount(callout, [
       icon('alert'),
       ` Another window deleted the recording for ${vault.format.dayMonth(date)}. Your prices were not saved. They are still here and are saved with the first holding you record for this date.`,
@@ -180,11 +182,15 @@ export function sweepView(vault, date, actions = {}) {
     if (sit.refreshed) return;
     sit.refreshed = true;
     const missing = vault.missingUnits(date);
-    if (!missing.length) return;
+    if (!missing.length) {
+      callout.hidden = true;
+      return;
+    }
     const unanswered = missing.some((unit) => vault.quotable(unit, date) && !block.lineFor(unit)?.typed);
     if (!sit.proposals && unanswered) sit.proposals = writes.fetchProposals(vault, date);
     if (sit.proposals) block.showProposals(await sit.proposals);
     const { failed } = await writes.refreshPrices(vault, date, {}, (unit) => block.partFor(unit));
+    callout.hidden = true;
     // A refused price wrote nothing, so it did not save either.
     for (const line of block.lines) if (line.invalid() && !failed.includes(line.unit)) failed.push(line.unit);
     // A line that did not save keeps what it shows, for the lines' own
