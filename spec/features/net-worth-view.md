@@ -1278,4 +1278,5 @@ rule of the chart (Archived holdings, Ranges and modes).
     `tests/browser/parts/dashboard-review-hero-day.mjs`.
 85. (walk) With every band hidden through the legend, the plot draws its
     value axis from 0 to 1 with the zero line, and the page logs no
-    error. Test: `tests/browser/parts/dashboard-all-hidden.mjs`.
+    error. Test: `tests/browser/parts/dashboard-all-hidden.mjs`,
+    `tests/browser/parts/dashboard-review-all-hidden.mjs`.
