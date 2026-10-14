@@ -987,6 +987,11 @@ await run(async () => {
   await reread();
   await go(`#/recording/${DH}`);
   await press('Update');
+  // A banner about the recording as it stood goes with it.
+  await typeLine('XAG-ozt', '20');
+  planted.push(...(await plantHere([price('XAG-ozt', DH, '19')])));
+  await press('Save the rate lines');
+  const filledFirst = await ev("document.querySelector('.sweep .banner').textContent");
   await typeLine('PAINT', '3.5');
   await typeRow('Savings', '5001');
   for (const recordId of planted) await rec.call(async (id) => (await import('/static/js/api.js')).del(`/api/records/${id}`), recordId);
@@ -1005,7 +1010,7 @@ await run(async () => {
   }));
   check(
     'record-rate: a rate-lines save at a date another window emptied reloads, writes nothing and says so under the date heading',
-    writesSent().length === 0 && typeReads('snapshot').length === 1 && typeReads('rate').length === 1 && callout.banner && callout.critical && callout.underHeading &&
+    filledFirst.startsWith('The Silver, troy ounce rate was filled in another window') && writesSent().length === 0 && typeReads('snapshot').length === 1 && typeReads('rate').length === 1 && callout.banner && callout.critical && callout.underHeading &&
       callout.callout === `Another window deleted the recording for ${await format('dayMonth', DH)}. Your prices were not saved. They are still here and are saved with the first holding you record for this date.`,
     JSON.stringify(callout),
   );
@@ -1026,6 +1031,10 @@ await run(async () => {
       refilled.find((p) => p.symbol === 'PAINT')?.rate === '3.5' && refilled.find((p) => p.symbol === 'PAINT').rateSource === 'manual' &&
       refilled.find((p) => p.symbol === 'USD')?.rateSource === 'proposed',
     JSON.stringify(refilled),
+  );
+  check(
+    'record-snapshot: once the first row recorded saves the prices, the Callout saying they were not saved is gone',
+    await ev("document.querySelector('.sweep .callout').hidden"),
   );
   await home();
 
