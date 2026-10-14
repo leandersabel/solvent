@@ -211,10 +211,16 @@ function drawChart({
     valueLabels[at].setAttribute('y', line + 4);
   });
 
+  // An area over one day has no width, so in Percentage, where no dot
+  // marks the day, a one-day range draws its bands as a column the
+  // dot's width (spec/features/net-worth-view.md, Axes).
+  const column = percentage && !spanDays;
   layers.forEach((layer, at) => {
     const fill = fills.get(layer.band);
     for (const [side, opacity] of [['upper', '0.85'], ['lower', '0.45']]) {
-      const d = areaPath(days, stacks.map((s) => s.layers[at][side]), x, y);
+      const d = column
+        ? columnPath(layer[side][0], x(firstDay), y)
+        : areaPath(days, stacks.map((s) => s.layers[at][side]), x, y);
       if (d) {
         root.append(svg('path', { d, fill, 'fill-opacity': opacity, class: 'band', 'data-band': layer.band.id }));
       }
@@ -521,6 +527,13 @@ function areaPath(days, spans, x, y) {
   const tops = outline(days, spans.map((run) => run.map(([, to]) => to)), x, y);
   const bottoms = outline(days, spans.map((run) => run.map(([from]) => from)), x, y);
   return `M${tops.join('L')}L${bottoms.reverse().join('L')}Z`;
+}
+
+/** A one-day band side, [low, high], as a column 8px wide centered on
+ *  `at`, the net-worth dot's diameter. */
+function columnPath([from, to], at, y) {
+  if (from === to) return null;
+  return `M${at - 4},${y(from)}H${at + 4}V${y(to)}H${at - 4}Z`;
 }
 
 /** Where the value axis draws a line: every multiple of a 1, 2 or 5
