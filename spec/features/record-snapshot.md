@@ -1531,8 +1531,10 @@ Editing an existing entry).
     that day's. On a recording and in a holding's list, a published unit
     with no price on a covered date reads "not priced", and an
     owner-priced unit, or one dated before its published prices, shows
-    the date of an earlier price it is valued at. Test:
-    `tests/browser/parts/recording-detail.mjs`.
+    the date of an earlier price it is valued at. On Update values, a
+    price cleared and saved moves the rows measured in it at once.
+    Test: `tests/browser/parts/recording-detail.mjs`,
+    `tests/browser/parts/update-values-cleared-price.mjs`.
 57. (blind) (walk) A second session whose model predates another
     session's recording is refused when it creates at that date: the
     reload runs, nothing is written, not even into free slots, the

@@ -155,7 +155,12 @@ export function sweepView(vault, date, actions = {}) {
     }
     return Boolean(proposals[pressed.unit]);
   };
-  saveAll.addEventListener('click', () => saveRates(vault, sit, block, { say, refused, filledElsewhere, syncSave, emptied, keepTyped }));
+  // The rows convert through what was saved, a cleared price included.
+  const saved = () => {
+    syncSave();
+    for (const row of rows) row.describe();
+  };
+  saveAll.addEventListener('click', () => saveRates(vault, sit, block, { say, refused, filledElsewhere, saved, emptied, keepTyped }));
 
   // A date holding nothing arrives with its rate lines filled in by the
   // proposals for it. A reopened recording asks the source nothing on
@@ -1037,7 +1042,7 @@ const filledCopy = (vault, unit) =>
  *  price that was missing is a complete act and needs no holding
  *  touched alongside it. One confirmation covers every line it updates
  *  or clears. */
-function saveRates(vault, sit, block, { say, refused, filledElsewhere, syncSave, emptied, keepTyped }) {
+function saveRates(vault, sit, block, { say, refused, filledElsewhere, saved, emptied, keepTyped }) {
   const changed = block.lines.filter((line) => line.changed());
   if (changed.some((line) => line.invalid())) {
     for (const line of changed) line.describe();
@@ -1069,7 +1074,7 @@ function saveRates(vault, sit, block, { say, refused, filledElsewhere, syncSave,
     for (const { line } of planned) {
       if (!failed.has(line.unit) || conflicts.includes(line.unit)) line.reset();
     }
-    syncSave();
+    saved();
     const conflictCopy = conflicts.map((unit) => `The ${vault.unitName(unit)} rate was changed in another window, and the line shows what is stored now.`).join(' ');
     say([partialCopy(vault, result), conflictCopy].filter(Boolean).join(' '), { critical: result.failed.length > 0 });
   };
