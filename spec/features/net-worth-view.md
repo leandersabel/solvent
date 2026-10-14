@@ -191,7 +191,9 @@ Interaction, each reading one calendar day (Reading a date):
 - **Legend** entries toggle a band, and hovering one highlights it and
   dims the rest. With a band hidden, the tooltip's net total covers only
   the visible bands, and a line under the chart says so. The hero still
-  counts every band (Hover). A band name too long for its
+  counts every band (Hover). With every band hidden, the plot keeps its
+  value axis, the domain with no extent, and the net-worth line lies on
+  zero. A band name too long for its
   entry wraps, breaking a word only where it has to.
 - **A click on a marked date, or on its tick, opens that date's
   recording** (`record-snapshot.md`, Recording detail), and on any other
@@ -1274,3 +1276,6 @@ rule of the chart (Archived holdings, Ranges and modes).
     band, while the tooltip's net total drops the hidden one. Test:
     `tests/browser/parts/dashboard-net-worth.mjs`,
     `tests/browser/parts/dashboard-review-hero-day.mjs`.
+85. (walk) With every band hidden through the legend, the plot draws its
+    value axis from 0 to 1 with the zero line, and the page logs no
+    error. Test: `tests/browser/parts/dashboard-all-hidden.mjs`.
