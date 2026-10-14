@@ -459,8 +459,10 @@ export function trackEdits(root) {
 }
 
 /** The fields under `root` the person changed, as plain values keyed
- *  by position. Nothing in the result refers to the form or the vault
- *  it was built from. */
+ *  by position, or by the `data-keep` a field carries where the screen
+ *  rebuilt after the unlock can order its fields differently (a sweep
+ *  row and its holding). Nothing in the result refers to the form or
+ *  the vault it was built from. */
 export function editedFields(root) {
   const kept = [];
   fieldsOf(root).forEach((field, index) => {
@@ -468,7 +470,7 @@ export function editedFields(root) {
     if (field.type === 'password' || field.type === 'file' || field.closest('.password-field, [data-keeps-nothing]')) return;
     const value = valueOf(field);
     if (value === baselines.get(field)) return;
-    kept.push({ index, kind: kindOf(field), value });
+    kept.push({ index, key: field.dataset.keep, kind: kindOf(field), value });
   });
   return kept;
 }
@@ -477,11 +479,12 @@ export function editedFields(root) {
  *  each so whatever is derived from a field (the converted figure under
  *  a quantity) follows it. The fields are read again for each value,
  *  because an announced one can rebuild others (a date redraws the rate
- *  lines). A field that is no longer the same kind at that position is
- *  left alone rather than guessed at. */
+ *  lines). A field that is no longer the same kind at that position, or
+ *  a keyed field no longer there, is left alone rather than guessed at. */
 export function restoreFields(root, kept) {
-  for (const { index, kind, value } of kept) {
-    const field = fieldsOf(root)[index];
+  for (const { index, key, kind, value } of kept) {
+    const fields = fieldsOf(root);
+    const field = key === undefined ? fields[index] : fields.find((f) => f.dataset.keep === key);
     if (!field || kindOf(field) !== kind) continue;
     if (field.type === 'checkbox' || field.type === 'radio') field.checked = value === 'true';
     else field.value = value;
