@@ -112,7 +112,8 @@
   before you added the holding.
 - Any figure or rate you recorded can be corrected later.
 - Nothing recalculates your history behind you. A rate published later
-  never changes a figure or a rate already recorded.
+  never changes a figure already recorded, and replaces a rate already
+  recorded only when you choose it.
 - Solvent keeps every figure exactly as you entered it, on any machine.
   Correcting one starts from what you entered, cents included.
 
@@ -120,6 +121,12 @@
 
 - Recording anything refreshes the rate of every currency and metal in
   your vault, for the date you are recording.
+- Changing anything already recorded on a date, a figure, a note or a
+  rate, also looks up the rates that date is missing and saves them
+  with the change.
+- When such a change finds a market rate where you typed one yourself,
+  Solvent asks whether to replace yours with it. Yours stays unless you
+  take it.
 - Solvent looks those rates up for you. Every rate it proposes is one
   you can change.
 - A proposed rate shows the day it is actually for, which on a weekend
