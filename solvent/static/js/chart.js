@@ -76,8 +76,7 @@ export function trendChart(options) {
  *  some.
  *
  *  Pure, so the arithmetic is tested without a page. */
-export function stack(bands, percentage = false, phase = null) {
-  const count = bands.length ? bands[0].points.length : 0;
+export function stack(bands, percentage = false, phase = null, count = bands.length ? bands[0].points.length : 0) {
   const layers = bands.map((band) => ({ band, upper: [], lower: [] }));
   const net = [];
   const sidesAt = (side, index) => bands.map((band) => {
@@ -158,7 +157,9 @@ function drawChart({
   // A day's samples are its value just before it and at it, so a
   // holding's first recording or archive draws as a step.
   const shown = bands.filter((band) => !hidden.has(band.id));
-  const stacks = [stack(shown, percentage, 'before'), stack(shown, percentage)];
+  // Counted from the days, so a chart with every band hidden still has
+  // a net of zero on each.
+  const stacks = [stack(shown, percentage, 'before', days.length), stack(shown, percentage, null, days.length)];
   const { layers, net: netLine } = stacks[1];
 
   let top = 0;
