@@ -835,7 +835,10 @@ function rateLine(vault, unit, date, { sit, readOnly: blockReadOnly, fillMissing
     if (reopened()) {
       explanation.textContent = `No rate was recorded for ${described.name} on this date.`;
     } else {
-      explanation.textContent = `No market rate came back for ${described.name}. Nothing will be recorded for it for this date.`;
+      // A typed price will be recorded, so the line reads as it will once saved.
+      explanation.textContent = line.changed()
+        ? ''
+        : `No market rate came back for ${described.name}. Nothing will be recorded for it for this date.`;
     }
     // A line that went in empty carries its own lookup, since the
     // outage that emptied it is the reason for coming back.

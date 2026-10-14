@@ -279,7 +279,9 @@ Line states:
   (`net-worth-view.md`, Current net worth). The line fills in as soon as
   the source answers. A row recorded in the unit keeps this wording,
   because the unit has a market and only its source is down. Nobody is
-  asked to type a dollar price to record a franc holding. The last price
+  asked to type a dollar price to record a franc holding. A price typed
+  into the line reads "Typed by you" and drops the sentence, because it
+  will be recorded, and the line reads the same once saved. The last price
   is not written again under this date, because that would put a figure
   nobody published into the history under a date it was not published
   for, invisibly.
@@ -1357,7 +1359,8 @@ Editing an existing entry).
 14. (walk) With the rate proxy down, the value still saves, every row
     still records, nothing is written for that unit, and the line says
     so quietly rather than blocking, also once a figure is typed or
-    recorded in that unit. Test:
+    recorded in that unit. Once a price is typed into the line, it reads
+    "Typed by you" and no longer says nothing will be recorded. Test:
     `tests/browser/parts/update-values.mjs`,
     `tests/browser/parts/snapshot-entry.mjs`.
 15. (blind) (walk) A quantity in a unit with no price at all, none
