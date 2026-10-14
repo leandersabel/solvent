@@ -288,7 +288,9 @@ age is stated in words.
   unit included.
 - A one-day history draws one whole dot in the plot's horizontal middle
   under every range, with its date beneath it on the date axis, at
-  desktop and phone width (Reading a date).
+  desktop and phone width (Reading a date). In Percentage, which has no
+  net-worth line or dot, the bands' shares stand there as one column the
+  dot's width, because an area over one day has no width.
 
 #### Breakdown by dimension
 
@@ -1280,3 +1282,8 @@ rule of the chart (Archived holdings, Ranges and modes).
     value axis from 0 to 1 with the zero line, and the page logs no
     error. Test: `tests/browser/parts/dashboard-all-hidden.mjs`,
     `tests/browser/parts/dashboard-review-all-hidden.mjs`.
+86. (blind) (walk) With a single recording, made today, at 1280px and
+    390px, Percentage draws the band as a column centered on the plot's
+    horizontal middle within half a pixel, of nonzero width and wholly
+    inside the plot, from 0% to 100%. Test:
+    `tests/browser/parts/dashboard-one-day-percentage.mjs`.
