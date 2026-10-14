@@ -863,6 +863,16 @@ await run(async () => {
     [typedOutage, recordedOutage].every((s) => s.says === 'No market rate came back for USD. Nothing will be recorded for it for this date.'),
     JSON.stringify([typedOutage, recordedOutage]),
   );
+  await typeLine('USD', '0.8');
+  const pricedOutage = await lineState('USD');
+  await typeLine('USD', '');
+  const clearedOutage = await lineState('USD');
+  check(
+    'record-snapshot: with the proxy down, a price typed into the line reads Typed by you and no longer says nothing will be recorded, until it is cleared',
+    pricedOutage.chip === 'Typed by you' && pricedOutage.says === '' &&
+      clearedOutage.says === 'No market rate came back for USD. Nothing will be recorded for it for this date.',
+    JSON.stringify([pricedOutage, clearedOutage]),
+  );
 
   proxy.mode = 'none';
   await plantHere([{
