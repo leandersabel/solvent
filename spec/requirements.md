@@ -124,8 +124,12 @@
   you can change.
 - A proposed rate shows the day it is actually for, which on a weekend
   or a holiday is an earlier day.
-- A failed lookup never stops you recording. Every figure in Solvent can
-  be entered by hand.
+- A figure in anything but your main currency is saved only with a rate
+  for its date, because without one the chart would count the holding as
+  zero on that day.
+- When a lookup fails, you type the rate yourself, with the last rate you
+  have for it shown for reference. Every rate in Solvent can be entered
+  by hand.
 - A price nobody publishes, such as your flat per square meter, is one
   you set yourself.
 - Prices come from free public sources with nobody answerable for them.
