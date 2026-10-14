@@ -1286,4 +1286,5 @@ rule of the chart (Archived holdings, Ranges and modes).
     390px, Percentage draws the band as a column centered on the plot's
     horizontal middle within half a pixel, of nonzero width and wholly
     inside the plot, from 0% to 100%. Test:
-    `tests/browser/parts/dashboard-one-day-percentage.mjs`.
+    `tests/browser/parts/dashboard-one-day-percentage.mjs`,
+    `tests/browser/parts/dashboard-review-one-day-percentage.mjs`.
