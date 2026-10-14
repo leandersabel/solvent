@@ -1362,7 +1362,8 @@ Editing an existing entry).
     recorded in that unit. Once a price is typed into the line, it reads
     "Typed by you" and no longer says nothing will be recorded. Test:
     `tests/browser/parts/update-values.mjs`,
-    `tests/browser/parts/snapshot-entry.mjs`.
+    `tests/browser/parts/snapshot-entry.mjs`,
+    `tests/browser/parts/update-values-review-outage-typed.mjs`.
 15. (blind) (walk) A quantity in a unit with no price at all, none
     typed, saves with the save control live throughout, writes one
     `snapshot`, and the holding is listed as not priced. Asserted for a
