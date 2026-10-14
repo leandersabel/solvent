@@ -511,7 +511,10 @@ rule.
   ever part of or triggers a price request, in any field or encoding
   (`rate-lookup.md`, Endpoint).
 - Locking mid-sweep keeps what is typed and unsaved and discards
-  everything else (`login.md`, Rules).
+  everything else (`login.md`, Rules). What was typed comes back in the
+  row of the holding, or the line of the unit, it was typed for, also
+  where the sweep drawn after the unlock orders its rows or lines
+  differently.
 
 ### Recording detail
 
@@ -1832,3 +1835,7 @@ Editing an existing entry).
      what is stored now." for that unit, never that the date already
      has a recording. Test: `tests/browser/parts/update-values.mjs`,
      `tests/browser/parts/update-values-review-filled-elsewhere.mjs`.
+116. (walk) After a lock and unlock on the sweep, each figure typed and
+     not saved is back in the row of the holding it was typed for, also
+     when a holding added meanwhile moves the rows, and no other row
+     holds it. Test: `tests/browser/parts/update-values-lock-order.mjs`.

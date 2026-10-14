@@ -261,6 +261,7 @@ function sweepRow(vault, holding, date, { sit, block, refused, closed, ensurePri
     class: 'quantity',
     'aria-label': `${holding.payload.name} value`,
     'aria-describedby': `sweep-line-${holding.recordId}`,
+    'data-keep': `holding-${holding.recordId}`,
   });
   const unit = vault.unitOf(holding.payload.unit);
   const suffix = el('span', { class: 'unit-suffix', text: unit.currency ? unit.symbol : unit.short });
@@ -645,6 +646,7 @@ function rateLine(vault, unit, date, { sit, readOnly: blockReadOnly, fillMissing
     class: 'quantity',
     'aria-label': `${described.name} rate`,
     'aria-describedby': lineId,
+    'data-keep': lineId,
   });
   const shown = el('span', { class: 'rate-figure' });
   const provenance = el('span', { class: 'chip' });
