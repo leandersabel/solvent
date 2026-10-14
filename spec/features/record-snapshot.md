@@ -1835,7 +1835,11 @@ Editing an existing entry).
      what is stored now." for that unit, never that the date already
      has a recording. Test: `tests/browser/parts/update-values.mjs`,
      `tests/browser/parts/update-values-review-filled-elsewhere.mjs`.
-116. (walk) After a lock and unlock on the sweep, each figure typed and
-     not saved is back in the row of the holding it was typed for, also
-     when a holding added meanwhile moves the rows, and no other row
-     holds it. Test: `tests/browser/parts/update-values-lock-order.mjs`.
+116. (walk) After a lock and unlock, each figure typed and not saved on
+     the sweep is back in the row of the holding it was typed for, and
+     each price on the sweep or the single-holding form on the line of
+     its unit, also when a holding added meanwhile moves the rows or
+     lines, and no other row or line holds it. Test:
+     `tests/browser/parts/update-values-lock-order.mjs`,
+     `tests/browser/parts/update-values-review-lock-order.mjs`,
+     `tests/browser/parts/snapshot-entry-review-lock-order.mjs`.
