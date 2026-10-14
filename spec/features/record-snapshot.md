@@ -1857,4 +1857,5 @@ Editing an existing entry).
      rate-lines save, a banner shown before that save is gone, and the
      Callout saying the prices were not saved is gone once the first
      holding recorded for the date has saved them. Test:
-     `tests/browser/parts/update-values.mjs`.
+     `tests/browser/parts/update-values.mjs`,
+     `tests/browser/parts/update-values-review-emptied-notice.mjs`.
