@@ -1,5 +1,5 @@
 // The hero's arrangement, written from spec/features/net-worth-view.md
-// alone (Hero figure; At phone width; acceptance criterion 86) and
+// alone (Hero figure; At phone width; acceptance criterion 87) and
 // design-system.md (Typography). While the dashboard is at least 1100px
 // wide, gross assets and gross liabilities sit at the right, level with
 // the foot of the total, each behind a hairline rule, with New recording
@@ -132,7 +132,7 @@ await run(async () => {
     const l = await atWidth(width);
     const [assets, liabilities] = l.parts;
     check(`net-worth-view: at ${width}px no part of the hero lies over another`, apart(l).length === 0, `${apart(l).join(', ')} ${JSON.stringify({ total: l.totalInk, assets: assets.box })}`);
-    // Below 1100px of dashboard the hero's arrangement is not criterion 86's.
+    // Below 1100px of dashboard the hero's arrangement is not criterion 87's.
     if (l.dashboard < LEVEL_FROM) continue;
     rows += 1;
     const level = (part) => near(part.foot.baseline, l.totalFoot.baseline, 4) || near(part.foot.ink, l.totalFoot.ink, 4);
