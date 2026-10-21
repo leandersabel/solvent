@@ -152,7 +152,7 @@ jobs:
       # same. The run's own token reads and nothing more.
       - if: steps.plan.outputs.features != '[]'
         timeout-minutes: 45
-        uses: anthropics/claude-code-action@6fed3ca145920b639991cb756090506e1bcaf515 # v1.0.245
+        uses: anthropics/claude-code-action@a26b07d8c778b0c43f64618e5fd29fd0f8af72e8 # v1.0.250
         env:
           CLAUDE_CODE_DISABLE_BACKGROUND_TASKS: "1"
           GH_TOKEN: ${{ github.token }}
