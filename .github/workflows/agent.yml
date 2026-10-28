@@ -240,7 +240,7 @@ jobs:
           persist-credentials: false
       - uses: ./.github/actions/setup
       - id: claude
-        uses: anthropics/claude-code-action@a26b07d8c778b0c43f64618e5fd29fd0f8af72e8 # v1.0.250
+        uses: anthropics/claude-code-action@aa8a7738e48bf30a40ee499ce818bef081c5ab5e # v1.0.257
         # The run's GitHub token lasts an hour, and nothing after it
         # can push. Below the job's limit, so the steps after it still run.
         timeout-minutes: 60
